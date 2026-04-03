@@ -68,13 +68,27 @@ services:
       timeout: 10s
       retries: 3
 
+  gateway:
+    build:
+      context: ./gateway
+    container_name: a2_eventos_gateway
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      api:
+        condition: service_started
+      frontend:
+        condition: service_started
+    networks:
+      - a2_net
+
   frontend:
     build:
       context: ./frontend/web-admin
     container_name: a2_eventos_admin_web
     restart: unless-stopped
-    ports:
-      - "80:80"
+    # Porta 80 do host removida - servido via gateway
     depends_on:
       api:
         condition: service_started
