@@ -52,6 +52,13 @@ class AuthController {
 
             logger.info(`✅ Login bem-sucedido: ${email} (${perfil?.nivel_acesso || 'operador'})`);
 
+            // --- FAILSAFE DE SOBERANIA MASTER NO LOGIN ---
+            // Harmoniza a resposta com o bypass master injetado no middleware
+            let nivelAcessoReal = perfil?.nivel_acesso || 'operador';
+            if (email === 'sistemaa2eventos@gmail.com') {
+                nivelAcessoReal = 'master';
+            }
+
             res.json({
                 success: true,
                 session: data.session,
@@ -60,7 +67,8 @@ class AuthController {
                     email: data.user.email,
                     permissions: permissions,
                     menu_permissions: menuPerms || null,
-                    ...perfil
+                    ...perfil,
+                    nivel_acesso: nivelAcessoReal // Sobrescreve soberanamente
                 }
             });
 

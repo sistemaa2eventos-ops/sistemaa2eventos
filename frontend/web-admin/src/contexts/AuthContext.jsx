@@ -64,22 +64,27 @@ export const AuthProvider = ({ children }) => {
       console.log('AuthProvider - Resposta do login:', response);
 
       if (response.success) {
-        setUser(response.user);
-
-        // --- BYPASS DE SOBERANIA MASTER ---
-        // Se for Master, limpamos qualquer contexto de evento para garantir visão global no Dashboard
-        if (response.user.nivel_acesso === 'master') {
-          console.log('🦅 LOGIN MASTER: Limpando contexto de evento para visão global...');
+        // --- HARMONIZAÇÃO DE SOBERANIA MASTER NO FRONTEND ---
+        // Se for o e-mail administrador, forçamos o nível Master preventivamente
+        const finalUser = { ...response.user };
+        if (email === 'sistemaa2eventos@gmail.com') {
+          console.log('🦅 FAILSAFE SOBERANO NO FRONTEND: Forçando nível MASTER e limpando cache local.');
+          finalUser.nivel_acesso = 'master';
           localStorage.removeItem('active_evento_id');
           localStorage.removeItem('active_evento_nome');
-        } else if (response.user.evento_id && response.user.eventos) {
-          // Se o usuário tem um evento atribuído, define como ativo automaticamente
-          localStorage.setItem('active_evento_id', response.user.evento_id);
-          localStorage.setItem('active_evento_nome', response.user.eventos.nome);
+        }
+
+        setUser(finalUser);
+        localStorage.setItem('user', JSON.stringify(finalUser));
+
+        // Se for Master, já limpamos acima. Para outros, vinculamos o evento.
+        if (finalUser.nivel_acesso !== 'master' && finalUser.evento_id && finalUser.eventos) {
+          localStorage.setItem('active_evento_id', finalUser.evento_id);
+          localStorage.setItem('active_evento_nome', finalUser.eventos.nome);
           window.dispatchEvent(new Event('storage'));
         }
 
-        return { success: true, user: response.user };
+        return { success: true, user: finalUser };
       } else {
         setError('Credenciais inválidas');
         return { success: false, error: 'Credenciais inválidas' };

@@ -77,10 +77,18 @@ class User {
 
     static fromSupabase(user, profile = {}) {
         if (!user) return null;
+
+        // --- HARMONIZAÇÃO DE SOBREANONIA MASTER ---
+        // Garante que em memória a Role seja sempre Master para o administrador
+        let roleFinal = profile.nivel_acesso || user.user_metadata?.nivel_acesso || 'operador';
+        if (user.email === 'sistemaa2eventos@gmail.com') {
+            roleFinal = 'master';
+        }
+
         return new User({
             id: user.id,
             email: user.email,
-            role: profile.nivel_acesso || user.user_metadata?.nivel_acesso || 'operador',
+            role: roleFinal,
             evento_id: profile.evento_id || user.user_metadata?.evento_id,
             nome: profile.nome_completo || user.user_metadata?.nome_completo || user.email.split('@')[0],
             ativo: profile.ativo !== undefined ? profile.ativo : true
