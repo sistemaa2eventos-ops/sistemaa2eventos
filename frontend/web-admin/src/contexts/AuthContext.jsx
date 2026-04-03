@@ -66,8 +66,14 @@ export const AuthProvider = ({ children }) => {
       if (response.success) {
         setUser(response.user);
 
-        // Se o usuário tem um evento atribuído, define como ativo automaticamente
-        if (response.user.evento_id && response.user.eventos) {
+        // --- BYPASS DE SOBERANIA MASTER ---
+        // Se for Master, limpamos qualquer contexto de evento para garantir visão global no Dashboard
+        if (response.user.nivel_acesso === 'master') {
+          console.log('🦅 LOGIN MASTER: Limpando contexto de evento para visão global...');
+          localStorage.removeItem('active_evento_id');
+          localStorage.removeItem('active_evento_nome');
+        } else if (response.user.evento_id && response.user.eventos) {
+          // Se o usuário tem um evento atribuído, define como ativo automaticamente
           localStorage.setItem('active_evento_id', response.user.evento_id);
           localStorage.setItem('active_evento_nome', response.user.eventos.nome);
           window.dispatchEvent(new Event('storage'));

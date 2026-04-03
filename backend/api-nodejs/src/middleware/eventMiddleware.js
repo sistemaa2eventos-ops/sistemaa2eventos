@@ -37,9 +37,14 @@ async function requireEvent(req, res, next) {
             .eq('id', eventoId)
             .single();
 
-        if (error || !evento) {
+        if ((error || !evento) && req.user.role !== 'master') {
             logger.warn(`Usuário ${req.user.id} tentou acessar evento inexistente: ${eventoId}`);
             return res.status(404).json({ error: 'Nexus de evento não encontrado ou inválido.' });
+        }
+
+        // Se for Master e o evento não existir, permitimos prosseguir (bypass de lixo de cache)
+        if (!evento && req.user.role === 'master') {
+            return next();
         }
 
         // Bloquear acesso se o evento não estiver ativo (exceto para Admin que pode estar configurando)

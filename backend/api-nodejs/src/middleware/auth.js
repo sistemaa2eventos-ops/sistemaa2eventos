@@ -48,18 +48,27 @@ async function authenticate(req, res, next) {
         let role = user.app_metadata?.nivel_acesso || user.app_metadata?.role || user.user_metadata?.nivel_acesso || 'operador';
 
         // --- FAILSAFE SOBERANO: Busca em tempo real se o Token estiver desatualizado ---
+        // Adicionado: Failsafe por e-mail para garantir soberania absoluta do sistemaa2eventos
         if (role !== 'master') {
-            const { data: dbPerfil } = await supabase
-                .from('perfis')
-                .select('nivel_acesso, evento_id')
-                .eq('id', user.id)
-                .maybeSingle();
-            
-            console.log(`🔍 AUDITORIA AUTH [${user.email}]: JWT=${role}, DB=${dbPerfil?.nivel_acesso}`);
-            
-            if (dbPerfil?.nivel_acesso === 'master') {
-                console.log('🦅 SOBERANIA MASTER DETECTADA NO BANCO! Fazendo bypass de token...');
+            if (user.email === 'sistemaa2eventos@gmail.com') {
+                console.log('🦅 FAILSAFE DE E-MAIL ACIONADO! Soberania absoluta garantida para o administrador.');
                 role = 'master';
+            } else {
+                const { data: dbPerfil } = await supabase
+                    .from('perfis')
+                    .select('nivel_acesso, evento_id')
+                    .eq('id', user.id)
+                    .maybeSingle();
+                
+                console.log(`🔍 AUDITORIA AUTH [${user.email}]: JWT=${role}, DB=${dbPerfil?.nivel_acesso}`);
+                
+                if (dbPerfil?.nivel_acesso === 'master') {
+                    console.log('🦅 SOBERANIA MASTER DETECTADA NO BANCO! Fazendo bypass de token...');
+                    role = 'master';
+                }
+            }
+
+            if (role === 'master') {
                 user.app_metadata = { ...user.app_metadata, nivel_acesso: 'master' };
             }
         }
