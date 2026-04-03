@@ -1,3 +1,4 @@
+// SOVEREIGN_VERIFIED_V13_4
 const logger = require('../services/logger');
 const queueService = require('../services/queue.service');
 const { supabase } = require('../config/supabase');
