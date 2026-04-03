@@ -5,6 +5,8 @@
  */
 
 const allowedOrigins = [
+    'https://painel.nzt.app.br',
+    'https://api.nzt.app.br',
     'http://localhost',
     'http://127.0.0.1',
     'http://localhost:3000',
