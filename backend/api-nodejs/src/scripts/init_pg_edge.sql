@@ -54,4 +54,39 @@ CREATE INDEX idx_pessoas_evento ON pessoas(evento_id);
 CREATE INDEX idx_pessoas_status ON pessoas(status_acesso);
 CREATE INDEX idx_logs_sincronizacao ON logs_acesso(sincronizado) WHERE sincronizado = false;
 -- Índice HNSW para Busca Supersônica de Rostos na Borda
-CREATE INDEX idx_pessoas_face_embedding ON pessoas USING hnsw (face_embedding vector_cosine_ops);
+CREATE INDEX IF NOT EXISTS idx_pessoas_face_embedding ON pessoas USING hnsw (face_embedding vector_cosine_ops);
+
+-- Configurações Globais do Sistema (SaaS/Local)
+CREATE TABLE IF NOT EXISTS system_settings (
+    id SERIAL PRIMARY KEY,
+    theme_neon_enabled BOOLEAN DEFAULT TRUE,
+    language VARCHAR(10) DEFAULT 'pt-BR',
+    biometric_login_enabled BOOLEAN DEFAULT TRUE,
+    cloud_sync_enabled BOOLEAN DEFAULT TRUE,
+    api_url TEXT DEFAULT 'https://api.nzt.app.br/api',
+    alert_operator_login BOOLEAN DEFAULT FALSE,
+    alert_event_peak BOOLEAN DEFAULT TRUE,
+    biometric_sensitivity INTEGER DEFAULT 85,
+    liveness_check_enabled BOOLEAN DEFAULT TRUE,
+    anti_passback_enabled BOOLEAN DEFAULT TRUE,
+    anti_passback_cooldown_min INTEGER DEFAULT 15,
+    auto_checkout_timeout_min INTEGER DEFAULT 300,
+    capacity_hard_block_enabled BOOLEAN DEFAULT TRUE,
+    gamification_enabled BOOLEAN DEFAULT FALSE,
+    -- Campos de Comunicação (v16.2)
+    smtp_enabled BOOLEAN DEFAULT FALSE,
+    smtp_host TEXT,
+    smtp_port INTEGER DEFAULT 465,
+    smtp_email TEXT,
+    smtp_user TEXT,
+    smtp_pass TEXT,
+    wpp_enabled BOOLEAN DEFAULT FALSE,
+    wpp_provider VARCHAR(50) DEFAULT 'twilio',
+    wpp_token TEXT,
+    wpp_phone_id TEXT,
+    capacity_vip_bypass BOOLEAN DEFAULT FALSE,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Garantir registro inicial de soberania
+INSERT INTO system_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;

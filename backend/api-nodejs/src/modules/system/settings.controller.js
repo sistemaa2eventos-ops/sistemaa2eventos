@@ -9,14 +9,6 @@ class SettingsController {
     async getSettings(req, res) {
         try {
             const conn = await getConnection();
-
-            // Tenta buscar a config
-            let result = await conn.request()
-                .input('id', sql.Int, 1)
-                .query(`SELECT * FROM system_settings WHERE id = @id`);
-
-            let settings = result.recordset[0];
-
             // Fallback se n existir
             if (!settings) {
                 settings = {
