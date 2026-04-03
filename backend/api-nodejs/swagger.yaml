@@ -1,0 +1,244 @@
+openapi: 3.0.0
+info:
+  title: A2 Eventos API
+  description: API para controle de acesso e credenciamento de eventos
+  version: 1.0.0
+  contact:
+    name: Suporte A2 Eventos
+    email: suporte@a2eventos.com.br
+
+servers:
+  - url: http://localhost:3001/api
+    description: Servidor de Desenvolvimento
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    Funcionario:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nome:
+          type: string
+        cpf:
+          type: string
+        funcao:
+          type: string
+        status_acesso:
+          type: string
+          enum: [pendente, checkin, checkout, expulso]
+        fase_montagem:
+          type: boolean
+        fase_showday:
+          type: boolean
+        fase_desmontagem:
+          type: boolean
+        foto_url:
+          type: string
+        qr_code:
+          type: string
+
+    AccessLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tipo:
+          type: string
+          enum: [checkin, checkout, expulsao]
+        metodo:
+          type: string
+          enum: [qrcode, face, manual, fast-track]
+        confianca:
+          type: number
+          format: float
+        created_at:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+paths:
+  /auth/login:
+    post:
+      summary: Login do usuário
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        200:
+          description: Login realizado com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  session:
+                    type: object
+                  user:
+                    type: object
+        401:
+          description: Credenciais inválidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /funcionarios:
+    get:
+      summary: Lista funcionários
+      tags: [Funcionarios]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: status_acesso
+          schema:
+            type: string
+            enum: [pendente, checkin, checkout, expulso]
+      responses:
+        200:
+          description: Lista de funcionários
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Funcionario'
+                  pagination:
+                    type: object
+
+    post:
+      summary: Cria novo funcionário
+      tags: [Funcionarios]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nome, cpf]
+              properties:
+                nome:
+                  type: string
+                cpf:
+                  type: string
+                funcao:
+                  type: string
+                empresa_id:
+                  type: string
+                  format: uuid
+                fase_montagem:
+                  type: boolean
+                fase_showday:
+                  type: boolean
+                fase_desmontagem:
+                  type: boolean
+      responses:
+        201:
+          description: Funcionário criado
+        400:
+          description: Dados inválidos
+
+  /access/checkin/qrcode:
+    post:
+      summary: Check-in via QR Code
+      tags: [Access]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [qrCode]
+              properties:
+                qrCode:
+                  type: string
+                dispositivoId:
+                  type: string
+      responses:
+        200:
+          description: Check-in realizado
+        404:
+          description: Credencial não encontrada
+
+  /sync/status:
+    get:
+      summary: Status da sincronização
+      tags: [Sync]
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Status do sistema de sincronização
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      lastSync:
+                        type: string
+                        format: date-time
+                      pending:
+                        type: integer
+                      synced:
+                        type: integer
+                      retryQueue:
+                        type: integer

@@ -1,0 +1,20 @@
+{
+    "tabs": {
+        "dashboard": "Zusammenfassung",
+        "checkin": "Check-in",
+        "settings": "Einstellungen"
+    },
+    "checkin": {
+        "scan_prompt": "Richten Sie die Kamera auf den QR-Code",
+        "success": "Check-in erfolgreich!",
+        "error_not_found": "Anmeldeinformationen nicht gefunden.",
+        "button_switch": "Kamera wechseln",
+        "button_manual": "Manuelle Suche"
+    },
+    "settings": {
+        "title": "Einstellungen",
+        "logout": "Abmelden",
+        "sync": "Daten synchronisieren",
+        "offline_mode": "Offline-Modus"
+    }
+}

@@ -1,0 +1,20 @@
+{
+    "tabs": {
+        "dashboard": "Resumo",
+        "checkin": "Check-in",
+        "settings": "Ajustes"
+    },
+    "checkin": {
+        "scan_prompt": "Aponte a câmera para o QR Code",
+        "success": "Check-in realizado com sucesso!",
+        "error_not_found": "Credencial não encontrada.",
+        "button_switch": "Inverter Câmera",
+        "button_manual": "Busca Manual"
+    },
+    "settings": {
+        "title": "Configurações",
+        "logout": "Sair da Conta",
+        "sync": "Sincronizar Dados",
+        "offline_mode": "Modo Offline"
+    }
+}

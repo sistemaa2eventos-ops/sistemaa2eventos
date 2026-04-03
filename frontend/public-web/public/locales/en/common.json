@@ -1,0 +1,15 @@
+{
+    "registration": {
+        "title": "Official Registration",
+        "subtitle": "Fill in your details to request access.",
+        "document": "Document / Passport",
+        "full_name": "Full Name",
+        "email": "Professional Email",
+        "phone": "Phone / WhatsApp",
+        "company": "Company / Organization",
+        "role": "Job Title / Role",
+        "submit": "SUBMIT REQUEST",
+        "success_message": "Your request has been submitted. Please wait for the confirmation email.",
+        "error_message": "An error occurred while processing your registration."
+    }
+}

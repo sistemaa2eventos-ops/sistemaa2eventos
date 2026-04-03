@@ -1,0 +1,16 @@
+{
+    "short_name": "A2 Eventos",
+    "name": "A2 Eventos Nexus Edge",
+    "icons": [
+        {
+            "src": "/vite.svg",
+            "type": "image/svg+xml",
+            "sizes": "512x512"
+        }
+    ],
+    "start_url": ".",
+    "display": "standalone",
+    "theme_color": "#050B18",
+    "background_color": "#050B18",
+    "orientation": "any"
+}

@@ -1,0 +1,21 @@
+{
+    "sidebar": {
+        "dashboard": "Übersicht",
+        "events": "Veranstaltungen",
+        "people": "Personen",
+        "reports": "Berichte",
+        "monitor": "Live-Monitor",
+        "devices": "Geräte",
+        "settings": "Einstellungen",
+        "logout": "Abmelden"
+    },
+    "dashboard": {
+        "title": "Zusammenfassung",
+        "total_events": "Alle Veranstaltungen",
+        "total_people": "Alle Personen",
+        "active_devices": "Aktive Geräte",
+        "total_accesses": "Erfasste Zugriffe",
+        "recent_events": "Aktuelle Veranstaltungen",
+        "recent_activity": "Kürzliche Aktivität"
+    }
+}

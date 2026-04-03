@@ -1,0 +1,21 @@
+{
+    "sidebar": {
+        "dashboard": "Dashboard",
+        "events": "Eventos",
+        "people": "Pessoas",
+        "reports": "Relatórios",
+        "monitor": "Monitor Real-time",
+        "devices": "Dispositivos",
+        "settings": "Configurações",
+        "logout": "Sair"
+    },
+    "dashboard": {
+        "title": "Visão Geral",
+        "total_events": "Total de Eventos",
+        "total_people": "Total de Pessoas",
+        "active_devices": "Dispositivos Ativos",
+        "total_accesses": "Acessos Registrados",
+        "recent_events": "Eventos Recentes",
+        "recent_activity": "Atividade Recente"
+    }
+}
