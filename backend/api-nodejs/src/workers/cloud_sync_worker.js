@@ -1,6 +1,6 @@
 const logger = require('../services/logger');
 const queueService = require('../services/queue.service');
-const { supabase } = require('../../config/supabase');
+const { supabase } = require('../config/supabase');
 const { getConnection, sql } = require('../../config/database');
 
 class CloudSyncWorker {
