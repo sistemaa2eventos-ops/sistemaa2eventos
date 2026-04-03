@@ -78,7 +78,7 @@ const corsOptions = {
     credentials: true
 };
 
-app.use(cors(corsOptions));
+// app.use(cors(corsOptions)); // DESATIVADO: Gateway (Nginx) centraliza a autoridade de CORS (v15.0)
 app.use(compression());
 app.use(express.json({ limit: '10mb' })); // Limite de 10mb para segurança
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
