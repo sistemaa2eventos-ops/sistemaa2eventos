@@ -13,7 +13,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ ./src/
-COPY .env .
+# O .env agora é injetado via docker-compose para flexibilidade total
+# COPY .env .
 
 RUN mkdir -p logs
 
