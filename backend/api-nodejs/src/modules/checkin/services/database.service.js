@@ -3,7 +3,7 @@ const { getConnection: getMsSql, sql } = require('../../../config/database');
 const { getPgConnection } = require('../../../config/pgEdge');
 const logger = require('../../../services/logger');
 const websocketService = require('../../../services/websocketService');
-const queueService = require('./queue.service');
+const queueService = require('../../../services/queue.service');
 
 class DatabaseService {
     async logDeniedAccess(evento_id, pessoa_id, metodo, dispositivo_id, created_by, motivo) {
