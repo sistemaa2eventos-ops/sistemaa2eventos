@@ -47,7 +47,7 @@ CREATE TABLE perfis (
     nome_completo VARCHAR(200) NOT NULL,
     avatar_url TEXT,
     nivel_acesso VARCHAR(20) NOT NULL DEFAULT 'operador' 
-        CHECK (nivel_acesso IN ('admin', 'supervisor', 'operador')),
+        CHECK (nivel_acesso IN ('master', 'admin', 'supervisor', 'operador')),
     documento VARCHAR(20),
     telefone VARCHAR(20),
     ativo BOOLEAN DEFAULT true,
