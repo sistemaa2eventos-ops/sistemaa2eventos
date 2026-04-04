@@ -386,16 +386,23 @@ class AuthController {
                 return res.status(400).json({ error: 'evento_id é obrigatório' });
             }
 
+            // --- AUTO-CURA SOBERANA (v19.0) ---
+            // Se o perfil não existir (ex: após Clean Ground), o UPSERT criará o registro físico.
             const { data, error } = await supabase
                 .from('perfis')
-                .update({ evento_id, updated_at: new Date() })
-                .eq('id', userId)
+                .upsert({ 
+                    id: userId,
+                    evento_id, 
+                    nome_completo: req.user.nome_completo || req.user.email,
+                    nivel_acesso: req.user.role || 'operador', // Failsafe 'master' via login middleware
+                    updated_at: new Date() 
+                }, { onConflict: 'id' })
                 .select()
                 .single();
 
             if (error) throw error;
 
-            logger.info(`🔗 Evento vinculado ao usuário: ${userId} -> ${evento_id}`);
+            logger.info(`🔗 Evento vinculado com Auto-Cura: ${userId} -> ${evento_id}`);
 
             res.json({
                 success: true,
@@ -404,7 +411,7 @@ class AuthController {
             });
 
         } catch (error) {
-            logger.error('Erro ao vincular evento:', error);
+            logger.error('Erro ao vincular evento (Auto-Cura):', error);
             res.status(500).json({ error: 'Erro interno no servidor' });
         }
     }
