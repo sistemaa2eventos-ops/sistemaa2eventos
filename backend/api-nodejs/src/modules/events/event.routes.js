@@ -9,7 +9,7 @@ router.use(authenticate);
 router.get('/', eventoController.list);
 router.get('/:id', eventoController.getById);
 router.get('/:id/stats', authorize('admin', 'supervisor'), eventoController.getStats);
-router.post('/', authorize('admin'), eventoController.create);
+router.post('/', authorize('master'), eventoController.create);
 router.put('/:id', authorize('admin'), eventoController.update);
 router.patch('/:id/activate', authorize('admin'), eventoController.activate);
 router.patch('/:id/deactivate', authorize('admin'), eventoController.deactivate);
