@@ -203,3 +203,150 @@ CREATE TABLE monitor_watchlist (
 
 ALTER TABLE monitor_watchlist ENABLE ROW LEVEL SECURITY;
 CREATE POLICY master_all_access_watchlist ON monitor_watchlist FOR ALL USING (auth.jwt() ->> 'email' = 'sistemaa2eventos@gmail.com');
+
+-- ============================================
+-- EXPANSÃO NEXUS: LOGÍSTICA E FROTA
+-- ============================================
+CREATE TABLE IF NOT EXISTS veiculos (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    placa VARCHAR(20) UNIQUE NOT NULL,
+    modelo VARCHAR(100) NOT NULL,
+    empresa_id UUID REFERENCES empresas(id) ON DELETE CASCADE,
+    motorista_id UUID REFERENCES pessoas(id) ON DELETE SET NULL,
+    criado_em TIMESTAMP DEFAULT NOW(),
+    atualizado_em TIMESTAMP DEFAULT NOW()
+);
+
+-- ============================================
+-- EXPANSÃO NEXUS: GESTÃO DOCUMENTAL
+-- ============================================
+CREATE TABLE IF NOT EXISTS empresa_documentos (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    empresa_id UUID NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
+    titulo VARCHAR(200) NOT NULL,
+    tipo_doc VARCHAR(100) NOT NULL,
+    url_arquivo TEXT NOT NULL,
+    status VARCHAR(20) DEFAULT 'pendente' CHECK (status IN ('pendente', 'aprovado', 'rejeitado')),
+    notas_auditoria TEXT,
+    revisado_por_user_id UUID REFERENCES auth.users(id),
+    data_revisao TIMESTAMP,
+    data_emissao DATE,
+    data_validade DATE,
+    data_inclusao TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS pessoa_documentos (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pessoa_id UUID NOT NULL REFERENCES pessoas(id) ON DELETE CASCADE,
+    titulo VARCHAR(200) NOT NULL,
+    tipo_doc VARCHAR(100) NOT NULL,
+    url_arquivo TEXT NOT NULL,
+    status VARCHAR(20) DEFAULT 'pendente' CHECK (status IN ('pendente', 'aprovado', 'rejeitado')),
+    notas_auditoria TEXT,
+    revisado_por_user_id UUID REFERENCES auth.users(id),
+    data_revisao TIMESTAMP,
+    data_emissao DATE,
+    data_validade DATE,
+    data_inclusao TIMESTAMP DEFAULT NOW()
+);
+
+-- ============================================
+-- EXPANSÃO NEXUS: INFRAESTRUTURA FÍSICA
+-- ============================================
+CREATE TABLE IF NOT EXISTS evento_areas (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    evento_id UUID NOT NULL REFERENCES eventos(id) ON DELETE CASCADE,
+    nome_area VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS evento_tipos_pulseira (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    evento_id UUID NOT NULL REFERENCES eventos(id) ON DELETE CASCADE,
+    nome_tipo VARCHAR(100) NOT NULL,
+    cor_hex VARCHAR(7),
+    numero_inicial INTEGER DEFAULT 0,
+    numero_final INTEGER DEFAULT 0,
+    tipo_leitura VARCHAR(30) DEFAULT 'qr_code'
+);
+
+CREATE TABLE IF NOT EXISTS pulseira_areas_permitidas (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pulseira_id UUID NOT NULL REFERENCES evento_tipos_pulseira(id) ON DELETE CASCADE,
+    area_id UUID NOT NULL REFERENCES evento_areas(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS evento_etiqueta_layouts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    evento_id UUID UNIQUE NOT NULL REFERENCES eventos(id) ON DELETE CASCADE,
+    papel_config JSONB DEFAULT '{}',
+    elementos JSONB DEFAULT '[]',
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- ============================================
+-- EXPANSÃO NEXUS: INTELIGÊNCIA DE SISTEMA
+-- ============================================
+CREATE TABLE IF NOT EXISTS system_settings (
+    id INTEGER PRIMARY KEY,
+    theme_neon_enabled BOOLEAN DEFAULT true,
+    language VARCHAR(10) DEFAULT 'pt-BR',
+    biometric_login_enabled BOOLEAN DEFAULT true,
+    cloud_sync_enabled BOOLEAN DEFAULT true,
+    api_url TEXT,
+    alert_operator_login BOOLEAN DEFAULT false,
+    alert_event_peak BOOLEAN DEFAULT true,
+    biometric_sensitivity INTEGER DEFAULT 85,
+    liveness_check_enabled BOOLEAN DEFAULT true,
+    anti_passback_enabled BOOLEAN DEFAULT true,
+    anti_passback_cooldown_min INTEGER DEFAULT 15,
+    auto_checkout_timeout_min INTEGER DEFAULT 300,
+    capacity_hard_block_enabled BOOLEAN DEFAULT true,
+    gamification_enabled BOOLEAN DEFAULT false,
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS system_api_keys (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    token TEXT UNIQUE NOT NULL,
+    expires_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS system_webhooks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    trigger_event VARCHAR(100) NOT NULL,
+    target_url TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- ============================================
+-- BLINDAGEM RLS SOBERANA (v26.0)
+-- ============================================
+ALTER TABLE veiculos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE empresa_documentos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pessoa_documentos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE evento_areas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE evento_tipos_pulseira ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pulseira_areas_permitidas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE evento_etiqueta_layouts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE system_api_keys ENABLE ROW LEVEL SECURITY;
+ALTER TABLE system_webhooks ENABLE ROW LEVEL SECURITY;
+
+-- Política Mestra Global
+CREATE POLICY master_full_access_veiculos ON veiculos FOR ALL USING (auth.jwt() ->> 'email' = 'sistemaa2eventos@gmail.com');
+CREATE POLICY master_full_access_emp_docs ON empresa_documentos FOR ALL USING (auth.jwt() ->> 'email' = 'sistemaa2eventos@gmail.com');
+CREATE POLICY master_full_access_pes_docs ON pessoa_documentos FOR ALL USING (auth.jwt() ->> 'email' = 'sistemaa2eventos@gmail.com');
+CREATE POLICY master_full_access_areas ON evento_areas FOR ALL USING (auth.jwt() ->> 'email' = 'sistemaa2eventos@gmail.com');
+CREATE POLICY master_full_access_puls ON evento_tipos_pulseira FOR ALL USING (auth.jwt() ->> 'email' = 'sistemaa2eventos@gmail.com');
+CREATE POLICY master_full_access_puls_areas ON pulseira_areas_permitidas FOR ALL USING (auth.jwt() ->> 'email' = 'sistemaa2eventos@gmail.com');
+CREATE POLICY master_full_access_layouts ON evento_etiqueta_layouts FOR ALL USING (auth.jwt() ->> 'email' = 'sistemaa2eventos@gmail.com');
+CREATE POLICY master_full_access_settings ON system_settings FOR ALL USING (auth.jwt() ->> 'email' = 'sistemaa2eventos@gmail.com');
+CREATE POLICY master_full_access_api_keys ON system_api_keys FOR ALL USING (auth.jwt() ->> 'email' = 'sistemaa2eventos@gmail.com');
+CREATE POLICY master_full_access_webhooks ON system_webhooks FOR ALL USING (auth.jwt() ->> 'email' = 'sistemaa2eventos@gmail.com');
+
+-- Inserir Configuração Inicial se não existir
+INSERT INTO system_settings (id, theme_neon_enabled) VALUES (1, true) ON CONFLICT (id) DO NOTHING;
