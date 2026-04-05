@@ -348,5 +348,50 @@ CREATE POLICY master_full_access_settings ON system_settings FOR ALL USING (auth
 CREATE POLICY master_full_access_api_keys ON system_api_keys FOR ALL USING (auth.jwt() ->> 'email' = 'sistemaa2eventos@gmail.com');
 CREATE POLICY master_full_access_webhooks ON system_webhooks FOR ALL USING (auth.jwt() ->> 'email' = 'sistemaa2eventos@gmail.com');
 
+-- ============================================
+-- EXPANSÃO NEXUS: REGRAS E SEGURANÇA (v26.2)
+-- ============================================
+CREATE TABLE IF NOT EXISTS event_modules (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    evento_id UUID NOT NULL REFERENCES eventos(id) ON DELETE CASCADE,
+    module_key VARCHAR(50) NOT NULL,
+    is_enabled BOOLEAN DEFAULT true,
+    UNIQUE(evento_id, module_key)
+);
+
+CREATE TABLE IF NOT EXISTS historico_bloqueios (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pessoa_id UUID NOT NULL REFERENCES pessoas(id) ON DELETE CASCADE,
+    acao_tipo VARCHAR(20) NOT NULL, -- 'bloqueio', 'desbloqueio'
+    justificativa TEXT NOT NULL,
+    executado_por_admin_id UUID REFERENCES auth.users(id),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Inserir Módulos Padrão para novos eventos
+CREATE OR REPLACE FUNCTION public.handle_new_event_modules()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO event_modules (evento_id, module_key) VALUES
+    (NEW.id, 'checkin_qrcode'),
+    (NEW.id, 'checkin_face'),
+    (NEW.id, 'checkin_manual'),
+    (NEW.id, 'checkout_manual');
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_event_created_modules ON eventos;
+CREATE TRIGGER on_event_created_modules
+    AFTER INSERT ON eventos
+    FOR EACH ROW EXECUTE FUNCTION public.handle_new_event_modules();
+
+-- Blindagem Adicional RLS
+ALTER TABLE event_modules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE historico_bloqueios ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY master_full_access_modules ON event_modules FOR ALL USING (auth.jwt() ->> 'email' = 'sistemaa2eventos@gmail.com');
+CREATE POLICY master_full_access_hist_bloq ON historico_bloqueios FOR ALL USING (auth.jwt() ->> 'email' = 'sistemaa2eventos@gmail.com');
+
 -- Inserir Configuração Inicial se não existir
 INSERT INTO system_settings (id, theme_neon_enabled) VALUES (1, true) ON CONFLICT (id) DO NOTHING;

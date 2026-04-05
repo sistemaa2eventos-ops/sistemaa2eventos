@@ -1,7 +1,9 @@
+const { supabase } = require('../config/supabase');
 const logger = require('./logger');
 
 /**
  * Serviço de Abstração para Impressoras Térmicas (ESC/POS)
+ * v26.2 - Suporte a Layouts Dinâmicos via Supabase
  */
 class PrinterService {
     /**
@@ -24,60 +26,77 @@ class PrinterService {
 
     /**
      * Gera o buffer para impressão de credencial
+     * Agora com carregamento de layout dinâmico
      */
-    generateBadgeBuffer(pessoa, empresaNome) {
+    async generateBadgeBuffer(pessoa, empresaNome, eventoId) {
         const { RESET, ALIGN_CENTER, BOLD_ON, TEXT_NORMAL, DOUBLE_HEIGHT_ON, CUT_PAPER } = this.COMMANDS;
 
-        let buffer = '';
-        buffer += RESET;
-        buffer += ALIGN_CENTER;
+        try {
+            // Tentar buscar layout personalizado para o evento
+            const { data: layout } = await supabase
+                .from('evento_etiqueta_layouts')
+                .select('*')
+                .eq('evento_id', eventoId)
+                .maybeSingle();
 
-        // Cabeçalho
-        buffer += BOLD_ON + "A2 EVENTOS\n" + TEXT_NORMAL;
-        buffer += "--------------------------------\n\n";
+            let buffer = RESET + ALIGN_CENTER;
 
-        // Nome do Participante (Destaque)
-        buffer += DOUBLE_HEIGHT_ON + BOLD_ON + pessoa.nome.toUpperCase() + "\n" + TEXT_NORMAL;
+            if (layout && layout.elementos && layout.elementos.length > 0) {
+                // MODO DINÂMICO (Layout customizado no painel)
+                logger.info(`🎨 [Printer] Usando layout dinâmico para evento ${eventoId}`);
+                
+                layout.elementos.forEach(el => {
+                    if (el.tipo === 'texto') {
+                        let txt = el.valor || '';
+                        // Replace placeholders
+                        txt = txt.replace('{nome}', (pessoa.nome || '').toUpperCase());
+                        txt = txt.replace('{empresa}', (empresaNome || '').toUpperCase());
+                        txt = txt.replace('{cpf}', pessoa.cpf || '');
+                        
+                        if (el.negrito) buffer += BOLD_ON;
+                        if (el.tamanho === 'grande') buffer += DOUBLE_HEIGHT_ON;
+                        buffer += txt + "\n" + TEXT_NORMAL + BOLD_OFF;
+                    } else if (el.tipo === 'separador') {
+                        buffer += "--------------------------------\n";
+                    }
+                });
+            } else {
+                // MODO FALLBACK (Layout Padrão A2)
+                buffer += BOLD_ON + "A2 EVENTOS\n" + TEXT_NORMAL;
+                buffer += "--------------------------------\n\n";
+                buffer += DOUBLE_HEIGHT_ON + BOLD_ON + (pessoa.nome || '').toUpperCase() + "\n" + TEXT_NORMAL;
+                if (empresaNome) buffer += empresaNome + "\n";
+                buffer += "CPF: " + (pessoa.cpf || '') + "\n\n";
+            }
 
-        // Empresa
-        if (empresaNome) {
-            buffer += empresaNome + "\n";
+            // Footer e Corte
+            buffer += "Validado em: " + new Date().toLocaleString() + "\n";
+            buffer += "\n\n\n" + CUT_PAPER;
+
+            return buffer;
+        } catch (error) {
+            logger.error('Erro ao gerar buffer de impressão:', error);
+            return null;
         }
-
-        // CPF (Opcional/Segurança)
-        buffer += "CPF: " + pessoa.cpf + "\n\n";
-
-        // Footer e Corte
-        buffer += "Validado em: " + new Date().toLocaleString() + "\n";
-        buffer += "\n\n\n";
-        buffer += CUT_PAPER;
-
-        return buffer;
     }
 
     /**
-     * Envia para uma impressora IP (Assíncrono / Não-bloqueante)
+     * Envia para uma impressora IP
      */
     printViaNetwork(printerIp, printerPort, buffer) {
-        // Envolvemos em um setImmediate ou Promise sem await para não travar a catraca
+        if (!buffer) return false;
+
         setImmediate(async () => {
             try {
                 logger.info(`🖨️ [Async] Enviando tarefa de impressão para ${printerIp}:${printerPort}`);
-
-                // Em uma implementação real:
-                // const net = require('net');
-                // const client = new net.Socket();
-                // client.setTimeout(3000); // Timeout de conexão curto
-                // ...
-
+                // Implementação física do Socket ficaria aqui
                 logger.info(`✅ Impressão enviada para ${printerIp}`);
             } catch (error) {
-                logger.error('❌ Erro assíncrono na impressora térmica:', error.message);
-                // Aqui poderíamos disparar um alerta via WebSocket para o Admin
+                logger.error('❌ Erro na impressora térmica:', error.message);
             }
         });
 
-        return true; // Retorna true IMEDIATAMENTE para liberar o fluxo do backend
+        return true; 
     }
 }
 
