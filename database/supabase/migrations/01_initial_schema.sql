@@ -166,3 +166,23 @@ CREATE TRIGGER update_empresas_modtime BEFORE UPDATE ON empresas FOR EACH ROW EX
 CREATE TRIGGER update_pessoas_modtime BEFORE UPDATE ON pessoas FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 CREATE TRIGGER update_perfis_modtime BEFORE UPDATE ON perfis FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 CREATE TRIGGER update_pivot_modtime BEFORE UPDATE ON pessoa_evento_empresa FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+-- ============================================
+-- POLÍTICAS DE SEGURANÇA (RLS) - SOBERANIA MASTER
+-- ============================================
+
+-- Habilitar RLS em todas as tabelas
+ALTER TABLE eventos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE perfis ENABLE ROW LEVEL SECURITY;
+ALTER TABLE empresas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pessoas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pessoa_evento_empresa ENABLE ROW LEVEL SECURITY;
+ALTER TABLE logs_acesso ENABLE ROW LEVEL SECURITY;
+
+-- POLÍTICA SOBERANA: Master tem poder total em tudo
+CREATE POLICY master_all_access_eventos ON eventos FOR ALL USING (auth.jwt() ->> 'email' = 'sistemaa2eventos@gmail.com');
+CREATE POLICY master_all_access_perfis ON perfis FOR ALL USING (auth.jwt() ->> 'email' = 'sistemaa2eventos@gmail.com');
+CREATE POLICY master_all_access_empresas ON empresas FOR ALL USING (auth.jwt() ->> 'email' = 'sistemaa2eventos@gmail.com');
+CREATE POLICY master_all_access_pessoas ON pessoas FOR ALL USING (auth.jwt() ->> 'email' = 'sistemaa2eventos@gmail.com');
+CREATE POLICY master_all_access_pivot ON pessoa_evento_empresa FOR ALL USING (auth.jwt() ->> 'email' = 'sistemaa2eventos@gmail.com');
+CREATE POLICY master_all_access_logs ON logs_acesso FOR ALL USING (auth.jwt() ->> 'email' = 'sistemaa2eventos@gmail.com');
