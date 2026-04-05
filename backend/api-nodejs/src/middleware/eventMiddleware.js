@@ -19,6 +19,8 @@ async function requireEvent(req, res, next) {
         // Prioridade 3: User Metadata JWT (Fixed assignment)
         const eventoId = req.headers['x-evento-id'] || req.query.evento_id || req.body?.evento_id || req.user.evento_id;
 
+        req.event = null;
+
         if (!eventoId && req.user.role !== 'master') {
             return res.status(400).json({
                 error: 'Falta vincular evento ativo. Utilize o seletor na interface para prosseguir.'
@@ -27,6 +29,7 @@ async function requireEvent(req, res, next) {
 
         // Se for Master e não tiver eventoId, permite prosseguir sem carregar req.event
         if (!eventoId && req.user.role === 'master') {
+            logger.info(`[Master Bypass] Usuário ${req.user.email} operando sem evento contextualizado.`);
             return next();
         }
 

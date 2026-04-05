@@ -42,7 +42,13 @@ class EmpresaController {
     async create(req, res) {
         try {
             const { nome, cnpj, servico, email, responsavel } = req.body;
-            const evento_id = req.event.id;
+            
+            // --- NEXUS CONTEXT FALLBACK (v24.0) ---
+            const evento_id = req.event?.id || req.body.evento_id || req.user?.evento_id || req.headers['x-evento-id'];
+
+            if (!evento_id) {
+                return res.status(400).json({ error: 'Falta vincular evento ativo para criar empresa.' });
+            }
 
             const { data, error } = await supabase
                 .from('empresas')
@@ -57,7 +63,7 @@ class EmpresaController {
                     datas_presenca: req.body.datas_presenca || [],
                     observacao: req.body.observacao || '',
                     registration_token: require('crypto').randomUUID(),
-                    created_by: req.user.id
+                    created_by: req.user?.id
                 }])
                 .select();
 

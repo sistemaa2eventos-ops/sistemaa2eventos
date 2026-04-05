@@ -12,11 +12,11 @@ router.use(requireEvent);
 router.get('/', empresaController.list);
 router.get('/search', empresaController.search);
 router.get('/:id', empresaController.getById);
-router.post('/', authenticate, authorize('admin', 'supervisor', 'operador'), empresaController.create);
-router.put('/:id', authenticate, authorize('admin', 'supervisor', 'operador'), empresaController.update);
-router.delete('/:id', authorize('admin'), empresaController.delete);
+router.post('/', authenticate, authorize('master', 'admin', 'supervisor', 'operador'), empresaController.create);
+router.put('/:id', authenticate, authorize('master', 'admin', 'supervisor', 'operador'), empresaController.update);
+router.delete('/:id', authorize('master', 'admin'), empresaController.delete);
 
 // Gerar novo token de cadastro (Admin/Supervisor)
-router.post('/:id/refresh-token', authorize('admin', 'supervisor'), empresaController.refreshToken);
+router.post('/:id/refresh-token', authorize('master', 'admin', 'supervisor'), empresaController.refreshToken);
 
 module.exports = router;
