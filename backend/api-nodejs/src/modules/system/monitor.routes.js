@@ -12,21 +12,19 @@ router.use('/watchlist', requireEvent);
 router.use('/dashboard', requireEvent);
 
 // Dashboard principal
-router.get('/dashboard', monitorController.dashboard);
+router.get('/dashboard', authenticate, requireEvent, monitorController.dashboard);
 
-// Status do sistema (admin apenas - SEM requireEvent, são rotas globais)
-router.get('/system/status', authorize('admin'), monitorController.systemStatus);
-router.get('/system/logs', authorize('admin'), monitorController.systemLogs);
-router.delete('/system/logs', authorize('admin'), monitorController.clearSystemLogs);
-router.get('/system/performance', authorize('admin'), monitorController.performance);
+// Rotas protegidas (Admin/Master)
+router.get('/system-status', authenticate, authorize('master', 'admin'), monitorController.systemStatus);
+router.get('/logs', authenticate, authorize('master', 'admin'), monitorController.systemLogs);
+router.post('/logs/clear', authenticate, authorize('master', 'admin'), monitorController.clearSystemLogs);
+router.get('/performance', authenticate, authorize('master', 'admin'), monitorController.performance);
+router.post('/force-sync', authenticate, authorize('master', 'admin'), monitorController.forceSync);
+router.post('/clear-cache', authenticate, authorize('master', 'admin'), monitorController.clearCache);
 
-// Ações administrativas (SEM requireEvent)
-router.post('/sync/force', authorize('admin'), monitorController.forceSync);
-router.post('/cache/clear', authorize('admin'), monitorController.clearCache);
-
-// Watchlist de Monitoramento (COM requireEvent, pois é por evento)
-router.get('/watchlist', monitorController.listWatchlist);
-router.post('/watchlist', monitorController.addToWatchlist);
-router.delete('/watchlist/:id', monitorController.removeFromWatchlist);
+// Watchlist (Monitoramento de Alvos)
+router.get('/watchlist', authenticate, requireEvent, monitorController.listWatchlist);
+router.post('/watchlist', authenticate, requireEvent, monitorController.addToWatchlist);
+router.delete('/watchlist/:id', authenticate, requireEvent, monitorController.removeFromWatchlist);
 
 module.exports = router;

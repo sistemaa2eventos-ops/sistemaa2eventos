@@ -15,7 +15,12 @@ class MonitorController {
      */
     async dashboard(req, res) {
         try {
-            const evento_id = req.event.id;
+            // --- NEXUS CONTEXT FALLBACK (v25.0) ---
+            const evento_id = req.event?.id || req.query.evento_id || req.user?.evento_id || req.headers['x-evento-id'];
+
+            if (!evento_id) {
+                return res.status(400).json({ error: 'Falta vincular evento ativo para carregar dashboard.' });
+            }
 
             // Buscar estatísticas em paralelo
             const [
@@ -377,7 +382,12 @@ class MonitorController {
      */
     async listWatchlist(req, res) {
         try {
-            const evento_id = req.event.id;
+            // --- NEXUS CONTEXT FALLBACK (v25.0) ---
+            const evento_id = req.event?.id || req.query.evento_id || req.user?.evento_id || req.headers['x-evento-id'];
+
+            if (!evento_id) {
+                return res.status(400).json({ error: 'Falta vincular evento ativo para carregar watchlist.' });
+            }
             const { data, error } = await supabase
                 .from('monitor_watchlist')
                 .select(`
@@ -404,7 +414,12 @@ class MonitorController {
      */
     async addToWatchlist(req, res) {
         try {
-            const evento_id = req.event.id;
+            // --- NEXUS CONTEXT FALLBACK (v25.0) ---
+            const evento_id = req.event?.id || req.body.evento_id || req.user?.evento_id || req.headers['x-evento-id'];
+
+            if (!evento_id) {
+                return res.status(400).json({ error: 'Falta vincular evento ativo para adicionar à watchlist.' });
+            }
             const { cpf, pessoa_id, nome } = req.body;
 
             if (!cpf && !pessoa_id) {
@@ -437,7 +452,12 @@ class MonitorController {
     async removeFromWatchlist(req, res) {
         try {
             const { id } = req.params;
-            const evento_id = req.event.id;
+            // --- NEXUS CONTEXT FALLBACK (v25.0) ---
+            const evento_id = req.event?.id || req.query.evento_id || req.user?.evento_id || req.headers['x-evento-id'];
+
+            if (!evento_id) {
+                return res.status(400).json({ error: 'Falta vincular evento ativo para remover da watchlist.' });
+            }
 
             const { error } = await supabase
                 .from('monitor_watchlist')
