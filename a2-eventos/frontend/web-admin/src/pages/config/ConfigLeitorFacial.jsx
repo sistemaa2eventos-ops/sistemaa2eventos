@@ -11,12 +11,12 @@ import {
     Settings as SettingsIcon,
     Add as AddIcon
 } from '@mui/icons-material';
-import GlassCard from '../../components/common/GlassCard';
-import NeonButton from '../../components/common/NeonButton';
-import ConfirmDialog from '../../components/common/ConfirmDialog';
-import { useLeitorFacial } from '../../hooks/useLeitorFacial';
-import DeviceListPanel from '../../components/config/DeviceListPanel';
-import GlobalSettingsPanel from '../../components/config/GlobalSettingsPanel';
+import GlassCard from '../../../components/common/GlassCard';
+import NeonButton from '../../../components/common/NeonButton';
+import ConfirmDialog from '../../../components/common/ConfirmDialog';
+import { useLeitorFacial } from '../../../hooks/useLeitorFacial';
+import DeviceListPanel from '../../../components/config/DeviceListPanel';
+import GlobalSettingsPanel from '../../../components/config/GlobalSettingsPanel';
 
 const ConfigLeitorFacial = () => {
     const {
