@@ -21,7 +21,7 @@ import {
 
 const DataTable = ({
   columns,
-  data,
+  data = [],
   loading = false,
   page = 0,
   rowsPerPage = 10,
