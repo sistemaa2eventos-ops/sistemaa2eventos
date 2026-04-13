@@ -1,0 +1,20 @@
+{
+    "tabs": {
+        "dashboard": "Summary",
+        "checkin": "Check-in",
+        "settings": "Settings"
+    },
+    "checkin": {
+        "scan_prompt": "Point the camera at the QR Code",
+        "success": "Check-in successful!",
+        "error_not_found": "Credential not found.",
+        "button_switch": "Switch Camera",
+        "button_manual": "Manual Search"
+    },
+    "settings": {
+        "title": "Settings",
+        "logout": "Logout",
+        "sync": "Sync Data",
+        "offline_mode": "Offline Mode"
+    }
+}

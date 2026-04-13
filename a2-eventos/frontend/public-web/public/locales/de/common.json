@@ -1,0 +1,15 @@
+{
+    "registration": {
+        "title": "Offizielle Anmeldung",
+        "subtitle": "Füllen Sie Ihre Daten aus, um Zugang zu beantragen.",
+        "document": "Dokument / Reisepass",
+        "full_name": "Vollständiger Name",
+        "email": "Berufliche E-Mail",
+        "phone": "Telefon / WhatsApp",
+        "company": "Unternehmen / Organisation",
+        "role": "Position / Funktion",
+        "submit": "ANFRAGE SENDEN",
+        "success_message": "Ihre Anfrage wurde gesendet. Bitte warten Sie auf die Bestätigungs-E-Mail.",
+        "error_message": "Bei der Bearbeitung Ihrer Anmeldung ist ein Fehler aufgetreten."
+    }
+}

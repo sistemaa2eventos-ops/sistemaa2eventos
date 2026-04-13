@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  postgres_edge:
+    image: ankane/pgvector:v0.5.1
+    container_name: a2_eventos_pg_edge_local
+    restart: unless-stopped
+    ports:
+      - "5433:5432" # Porta externa 5433 para evitar conflitos
+    environment:
+      POSTGRES_USER: a2_edge_user
+      POSTGRES_PASSWORD: a2_edge_password
+      POSTGRES_DB: a2_edge_db
+    volumes:
+      - pg_edge_local_data:/var/lib/postgresql/data
+      - ./backend/api-nodejs/src/scripts/init_pg_edge.sql:/docker-entrypoint-initdb.d/init_pg_edge.sql
+
+  redis:
+    image: redis:7-alpine
+    container_name: a2_eventos_redis_local
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_local_data:/data
+
+volumes:
+  pg_edge_local_data:
+  redis_local_data:

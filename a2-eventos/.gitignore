@@ -1,0 +1,107 @@
+# Sensitive files
+*.key
+*.pem
+*.crt
+*.pfx
+*.p12
+secrets/
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+*.log.*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+*.swp
+*.swo
+*~
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+.project
+.classpath
+.settings/
+
+# Binary files
+*.bin
+*.exe
+*.dll
+*.so
+*.dylib
+*.o
+*.obj
+*.class
+
+# Test files
+__pycache__/
+*.pyc
+.coverage
+.nyc_output/
+coverage/
+*.test.js
+*.spec.js
+
+# Driver files
+drivers/*.exe
+drivers/*.msi
+drivers/*.cab
+drivers/*.sys
+drivers/*.inf
+!drivers/README.md
+
+# Manuals (PDFs are tracked, but not in Git)
+manuals/*.pdf
+!manuals/README.md
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Hardware specific
+hardware-config/
+device-*.conf
+*.hex
+*.eep
+
+# Node and UI builds
+node_modules/
+dist/
+build/
+.next/
+out/
+.svelte-kit/
+
+# Compressed archives (V19 Cleanup)
+*.zip
+*.tar.gz
+*.tar
+*.gz
+*.rar
+*.7z
+*.7zip
+
+# Internal backup files
+meu_projeto.txt
+project_context_dump.txt
+recent_api_logs.txt
+logs/
+*.log
+startup_debug.txt
+rbac_dump.txt

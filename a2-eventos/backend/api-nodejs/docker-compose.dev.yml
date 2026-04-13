@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: npm run dev
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./src:/app/src
+      - ./logs:/app/logs
+    environment:
+      - NODE_ENV=development
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SQL_SERVER_HOST=host.docker.internal
+      - SQL_SERVER_DATABASE=${SQL_SERVER_DATABASE}
+      - SQL_SERVER_USER=${SQL_SERVER_USER}
+      - SQL_SERVER_PASSWORD=${SQL_SERVER_PASSWORD}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

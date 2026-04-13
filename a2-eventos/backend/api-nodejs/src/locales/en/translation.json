@@ -1,0 +1,28 @@
+{
+    "success": {
+        "module_toggled": "Module status updated successfully.",
+        "checkin": "Check-in successful",
+        "checkout": "Checkout successful",
+        "access_granted": "Access granted",
+        "sync": "Data synced successfully"
+    },
+    "error": {
+        "internal_server": "Internal server error",
+        "not_authenticated": "Not authenticated",
+        "module_disabled_qrcode": "QR Code Check-in module is disabled for this event.",
+        "module_disabled_barcode": "Barcode Check-in module is disabled for this event.",
+        "module_disabled_face": "Facial Recognition module is disabled for this event.",
+        "qr_required": "QR Code is required",
+        "barcode_required": "Search parameter is required",
+        "face_required": "Incomplete facial data",
+        "rfid_required": "RFID tag is required",
+        "credential_not_found": "Credential not found or invalid event",
+        "already_checked_in": "Person is already checked in",
+        "not_checked_in": "Person is not checked in",
+        "phase_not_allowed": "Event phase not allowed for your profile",
+        "blocked_person": "Blocked person",
+        "blocked_company": "Blocked company",
+        "incomplete_registration": "Incomplete registration (Pending)",
+        "date_not_allowed": "Access not authorized for today's date"
+    }
+}

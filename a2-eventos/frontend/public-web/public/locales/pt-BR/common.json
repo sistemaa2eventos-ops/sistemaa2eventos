@@ -1,0 +1,15 @@
+{
+    "registration": {
+        "title": "Credenciamento Oficial",
+        "subtitle": "Preencha seus dados para solicitar acesso.",
+        "document": "CPF / Passaporte",
+        "full_name": "Nome Completo",
+        "email": "E-mail Profissional",
+        "phone": "Telefone / WhatsApp",
+        "company": "Empresa / Entidade",
+        "role": "Cargo / Função",
+        "submit": "ENVIAR SOLICITAÇÃO",
+        "success_message": "Sua solicitação foi enviada. Aguarde o e-mail de confirmação.",
+        "error_message": "Ocorreu um erro ao processar seu cadastro."
+    }
+}

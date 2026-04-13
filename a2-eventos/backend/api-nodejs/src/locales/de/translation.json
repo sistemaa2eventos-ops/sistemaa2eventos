@@ -1,0 +1,28 @@
+{
+    "success": {
+        "module_toggled": "Modulstatus erfolgreich aktualisiert.",
+        "checkin": "Check-in erfolgreich",
+        "checkout": "Checkout erfolgreich",
+        "access_granted": "Zugriff gewährt",
+        "sync": "Daten erfolgreich synchronisiert"
+    },
+    "error": {
+        "internal_server": "Interner Serverfehler",
+        "not_authenticated": "Nicht authentifiziert",
+        "module_disabled_qrcode": "QR-Code-Check-in-Modul ist für dieses Ereignis deaktiviert.",
+        "module_disabled_barcode": "Barcode-Check-in-Modul ist für dieses Ereignis deaktiviert.",
+        "module_disabled_face": "Gesichtserkennungsmodul ist für dieses Ereignis deaktiviert.",
+        "qr_required": "QR-Code ist erforderlich",
+        "barcode_required": "Suchparameter ist erforderlich",
+        "face_required": "Unvollständige Gesichtsdaten",
+        "rfid_required": "RFID-Tag ist erforderlich",
+        "credential_not_found": "Anmeldeinformationen nicht gefunden oder ungültiges Ereignis",
+        "already_checked_in": "Person ist bereits eingecheckt",
+        "not_checked_in": "Person ist nicht eingecheckt",
+        "phase_not_allowed": "Ereignisphase für Ihr Profil nicht erlaubt",
+        "blocked_person": "Blockierte Person",
+        "blocked_company": "Blockiertes Unternehmen",
+        "incomplete_registration": "Unvollständige Registrierung (Ausstehend)",
+        "date_not_allowed": "Zugriff für das heutige Datum nicht autorisiert"
+    }
+}

@@ -1,0 +1,39 @@
+{
+  "turnstile": {
+    "models": {
+      "henry": {
+        "name": "Henry Catraca",
+        "protocol": "TCP",
+        "default_port": 3000,
+        "commands": {
+          "open": { "command": "OPEN", "response": "OK", "timeout": 5000 },
+          "close": { "command": "CLOSE", "response": "OK", "timeout": 5000 },
+          "status": { "command": "STATUS", "response": "ONLINE|OFFLINE|BLOCKED", "timeout": 3000 },
+          "count": { "command": "COUNT", "response": "\\d+", "timeout": 3000 }
+        }
+      },
+      "bio-t": {
+        "name": "Bio-T Facial Terminal",
+        "protocol": "HTTP",
+        "default_port": 8080,
+        "endpoints": {
+          "open": "/api/access/grant",
+          "close": "/api/access/deny",
+          "status": "/api/status",
+          "users": "/api/users",
+          "face": "/api/face/register"
+        }
+      },
+      "intelbras": {
+        "name": "Intelbras Facial",
+        "protocol": "HTTP",
+        "default_port": 80,
+        "endpoints": {
+          "open": "/cgi-bin/access.cgi?action=open",
+          "close": "/cgi-bin/access.cgi?action=close",
+          "status": "/cgi-bin/status.cgi"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,40 @@
+# 🚫 ARQUIVOS E PASTAS IGNORADAS NO BUILD DOCKER
+# Evita que milhares de MB inúteis sejam copiados para a Hostinger
+
+# Node.js
+**/node_modules
+**/npm-debug.log
+**/.npm
+**/.next
+**/.vite
+**/dist
+**/build
+
+# Python
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.Python
+**/venv
+**/.venv
+**/env
+**/.env.local
+
+# Git e Logs
+.git
+.gitignore
+**/logs
+**/*.log
+
+# Windows specific
+desktop.ini
+Thumbs.db
+*.exe
+*.bat
+*.ps1
+
+# Docker specific
+Dockerfile
+docker-compose.yml
+.dockerignore
