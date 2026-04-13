@@ -4,7 +4,13 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
     plugins: [
-        react()
+        react(),
+        VitePWA({
+            registerType: 'autoUpdate',
+            includeAssets: ['favicon.ico', 'vite.svg'],
+            manifest: false,
+            workbox: false
+        })
     ],
     server: {
         port: 5173,
