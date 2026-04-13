@@ -1,0 +1,46 @@
+=========================================================
+      AUDITORIA DE INTEGRAÇÃO HARDWARE E IOT
+                   PROJETO: A2 EVENTOS
+=========================================================
+
+Como Engenheiro de Integração IoT, realizei o teste de estresse lógico na comunicação com os dispositivos físicos (Intelbras, Facial, Impressoras). O sistema é funcional, mas possui "ângulos mortos" que podem causar travamentos em condições de rede instável.
+
+---------------------------------------------------------
+🔴 1. RISCO DE TRAVAMENTO: AUSÊNCIA DE TIMEOUTS EM DRIVERS
+---------------------------------------------------------
+VULNERABILIDADE: O `intelbrasService.js` usa `fetch` via Digest Auth sem definir um limite de tempo. No cenário real de um evento, se uma câmera perder o cabo de rede durante um comando de "Abrir Porta", a thread do Node.js pode ficar aguardando o socket por minutos, gerando lentidão no backend inteiro.
+
+CORREÇÃO CIRÚRGICA (Adicionar AbortController):
+```javascript
+async _get(path, params = {}) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000); // 5 segundos de limite
+    try {
+        const res = await this.digestClient.fetch(url, { signal: controller.signal });
+        // ...
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+```
+
+---------------------------------------------------------
+🟠 2. GARGALO FÍSICO: IMPRESSORA BLOQUEANTE
+---------------------------------------------------------
+VULNERABILIDADE: O `printerService.js` hoje é um placeholder. Em uma implementação real, o fluxo de check-in não deve esperar a impressora confirmar que "terminou de imprimir" para liberar a catraca. Se a impressora travar ou acabar o papel, a catraca deve abrir e o erro deve ser logado apenas no monitor.
+
+SOLUÇÃO (Fila Assíncrona):
+A impressão deve ser despachada para um `setImmediate` ou processada por um "Worker" separado, garantindo que o acesso físico do participante seja a prioridade zero.
+
+---------------------------------------------------------
+🟡 3. BIOMETRIA: SCORE DE SIMILARIDADE E ALERTA
+---------------------------------------------------------
+VULNERABILIDADE: O sistema recebe o score de `confianca`, mas não tem um "piso" de segurança configurável por evento. 
+
+RECOMENDAÇÃO:
+Adicionar um campo `min_face_score` na configuração do evento. Se o match facial for < 70% (exemplo), o sistema deve emitir um `negado_biometria` e disparar um som de alerta imediato no dashboard de monitoramento via WebSocket.
+
+---------------------------------------------------------
+🟢 PONTOS POSITIVOS
+- A fila de sincronização `pending_face_sync` está excelente! Ela garante que, se o microsserviço de face estiver offline, os dados não se percam.
+- A normalização de eventos da Intelbras (Push) está bem implementada.

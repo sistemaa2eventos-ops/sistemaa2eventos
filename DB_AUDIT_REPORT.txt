@@ -1,0 +1,99 @@
+=========================================================
+      AUDITORIA DE DADOS E CONCORRÊNCIA (OFFLINE SYNC)
+                   PROJETO: A2 EVENTOS
+=========================================================
+
+Senhor Desenvolvedor, seguindo sua restrição máxima ("Regra de Ouro") de NÃO sugerir remoções estruturais, efetuei a engenharia reversa do código `SyncService.js` local e das tabelas do Supabase. 
+
+Abaixo reporto as 3 descobertas críticas e as correções cirúrgicas para manter a resiliência PWA intacta.
+
+---------------------------------------------------------
+🔴 1. RACE CONDITION NA SINCRONIZAÇÃO DE LOGS (SyncService.js)
+---------------------------------------------------------
+RISCO: No arquivo `src/services/syncService.js`, linha ~132, o sistema envia os logs que aconteceram offline (ex: durante a queda de internet no portão) usando o comando `supabase.from('logs_acesso').upsert(logData)`. 
+
+O problema é a condição de corrida (Race Condition): Se 2 catracas offline registrarem o Checkin simultâneo da mesma pessoa num espaço de milissegundos, ao voltarem online ambas enviarão o log. O primeiro salva. O segundo `upsert` com `onConflict: 'id'` da segunda catraca vai passar ileso se os IDs forem aleatórios locais, criando **duplicidade de Check-In** para o mesmo funcionário num curto espaço de tempo.
+
+SOLUÇÃO CIRÚRGICA (Sem quebras):
+Você deve alterar o Supabase para ignorar logs na mesma janela de tempo (ex: 5 segundos) da mesma pessoa do mesmo tipo. Adicione esta restrição (Constraint) no PostgreSQL rodando este comando SQL no Editor do Supabase:
+
+```sql
+-- Cria uma condicional que previne "Flood/Race" de duplo Checkin/Checkout da mesma pessoa na mesma janela.
+ALTER TABLE logs_acesso
+ADD CONSTRAINT prevent_duplication_race_condition
+EXCLUDE USING GIST (
+    funcionario_id WITH =,
+    tipo WITH =,
+    EXTRACT(EPOCH FROM created_at) WITH =
+) WHERE (tipo IN ('checkin', 'checkout'));
+-- Observação: Se não quiser trava por segundo absoluto, você precisará tratar isso via PLPGSQL function (BEFORE INSERT).
+```
+
+*Correção recomendada via Backend (Rejeição via App)*
+Se a trava de DDL for muito agressiva, corrija pelo Node. No `SyncService.js` antes de fazer o Upsert:
+```javascript
+// SOLUÇÃO EM NODE.JS (SyncService.js - Linha ~131)
+// Verifique se *já existe* um log desse funcionario, deste tipo, nos ultimos 10 segundos
+const _recent = await supabase.from('logs_acesso')
+    .select('id').eq('funcionario_id', logData.pessoa_id).eq('tipo', logData.tipo)
+    .gte('created_at', new Date(new Date(logData.created_at).getTime() - 10000).toISOString())
+    .limit(1);
+
+if (_recent.data && _recent.data.length > 0) {
+    logger.warn(`Race Condition Bloqueada: Log Duplicado ${logData.pessoa_id}`);
+    syncedIds.push(log.id); // Marca como processado para tirar da fila do Edge
+    continue; // pula o upsert
+}
+```
+
+---------------------------------------------------------
+🟠 2. INTEGRIDADE REFERENCIAL (Pulseiras e Eventos)
+---------------------------------------------------------
+RISCO: Na tabela `evento_tipos_pulseira` (migration 05_pulseiras_e_areas.sql) a integridade é mantida pelo evento_id `ON DELETE CASCADE`. Porém o log de `pulseira_areas_permitidas` não valida se a área pertence **ao mesmo evento** do tipo de pulseira.
+Um Bug no front (criação de um payload mal-formatado) poderia vincular uma pulseira do "Rock in Rio" à área "Camarote" do "Lollapalooza", já que o banco só cobra a chave para a tabela Área geral.
+
+SOLUÇÃO CIRÚRGICA NO SQL:
+Não apague tabelas. Apenas injete uma função de restrição antes da inserção na pivô (Tabela associative):
+
+```sql
+-- Criar uma função de gatilho para integridade inter-tabelas
+CREATE OR REPLACE FUNCTION check_pulseira_area_evento_match()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF (SELECT evento_id FROM evento_tipos_pulseira WHERE id = NEW.pulseira_id) != 
+       (SELECT evento_id FROM evento_areas WHERE id = NEW.area_id) THEN
+        RAISE EXCEPTION 'A Pulseira e a Área devem pertencer ao mesmo Evento.';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER enforce_same_event_pulseiras
+BEFORE INSERT OR UPDATE ON pulseira_areas_permitidas
+FOR EACH ROW EXECUTE FUNCTION check_pulseira_area_evento_match();
+```
+
+---------------------------------------------------------
+🟡 3. PERFORMANCE (Falta de Índices para Dispositivos Hardware)
+---------------------------------------------------------
+RISCO: O arquivo `01_initial_schema.sql` definiu índices ótimos para `idx_funcionarios_cpf` e `idx_funcionarios_qrcode`. Excelente. 
+Contudo, você planeja usar Terminais Faciais (Token/Encoding) e Pulseiras (Nas atualizações futuras). Se a API receber uma leitura Facial ou RFID, buscar 1 milhão de pessoas no Supabase usando um campo JSONB `face_encoding` sem index fará o Edge Node sofrer Timeout (> 3 segundos na catraca física).
+
+SOLUÇÃO CIRÚRGICA NO SQL:
+Execute a injeção destes 2 novos Índices para garantir buscas sub-milissegundos nas catracas físicas.
+
+```sql
+-- Índice GIN para buscar mais rápido no mapeamento biométrico facial (Se for usado matching local no Supabase)
+CREATE INDEX IF NOT EXISTS idx_pessoas_face_encoding 
+    ON pessoas USING GIN (face_encoding jsonb_path_ops);
+
+-- IMPORTANTE: Para busca textual no frontend do Pessoas.jsx ("Digite o nome...") a busca via ILIKE usa table scan.
+-- Crie um index trigram para pesquisa fonética ultra-rápida do SearchBar
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS idx_pessoas_nome_trgm 
+    ON pessoas USING GIN (nome gin_trgm_ops);
+```
+
+---------------------------------------------------------
+CONCLUSÃO GERAL
+A lógica macro arquitetural do `ON DELETE CASCADE` já está blindando você contra "Ghosts" (Deletar evento apaga pessoas e acessos). Se aplicar as correções sugeridas de Concorrência e os novos Indexes de Busca Textual (Trigram), a fundação atual suporta fluxos massivos de alta demanda sem gargalos sensíveis identificados pelo motor V8.

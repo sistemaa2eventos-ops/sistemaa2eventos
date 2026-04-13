@@ -1,0 +1,561 @@
+Projeto_A2_Eventos
+├── .vscode
+│   └── settings.json
+├── BACKEND_AUDIT_REPORT.txt
+├── DB_AUDIT_REPORT.txt
+├── FRONTEND_QA_REPORT.txt
+├── HARDWARE_AUDIT_REPORT.txt
+├── UI_CUSTOMIZATION_GUIDE.txt
+├── a2-eventos
+│   ├── .gitignore
+│   ├── README.md
+│   ├── backend
+│   │   ├── api-nodejs
+│   │   │   ├── .env
+│   │   │   ├── .env.example
+│   │   │   ├── .eslintrc.js
+│   │   │   ├── .prettierrc
+│   │   │   ├── Dockerfile
+│   │   │   ├── apply_hotfix.js
+│   │   │   ├── apply_modules_migration.js
+│   │   │   ├── check_db.js
+│   │   │   ├── corrigir-funcionarios.ps1
+│   │   │   ├── corrigir-qrcode.ps1
+│   │   │   ├── create_event_modules.sql
+│   │   │   ├── criar-controllers.ps1
+│   │   │   ├── criar-utils.ps1
+│   │   │   ├── db-check.log
+│   │   │   ├── debug_schema.js
+│   │   │   ├── debug_sync.js
+│   │   │   ├── docker-compose.dev.yml
+│   │   │   ├── dump_terminals.js
+│   │   │   ├── error.log
+│   │   │   ├── final_result.txt
+│   │   │   ├── get_intelbras_info.js
+│   │   │   ├── hardened_policies.sql
+│   │   │   ├── hotfix_schema.sql
+│   │   │   ├── inspect_digest.js
+│   │   │   ├── logs
+│   │   │   │   ├── combined.log
+│   │   │   │   ├── combined1.log
+│   │   │   │   ├── error.log
+│   │   │   │   ├── sync.log
+│   │   │   │   └── sync1.log
+│   │   │   ├── mailer_error.log
+│   │   │   ├── mailer_output.log
+│   │   │   ├── mailer_test.log
+│   │   │   ├── migrate_db.js
+│   │   │   ├── migrate_funcionarios_to_pessoas.sql
+│   │   │   ├── nodemon.json
+│   │   │   ├── package-lock.json
+│   │   │   ├── package.json
+│   │   │   ├── reproduce_digest.js
+│   │   │   ├── simulate_push.js
+│   │   │   ├── src
+│   │   │   │   ├── app.js
+│   │   │   │   ├── config
+│   │   │   │   │   ├── database.js
+│   │   │   │   │   ├── i18n.js
+│   │   │   │   │   └── supabase.js
+│   │   │   │   ├── controllers
+│   │   │   │   │   ├── accessController.js
+│   │   │   │   │   ├── authController.js
+│   │   │   │   │   ├── configController.js
+│   │   │   │   │   ├── cronController.js
+│   │   │   │   │   ├── deviceController.js
+│   │   │   │   │   ├── documentoController.js
+│   │   │   │   │   ├── empresaController.js
+│   │   │   │   │   ├── eventoController.js
+│   │   │   │   │   ├── excelController.js
+│   │   │   │   │   ├── intelbrasController.js
+│   │   │   │   │   ├── monitorController.js
+│   │   │   │   │   ├── pessoaController.js
+│   │   │   │   │   ├── publicController.js
+│   │   │   │   │   ├── reportController.js
+│   │   │   │   │   ├── settingsController.js
+│   │   │   │   │   ├── systemMetricsController.js
+│   │   │   │   │   └── veiculoController.js
+│   │   │   │   ├── locales
+│   │   │   │   │   ├── de
+│   │   │   │   │   │   └── translation.json
+│   │   │   │   │   ├── en
+│   │   │   │   │   │   └── translation.json
+│   │   │   │   │   ├── es
+│   │   │   │   │   │   └── translation.json
+│   │   │   │   │   └── pt-BR
+│   │   │   │   │       └── translation.json
+│   │   │   │   ├── middleware
+│   │   │   │   │   ├── auth.js
+│   │   │   │   │   ├── eventMiddleware.js
+│   │   │   │   │   ├── permissions.js
+│   │   │   │   │   ├── rateLimiter.js
+│   │   │   │   │   └── validator.js
+│   │   │   │   ├── models
+│   │   │   │   │   ├── AccessLog.js
+│   │   │   │   │   ├── Dispositivo.js
+│   │   │   │   │   ├── Empresa.js
+│   │   │   │   │   ├── Evento.js
+│   │   │   │   │   ├── Pessoa.js
+│   │   │   │   │   ├── User.js
+│   │   │   │   │   └── __tests__
+│   │   │   │   │       ├── Pessoa.test.js
+│   │   │   │   │       └── syncService.test.js
+│   │   │   │   ├── routes
+│   │   │   │   │   ├── access.js
+│   │   │   │   │   ├── auth.js
+│   │   │   │   │   ├── config.js
+│   │   │   │   │   ├── dispositivos.js
+│   │   │   │   │   ├── documentos.js
+│   │   │   │   │   ├── empresas.js
+│   │   │   │   │   ├── eventos.js
+│   │   │   │   │   ├── excel.js
+│   │   │   │   │   ├── intelbras.js
+│   │   │   │   │   ├── monitor.js
+│   │   │   │   │   ├── pessoas.js
+│   │   │   │   │   ├── portal
+│   │   │   │   │   │   ├── cliente.js
+│   │   │   │   │   │   └── empresa.js
+│   │   │   │   │   ├── public.js
+│   │   │   │   │   ├── reports.js
+│   │   │   │   │   ├── settings.js
+│   │   │   │   │   ├── sync.js
+│   │   │   │   │   └── veiculos.js
+│   │   │   │   ├── scripts
+│   │   │   │   │   ├── check-database.js
+│   │   │   │   │   ├── configure_terminals.js
+│   │   │   │   │   ├── debug_schema.js
+│   │   │   │   │   ├── debug_tables.js
+│   │   │   │   │   ├── kill-port.js
+│   │   │   │   │   ├── live-monitor.js
+│   │   │   │   │   ├── manual-sync.js
+│   │   │   │   │   ├── migrate-system-settings.js
+│   │   │   │   │   ├── monitor.js
+│   │   │   │   │   ├── reset-database.js
+│   │   │   │   │   ├── seed_nexus.js
+│   │   │   │   │   ├── setup_storage.js
+│   │   │   │   │   └── wipe-all-data.js
+│   │   │   │   ├── services
+│   │   │   │   │   ├── cacheService.js
+│   │   │   │   │   ├── emailService.js
+│   │   │   │   │   ├── hikvisionService.js
+│   │   │   │   │   ├── intelbrasService.js
+│   │   │   │   │   ├── logger.js
+│   │   │   │   │   ├── policyEngine.js
+│   │   │   │   │   ├── printerService.js
+│   │   │   │   │   ├── sqlServerService.js
+│   │   │   │   │   ├── supabaseService.js
+│   │   │   │   │   ├── syncScheduler.js
+│   │   │   │   │   ├── syncService.js
+│   │   │   │   │   ├── terminalSyncService.js
+│   │   │   │   │   └── websocketService.js
+│   │   │   │   └── utils
+│   │   │   │       ├── dateUtils.js
+│   │   │   │       ├── faceEncoder.js
+│   │   │   │       ├── qrGenerator.js
+│   │   │   │       └── validators.js
+│   │   │   ├── startup_log.txt
+│   │   │   ├── supabase_functions.sql
+│   │   │   ├── swagger.yaml
+│   │   │   ├── temp_query.js
+│   │   │   ├── terminals_dump.json
+│   │   │   ├── test-api.js
+│   │   │   ├── test-auth.js
+│   │   │   ├── test-connection.js
+│   │   │   ├── test-mailer.js
+│   │   │   ├── test_addface.js
+│   │   │   ├── test_intelbras_auth.js
+│   │   │   ├── test_intelbras_flow.js
+│   │   │   ├── test_list_users.js
+│   │   │   ├── test_log.txt
+│   │   │   ├── test_output.txt
+│   │   │   ├── test_rpc.js
+│   │   │   ├── test_sync.js
+│   │   │   ├── test_sync_v2.js
+│   │   │   ├── trigger_hw_sync.js
+│   │   │   ├── update_creds.js
+│   │   │   ├── update_event_schema.sql
+│   │   │   ├── update_event_schema_v2.sql
+│   │   │   └── verify_db.js
+│   │   ├── microservice-face-python
+│   │   │   ├── .env
+│   │   │   ├── Dockerfile
+│   │   │   ├── README.md
+│   │   │   ├── config.yaml
+│   │   │   ├── docker-compose.yml
+│   │   │   ├── logs
+│   │   │   │   ├── face_service_2026-02-14.log
+│   │   │   │   └── face_service_2026-02-17.log
+│   │   │   ├── package-lock.json
+│   │   │   ├── requirements.txt
+│   │   │   ├── src
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── api
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   ├── routes.py
+│   │   │   │   │   └── websocket_handler.py
+│   │   │   │   ├── camera
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   ├── camera_manager.py
+│   │   │   │   │   ├── frame_processor.py
+│   │   │   │   │   └── rtsp_client.py
+│   │   │   │   ├── face_recognition
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   ├── face_comparator.py
+│   │   │   │   │   ├── face_encoder.py
+│   │   │   │   │   ├── face_processor.py
+│   │   │   │   │   └── face_validator.py
+│   │   │   │   ├── hardware
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   ├── biometric_terminal.py
+│   │   │   │   │   ├── gpio_controller.py
+│   │   │   │   │   └── turnstile_controller.py
+│   │   │   │   ├── main.py
+│   │   │   │   └── services
+│   │   │   │       ├── recognition_service.py
+│   │   │   │       └── supabase_client.py
+│   │   │   └── verify_all.py
+│   │   └── package-lock.json
+│   ├── database
+│   │   ├── schema
+│   │   │   ├── 08_system_settings.sql
+│   │   │   └── 09_evento_etiquetas.sql
+│   │   ├── sql-server
+│   │   │   ├── replication
+│   │   │   │   └── sync_job.sql
+│   │   │   └── scripts
+│   │   │       ├── create_tables.sql
+│   │   │       ├── stored_procedures.sql
+│   │   │       └── triggers.sql
+│   │   └── supabase
+│   │       ├── migrations
+│   │       │   ├── 01_initial_schema.sql
+│   │       │   ├── 02_functions.sql
+│   │       │   ├── 03_policies.sql
+│   │       │   ├── 04_veiculos_bloqueios_config.sql
+│   │       │   ├── 05_pulseiras_e_areas.sql
+│   │       │   ├── 06_audit_fixes.sql
+│   │       │   ├── 07_security_shield.sql
+│   │       │   ├── 08_iam_ecm_expansion.sql
+│   │       │   ├── 09_ecm_validity.sql
+│   │       │   ├── 10_pessoa_empresa_pivot.sql
+│   │       │   ├── 11_populate_pessoa_pivot.sql
+│   │       │   ├── 12_audit_trail_triggers.sql
+│   │       │   ├── 13_b2b_strict_rls.sql
+│   │       │   ├── 14_ticket_transfer.sql
+│   │       │   └── 15_unified_security_policies.sql
+│   │       └── seed.sql
+│   ├── docker-compose.yml
+│   ├── docs
+│   │   ├── api
+│   │   │   ├── API - Linha de Faciais - Controle de Acesso Corporativo – Integracao.pdf
+│   │   │   └── Controle de Acesso - Bio-T - Intelbras.postman_collection.json
+│   │   ├── architecture
+│   │   ├── deployment
+│   │   ├── hardware
+│   │   └── user-manual
+│   │       └── README.md
+│   ├── frontend
+│   │   ├── mobile-app
+│   │   │   ├── .gitignore
+│   │   │   ├── .vscode
+│   │   │   │   ├── extensions.json
+│   │   │   │   └── settings.json
+│   │   │   ├── README.md
+│   │   │   ├── app
+│   │   │   │   ├── (auth)
+│   │   │   │   │   ├── login.tsx
+│   │   │   │   │   └── register.tsx
+│   │   │   │   ├── (tabs)
+│   │   │   │   │   ├── _layout.tsx
+│   │   │   │   │   ├── explore.tsx
+│   │   │   │   │   ├── index.tsx
+│   │   │   │   │   ├── monitoring.tsx
+│   │   │   │   │   └── profile.tsx
+│   │   │   │   ├── _layout.tsx
+│   │   │   │   ├── devices.tsx
+│   │   │   │   ├── employee
+│   │   │   │   │   └── [id].tsx
+│   │   │   │   ├── event
+│   │   │   │   │   └── [id].tsx
+│   │   │   │   ├── face-id.tsx
+│   │   │   │   ├── modal.tsx
+│   │   │   │   └── scanner.tsx
+│   │   │   ├── app.json
+│   │   │   ├── assets
+│   │   │   │   └── images
+│   │   │   │       ├── android-icon-background.png
+│   │   │   │       ├── android-icon-foreground.png
+│   │   │   │       ├── android-icon-monochrome.png
+│   │   │   │       ├── favicon.png
+│   │   │   │       ├── icon.png
+│   │   │   │       ├── partial-react-logo.png
+│   │   │   │       ├── react-logo.png
+│   │   │   │       ├── react-logo@2x.png
+│   │   │   │       ├── react-logo@3x.png
+│   │   │   │       └── splash-icon.png
+│   │   │   ├── components
+│   │   │   │   ├── A2Button.tsx
+│   │   │   │   ├── A2Card.tsx
+│   │   │   │   ├── A2CompanyConfig.tsx
+│   │   │   │   ├── A2Input.tsx
+│   │   │   │   ├── A2QRCodeModal.tsx
+│   │   │   │   ├── external-link.tsx
+│   │   │   │   ├── haptic-tab.tsx
+│   │   │   │   ├── hello-wave.tsx
+│   │   │   │   ├── parallax-scroll-view.tsx
+│   │   │   │   ├── themed-text.tsx
+│   │   │   │   ├── themed-view.tsx
+│   │   │   │   └── ui
+│   │   │   │       ├── collapsible.tsx
+│   │   │   │       ├── icon-symbol.ios.tsx
+│   │   │   │       └── icon-symbol.tsx
+│   │   │   ├── config
+│   │   │   │   └── i18n.ts
+│   │   │   ├── constants
+│   │   │   │   ├── Colors.ts
+│   │   │   │   └── theme.ts
+│   │   │   ├── context
+│   │   │   │   └── AuthContext.tsx
+│   │   │   ├── eslint.config.js
+│   │   │   ├── expo-env.d.ts
+│   │   │   ├── hooks
+│   │   │   │   ├── use-color-scheme.ts
+│   │   │   │   ├── use-color-scheme.web.ts
+│   │   │   │   └── use-theme-color.ts
+│   │   │   ├── locales
+│   │   │   │   ├── de.json
+│   │   │   │   ├── en.json
+│   │   │   │   ├── es.json
+│   │   │   │   └── pt-BR.json
+│   │   │   ├── package-lock.json
+│   │   │   ├── package.json
+│   │   │   ├── scripts
+│   │   │   │   ├── reset-project.js
+│   │   │   │   └── start-android.ps1
+│   │   │   ├── services
+│   │   │   │   ├── SyncManager.ts
+│   │   │   │   ├── apiService.ts
+│   │   │   │   ├── companyService.ts
+│   │   │   │   ├── deviceService.ts
+│   │   │   │   ├── eventService.ts
+│   │   │   │   ├── notificationService.ts
+│   │   │   │   ├── offlineService.ts
+│   │   │   │   └── supabase.ts
+│   │   │   └── tsconfig.json
+│   │   ├── public-web
+│   │   │   ├── .gitignore
+│   │   │   ├── README.md
+│   │   │   ├── eslint.config.mjs
+│   │   │   ├── next-env.d.ts
+│   │   │   ├── next-i18next.config.js
+│   │   │   ├── next.config.ts
+│   │   │   ├── package-lock.json
+│   │   │   ├── package.json
+│   │   │   ├── postcss.config.mjs
+│   │   │   ├── public
+│   │   │   │   ├── file.svg
+│   │   │   │   ├── globe.svg
+│   │   │   │   ├── locales
+│   │   │   │   │   ├── de
+│   │   │   │   │   │   └── common.json
+│   │   │   │   │   ├── en
+│   │   │   │   │   │   └── common.json
+│   │   │   │   │   ├── es
+│   │   │   │   │   │   └── common.json
+│   │   │   │   │   └── pt-BR
+│   │   │   │   │       └── common.json
+│   │   │   │   ├── next.svg
+│   │   │   │   ├── vercel.svg
+│   │   │   │   └── window.svg
+│   │   │   ├── public-web.log
+│   │   │   ├── src
+│   │   │   │   ├── app
+│   │   │   │   │   ├── cliente
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   ├── empresa
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   ├── favicon.ico
+│   │   │   │   │   ├── globals.css
+│   │   │   │   │   ├── layout.tsx
+│   │   │   │   │   ├── page.tsx
+│   │   │   │   │   └── register
+│   │   │   │   │       └── [token]
+│   │   │   │   │           └── page.tsx
+│   │   │   │   ├── components
+│   │   │   │   │   ├── I18nProvider.tsx
+│   │   │   │   │   ├── PhotoCapture.tsx
+│   │   │   │   │   ├── PhotoEditor.tsx
+│   │   │   │   │   └── RegistrationForm.tsx
+│   │   │   │   ├── lib
+│   │   │   │   │   └── api.ts
+│   │   │   │   └── utils
+│   │   │   │       ├── FaceValidator.ts
+│   │   │   │       └── cropImage.ts
+│   │   │   └── tsconfig.json
+│   │   └── web-admin
+│   │       ├── .env
+│   │       ├── .env.local
+│   │       ├── README.md
+│   │       ├── build_output.log
+│   │       ├── criar-componentes.ps1
+│   │       ├── criar-frontend-completo.ps1
+│   │       ├── index.html
+│   │       ├── package-lock.json
+│   │       ├── package.json
+│   │       ├── public
+│   │       │   ├── assets
+│   │       │   │   └── nzt-logo.jpg
+│   │       │   └── manifest.json
+│   │       ├── src
+│   │       │   ├── App.jsx
+│   │       │   ├── components
+│   │       │   │   ├── LanguageSwitcher.jsx
+│   │       │   │   ├── common
+│   │       │   │   │   ├── DataTable.jsx
+│   │       │   │   │   ├── FaceCropper.jsx
+│   │       │   │   │   ├── GlassCard.jsx
+│   │       │   │   │   ├── GlobalErrorBoundary.jsx
+│   │       │   │   │   ├── LoadingOverlay.jsx
+│   │       │   │   │   ├── NeonButton.jsx
+│   │       │   │   │   ├── PageHeader.jsx
+│   │       │   │   │   ├── PhotoCapture.jsx
+│   │       │   │   │   ├── SearchBar.jsx
+│   │       │   │   │   ├── StatusBadge.jsx
+│   │       │   │   │   └── confirmDialog.jsx
+│   │       │   │   ├── dashboard
+│   │       │   │   │   ├── RecentAdditions.jsx
+│   │       │   │   │   ├── RecentCheckins.jsx
+│   │       │   │   │   └── StatsCards.jsx
+│   │       │   │   ├── empresa
+│   │       │   │   │   ├── EmpresaCard.jsx
+│   │       │   │   │   ├── EmpresaForm.jsx
+│   │       │   │   │   └── EmpresaList.jsx
+│   │       │   │   ├── layout
+│   │       │   │   │   └── Sidebar.jsx
+│   │       │   │   └── pessoa
+│   │       │   │       ├── BadgePrint.jsx
+│   │       │   │       ├── FaceCapture.jsx
+│   │       │   │       └── PessoaForm.jsx
+│   │       │   ├── config
+│   │       │   │   └── i18n.js
+│   │       │   ├── contexts
+│   │       │   │   ├── AuthContext.jsx
+│   │       │   │   └── EventContext.jsx
+│   │       │   ├── hooks
+│   │       │   │   ├── useAuth.js
+│   │       │   │   ├── useAuth.jsx
+│   │       │   │   ├── usePermissions.js
+│   │       │   │   └── useRealtime.js
+│   │       │   ├── index.css
+│   │       │   ├── index.js
+│   │       │   ├── locales
+│   │       │   │   ├── de.json
+│   │       │   │   ├── en.json
+│   │       │   │   ├── es.json
+│   │       │   │   └── pt-BR.json
+│   │       │   ├── main.jsx
+│   │       │   ├── pages
+│   │       │   │   ├── AuditoriaDocumental.jsx
+│   │       │   │   ├── Checkin.jsx
+│   │       │   │   ├── Checkout.jsx
+│   │       │   │   ├── Configuracoes.jsx
+│   │       │   │   ├── Dashboard.jsx
+│   │       │   │   ├── Empresas.jsx
+│   │       │   │   ├── Eventos.jsx
+│   │       │   │   ├── Login.jsx
+│   │       │   │   ├── Monitor.jsx
+│   │       │   │   ├── Pessoas.jsx
+│   │       │   │   ├── Reports.jsx
+│   │       │   │   ├── Usuarios.jsx
+│   │       │   │   ├── Veiculos.jsx
+│   │       │   │   └── config
+│   │       │   │       ├── ConfigAreas.jsx
+│   │       │   │       ├── ConfigBancoDados.jsx
+│   │       │   │       ├── ConfigCameras.jsx
+│   │       │   │       ├── ConfigCheckin.jsx
+│   │       │   │       ├── ConfigComunicacao.jsx
+│   │       │   │       ├── ConfigCredenciamento.jsx
+│   │       │   │       ├── ConfigEtiquetas.jsx
+│   │       │   │       ├── ConfigGamificacao.jsx
+│   │       │   │       ├── ConfigGeral.jsx
+│   │       │   │       ├── ConfigIdiomas.jsx
+│   │       │   │       ├── ConfigIntegracoes.jsx
+│   │       │   │       ├── ConfigLeitorFacial.jsx
+│   │       │   │       ├── ConfigLogs.jsx
+│   │       │   │       ├── ConfigNotificacoes.jsx
+│   │       │   │       ├── ConfigPulseiras.jsx
+│   │       │   │       ├── ConfigSeguranca.jsx
+│   │       │   │       ├── ConfigVeiculos.jsx
+│   │       │   │       ├── ConfigWebhooks.jsx
+│   │       │   │       └── tabs
+│   │       │   │           ├── TabEventos.jsx
+│   │       │   │           ├── TabGeral.jsx
+│   │       │   │           ├── TabIdiomas.jsx
+│   │       │   │           ├── TabIntegracoes.jsx
+│   │       │   │           └── TabNotificacoes.jsx
+│   │       │   ├── services
+│   │       │   │   ├── LocalCheckinService.js
+│   │       │   │   ├── api.js
+│   │       │   │   ├── auth.js
+│   │       │   │   ├── db.js
+│   │       │   │   ├── supabase.js
+│   │       │   │   └── websocket.js
+│   │       │   ├── styles
+│   │       │   │   └── theme.js
+│   │       │   └── utils
+│   │       │       └── FaceValidator.js
+│   │       └── vite.config.js
+│   ├── generate_dump.ps1
+│   ├── hardware-integration
+│   │   ├── drivers
+│   │   │   ├── linux
+│   │   │   └── windows
+│   │   ├── examples
+│   │   │   └── turnstile-example.js
+│   │   ├── manuals
+│   │   │   ├── biot-facial-terminal.pdf
+│   │   │   ├── intelbras-facial.pdf
+│   │   │   └── turnstile-api.pdf
+│   │   ├── nginx
+│   │   │   ├── conf.d
+│   │   │   └── ssl
+│   │   ├── protocols
+│   │   │   ├── biometric
+│   │   │   ├── camera
+│   │   │   ├── http-endpoints.json
+│   │   │   └── turnstile
+│   │   │       ├── http-api.js
+│   │   │       └── tcp-commands.json
+│   │   └── simulators
+│   │       ├── facial
+│   │       ├── rtsp
+│   │       │   └── streams
+│   │       └── turnstile
+│   ├── meu_projeto.txt
+│   ├── project_context_dump.txt
+│   ├── project_dumps
+│   │   ├── 01_DATABASE_MODULE.txt
+│   │   ├── 02_BACKEND_API_MODULE.txt
+│   │   ├── 03_BACKEND_PYTHON_MODULE.txt
+│   │   ├── 04_FRONTEND_ADMIN_MODULE.txt
+│   │   ├── 05_FRONTEND_PUBLIC_MODULE.txt
+│   │   ├── 06_FRONTEND_MOBILE_MODULE.txt
+│   │   └── 07_DOCS_ROOT_MODULE.txt
+│   ├── project_dumps_20260220_202605
+│   │   ├── 01_DATABASE_MODULE.txt
+│   │   └── 02_BACKEND_API_MODULE.txt
+│   ├── project_dumps_20260220_202753
+│   │   ├── 01_DATABASE_MODULE.txt
+│   │   ├── 02_BACKEND_API_MODULE.txt
+│   │   ├── 03_BACKEND_PYTHON_MODULE.txt
+│   │   ├── 04_FRONTEND_ADMIN_MODULE.txt
+│   │   ├── 05_FRONTEND_PUBLIC_MODULE.txt
+│   │   ├── 06_FRONTEND_MOBILE_MODULE.txt
+│   │   ├── 07_DOCS_ROOT_MODULE.txt
+│   │   └── project_context_dump_UPDATED.txt
+│   ├── scripts
+│   │   ├── generate_modular_dumps.ps1
+│   │   └── refactor_identities.js
+│   ├── start_all.bat
+│   └── start_nexus.ps1
+└── generate_tree.js

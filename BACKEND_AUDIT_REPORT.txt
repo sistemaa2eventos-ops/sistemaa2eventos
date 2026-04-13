@@ -1,0 +1,78 @@
+=========================================================
+      AUDITORIA DE LÓGICA E REGRAS DE NEGÓCIO (BACKEND)
+                   PROJETO: A2 EVENTOS
+=========================================================
+
+Senhor Arquiteto, realizei o pente-fino no controlador `accessController.js`. Identifiquei falhas que podem gerar furos de segurança física e inconsistência de dados em cenários de alta carga ou falha de hardware.
+
+Abaixo, as vulnerabilidades e as correções cirúrgicas:
+
+---------------------------------------------------------
+🔴 1. FURO DE SEGURANÇA: AUSÊNCIA DE VALIDAÇÃO DE FASES (QR/BARCODE/MANUAL)
+---------------------------------------------------------
+VULNERABILIDADE: A função `verificarFaseEvento` só é chamada no reconhecimento facial. Se um usuário tiver permissão apenas para "Fase Montagem", ele consegue entrar durante o "Showday" se apresentar o QR Code ou se o operador fizer Check-in Manual, pois esses fluxos ignoram a data do evento.
+
+CORREÇÃO CIRÚRGICA (Mover para o registrarAcesso):
+```javascript
+// Dentro de registrarAcesso (accessController.js)
+// Antes de registrar o log no Supabase:
+
+const fasePermitida = await this.verificarFaseEvento(evento_id, pessoa);
+if (!fasePermitida && tipo === 'checkin') {
+    const motivo = 'Acesso negado: Fase do evento não permitida para este perfil';
+    logger.warn(`🛑 ACESSO NEGADO: ${pessoa.nome} - Motivo: ${motivo}`);
+    // ... registrar log de negado ...
+    const error = new Error(motivo);
+    error.status = 403;
+    throw error;
+}
+```
+
+---------------------------------------------------------
+🟠 2. INCONSISTÊNCIA DE DADOS: FALHA DE "ROLLBACK" NA CATRACA (HARDWARE)
+---------------------------------------------------------
+VULNERABILIDADE: No `processFaceRecognition`, o sistema executa `registrarAcesso` (escreve no banco) e DEPOIS `acionarCatraca`. Se a catraca falhar (timeout ou queda de luz), o banco marca a pessoa como "Dentro", mas ela ficou do lado de fora.
+
+SOLUÇÃO COM "COMPENSATING ACTION":
+```javascript
+// No processFaceRecognition:
+try {
+    const result = await this.registrarAcesso({ ... });
+    
+    try {
+        await this.acionarCatraca(dispositivo_id, 'liberar');
+    } catch (hwError) {
+        logger.error('Falha de Hardware - Revertendo Check-in:', hwError);
+        // Ação Compensatória: Reverte status e marca o log como falha de hardware
+        await supabase.from('pessoas').update({ status_acesso: 'pendente' }).eq('id', pessoa_id);
+        await supabase.from('logs_acesso').update({ tipo: 'falha_hardware' }).eq('id', result.log.id);
+        throw new Error('Falha ao acionar dispositivo físico. Acesso não concluído.');
+    }
+} catch (error) { ... }
+```
+
+---------------------------------------------------------
+🟡 3. GARGALO DE CAPACIDADE: AUSÊNCIA DE BLOQUEIO POR COTA/CAPACIDADE
+---------------------------------------------------------
+VULNERABILIDADE: O sistema possui tabelas de quotas empresas e capacidade total do evento, mas o controlador de acesso JAMAIS checa se a cota estourou antes de deixar entrar. Isso pode gerar superlotamento e problemas legais com o alvará do evento.
+
+CORREÇÃO CIRÚRGICA (Injetar em registrarAcesso):
+```javascript
+// Validar Cota da Empresa e Capacidade Global
+if (tipo === 'checkin') {
+    const stats = await this.getRealtimeStats({ event: { id: evento_id } }, { json: (d) => d }); // Mock simplificado
+    const empresaInfo = stats.data.empresas.find(e => e.id === pessoa.empresa_id);
+    
+    if (stats.data.presentes >= stats.data.capacidade) {
+        throw new Error('Capacidade máxima do evento atingida.');
+    }
+    
+    if (empresaInfo && empresaInfo.quota > 0 && empresaInfo.total >= empresaInfo.quota) {
+        throw new Error('Cota da empresa atingida para este evento.');
+    }
+}
+```
+
+---------------------------------------------------------
+🟢 CONCLUSÃO
+As proteções contra usuários bloqueados e empresas inativas já estão bem implementadas. O foco deve ser a centralização da `verificarFaseEvento` e a gestão de erro do hardware para evitar o "fantasma" do check-in que não aconteceu fisicamente.
