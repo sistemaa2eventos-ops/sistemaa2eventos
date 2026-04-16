@@ -19,9 +19,11 @@ import RecentAdditions from '../components/dashboard/RecentAdditions';
 import NeonButton from '../components/common/NeonButton';
 import { useDashboard } from '../hooks/useDashboard';
 
-const StatValue = styled(Typography)(({ theme, color }) => ({
-    fontSize: '2.5rem', fontWeight: 900, fontFamily: '"Orbitron", sans-serif',
-    color: '#fff', textShadow: `0 0 20px ${color || '#00D4FF'}40`,
+const StatValue = styled(Typography)(() => ({
+    fontSize: '2.25rem', fontWeight: 800,
+    fontFamily: '"Space Grotesk", "Inter", sans-serif',
+    color: '#fff', letterSpacing: '-0.03em',
+    lineHeight: 1.1,
 }));
 
 const CustomTooltip = ({ active, payload, label }) => {
@@ -52,7 +54,7 @@ const Dashboard = () => {
         return (
             <Box sx={{ p: 4, textAlign: 'center', mt: 10 }}>
                 <EventIcon sx={{ fontSize: 60, opacity: 0.2, mb: 2 }} />
-                <Typography variant="h5" fontWeight={700}>NENHUM EVENTO ATIVO</Typography>
+                <Typography variant="h5" fontWeight={700}>Nenhum evento ativo</Typography>
                 <Typography variant="body2" sx={{ mb: 3 }} color="text.secondary">Selecione um Evento no menu lateral.</Typography>
                 <NeonButton onClick={() => navigate('/eventos')}>IR PARA EVENTOS</NeonButton>
             </Box>
@@ -62,10 +64,10 @@ const Dashboard = () => {
     if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
 
     const cards = [
-        { title: 'EMPRESAS', value: stats.total_empresas, icon: <BusinessIcon />, color: '#00D4FF', trend: 'Credenciadas' },
-        { title: 'PARTICIPANTES', value: stats.total_pessoas, icon: <PeopleIcon />, color: '#7B2FBE', trend: `${stats.presentes} presentes` },
-        { title: 'CHECK-INS (HOJE)', value: stats.checkins_hoje, icon: <LoginIcon />, color: '#00FF88', trend: 'Entradas' },
-        { title: 'SAÍDAS (HOJE)', value: stats.checkouts_hoje, icon: <LogoutIcon />, color: '#FFB800', trend: 'Dispersão' },
+        { title: 'Empresas', value: stats.total_empresas, icon: <BusinessIcon />, color: '#00D4FF', trend: 'Credenciadas' },
+        { title: 'Participantes', value: stats.total_pessoas, icon: <PeopleIcon />, color: '#7B2FBE', trend: `${stats.presentes} presentes` },
+        { title: 'Check-ins hoje', value: stats.checkins_hoje, icon: <LoginIcon />, color: '#00FF88', trend: 'Entradas' },
+        { title: 'Saídas hoje', value: stats.checkouts_hoje, icon: <LogoutIcon />, color: '#FFB800', trend: 'Dispersão' },
     ];
 
     return (
@@ -88,15 +90,15 @@ const Dashboard = () => {
                                 <Box sx={{ p: 1, borderRadius: 2, background: `${card.color}20`, color: card.color }}>{card.icon}</Box>
                                 <Typography variant="caption" color="#00FF88" fontWeight={700}><TrendingUpIcon sx={{ fontSize: 14 }} /> {card.trend}</Typography>
                             </Box>
-                            <Typography variant="caption" fontWeight={700} color="text.secondary">{card.title}</Typography>
-                            <StatValue color={card.color}>{String(card.value).padStart(2, '0')}</StatValue>
+                            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: '0.7rem' }}>{card.title}</Typography>
+                            <StatValue>{String(card.value).padStart(2, '0')}</StatValue>
                         </GlassCard>
                     </Grid>
                 ))}
 
                 <Grid item xs={12} md={7}>
                     <GlassCard sx={{ p: 3, height: 400 }}>
-                        <Typography variant="h6" fontWeight={700} color="#00D4FF" mb={3}>FLUXO DE ACESSO (24H)</Typography>
+                        <Typography variant="h6" fontWeight={700} color="primary.main" mb={3}>Fluxo de Acesso — 24h</Typography>
                         <ResponsiveContainer width="100%" height={300}>
                             <AreaChart data={fluxData}>
                                 <defs>
@@ -118,7 +120,7 @@ const Dashboard = () => {
                 <Grid item xs={12} md={5}>
                     <GlassCard sx={{ p: 3, height: 400, display: 'flex', flexDirection: 'column' }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                            <Typography variant="h6" fontWeight={700} color="#00FF88">TERMINAIS ATIVOS</Typography>
+                            <Typography variant="h6" fontWeight={700} color="success.main">Terminais Ativos</Typography>
                             <Chip label={stats.dispositivos_online > 0 ? 'ONLINE' : 'OFFLINE'} size="small" sx={{ bgcolor: stats.dispositivos_online > 0 ? 'rgba(0,255,136,0.1)' : 'rgba(255,51,102,0.1)', color: stats.dispositivos_online > 0 ? '#00FF88' : '#FF3366', fontWeight: 800 }} />
                         </Box>
                         <Stack spacing={2} sx={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -137,7 +139,7 @@ const Dashboard = () => {
 
                 <Grid item xs={12}>
                     <GlassCard sx={{ p: 3 }}>
-                        <Typography variant="h6" fontWeight={700} color="#00FF88" mb={3}>ÚLTIMOS PARTICIPANTES CADASTRADOS</Typography>
+                        <Typography variant="h6" fontWeight={700} color="text.primary" mb={3}>Últimos Participantes Cadastrados</Typography>
                         <RecentAdditions pessoas={recentPessoas} />
                     </GlassCard>
                 </Grid>
