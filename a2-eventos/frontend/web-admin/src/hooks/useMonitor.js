@@ -168,7 +168,7 @@ export const useMonitor = () => {
                 watchlist: alert.watchlist
             };
             setActiveAlert(formattedAlert);
-            try { alertAudio.play().catch(() => {}); } catch (e) {}
+            alertAudio.play().catch(() => null);
             setTimeout(() => setActiveAlert(null), 10000);
         });
 

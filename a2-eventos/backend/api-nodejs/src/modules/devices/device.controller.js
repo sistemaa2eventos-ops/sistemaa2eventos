@@ -362,7 +362,7 @@ class DeviceController {
                 .limit(1);
 
             const printerService = require('../../services/printerService');
-            const buffer = printerService.generateBadgeBuffer(pessoa, pessoa.empresas?.nome);
+            const buffer = await printerService.generateBadgeBuffer(pessoa, pessoa.empresas?.nome, evento_id || req.event?.id);
 
             if (printer && printer.length > 0) {
                 const p = printer[0];

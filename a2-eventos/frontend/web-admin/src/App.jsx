@@ -80,6 +80,12 @@ const AppContent = () => {
       window.addEventListener('offline', () => {
         enqueueSnackbar(`Sem conexão! Modo Offline ativado. Check-ins salvos localmente.`, { variant: 'warning' });
       });
+
+      window.addEventListener('offline-sync-completed', () => {
+        // Notifica componentes para recarregarem via evento global customizado
+        window.dispatchEvent(new CustomEvent('refresh-global-data'));
+        enqueueSnackbar(`Dashboard atualizado com dados sincronizados.`, { variant: 'success' });
+      });
     }
   }, [user, loading, enqueueSnackbar]);
 

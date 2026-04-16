@@ -38,6 +38,7 @@
         "uuid": "^13.0.0"
     },
     "devDependencies": {
+        "@playwright/test": "^1.59.1",
         "@types/react": "^18.2.37",
         "@types/react-dom": "^18.2.15",
         "@vitejs/plugin-react": "^4.2.0",
@@ -47,5 +48,8 @@
         "eslint-plugin-react-refresh": "^0.4.4",
         "vite": "^5.0.0",
         "vite-plugin-pwa": "^1.2.0"
+    },
+    "optionalDependencies": {
+        "@rollup/rollup-linux-x64-musl": "^4.24.4"
     }
 }

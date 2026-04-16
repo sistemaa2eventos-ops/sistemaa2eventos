@@ -112,6 +112,9 @@ class LocalCheckinService {
         window.dispatchEvent(new CustomEvent('sync-status-changed', { 
             detail: { count: await this.getPendenteCount() } 
         }));
+
+        // F-02: Notifica UI de que os dados mudaram (necessário refresh de listas)
+        window.dispatchEvent(new CustomEvent('offline-sync-completed'));
     }
 
     /**

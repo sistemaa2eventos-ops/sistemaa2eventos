@@ -5,7 +5,7 @@ ARG VITE_API_URL=https://api.nzt.app.br/api
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install --legacy-peer-deps
+RUN npm install --legacy-peer-deps && npm install @rollup/rollup-linux-x64-musl
 
 COPY . .
 ENV VITE_API_URL=$VITE_API_URL

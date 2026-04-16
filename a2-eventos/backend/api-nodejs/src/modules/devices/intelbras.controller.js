@@ -126,10 +126,25 @@ class IntelbrasController {
                         if (result.action === 'allow') {
                             // SUCESSO: Abre a catraca se configurado
                             if (dispositivoConfig?.controla_rele !== false) {
-                                await service.openDoor();
-                                logger.info(`🔌 [Intelbras] Relé acionado para ${pessoa.nome}`);
+                                try {
+                                    await service.openDoor();
+                                    logger.info(`🔌 [Intelbras] Relé acionado para ${pessoa.nome}`);
+                                    await service.displayMessage(`BEM-VINDO ${pessoa.nome.split(' ')[0]}`);
+                                } catch (hwError) {
+                                    logger.error(`🚨 [Intelbras] FALHA CRÍTICA DE HARDWARE: ${hwError.message}. Iniciando ROLLBACK.`);
+                                    
+                                    // B-02: ROLLBACK - Reverter o registro no banco para não queimar o acesso
+                                    await checkinService.reverterAcesso(supabase, {
+                                        pessoa_id: pessoa.id,
+                                        log_id: result.details?.id,
+                                        motivo: `Falha técnica no hardware: ${hwError.message}`
+                                    });
+
+                                    await service.displayMessage(`ERRO HARDWARE`);
+                                }
+                            } else {
+                                await service.displayMessage(`BEM-VINDO ${pessoa.nome.split(' ')[0]}`);
                             }
-                            await service.displayMessage(`BEM-VINDO ${pessoa.nome.split(' ')[0]}`);
                         } else {
                             // NEGADO: Apenas feedback visual/sonoro
                             await service.displayMessage(`NEGADO: ${result.error || 'ERRO'}`);

@@ -325,11 +325,11 @@ export const usePessoas = () => {
       try {
         setImportLoading(true);
         const response = await api.post('/excel/import/pessoas', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-        alert(response.data.message); 
+        enqueueSnackbar(response.data.message, { variant: 'success' }); 
         setOpenImport(false); 
         loadPessoas();
       } catch (error) { 
-          alert('Erro na importação.'); 
+        enqueueSnackbar('Erro na importação.', { variant: 'error' }); 
       } finally { setImportLoading(false); }
     };
 

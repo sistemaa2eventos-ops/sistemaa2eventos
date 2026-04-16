@@ -84,7 +84,9 @@ class PessoaController {
 
     async create(req, res) {
         try {
-            const supabaseClient = req.supabase || supabase;
+            // Sempre usar service_role para operações de escrita (criar/editar)
+            // O req.supabase usa anon_key e passa pelas políticas RLS, que podem bloquear operações administrativas
+            const supabaseClient = supabase;
             const result = await pessoaService.createPessoa(supabaseClient, req.body, req.user);
 
             // Auditoria

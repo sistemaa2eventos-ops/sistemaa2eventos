@@ -71,9 +71,18 @@ class HikvisionController {
 
             // 4. Feedback
             if (result.action === 'allow' && dispositivo.config?.controla_rele !== false) {
-                const HikvisionService = require('./hikvision.service');
-                const service = new HikvisionService(dispositivo);
-                await service.openDoor();
+                try {
+                    const HikvisionService = require('./hikvision.service');
+                    const service = new HikvisionService(dispositivo);
+                    await service.openDoor();
+                } catch (hwError) {
+                    logger.error(`🚨 [Hikvision] FALHA CRÍTICA DE HARDWARE: ${hwError.message}. Iniciando ROLLBACK.`);
+                    await checkinService.reverterAcesso(supabase, {
+                        pessoa_id: pessoa.id,
+                        log_id: result.details?.id,
+                        motivo: `Falha técnica no hardware Hikvision: ${hwError.message}`
+                    });
+                }
             }
 
             res.json({ success: true });

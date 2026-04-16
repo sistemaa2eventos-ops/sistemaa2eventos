@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -16,13 +16,19 @@ export const metadata: Metadata = {
   title: "A2 Eventos | Credenciamento",
   description: "Plataforma Inteligente de Gestão de Bordo, Controle de Acesso e Credenciamento Biométrico B2B/B2C.",
   manifest: "/manifest.webmanifest",
-  themeColor: "#020617",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "A2 Acesso",
-  },
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0",
+  }
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#020617"
 };
 
 import { I18nProvider } from '@/components/I18nProvider';

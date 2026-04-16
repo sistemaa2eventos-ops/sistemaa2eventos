@@ -30,8 +30,9 @@ export default function PrivacyPage() {
             if (!res.ok) throw new Error(data.error || 'Erro ao processar solicitação');
 
             setMessage({ type: 'success', text: data.message });
-        } catch (error: any) {
-            setMessage({ type: 'error', text: error.message });
+        } catch (error: unknown) {
+            const messageText = error instanceof Error ? error.message : 'Falha ao processar solicitação';
+            setMessage({ type: 'error', text: messageText });
         } finally {
             setLoading(false);
         }

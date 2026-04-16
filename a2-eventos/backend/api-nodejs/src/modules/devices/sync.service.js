@@ -187,27 +187,39 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
                 logsToSync.push(logData);
             }
 
-            // 3. Upsert em lote no Supabase
-            if (logsToSync.length > 0) {
-                const { error } = await supabase
-                    .from('logs_acesso')
-                    .upsert(logsToSync, { onConflict: 'id', ignoreDuplicates: true });
+            // 3. Upsert inteligente com verificação de Race Condition (D-01)
+            const syncedIds = [];
+            const failedLogs = [];
 
-                if (error) {
-                    logger.error('❌ Erro no batch upsert de logs:', error.message);
-                    // Em caso de erro no lote, voltamos para o modo individual para identificar o culpado
-                    for (const log of logsToSync) {
-                        try {
-                            const { error: singleErr } = await supabase.from('logs_acesso').upsert(log, { onConflict: 'id' });
-                            if (singleErr) throw singleErr;
-                            syncedIds.push(log.id);
-                        } catch (err) {
-                            failedLogs.push({ ...log, error: err.message });
+            if (logsToSync.length > 0) {
+                for (const logData of logsToSync) {
+                    try {
+                        // Verificar se já existe um log idêntico nos últimos 10 segundos
+                        // Evita duplicidade se 2 catracas sincronizarem o mesmo evento/pessoa simultaneamente
+                        const { data: recent } = await supabase
+                            .from('logs_acesso')
+                            .select('id')
+                            .eq('pessoa_id', logData.pessoa_id)
+                            .eq('tipo', logData.tipo)
+                            .eq('evento_id', logData.evento_id)
+                            .gte('created_at', new Date(new Date(logData.created_at).getTime() - 10000).toISOString())
+                            .limit(1);
+
+                        if (recent && recent.length > 0) {
+                            logger.warn(`🛑 [Sync] Race Condition Detectada para Pessoa ${logData.pessoa_id}. Ignorando log duplicado.`);
+                            syncedIds.push(logData.id); // Marcar como sincronizado para não tentar de novo
+                            continue;
                         }
+
+                        const { error } = await supabase.from('logs_acesso').upsert(logData, { onConflict: 'id', ignoreDuplicates: true });
+                        if (error) throw error;
+                        
+                        syncedIds.push(logData.id);
+                        this.stats.totalSynced++;
+                    } catch (err) {
+                        logger.error(`❌ Erro ao sincronizar log ${logData.id}:`, err.message);
+                        failedLogs.push({ ...logData, error: err.message });
                     }
-                } else {
-                    logsToSync.forEach(l => syncedIds.push(l.id));
-                    this.stats.totalSynced += logsToSync.length;
                 }
             }
 

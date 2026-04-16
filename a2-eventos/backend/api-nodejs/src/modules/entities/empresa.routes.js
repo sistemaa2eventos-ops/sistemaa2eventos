@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const empresaController = require('./empresa.controller');
-const { authenticate, authorize, checkPermission } = require('../../middleware/auth');
+const { authenticate, checkPermission } = require('../../middleware/auth');
 const { requireEvent } = require('../../middleware/eventMiddleware');
 
 // Todas as rotas de empresa requerem autenticação e contexto de evento
@@ -18,6 +18,6 @@ router.delete('/:id', checkPermission('empresas', 'escrita'), empresaController.
 
 // Gerar novo token de cadastro (Admin/Supervisor)
 router.post('/:id/refresh-token', checkPermission('empresas', 'escrita'), empresaController.refreshToken);
-router.post('/:id/gerar-convite', authenticate, empresaController.gerarConvite);
+router.post('/:id/gerar-convite', checkPermission('empresas', 'escrita'), empresaController.gerarConvite);
 
 module.exports = router;

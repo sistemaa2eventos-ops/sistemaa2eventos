@@ -1,11 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, FlatList, ActivityIndicator, SafeAreaView, View, TouchableOpacity } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { A2Card } from '@/components/A2Card';
-import { A2Button } from '@/components/A2Button';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { eventService, Event } from '@/services/eventService';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,8 +10,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 export default function EventsScreen() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const colorScheme = useColorScheme() ?? 'dark';
-  const theme = Colors[colorScheme];
   const router = useRouter();
 
   useEffect(() => {

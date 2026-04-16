@@ -28,8 +28,11 @@ Write-Step 2 "Verificacao de variaveis de ambiente"
 node backend/api-nodejs/scripts/check_env.js
 if ($LASTEXITCODE -ne 0) { Abort "Configure as variaveis no .env antes de continuar." }
 
-Write-Step 2.1 "Verificando .env para production"
-(Get-Content backend/api-nodejs/.env) -replace 'NODE_ENV=development', 'NODE_ENV=production' | Set-Content backend/api-nodejs/.env
+Write-Step 2.1 "Validando NODE_ENV de deploy sem alterar .env local"
+$envRaw = Get-Content backend/api-nodejs/.env -Raw
+if ($envRaw -notmatch "(?m)^NODE_ENV=production$") {
+  Write-Host "  Aviso: NODE_ENV no .env local nao esta como production. O container de producao ainda usara NODE_ENV=production via docker-compose." -ForegroundColor Yellow
+}
 
 Write-Step 3 "Gerando Tarball e Enviando arquivos para a VPS"
 if (Test-Path $TAR_FILE) { Remove-Item $TAR_FILE }
@@ -42,8 +45,12 @@ ssh "${User}@${IP}" @"
   cd $AppPath
   echo '  Descompactando...'
   tar -xzf $TAR_FILE
-  echo '  docker-compose build and up...'
-  docker-compose up -d --build --remove-orphans
+  echo '  Limpando cache e imagens antigas...'
+  docker system prune -f
+  echo '  Iniciando Build (pode demorar)...'
+  docker-compose build --no-cache admin-web
+  echo '  Subindo servicos...'
+  docker-compose up -d --remove-orphans
 "@
 
 Write-Step 5 "Aguardando inicializacao ($WaitSec segundos)"

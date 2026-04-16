@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, StyleSheet, View, TouchableOpacity, SafeAreaView } from 'react-native';
+import { Modal, StyleSheet, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';

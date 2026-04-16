@@ -54,7 +54,7 @@ class CheckinService {
 
         // 3. Validar políticas de acesso
         try {
-            await ValidationService.validateAccessRules(evento_id, pessoa, tipoFinal, metodo, timestamp, accessData.confianca, area_id);
+            const validation = await ValidationService.validateAccessRules(evento_id, pessoa, tipoFinal, metodo, timestamp, accessData.confianca, area_id);
             
             // 4. Sucesso: Persistir no Banco de Dados
             const logId = require('uuid').v4();
@@ -67,7 +67,8 @@ class CheckinService {
                     evento_id, pessoa_id, tipo: tipoFinal, metodo,
                     dispositivo_id, created_by, sync_id,
                     confianca: accessData.confianca || null,
-                    foto_capturada: accessData.foto_capturada || null
+                    foto_capturada: accessData.foto_capturada || null,
+                    observacao: (validation && validation.quotaBypassed) ? '⚠️ BYPASS_COTA (Capacidade Excedida)' : null
                 },
                 pessoa,
                 new_status
@@ -190,6 +191,43 @@ class CheckinService {
 
     async getStats(supabaseClient, eventoId) {
         return ValidationService.getRealtimeStatsInternal(eventoId);
+    }
+
+    /**
+     * B-02: Reverter Acesso em caso de Falha de Hardware (Rollback)
+     */
+    async reverterAcesso(supabaseClient, { pessoa_id, log_id, motivo }) {
+        try {
+            logger.warn(`♻️ [Rollback] Revertendo check-in para pessoa ${pessoa_id}. Motivo: ${motivo}`);
+            
+            // 1. Reverter Status da Pessoa
+            const { error: pErr } = await supabaseClient
+                .from('pessoas')
+                .update({ 
+                    status_acesso: 'checkout',
+                    last_access_at: null 
+                })
+                .eq('id', pessoa_id);
+
+            if (pErr) throw pErr;
+
+            // 2. Marcar log como FAILED ou Deletar
+            // Optamos por manter o log mas marcado como erro de hardware para auditoria
+            if (log_id) {
+                await supabaseClient
+                    .from('logs_acesso')
+                    .update({ 
+                        tipo: 'erro_hardware',
+                        observacao: motivo 
+                    })
+                    .eq('id', log_id);
+            }
+
+            return { success: true };
+        } catch (error) {
+            logger.error('Erro ao reverter acesso:', error.message);
+            return { success: false, error: error.message };
+        }
     }
 }
 

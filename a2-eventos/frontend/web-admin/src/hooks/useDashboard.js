@@ -79,6 +79,17 @@ export const useDashboard = () => {
         };
     }, [eventoId]);
 
+    // F-02: Escuta evento global de sincronização offline concluída para atualizar UI
+    useEffect(() => {
+        const handleGlobalRefresh = () => {
+            logger.info('🔄 Dashboard Refresh Triggered via Global Event');
+            refresh();
+        };
+
+        window.addEventListener('refresh-global-data', handleGlobalRefresh);
+        return () => window.removeEventListener('refresh-global-data', handleGlobalRefresh);
+    }, [refresh]);
+
     return {
         stats, fluxData, recentCheckins, recentPessoas,
         loading, refreshing, eventoId, refresh

@@ -2,39 +2,49 @@ const express = require('express');
 const router = express.Router();
 const authController = require('./auth.controller');
 const { authenticate, authorize } = require('../../middleware/auth');
-const { validateLogin, validateRegister } = require('../../middleware/validator');
+const { validateLogin } = require('../../middleware/validator');
 const rateLimiter = require('../../middleware/rateLimiter');
 
-// Rotas públicas (com rate limiting)
+// ============================================
+// ROTAS PÚBLICAS
+// ============================================
 router.post('/login', rateLimiter.auth, validateLogin, authController.login);
 router.post('/forgot-password', rateLimiter.auth, authController.forgotPassword);
-router.get('/onboarding/:token', authController.getOnboardingData);
-router.post('/onboarding/:token', authController.completeOnboarding);
 
-// FIX ERR-U02: Substituído por Invite (Bi-Role)
-router.post('/invite', authenticate, authorize('master', 'operador'), authController.invite);
+// ============================================
+// ROTAS DE CONVITE (apenas admin_master)
+// ============================================
+router.post('/invite', authenticate, authController.invite);
 
-// Rotas protegidas
+// ============================================
+// ROTAS PROTEGIDAS
+// ============================================
 router.post('/logout', authenticate, authController.logout);
 router.get('/profile', authenticate, authController.getProfile);
 router.get('/me', authenticate, authController.getProfile);
-router.put('/profile', authenticate, authController.updateProfile);
-router.post('/active-event', authenticate, authController.setActiveEvent);
-
-// Rotas de gestão de usuários (Bi-Role)
-router.get('/users', authenticate, authorize('master', 'operador'), authController.listUsers);
-router.get('/roles', authenticate, authorize('master'), authController.listRoles);
-router.put('/users/:userId/role', authenticate, authorize('master', 'operador'), authController.updateUser);
-router.patch('/users/:userId/status', authenticate, authorize('master', 'operador'), authController.updateUserStatus);
-
-// Rotas de permissões de menu (master only)
-router.get('/available-permissions', authenticate, authorize('master'), authController.getAvailablePermissions);
-router.get('/permissions', authenticate, authorize('master'), authController.listPermissions);
-router.get('/permissions/:role', authenticate, authorize('master'), authController.getPermissions);
-router.put('/permissions/:role', authenticate, authorize('master'), authController.savePermissions);
-
-// Gerenciamento de Senhas
-router.post('/admin/reset-password/:userId', authenticate, authorize('master', 'operador'), authController.adminResetPassword);
 router.post('/profile/change-password', authenticate, authController.changeOwnPassword);
+
+// ============================================
+// GESTÃO DE USUÁRIOS
+// ============================================
+// Listar usuários (admin_master vê todos, operador vê do seu evento)
+router.get('/users', authenticate, authController.listUsers);
+
+// Aprovar usuário (apenas admin_master)
+router.post('/users/:userId/approve', authenticate, authController.approveUser);
+
+// Atualizar permissões (apenas admin_master)
+router.put('/users/:userId/permissions', authenticate, authController.updatePermissions);
+
+// Atualizar dados do usuário
+router.put('/users/:userId', authenticate, authController.updateUser);
+
+// Ativar/Inativar usuário (apenas admin_master)
+router.patch('/users/:userId/status', authenticate, authController.updateUserStatus);
+
+// ============================================
+// ADMIN: Reset de senha (deprecated - agora usa approve)
+// ============================================
+// router.post('/admin/reset-password/:userId', authenticate, authorize('admin_master'), authController.adminResetPassword);
 
 module.exports = router;

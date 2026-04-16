@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import Cropper from 'react-easy-crop';
+import type { Area } from 'react-easy-crop';
 import { getCroppedImg } from '../utils/cropImage';
 import { X, Check, RotateCw, ZoomIn, ZoomOut } from 'lucide-react';
 
@@ -15,11 +16,11 @@ export default function PhotoEditor({ image, onSave, onCancel }: PhotoEditorProp
     const [crop, setCrop] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
     const [rotation, setRotation] = useState(0);
-    const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+    const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
     const [loading, setLoading] = useState(false);
 
-    const onCropComplete = useCallback((_croppedArea: any, croppedAreaPixels: any) => {
-        setCroppedAreaPixels(croppedAreaPixels);
+    const onCropComplete = useCallback((_croppedArea: Area, nextCroppedAreaPixels: Area) => {
+        setCroppedAreaPixels(nextCroppedAreaPixels);
     }, []);
 
     const handleSave = async () => {

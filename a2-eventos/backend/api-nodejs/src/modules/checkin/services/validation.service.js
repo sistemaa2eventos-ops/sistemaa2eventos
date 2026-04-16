@@ -164,9 +164,11 @@ class ValidationService {
             throw this._buildError('Cadastro Incompleto (Pendente)');
         }
 
+        const { data: evento } = await supabase.from('eventos').select('min_face_score').eq('id', evento_id).single();
         const s = await this.getCheckinSettings(evento_id);
+        
         const cooldown = s.checkin_cooldown_min ?? 15;
-        const targetConfidence = s.biometric_confidence ?? 75;
+        const targetConfidence = evento?.min_face_score ?? s.biometric_confidence ?? 75;
         const blockDays = s.block_unauthorized_days ?? true;
         const allowOffhour = s.allow_offhour_checkin ?? false;
 
@@ -185,7 +187,12 @@ class ValidationService {
             }
         }
 
-        if (tipo === 'checkin' && !allowOffhour) {
+        // 1. Validação de Fase do Evento (B-01)
+        // Regra: Métodos automáticos (QR/Barcode/RFID) SEMPRE validam fase.
+        // O bypass 'allowOffhour' só se aplica a check-ins manuais (dashboard).
+        const skipPhaseCheck = allowOffhour && metodo === 'manual';
+        
+        if (tipo === 'checkin' && !skipPhaseCheck) {
             const fasePermitida = await this.verificarFaseEvento(evento_id, pessoa, metodo);
             if (!fasePermitida) throw this._buildError('Fase do evento não permitida para este perfil');
         }
@@ -200,9 +207,18 @@ class ValidationService {
             throw this._buildError(pessoa.bloqueado ? (pessoa.motivo_bloqueio || 'Pessoa Bloqueada') : 'Empresa Bloqueada');
         }
 
+        let quotaBypassed = false;
         if (tipo === 'checkin') {
             const stats = await this.getRealtimeStatsInternal(evento_id);
-            if (stats.presentes >= stats.capacidade && stats.capacidade > 0) throw this._buildError('Capacidade máxima do evento atingida');
+            if (stats.presentes >= stats.capacidade && stats.capacidade > 0) {
+                // B-03: Permitir bypass apenas para check-in manual (Dashboard/Admin)
+                if (metodo === 'manual') {
+                    logger.warn(`⚠️ [BYPASS] Cota de evento ${evento_id} excedida, mas liberada via manual`);
+                    quotaBypassed = true;
+                } else {
+                    throw this._buildError('Capacidade máxima do evento atingida');
+                }
+            }
 
             const { data: vinculos } = await supabase
                 .from('pessoa_evento_empresa').select('empresa_id')
@@ -258,7 +274,7 @@ class ValidationService {
             }
         }
 
-        return true;
+        return { success: true, quotaBypassed };
     }
 
     _buildError(message) {

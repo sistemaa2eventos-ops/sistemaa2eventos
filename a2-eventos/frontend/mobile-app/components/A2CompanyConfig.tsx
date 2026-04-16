@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Modal, ScrollView, Switch, TouchableOpacity, Share } from 'react-native';
+import { StyleSheet, View, Modal, ScrollView, TouchableOpacity, Share } from 'react-native';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 import { A2Button } from './A2Button';

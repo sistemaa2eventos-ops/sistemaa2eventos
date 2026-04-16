@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, SafeAreaView, TouchableOpacity, Alert, ScrollView, TextInput } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { A2Button } from '@/components/A2Button';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'expo-router';
@@ -15,8 +13,6 @@ import { offlineService } from '@/services/offlineService';
 const ProfileScreen = () => {
     const { user, profile, signOut } = useAuth();
     const router = useRouter();
-    const colorScheme = useColorScheme() ?? 'dark';
-    const theme = Colors[colorScheme];
 
     const [isEditing, setIsEditing] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -40,7 +36,9 @@ const ProfileScreen = () => {
             try {
                 const pending = await offlineService.getPendingActions();
                 setPendingCount(pending.length);
-            } catch (err) { }
+            } catch {
+                // ignore queue refresh errors on profile load
+            }
         };
         fetchQueue();
     }, [profile, isEditing]);

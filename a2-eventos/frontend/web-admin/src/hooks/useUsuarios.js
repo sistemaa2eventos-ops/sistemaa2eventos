@@ -1,36 +1,49 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSnackbar } from 'notistack';
-import { format } from 'date-fns';
 import api from '../services/api';
 
+// Módulos disponíveis
+export const MODULOS = [
+  { key: 'dashboard', label: 'Dashboard' },
+  { key: 'empresas', label: 'Empresas' },
+  { key: 'pessoas', label: 'Pessoas' },
+  { key: 'auditoria_documentos', label: 'Auditoria Documentos' },
+  { key: 'monitoramento', label: 'Monitoramento' },
+  { key: 'relatorios', label: 'Relatórios' },
+  { key: 'checkin', label: 'Check-in' },
+  { key: 'checkout', label: 'Check-out' }
+];
+
 /**
- * useUsuarios: Hook de controle para gestão de operadores e permissões.
- * Centraliza o CRUD de usuários do sistema, vinculação de eventos e captura de fotos.
+ * useUsuarios: Hook para gestão de usuários
  */
 export const useUsuarios = () => {
     const { enqueueSnackbar } = useSnackbar();
     const [usuarios, setUsuarios] = useState([]);
     const [eventos, setEventos] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [deleteLoading, setDeleteLoading] = useState(false);
     const [search, setSearch] = useState('');
     
     // Dialog States
     const [openDialog, setOpenDialog] = useState(false);
-    const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
-    const [userToDelete, setUserToDelete] = useState(null);
     const [selectedUser, setSelectedUser] = useState(null);
-    const [openPasswordDialog, setOpenPasswordDialog] = useState(false);
-    const [resetingPassword, setResetingPassword] = useState(false);
-
-    const [page, setPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-    const [totalCount, setTotalCount] = useState(0);
-
+    
+    // Formulário
     const [formData, setFormData] = useState({
-        email: '', nome_completo: '', cpf: '',
-        data_nascimento: '', foto_url: '',
-        nivel_acesso: 'operador', evento_id: ''
+        email: '',
+        nome_completo: '',
+        nivel_acesso: 'operador',
+        evento_id: '',
+        permissions: {
+            dashboard: true,
+            empresas: false,
+            pessoas: false,
+            auditoria_documentos: false,
+            monitoramento: false,
+            relatorios: false,
+            checkin: false,
+            checkout: false
+        }
     });
 
     const loadEventos = useCallback(async () => {
@@ -42,45 +55,61 @@ export const useUsuarios = () => {
         }
     }, []);
 
-    const loadUsuarios = useCallback(async (currentPage = page, currentSearch = search) => {
+    const loadUsuarios = useCallback(async () => {
         try {
             setLoading(true);
             const response = await api.get('/auth/users', {
-                params: { page: currentPage, limit: 10, search: currentSearch }
+                params: { search }
             });
-            setUsuarios(response.data.data || []);
-            setTotalPages(response.data.pagination?.pages || 1);
-            setTotalCount(response.data.pagination?.total || 0);
+            setUsuarios(response.data.users || []);
         } catch (error) {
             console.error('Erro ao buscar usuários:', error);
         } finally {
             setLoading(false);
         }
-    }, [page, search]);
+    }, [search]);
 
     useEffect(() => {
         loadUsuarios();
         loadEventos();
-    }, [loadUsuarios, loadEventos, page]);
+    }, [loadUsuarios, loadEventos]);
 
     const handleOpenDialog = (user = null) => {
         if (user) {
             setSelectedUser(user);
             setFormData({
-                email: user.email,
+                email: user.email || '',
                 nome_completo: user.nome_completo || '',
-                cpf: user.cpf || '',
-                data_nascimento: user.data_nascimento ? format(new Date(user.data_nascimento), "yyyy-MM-dd") : '',
-                foto_url: user.foto_url || '',
                 nivel_acesso: user.nivel_acesso || 'operador',
                 evento_id: user.evento_id || '',
+                permissions: user.permissions || {
+                    dashboard: true,
+                    empresas: false,
+                    pessoas: false,
+                    auditoria_documentos: false,
+                    monitoramento: false,
+                    relatorios: false,
+                    checkin: false,
+                    checkout: false
+                }
             });
         } else {
             setSelectedUser(null);
             setFormData({
-                email: '', nome_completo: '', cpf: '',
-                data_nascimento: '', foto_url: '',
-                nivel_acesso: 'operador', evento_id: '',
+                email: '',
+                nome_completo: '',
+                nivel_acesso: 'operador',
+                evento_id: '',
+                permissions: {
+                    dashboard: true,
+                    empresas: false,
+                    pessoas: false,
+                    auditoria_documentos: false,
+                    monitoramento: false,
+                    relatorios: false,
+                    checkin: false,
+                    checkout: false
+                }
             });
         }
         setOpenDialog(true);
@@ -88,28 +117,38 @@ export const useUsuarios = () => {
 
     const handleSave = async () => {
         try {
-            if (formData.nivel_acesso === 'operador' && !formData.evento_id) {
-                enqueueSnackbar('Operadores precisam estar vinculados a um Evento.', { variant: 'warning' });
+            if (!formData.email) {
+                enqueueSnackbar('E-mail é obrigatório.', { variant: 'warning' });
+                return;
+            }
+            if (!formData.evento_id) {
+                enqueueSnackbar('Evento é obrigatório.', { variant: 'warning' });
                 return;
             }
 
             if (selectedUser) {
-                await api.put(`/auth/users/${selectedUser.id}/role`, {
-                    nivel_acesso: formData.nivel_acesso,
-                    evento_id: formData.evento_id || null,
-                    nome_completo: formData.nome_completo,
-                    cpf: formData.cpf,
-                    data_nascimento: formData.data_nascimento || null,
-                    foto_url: formData.foto_url
+                // Atualizar permissões
+                await api.put(`/auth/users/${selectedUser.id}/permissions`, {
+                    permissions: formData.permissions
                 });
-            } else {
-                if (!formData.email) {
-                    enqueueSnackbar('E-mail é obrigatório.', { variant: 'warning' });
-                    return;
+                // Sependente, atualizar evento
+                if (formData.evento_id !== selectedUser.evento_id) {
+                    await api.put(`/auth/users/${selectedUser.id}`, {
+                        evento_id: formData.evento_id,
+                        nome_completo: formData.nome_completo
+                    });
                 }
-                await api.post('/auth/invite', formData);
+                enqueueSnackbar('Permissões atualizadas!', { variant: 'success' });
+            } else {
+                // Criar convite
+                await api.post('/auth/invite', {
+                    email: formData.email,
+                    nome_completo: formData.nome_completo,
+                    nivel_acesso: 'operador',
+                    evento_id: formData.evento_id
+                });
+                enqueueSnackbar('Convite enviado!', { variant: 'success' });
             }
-            enqueueSnackbar(selectedUser ? 'Atualizado!' : 'Convite Enviado!', { variant: 'success' });
             setOpenDialog(false);
             loadUsuarios();
         } catch (error) {
@@ -117,38 +156,35 @@ export const useUsuarios = () => {
         }
     };
 
-    const handleToggleStatus = async (userId, currentStatus) => {
+    const handleApprove = async (userId) => {
         try {
-            setDeleteLoading(true);
-            await api.patch(`/auth/users/${userId}/status`, { ativo: !currentStatus });
-            enqueueSnackbar(`Usuário ${!currentStatus ? 'ativado' : 'desativado'}.`, { variant: 'success' });
+            await api.post(`/auth/users/${userId}/approve`, {
+                evento_id: formData.evento_id,
+                permissions: formData.permissions
+            });
+            enqueueSnackbar('Usuário aprovado!', { variant: 'success' });
             loadUsuarios();
         } catch (error) {
-            enqueueSnackbar('Erro ao alterar status.', { variant: 'error' });
-        } finally {
-            setDeleteLoading(false);
+            enqueueSnackbar(error.response?.data?.error || 'Erro ao aprobar.', { variant: 'error' });
         }
     };
 
-    const handleResetPassword = async (userId, newPassword) => {
+    const handleToggleStatus = async (userId, currentStatus) => {
         try {
-            setResetingPassword(true);
-            await api.post(`/auth/admin/reset-password/${userId}`, { newPassword });
-            enqueueSnackbar('Senha resetada com sucesso!', { variant: 'success' });
-            setOpenPasswordDialog(false);
+            const newStatus = currentStatus === 'ativo' ? 'inativo' : 'ativo';
+            await api.patch(`/auth/users/${userId}/status`, { status: newStatus });
+            enqueueSnackbar(`Usuário ${newStatus === 'ativo' ? 'ativado' : 'inativado'}.`, { variant: 'success' });
+            loadUsuarios();
         } catch (error) {
-            enqueueSnackbar(error.response?.data?.error || 'Erro ao resetar senha.', { variant: 'error' });
-        } finally {
-            setResetingPassword(false);
+            enqueueSnackbar('Erro ao alterar status.', { variant: 'error' });
         }
     };
 
     return {
-        usuarios, eventos, loading, deleteLoading, search, setSearch, page, setPage, totalPages, totalCount,
-        openDialog, setOpenDialog, openDeleteConfirm, setOpenDeleteConfirm,
+        usuarios, eventos, loading, search, setSearch,
+        openDialog, setOpenDialog,
         selectedUser, setSelectedUser, formData, setFormData,
-        openPasswordDialog, setOpenPasswordDialog,
-        resetingPassword, handleResetPassword,
-        handleOpenDialog, handleSave, handleToggleStatus, setUserToDelete
+        handleOpenDialog, handleSave, handleApprove, handleToggleStatus,
+        MODULOS
     };
 };

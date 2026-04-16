@@ -3,7 +3,7 @@ import {
   StyleSheet, View, ScrollView, SafeAreaView,
   ActivityIndicator, TouchableOpacity, RefreshControl
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 

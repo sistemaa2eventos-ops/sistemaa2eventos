@@ -12,20 +12,20 @@ router.use('/watchlist', requireEvent);
 router.use('/dashboard', requireEvent);
 
 // Dashboard principal
-router.get('/dashboard', authenticate, requireEvent, monitorController.dashboard);
+router.get('/dashboard', requireEvent, monitorController.dashboard);
 
 // Rotas protegidas — migradas para checkPermission (RBAC granular)
-router.get('/system-status', authenticate, checkPermission('monitor', 'leitura'), monitorController.systemStatus);
-router.get('/logs', authenticate, checkPermission('monitor', 'leitura'), monitorController.systemLogs);
-router.post('/logs/clear', authenticate, checkPermission('monitor', 'escrita'), monitorController.clearSystemLogs);
-router.get('/performance', authenticate, checkPermission('monitor', 'leitura'), monitorController.performance);
-router.get('/terminais', authenticate, monitorController.getTerminais);
-router.post('/force-sync', authenticate, checkPermission('monitor', 'escrita'), monitorController.forceSync);
-router.post('/clear-cache', authenticate, checkPermission('monitor', 'escrita'), monitorController.clearCache);
+router.get('/system-status', checkPermission('monitor', 'leitura'), monitorController.systemStatus);
+router.get('/logs', checkPermission('monitor', 'leitura'), monitorController.systemLogs);
+router.post('/logs/clear', checkPermission('monitor', 'escrita'), monitorController.clearSystemLogs);
+router.get('/performance', checkPermission('monitor', 'leitura'), monitorController.performance);
+router.get('/terminais', checkPermission('monitor', 'leitura'), requireEvent, monitorController.getTerminais);
+router.post('/force-sync', checkPermission('monitor', 'escrita'), monitorController.forceSync);
+router.post('/clear-cache', checkPermission('monitor', 'escrita'), monitorController.clearCache);
 
 // Watchlist (Monitoramento de Alvos)
-router.get('/watchlist', authenticate, requireEvent, monitorController.listWatchlist);
-router.post('/watchlist', authenticate, requireEvent, monitorController.addToWatchlist);
-router.delete('/watchlist/:id', authenticate, requireEvent, monitorController.removeFromWatchlist);
+router.get('/watchlist', checkPermission('monitor', 'leitura'), requireEvent, monitorController.listWatchlist);
+router.post('/watchlist', checkPermission('monitor', 'escrita'), requireEvent, monitorController.addToWatchlist);
+router.delete('/watchlist/:id', checkPermission('monitor', 'escrita'), requireEvent, monitorController.removeFromWatchlist);
 
 module.exports = router;

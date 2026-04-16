@@ -1,7 +1,5 @@
 // Service Worker minimalista (Obrigatório para PWA Install Prompt)
-const CACHE_NAME = 'a2-eventos-public-cache-v1';
-
-self.addEventListener('install', (event) => {
+self.addEventListener('install', () => {
     self.skipWaiting();
 });
 

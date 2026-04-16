@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TextInput, Text, StyleSheet, ViewStyle, TextInputProps } from 'react-native';
+import { View, TextInput, StyleSheet, ViewStyle, TextInputProps } from 'react-native';
 import { ThemedText } from './themed-text';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';

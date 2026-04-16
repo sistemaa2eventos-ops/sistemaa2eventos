@@ -182,7 +182,7 @@ class MonitorController {
      */
     async getTerminais(req, res) {
         try {
-            const evento_id = _s(req.query.evento_id) || _s(req.headers['x-evento-id']);
+            const evento_id = _s(req.tenantId) || _s(req.event?.id) || _s(req.query.evento_id) || _s(req.headers['x-evento-id']);
             if (!evento_id) return res.status(400).json({ error: 'evento_id obrigatório' });
 
             const { data, error } = await supabase

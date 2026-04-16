@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, SafeAreaView, KeyboardAvoidingView, Platform, TouchableOpacity, Alert, ImageBackground } from 'react-native';
+import { StyleSheet, View, SafeAreaView, KeyboardAvoidingView, Platform, TouchableOpacity, Alert } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { A2Button } from '@/components/A2Button';
 import { A2Input } from '@/components/A2Input';
@@ -35,7 +35,7 @@ export default function LoginScreen() {
             } else {
                 router.replace('/(tabs)');
             }
-        } catch (err) {
+        } catch {
             Alert.alert('Erro', 'Ocorreu um erro inesperado.');
         } finally {
             setLoading(false);

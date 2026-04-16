@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Camera, Upload, CheckCircle, AlertCircle, Calendar, ShieldCheck, ChevronRight, User, Briefcase, Users, Clock } from 'lucide-react';
+import Image from 'next/image';
+import { Upload, CheckCircle, AlertCircle, Calendar, ShieldCheck, ChevronRight, User, Briefcase, Users, Clock } from 'lucide-react';
 import api from '@/lib/api';
 import PhotoCapture from './PhotoCapture';
 import PhotoEditor from './PhotoEditor';
@@ -46,29 +47,48 @@ interface RegistrationFormProps {
     } | null;
 }
 
+interface EmployeeSummary {
+    id: string;
+    nome: string;
+    funcao?: string;
+    status_acesso?: string;
+}
+
+interface UploadedDocument {
+    name: string;
+    type: string;
+    base64: string;
+}
+
+type ApiErrorShape = {
+    response?: {
+        status?: number;
+        data?: {
+            error?: string;
+        };
+    };
+};
+
+const asApiError = (error: unknown): ApiErrorShape => {
+    if (typeof error === 'object' && error !== null) {
+        return error as ApiErrorShape;
+    }
+
+    return {};
+};
+
 export default function RegistrationForm({ token, company, branding, requiredFields, preFilledData }: RegistrationFormProps) {
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
     const [rawPhoto, setRawPhoto] = useState<string | null>(null);
-    const [employees, setEmployees] = useState<any[]>([]);
+    const [employees, setEmployees] = useState<EmployeeSummary[]>([]);
     const [loadingEmployees, setLoadingEmployees] = useState(true);
     const [showLGPDModal, setShowLGPDModal] = useState(false);
     const { t } = useTranslation('common');
 
     const LGPD_TEXT = `O Tratamento de Dados Pessoais Sensíveis (Biometria Facial) é realizado com a finalidade exclusiva de segurança, prevenção à fraude e controle de acesso em tempo real. Os dados são armazenados em ambiente criptografado e não são compartilhados com terceiros para fins comerciais. Ao prosseguir, você autoriza o processamento desses dados conforme a Lei 13.709/2018.`;
-
-    // Helper: Formatar data ISO para DD/MM
-    const formatDate = (dateStr: string) => {
-        try {
-            const [year, month, day] = dateStr.split('-');
-            if (!day || !month) return dateStr;
-            return `${day}/${month}`;
-        } catch (e) {
-            return dateStr;
-        }
-    };
 
     // Fetch existing employees
     useEffect(() => {
@@ -78,8 +98,8 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                     const cleanToken = token?.trim();
                     const res = await api.get(`/public/company/${cleanToken}/employees`);
                     setEmployees(res.data.employees || []);
-                } catch (err: any) {
-                    if (err.response?.status !== 404) {
+                } catch (err: unknown) {
+                    if (asApiError(err).response?.status !== 404) {
                         console.error('Failed to load employees', err);
                     }
                 } finally {
@@ -93,14 +113,14 @@ export default function RegistrationForm({ token, company, branding, requiredFie
     }, [token, preFilledData]);
 
     // Helper: campo é obrigatório? nome e cpf = SEMPRE obrigatórios
-    const isRequired = (field: string): boolean => {
+    const isRequired = (field: keyof RequiredFieldsConfig): boolean => {
         if (field === 'nome' || field === 'cpf') return true; // Travados
         if (!requiredFields) return true; // Sem config = tudo obrigatório (legado)
-        return (requiredFields as any)[field] !== false;
+        return requiredFields[field] !== false;
     };
 
     // Helper: campo deve ser exibido?
-    const isVisible = (field: string): boolean => {
+    const isVisible = (field: keyof RequiredFieldsConfig): boolean => {
         if (field === 'nome' || field === 'cpf' || field === 'email') return true; // Sempre visíveis
         return isRequired(field);
     };
@@ -114,7 +134,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
         funcao: preFilledData?.funcao || '',
         dias_trabalho: [] as string[],
         foto_base64: null as string | null,
-        documentos: [] as any[],
+        documentos: [] as UploadedDocument[],
         aceite_lgpd: false
     });
 
@@ -182,7 +202,19 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                 }
             }
 
-            const payloadData = {
+            const payloadData: {
+                nome: string;
+                cpf: string;
+                email: string;
+                nome_mae: string;
+                data_nascimento: string;
+                funcao: string;
+                dias_trabalho: string[];
+                foto_base64: string | null;
+                documentos: UploadedDocument[];
+                aceite_lgpd: boolean;
+                foto_url?: string;
+            } = {
                 ...formData,
                 cpf: cleanCpf,
                 aceite_lgpd: true  // Always send as boolean
@@ -190,7 +222,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
 
             // Se obteve photoUrl via direct upload, remove o base64 gigante do payload
             if (photoUrl) {
-                (payloadData as any).foto_url = photoUrl;
+                payloadData.foto_url = photoUrl;
                 payloadData.foto_base64 = null;
             }
 
@@ -199,15 +231,16 @@ export default function RegistrationForm({ token, company, branding, requiredFie
             await api.post(`/public/register/${cleanToken}`, payloadData);
 
             setSuccess(true);
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Registration error:', err);
+            const apiError = asApiError(err);
             
-            if (err.response?.status === 404) {
+            if (apiError.response?.status === 404) {
                 setError('Este link de cadastro expirou ou foi revogado. Por favor, solicite um novo convite ao administrador.');
-            } else if (err.response?.status === 403) {
+            } else if (apiError.response?.status === 403) {
                 setError('Acesso negado. Sua conta pode ter sido bloqueada ou o limite de vagas foi atingido.');
             } else {
-                setError(err.response?.data?.error || 'Erro ao realizar cadastro. Verifique os campos e tente novamente.');
+                setError(apiError.response?.data?.error || 'Erro ao realizar cadastro. Verifique os campos e tente novamente.');
             }
         } finally {
             setLoading(false);
@@ -238,7 +271,14 @@ export default function RegistrationForm({ token, company, branding, requiredFie
             {/* Banner do Evento */}
             {branding?.banner_url && (
                 <div className="w-full h-40 overflow-hidden relative">
-                    <img src={branding.banner_url} alt="Banner" className="w-full h-full object-cover" />
+                    <Image
+                        src={branding.banner_url}
+                        alt="Banner"
+                        fill
+                        sizes="(max-width: 768px) 100vw, 768px"
+                        className="w-full h-full object-cover"
+                        unoptimized
+                    />
                     <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-900/90" />
                 </div>
             )}
@@ -247,7 +287,14 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
                         {branding?.logo_url && (
-                            <img src={branding.logo_url} alt="Logo" className="w-10 h-10 rounded-lg object-contain bg-white/10 p-1" />
+                            <Image
+                                src={branding.logo_url}
+                                alt="Logo"
+                                width={40}
+                                height={40}
+                                className="w-10 h-10 rounded-lg object-contain bg-white/10 p-1"
+                                unoptimized
+                            />
                         )}
                         <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r tracking-tight" style={{ backgroundImage: `linear-gradient(to right, var(--brand-primary), var(--brand-secondary))` }}>
                             {branding?.evento_nome || t('registration.title', { defaultValue: 'Credenciamento' })}

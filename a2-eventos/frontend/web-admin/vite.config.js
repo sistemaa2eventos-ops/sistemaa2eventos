@@ -1,21 +1,20 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
     plugins: [
-        react(),
-        VitePWA({
-            registerType: 'autoUpdate',
-            includeAssets: ['favicon.ico', 'vite.svg'],
-            manifest: false,
-            workbox: false
-        })
+        react()
     ],
     server: {
         port: 5173,
         host: true,
         strictPort: true,
+        proxy: {
+            '/api': {
+                target: 'http://localhost:3001',
+                changeOrigin: true
+            }
+        },
         hmr: {
             overlay: true
         }
@@ -23,7 +22,7 @@ export default defineConfig({
     build: {
         sourcemap: false,
         minify: 'esbuild',
-        chunkSizeWarningLimit: 2000,
+        chunkSizeWarningLimit: 2500,
         rollupOptions: {
             output: {
                 manualChunks(id) {

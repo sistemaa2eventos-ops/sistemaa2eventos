@@ -47,7 +47,11 @@ const ConfigWebhooks = () => {
     const handleCreateKey = async () => {
         const key = await generateApiKey();
         if (key) {
-            alert(`Sua nova API Key foi gerada:\n\n${key}\n\nCOPIE E SALVE AGORA. Por segurança, esta chave não será exibida novamente por completo.`);
+            enqueueSnackbar(`Nova API Key Gerada! COPIE AGORA: ${key}`, { 
+                variant: 'info', 
+                autoHideDuration: 20000,
+                anchorOrigin: { vertical: 'top', horizontal: 'center' }
+            });
         }
     };
 

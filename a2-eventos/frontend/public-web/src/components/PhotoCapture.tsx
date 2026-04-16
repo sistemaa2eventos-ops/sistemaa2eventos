@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useCallback } from 'react';
+import Image from 'next/image';
 import Webcam from 'react-webcam';
 import { Camera, RefreshCw, Trash2, CheckCircle, AlertCircle, Upload } from 'lucide-react';
 import { FaceValidator } from '../utils/FaceValidator';
@@ -75,10 +76,13 @@ export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: P
             {imgSrc ? (
                 <div className="flex flex-col items-center">
                     <div className="relative inline-block">
-                        <img
+                        <Image
                             src={imgSrc}
                             alt="Preview"
+                            width={192}
+                            height={256}
                             className="w-48 h-64 rounded-xl object-cover border-4 border-emerald-500 shadow-xl"
+                            unoptimized
                         />
                         <button
                             type="button"

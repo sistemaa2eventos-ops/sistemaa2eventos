@@ -54,7 +54,7 @@ class IntelbrasService extends AccessDevice {
      */
     async _get(path, params = {}) {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        const timeout = setTimeout(() => controller.abort(), 5000); // 5s timeout (H-01)
 
         try {
             const queryString = new URLSearchParams(params).toString();
@@ -89,7 +89,7 @@ class IntelbrasService extends AccessDevice {
      */
     async _post(path, params = {}, body, contentType = 'application/octet-stream') {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout para POST (ex: envio de foto)
+        const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout para POST (H-01)
 
         try {
             const queryString = new URLSearchParams(params).toString();

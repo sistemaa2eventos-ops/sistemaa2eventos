@@ -1,12 +1,10 @@
 import React from 'react';
-import { StyleSheet, View, ScrollView, Image, ActivityIndicator, TextInput, Alert } from 'react-native';
+import { StyleSheet, View, ScrollView, Image, ActivityIndicator, TextInput } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { ThemedText } from '@/components/themed-text';
 import { A2Button } from '@/components/A2Button';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useEmployee } from '@/hooks/useEmployee';
 
 /**
@@ -16,12 +14,10 @@ import { useEmployee } from '@/hooks/useEmployee';
 export default function EmployeeDetailScreen() {
     const { id } = useLocalSearchParams();
     const router = useRouter();
-    const colorScheme = useColorScheme() ?? 'dark';
-    const theme = Colors[colorScheme];
 
     const {
         employee, loading, saving, pulseira, setPulseira,
-        dataSource, isOnline, assignPulseira, executeCheckin
+        dataSource, assignPulseira, executeCheckin
     } = useEmployee(id as string, router);
 
     if (loading || !employee) {

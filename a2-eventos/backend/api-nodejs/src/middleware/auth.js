@@ -53,7 +53,7 @@ async function authenticate(req, res, next) {
                 const v = user.user_metadata?.evento_id;
                 return (v && v !== 'undefined' && v !== 'null') ? v : null;
             })(),
-            ativo: true
+            status: 'ativo'
         };
 
         // Criar instância do modelo User (RBAC)
@@ -70,11 +70,10 @@ async function authenticate(req, res, next) {
 }
 
 const ROLE_ALIASES = {
-    'admin': 'master',
-    'supervisor': 'master',
-    'op_analista': 'operador',
-    'op_atendimento': 'operador',
-    'op_monitoramento': 'operador'
+    'master': 'admin_master',  // Legado -> novo
+    'admin': 'operador',      // Legado -> operador
+    'supervisor': 'operador', // Legado -> operador
+    'operador': 'operador'
 };
 
 const normalize = (role) => ROLE_ALIASES[role] || role;
@@ -90,7 +89,7 @@ function authorize(...roles) {
         const userRole = normalize(req.user.role || req.user.nivel_acesso);
         const allowed = roles.map(normalize);
 
-        if (userRole === 'master' || allowed.includes(userRole)) {
+        if (userRole === 'admin_master' || allowed.includes(userRole)) {
             return next();
         }
 

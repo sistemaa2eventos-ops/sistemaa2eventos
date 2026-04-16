@@ -1,0 +1,11 @@
+{
+  "owner": "allthebadthings",
+  "slug": "gateway-safety",
+  "displayName": "Gateway Safety",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1773347927045,
+    "commit": "https://github.com/openclaw/skills/commit/4aa5beaa02b7ff3bfcddaaec6369bdf2edd79969"
+  },
+  "history": []
+}

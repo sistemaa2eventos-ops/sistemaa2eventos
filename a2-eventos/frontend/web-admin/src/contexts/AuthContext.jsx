@@ -9,11 +9,23 @@ export const useAuth = () => useContext(AuthContext);
 
 export const getDefaultRoute = (nivel_acesso) => {
   const routes = {
-    master: '/',
+    admin_master: '/',
     operador: '/checkin'
   };
   return routes[nivel_acesso] || '/login';
 };
+
+// Módulos disponíveis
+export const MODULOS = [
+  { key: 'dashboard', label: 'Dashboard', icon: 'Home' },
+  { key: 'empresas', label: 'Empresas', icon: 'Building' },
+  { key: 'pessoas', label: 'Pessoas', icon: 'Users' },
+  { key: 'auditoria_documentos', label: 'Auditoria', icon: 'FileText' },
+  { key: 'monitoramento', label: 'Monitoramento', icon: 'Monitor' },
+  { key: 'relatorios', label: 'Relatórios', icon: 'BarChart' },
+  { key: 'checkin', label: 'Check-in', icon: 'LogIn' },
+  { key: 'checkout', label: 'Check-out', icon: 'LogOut' }
+];
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -33,19 +45,12 @@ export const AuthProvider = ({ children }) => {
       try {
         const response = await authService.me();
         if (response.success && response.user) {
-          // Garante que só os dados seguros fiquem no estado (regra 13)
-          const { id, nome, email, nivel_acesso, avatar_url, evento_id } = response.user;
-          const cleanUser = { id, nome, email, nivel_acesso, avatar_url, evento_id };
+          const { id, nome, email, nivel_acesso, avatar_url, evento_id, permissions, status } = response.user;
+          const cleanUser = { id, nome, email, nivel_acesso, avatar_url, evento_id, permissions, status };
           
           if (isMounted) {
             setUser(cleanUser);
             setToken(storedToken);
-            
-            // Re-sync do evento_id para o axios (session prevalece ou local)
-            if (evento_id && nivel_acesso !== 'master') {
-                const storage = sessionStorage.getItem('token') ? sessionStorage : localStorage;
-                storage.setItem('active_evento_id', evento_id);
-            }
           }
         } else {
           throw new Error('Sessão inválida');
@@ -54,11 +59,8 @@ export const AuthProvider = ({ children }) => {
         log('Erro na validação do token, limpando storages...');
         sessionStorage.removeItem('token');
         sessionStorage.removeItem('user');
-        sessionStorage.removeItem('active_evento_id');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        localStorage.removeItem('active_evento_id');
-        localStorage.removeItem('active_evento_nome');
         if (isMounted) {
           setUser(null);
           setToken(null);
@@ -80,18 +82,13 @@ export const AuthProvider = ({ children }) => {
         const payloadToken = response.session?.access_token || response.token;
         const payloadUser = response.user || response.data;
         
-        // Limpeza dos dados: apenas nivel_acesso provindo exclusivamente do banco (regra 1 e 13)
-        const { id, nome, userEmail, nivel_acesso, avatar_url, evento_id } = payloadUser;
-        const cleanUser = { id, nome, email: userEmail || email, nivel_acesso, avatar_url, evento_id };
+        const { id, nome, userEmail, nivel_acesso, avatar_url, evento_id, permissions, status } = payloadUser;
+        const cleanUser = { id, nome, email: userEmail || email, nivel_acesso, avatar_url, evento_id, permissions, status };
 
         // Regra 9: Lembrar de mim
         const storage = rememberMe ? localStorage : sessionStorage;
         storage.setItem('token', payloadToken);
         
-        if (nivel_acesso !== 'master' && evento_id) {
-          storage.setItem('active_evento_id', evento_id);
-        }
-
         setUser(cleanUser);
         setToken(payloadToken);
         
@@ -101,14 +98,20 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (err) {
       log('Erro no login:', err);
-      // Mensagens de erro amigáveis
       let errorMsg = "Erro no servidor. Tente novamente em instantes.";
       if (!err.response) {
         errorMsg = "Sem conexão com o servidor.";
       } else if (err.response.status === 401) {
         errorMsg = "Email ou senha incorretos";
       } else if (err.response.status === 403) {
-        errorMsg = "Seu acesso está suspenso. Contate o administrador.";
+        const errorData = err.response.data?.error || '';
+        if (errorData.includes('pendente')) {
+          errorMsg = "Aguarde aprovação do administrador.";
+        } else if (errorData.includes('inativo')) {
+          errorMsg = "Usuário inativo. Contate o administrador.";
+        } else {
+          errorMsg = "Acesso negado.";
+        }
       } else if (err.response.data && err.response.data.error) {
         errorMsg = err.response.data.error;
       }
@@ -124,18 +127,25 @@ export const AuthProvider = ({ children }) => {
       setToken(null);
       sessionStorage.removeItem('token');
       sessionStorage.removeItem('user');
-      sessionStorage.removeItem('active_evento_id');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      localStorage.removeItem('active_evento_id');
-      localStorage.removeItem('active_evento_nome');
       window.location.href = '/login';
     }
   };
 
-  // Simples compatibilidade com os componentes legados
-  const hasPermission = () => true; 
-  const hasMenuAccess = () => true;
+  // Verificar se tem permissão para módulo
+  const hasPermission = (modulo) => {
+    if (!user) return false;
+    // admin_master tem todas as permissões
+    if (user.nivel_acesso === 'admin_master') return true;
+    // Operador consulta permissions
+    return user.permissions?.[modulo] === true;
+  };
+
+  // Verificar se tem acesso ao menu
+  const hasMenuAccess = (modulo) => {
+    return hasPermission(modulo);
+  };
 
   const value = {
     user,

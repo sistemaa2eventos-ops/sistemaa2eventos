@@ -11,7 +11,7 @@
     "check:all": "npm run check:syntax && npm run check:env",
     "predev": "node src/scripts/kill-port.js",
     "dev": "nodemon src/app.js",
-    "test": "node test-connection.js",
+    "test": "npm run check:all",
     "sync:manual": "node src/scripts/manual-sync.js",
     "db:check": "node src/scripts/check-database.js"
   },

@@ -91,7 +91,7 @@ export default function Financeiro() {
     }, [filters, pagination.limit, enqueueSnackbar]);
 
     useEffect(() => { fetchEvents(); }, [fetchEvents]);
-    useEffect(() => { fetchTransactions(1); }, [filters]); // eslint-disable-line
+    useEffect(() => { fetchTransactions(1); }, [filters]);
 
     const handleReconcile = async (id) => {
         if (!window.confirm('Confirma reconciliação manual desta transação?')) return;

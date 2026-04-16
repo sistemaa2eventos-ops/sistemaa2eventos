@@ -6,7 +6,7 @@
 
 export class FaceValidator {
     private static isInitialized = false;
-    private static faceapi: any = null;
+    private static faceapi: typeof import('@vladmandic/face-api') | null = null;
 
     /**
      * Carrega dinamicamente a biblioteca face-api e os modelos neurais.

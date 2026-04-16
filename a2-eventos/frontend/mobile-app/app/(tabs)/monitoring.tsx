@@ -1,16 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, FlatList, Image, ActivityIndicator, RefreshControl } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '@/services/apiService';
 import { format } from 'date-fns';
 
 export default function MonitoringScreen() {
-    const colorScheme = useColorScheme() ?? 'dark';
-    const theme = Colors[colorScheme];
-
     const [logs, setLogs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);

@@ -128,8 +128,8 @@ const Pessoas = () => {
         <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
           <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleDownloadTemplate} sx={{ borderColor: 'rgba(255,255,255,0.3)', color: '#fff' }}>Baixar Template</Button>
           <Button variant="outlined" startIcon={<UploadIcon />} onClick={() => setOpenImport(true)} sx={{ borderColor: 'rgba(0,255,136,0.3)', color: '#00FF88' }}>Importar Lote</Button>
-          <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExport} sx={{ borderColor: 'rgba(123,47,190,0.5)', color: '#7B2FBE' }}>Exportar Lote</Button>
-          <NeonButton startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>{isEmpresa ? 'Novo Vínculo' : 'Novo Registro'}</NeonButton>
+          <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExport} disabled={saving} sx={{ borderColor: 'rgba(123,47,190,0.5)', color: '#7B2FBE' }}>{saving ? 'Exportando...' : 'Exportar Lote'}</Button>
+          <NeonButton startIcon={<AddIcon />} loading={saving} onClick={() => handleOpenDialog()}>{isEmpresa ? 'Novo Vínculo' : 'Novo Registro'}</NeonButton>
 
         </Stack>
       </Box>
