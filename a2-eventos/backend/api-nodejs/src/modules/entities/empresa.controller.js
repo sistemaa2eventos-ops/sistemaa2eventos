@@ -155,7 +155,7 @@ class EmpresaController {
             if (updateError) return res.status(500).json({ error: 'Erro ao gerar convite no banco' });
 
             // 3. Enviar e-mail real via EmailService (Assíncrono para performance)
-            const link = `${process.env.PUBLIC_PORTAL_URL || 'https://cadastro.nzt.app.br'}/register/${token}`;
+            const link = `${process.env.PUBLIC_PORTAL_URL || 'http://localhost:3000'}/register/${token}`;
             
             if (empresa.email) {
                 emailService.sendCompanyInvite(empresa.email, empresa.nome, link)

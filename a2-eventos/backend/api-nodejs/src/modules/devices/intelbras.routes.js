@@ -35,7 +35,7 @@ router.get('/ping', (req, res) => {
         server_ip: req.hostname,
         device_ip: req.ip,
         timestamp: new Date().toISOString(),
-        endpoint_push: `${process.env.FRONTEND_URL || 'https://api.nzt.app.br'}/api/intelbras/events`
+        endpoint_push: `${process.env.API_URL || 'http://localhost:3001'}/intelbras/events`
     });
 });
 

@@ -200,7 +200,7 @@ router.post('/colaboradores', async (req, res) => {
 
         // 4. Enviar e-mail de convite ao colaborador
         if (payload.email) {
-            const inviteLink = `${process.env.PUBLIC_PORTAL_URL || 'https://cadastro.nzt.app.br'}/register/${token}`;
+            const inviteLink = `${process.env.PUBLIC_PORTAL_URL || 'http://localhost:3000'}/register/${token}`;
             emailService.sendEmployeeInvite(payload.email, data.nome, empresa?.nome || 'Empresa Parceira', inviteLink)
                 .catch(e => logger.error('❌ Erro silencioso ao enviar convite ao colaborador:', e));
         }

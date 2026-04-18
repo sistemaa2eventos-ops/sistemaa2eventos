@@ -24,7 +24,7 @@ class SettingsController {
                     language: 'pt-BR',
                     biometric_login_enabled: true,
                     cloud_sync_enabled: true,
-                    api_url: 'https://api.nzt.app.br/api',
+                    api_url: process.env.API_URL ? `${process.env.API_URL}/api` : 'http://localhost:3001/api',
                     alert_operator_login: false,
                     alert_event_peak: true,
                     biometric_sensitivity: 85,

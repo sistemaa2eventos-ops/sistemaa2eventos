@@ -491,7 +491,7 @@ class PublicController {
                         empresaData.email,
                         nome,
                         empresaData.nome,
-                        `${process.env.PUBLIC_PORTAL_URL || 'https://cadastro.nzt.app.br'}`
+                        `${process.env.PUBLIC_PORTAL_URL || 'http://localhost:3000'}`
                     ).catch(e => logger.warn('Erro ao enviar email de confirmação:', e.message));
                 }
             } catch (emailErr) {

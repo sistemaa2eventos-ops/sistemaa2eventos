@@ -5,11 +5,12 @@
  */
 
 const allowedOrigins = [
+    // Production URLs (via environment variables)
     process.env.FRONTEND_URL,
     process.env.PUBLIC_PORTAL_URL,
-    'https://painel.nzt.app.br',
-    'https://cadastro.nzt.app.br',
-    'https://api.nzt.app.br',
+    process.env.API_URL,
+
+    // Development URLs (fallback)
     'http://localhost',
     'http://127.0.0.1',
     'http://localhost:3000',
