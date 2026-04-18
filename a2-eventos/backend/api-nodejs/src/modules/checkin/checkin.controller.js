@@ -2,6 +2,7 @@ const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const qrGenerator = require('../../utils/qrGenerator');
 const checkinService = require('./checkin.service');
+const validationService = require('./services/validation.service');
 const ApiResponse = require('../../utils/apiResponse');
 const webhookDispatcher = require('../../services/webhookDispatcher');
 const websocketService = require('../../services/websocketService'); // FIX C-02: import ausente causava ReferenceError em runtime
@@ -63,14 +64,14 @@ class AccessController {
             if (!qrCode) return ApiResponse.error(res, 'QR Code é obrigatório.', 400);
 
             let qrData;
-            try { 
-                qrData = qrGenerator.parseCode(qrCode); 
-            } catch (qrErr) { 
+            try {
+                qrData = qrGenerator.parseCode(qrCode);
+            } catch (qrErr) {
                 // Fallback para Sync Offline: se vier do mobile app (offline_sync), o qrCode é o ID direto
                 if (req.body.offline_sync) {
                     qrData = { identifier: qrCode };
                 } else {
-                    return ApiResponse.error(res, 'Credencial inválida ou assinatura corrompida', 401); 
+                    return ApiResponse.error(res, 'Credencial inválida ou assinatura corrompida', 401);
                 }
             }
 
@@ -87,19 +88,26 @@ class AccessController {
                 return ApiResponse.error(res, 'Pessoa já realizou check-in.', 400, { pessoa_id: pessoa.id, nome: pessoa.nome_completo });
             }
 
+            // ALTO #3: Validar fase do evento para QR Code
+            try {
+                await validationService.validateAccessRules(eventoId, pessoa, 'checkin', 'qrcode', new Date(), null);
+            } catch (validationError) {
+                return ApiResponse.error(res, validationError.message, validationError.status || 403);
+            }
+
             const result = await checkinService.registrarAcesso(supabaseClient, {
-                pessoa_id: pessoa.id, 
-                evento_id: eventoId, 
-                tipo: 'checkin', 
+                pessoa_id: pessoa.id,
+                evento_id: eventoId,
+                tipo: 'checkin',
                 metodo: 'qrcode',
-                dispositivo_id: dispositivoId, 
-                created_by: req.user?.id, 
-                sync_id, 
+                dispositivo_id: dispositivoId,
+                created_by: req.user?.id,
+                sync_id,
                 offline_timestamp
             });
 
             if (result.error) return ApiResponse.error(res, result.error, 400);
-            
+
             return ApiResponse.success(res, result, 201);
         } catch (error) {
             logger.error('Erro no check-in QR Code:', error.message);
@@ -126,13 +134,20 @@ class AccessController {
 
             if (error || !pessoa) return ApiResponse.error(res, 'Credencial não localizada.', 404);
 
-            const result = await checkinService.registrarAcesso(supabaseClient, { 
-                pessoa_id: pessoa.id, 
-                evento_id: eventoId, 
-                tipo: 'checkin', 
-                metodo: 'barcode', 
-                dispositivo_id: dispositivoId, 
-                created_by: req.user?.id 
+            // ALTO #3: Validar fase do evento para Código de Barras
+            try {
+                await validationService.validateAccessRules(eventoId, pessoa, 'checkin', 'barcode', new Date(), null);
+            } catch (validationError) {
+                return ApiResponse.error(res, validationError.message, validationError.status || 403);
+            }
+
+            const result = await checkinService.registrarAcesso(supabaseClient, {
+                pessoa_id: pessoa.id,
+                evento_id: eventoId,
+                tipo: 'checkin',
+                metodo: 'barcode',
+                dispositivo_id: dispositivoId,
+                created_by: req.user?.id
             });
 
             if (result.error) return ApiResponse.error(res, result.error, 400);
@@ -163,13 +178,20 @@ class AccessController {
 
             if (error || !pessoa) return ApiResponse.error(res, 'Tag não reconhecida para este evento.', 404);
 
-            const result = await checkinService.registrarAcesso(supabaseClient, { 
-                pessoa_id: pessoa.id, 
-                evento_id: eventoId, 
-                tipo: 'checkin', 
-                metodo: 'rfid', 
-                dispositivo_id: dispositivoId, 
-                created_by: req.user?.id 
+            // ALTO #3: Validar fase do evento para RFID
+            try {
+                await validationService.validateAccessRules(eventoId, pessoa, 'checkin', 'rfid', new Date(), null);
+            } catch (validationError) {
+                return ApiResponse.error(res, validationError.message, validationError.status || 403);
+            }
+
+            const result = await checkinService.registrarAcesso(supabaseClient, {
+                pessoa_id: pessoa.id,
+                evento_id: eventoId,
+                tipo: 'checkin',
+                metodo: 'rfid',
+                dispositivo_id: dispositivoId,
+                created_by: req.user?.id
             });
 
             if (result.error) return ApiResponse.error(res, result.error, 400);
@@ -212,6 +234,13 @@ class AccessController {
 
             const pessoa = pessoas[0];
             if (pessoa.status_acesso === 'checkin_feito') return ApiResponse.error(res, 'Registro já em estado de Check-in.', 400); // FIX C-09
+
+            // ALTO #3: Validar fase do evento para Check-in Manual
+            try {
+                await validationService.validateAccessRules(eventoId, pessoa, 'checkin', 'manual', new Date(), null);
+            } catch (validationError) {
+                return ApiResponse.error(res, validationError.message, validationError.status || 403);
+            }
 
             const result = await checkinService.registrarAcesso(supabaseClient, {
                 pessoa_id: pessoa.id,
@@ -586,6 +615,13 @@ class AccessController {
             // Validar status (não pode já estar em check-in)
             if (pessoa.status_acesso === 'checkin_feito') {
                 return ApiResponse.error(res, 'Pessoa já está em check-in', 400);
+            }
+
+            // ALTO #3: Validar fase do evento para Pulseira
+            try {
+                await validationService.validateAccessRules(eventoId, pessoa, 'checkin', 'pulseira', new Date(), null);
+            } catch (validationError) {
+                return ApiResponse.error(res, validationError.message, validationError.status || 403);
             }
 
             // Buscar informações da pulseira (tipo, cor, áreas)
