@@ -77,11 +77,10 @@ export const useUsuarios = () => {
             setUsuarios(users);
         } catch (error) {
             console.error('Erro ao buscar usuários:', error);
-            enqueueSnackbar('Erro ao buscar usuários', { variant: 'error' });
         } finally {
             setLoading(false);
         }
-    }, [search, enqueueSnackbar]);
+    }, [search]);
 
     useEffect(() => {
         loadUsuarios();
