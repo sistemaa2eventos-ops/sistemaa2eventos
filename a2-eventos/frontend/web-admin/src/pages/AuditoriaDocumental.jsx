@@ -94,9 +94,9 @@ const AuditoriaDocumental = () => {
 
             if (isBatch) {
                 const payloadDocs = selectedDocs.map(id => {
-                    const d = documentos.find(doc => doc.id === id);
-                    return { id: d.id, tipo_entidade: d.tipo_entidade };
-                });
+                    const d = Array.isArray(documentos) ? documentos.find(doc => doc.id === id) : null;
+                    return d ? { id: d.id, tipo_entidade: d.tipo_entidade } : null;
+                }).filter(Boolean);
 
                 await api.patch('/documentos/batch/auditar', {
                     documentos: payloadDocs,
@@ -136,8 +136,8 @@ const AuditoriaDocumental = () => {
             minWidth: 200,
             format: (val, row) => (
                 <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>{val}</Typography>
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>Doc: {row.entidade_doc}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>{String(val || 'Nome Indisponível')}</Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>Doc: {String(row.entidade_doc || '—')}</Typography>
                 </Box>
             )
         },
@@ -147,7 +147,7 @@ const AuditoriaDocumental = () => {
             minWidth: 100,
             format: (val) => (
                 <Chip
-                    label={val.toUpperCase()}
+                    label={(val || 'N/A').toUpperCase()}
                     size="small"
                     sx={{
                         bgcolor: val === 'empresa' ? 'rgba(0,212,255,0.1)' : 'rgba(123,47,190,0.1)',

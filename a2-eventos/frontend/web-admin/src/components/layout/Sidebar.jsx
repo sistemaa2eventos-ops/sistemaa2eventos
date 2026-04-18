@@ -24,7 +24,7 @@ import {
     Settings as SettingsIcon,
     ExitToApp as LogoutIcon,
     Assessment as AssessmentIcon,
-    Paid as PaidIcon,
+
     Monitor as MonitorIcon,
     Event as EventIcon,
     Badge as UserIcon,
@@ -39,18 +39,21 @@ import {
     Extension as ExtensionIcon,
     Storage as StorageIcon,
     Palette as PaletteIcon,
-    Translate as TranslateIcon,
+
     NotificationsActive as NotifIcon,
     CameraAlt as CameraIcon,
     Label as LabelIcon,
     VerifiedUser as VerifiedIcon,
     Webhook as WebhookIcon,
     Schedule as CronIcon,
-    EmojiEvents as GameIcon,
+
     ViewModule as CredIcon,
     FactCheck as CheckConfigIcon,
     Description as LogsIcon,
     Chat as ChatIcon,
+    Place as AreaIcon,
+    QrCode2 as PulseiraIcon,
+    Face as FaceIcon,
 } from '@mui/icons-material';
 import { Collapse } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
@@ -161,7 +164,7 @@ const UserCard = styled(Box)(({ theme }) => ({
 }));
 
 const Sidebar = ({ open, onClose }) => {
-    const { user, logout } = useAuth();
+    const { user, logout, hasMenuAccess } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const { t } = useTranslation();
@@ -238,38 +241,6 @@ const Sidebar = ({ open, onClose }) => {
             roles: ['admin', 'supervisor', 'op_monitoramento']
         },
         {
-            text: 'Financeiro',
-            icon: <PaidIcon />,
-            menuKey: 'financeiro',
-            path: '/financeiro',
-            roles: ['admin', 'master'],
-            disabled: true
-        },
-        {
-            text: 'Gamificação',
-            icon: <GameIcon />,
-            menuKey: 'gamificacao',
-            path: '/config/gamificacao',
-            roles: ['master'],
-            disabled: true
-        },
-        {
-            text: 'Pulseiras',
-            icon: <LabelIcon />,
-            menuKey: 'pulseiras',
-            path: '/config/pulseiras',
-            roles: ['master'],
-            disabled: true
-        },
-        {
-            text: 'Idiomas',
-            icon: <TranslateIcon />,
-            menuKey: 'idiomas',
-            path: '/config/idiomas',
-            roles: ['master'],
-            disabled: true
-        },
-        {
             text: 'Frota LPR',
             icon: <CarIcon />,
             menuKey: 'frota_lpr',
@@ -277,7 +248,7 @@ const Sidebar = ({ open, onClose }) => {
                 const eid = localStorage.getItem('active_evento_id');
                 return eid ? `/veiculos?evento_id=${eid}` : '/veiculos';
             },
-            roles: ['master']
+            roles: ['master', 'admin_master']
         },
         { divider: true },
         {
@@ -325,60 +296,51 @@ const Sidebar = ({ open, onClose }) => {
             icon: <SettingsIcon />,
             menuKey: 'configuracoes',
             path: '/configuracoes',
-            roles: ['master'],
+            roles: ['master', 'admin_master'],
             children: [
-                // --- Evento ---
+                // --- GRUPO 1: CONFIGURAÇÕES DO EVENTO ---
                 { text: 'Central de Configurações', path: '/configuracoes', icon: <SettingsIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Gerenciar Eventos', path: '/eventos', icon: <EventIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Geral & Interface', path: '/config/geral', icon: <PaletteIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Credenciamento', path: '/config/credenciamento', icon: <CredIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Regras de Check-in', path: '/config/checkin', icon: <CheckConfigIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Regras de Acesso', path: '/config/checkin', icon: <CheckConfigIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Áreas de Acesso', path: '/config/areas', icon: <AreaIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Pulseiras & Tipos', path: '/config/pulseiras', icon: <PulseiraIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Terminais & Dispositivos', path: '/config/dispositivos', icon: <FaceIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Etiquetas & Crachás', path: '/config/etiquetas', icon: <LabelIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Veículos LPR', path: '/config/veiculos', icon: <CarIcon sx={{ fontSize: 16 }} /> },
                 { divider: true },
-                // --- Segurança ---
-                { text: '🔒 Segurança JWT/2FA', path: '/config/seguranca', icon: <SecurityIcon sx={{ fontSize: 16 }} /> },
+                // --- GRUPO 2: SEGURANÇA & USUÁRIOS ---
                 { text: 'Perfis de Acesso', path: '/config/permissoes', icon: <VerifiedIcon sx={{ fontSize: 16 }} /> },
-                { divider: true },
-                // --- Integrações ---
-                { text: '🔌 APIs & Cloud', path: '/config/integracoes', icon: <ExtensionIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Webhooks & API Keys', path: '/config/webhooks', icon: <WebhookIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Segurança', path: '/config/seguranca', icon: <SecurityIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Comunicação', path: '/config/comunicacao', icon: <ChatIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Gamificação', path: '/config/gamificacao', icon: <GameIcon sx={{ fontSize: 16 }} /> },
                 { divider: true },
-                // --- Sistema ---
-                { text: '🖥️ Idiomas', path: '/config/idiomas', icon: <TranslateIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Notificações', path: '/config/notificacoes', icon: <NotifIcon sx={{ fontSize: 16 }} /> },
+                // --- GRUPO 3: INTEGRAÇÕES & AUTOMAÇÃO ---
+                { text: 'APIs & Cloud', path: '/config/integracoes', icon: <ExtensionIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Webhooks & API Keys', path: '/config/webhooks', icon: <WebhookIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Câmeras', path: '/config/cameras', icon: <CameraIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Banco de Dados', path: '/config/banco-dados', icon: <StorageIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Logs do Sistema', path: '/config/logs', icon: <LogsIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Automação CRON', path: '/config/cron', icon: <CronIcon sx={{ fontSize: 16 }} /> },
+                { divider: true },
+                // --- GRUPO 4: SISTEMA ---
+                { text: 'Notificações', path: '/config/notificacoes', icon: <NotifIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Logs do Sistema', path: '/config/logs', icon: <LogsIcon sx={{ fontSize: 16 }} /> },
+
             ]
         },
     ];
 
-    const { hasMenuAccess } = useAuth();
-
-    // Verificar se o role do usuário tem permissões granulares configuradas
-    const hasGranularPerms = !!(user?.menu_permissions?.web_admin?.length > 0);
-
-    const MENU_MASTER = [
-        'dashboard', 'empresas', 'participantes', 'auditoria', 'relatorios', 
-        'financeiro', 'frota_lpr', 'checkin', 'checkout', 'monitor', 
-        'auditoria_sistema', 'usuarios', 'configuracoes', 'gamificacao', 'pulseiras', 'idiomas'
-    ];
-
-    const MENU_OPERADOR = [
-        'participantes', 'checkin', 'checkout', 'monitor'
-    ];
+    // admin_master tem acesso total, operador usa hasMenuAccess
 
     const filteredMenu = menuItems.filter(item => {
         if (item.divider) return true;
 
         const nivel = user?.nivel_acesso || 'operador';
-        const allowedKeys = nivel === 'master' ? MENU_MASTER : MENU_OPERADOR;
+        
+        // admin_master tem acesso a todos os menus
+        if (nivel === 'admin_master' || nivel === 'master') return true;
 
-        if (!allowedKeys.includes(item.menuKey)) return false;
+        // Operador usa permissões do JSONB
+        if (item.menuKey && !hasMenuAccess(item.menuKey)) return false;
 
         return true;
     });
@@ -505,12 +467,12 @@ const Sidebar = ({ open, onClose }) => {
                             fontWeight: 700
                         }}
                     >
-                        Intelligent Control Systems
+                        Intelligent Control System
                     </Typography>
                 </Box>
             </LogoContainer>
 
-            {/* Evento Ativo Context */}
+{/* Evento Ativo Context */}
             {localStorage.getItem('active_evento_id') && (
                 <Box sx={{ px: 3, pt: 2, pb: 1 }}>
                     <Typography variant="caption" sx={{ color: 'text.secondary', letterSpacing: '1px', fontWeight: 800 }}>
@@ -524,13 +486,15 @@ const Sidebar = ({ open, onClose }) => {
                             background: 'rgba(0, 212, 255, 0.05)',
                             border: '1px solid rgba(0, 212, 255, 0.2)',
                             boxShadow: 'inset 0 0 20px rgba(0, 212, 255, 0.05)',
-                            cursor: (user?.nivel_acesso === 'admin' || user?.nivel_acesso === 'master') ? 'pointer' : 'default',
-                            '&:hover': (user?.nivel_acesso === 'admin' || user?.nivel_acesso === 'master')
+                            cursor: (user?.nivel_acesso === 'admin' || user?.nivel_acesso === 'master' || user?.nivel_acesso === 'admin_master') ? 'pointer' : 'default',
+                            '&:hover': (user?.nivel_acesso === 'admin' || user?.nivel_acesso === 'master' || user?.nivel_acesso === 'admin_master')
                                 ? { background: 'rgba(0, 212, 255, 0.1)' }
                                 : {}
                         }}
                         onClick={() => {
-                            if (user?.nivel_acesso === 'admin' || user?.nivel_acesso === 'master') {
+                            const nivel = user?.nivel_acesso;
+                            const podeAlterarEvento = nivel === 'admin_master' || nivel === 'master' || nivel === 'admin';
+                            if (podeAlterarEvento) {
                                 navigate('/eventos');
                             }
                         }}
@@ -542,10 +506,10 @@ const Sidebar = ({ open, onClose }) => {
                                     {localStorage.getItem('active_evento_nome') || 'A2 Eventos'}
                                 </Typography>
                                 <Typography variant="caption" sx={{
-                                    color: (user?.nivel_acesso === 'admin' || user?.nivel_acesso === 'master') ? '#00FF88' : '#FFB800',
+                                    color: (user?.nivel_acesso === 'admin' || user?.nivel_acesso === 'master' || user?.nivel_acesso === 'admin_master') ? '#00FF88' : '#FFB800',
                                     fontWeight: 700, fontSize: '0.6rem'
                                 }}>
-                                    {(user?.nivel_acesso === 'admin' || user?.nivel_acesso === 'master') ? 'SISTEMA ATIVO' : '🔒 NZT FIXO'}
+                                    {(user?.nivel_acesso === 'admin' || user?.nivel_acesso === 'master' || user?.nivel_acesso === 'admin_master') ? 'SISTEMA ATIVO' : '🔒 NZT FIXO'}
                                 </Typography>
                             </Box>
                         </Box>
@@ -553,7 +517,7 @@ const Sidebar = ({ open, onClose }) => {
                 </Box>
             )}
 
-            <List sx={{ flex: 1, pt: 2, px: 0 }}>
+                <List sx={{ flex: 1, pt: 2, px: 0 }}>
                 {filteredMenu.map((item) => renderMenuItem(item))}
             </List>
 

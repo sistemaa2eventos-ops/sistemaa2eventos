@@ -102,4 +102,15 @@ export class FaceValidator {
             return { isValid: false, errors: ["Falha ao inicializar o motor de Inteligência Artificial."] };
         }
     }
+
+    /**
+     * Real-time face detection on Video or Image element.
+     */
+    static async detect(input: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement) {
+        if (!this.faceapi) await this.initModels();
+        if (!this.faceapi) return null;
+        
+        return await this.faceapi.detectSingleFace(input, new this.faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }));
+    }
 }
+

@@ -14,7 +14,7 @@ router.post('/forgot-password', rateLimiter.auth, authController.forgotPassword)
 // ============================================
 // ROTAS DE CONVITE (apenas admin_master)
 // ============================================
-router.post('/invite', authenticate, authController.invite);
+router.post('/invite', authenticate, authorize('admin_master'), authController.invite); // FIX C-06: authorize ausente
 
 // ============================================
 // ROTAS PROTEGIDAS
@@ -23,6 +23,7 @@ router.post('/logout', authenticate, authController.logout);
 router.get('/profile', authenticate, authController.getProfile);
 router.get('/me', authenticate, authController.getProfile);
 router.post('/profile/change-password', authenticate, authController.changeOwnPassword);
+router.post('/active-event', authenticate, authController.setActiveEvent);
 
 // ============================================
 // GESTÃO DE USUÁRIOS
@@ -30,17 +31,17 @@ router.post('/profile/change-password', authenticate, authController.changeOwnPa
 // Listar usuários (admin_master vê todos, operador vê do seu evento)
 router.get('/users', authenticate, authController.listUsers);
 
-// Aprovar usuário (apenas admin_master)
-router.post('/users/:userId/approve', authenticate, authController.approveUser);
+// Aprovar usuário (apenas admin_master) — FIX C-06
+router.post('/users/:userId/approve', authenticate, authorize('admin_master'), authController.approveUser);
 
-// Atualizar permissões (apenas admin_master)
-router.put('/users/:userId/permissions', authenticate, authController.updatePermissions);
+// Atualizar permissões (apenas admin_master) — FIX C-06
+router.put('/users/:userId/permissions', authenticate, authorize('admin_master'), authController.updatePermissions);
 
-// Atualizar dados do usuário
-router.put('/users/:userId', authenticate, authController.updateUser);
+// Atualizar dados do usuário (apenas admin_master) — FIX C-06
+router.put('/users/:userId', authenticate, authorize('admin_master'), authController.updateUser);
 
-// Ativar/Inativar usuário (apenas admin_master)
-router.patch('/users/:userId/status', authenticate, authController.updateUserStatus);
+// Ativar/Inativar usuário (apenas admin_master) — FIX C-06
+router.patch('/users/:userId/status', authenticate, authorize('admin_master'), authController.updateUserStatus);
 
 // ============================================
 // ADMIN: Reset de senha (deprecated - agora usa approve)

@@ -24,6 +24,7 @@ router.delete('/webhooks/:id', checkPermission('configuracoes', 'escrita'), sett
 
 // Auditoria
 router.get('/test-connection', checkPermission('configuracoes', 'escrita'), settingsController.testConnection);
+router.get('/test-supabase', checkPermission('configuracoes', 'escrita'), settingsController.testConnection);
 router.get('/sync-history', checkPermission('configuracoes', 'leitura'), settingsController.getSyncHistory);
 
 // Comunicação

@@ -1,6 +1,17 @@
 // ⏰ CRÍTICO: Definir timezone ANTES de qualquer outro código
 process.env.TZ = 'America/Sao_Paulo';
 
+// FIX 4.2: Sentry deve ser inicializado antes de qualquer outro módulo
+const Sentry = require('@sentry/node');
+if (process.env.SENTRY_DSN) {
+    Sentry.init({
+        dsn: process.env.SENTRY_DSN,
+        environment: process.env.NODE_ENV || 'production',
+        tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+        integrations: [Sentry.httpIntegration()]
+    });
+}
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -131,6 +142,11 @@ app.use((req, res, next) => {
 const auditMiddleware = require('./middleware/audit');
 app.use(auditMiddleware);
 
+// FIX 4.7: Injeta cliente Supabase escopado ao token do usuário em req.supabase
+// Permite que controllers usem RLS nativamente via `req.supabase || supabase`
+const { injectSupabaseClient } = require('./middleware/supabaseClient');
+app.use(injectSupabaseClient);
+
 app.use(require('./modules/system/health.routes'));
 
 // Rotas
@@ -159,7 +175,27 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/lgpd', lgpdRoutes);
 app.use('/api/watchlist', watchlistRoutes);
 app.use('/api/cameras', cameraRoutes);
-app.use('/api/public', publicRoutes);
+app.use('/api/public', rateLimiter.public, publicRoutes); // FIX I-10: rate limiter dedicado para rotas públicas
+
+// ============================================
+// GLOBAL ERROR HANDLER — FIX I-06 + 4.2
+// Deve vir APÓS todas as rotas.
+// Previne stack traces em produção, centraliza logs e reporta ao Sentry.
+// ============================================
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+    const status = err.status || err.statusCode || 500;
+    const isDev = process.env.NODE_ENV === 'development';
+    logger.error({ err, url: req.originalUrl, method: req.method }, 'Erro não tratado capturado pelo global handler');
+    // FIX 4.2: Captura no Sentry apenas erros de servidor (5xx), não erros de cliente (4xx)
+    if (status >= 500 && process.env.SENTRY_DSN) {
+        Sentry.captureException(err);
+    }
+    return res.status(status).json({
+        error: isDev ? err.message : 'Erro interno do servidor.',
+        ...(isDev && { stack: err.stack })
+    });
+});
 
 const websocketService = require('./services/websocketService');
 const PORT = process.env.PORT || 3001;

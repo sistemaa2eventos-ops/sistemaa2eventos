@@ -130,7 +130,7 @@ class ExcelController {
                     const { code } = await qrGenerator.generate(cpf);
 
                     const { error: funcError } = await supabase.from('pessoas').upsert({
-                        nome,
+                        nome_completo: nome,
                         cpf,
                         nome_mae: nome_mae || 'Pendente Análise',
                         data_nascimento: data_nasc_raw ? new Date(data_nasc_raw).toISOString().split('T')[0] : null,
@@ -171,9 +171,9 @@ class ExcelController {
 
             const { data: pessoas, error } = await supabase
                 .from('pessoas')
-                .select('nome, cpf, nome_mae, data_nascimento, funcao, status_acesso, empresas(nome)')
+                .select('nome_completo, cpf, nome_mae, data_nascimento, funcao, status_acesso, empresas(nome)')
                 .eq('evento_id', eventoId)
-                .order('nome');
+                .order('nome_completo');
 
             if (error) throw error;
 
@@ -196,7 +196,7 @@ class ExcelController {
 
             pessoas.forEach(f => {
                 worksheet.addRow({
-                    nome: f.nome?.toUpperCase(),
+                    nome: f.nome_completo?.toUpperCase(),
                     cpf: f.cpf,
                     nome_mae: f.nome_mae?.toUpperCase(),
                     data_nascimento: f.data_nascimento ? new Date(f.data_nascimento).toLocaleDateString() : 'N/D',
@@ -290,11 +290,11 @@ class ExcelController {
                 sheet.getCell('A1').value = empresa.nome;
                 sheet.getCell('A1').font = { bold: true, size: 14 };
 
-                sheet.getRow(2).values = ['Nome', 'CPF', 'Função', 'Tipo Pulseira', 'Nº Pulseira', 'Entradas', 'Saídas', 'Horas Trabalhadas'];
+                sheet.getRow(2).values = ['Nome', 'CPF', 'Função', 'Nº Pulseira', 'Entradas', 'Saídas', 'Horas Trabalhadas'];
                 sheet.getRow(2).font = { bold: true, color: { argb: 'FFFFFFFF' } };
                 sheet.getRow(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A237E' } };
 
-                const { data: pessoas } = await supabase.from('pessoas').select('id, nome, cpf, funcao, tipo_pulseira, numero_pulseira').eq('empresa_id', empresa.id).eq('evento_id', evento_id).order('nome');
+                const { data: pessoas } = await supabase.from('pessoas').select('id, nome_completo, cpf, funcao, numero_pulseira').eq('empresa_id', empresa.id).eq('evento_id', evento_id).order('nome_completo');
 
                 for (const pessoa of (pessoas || [])) {
                     const inicio = `${data}T00:00:00`;
@@ -319,10 +319,10 @@ class ExcelController {
 
                     const horasFmt = detalhes.length > 0 ? (detalhes.length > 1 ? `${detalhes.join(' + ')} = ${Math.floor(totalMinutos / 60)}h${String(totalMinutos % 60).padStart(2, '0')}` : detalhes[0]) : '—';
 
-                    const row = sheet.addRow([pessoa.nome, pessoa.cpf, pessoa.funcao || '—', pessoa.tipo_pulseira || '—', pessoa.numero_pulseira || '—', entradasFmt.join(' / ') || '—', saidasFmt.join(' / ') || '—', horasFmt]);
+                    const row = sheet.addRow([pessoa.nome_completo, pessoa.cpf, pessoa.funcao || '—', pessoa.numero_pulseira || '—', entradasFmt.join(' / ') || '—', saidasFmt.join(' / ') || '—', horasFmt]);
                     row.alignment = { wrapText: true, vertical: 'top' };
                 }
-                sheet.columns = [{ width: 35 }, { width: 16 }, { width: 25 }, { width: 18 }, { width: 14 }, { width: 22 }, { width: 22 }, { width: 28 }];
+                sheet.columns = [{ width: 35 }, { width: 16 }, { width: 25 }, { width: 14 }, { width: 22 }, { width: 22 }, { width: 28 }];
             }
             return workbook;
         } catch (error) {

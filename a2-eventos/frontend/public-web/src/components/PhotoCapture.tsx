@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 import Webcam from 'react-webcam';
-import { Camera, RefreshCw, Trash2, CheckCircle, AlertCircle, Upload } from 'lucide-react';
+import { Camera, RefreshCw, Trash2, CheckCircle, AlertCircle, Upload, ShieldCheck, Sparkles } from 'lucide-react';
 import { FaceValidator } from '../utils/FaceValidator';
 
 interface PhotoCaptureProps {
-    onPhotoCaptured: (base64: string | null) => void;
+    onPhotoCaptured: (base64: string | null, source?: 'camera' | 'upload') => void;
     initialPhoto?: string | null;
 }
 
@@ -17,29 +17,85 @@ export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: P
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [faceDetected, setFaceDetected] = useState(false);
+    const [guidance, setGuidance] = useState("Aguardando câmera...");
 
     const videoConstraints = {
-        width: 480,
-        height: 640,
+        width: 640,
+        height: 480,
         facingMode: "user"
     };
+
+    // Sync imgSrc with prop when it changes (e.g. if cleared by parent)
+    useEffect(() => {
+        setImgSrc(initialPhoto);
+    }, [initialPhoto]);
+
+    // Real-time detection loop
+    useEffect(() => {
+        let animationFrame: number;
+        let isActive = true;
+
+        const detectLoop = async () => {
+            if (!isActive) return;
+
+            try {
+                if (isCameraOpen && webcamRef.current?.video) {
+                    const video = webcamRef.current.video;
+                    if (video.readyState === 4) {
+                        const detection = await FaceValidator.detect(video);
+                        if (isActive) {
+                            if (detection) {
+                                setFaceDetected(true);
+                                setGuidance("Rosto detectado! Mantenha a posição.");
+                                setError(null);
+                            } else {
+                                setFaceDetected(false);
+                                setGuidance("Posicione seu rosto dentro do quadro.");
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Erro na detecção em tempo real:", err);
+            }
+            
+            if (isActive && isCameraOpen) {
+                animationFrame = requestAnimationFrame(detectLoop);
+            }
+        };
+
+        if (isCameraOpen) {
+            detectLoop();
+        }
+
+        return () => {
+            isActive = false;
+            if (animationFrame) cancelAnimationFrame(animationFrame);
+        };
+    }, [isCameraOpen]);
 
     const capture = useCallback(async () => {
         if (webcamRef.current) {
             const imageSrc = webcamRef.current.getScreenshot();
             if (imageSrc) {
                 setLoading(true);
-                const validation = await FaceValidator.validate(imageSrc);
+                try {
+                    const validation = await FaceValidator.validate(imageSrc);
 
-                if (validation.isValid && validation.croppedBase64) {
-                    setImgSrc(validation.croppedBase64);
-                    setIsCameraOpen(false);
-                    setError(null);
-                    onPhotoCaptured(validation.croppedBase64);
-                } else {
-                    setError(validation.errors[0] || "Rosto não reconhecido");
+                    if (validation.isValid && validation.croppedBase64) {
+                        setImgSrc(validation.croppedBase64);
+                        setIsCameraOpen(false);
+                        setError(null);
+                        onPhotoCaptured(validation.croppedBase64, 'camera');
+                    } else {
+                        setError(validation.errors[0] || "Rosto não reconhecido");
+                    }
+                } catch (err) {
+                    setError("Erro ao processar a biometria facial.");
+                } finally {
+                    setLoading(false);
                 }
-                setLoading(false);
             }
         }
     }, [webcamRef, onPhotoCaptured]);
@@ -51,15 +107,20 @@ export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: P
             reader.onloadend = async () => {
                 const base64 = reader.result as string;
                 setLoading(true);
-                const validation = await FaceValidator.validate(base64);
-                if (validation.isValid && validation.croppedBase64) {
-                    setImgSrc(validation.croppedBase64);
-                    setError(null);
-                    onPhotoCaptured(validation.croppedBase64);
-                } else {
-                    setError(validation.errors[0] || "Rosto não reconhecido");
+                try {
+                    const validation = await FaceValidator.validate(base64);
+                    if (validation.isValid && validation.croppedBase64) {
+                        setImgSrc(validation.croppedBase64);
+                        setError(null);
+                        onPhotoCaptured(validation.croppedBase64, 'upload');
+                    } else {
+                        setError(validation.errors[0] || "Rosto não reconhecido");
+                    }
+                } catch (err) {
+                    setError("Erro ao processar o arquivo enviado.");
+                } finally {
+                    setLoading(false);
                 }
-                setLoading(false);
             };
             reader.readAsDataURL(file);
         }
@@ -74,31 +135,37 @@ export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: P
     return (
         <div className="w-full space-y-4">
             {imgSrc ? (
-                <div className="flex flex-col items-center">
-                    <div className="relative inline-block">
-                        <Image
-                            src={imgSrc}
-                            alt="Preview"
-                            width={192}
-                            height={256}
-                            className="w-48 h-64 rounded-xl object-cover border-4 border-emerald-500 shadow-xl"
-                            unoptimized
-                        />
-                        <button
-                            type="button"
-                            onClick={clearPhoto}
-                            className="absolute -top-3 -right-3 p-2 bg-red-600 text-white rounded-full hover:bg-red-700 shadow-lg transition-transform hover:scale-110 z-10"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                        </button>
+                <div className="flex flex-col items-center animate-in fade-in zoom-in duration-500">
+                    <div className="relative group">
+                        <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-2xl blur opacity-30 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
+                        <div className="relative flex flex-col items-center">
+                            <Image
+                                src={imgSrc}
+                                alt="Preview"
+                                width={240}
+                                height={320}
+                                className="w-60 h-80 rounded-2xl object-cover border-4 border-emerald-500/50 shadow-2xl"
+                                unoptimized
+                            />
+                            <button
+                                type="button"
+                                onClick={clearPhoto}
+                                className="absolute -top-3 -right-3 p-3 bg-red-600 text-white rounded-full hover:bg-red-500 shadow-lg transition-all hover:scale-110 z-20 backdrop-blur-md"
+                            >
+                                <Trash2 className="w-5 h-5" />
+                            </button>
+                        </div>
                     </div>
-                    <div className="mt-4 flex items-center gap-2 text-emerald-500 font-bold bg-emerald-500/10 px-4 py-2 rounded-full">
-                        <CheckCircle className="w-5 h-5" />
-                        <span>FOTO VALIDADA PELA IA</span>
+                    <div className="mt-6 flex flex-col items-center gap-2">
+                        <div className="flex items-center gap-2 text-emerald-400 font-bold bg-emerald-500/10 px-6 py-3 rounded-2xl border border-emerald-500/20 backdrop-blur-sm">
+                            <ShieldCheck className="w-6 h-6" />
+                            <span className="tracking-wider uppercase text-sm">Validado</span>
+                        </div>
                     </div>
                 </div>
             ) : (
-                <div className="w-full max-w-sm mx-auto h-[480px] bg-slate-900 rounded-2xl border-2 border-dashed border-slate-700 flex flex-col items-center justify-center overflow-hidden relative shadow-inner">
+                <div className="w-full max-w-lg mx-auto aspect-[3/4] sm:h-[500px] bg-slate-950 rounded-[2rem] border border-slate-800/50 flex flex-col items-center justify-center overflow-hidden relative shadow-2xl">
+                    
                     {isCameraOpen ? (
                         <>
                             <Webcam
@@ -107,57 +174,80 @@ export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: P
                                 screenshotFormat="image/jpeg"
                                 videoConstraints={videoConstraints}
                                 mirrored={true}
-                                className="w-full h-full object-cover scale-105"
+                                className="w-full h-full object-cover"
                             />
-                            {/* Overlay Silhouette for Face Guide */}
-                            <div className="absolute inset-0 z-10 pointer-events-none flex flex-col items-center justify-center">
-                                <div className="w-56 h-72 rounded-[100%] border-2 border-cyan-400/70 shadow-[0_0_0_9999px_rgba(15,23,42,0.85)] relative flex items-center justify-center">
-                                    <div className="absolute opacity-50 px-2 py-1 text-[10px] uppercase font-bold tracking-widest text-cyan-400 bg-slate-900/80 rounded top-2">Enquadre o Rosto</div>
+
+                            {/* Cyber Scanner Overlay */}
+                            <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
+                                {/* Face Silhouette Guide */}
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className={`w-[240px] h-[320px] xs:w-64 xs:h-80 rounded-[100%] border-2 ${faceDetected ? 'border-emerald-400' : 'border-cyan-400/50'} relative flex items-center justify-center transition-colors duration-500`}>
+                                        <div className={`absolute inset-0 rounded-[100%] border-4 border-white/10 ${faceDetected ? 'animate-pulse' : ''}`}></div>
+                                        
+                                        {/* Corner Markers */}
+                                        <div className="absolute top-10 left-0 w-8 h-8 border-t-2 border-l-2 border-cyan-400/30 rounded-tl-2xl"></div>
+                                        <div className="absolute top-10 right-0 w-8 h-8 border-t-2 border-r-2 border-cyan-400/30 rounded-tr-2xl"></div>
+                                        <div className="absolute bottom-10 left-0 w-8 h-8 border-b-2 border-l-2 border-cyan-400/30 rounded-bl-2xl"></div>
+                                        <div className="absolute bottom-10 right-0 w-8 h-8 border-b-2 border-r-2 border-cyan-400/30 rounded-br-2xl"></div>
+                                    </div>
+                                </div>
+
+                                {/* Status and Guidance */}
+                                <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 w-[80%]">
+                                    <div className={`glass-panel px-4 py-2 rounded-full border text-center transition-all duration-500 ${faceDetected ? 'border-emerald-500/50 bg-emerald-500/20' : 'border-cyan-500/30'}`}>
+                                        <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-white">{guidance}</span>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="absolute bottom-6 flex gap-3 z-20">
+                            {/* Control Bar */}
+                            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-4 bg-slate-900/80 backdrop-blur-xl p-3 rounded-3xl border border-white/10 shadow-2xl">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsCameraOpen(false)}
+                                    className="p-3 bg-white/5 text-slate-400 rounded-2xl hover:bg-white/10"
+                                >
+                                    <Trash2 className="w-6 h-6" />
+                                </button>
+                                
                                 <button
                                     type="button"
                                     onClick={capture}
                                     disabled={loading}
-                                    className="px-6 py-3 bg-cyan-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-cyan-500 hover:scale-105 transition-all shadow-lg shadow-cyan-600/30 disabled:opacity-70 disabled:scale-100"
+                                    className={`px-8 py-3 rounded-2xl font-black tracking-widest text-xs flex items-center gap-3 transition-all
+                                        ${faceDetected 
+                                            ? 'bg-cyan-600 text-white hover:bg-cyan-500' 
+                                            : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50'}`}
                                 >
                                     {loading ? (
-                                        <><RefreshCw className="w-5 h-5 animate-spin" /> ANALISANDO...</>
+                                        <><RefreshCw className="w-4 h-4 animate-spin" /> PROCESSANDO</>
                                     ) : (
                                         <><Camera className="w-5 h-5" /> CAPTURAR</>
                                     )}
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsCameraOpen(false)}
-                                    disabled={loading}
-                                    className="px-4 py-3 bg-slate-800 text-slate-300 rounded-xl font-bold flex items-center hover:bg-slate-700 transition"
-                                >
-                                    <Trash2 className="w-5 h-5" />
-                                </button>
                             </div>
                         </>
                     ) : (
-                        <div className="flex flex-col items-center gap-4 p-4 text-center">
-                            <Camera className="w-12 h-12 text-gray-400" />
-                            <div>
-                                <p className="text-sm font-bold text-gray-600">Captura Facial Obrigatória</p>
-                                <p className="text-xs text-gray-400">Posicione-se em local iluminado</p>
+                        <div className="flex flex-col items-center gap-6 p-10 text-center relative z-10">
+                            <div className="w-20 h-20 bg-cyan-600 rounded-2xl flex items-center justify-center shadow-xl">
+                                <Camera className="w-10 h-10 text-white" />
                             </div>
-                            <div className="flex gap-2">
+
+                            <div className="space-y-2">
+                                <h3 className="text-xl font-bold text-white uppercase tracking-tight">Biometria Facial</h3>
+                                <p className="text-slate-400 text-sm leading-relaxed">Capture uma foto para sua credencial.</p>
+                            </div>
+
+                            <div className="flex flex-col w-full gap-3">
                                 <button
                                     type="button"
                                     onClick={() => setIsCameraOpen(true)}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-blue-700"
+                                    className="w-full bg-white text-slate-950 font-bold py-3.5 rounded-xl text-sm"
                                 >
-                                    <Camera className="w-4 h-4" />
-                                    ABRIR CÂMERA
+                                    ATIVAR CÂMERA
                                 </button>
-                                <label className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-purple-700 cursor-pointer">
-                                    <Upload className="w-4 h-4" />
-                                    UPLOAD
+                                <label className="w-full bg-slate-900 text-white font-bold py-3.5 rounded-xl text-sm border border-slate-800 cursor-pointer">
+                                    UPLOAD DE FOTO
                                     <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
                                 </label>
                             </div>
@@ -167,11 +257,12 @@ export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: P
             )}
 
             {error && (
-                <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm flex items-center gap-2 border border-red-100">
-                    <AlertCircle className="w-4 h-4" />
-                    {error}
+                <div className="p-4 bg-red-950/20 border border-red-500/30 text-red-400 rounded-xl text-xs flex items-center gap-3">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{error}</span>
                 </div>
             )}
         </div>
     );
 }
+

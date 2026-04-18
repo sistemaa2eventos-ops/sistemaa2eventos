@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import Webcam from 'react-webcam';
+import { useSnackbar } from 'notistack';
 import {
     Box,
     Button,
@@ -253,10 +254,33 @@ const PhotoCapture = ({ onPhotoCaptured, initialPhoto }) => {
     const [showVerification, setShowVerification] = useState(false);
     const [validationResult, setValidationResult] = useState(null);
 
-    const handleCapture = () => {
-        const imageSrc = webcamRef.current.getScreenshot();
-        setTempImage(imageSrc);
-        setCropperOpen(true);
+    const { enqueueSnackbar } = useSnackbar();
+
+    const handleCapture = async () => {
+        if (!webcamRef.current) return;
+        
+        try {
+            setLoading(true);
+            const imageSrc = webcamRef.current.getScreenshot();
+            
+            // Bypass manual cropper for webcam: Use Automated Smart Crop
+            const validation = await FaceValidator.validate(imageSrc);
+            
+            if (validation.isValid && validation.croppedBase64) {
+                // INSTANT SAVE FOR SELFIES: Skip cropper AND verification dialog
+                setImgSrc(validation.croppedBase64);
+                onPhotoCaptured(validation.croppedBase64);
+                setIsCameraOpen(false);
+                enqueueSnackbar('Biometria capturada com sucesso.', { variant: 'success' });
+            } else {
+                enqueueSnackbar(validation.errors[0] || 'Falha na detecção facial. Tente novamente.', { variant: 'error' });
+            }
+        } catch (err) {
+            console.error("Capture Error:", err);
+            enqueueSnackbar('Erro ao processar a captura biométrica.', { variant: 'error' });
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleFileUpload = (e) => {

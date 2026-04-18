@@ -16,8 +16,14 @@ import {
   CardContent,
   Stack,
   Divider,
-  Checkbox
+  Checkbox,
+  Typography
 } from '@mui/material';
+
+const prefersReducedMotion = () => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+};
 
 const DataTable = ({
   columns,
@@ -142,8 +148,8 @@ const DataTable = ({
   // Desktop Render (Standard Table)
   return (
     <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-      <TableContainer sx={{ maxHeight: 440 }}>
-        <Table stickyHeader>
+      <TableContainer sx={{ maxHeight: 440 }} component="div" role="table" aria-label="Tabela de dados">
+        <Table stickyHeader component="table">
           <TableHead>
             <TableRow>
               {checkboxSelection && (
@@ -180,19 +186,26 @@ const DataTable = ({
                 return (
                   <TableRow
                     hover
+                    role="row"
                     key={row.id || index}
+                    aria-selected={isItemSelected}
                     selected={isItemSelected}
-                    sx={{ '&.Mui-selected, &.Mui-selected:hover': { bgcolor: 'rgba(0, 212, 255, 0.05)' } }}
+                    sx={{ 
+                        '&.Mui-selected, &.Mui-selected:hover': { bgcolor: 'rgba(0, 212, 255, 0.05)' },
+                        cursor: onRowDoubleClick ? 'pointer' : 'default',
+                        transition: 'background-color 0.2s ease',
+                    }}
                     onDoubleClick={onRowDoubleClick ? () => onRowDoubleClick(row) : undefined}
                   >
                     {checkboxSelection && (
-                      <TableCell padding="checkbox">
-                        <Checkbox
-                          checked={isItemSelected}
-                          onChange={(event) => handleSelectOne(event, row.id)}
-                          sx={{ color: 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: '#00D4FF' } }}
-                        />
-                      </TableCell>
+<TableCell padding="checkbox" role="cell">
+                  <Checkbox
+                    checked={isItemSelected}
+                    onChange={(event) => handleSelectOne(event, row.id)}
+                    inputProps={{ 'aria-label': `Selecionar linha ${index + 1}` }}
+                    sx={{ color: 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: '#00D4FF' }, '&:focus-visible': { outline: '2px solid #00D4FF', outlineOffset: 2 } }}
+                  />
+                </TableCell>
                     )}
                     {columns.map((column) => (
                       <TableCell key={column.id} align={column.align || 'left'}>

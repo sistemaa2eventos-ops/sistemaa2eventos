@@ -91,7 +91,7 @@ class PessoaController {
 
             // Auditoria
             await auditService.logEntity(req, 'CREATE_PERSON', 'PESSOAS', result.id, { 
-                nome: req.body.nome, 
+                nome: req.body.nome_completo, 
                 cpf: req.body.cpf 
             });
 
@@ -198,35 +198,53 @@ class PessoaController {
     async updateStatus(req, res) {
         try {
             const { id } = req.params;
-            const { status } = req.body;
+            let { status } = req.body;
             const supabaseClient = req.supabase || supabase;
             const tenantId = req.tenantId || req.event?.id || null;
 
-            const validStatus = ['ATIVO', 'PENDENTE', 'REJEITADO', 'BLOQUEADO'];
+            if (!status) return ApiResponse.error(res, 'Status é obrigatório.', 400);
+
+            // Normalização e Aliases (Robustez)
+            status = status.toLowerCase();
+            if (status === 'ativo') status = 'autorizado';
+            if (status === 'rejeitado') status = 'recusado';
+
+            // Novos status (inclui verificação)
+            const validStatus = ['pendente', 'autorizado', 'recusado', 'bloqueado', 'verificacao', 'checkin_feito', 'checkout_feito'];
             if (!validStatus.includes(status)) {
-                return ApiResponse.error(res, 'Status inválido.', 400);
+                return ApiResponse.error(res, `Status inválido: ${status}`, 400);
             }
 
-            const newStatus = status.toLowerCase();
-
-            // 1. Buscar dados atuais para saber se mudou e para quem enviar e-mail
+            // 1. Buscar dados atuais
             const { data: currentPessoa, error: findError } = await supabaseClient
                 .from('pessoas')
-                .select('id, nome, status_acesso, empresa_id, empresas(nome, email)')
+                .select('id, nome_completo, cpf, status_acesso, empresa_id, evento_id, empresas(nome, email)')
                 .eq('id', id)
                 .single();
 
             if (findError || !currentPessoa) {
-                return ApiResponse.error(res, 'Colaborador não encontrado.', 404);
+                return ApiResponse.error(res, 'Pessoa não encontrada.', 404);
             }
 
-            // 2. Atualizar Status
+            // 2. Preparar dados de atualização
+            const updateData = { 
+                status_acesso: status, 
+                updated_at: new Date() 
+            };
+
+            // 3. Se status mudará para 'autorizado', gerar QR Code
+            if (status === 'autorizado' && currentPessoa.status_acesso !== 'autorizado') {
+                const qrGenerator = require('../../utils/qrGenerator');
+                const cpf = currentPessoa.cpf || id;
+                const qrData = await qrGenerator.generate(cpf);
+                updateData.qr_code = qrData.code;
+                logger.info(`QR Code gerado para ${currentPessoa.nome_completo} (ID: ${id})`);
+            }
+
+            // 4. Atualizar Status
             const { data, error } = await supabaseClient
                 .from('pessoas')
-                .update({ 
-                    status_acesso: newStatus, 
-                    updated_at: new Date() 
-                })
+                .update(updateData)
                 .eq('id', id)
                 .eq('evento_id', tenantId)
                 .select()
@@ -237,19 +255,20 @@ class PessoaController {
                 return ApiResponse.error(res, 'Erro ao atualizar status.', 500);
             }
 
-            // 3. Notificar Empresa se for APROVAÇÃO (de pendente para ativo)
-            if (newStatus === 'ativo' && currentPessoa.status_acesso !== 'ativo') {
+            // 5. Notificar por e-mail se for APROVAÇÃO
+            if (status === 'autorizado' && currentPessoa.status_acesso !== 'autorizado') {
                 const empresa = currentPessoa.empresas;
-                if (empresa && empresa.email) {
+                if (empresa?.email) {
                     try {
                         await emailService.sendApprovalNotification(
                             empresa.email,
-                            currentPessoa.nome,
-                            empresa.nome
+                            currentPessoa.nome_completo,
+                            empresa.nome,
+                            updateData.qr_code
                         );
-                        logger.info(`E-mail de aprovação enviado para ${empresa.email} (Colaborador: ${currentPessoa.nome})`);
+                        logger.info(`E-mail de aprovação enviado para ${empresa.email}`);
                     } catch (emailErr) {
-                        logger.error('Falha ao enviar e-mail de aprovação:', emailErr);
+                        logger.error('Falha ao enviar e-mail:', emailErr.message);
                     }
                 }
             }
@@ -257,6 +276,180 @@ class PessoaController {
             return ApiResponse.success(res, { success: true, data });
         } catch (error) {
             logger.error('Erro catch no updateStatus:', error);
+            return ApiResponse.error(res, error.message, 500);
+        }
+    }
+
+    /**
+     * Aprovar pessoa (gera QR Code + sincroniza com dispositivos por área)
+     */
+    async approve(req, res) {
+        try {
+            const { id } = req.params;
+            const { areas_autorizadas } = req.body; // Array de UUIDs de áreas selecionadas
+            const supabaseClient = req.supabase || supabase;
+            const tenantId = req.tenantId || req.event?.id || null;
+
+            if (!tenantId) {
+                return ApiResponse.error(res, 'Contexto de evento não encontrado.', 400);
+            }
+
+            const { data: pessoa, error: findError } = await supabaseClient
+                .from('pessoas')
+                .select('id, nome_completo, cpf, qr_code, status_acesso')
+                .eq('id', id)
+                .eq('evento_id', tenantId)
+                .single();
+
+            if (findError || !pessoa) {
+                return ApiResponse.error(res, 'Pessoa não encontrado.', 404);
+            }
+
+            // 🔐 REGRA 5: Validar que pessoa tem pelo menos uma área (se áreas estiverem em uso)
+            if (areas_autorizadas && Array.isArray(areas_autorizadas) && areas_autorizadas.length === 0) {
+                return ApiResponse.error(res, 'Atenção: Selecione pelo menos uma área de acesso antes de aprovar.', 400);
+            }
+
+            // 1. Aprovar na pivottable
+            const { error: pivotError } = await supabaseClient
+                .from('pessoa_evento_empresa')
+                .update({ status_aprovacao: 'aprovado', atualizado_em: new Date() })
+                .eq('pessoa_id', id)
+                .eq('evento_id', tenantId);
+
+            if (pivotError) {
+                logger.error('Erro ao aprovar pivot:', pivotError);
+            }
+
+            // 2. Gerar QR Code apenas se não existir
+            let qrCodeGenerated = null;
+            if (!pessoa.qr_code) {
+                const qrGenerator = require('../../utils/qrGenerator');
+                const qrSource = pessoa.cpf || pessoa.id;
+                const qrData = await qrGenerator.generate(qrSource);
+
+                await supabaseClient
+                    .from('pessoas')
+                    .update({ qr_code: qrData.code, status_acesso: 'autorizado', updated_at: new Date() })
+                    .eq('id', id);
+
+                qrCodeGenerated = qrData;
+                logger.info(`QR Code gerado na aprovação: ${pessoa.nome_completo}`);
+            } else {
+                // Apenas atualizar status
+                await supabaseClient
+                    .from('pessoas')
+                    .update({ status_acesso: 'autorizado', updated_at: new Date() })
+                    .eq('id', id);
+            }
+
+            // 3. 🆕 VINCULAR ÁREAS DE ACESSO (novo fluxo)
+            if (areas_autorizadas && Array.isArray(areas_autorizadas) && areas_autorizadas.length > 0) {
+                logger.info(`🔐 [Approve] Vinculando ${areas_autorizadas.length} áreas para ${pessoa.nome_completo}...`);
+
+                // Limpar áreas antigas (se houver)
+                await supabaseClient
+                    .from('pessoa_areas_acesso')
+                    .delete()
+                    .eq('pessoa_id', id)
+                    .eq('evento_id', tenantId);
+
+                // Inserir novas áreas
+                const areaVinculos = areas_autorizadas.map(areaId => ({
+                    pessoa_id: id,
+                    area_id: areaId,
+                    evento_id: tenantId,
+                    criado_por: req.user?.id
+                }));
+
+                const { error: vinculoError } = await supabaseClient
+                    .from('pessoa_areas_acesso')
+                    .insert(areaVinculos);
+
+                if (vinculoError) {
+                    logger.error('Erro ao vincular áreas:', vinculoError);
+                    return ApiResponse.error(res, 'Erro ao vincular áreas de acesso', 500);
+                }
+
+                // 4. 🆕 DISPARAR SINCRONIZAÇÃO INTELIGENTE POR ÁREA
+                const syncService = require('../devices/sync.service');
+                setImmediate(async () => {
+                    try {
+                        const result = await syncService.syncEnrollmentByArea(id);
+                        logger.info(`✅ [Approve] Sync por área concluído: ${result.cadastrados} cadastrados, ${result.removidos} removidos`);
+                    } catch (err) {
+                        logger.error('❌ [Approve] Erro ao sincronizar por área:', err);
+                    }
+                });
+
+                logger.info(`✅ [Approve] ${areas_autorizadas.length} áreas vinculadas. Sync iniciado assincronamente.`);
+            }
+
+            await auditService.logEntity(req, 'APPROVE_PERSON', 'PESSOAS', id, {
+                nome: pessoa.nome_completo,
+                areas: areas_autorizadas?.length || 0
+            });
+
+            return ApiResponse.success(res, {
+                success: true,
+                message: 'Pessoa aprovada com sucesso e sincronizada aos dispositivos',
+                qr_code: qrCodeGenerated || pessoa.qr_code,
+                areas_sincronizadas: areas_autorizadas?.length || 0
+            });
+        } catch (error) {
+            logger.error('Erro na aprovação:', error);
+            return ApiResponse.error(res, error.message, 500);
+        }
+    }
+
+    /**
+     * Reprovar pessoa
+     */
+    async reject(req, res) {
+        try {
+            const { id } = req.params;
+            const { justificativa } = req.body;
+            const supabaseClient = req.supabase || supabase;
+            const tenantId = req.tenantId || req.event?.id || null;
+
+            if (!tenantId) {
+                return ApiResponse.error(res, 'Contexto de evento não encontrado.', 400);
+            }
+
+            const { data: pessoa, error: findError } = await supabaseClient
+                .from('pessoas')
+                .select('id, nome_completo')
+                .eq('id', id)
+                .eq('evento_id', tenantId)
+                .single();
+
+            if (findError || !pessoa) {
+                return ApiResponse.error(res, 'Pessoa não encontrada.', 404);
+            }
+
+            await supabaseClient
+                .from('pessoa_evento_empresa')
+                .update({ status_aprovacao: 'recusado', atualizado_em: new Date() })
+                .eq('pessoa_id', id)
+                .eq('evento_id', tenantId);
+
+            await supabaseClient
+                .from('pessoas')
+                .update({ 
+                    status_acesso: 'recusado', 
+                    motivo_bloqueio: justificativa || 'Reprovado pelo administrador',
+                    updated_at: new Date() 
+                })
+                .eq('id', id);
+
+            await auditService.logEntity(req, 'REJECT_PERSON', 'PESSOAS', id, { nome: pessoa.nome_completo, justificativa });
+
+            return ApiResponse.success(res, { 
+                success: true, 
+                message: 'Pessoa reprovada com sucesso'
+            });
+        } catch (error) {
+            logger.error('Erro na reprovação:', error);
             return ApiResponse.error(res, error.message, 500);
         }
     }

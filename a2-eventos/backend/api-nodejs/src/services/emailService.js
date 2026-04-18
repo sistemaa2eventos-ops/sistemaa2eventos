@@ -218,29 +218,45 @@ class EmailService {
     /**
      * Notificação de Aprovação de Cadastro (Enviado para a Empresa)
      */
-    async sendApprovalNotification(email, nomePessoa, nomeEmpresa) {
+    async sendApprovalNotification(email, nomePessoa, nomeEmpresa, qrCode = null) {
         try {
+            // Gerar QR code inline se não fornecido
+            let qrImageHtml = '';
+            if (qrCode) {
+                qrImageHtml = `
+                    <div style="text-align: center; margin: 30px 0;">
+                        <p style="font-size: 14px; margin-bottom: 10px;"><strong>QR Code de Acesso:</strong></p>
+                        <div style="display: inline-block; padding: 15px; background: white; border-radius: 8px;">
+                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrCode)}" alt="QR Code" style="width: 200px; height: 200px;"/>
+                        </div>
+                        <p style="font-size: 12px; margin-top: 10px; color: #666;">Código: ${qrCode}</p>
+                    </div>
+                `;
+            }
+
             const mailOptions = {
-                from: `"Nexus Control - Auditoria" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
+                from: `"A2 Eventos - Credenciamento" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
                 to: email,
-                subject: `Credenciamento Aprovado: ${nomePessoa} ✅`,
+                subject: `Credenciamento Aprovado: ${nomePessoa}`,
                 html: `
                     <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 40px; border: 1px solid #eee; border-radius: 12px;">
                         <div style="text-align: center; margin-bottom: 30px;">
                             <div style="font-size: 60px; margin-bottom: 20px;">✅</div>
-                            <h2 style="color: #2E7D32; margin: 0;">Colaborador Confirmado!</h2>
+                            <h2 style="color: #2E7D32; margin: 0;">Credenciamento Aprovado!</h2>
                         </div>
                         <p>Olá, <strong>${nomeEmpresa}</strong>.</p>
-                        <p>Informamos que o credenciamento do colaborador <strong>${nomePessoa}</strong> foi revisado e <strong>APROVADO</strong> pela nossa equipe de auditoria operando para o seu evento.</p>
-                        <p>O acesso aos terminais biométricos e faciais já está <strong>liberado</strong> para este CPF, seguindo os dias de trabalho solicitados.</p>
+                        <p>O credenciamento de <strong>${nomePessoa}</strong> foi <strong>APROVADO</strong> e já está liberado para acesso.</p>
                         
+                        ${qrImageHtml}
+
                         <div style="background: #f0fdf4; border-radius: 8px; padding: 20px; margin: 30px 0; border: 1px solid #dcfce7; color: #166534; font-size: 14px;">
-                            <strong>Próximos Passos:</strong><br>
-                            O colaborador já pode realizar o check-in no recinto. Certifique-se de que ele esteja portando um documento original com foto para eventuais auditorias de campo.
+                            <strong>Instruções:</strong><br>
+                            • Apresente o QR Code na entrada ou use biometria facial<br>
+                            • O acesso está liberado para as datas definidas no cadastro
                         </div>
 
                         <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;" />
-                        <p style="font-size: 11px; color: #999; text-align: center;">A2 Eventos - Monitoramento e Controle Operacional<br>© 2026 Nexus Analytics</p>
+                        <p style="font-size: 11px; color: #999; text-align: center;">A2 Eventos - Sistema de Credenciamento<br>© 2026</p>
                     </div>
                 `
             };

@@ -168,10 +168,24 @@ const Empresas = () => {
       enqueueSnackbar('Telefone não cadastrado.', { variant: 'warning' });
       return;
     }
-    // Abrir WhatsApp diretamente com o número
+
     const cleanPhone = telefone.replace(/\D/g, '');
-    const whatsappUrl = `https://wa.me/55${cleanPhone}`;
-    window.open(whatsappUrl, '_blank');
+    const eventoNome = localStorage.getItem('active_evento_nome') || 'Evento';
+    const publicUrl = 'https://cadastro.nzt.app.br'; // Fallback base
+    
+    // Se a empresa já tem um token, enviamos o link direto
+    if (row.registration_token) {
+      const link = `${publicUrl}/register/${row.registration_token}`;
+      const body = encodeURIComponent(
+        `Olá, *${row.responsavel || 'Responsável'}*!\n\n` +
+        `Segue o link para registro da equipe da *${row.nome}* no evento *${eventoNome}*:\n\n` +
+        `${link}`
+      );
+      window.open(`https://wa.me/55${cleanPhone}?text=${body}`, '_blank');
+    } else {
+      // Caso contrário, apenas abre o chat
+      window.open(`https://wa.me/55${cleanPhone}`, '_blank');
+    }
   };
 
   const handleGerarConvite = async (row) => {
@@ -217,6 +231,7 @@ const Empresas = () => {
     const telefone = inviteResult.empresa.telefone || inviteResult.empresa.responsavel_telefone || '';
     const cleanPhone = telefone.replace(/\D/g, '');
     
+    // Garantir que usamos o link gerado, que agora vem no formato correto do backend
     const body = encodeURIComponent(
       `Olá, *${responsavel}*!\n\n` +
       `Sua empresa *${empresaNome}* foi cadastrada para o evento *${eventoNome}*.\n` +
@@ -258,7 +273,7 @@ const Empresas = () => {
         email_convite: '',
         responsavel: '',
         observacao: '',
-        registration_token: Math.random().toString(36).substring(2, 15),
+        registration_token: '',
         max_colaboradores: 50
       });
       setOpenDialog(true);

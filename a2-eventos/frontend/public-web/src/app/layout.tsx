@@ -13,13 +13,28 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "A2 Eventos | Credenciamento",
-  description: "Plataforma Inteligente de Gestão de Bordo, Controle de Acesso e Credenciamento Biométrico B2B/B2C.",
+  title: "NZT - Intelligent Control System",
+  description: "Plataforma Inteligente de Gestão de Bordo, Controle de Acesso e Credenciamento Biométrico.",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/logo.jpg",
+    apple: "/logo.jpg",
+  },
+  openGraph: {
+    title: "NZT - Intelligent Control System",
+    description: "Credenciamento Biométrico Inteligente",
+    images: ["/logo.jpg"],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "NZT - Intelligent Control System",
+    images: ["/logo.jpg"],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "A2 Acesso",
+    title: "NZT Control",
   }
 };
 

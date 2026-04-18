@@ -14,7 +14,7 @@ export const usePessoas = () => {
 
     // Params
     const eventoIdParam = searchParams.get('evento_id') || localStorage.getItem('active_evento_id');
-    const isAdmin = user?.nivel_acesso === 'admin' || user?.nivel_acesso === 'master' || user?.nivel_acesso === 'supervisor';
+    const isAdmin = user?.nivel_acesso === 'admin_master' || user?.nivel_acesso === 'admin' || user?.nivel_acesso === 'master' || user?.nivel_acesso === 'supervisor';
     const isEmpresa = user?.nivel_acesso === 'empresa';
 
     // States
@@ -52,9 +52,11 @@ export const usePessoas = () => {
     const [expulsionLoading, setExpulsionLoading] = useState(false);
 
     const [formData, setFormData] = useState({
-      nome: '', nome_credencial: '', cpf: '', passaporte: '', telefone: '', nome_mae: '', data_nascimento: '',
-      funcao: '', empresa_id: '', tipo_pessoa: 'colaborador', foto_url: '', dias_trabalho: [], trabalho_area_tecnica: false,
-      trabalho_altura: false, pagamento_validado: false, aceite_lgpd: false
+      nome_completo: '', nome_credencial: '', cpf: '', passaporte: '', telefone: '', nome_mae: '', data_nascimento: '',
+      funcao: '', empresa_id: '', tipo_pessoa: 'colaborador', foto_url: '', 
+      fases_acesso: [], dias_acesso: [], documentos_trabalho: [],
+      trabalho_area_tecnica: false, trabalho_altura: false, pagamento_validado: false, aceite_lgpd: false,
+      codigo_ingresso: '', origem_pagamento: ''
     });
 
     const [openWebcamECM, setOpenWebcamECM] = useState(false);
@@ -182,17 +184,23 @@ export const usePessoas = () => {
         setSelectedPessoa(pessoa);
         setFormData({
           ...pessoa,
+          nome_completo: pessoa.nome_completo || pessoa.nome || '',
           data_nascimento: pessoa.data_nascimento ? format(new Date(pessoa.data_nascimento), "yyyy-MM-dd") : '',
-          tipo_pessoa: pessoa.tipo_pessoa || pessoa.categoria_operacional || '',
-          dias_trabalho: Array.isArray(pessoa.dias_trabalho) ? pessoa.dias_trabalho : [],
+          tipo_pessoa: pessoa.tipo_pessoa || pessoa.categoria_operacional || 'colaborador',
+          // Novos campos de fase/dias
+          fases_acesso: Array.isArray(pessoa.fases_acesso) ? pessoa.fases_acesso : [],
+          dias_acesso: Array.isArray(pessoa.dias_acesso) ? pessoa.dias_acesso : [],
+          documentos_trabalho: Array.isArray(pessoa.documentos_trabalho) ? pessoa.documentos_trabalho : [],
         });
       } else {
         setSelectedPessoa(null);
         setFormData({
-          nome: '', nome_credencial: '', cpf: '', passaporte: '', telefone: '', nome_mae: '', data_nascimento: '', funcao: '', tipo_pessoa: 'colaborador',
-          email: '', // Campo novo necessário para convites
+          nome_completo: '', nome_credencial: '', cpf: '', passaporte: '', telefone: '', nome_mae: '', data_nascimento: '', funcao: '', tipo_pessoa: 'colaborador',
+          email: '',
           empresa_id: isEmpresa ? user?.empresa_id : '', 
-          foto_url: '', dias_trabalho: [], trabalho_area_tecnica: false, trabalho_altura: false, pagamento_validado: false, parecer_documentos: 'pendente'
+          foto_url: '', fases_acesso: [], dias_acesso: [], documentos_trabalho: [],
+          trabalho_area_tecnica: false, trabalho_altura: false, pagamento_validado: false, parecer_documentos: 'pendente',
+          codigo_ingresso: '', origem_pagamento: ''
         });
         setDocumentos([]);
       }
@@ -202,7 +210,7 @@ export const usePessoas = () => {
     const handleCloseDialog = () => { setOpenDialog(false); setSelectedPessoa(null); };
 
     const handleSave = async () => {
-      if (!formData.nome || !formData.empresa_id) { enqueueSnackbar('Nome e Empresa são obrigatórios.', {variant: 'error'}); return; }
+      if (!formData.nome_completo || !formData.empresa_id) { enqueueSnackbar('Nome Completo e Empresa são obrigatórios.', {variant: 'error'}); return; }
       try {
         setSaving(true);
         let payload = { ...formData };
@@ -224,10 +232,10 @@ export const usePessoas = () => {
           await api.put(`/pessoas/${selectedPessoa.id}`, payload);
           if (selectedPessoa.status === 'PENDENTE' || selectedPessoa.status_acesso === 'pendente') {
             if (payload.parecer_documentos === 'completo') {
-              await api.patch(`/pessoas/${selectedPessoa.id}/status`, { status: 'ATIVO' });
+              await api.patch(`/pessoas/${selectedPessoa.id}/status`, { status: 'autorizado' });
               enqueueSnackbar('Cadastro aprovado com sucesso!', { variant: 'success' });
             } else if (payload.parecer_documentos === 'incorreto') {
-              await api.patch(`/pessoas/${selectedPessoa.id}/status`, { status: 'REJEITADO' });
+              await api.patch(`/pessoas/${selectedPessoa.id}/status`, { status: 'recusado' });
               enqueueSnackbar('Cadastro rejeitado.', { variant: 'warning' });
             }
           }
@@ -241,10 +249,17 @@ export const usePessoas = () => {
     };
 
     const handleDateToggle = (date) => {
-      const current = Array.isArray(formData.dias_trabalho) ? [...formData.dias_trabalho] : [];
+      const current = Array.isArray(formData.dias_acesso) ? [...formData.dias_acesso] : [];
       const index = current.indexOf(date);
       if (index === -1) current.push(date); else current.splice(index, 1);
-      setFormData({ ...formData, dias_trabalho: current });
+      setFormData({ ...formData, dias_acesso: current });
+    };
+
+    const handleFaseToggle = (fase) => {
+      const current = Array.isArray(formData.fases_acesso) ? [...formData.fases_acesso] : [];
+      const index = current.indexOf(fase);
+      if (index === -1) current.push(fase); else current.splice(index, 1);
+      setFormData({ ...formData, fases_acesso: current });
     };
 
     const handleDelete = (id) => { setPessoaToDelete(id); setOpenDeleteConfirm(true); };
@@ -261,7 +276,7 @@ export const usePessoas = () => {
 
     const handleNextStep = async () => {
       if (activeStep === 0 && !selectedPessoa) {
-        if (!formData.nome || !formData.empresa_id) { enqueueSnackbar('Preencha Nome e Empresa.', { variant: 'warning' }); return; }
+        if (!formData.nome_completo || !formData.empresa_id) { enqueueSnackbar('Preencha Nome Completo e Empresa.', { variant: 'warning' }); return; }
         try {
           setSaving(true);
           const response = await api.post('/pessoas', { ...formData, status_acesso: 'pendente' });
@@ -271,7 +286,9 @@ export const usePessoas = () => {
             setFormData({
               ...formData,
               ...(savedPessoa || {}),
-              dias_trabalho: (savedPessoa && Array.isArray(savedPessoa.dias_trabalho)) ? savedPessoa.dias_trabalho : []
+              fases_acesso: (savedPessoa && Array.isArray(savedPessoa.fases_acesso)) ? savedPessoa.fases_acesso : [],
+              dias_acesso: (savedPessoa && Array.isArray(savedPessoa.dias_acesso)) ? savedPessoa.dias_acesso : [],
+              documentos_trabalho: (savedPessoa && Array.isArray(savedPessoa.documentos_trabalho)) ? savedPessoa.documentos_trabalho : []
             });
             enqueueSnackbar('Registro inicial salvo. Prossiga com o escopo de atuação.', { variant: 'info' });
             setActiveStep(1);
@@ -404,6 +421,7 @@ export const usePessoas = () => {
         handleCloseDialog,
         handleSave,
         handleDateToggle,
+        handleFaseToggle,
         handleDelete,
         confirmDelete,
         handleOpenBlock,

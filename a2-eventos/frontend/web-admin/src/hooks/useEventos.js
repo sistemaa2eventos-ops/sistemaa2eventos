@@ -28,8 +28,8 @@ export const useEventos = () => {
         datas_evento: [],
         datas_desmontagem: [],
         horario_reset: '00:00',
-        tipos_checkin: ['qrcode', 'barcode', 'manual'],
-        tipos_checkout: ['qrcode', 'barcode', 'manual'],
+        tipos_checkin: ['facial', 'pulseira'],
+        tipos_checkout: ['facial', 'pulseira'],
         impressao_etiquetas: false,
         modules: []
     });
@@ -65,8 +65,8 @@ export const useEventos = () => {
                 datas_evento: evento.datas_evento || [],
                 datas_desmontagem: evento.datas_desmontagem || [],
                 horario_reset: evento.horario_reset || '00:00',
-                tipos_checkin: evento.tipos_checkin || ['qrcode', 'barcode', 'manual'],
-                tipos_checkout: evento.tipos_checkout || ['qrcode', 'barcode', 'manual'],
+                tipos_checkin: evento.tipos_checkin || ['facial', 'pulseira'],
+                tipos_checkout: evento.tipos_checkout || ['facial', 'pulseira'],
                 impressao_etiquetas: !!evento.impressao_etiquetas,
                 modules: evento.event_modules || []
             });

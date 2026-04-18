@@ -16,12 +16,15 @@ import {
     InputLabel,
     FormControl,
     OutlinedInput,
-    Chip
+    Chip,
+    Switch,
+    FormControlLabel
 } from '@mui/material';
 import { useSnackbar } from 'notistack';
 import {
     Add as AddIcon,
     Delete as DeleteIcon,
+    Edit as EditIcon,
     Style as StyleIcon,
     Circle as CircleIcon
 } from '@mui/icons-material';
@@ -56,9 +59,14 @@ const ConfigPulseiras = ({ embedded = false }) => {
         cor_hex: '#00D4FF',
         numero_inicial: '',
         numero_final: '',
-        tipo_leitura: 'qr_code',
-        areas_permitidas: []
+        tipo_leitura: 'combinada',
+        areas_permitidas: [],
+        prefixo_codigo: '',
+        alerta_duplicidade: true,
+        tempo_confirmacao_checkout: 3
     });
+
+    const [editingId, setEditingId] = useState(null);
 
     const columns = [
         {
@@ -129,10 +137,18 @@ const ConfigPulseiras = ({ embedded = false }) => {
         {
             id: 'acoes',
             label: 'AÇÕES',
-            minWidth: 100,
+            minWidth: 120,
             align: 'center',
             format: (value, row) => (
                 <Stack direction="row" spacing={1} justifyContent="center">
+                    <IconButton
+                        size="small"
+                        onClick={() => handleOpenDialog(row)}
+                        sx={{ color: '#00D4FF', background: 'rgba(0,212,255,0.05)' }}
+                        title="Editar"
+                    >
+                        <EditIcon fontSize="small" />
+                    </IconButton>
                     <IconButton
                         size="small"
                         onClick={() => handleDelete(row.id)}
@@ -166,15 +182,34 @@ const ConfigPulseiras = ({ embedded = false }) => {
         }
     };
 
-    const handleOpenDialog = () => {
-        setFormData({
-            nome_tipo: '',
-            cor_hex: '#00D4FF',
-            numero_inicial: '',
-            numero_final: '',
-            tipo_leitura: 'qr_code',
-            areas_permitidas: []
-        });
+    const handleOpenDialog = (pulseira = null) => {
+        if (pulseira) {
+            setEditingId(pulseira.id);
+            setFormData({
+                nome_tipo: pulseira.nome_tipo || '',
+                cor_hex: pulseira.cor_hex || '#00D4FF',
+                numero_inicial: pulseira.numero_inicial || '',
+                numero_final: pulseira.numero_final || '',
+                tipo_leitura: pulseira.tipo_leitura || 'combinada',
+                areas_permitidas: pulseira.pulseira_areas_permitidas?.map(p => p.area_id) || [],
+                prefixo_codigo: pulseira.prefixo_codigo || '',
+                alerta_duplicidade: pulseira.alerta_duplicidade !== false,
+                tempo_confirmacao_checkout: pulseira.tempo_confirmacao_checkout || 3
+            });
+        } else {
+            setEditingId(null);
+            setFormData({
+                nome_tipo: '',
+                cor_hex: '#00D4FF',
+                numero_inicial: '',
+                numero_final: '',
+                tipo_leitura: 'combinada',
+                areas_permitidas: [],
+                prefixo_codigo: '',
+                alerta_duplicidade: true,
+                tempo_confirmacao_checkout: 3
+            });
+        }
         setOpenDialog(true);
     };
 
@@ -202,15 +237,21 @@ const ConfigPulseiras = ({ embedded = false }) => {
             const payload = {
                 ...formData,
                 numero_inicial: parseInt(numero_inicial),
-                numero_final: parseInt(numero_final)
+                numero_final: parseInt(numero_final),
+                tempo_confirmacao_checkout: parseInt(formData.tempo_confirmacao_checkout) || 3
             };
 
-            await api.post('/config/pulseiras', payload);
-            enqueueSnackbar('Lote de pulseira provisionado com sucesso!', { variant: 'success' });
+            if (editingId) {
+                await api.put(`/config/pulseiras/${editingId}`, payload);
+                enqueueSnackbar('Pulseira atualizada com sucesso!', { variant: 'success' });
+            } else {
+                await api.post('/config/pulseiras', payload);
+                enqueueSnackbar('Lote de pulseira provisionado com sucesso!', { variant: 'success' });
+            }
             handleCloseDialog();
             loadData();
         } catch (error) {
-            enqueueSnackbar(error.response?.data?.error || 'Erro Crítico no Provisionamento.', { variant: 'error' });
+            enqueueSnackbar(error.response?.data?.error || 'Erro crítico no provisionamento.', { variant: 'error' });
         } finally {
             setSaving(false);
         }
@@ -277,7 +318,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
 
             <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth disableRestoreFocus>
                 <DialogTitle sx={{ fontFamily: '"Orbitron", sans-serif', fontWeight: 700, letterSpacing: '2px', color: '#00D4FF' }}>
-                    PROVISIONAMENTO DE PULSEIRA
+                    {editingId ? 'EDITAR PULSEIRA' : 'PROVISIONAMENTO DE PULSEIRA'}
                 </DialogTitle>
                 <DialogContent>
                     <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -322,6 +363,14 @@ const ConfigPulseiras = ({ embedded = false }) => {
                             </Grid>
                         </Grid>
 
+                        <TextField
+                            label="Prefixo do Código (opcional)"
+                            fullWidth
+                            placeholder="Ex: A2"
+                            value={formData.prefixo_codigo}
+                            onChange={(e) => setFormData({ ...formData, prefixo_codigo: e.target.value })}
+                        />
+
                         <FormControl fullWidth size="small">
                             <InputLabel>Método de Leitura Principal</InputLabel>
                             <Select
@@ -330,10 +379,10 @@ const ConfigPulseiras = ({ embedded = false }) => {
                                 input={<OutlinedInput label="Método de Leitura Principal" />}
                                 MenuProps={MenuProps}
                             >
-                                <MenuItem value="qr_code">QR Code (Padrão)</MenuItem>
-                                <MenuItem value="barcode_ean13">Código de Barras (EAN-13)</MenuItem>
-                                <MenuItem value="barcode_128">Código de Barras (CODE 128)</MenuItem>
-                                <MenuItem value="number_only">Somente Número (Digitação)</MenuItem>
+                                <MenuItem value="numerada">Somente Número</MenuItem>
+                                <MenuItem value="qrcode">QR Code</MenuItem>
+                                <MenuItem value="barcode">Código de Barras</MenuItem>
+                                <MenuItem value="combinada">Combinada (QR + Código)</MenuItem>
                             </Select>
                         </FormControl>
 
@@ -362,11 +411,37 @@ const ConfigPulseiras = ({ embedded = false }) => {
                                 ))}
                             </Select>
                         </FormControl>
+
+                        <Grid container spacing={2}>
+                            <Grid item xs={6}>
+                                <TextField
+                                    label="Tempo Confirmação Checkout (seg)"
+                                    type="number"
+                                    fullWidth
+                                    value={formData.tempo_confirmacao_checkout}
+                                    onChange={(e) => setFormData({ ...formData, tempo_confirmacao_checkout: e.target.value })}
+                                    helperText="Tempo de espera após bipar"
+                                />
+                            </Grid>
+                            <Grid item xs={6} sx={{ display: 'flex', alignItems: 'center' }}>
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            checked={formData.alerta_duplicidade}
+                                            onChange={(e) => setFormData({ ...formData, alerta_duplicidade: e.target.checked })}
+                                        />
+                                    }
+                                    label="Alerta de Duplicidade"
+                                />
+                            </Grid>
+                        </Grid>
                     </Box>
                 </DialogContent>
                 <DialogActions sx={{ p: 3 }}>
                     <Button onClick={handleCloseDialog} disabled={saving} sx={{ color: 'text.secondary' }}>CANCELAR</Button>
-                    <NeonButton onClick={handleSave} loading={saving} autoFocus>EXECUTAR</NeonButton>
+                    <NeonButton onClick={handleSave} loading={saving} autoFocus>
+                        {editingId ? 'SALVAR' : 'EXECUTAR'}
+                    </NeonButton>
                 </DialogActions>
             </Dialog>
 

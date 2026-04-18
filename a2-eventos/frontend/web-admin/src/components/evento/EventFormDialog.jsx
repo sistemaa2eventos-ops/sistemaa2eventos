@@ -136,11 +136,8 @@ const EventFormDialog = ({
                             </Typography>
                             <FormGroup row sx={{ ml: 1, mb: 2 }}>
                                 {[
-                                    { id: 'qrcode', label: 'QR Code' },
-                                    { id: 'barcode', label: 'Barras' },
-                                    { id: 'manual', label: 'Manual' },
-                                    { id: 'rfid', label: 'Pulseira/RFID' },
-                                    { id: 'face', label: 'Leitor Facial' }
+                                    { id: 'facial', label: 'Reconhecimento Facial' },
+                                    { id: 'pulseira', label: 'Pulseira/Barcode' }
                                 ].map(method => (
                                     <FormControlLabel
                                         key={method.id}
@@ -170,11 +167,8 @@ const EventFormDialog = ({
                             </Typography>
                             <FormGroup row sx={{ ml: 1 }}>
                                 {[
-                                    { id: 'qrcode', label: 'QR Code' },
-                                    { id: 'barcode', label: 'Barras' },
-                                    { id: 'manual', label: 'Manual' },
-                                    { id: 'rfid', label: 'Pulseira/RFID' },
-                                    { id: 'face', label: 'Leitor Facial' }
+                                    { id: 'facial', label: 'Reconhecimento Facial' },
+                                    { id: 'pulseira', label: 'Pulseira/Barcode' }
                                 ].map(method => (
                                     <FormControlLabel
                                         key={method.id}

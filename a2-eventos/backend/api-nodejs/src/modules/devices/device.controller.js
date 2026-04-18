@@ -4,17 +4,32 @@ const DeviceFactory = require('./adapters/DeviceFactory');
 
 class DeviceController {
 
-    // Listar todos os dispositivos
     async list(req, res) {
         try {
-            let query = supabase.from('dispositivos_acesso').select('*');
-            const evento_id = req.event.id;
-            query = query.eq('evento_id', evento_id);
-            const { data, error } = await query;
-            if (error) throw error;
+            const evento_id = req.event?.id;
+            if (!evento_id) {
+                return res.status(400).json({ error: 'Contexto de evento não identificado' });
+            }
+
+            const { data, error } = await supabase
+                .from('dispositivos_acesso')
+                .select('*')
+                .eq('evento_id', evento_id)
+                .order('nome', { ascending: true });
+
+            if (error) {
+                logger.error(`❌ Erro Supabase [DeviceController.list]: ${error.message}`, error);
+                throw error;
+            }
+
             res.json({ success: true, data });
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            logger.error('Erro fatal ao listar dispositivos:', error);
+            res.status(500).json({ 
+                error: 'Erro ao buscar dispositivos', 
+                message: error.message,
+                details: error.details || error.hint
+            });
         }
     }
 
@@ -30,6 +45,11 @@ class DeviceController {
                 rtsp_url = device.getRTSPUrl();
             }
 
+            if (!req.event?.id) {
+                logger.error(`❌ Tentativa de criar dispositivo sem evento_id: ${req.user.email}`);
+                return res.status(400).json({ error: 'Contexto de evento (Nexus) não identificado. Recarregue a página.' });
+            }
+
             const { data, error } = await supabase
                 .from('dispositivos_acesso')
                 .insert([{
@@ -43,12 +63,15 @@ class DeviceController {
                     password_device: password, // Armazenar de forma segura em prod
                     rtsp_url,
                     config: req.body.config || { modo_identificacao: false },
-                    status: 'online' // Simulado
+                    status_online: 'offline'
                 }])
                 .select()
                 .single();
 
-            if (error) throw error;
+            if (error) {
+                logger.error(`❌ Erro no Supabase ao criar dispositivo: ${error.message}`, error);
+                throw error;
+            }
             logger.info(`📸 Dispositivo adicionado: ${nome} (${marca})`);
 
             // Auto-configurar Push
@@ -62,7 +85,7 @@ class DeviceController {
 
                     await device.configureEventPush(serverIp);
                 } catch (pushError) {
-                    logger.error('Erro ao auto-configurar push:', pushError);
+                    logger.error(`⚠️ Erro ao auto-configurar push para ${nome}: ${pushError.message}`, pushError);
                     // Não falhar a criação se o push falhar
                 }
             }
@@ -70,8 +93,12 @@ class DeviceController {
             res.status(201).json({ success: true, data });
 
         } catch (error) {
-            logger.error('Erro ao criar dispositivo:', error);
-            res.status(500).json({ error: error.message });
+            logger.error(`🚨 Erro Crítico [DeviceController.create]: ${error.message}`, {
+                stack: error.stack,
+                body: req.body,
+                user: req.user?.id
+            });
+            res.status(500).json({ error: 'Falha interna ao criar dispositivo. Detalhes registrados no log.' });
         }
     }
 
@@ -262,12 +289,18 @@ class DeviceController {
     async delete(req, res) {
         try {
             const { id } = req.params;
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('dispositivos_acesso')
                 .delete()
-                .eq('id', id);
+                .eq('id', id)
+                .eq('evento_id', req.event.id)
+                .select()
+                .maybeSingle();
 
             if (error) throw error;
+            if (!data) {
+                return res.status(404).json({ error: 'Dispositivo não encontrado neste evento.' });
+            }
             res.json({ success: true, message: 'Dispositivo removido.' });
         } catch (error) {
             res.status(500).json({ error: error.message });
@@ -384,6 +417,205 @@ class DeviceController {
         } catch (error) {
             logger.error('Erro ao imprimir etiqueta:', error);
             res.status(500).json({ error: 'Erro ao gerar etiqueta' });
+        }
+    }
+
+    /**
+     * Forçar processamento da fila de um dispositivo específico
+     */
+    async forceQueue(req, res) {
+        try {
+            const { id } = req.params;
+
+            // Verificar se dispositivo existe
+            const { data: dispositivo, error: devError } = await supabase
+                .from('dispositivos_acesso')
+                .select('*')
+                .eq('id', id)
+                .single();
+
+            if (devError || !dispositivo) {
+                return res.status(404).json({ error: 'Dispositivo não encontrado' });
+            }
+
+            // Marcar itens da fila como pendente (remover status erro)
+            const { getPgConnection } = require('../../config/pgEdge');
+            const connection = await getPgConnection();
+
+            const result = await connection.query(`
+                UPDATE terminal_sync_queue
+                SET status = 'pendente', attempt_count = 0, last_attempt = NULL
+                WHERE dispositivo_id = $1 AND status = 'erro'
+                RETURNING id
+            `, [id]);
+
+            logger.info(`⚡ [ForceQueue] ${result.rowCount} itens com erro reiniciados para dispositivo ${dispositivo.nome}`);
+
+            res.json({
+                success: true,
+                message: `${result.rowCount} itens enfileirados para reprocessamento`,
+                data: {
+                    device: dispositivo.nome,
+                    requeued: result.rowCount
+                }
+            });
+
+        } catch (error) {
+            logger.error('Erro ao forçar fila:', error);
+            res.status(500).json({ error: error.message });
+        }
+    }
+
+    /**
+     * Retornar status detalhado de um dispositivo (online/offline + fila)
+     */
+    async getHealth(req, res) {
+        try {
+            const { id } = req.params;
+
+            const deviceHealthCheck = require('./deviceHealthCheck.service');
+            const status = await deviceHealthCheck.getDeviceStatus(id);
+
+            if (status.error) {
+                return res.status(404).json({ error: status.error });
+            }
+
+            res.json({ success: true, data: status });
+
+        } catch (error) {
+            logger.error('Erro ao buscar status:', error);
+            res.status(500).json({ error: error.message });
+        }
+    }
+    // Listar fila de sincronização do evento
+    async getQueue(req, res) {
+        try {
+            const evento_id = req.event?.id;
+            if (!evento_id) return res.status(400).json({ error: 'Contexto de evento não identificado' });
+
+            const { data, error } = await supabase
+                .from('terminal_sync_queue')
+                .select(`
+                    *,
+                    dispositivos_acesso (
+                        nome
+                    )
+                `)
+                .eq('evento_id', evento_id)
+                .in('status', ['pendente', 'erro', 'processando'])
+                .order('created_at', { ascending: false })
+                .limit(100);
+
+            if (error) {
+                logger.error('Erro Supabase ao buscar fila de dispositivos:', error);
+                
+                // Fallback se a junção falhar (ex: tabela dispositivos_acesso com nome diferente ou sem relação formal)
+                if (error.message.includes('relation') || error.message.includes('join')) {
+                    const { data: simpleData, error: simpleError } = await supabase
+                        .from('terminal_sync_queue')
+                        .select('*')
+                        .eq('evento_id', evento_id)
+                        .limit(100);
+                    
+                    if (simpleError) throw simpleError;
+                    return res.json({ success: true, data: simpleData });
+                }
+                
+                throw error;
+            }
+
+            // Flatten device_name para o frontend
+            const items = (data || []).map(item => ({
+                ...item,
+                device_name: item.dispositivos_acesso?.nome ?? (item.dispositivos_acesso?.[0]?.nome) ?? item.dispositivo_id
+            }));
+
+            res.json({ success: true, data: items });
+        } catch (error) {
+            logger.error('Erro fatal ao buscar fila:', error);
+            res.status(500).json({ 
+                error: 'Erro ao buscar fila de sincronização',
+                message: error.message,
+                details: error.details
+            });
+        }
+    }
+
+    // Forçar reprocessamento da fila de um dispositivo
+    async forceQueue(req, res) {
+        try {
+            const { id } = req.params;
+            const syncScheduler = require('./syncScheduler.service');
+            await syncScheduler.runManualSync();
+            res.json({ success: true, message: 'Fila reprocessada com sucesso.' });
+        } catch (error) {
+            logger.error('Erro ao forçar fila:', error);
+            res.status(500).json({ error: error.message });
+        }
+    }
+
+    // Health check detalhado do dispositivo
+    async getHealth(req, res) {
+        try {
+            const { id } = req.params;
+            const net = require('net');
+
+            const { data: deviceData, error } = await supabase
+                .from('dispositivos_acesso')
+                .select('*')
+                .eq('id', id)
+                .single();
+
+            if (error || !deviceData) throw new Error('Dispositivo não encontrado');
+
+            // Teste de conectividade TCP
+            const tcpResult = await new Promise((resolve) => {
+                const client = new net.Socket();
+                const start  = Date.now();
+                let done     = false;
+
+                const timeout = setTimeout(() => {
+                    if (!done) { done = true; client.destroy(); resolve({ online: false, latency: null }); }
+                }, 4000);
+
+                client.connect(deviceData.porta || 80, deviceData.ip_address, () => {
+                    done = true;
+                    clearTimeout(timeout);
+                    const latency = Date.now() - start;
+                    client.destroy();
+                    resolve({ online: true, latency });
+                });
+
+                client.on('error', () => {
+                    if (!done) { done = true; clearTimeout(timeout); client.destroy(); resolve({ online: false, latency: null }); }
+                });
+            });
+
+            // Atualiza status_online no banco
+            const newStatus = tcpResult.online ? 'online' : 'offline';
+            await supabase
+                .from('dispositivos_acesso')
+                .update({ status_online: newStatus, ultimo_ping: new Date().toISOString() })
+                .eq('id', id);
+
+            res.json({
+                success: true,
+                data: {
+                    id: deviceData.id,
+                    nome: deviceData.nome,
+                    ip_address: deviceData.ip_address,
+                    porta: deviceData.porta,
+                    online: tcpResult.online,
+                    latency_ms: tcpResult.latency,
+                    status_online: newStatus,
+                    ultimo_ping: new Date().toISOString(),
+                    marca: deviceData.marca,
+                    tipo: deviceData.tipo
+                }
+            });
+        } catch (error) {
+            logger.error('Erro no health check:', error);
+            res.status(500).json({ error: error.message });
         }
     }
 }

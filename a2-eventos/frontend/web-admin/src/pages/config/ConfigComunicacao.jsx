@@ -41,7 +41,15 @@ const ConfigComunicacao = () => {
 
     const loadTemplates = async () => {
         try {
-            const { data } = await api.get('/messages/templates');
+            const eventoId = sessionStorage.getItem('active_evento_id') || localStorage.getItem('active_evento_id');
+            if (!eventoId) {
+                console.warn('Sem contexto de evento para carregar templates');
+                return;
+            }
+
+            const { data } = await api.get('/messages/templates', {
+                params: { evento_id: eventoId }
+            });
             if (data.success) {
                 setTemplates(data.data);
                 if (data.data.length > 0) handleSelectTemplate(data.data[0]);

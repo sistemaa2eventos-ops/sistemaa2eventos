@@ -1,81 +1,47 @@
-const winston = require('winston');
-const path = require('path');
-const fs = require('fs');
+const pino = require('pino');
 
-// Criar pasta de logs se não existir
-const logDir = path.join(__dirname, '../../logs');
-if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir, { recursive: true });
-}
+// Campos sensíveis que serão mascarados nos logs
+const SENSITIVE_KEYS = new Set([
+    'password', 'token', 'cpf', 'qr_code',
+    'foto_capturada', 'face_encoding', 'foto_base64_internal', 'session',
+    'authorization', 'service_role_key'
+]);
 
-// Filtro de dados sensíveis
-const sanitizeMeta = (meta) => {
-    if (!meta) return meta;
-    const sanitized = { ...meta };
-    const sensitiveKeys = ['password', 'token', 'cpf', 'qr_code', 'foto_capturada', 'face_encoding', 'foto_base64_internal', 'session'];
+// Redact paths para pino suprimir campos em JSON aninhado
+const redactPaths = [
+    'password', 'token', 'cpf', 'qr_code', 'face_encoding',
+    'foto_capturada', 'foto_base64_internal', 'session',
+    '*.password', '*.token', '*.cpf', '*.face_encoding'
+];
 
-    for (const key of Object.keys(sanitized)) {
-        if (sensitiveKeys.includes(key)) {
-            sanitized[key] = '*** MASCARADO ***';
-        } else if (typeof sanitized[key] === 'object' && sanitized[key] !== null) {
-            sanitized[key] = sanitizeMeta(sanitized[key]); // recursive
-        }
-    }
-    return sanitized;
-};
+const isDev = process.env.NODE_ENV === 'development';
 
-// Formato personalizado
-const customFormat = winston.format.combine(
-    winston.format.timestamp({
-        format: 'YYYY-MM-DD HH:mm:ss'
-    }),
-    winston.format.errors({ stack: true }),
-    winston.format.splat(),
-    winston.format.printf(({ timestamp, level, message, service, ...meta }) => {
-        const serviceName = service || 'a2-eventos';
-        const cleanMeta = sanitizeMeta(meta);
-        const metaStr = Object.keys(cleanMeta).length ? ` ${JSON.stringify(cleanMeta)}` : '';
-        return `[${timestamp}] [${level.toUpperCase()}] [${serviceName}] ${message}${metaStr}`;
-    })
-);
-
-// Logger principal
-const logger = winston.createLogger({
+// FIX I-07: Substituído Winston por Pino (já presente no package.json como dep principal)
+// Winston removido — mantendo apenas Pino para logs estruturados JSON (melhor para Docker/K8s)
+const logger = pino({
     level: process.env.LOG_LEVEL || 'info',
-    format: customFormat,
-    defaultMeta: { service: 'a2-sync' },
-    transports: [
-        // Arquivo de erros
-        new winston.transports.File({
-            filename: path.join(logDir, 'error.log'),
-            level: 'error',
-            maxsize: 5242880, // 5MB
-            maxFiles: 5
-        }),
-        // Arquivo combinado
-        new winston.transports.File({
-            filename: path.join(logDir, 'combined.log'),
-            maxsize: 5242880,
-            maxFiles: 5
-        }),
-        // Arquivo específico de sincronização
-        new winston.transports.File({
-            filename: path.join(logDir, 'sync.log'),
-            maxsize: 5242880,
-            maxFiles: 5
-        })
-    ]
+    redact: {
+        paths: redactPaths,
+        censor: '*** MASCARADO ***'
+    },
+    timestamp: pino.stdTimeFunctions.isoTime,
+    formatters: {
+        level: (label) => ({ level: label.toUpperCase() })
+    },
+    // Em desenvolvimento, formata de forma legível
+    ...(isDev && {
+        transport: {
+            target: 'pino-pretty',
+            options: {
+                colorize: true,
+                translateTime: 'SYS:yyyy-mm-dd HH:MM:ss',
+                ignore: 'pid,hostname'
+            }
+        }
+    })
 });
 
-// Sempre adicionar console para orquestradores (Docker/K8s/PM2) pegarem o stdout
-logger.add(new winston.transports.Console({
-    format: winston.format.combine(
-        winston.format.colorize(),
-        winston.format.simple()
-    )
-}));
-
-// Stream para morgan
+// Stream para compatibilidade com morgan (req logging)
 logger.stream = {
     write: (message) => logger.info(message.trim())
 };

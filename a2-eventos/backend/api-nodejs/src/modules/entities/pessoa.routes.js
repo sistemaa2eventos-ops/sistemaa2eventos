@@ -21,4 +21,8 @@ router.post('/:id/bloqueio', checkPermission('pessoas', 'escrita'), accessContro
 router.post('/:id/qr-code', checkPermission('pessoas', 'escrita'), pessoaController.generateQRCode.bind(pessoaController));
 router.get('/:id/qrcode', checkPermission('pessoas', 'leitura'), pessoaController.generateQRCode.bind(pessoaController));
 
+//Fluxo de Aprovação
+router.post('/:id/approve', checkPermission('pessoas', 'escrita'), pessoaController.approve.bind(pessoaController));
+router.post('/:id/reject', checkPermission('pessoas', 'escrita'), pessoaController.reject.bind(pessoaController));
+
 module.exports = router;

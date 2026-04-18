@@ -18,8 +18,11 @@ class PessoaService {
         const sanitized = { ...data };
 
         // Normalizar nomes para MAIÚSCULAS (crachás, dashboards)
-        if (sanitized.nome) {
-            sanitized.nome = sanitized.nome.trim().replace(/\s+/g, ' ').toUpperCase();
+        if (sanitized.nome_completo) {
+            sanitized.nome_completo = sanitized.nome_completo.trim().replace(/\s+/g, ' ').toUpperCase();
+        } else if (sanitized.nome) {
+            // Fallback para quando o frontend envia 'nome'
+            sanitized.nome_completo = sanitized.nome.trim().replace(/\s+/g, ' ').toUpperCase();
         }
         if (sanitized.nome_credencial) {
             sanitized.nome_credencial = sanitized.nome_credencial.trim().replace(/\s+/g, ' ').toUpperCase();
@@ -78,11 +81,37 @@ class PessoaService {
              query = query.or(`updated_at.gte.${since},pivot_updated_at.gte.${since}`);
         }
 
-        const { data, count, error } = await query;
-
+        let { data, count, error } = await query;
+        
+        // --- FALLBACK ESTRATÉGICO: Se a View falhar, tentamos a tabela base ---
         if (error) {
-            logger.error(`[PessoaService.listByEvent] Erro:`, error);
-            throw error;
+            logger.error(`[PessoaService.listByEvent] View falhou (provável schema drift), tentando fallback para tabela 'pessoas':`, error);
+            
+            let fallbackQuery = supabaseClient
+                .from('pessoas')
+                .select('id, nome_completo, cpf, email, status_acesso, created_at, empresa_id', { count: 'exact' })
+                .eq('evento_id', eventoId)
+                .order('nome_completo', { ascending: true });
+
+            if (!since) {
+                fallbackQuery = fallbackQuery.range(offset, offset + limit - 1);
+            }
+            if (filters.status) {
+                fallbackQuery = fallbackQuery.eq('status_acesso', filters.status.toLowerCase());
+            }
+            if (busca) {
+                fallbackQuery = fallbackQuery.or(`nome_completo.ilike.%${busca}%,cpf.ilike.%${busca}%,email.ilike.%${busca}%`);
+            }
+
+            const fb = await fallbackQuery;
+            if (fb.error) {
+                logger.error(`[PessoaService.listByEvent] Fallback também falhou:`, fb.error);
+                throw fb.error;
+            }
+            
+            data = fb.data?.map(p => ({ ...p, nome: p.nome_completo })) || [];
+            count = fb.count;
+            error = null;
         }
 
         return {
@@ -109,11 +138,11 @@ class PessoaService {
         // Passo 2: Buscar pessoas com filtro de texto (ou todas do pivot se sem filtro)
         const pIds = [...new Set(pivots.map(p => p.pessoa_id))];
         let pesQuery = supabaseClient.from('pessoas')
-            .select('id, nome, nome_credencial, cpf, funcao, status_acesso, foto_url, qr_code, ativo, created_at')
+            .select('id, nome_completo, nome_credencial, cpf, funcao, status_acesso, foto_url, qr_code, ativo, created_at')
             .in('id', pIds);
 
         if (queryText) {
-            pesQuery = pesQuery.or(`nome.ilike.%${queryText}%,cpf.ilike.%${queryText}%,funcao.ilike.%${queryText}%`);
+            pesQuery = pesQuery.or(`nome_completo.ilike.%${queryText}%,cpf.ilike.%${queryText}%,funcao.ilike.%${queryText}%`);
         }
 
         if (statusParam) {
@@ -134,6 +163,7 @@ class PessoaService {
             if (!pessoa) return null;
             return {
                 ...pessoa,
+                nome: pessoa.nome_completo, // Compatibilidade com frontend
                 status: pessoa.status_acesso,
                 empresas: empMap[p.empresa_id] || { nome: 'Sem Empresa' },
                 vinculo_id: p.id,
@@ -155,7 +185,7 @@ class PessoaService {
             empresa_id, 
             cpf, 
             nome_credencial, 
-            nome, 
+            nome_completo, 
             parecer_documentos,
             empresa_direta_id, 
             ...otherData 
@@ -174,8 +204,8 @@ class PessoaService {
             Object.entries(otherData).filter(([key]) => ALLOWED_INSERT.has(key))
         );
 
-        if (!nome || !empresa_id) {
-            throw new Error('Nome e Empresa são obrigatórios.');
+        if (!nome_completo || !empresa_id) {
+            throw new Error('Nome Completo e Empresa são obrigatórios.');
         }
 
         const cpfLimpo = cpf || null;
@@ -234,9 +264,9 @@ class PessoaService {
             }
         }
 
-        // 2. Geração de QR Code
-        const qrSource = cpfLimpo || uuidv4();
-        const qrData = await qrGenerator.generate(qrSource);
+        // 2. QR Code NÃO é gerado aqui - apenas após aprovação
+        // O QR Code será gerado no endpoint POST /:id/approve
+        let qrCode = null;
 
         // 3. Determinar Status Inicial e Geração de Token de Convite
         const origenCadastroStr = originUser ? 'interno' : 'externo';
@@ -260,17 +290,17 @@ class PessoaService {
             }
         }
 
-        // 4. Inserção na Tabela Pessoas
+        // 4. Inserção na Tabela Pessoas (sem QR Code - será gerado após aprovação)
         const { data: newPessoa, error: insertError } = await supabaseClient
             .from('pessoas')
             .insert([{
                 ...safeOtherData,
-                nome,
-                nome_credencial: nome_credencial || nome,
+                nome_completo: nome_completo,
+                nome_credencial: nome_credencial || nome_completo,
                 cpf: cpfLimpo,
                 empresa_id,
                 evento_id: empresa.evento_id,
-                qr_code: qrData.code,
+                qr_code: qrCode,  // null inicialmente - gerado após aprovação
                 status_acesso: statusAcesso,
                 origem_cadastro: origenCadastroStr,
                 registration_token: registrationToken,
@@ -308,7 +338,7 @@ class PessoaService {
             
             emailService.sendEmployeeInvite(
                 sanitized.email,
-                nome,
+                nome_completo,
                 empresaData?.nome || 'Sua Empresa',
                 inviteLink
             ).catch(err => logger.error('Falha ao enviar e-mail de convite na criação:', err));
@@ -316,7 +346,7 @@ class PessoaService {
 
         return {
             pessoa: newPessoa,
-            qrImage: qrData.image
+            message: 'Pessoa criada. Aguarde aprovação para gerar QR Code.'
         };
     }
 
@@ -387,7 +417,7 @@ class PessoaService {
         // O frontend envia o objeto completo da view (com joins como empresa_nome,
         // empresas, etc). Filtramos aqui para evitar erro PGRST204.
         const ALLOWED_COLUMNS = new Set([
-            'nome', 'cpf', 'email', 'funcao', 'tipo_pessoa',
+            'nome_completo', 'cpf', 'email', 'funcao', 'tipo_pessoa',
             'nome_mae', 'data_nascimento', 'telefone', 'documento',
             'dias_trabalho', 'foto_url', 'face_encoding', 'qr_code',
             'numero_pulseira', 'tipo_fluxo', 'fase_montagem',
@@ -419,7 +449,7 @@ class PessoaService {
         if (error) throw error;
 
         // Sincronizar com hardwares caso dados biométricos tenham mudado
-        if (safeData.foto_url || safeData.cpf || safeData.nome) {
+        if (safeData.foto_url || safeData.cpf || safeData.nome_completo) {
             syncService.syncUserToAllDevices(data)
                 .catch(e => logger.error(`[AutoSync] Erro Re-sync via Service após update:`, e));
         }
@@ -500,19 +530,40 @@ class PessoaService {
     }
 
     /**
-     * Recupera ou Gera um QR Code para o participante
+     * Recupera ou Gera um QR Code para o participante APROVADO
+     * QR Code só é gerado para pessoas com status_aprovacao = 'aprovado'
      */
     async generateQRCode(supabaseClient, id, tenantId) {
+        // Buscar pessoa com status da pivot
         const { data: pessoa, error } = await supabaseClient
             .from('pessoas')
-            .select('id, cpf, qr_code, evento_id')
+            .select('id, cpf, qr_code, evento_id, status_acesso')
             .eq('id', id)
             .eq('evento_id', tenantId)
             .single();
 
         if (error || !pessoa) throw new Error('Pessoa não encontrada ou acesso negado.');
 
-        // Se já tem um código, gera a imagem para ele. Se não tem, gera um novo.
+        // Verificar aprovação via pivot table
+        const { data: pivot, error: pivotError } = await supabaseClient
+            .from('pessoa_evento_empresa')
+            .select('status_aprovacao')
+            .eq('pessoa_id', id)
+            .eq('evento_id', tenantId)
+            .in('status_aprovacao', ['aprovado', 'pendente'])
+            .limit(1)
+            .single();
+
+        if (pivotError || !pivot) {
+            throw new Error('Pessoa não vinculada a este evento.');
+        }
+
+        // QR Code só para aprovados
+        if (pivot.status_aprovacao !== 'aprovado') {
+            throw new Error('Pessoa pendente de aprovação. Aguarde a confirmação.');
+        }
+
+        // Se já tem um código, retorna. Se não tem, gera novo.
         const qrSource = pessoa.qr_code || pessoa.cpf || pessoa.id;
         const qrData = await qrGenerator.generate(qrSource);
 

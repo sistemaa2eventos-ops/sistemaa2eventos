@@ -199,6 +199,32 @@ class EventoController {
             return ApiResponse.error(res, error.message);
         }
     }
+
+    /**
+     * Obter áreas de acesso de um evento (para seleção durante aprovação de pessoa)
+     */
+    async getAreas(req, res) {
+        try {
+            const { id } = req.params;
+            const supabaseClient = req.supabase || supabase;
+
+            const { data, error } = await supabaseClient
+                .from('evento_areas')
+                .select('id, nome, descricao')
+                .eq('evento_id', id)
+                .order('nome', { ascending: true });
+
+            if (error) throw error;
+
+            return ApiResponse.success(res, {
+                data: data || [],
+                total: (data || []).length
+            });
+        } catch (error) {
+            logger.error('Erro ao obter áreas do evento:', error);
+            return ApiResponse.error(res, error.message);
+        }
+    }
 }
 
 module.exports = new EventoController();

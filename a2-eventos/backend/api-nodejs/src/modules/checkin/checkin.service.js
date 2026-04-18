@@ -58,7 +58,7 @@ class CheckinService {
             
             // 4. Sucesso: Persistir no Banco de Dados
             const logId = require('uuid').v4();
-            const new_status = tipoFinal === 'checkin' ? 'presente' : 'saiu';
+            const new_status = tipoFinal === 'checkin' ? 'checkin_feito' : 'checkout_feito'; // FIX C-09: 'presente'/'saiu' violavam CHECK constraint
 
             const result = await DatabaseService.registerAccessTransaction(
                 logId,
@@ -81,7 +81,7 @@ class CheckinService {
                 // 5. Notificação via WebSocket
             websocketService.emit('new_access', {
                 ...resultData,
-                pessoa_nome: pessoa.nome,
+                pessoa_nome: pessoa.nome_completo,
                 tipo_acesso: tipoFinal,
                 area_id: area_id || null
             }, evento_id);
@@ -91,13 +91,13 @@ class CheckinService {
             const monitorado = await watchlistService.verificarCPF(pessoa.cpf, evento_id);
             
             if (monitorado) {
-                logger.warn(`🚨 WATCHLIST: Alvo '${pessoa.nome}' detectado no ${tipoFinal}!`);
+                logger.warn(`🚨 WATCHLIST: Alvo '${pessoa.nome_completo}' detectado no ${tipoFinal}!`);
                 
                 // Alerta em tempo real no Monitor
                 websocketService.emit('watchlist_alert', {
                     pessoa: { 
                         id: pessoa.id, 
-                        nome: pessoa.nome, 
+                        nome: pessoa.nome_completo, 
                         cpf: pessoa.cpf,
                         foto_url: pessoa.foto_url 
                     },
@@ -111,7 +111,7 @@ class CheckinService {
                 // Disparar notificações externas (Telegram/WhatsApp)
                 await watchlistService.registrarAlerta(monitorado, {
                     pessoa_id: pessoa.id,
-                    nome: pessoa.nome,
+                    nome: pessoa.nome_completo,
                     evento_id,
                     tipo: tipoFinal,
                     area_id: area_id,
@@ -124,7 +124,7 @@ class CheckinService {
             return { ...resultData, action: 'allow' };
 
         } catch (valErr) {
-            logger.warn(`🚫 Acesso NEGADO para ${pessoa.nome}: ${valErr.message}`);
+            logger.warn(`🚫 Acesso NEGADO para ${pessoa.nome_completo}: ${valErr.message}`);
 
             // Regra NZT: SEMPRE registrar o log, mesmo se negado
             await DatabaseService.logDeniedAccess(
@@ -141,7 +141,7 @@ class CheckinService {
             // Notifica o painel sobre o acesso negado em tempo real
             websocketService.emit('new_access', {
                 ...(resultNegado.data || {}),
-                pessoa_nome: pessoa.nome,
+                pessoa_nome: pessoa.nome_completo,
                 tipo_acesso: 'negado',
                 erro: valErr.message,
                 area_id: area_id || null
@@ -153,7 +153,7 @@ class CheckinService {
                 const monitoradoVal = await watchlistService.verificarCPF(pessoa.cpf, evento_id);
                 if (monitoradoVal) {
                     websocketService.emit('watchlist_alert', {
-                        pessoa: { id: pessoa.id, nome: pessoa.nome, cpf: pessoa.cpf, foto_url: pessoa.foto_url },
+                        pessoa: { id: pessoa.id, nome: pessoa.nome_completo, cpf: pessoa.cpf, foto_url: pessoa.foto_url },
                         watchlist: monitoradoVal,
                         tipo: 'negado',
                         area: accessData.area_nome || 'Acesso Restrito',
@@ -204,7 +204,7 @@ class CheckinService {
             const { error: pErr } = await supabaseClient
                 .from('pessoas')
                 .update({ 
-                    status_acesso: 'checkout',
+                    status_acesso: 'checkout_feito', // FIX C-09: 'checkout' não faz parte do CHECK constraint
                     last_access_at: null 
                 })
                 .eq('id', pessoa_id);

@@ -1,33 +1,65 @@
 const express = require('express');
 const router = express.Router();
 const accessController = require('./checkin.controller');
+const terminalController = require('./terminal.controller');
+const pulseiraConfigController = require('./pulseiraConfig.controller');
 const { authenticate, authorize, validateInternalApiKey } = require('../../middleware/auth');
 const { requireEvent } = require('../../middleware/eventMiddleware');
 const rateLimiter = require('../../middleware/rateLimiter');
 
-// Rota para microsserviço facial (API key) - Sem contexto de evento via Token
-router.post('/face/process', validateInternalApiKey, accessController.processFaceRecognition);
+// ============================================
+// ROTAS PÚBLICAS (sem autenticação - para terminais)
+// ============================================
+// Check-in/out via terminal facial (API key interna)
+router.post('/facial', validateInternalApiKey, accessController.checkinFacial);
 
-// Middleware global para rotas de Dashboard/Operação
+// ============================================
+// Middleware para rotas autenticadas
+// ============================================
 const sessionMiddleware = [authenticate, requireEvent];
 
-// Rotas para operadores (check-in/out)
-router.post('/validate/qrcode', sessionMiddleware, rateLimiter.access, accessController.validateQRCode);
-router.post('/checkin/qrcode', sessionMiddleware, rateLimiter.access, accessController.checkinQRCode);
-router.post('/checkin/barcode', sessionMiddleware, rateLimiter.access, accessController.checkinBarcode);
-router.post('/checkin/rfid', sessionMiddleware, rateLimiter.access, accessController.checkinRFID);
-router.post('/checkin/manual', sessionMiddleware, rateLimiter.access, accessController.checkinManual);
-router.post('/checkout', sessionMiddleware, rateLimiter.access, accessController.checkout);
-router.post('/checkout/qrcode', sessionMiddleware, rateLimiter.access, accessController.checkoutQRCode);
-router.post('/vincular-pulseira-facial', sessionMiddleware, rateLimiter.access, accessController.vincularPulseiraFacial);
-router.get('/consultar-pulseira/:codigo', sessionMiddleware, accessController.consultarPulseira);
-router.get('/ultimo-checkin/:pessoa_id', sessionMiddleware, accessController.ultimoCheckin);
+// ============================================
+// CHECK-IN / CHECK-OUT VIA PULSEIRA
+// ============================================
+router.post('/pulseira/checkin', sessionMiddleware, rateLimiter.access, accessController.checkinPulseira);
+router.post('/pulseira/checkout', sessionMiddleware, rateLimiter.access, accessController.checkoutPulseira);
+router.get('/pulseira/buscar', sessionMiddleware, accessController.buscarPessoaPulseira);
+router.get('/pulseira/ultimo/:pessoa_id', sessionMiddleware, accessController.ultimoCheckin);
 
-// Rotas de consulta
+// ============================================
+// GESTÃO DE TERMINAIS (apenas admin_master)
+// ============================================
+router.get('/terminais', sessionMiddleware, terminalController.list);
+router.post('/terminais', sessionMiddleware, authorize('admin_master'), terminalController.create);
+router.put('/terminais/:id', sessionMiddleware, authorize('admin_master'), terminalController.update);
+router.delete('/terminais/:id', sessionMiddleware, authorize('admin_master'), terminalController.delete);
+
+// ============================================
+// CONFIGURAÇÕES DE PULSEIRA (apenas admin_master)
+// ============================================
+router.get('/config-pulseira', sessionMiddleware, pulseiraConfigController.get);
+router.put('/config-pulseira', sessionMiddleware, authorize('admin_master'), pulseiraConfigController.update);
+
+// ============================================
+// CONSULTAS
+// ============================================
 router.get('/logs', sessionMiddleware, accessController.getLogs);
 router.get('/stats/realtime', sessionMiddleware, accessController.getRealtimeStats);
 
-// Rotas administrativas
-router.post('/expulsar/:pessoa_id', sessionMiddleware, authorize('admin', 'supervisor'), accessController.expulsar);
+// ============================================
+// ADMINISTRATIVAS
+// ============================================
+router.post('/expulsar/:pessoa_id', sessionMiddleware, authorize('admin_master'), accessController.expulsar);
+
+// ============================================
+// DEPRECATED -Removidas:
+// - /validate/qrcode (substituir por busca de pulseira)
+// - /checkin/qrcode (substituir por pulseira/checkin)
+// - /checkin/barcode (removido)
+// - /checkin/rfid (removido)
+// - /checkin/manual (removido)
+// - /checkout/qrcode (substituir por pulseira/checkout)
+// - /vincular-pulseira-facial (funcionalidade integrida no checkin facial)
+// ============================================
 
 module.exports = router;

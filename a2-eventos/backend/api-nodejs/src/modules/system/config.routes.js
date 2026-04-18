@@ -10,11 +10,13 @@ router.use(authenticate, requireEvent);
 // Rotas para Gerenciamento de Áreas — migradas para checkPermission
 router.get('/areas', configController.getAreas);
 router.post('/areas', checkPermission('configuracoes', 'escrita'), configController.createArea);
+router.put('/areas/:id', checkPermission('configuracoes', 'escrita'), configController.updateArea);
 router.delete('/areas/:id', checkPermission('configuracoes', 'escrita'), configController.deleteArea);
 
 // Rotas para Gerenciamento de Pulseiras Customizadas
 router.get('/pulseiras', configController.getPulseiras);
 router.post('/pulseiras', checkPermission('configuracoes', 'escrita'), configController.createPulseira);
+router.put('/pulseiras/:id', checkPermission('configuracoes', 'escrita'), configController.updatePulseira);
 router.delete('/pulseiras/:id', checkPermission('configuracoes', 'escrita'), configController.deletePulseira);
 
 // Rotas para Editor de Etiquetas e Crachas

@@ -6,7 +6,9 @@ import {
 } from '@mui/material';
 import {
     Add as AddIcon, Edit as EditIcon,
-    Search as SearchIcon, Email as EmailIcon, LockReset as ResetIcon
+    Search as SearchIcon, Email as EmailIcon, LockReset as ResetIcon,
+    CheckCircle as AtivoIcon, HourglassEmpty as PendenteIcon, Cancel as InativoIcon,
+    Check as ApproveIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 
@@ -27,9 +29,16 @@ const SearchWrapper = styled(Box)(({ theme }) => ({
 
 const RoleChip = styled(Chip)(({ theme, role }) => ({
     fontWeight: 700, fontSize: '0.65rem', height: 24, textTransform: 'uppercase',
-    background: role === 'admin' ? 'rgba(255, 184, 0, 0.1)' : 'rgba(0, 212, 255, 0.1)',
-    color: role === 'admin' ? '#FFB800' : '#00D4FF',
-    border: `1px solid ${role === 'admin' ? 'rgba(255, 184, 0, 0.2)' : 'rgba(0, 212, 255, 0.2)'}`
+    background: role === 'admin_master' || role === 'master' ? 'rgba(0, 212, 255, 0.1)' : 'rgba(0, 212, 255, 0.05)',
+    color: role === 'admin_master' || role === 'master' ? '#00D4FF' : '#fff',
+    border: `1px solid ${role === 'admin_master' || role === 'master' ? 'rgba(0, 212, 255, 0.2)' : 'rgba(255,255,255,0.1)'}`
+}));
+
+const StatusChip = styled(Chip)(({ theme, status }) => ({
+    fontWeight: 700, fontSize: '0.65rem', height: 24, textTransform: 'uppercase',
+    background: status === 'ativo' ? 'rgba(0, 255, 136, 0.1)' : (status === 'pendente' ? 'rgba(255, 184, 0, 0.1)' : 'rgba(255, 51, 102, 0.1)'),
+    color: status === 'ativo' ? '#00FF88' : (status === 'pendente' ? '#FFB800' : '#FF3366'),
+    border: `1px solid ${status === 'ativo' ? 'rgba(0, 255, 136, 0.2)' : (status === 'pendente' ? 'rgba(255, 184, 0, 0.2)' : 'rgba(255, 51, 102, 0.2)')}`
 }));
 
 /**
@@ -43,13 +52,13 @@ const Usuarios = () => {
         selectedUser, setSelectedUser, formData, setFormData,
         openPasswordDialog, setOpenPasswordDialog,
         resetingPassword, handleResetPassword,
-        handleOpenDialog, handleSave, handleToggleStatus, setUserToDelete
+        handleOpenDialog, handleSave, handleApprove, handleToggleStatus, setUserToDelete
     } = useUsuarios();
     const { user: currentUser } = useAuth();
     const [newPassword, setNewPassword] = useState('');
 
     // Definição da Hierarquia de Peso
-    const roleWeights = { master: 2, admin: 0, supervisor: 0, operador: 1 };
+    const roleWeights = { admin_master: 2, master: 2, admin: 0, supervisor: 0, operador: 1 };
     const currentUserWeight = roleWeights[currentUser?.nivel_acesso] || 1;
 
     const columns = [
@@ -70,19 +79,36 @@ const Usuarios = () => {
         },
         { id: 'cpf', label: 'CPF', minWidth: 150 },
         {
-            id: 'nivel_acesso', label: 'CARGO', minWidth: 120,
-            format: (val) => (
+            id: 'nivel_acesso', label: 'CARGO', minWidth: 100,
+            format: (val) => {
+                const isAdmin = val === 'admin_master' || val === 'master';
+                return (
                 <RoleChip 
                     role={val} 
-                    label={val === 'operador' ? 'OPERADOR' : val.toUpperCase()} 
+                    label={val === 'operador' ? 'OPERADOR' : (val === 'admin_master' ? 'ADMIN MASTER' : val.toUpperCase())} 
                     sx={{ 
-                        background: val === 'master' ? 'rgba(0, 212, 255, 0.2)' : (val === 'admin' ? 'rgba(255, 184, 0, 0.1)' : 'rgba(255,255,255,0.05)'),
-                        color: val === 'master' ? '#00D4FF' : (val === 'admin' ? '#FFB800' : '#fff'),
-                        border: `1px solid ${val === 'master' ? '#00D4FF' : (val === 'admin' ? '#FFB800' : 'rgba(255,255,255,0.1)')}`,
-                        boxShadow: val === 'master' ? '0 0 10px rgba(0, 212, 255, 0.3)' : 'none'
+                        background: isAdmin ? 'rgba(0, 212, 255, 0.2)' : 'rgba(255,255,255,0.05)',
+                        color: isAdmin ? '#00D4FF' : '#fff',
+                        border: `1px solid ${isAdmin ? '#00D4FF' : 'rgba(255,255,255,0.1)'}`,
+                        boxShadow: isAdmin ? '0 0 10px rgba(0, 212, 255, 0.3)' : 'none'
                     }}
                 />
-            )
+            )}
+        },
+        {
+            id: 'status', label: 'STATUS', minWidth: 100,
+            format: (val) => {
+                const status = val || 'pendente';
+                const icons = { ativo: <AtivoIcon sx={{ fontSize: 14 }} />, pendente: <PendenteIcon sx={{ fontSize: 14 }} />, inativo: <InativoIcon sx={{ fontSize: 14 }} /> };
+                const labels = { ativo: 'ATIVO', pendente: 'PENDENTE', inativo: 'INATIVO' };
+                return (
+                    <StatusChip 
+                        status={status}
+                        icon={icons[status]}
+                        label={labels[status]} 
+                    />
+                );
+            }
         },
         {
             id: 'eventos', label: 'VÍNCULO', minWidth: 150,
@@ -92,7 +118,7 @@ const Usuarios = () => {
             id: 'acoes', label: 'AÇÕES', minWidth: 100, align: 'center',
             format: (_, row) => {
                 const targetWeight = roleWeights[row.nivel_acesso] || 1;
-                const canManage = currentUserWeight > targetWeight || (currentUser?.nivel_acesso === 'master');
+                const canManage = currentUserWeight > targetWeight || (currentUser?.nivel_acesso === 'admin_master') || (currentUser?.nivel_acesso === 'master');
 
                 return (
                     <Stack direction="row" spacing={1} justifyContent="center">
@@ -106,11 +132,18 @@ const Usuarios = () => {
                                 <IconButton size="small" disabled={!canManage} onClick={() => handleOpenDialog(row)} sx={{ color: '#00D4FF' }}><EditIcon fontSize="small" /></IconButton>
                             </span>
                         </Tooltip>
-                        <Tooltip title={canManage ? "Estatus Ativo/Inativo" : "Privilégio Insuficiente"}>
-                            <span>
-                                <Switch size="small" checked={row.ativo !== false} disabled={!canManage || row.nivel_acesso === 'master'} onChange={() => handleToggleStatus(row.id, row.ativo !== false)} color="info" />
-                            </span>
-                        </Tooltip>
+                        {row.status === 'pendente' && (
+                            <Tooltip title="Aprovar Usuário">
+                                <IconButton size="small" onClick={() => handleApprove(row.id)} sx={{ color: '#00FF88' }}><ApproveIcon fontSize="small" /></IconButton>
+                            </Tooltip>
+                        )}
+                        {row.status !== 'pendente' && (
+                            <Tooltip title={canManage ? "Ativar/Inativar" : "Privilégio Insuficiente"}>
+                                <span>
+                                    <Switch size="small" checked={row.status === 'ativo'} disabled={!canManage || row.nivel_acesso === 'master'} onChange={() => handleToggleStatus(row.id, row.status)} color="info" />
+                                </span>
+                            </Tooltip>
+                        )}
                     </Stack>
                 );
             },

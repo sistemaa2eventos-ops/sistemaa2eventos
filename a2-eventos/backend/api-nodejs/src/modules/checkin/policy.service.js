@@ -28,7 +28,7 @@ class PolicyEngine {
 
         try {
             // Master bypass (Sempre acesso total)
-            if (roleName === 'master') {
+            if (roleName === 'master' || roleName === 'admin_master') {
                 const rootPerms = [{ recurso: '*', acao: '*', escopo: 'global' }];
                 cacheService.set(cacheKey, rootPerms, 60 * 60 * 1000);
                 return rootPerms;
@@ -99,7 +99,7 @@ class PolicyEngine {
 
         try {
             // Master vê tudo
-            if (roleName === 'master') {
+            if (roleName === 'master' || roleName === 'admin_master') {
                 const { data } = await supabase
                     .from('sys_permissions')
                     .select('recurso, acao, nome_humanizado, recurso_frontend, menu_icon, menu_order')
@@ -164,7 +164,7 @@ class PolicyEngine {
      * Resolve se uma Role específica tem uma action sobre um resource em um contexto de evento
      */
     async hasPermission(roleName, recurso, acao, eventoId = null) {
-        if (roleName === 'master') return true;
+        if (roleName === 'master' || roleName === 'admin_master') return true;
 
         // CORREÇÃO 4c: Admin bypass com log de auditoria (I11).
         // O bypass é mantido por design (admin tem acesso total), mas agora

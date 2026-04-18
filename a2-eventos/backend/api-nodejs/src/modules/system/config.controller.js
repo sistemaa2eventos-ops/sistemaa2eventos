@@ -74,12 +74,40 @@ class ConfigController {
         }
     }
 
+    async updateArea(req, res) {
+        try {
+            const { id } = req.params;
+            const { nome_area, capacidade_maxima } = req.body;
+            const eventoId = req.event?.id;
+
+            const updateData = { atualizado_em: new Date() };
+            if (nome_area) updateData.nome_area = nome_area;
+            if (capacidade_maxima) updateData.capacidade_maxima = capacidade_maxima;
+
+            const { data, error } = await supabase
+                .from('evento_areas')
+                .update(updateData)
+                .eq('id', id)
+                .eq('evento_id', eventoId)
+                .select()
+                .single();
+
+            if (error) throw error;
+            res.json({ success: true, data });
+        } catch (error) {
+            logger.error('Erro ao atualizar área:', error);
+            res.status(500).json({ error: 'Erro ao atualizar área.' });
+        }
+    }
+
     // ==========================================
     // TIPOS DE PULSEIRAS E REGRAS
     // ==========================================
     async getPulseiras(req, res) {
         try {
             const evento_id = req.event?.id || req.query.evento_id;
+            if (!evento_id) return res.status(400).json({ error: 'Contexto de evento não identificado' });
+
             const { data, error } = await supabase
                 .from('evento_tipos_pulseira')
                 .select(`
@@ -92,11 +120,32 @@ class ConfigController {
                 .eq('evento_id', evento_id)
                 .order('numero_inicial', { ascending: true });
 
-            if (error) throw error;
+            if (error) {
+                logger.error('Erro Supabase ao listar pulseiras:', error);
+                
+                // Fallback se a junção falhar
+                if (error.message.includes('relation') || error.message.includes('join')) {
+                    const { data: simpleData, error: simpleError } = await supabase
+                        .from('evento_tipos_pulseira')
+                        .select('*')
+                        .eq('evento_id', evento_id)
+                        .order('numero_inicial', { ascending: true });
+                    
+                    if (simpleError) throw simpleError;
+                    return res.json({ success: true, data: simpleData });
+                }
+                
+                throw error;
+            }
+
             res.json({ success: true, data });
         } catch (error) {
-            logger.error('Erro ao listar tipos de pulseira:', error);
-            res.status(500).json({ error: 'Erro ao buscar pulseiras' });
+            logger.error('Erro fatal ao listar tipos de pulseira:', error);
+            res.status(500).json({ 
+                error: 'Erro ao buscar pulseiras',
+                message: error.message,
+                details: error.details
+            });
         }
     }
 
@@ -227,6 +276,60 @@ class ConfigController {
         } catch (error) {
             logger.error('Erro ao excluir pulseira:', error);
             res.status(500).json({ error: 'Erro ao excluir pulseira.' });
+        }
+    }
+
+    async updatePulseira(req, res) {
+        try {
+            const { id } = req.params;
+            const eventoId = req.event?.id;
+            const { nome_tipo, cor_hex, numero_inicial, numero_final, areas_permitidas, tipo_leitura, prefixo_codigo, alerta_duplicidade, tempo_confirmacao_checkout } = req.body;
+
+            // Validar range
+            if (numero_inicial && numero_final && numero_inicial > numero_final) {
+                return res.status(400).json({ error: 'O número inicial não pode ser maior que o final' });
+            }
+
+            // Atualizar pulseira
+            const updateData = { atualizado_em: new Date() };
+            if (nome_tipo) updateData.nome_tipo = nome_tipo;
+            if (cor_hex) updateData.cor_hex = cor_hex;
+            if (numero_inicial) updateData.numero_inicial = numero_inicial;
+            if (numero_final) updateData.numero_final = numero_final;
+            if (tipo_leitura) updateData.tipo_leitura = tipo_leitura;
+            if (prefixo_codigo !== undefined) updateData.prefixo_codigo = prefixo_codigo;
+            if (alerta_duplicidade !== undefined) updateData.alerta_duplicidade = alerta_duplicidade;
+            if (tempo_confirmacao_checkout !== undefined) updateData.tempo_confirmacao_checkout = tempo_confirmacao_checkout;
+
+            const { data: pulseira, error: pulseiraErr } = await supabase
+                .from('evento_tipos_pulseira')
+                .update(updateData)
+                .eq('id', id)
+                .eq('evento_id', eventoId)
+                .select()
+                .single();
+
+            if (pulseiraErr) throw pulseiraErr;
+
+            // Atualizar áreas permitidas se fornecidas
+            if (areas_permitidas !== undefined) {
+                // Remover áreas existentes
+                await supabase.from('pulseira_areas_permitidas').delete().eq('pulseira_id', id);
+                
+                // Inserir novas áreas
+                if (Array.isArray(areas_permitidas) && areas_permitidas.length > 0) {
+                    const permits = areas_permitidas.map(area_id => ({
+                        pulseira_id: id,
+                        area_id: area_id
+                    }));
+                    await supabase.from('pulseira_areas_permitidas').insert(permits);
+                }
+            }
+
+            res.json({ success: true, message: 'Pulseira atualizada com sucesso', data: pulseira });
+        } catch (error) {
+            logger.error('Erro ao atualizar pulseira:', error);
+            res.status(500).json({ error: 'Erro ao atualizar pulseira.' });
         }
     }
 

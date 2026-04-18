@@ -16,7 +16,7 @@ class ReportController {
             // Passo 1: Buscar logs de acesso brutos
             let query = supabase
                 .from('logs_acesso')
-                .select('id, tipo, metodo, dispositivo_id, confianca, observacao, created_at, pessoa_id, pessoas!inner(id, nome, cpf, empresa_id)', { count: 'exact' })
+                .select('id, tipo, metodo, dispositivo_id, confianca, observacao, created_at, pessoa_id, pessoas!inner(id, nome_completo, cpf, empresa_id)', { count: 'exact' })
                 .eq('evento_id', evento_id);
 
             if (data_inicio) query = query.gte('created_at', data_inicio);
@@ -46,7 +46,7 @@ class ReportController {
                 confianca: log.confianca,
                 observacao: log.observacao,
                 horario: log.created_at,
-                pessoa: log.pessoas?.nome || 'Desconhecido',
+                pessoa: log.pessoas?.nome_completo || 'Desconhecido',
                 cpf: log.pessoas?.cpf,
                 empresa: empMap[log.pessoas?.empresa_id]?.nome || 'Sem Empresa'
             }));
@@ -308,7 +308,7 @@ class ReportController {
 
             // 2. Unificação de Pessoas em Memória
             const pIds = [...new Set(logs.map(l => l.pessoa_id))];
-            const { data: pData } = await supabase.from('pessoas').select('id, nome, foto_url, empresa_id').in('id', pIds);
+            const { data: pData } = await supabase.from('pessoas').select('id, nome_completo, foto_url, empresa_id').in('id', pIds);
             const pMap = (pData || []).reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
 
             // 3. Unificação de Empresas em Memória
@@ -325,7 +325,7 @@ class ReportController {
                 if (!scores[pid]) {
                     scores[pid] = {
                         id: pid,
-                        nome: pessoa.nome,
+                        nome: pessoa.nome_completo,
                         empresa: eMap[pessoa.empresa_id]?.nome || 'S/ Empresa',
                         foto: pessoa.foto_url,
                         score: 0,
@@ -355,7 +355,7 @@ class ReportController {
             const { empresa_id } = req.query;
 
             // 1. Pessoas
-            let query = supabase.from('pessoas').select('nome, cpf, empresa_id').eq('evento_id', evento_id).order('nome');
+            let query = supabase.from('pessoas').select('nome_completo, cpf, empresa_id').eq('evento_id', evento_id).order('nome_completo');
             if (empresa_id) query = query.eq('empresa_id', empresa_id);
             const { data: pessoas, error } = await query;
             if (error) throw error;
@@ -367,6 +367,7 @@ class ReportController {
 
             const finalPessoas = pessoas.map(p => ({
                 ...p,
+                nome: p.nome_completo, // Para compatibilidade com PDF service
                 empresas: { nome: eMap[p.empresa_id]?.nome || 'Sem Empresa' }
             }));
 

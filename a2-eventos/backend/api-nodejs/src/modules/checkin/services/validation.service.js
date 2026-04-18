@@ -159,16 +159,22 @@ class ValidationService {
     }
 
     async validateAccessRules(evento_id, pessoa, tipo, metodo, timestamp, confianca, area_id = null) {
-        // Permitir bypass se for manual (dashboard), caso contrário bloquear pendentes
-        if (pessoa.status_acesso === 'pendente' && metodo !== 'manual') {
+        // Permitir bypass se for pulseira (operador humano), caso contrário bloquear pendentes
+        if (pessoa.status_acesso === 'pendente' && metodo !== 'pulseira') {
             throw this._buildError('Cadastro Incompleto (Pendente)');
         }
 
         const { data: evento } = await supabase.from('eventos').select('min_face_score').eq('id', evento_id).single();
         const s = await this.getCheckinSettings(evento_id);
         
-        const cooldown = s.checkin_cooldown_min ?? 15;
+        // Cooldown: 15 min para facial, 0 para pulseira (opcional)
+        const cooldownFacial = s.checkin_cooldown_min ?? 15;
+        const cooldownPulseira = s.pulseira_cooldown_min ?? 0;
+        const cooldown = metodo === 'facial' ? cooldownFacial : cooldownPulseira;
+        
+        // Confiança: apenas para facial
         const targetConfidence = evento?.min_face_score ?? s.biometric_confidence ?? 75;
+        
         const blockDays = s.block_unauthorized_days ?? true;
         const allowOffhour = s.allow_offhour_checkin ?? false;
 
@@ -187,94 +193,85 @@ class ValidationService {
             }
         }
 
-        // 1. Validação de Fase do Evento (B-01)
-        // Regra: Métodos automáticos (QR/Barcode/RFID) SEMPRE validam fase.
-        // O bypass 'allowOffhour' só se aplica a check-ins manuais (dashboard).
-        const skipPhaseCheck = allowOffhour && metodo === 'manual';
+        // 1. Validação de Fase do Evento
+        // Regra: Apenas facial valida fase. Pulseira é bypass por serOperado por humano.
+        const skipPhaseCheck = allowOffhour && metodo === 'pulseira';
         
         if (tipo === 'checkin' && !skipPhaseCheck) {
             const fasePermitida = await this.verificarFaseEvento(evento_id, pessoa, metodo);
             if (!fasePermitida) throw this._buildError('Fase do evento não permitida para este perfil');
         }
 
+        // 2. Validação de Dia (apenas para facial)
         const hojeLiteral = getHojeLocal();
-        if (metodo !== 'manual' && blockDays && pessoa.dias_trabalho && pessoa.dias_trabalho.length > 0) {
-            if (!pessoa.dias_trabalho.includes(hojeLiteral)) throw this._buildError(`Acesso não autorizado para esta data (${hojeLiteral})`);
+        if (metodo === 'facial' && blockDays && pessoa.dias_acesso && pessoa.dias_acesso.length > 0) {
+            if (!pessoa.dias_acesso.includes(hojeLiteral)) throw this._buildError(`Acesso não autorizado para esta data (${hojeLiteral})`);
         }
 
+        // 3. Validação de Empresa/Bloqueio
         const empresaBloqueada = pessoa.empresas && pessoa.empresas.ativo === false;
         if (pessoa.bloqueado || empresaBloqueada) {
             throw this._buildError(pessoa.bloqueado ? (pessoa.motivo_bloqueio || 'Pessoa Bloqueada') : 'Empresa Bloqueada');
         }
 
+        // 4. Capacidade
         let quotaBypassed = false;
         if (tipo === 'checkin') {
             const stats = await this.getRealtimeStatsInternal(evento_id);
             if (stats.presentes >= stats.capacidade && stats.capacidade > 0) {
-                // B-03: Permitir bypass apenas para check-in manual (Dashboard/Admin)
-                if (metodo === 'manual') {
-                    logger.warn(`⚠️ [BYPASS] Cota de evento ${evento_id} excedida, mas liberada via manual`);
+                // Permitir bypass para pulseira (operador humano decide)
+                if (metodo === 'pulseira') {
+                    logger.warn(`⚠️ [BYPASS] Cota excedida, liberada via pulseira`);
                     quotaBypassed = true;
                 } else {
                     throw this._buildError('Capacidade máxima do evento atingida');
                 }
             }
-
-            const { data: vinculos } = await supabase
-                .from('pessoa_evento_empresa').select('empresa_id')
-                .eq('pessoa_id', pessoa.id).eq('evento_id', evento_id).eq('status_aprovacao', 'aprovado');
-
-            if (vinculos && vinculos.length > 0) {
-                let hasAvailableQuota = false;
-                let companyViolations = [];
-                for (const vinculo of vinculos) {
-                    const empresaCota = stats.empresas.find(e => e.id === vinculo.empresa_id);
-                    if (!empresaCota || empresaCota.quota === 0) {
-                        hasAvailableQuota = true; break;
-                    } else if (empresaCota.total < empresaCota.quota) {
-                        hasAvailableQuota = true; break;
-                    } else {
-                        companyViolations.push(empresaCota.nome);
-                    }
-                }
-                if (!hasAvailableQuota) throw this._buildError(`Cota esgotada: ${companyViolations.join(', ')}`);
-            }
-
-            if (metodo === 'face' && confianca !== null && parseFloat(confianca) < targetConfidence) {
-                throw this._buildError(`Baixa confiança biométrica: ${confianca}% (Piso: ${targetConfidence}%)`);
-            }
         }
 
-        // 3. Anti-Passback
-        if (tipo === 'checkin' || tipo === 'checkout') {
-            const apCooldown = cooldown; // minutos dinâmicos
-            if (metodo !== 'manual' && metodo !== 'face-rfid') {
-                const { data: lastLog } = await supabase
-                    .from('logs_acesso')
-                    .select('created_at, tipo')
-                    .eq('pessoa_id', pessoa.id)
-                    .eq('evento_id', evento_id)
-                    .in('tipo', ['checkin', 'checkout'])
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .single();
-
-                if (lastLog) {
-                    let lastTimeStr = lastLog.created_at;
-                    if (!lastTimeStr.endsWith('Z') && !lastTimeStr.includes('+') && !lastTimeStr.match(/-\d{2}:\d{2}$/)) lastTimeStr += 'Z';
-                    const lastTime = new Date(lastTimeStr);
-                    const diffMins = (timestamp - lastTime) / 60000;
-
-                    if (diffMins >= 0 && apCooldown > 0 && diffMins < apCooldown && lastLog.tipo === tipo) {
-                        const err = this._buildError(`Anti-Passback: Aguarde ${Math.ceil(apCooldown - diffMins)} min.`);
-                        err.is_passback_cooldown = true;
-                        throw err;
-                    }
-                }
-            }
+        // Validar confiança biométrica
+        if (metodo === 'facial' && confianca !== null && parseFloat(confianca) < targetConfidence) {
+            throw this._buildError(`Baixa confiança biométrica: ${confianca}% (Piso: ${targetConfidence}%)`);
         }
 
-        return { success: true, quotaBypassed };
+        return { quotaBypassed, cooldown, targetConfidence };
+    }
+
+    /**
+     * Validar anti-passback (evitar check-in/checkout duplo rápido)
+     */
+    async validateAntiPassback(evento_id, pessoa_id, tipo, metodo, cooldownMinutos) {
+        if (cooldownMinutos <= 0) return true;
+
+        const { data: lastLog } = await supabase
+            .from('logs_acesso')
+            .select('created_at, tipo')
+            .eq('pessoa_id', pessoa_id)
+            .eq('evento_id', evento_id)
+            .in('tipo', ['checkin', 'checkout'])
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (!lastLog) return true;
+
+        let lastTimeStr = lastLog.created_at;
+        if (!lastTimeStr.endsWith('Z') && !lastTimeStr.includes('+') && !lastTimeStr.match(/-\d{2}:\d{2}$/)) {
+            lastTimeStr += 'Z';
+        }
+        
+        const lastTime = new Date(lastTimeStr);
+        const now = new Date();
+        const diffMins = (now - lastTime) / 60000;
+
+        if (diffMins >= 0 && diffMins < cooldownMinutos && lastLog.tipo === tipo) {
+            const error = new Error(`Anti-Passback: Aguarde ${Math.ceil(cooldownMinutos - diffMins)} min.`);
+            error.status = 403;
+            error.is_passback_cooldown = true;
+            throw error;
+        }
+
+        return true;
     }
 
     _buildError(message) {

@@ -133,7 +133,8 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
                     border: '1px solid rgba(0, 212, 255, 0.1)',
                     borderRadius: 4,
                     boxShadow: '0 0 50px rgba(0,0,0,0.8)',
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    mx: { xs: 1, sm: 2 }
                 }
             }}
             disableEnforceFocus
@@ -143,8 +144,9 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
                     color: '#fff',
                     fontFamily: '"Orbitron", sans-serif',
                     fontWeight: 900,
-                    letterSpacing: 4,
-                    textTransform: 'uppercase'
+                    letterSpacing: { xs: 2, sm: 4 },
+                    textTransform: 'uppercase',
+                    fontSize: { xs: '1.25rem', sm: '2.125rem' }
                 }}>
                     ENQUADRAMENTO BIOMÉTRICO
                 </Typography>
@@ -169,8 +171,9 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
                     ref={containerRef}
                     sx={{
                         position: 'relative',
-                        width: 720,
-                        height: 480,
+                        width: '100%',
+                        maxWidth: 720,
+                        aspectRatio: '3 / 2',
                         bgcolor: '#000',
                         borderRadius: 3,
                         border: '1px solid rgba(0, 212, 255, 0.2)',
@@ -183,6 +186,18 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
                         justifyContent: 'center'
                     }}
                     onMouseDown={handleMouseDown}
+                    onTouchStart={(e) => {
+                        setDragging(true);
+                        setLastPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+                    }}
+                    onTouchMove={(e) => {
+                        if (!dragging) return;
+                        const dx = e.touches[0].clientX - lastPos.x;
+                        const dy = e.touches[0].clientY - lastPos.y;
+                        setPosition(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+                        setLastPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+                    }}
+                    onTouchEnd={() => setDragging(false)}
                 >
                     {/* Imagem com Transformação de Hardware */}
                     <img
@@ -207,19 +222,16 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
                         bottom: 0,
                         pointerEvents: 'none',
                         zIndex: 5,
-                        // Criar o buraco central via radial-gradient ou múltiplos boxes
                         backgroundColor: 'rgba(5, 10, 20, 0.75)',
-                        maskImage: `radial-gradient(rect, transparent ${MASK_WIDTH}px ${MASK_HEIGHT}px, black ${MASK_WIDTH}px ${MASK_HEIGHT}px)`,
-                        // Infelizmente mask-image com rect não é padrão em todos os browsers facilmente.
-                        // Usaremos clip-path para o buraco
+                        // Dinâmico baseado na largura do contêiner
                         clipPath: `polygon(
                             0% 0%, 0% 100%, 
-                            ${(720 - MASK_WIDTH) / 2}px 100%, 
-                            ${(720 - MASK_WIDTH) / 2}px ${(480 - MASK_HEIGHT) / 2}px, 
-                            ${(720 + MASK_WIDTH) / 2}px ${(480 - MASK_HEIGHT) / 2}px, 
-                            ${(720 + MASK_WIDTH) / 2}px ${(480 + MASK_HEIGHT) / 2}px, 
-                            ${(720 - MASK_WIDTH) / 2}px ${(480 + MASK_HEIGHT) / 2}px, 
-                            ${(720 - MASK_WIDTH) / 2}px 100%, 
+                            calc(50% - ${MASK_WIDTH/2}px) 100%, 
+                            calc(50% - ${MASK_WIDTH/2}px) calc(50% - ${MASK_HEIGHT/2}px), 
+                            calc(50% + ${MASK_WIDTH/2}px) calc(50% - ${MASK_HEIGHT/2}px), 
+                            calc(50% + ${MASK_WIDTH/2}px) calc(50% + ${MASK_HEIGHT/2}px), 
+                            calc(50% - ${MASK_WIDTH/2}px) calc(50% + ${MASK_HEIGHT/2}px), 
+                            calc(50% - ${MASK_WIDTH/2}px) 100%, 
                             100% 100%, 100% 0%
                         )`
                     }} />
@@ -277,15 +289,16 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
                 </Stack>
             </DialogContent>
 
-            <DialogActions sx={{ p: 6, pt: 2, justifyContent: 'center', gap: 3 }}>
+            <DialogActions sx={{ p: { xs: 3, sm: 6 }, pt: 2, justifyContent: 'center', gap: { xs: 1, sm: 3 }, flexDirection: { xs: 'column', sm: 'row' } }}>
                 <Button
                     variant="contained"
                     onClick={handleConfirm}
+                    fullWidth
                     sx={{
                         bgcolor: '#00D4FF',
                         color: '#000',
                         fontWeight: 900,
-                        px: 10,
+                        maxWidth: { xs: '100%', sm: 300 },
                         py: 2,
                         borderRadius: 2,
                         fontFamily: '"Inter", sans-serif',
@@ -300,10 +313,11 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
                 <Button
                     variant="outlined"
                     onClick={onClose}
+                    fullWidth
                     sx={{
                         color: '#fff',
                         borderColor: '#00D4FF',
-                        px: 6,
+                        maxWidth: { xs: '100%', sm: 300 },
                         py: 2,
                         borderRadius: 2,
                         fontWeight: 900,

@@ -389,9 +389,10 @@ class AuthController {
         try {
             const isAdminMaster = req.user?.nivel_acesso === 'admin_master';
             
+            // Tentativa de busca com campos padrão do Supabase
             let query = supabase
                 .from('perfis')
-                .select('id, email, nome_completo, nivel_acesso, status, evento_id, permissions, criado_em')
+                .select('id, nome_completo, nivel_acesso, status, evento_id, permissions, created_at')
                 .order('nome_completo');
 
             // Se não for admin_master, só mostra usuários do mesmo evento
@@ -401,7 +402,22 @@ class AuthController {
 
             const { data, error } = await query;
 
-            if (error) throw error;
+            if (error) {
+                logger.error('Erro Supabase ao listar perfis:', error);
+
+                // Fallback: Tentar com campos mínimos se a query completa falhar
+                if (error.message.includes('created_at') || error.message.includes('permissions') || error.message.includes('column')) {
+                    const { data: retryData, error: retryError } = await supabase
+                        .from('perfis')
+                        .select('id, nome_completo, nivel_acesso, status, evento_id')
+                        .order('nome_completo');
+
+                    if (retryError) throw retryError;
+                    return res.json({ success: true, users: retryData });
+                }
+
+                throw error;
+            }
 
             res.json({
                 success: true,
@@ -409,8 +425,12 @@ class AuthController {
             });
 
         } catch (error) {
-            logger.error('Erro ao listar perfis:', error);
-            res.status(500).json({ error: 'Erro ao buscar perfis' });
+            logger.error('Erro fatal ao listar perfis:', error);
+            res.status(500).json({ 
+                error: 'Erro ao buscar perfis', 
+                message: error.message,
+                details: error.details || error.hint 
+            });
         }
     }
 
@@ -564,6 +584,36 @@ class AuthController {
 
         } catch (error) {
             logger.error('Erro ao buscar perfil:', error);
+            res.status(500).json({ error: 'Erro interno no servidor' });
+        }
+    }
+
+    /**
+     * Definir evento ativo (troca de contexto)
+     */
+    async setActiveEvent(req, res) {
+        try {
+            const { evento_id } = req.body;
+
+            if (!evento_id) {
+                return res.status(400).json({ error: 'evento_id é obrigatório' });
+            }
+
+            // Opcional: Atualiza o último evento acessado no DB para conveniência
+            await supabase
+                .from('perfis')
+                .update({ evento_id, updated_at: new Date() })
+                .eq('id', req.user.id);
+
+            logger.info(`🔄 Contexto de evento alterado: ${req.user.email} -> ${evento_id}`);
+
+            res.json({
+                success: true,
+                message: 'Evento ativo atualizado'
+            });
+
+        } catch (error) {
+            logger.error('Erro ao definir evento ativo:', error);
             res.status(500).json({ error: 'Erro interno no servidor' });
         }
     }

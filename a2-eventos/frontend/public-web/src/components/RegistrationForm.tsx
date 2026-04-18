@@ -140,16 +140,18 @@ export default function RegistrationForm({ token, company, branding, requiredFie
 
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
     };
 
     const toggleDate = (date: string) => {
-        const current = formData.dias_trabalho;
-        if (current.includes(date)) {
-            setFormData({ ...formData, dias_trabalho: current.filter(d => d !== date) });
-        } else {
-            setFormData({ ...formData, dias_trabalho: [...current, date] });
-        }
+        setFormData(prev => {
+            const current = prev.dias_trabalho;
+            const updated = current.includes(date)
+                ? current.filter(d => d !== date)
+                : [...current, date];
+            return { ...prev, dias_trabalho: updated };
+        });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -286,18 +288,16 @@ export default function RegistrationForm({ token, company, branding, requiredFie
             <div className="p-8 pb-6 border-b border-slate-800 relative z-10">
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
-                        {branding?.logo_url && (
-                            <Image
-                                src={branding.logo_url}
-                                alt="Logo"
-                                width={40}
-                                height={40}
-                                className="w-10 h-10 rounded-lg object-contain bg-white/10 p-1"
-                                unoptimized
-                            />
-                        )}
+                        <Image
+                            src="/logo.jpg"
+                            alt="NZT Logo"
+                            width={40}
+                            height={40}
+                            className="w-10 h-10 rounded-lg object-contain bg-white/10 p-1 mr-2"
+                            unoptimized
+                        />
                         <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r tracking-tight" style={{ backgroundImage: `linear-gradient(to right, var(--brand-primary), var(--brand-secondary))` }}>
-                            {branding?.evento_nome || t('registration.title', { defaultValue: 'Credenciamento' })}
+                            {branding?.evento_nome || "NZT - Intelligent Control System"}
                         </h1>
                     </div>
                     <span className="px-4 py-1.5 rounded-full text-sm font-semibold border flex items-center gap-2" style={{ backgroundColor: 'color-mix(in srgb, var(--brand-primary) 10%, transparent)', color: 'var(--brand-primary)', borderColor: 'color-mix(in srgb, var(--brand-primary) 20%, transparent)' }}>
@@ -338,7 +338,22 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                         </div>
 
                         <PhotoCapture
-                            onPhotoCaptured={(base64) => setRawPhoto(base64)}
+                            onPhotoCaptured={(base64, source) => {
+                                if (base64 === null) {
+                                    setFormData(prev => ({ ...prev, foto_base64: null }));
+                                    setRawPhoto(null);
+                                    return;
+                                }
+
+                                // Se for selfie (camera), pula o editor e salva direto
+                                if (source === 'camera') {
+                                    setFormData(prev => ({ ...prev, foto_base64: base64 }));
+                                    setRawPhoto(null);
+                                } else {
+                                    // Upload exige refinamento manual no editor
+                                    setRawPhoto(base64);
+                                }
+                            }}
                             initialPhoto={formData.foto_base64}
                         />
 
@@ -346,7 +361,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                             <PhotoEditor
                                 image={rawPhoto}
                                 onSave={(cropped) => {
-                                    setFormData({ ...formData, foto_base64: cropped });
+                                    setFormData(prev => ({ ...prev, foto_base64: cropped }));
                                     setRawPhoto(null);
                                 }}
                                 onCancel={() => setRawPhoto(null)}

@@ -6,37 +6,47 @@ class User {
     constructor(data = {}) {
         this.id = data.id || null;
         this.email = data.email || '';
-        this.role = data.role || 'operador';
-        this.nivel_acesso = data.nivel_acesso || 'operador';
+        this.nivel_acesso = data.nivel_acesso || data.role || 'operador';
+        this.role = this.nivel_acesso; // alias
+        
+        // --- 🛡️ Role Harmonization (Nexus Architecture) ---
+        // Normalização interna para garantir que o modelo fale a mesma língua que os middlewares
+        if (this.nivel_acesso === 'master') this.nivel_acesso = 'admin_master';
+        this.role = this.nivel_acesso;
         this.evento_id = data.evento_id || null;
         this.nome = data.nome || '';
         this.status = data.status || 'pendente';
         this.permissions = data.permissions || {};
     }
-
     /**
      * Papéis disponíveis no sistema (novo)
      */
     static get ROLES() {
         return {
-            ADMIN_MASTER: 'admin_master',  // Acesso total
-            OPERADOR: 'operador'        // Acesso por permissões
+            ADMIN_MASTER: 'admin_master',  // Acesso total (Super Admin)
+            ADMIN: 'admin',                // Admin de Evento/SaaS
+            SUPERVISOR: 'supervisor',
+            OPERADOR: 'operador'
         };
     }
 
-    /**
-     * Verificar se é admin_master
-     */
     isAdminMaster() {
-        return this.nivel_acesso === 'admin_master';
+        return this.nivel_acesso === 'admin_master' || this.nivel_acesso === 'admin';
+    }
+
+    /**
+     * Verifica se o usuário tem privilégios de gestão (Admin/Master/Supervisor)
+     */
+    isPrivileged() {
+        return ['admin_master', 'admin', 'supervisor'].includes(this.nivel_acesso);
     }
 
     /**
      * Verificar se tem permissão para módulo
      */
     hasPermission(modulo) {
-        // admin_master tem todas as permissões
-        if (this.nivel_acesso === 'admin_master') return true;
+        // admin_master e admin têm todas as permissões (bypass RLS/ACL no backend)
+        if (this.nivel_acesso === 'admin_master' || this.nivel_acesso === 'admin') return true;
         
         //operador consulta o JSONB
         return this.permissions?.[modulo] === true;

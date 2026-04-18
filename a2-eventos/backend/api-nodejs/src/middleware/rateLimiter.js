@@ -29,8 +29,21 @@ const apiLimiter = rateLimit({
     }
 });
 
+// FIX I-10: Limiter para rotas públicas (cadastro, portal, etc.)
+// Mais restritivo para proteger contra abuso no endpoint de cadastro público
+const publicLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minuto
+    max: process.env.NODE_ENV === 'development' ? 200 : 30,
+    message: {
+        error: 'Muitas requisições ao portal. Aguarde um momento.'
+    },
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
 module.exports = {
     auth: authLimiter,
     access: accessLimiter,
-    api: apiLimiter
-};
+    api: apiLimiter,
+    public: publicLimiter // FIX I-10
+};

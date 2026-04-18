@@ -177,7 +177,7 @@ class SettingsController {
     // Auditoria de Conexão Supabase
     async testConnection(req, res) {
         try {
-            const { data, error } = await supabase.from('eventos').select('count').limit(1);
+            const { count, error } = await supabase.from('eventos').select('*', { count: 'exact', head: true });
             if (error) throw error;
             res.json({ success: true, message: 'Conexão com Supabase Nexus estabelecida!' });
         } catch (error) {

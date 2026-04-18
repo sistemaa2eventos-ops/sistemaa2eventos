@@ -52,37 +52,39 @@ const Reports = () => {
     };
 
     const logColumns = [
-        { field: 'pessoa', headerName: 'Participante', width: 250 },
-        { field: 'empresa', headerName: 'Empresa', width: 200 },
+        { id: 'pessoa', label: 'Participante', width: 250 },
+        { id: 'empresa', label: 'Empresa', width: 200 },
         { 
-            field: 'tipo', 
-            headerName: 'Tipo', 
+            id: 'tipo', 
+            label: 'Tipo', 
             width: 120,
-            renderCell: (params) => (
+            format: (value) => (
+
                 <Typography 
                     variant="caption" 
                     fontWeight={900} 
-                    sx={{ color: params.value === 'checkin' ? '#00FF88' : '#FF3366' }}
+                    sx={{ color: value === 'checkin' ? '#00FF88' : '#FF3366' }}
                 >
-                    {params.value.toUpperCase()}
+                    {value.toUpperCase()}
                 </Typography>
             )
         },
         { 
-            field: 'horario', 
-            headerName: 'Horário', 
+            id: 'horario', 
+            label: 'Horário', 
             width: 180,
-            renderCell: (params) => params.value && format(new Date(params.value), "dd/MM HH:mm:ss", { locale: ptBR })
+            format: (value) => value && format(new Date(value), "dd/MM HH:mm:ss", { locale: ptBR })
         },
-        { field: 'metodo', headerName: 'Método', width: 150 },
-        { field: 'leitor', headerName: 'Equipamento', width: 150 }
+        { id: 'metodo', label: 'Método', width: 150 },
+        { id: 'leitor', label: 'Equipamento', width: 150 }
     ];
 
     const aggregatedColumns = [
-        { field: 'total', headerName: 'Total de Registros', width: 180, type: 'number' },
-        { field: 'checkins', headerName: 'Check-ins', width: 150, type: 'number' },
-        { field: 'checkouts', headerName: 'Check-outs', width: 150, type: 'number' }
+        { id: 'total', label: 'Total de Registros', width: 180, type: 'number' },
+        { id: 'checkins', label: 'Check-ins', width: 150, type: 'number' },
+        { id: 'checkouts', label: 'Check-outs', width: 150, type: 'number' }
     ];
+
 
     const renderExportButtons = (type) => (
         <Stack direction="row" spacing={1}>
@@ -190,63 +192,57 @@ const Reports = () => {
                 <Box sx={{ p: 2 }}>
                     {tab === 'logs' && (
                         <DataTable
-                            rows={dailyLogs}
+                            data={dailyLogs}
                             columns={logColumns}
                             loading={loading}
-                            pagination
-                            paginationMode="server"
-                            rowCount={totalLogs}
+                            totalCount={totalLogs}
                             page={page - 1}
-                            pageSize={25}
-                            onPageChange={(newPage) => setPage(newPage + 1)}
-                            toolbar={() => renderExportButtons('logs')}
+                            rowsPerPage={25}
+                            onPageChange={(event, newPage) => setPage(newPage + 1)}
+                            // Note: DataTable custom component properties handled here
                         />
                     )}
 
                     {tab === 'area' && (
                         <DataTable
-                            rows={reportArea}
-                            columns={[{ field: 'item', headerName: 'Área de Acesso', width: 300 }, ...aggregatedColumns]}
+                            data={reportArea}
+                            columns={[{ id: 'item', label: 'Área de Acesso', width: 300 }, ...aggregatedColumns]}
                             loading={loading}
-                            toolbar={() => renderExportButtons('area')}
                         />
                     )}
 
                     {tab === 'empresa' && (
                         <DataTable
-                            rows={reportEmpresa}
-                            columns={[{ field: 'item', headerName: 'Empresa', width: 300 }, ...aggregatedColumns]}
+                            data={reportEmpresa}
+                            columns={[{ id: 'item', label: 'Empresa', width: 300 }, ...aggregatedColumns]}
                             loading={loading}
-                            toolbar={() => renderExportButtons('empresa')}
                         />
                     )}
 
                     {tab === 'leitor' && (
                         <DataTable
-                            rows={reportLeitor}
-                            columns={[{ field: 'item', headerName: 'Equipamento', width: 300 }, ...aggregatedColumns]}
+                            data={reportLeitor}
+                            columns={[{ id: 'item', label: 'Equipamento', width: 300 }, ...aggregatedColumns]}
                             loading={loading}
-                            toolbar={() => renderExportButtons('leitor')}
                         />
                     )}
 
                     {tab === 'funcao' && (
                         <DataTable
-                            rows={reportFuncao}
-                            columns={[{ field: 'item', headerName: 'Cargo/Função', width: 300 }, ...aggregatedColumns]}
+                            data={reportFuncao}
+                            columns={[{ id: 'item', label: 'Cargo/Função', width: 300 }, ...aggregatedColumns]}
                             loading={loading}
-                            toolbar={() => renderExportButtons('funcao')}
                         />
                     )}
 
                     {tab === 'status' && (
                         <DataTable
-                            rows={reportStatus}
-                            columns={[{ field: 'item', headerName: 'Status Documental', width: 300 }, ...aggregatedColumns]}
+                            data={reportStatus}
+                            columns={[{ id: 'item', label: 'Status Documental', width: 300 }, ...aggregatedColumns]}
                             loading={loading}
-                            toolbar={() => renderExportButtons('status')}
                         />
                     )}
+
                 </Box>
             </GlassCard>
         </Box>

@@ -185,13 +185,25 @@ class MonitorController {
             const evento_id = _s(req.tenantId) || _s(req.event?.id) || _s(req.query.evento_id) || _s(req.headers['x-evento-id']);
             if (!evento_id) return res.status(400).json({ error: 'evento_id obrigatório' });
 
-            const { data, error } = await supabase
+            let { data, error } = await supabase
                 .from('dispositivos_acesso')
                 .select('id, nome, tipo, status, area_id, last_seen, evento_areas(nome)')
                 .eq('evento_id', evento_id)
                 .order('status', { ascending: false });
 
-            if (error) throw error;
+            // Fallback: se o join com evento_areas falhar, buscar sem o join
+            if (error) {
+                logger.warn('Fallback getTerminais sem join evento_areas:', error.message);
+                const retry = await supabase
+                    .from('dispositivos_acesso')
+                    .select('id, nome, tipo, status, area_id, last_seen')
+                    .eq('evento_id', evento_id)
+                    .order('status', { ascending: false });
+
+                if (retry.error) throw retry.error;
+                data = retry.data;
+            }
+
             res.json({ success: true, data: data || [] });
         } catch (error) {
             logger.error('Erro ao buscar terminais:', error);
@@ -334,7 +346,8 @@ class MonitorController {
     async forceSync(req, res) {
         try {
             // Verificar permissão
-            if (!['admin', 'master'].includes(req.user.role)) {
+            const { extractRole } = require('../../middleware/auth');
+            if (!['admin', 'admin_master'].includes(extractRole(req.user))) {
                 return res.status(403).json({ error: 'Acesso negado' });
             }
 
@@ -359,7 +372,8 @@ class MonitorController {
      */
     async clearCache(req, res) {
         try {
-            if (!['admin', 'master'].includes(req.user.role)) {
+            const { extractRole } = require('../../middleware/auth');
+            if (!['admin', 'admin_master'].includes(extractRole(req.user))) {
                 return res.status(403).json({ error: 'Acesso negado' });
             }
 

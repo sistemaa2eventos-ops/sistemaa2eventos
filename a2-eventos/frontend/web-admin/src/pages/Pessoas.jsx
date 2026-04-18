@@ -90,6 +90,7 @@ const Pessoas = () => {
     handleCloseDialog,
     handleSave,
     handleDateToggle,
+    handleFaseToggle,
     handleDelete,
     confirmDelete,
     handleOpenBlock,
@@ -183,6 +184,7 @@ const Pessoas = () => {
         empresas={empresas}
         activeEvent={activeEvent}
         handleDateToggle={handleDateToggle}
+        handleFaseToggle={handleFaseToggle}
         documentos={documentos}
         handleUploadECM={handleUploadECM}
         handleOpenWebcamECM={handleOpenWebcamECM}

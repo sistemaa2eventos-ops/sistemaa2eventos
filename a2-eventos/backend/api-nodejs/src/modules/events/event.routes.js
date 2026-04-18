@@ -24,6 +24,9 @@ router.post('/:id/quotas/:empresa_id', checkPermission('eventos', 'escrita'), ev
 router.get('/presets/list', checkPermission('eventos', 'leitura'), eventoController.listPresets);
 router.post('/:id/apply-preset', checkPermission('eventos', 'escrita'), eventoController.applyPreset);
 
+// Rotas de Áreas de Acesso (para biometria)
+router.get('/:id/areas', checkPermission('eventos', 'leitura'), eventoController.getAreas);
+
 router.post('/reset/manual', checkPermission('eventos', 'escrita'), cronController.manualTrigger);
 
 module.exports = router;

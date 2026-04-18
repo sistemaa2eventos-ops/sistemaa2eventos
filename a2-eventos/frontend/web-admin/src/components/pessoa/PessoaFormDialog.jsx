@@ -29,6 +29,7 @@ const PessoaFormDialog = ({
   empresas,
   activeEvent,
   handleDateToggle,
+  handleFaseToggle,
   documentos,
   handleUploadECM,
   handleOpenWebcamECM,
@@ -135,7 +136,7 @@ const PessoaFormDialog = ({
               {activeStep === 0 && (
                 <Grid container spacing={2.5}>
                   <Grid item xs={12} md={isEmpresa ? 12 : 8}>
-                    <TextField label="Nome Completo" fullWidth required value={formData.nome} onChange={(e) => setFormData({ ...formData, nome: e.target.value })} />
+                    <TextField label="Nome Completo" fullWidth required value={formData.nome_completo} onChange={(e) => setFormData({ ...formData, nome_completo: e.target.value })} />
                   </Grid>
                   {!isEmpresa && (
                     <Grid item xs={12} md={4}>
@@ -193,10 +194,8 @@ const PessoaFormDialog = ({
                       <FormControl fullWidth required>
                         <InputLabel>Categoria Operacional</InputLabel>
                         <Select value={formData.tipo_pessoa || ''} label="Categoria Operacional" onChange={(e) => setFormData({ ...formData, tipo_pessoa: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: '#0a1628', color: '#fff', border: '1px solid #00D4FF' } } }}>
-                          <MenuItem value="colaborador">Colaborador (B2B)</MenuItem>
-                          <MenuItem value="visitante">Cliente / Visitante (B2C)</MenuItem>
-                          <MenuItem value="staff">Staff Interno / Diretoria</MenuItem>
-                          <MenuItem value="fornecedor">Fornecedor de Suprimento</MenuItem>
+                          <MenuItem value="colaborador">Colaborador (B2B) / Staff</MenuItem>
+                          <MenuItem value="visitante">Visitante (B2C)</MenuItem>
                         </Select>
                       </FormControl>
                     </Grid>
@@ -224,38 +223,76 @@ const PessoaFormDialog = ({
 
                   {activeEvent && formData && (
                     <Box>
-                      <Typography variant="subtitle2" sx={{ color: '#00D4FF', mb: 1, fontWeight: 700 }}>DIAS PERMITIDOS PARA ACESSO FÍSICO</Typography>
+                      <Typography variant="subtitle2" sx={{ color: '#00D4FF', mb: 1, fontWeight: 700 }}>ACESSO POR FASE DO EVENTO</Typography>
                       <Divider sx={{ mb: 2, borderColor: 'rgba(255,255,255,0.1)' }} />
-                      <Stack spacing={2}>
-                        {['montagem', 'evento', 'desmontagem'].map(phase => {
-                          const dates = (activeEvent && activeEvent[`datas_${phase}`]) || [];
-                          if (!Array.isArray(dates) || dates.length === 0) return null;
+                      <FormGroup row sx={{ mb: 3 }}>
+                        {['montagem', 'evento', 'desmontagem'].map(fase => {
+                          const isChecked = Array.isArray(formData?.fases_acesso) && formData.fases_acesso.includes(fase);
                           return (
-                            <Box key={phase}>
-                              <Typography variant="caption" sx={{ color: 'text.secondary', textTransform: 'uppercase', display: 'block', mb: 0.5 }}>{phase}</Typography>
-                              <FormGroup row>
-                                {dates.map(date => {
-                                  const isChecked = Array.isArray(formData?.dias_trabalho) && formData.dias_trabalho.includes(date);
-                                  return (
-                                    <FormControlLabel 
-                                      key={date} 
-                                      control={
-                                        <Checkbox 
-                                          size="small" 
-                                          checked={!!isChecked} 
-                                          onChange={() => handleDateToggle(date)} 
-                                          sx={{ color: 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: '#00D4FF' } }} 
-                                        />
-                                      } 
-                                      label={<Typography variant="caption">{date ? format(new Date(date + 'T00:00:00'), "dd/MM") : '--/--'}</Typography>} 
-                                    />
-                                  );
-                                })}
-                              </FormGroup>
-                            </Box>
+                            <FormControlLabel 
+                              key={fase}
+                              control={
+                                <Checkbox 
+                                  checked={!!isChecked} 
+                                  onChange={() => handleFaseToggle(fase)}
+                                  sx={{ color: 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: '#00D4FF' } }}
+                                />
+                              }
+                              label={<Typography variant="body2" sx={{ textTransform: 'uppercase' }}>{fase}</Typography>}
+                            />
                           );
                         })}
-                      </Stack>
+                      </FormGroup>
+                      
+                      <Typography variant="subtitle2" sx={{ color: '#00D4FF', mb: 1, fontWeight: 700 }}>DIAS PERMITIDOS PARA ACESSO FÍSICO</Typography>
+                      <Divider sx={{ mb: 2, borderColor: 'rgba(255,255,255,0.1)' }} />
+                      <Box 
+                        sx={{ 
+                          maxHeight: 250, 
+                          overflowY: 'auto', 
+                          pr: 2, 
+                          border: '1px solid rgba(0, 212, 255, 0.1)',
+                          borderRadius: 2,
+                          p: 2,
+                          bgcolor: 'rgba(0,0,0,0.1)',
+                          '&::-webkit-scrollbar': { width: '6px' }, 
+                          '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.4)', borderRadius: '10px' },
+                          '&::-webkit-scrollbar-track': { background: 'rgba(255,255,255,0.05)' }
+                        }}
+                      >
+                        <Stack spacing={2.5}>
+                          {['montagem', 'evento', 'desmontagem'].map(phase => {
+                            const dates = (activeEvent && activeEvent[`datas_${phase}`]) || [];
+                            if (!Array.isArray(dates) || dates.length === 0) return null;
+                            return (
+                              <Box key={phase}>
+                                <Typography variant="caption" sx={{ color: '#00FF88', textTransform: 'uppercase', fontWeight: 800, display: 'block', mb: 1 }}>{phase}</Typography>
+                                <Grid container spacing={1}>
+                                  {dates.map(date => {
+                                    const isChecked = Array.isArray(formData?.dias_acesso) && formData.dias_acesso.includes(date);
+                                    return (
+                                      <Grid item key={date}>
+                                        <FormControlLabel 
+                                          control={
+                                            <Checkbox 
+                                              size="small" 
+                                              checked={!!isChecked} 
+                                              onChange={() => handleDateToggle(date)} 
+                                              sx={{ color: 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: '#00FF88' }, p: 0.5 }} 
+                                            />
+                                          } 
+                                          label={<Typography variant="caption" sx={{ color: isChecked ? '#fff' : 'rgba(255,255,255,0.6)' }}>{date ? format(new Date(date + 'T00:00:00'), "dd/MM") : '--/--'}</Typography>} 
+                                          sx={{ m: 0, mr: 1, border: '1px solid rgba(255,255,255,0.05)', borderRadius: 1, px: 1, py: 0.5, bgcolor: isChecked ? 'rgba(0,255,136,0.05)' : 'transparent' }}
+                                        />
+                                      </Grid>
+                                    );
+                                  })}
+                                </Grid>
+                              </Box>
+                            );
+                          })}
+                        </Stack>
+                      </Box>
                     </Box>
                   )}
                 </Box>

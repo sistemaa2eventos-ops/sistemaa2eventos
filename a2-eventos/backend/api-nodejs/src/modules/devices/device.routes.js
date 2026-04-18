@@ -14,6 +14,9 @@ router.use(requireEvent);
 // Listar dispositivos
 router.get('/', deviceController.list);
 
+// Obter fila de sincronização
+router.get('/queue', deviceController.getQueue);
+
 // Cadastrar dispositivo (Admin/Supervisor)
 router.post('/', authorize('admin', 'supervisor'), deviceController.create);
 
@@ -25,6 +28,12 @@ router.delete('/:id', authorize('admin'), deviceController.delete);
 
 // Forçar sincronização de faces (Admin/Supervisor)
 router.post('/:id/sync', authorize('admin', 'supervisor'), deviceController.sync);
+
+// Forçar processamento da fila (Admin/Supervisor)
+router.post('/:id/force-queue', authorize('admin', 'supervisor'), deviceController.forceQueue);
+
+// Obter status de saúde do dispositivo
+router.get('/:id/health', deviceController.getHealth);
 
 // Configurar Push de Eventos (Intelbras)
 router.post('/:id/configure-push', authorize('admin', 'supervisor'), deviceController.configurePush);

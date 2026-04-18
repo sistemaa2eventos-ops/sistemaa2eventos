@@ -3,6 +3,8 @@ const logger = require('../../services/logger');
 const qrGenerator = require('../../utils/qrGenerator');
 const checkinService = require('./checkin.service');
 const ApiResponse = require('../../utils/apiResponse');
+const webhookDispatcher = require('../../services/webhookDispatcher');
+const websocketService = require('../../services/websocketService'); // FIX C-02: import ausente causava ReferenceError em runtime
 
 class AccessController {
     constructor() {
@@ -81,8 +83,8 @@ class AccessController {
 
             if (error || !pessoa) return ApiResponse.error(res, 'Participante não localizado.', 404);
 
-            if (pessoa.status_acesso === 'checkin') {
-                return ApiResponse.error(res, 'Pessoa já realizou check-in.', 400, { pessoa_id: pessoa.id, nome: pessoa.nome });
+            if (pessoa.status_acesso === 'checkin_feito') { // FIX C-09: era 'checkin', valor fora do CHECK constraint
+                return ApiResponse.error(res, 'Pessoa já realizou check-in.', 400, { pessoa_id: pessoa.id, nome: pessoa.nome_completo });
             }
 
             const result = await checkinService.registrarAcesso(supabaseClient, {
@@ -197,7 +199,7 @@ class AccessController {
             } else {
                 const buscaLimpa = busca.replace(/[^\d\w\s]/g, '');
                 if (/^\d+$/.test(buscaLimpa) && buscaLimpa.length === 11) query = query.eq('cpf', buscaLimpa);
-                else query = query.ilike('nome', `%${buscaLimpa}%`);
+                else query = query.ilike('nome_completo', `%${buscaLimpa}%`); // FIX C-03: era 'nome', coluna renomeada para 'nome_completo'
             }
 
             const { data: pessoas, error } = await query.limit(10);
@@ -205,11 +207,11 @@ class AccessController {
             if (!pessoas || pessoas.length === 0) return ApiResponse.error(res, 'Nenhum registro encontrado.', 404);
 
             if (pessoas.length > 1) {
-                return ApiResponse.success(res, { multiple: true, pessoas: pessoas.map(f => ({ id: f.id, nome: f.nome, cpf: f.cpf, status: f.status_acesso })) });
+                return ApiResponse.success(res, { multiple: true, pessoas: pessoas.map(f => ({ id: f.id, nome: f.nome_completo, cpf: f.cpf, status: f.status_acesso })) });
             }
 
             const pessoa = pessoas[0];
-            if (pessoa.status_acesso === 'checkin') return ApiResponse.error(res, 'Registro já em estado de Check-in.', 400);
+            if (pessoa.status_acesso === 'checkin_feito') return ApiResponse.error(res, 'Registro já em estado de Check-in.', 400); // FIX C-09
 
             const result = await checkinService.registrarAcesso(supabaseClient, {
                 pessoa_id: pessoa.id,
@@ -302,15 +304,11 @@ class AccessController {
     }
 
     async processFaceRecognition(req, res) {
-        // Gerenciado pelo hardware externo via WebSocket
-        // Ver: Monitor.jsx e websocketService.js
-        // Não remover — pode ser necessário no futuro
+        // FIX 4.4: Método em migração para pgvector (Fase 5.1)
+        // Recebe requisições mas retorna 501 até que o novo motor biométrico esteja ativo
+        // NÃO remover — rota já publicada em checkin.routes.js
         try {
-            const { face_token, dispositivo_id } = req.body;
-            const eventoId = req.event?.id;
-            const supabaseClient = req.supabase || supabase;
-
-            return ApiResponse.error(res, 'Ponto de Reconhecimento Facial em migração de Vector Store.', 501);
+            return ApiResponse.error(res, 'Reconhecimento facial em migração para motor de vetores. Use o terminal físico.', 501);
         } catch (error) {
             logger.error('Erro no processamento facial:', error.message);
             return ApiResponse.error(res, 'Falha crítica no motor biométrico.');
@@ -418,6 +416,9 @@ class AccessController {
                 created_by: req.user?.id
             });
 
+            // Dispatch webhook
+            webhookDispatcher.dispatchPessoaBloqueada(eventoId, pessoa, justificativa);
+
             return ApiResponse.success(res, { message: 'Participante expulso com sucesso.', data: pessoa });
         } catch (error) {
             logger.error('Erro ao expulsar participante:', error.message);
@@ -443,18 +444,60 @@ class AccessController {
           const evento_id = req.headers['x-evento-id'] || req.query.evento_id || req.event?.id;
           const supabaseClient = req.supabase || supabase;
       
-          const { data, error } = await supabaseClient
+          // Converter código para número para comparação
+          const numeroPulseira = parseInt(codigo, 10);
+          if (isNaN(numeroPulseira)) {
+            return ApiResponse.error(res, 'Código de pulseira inválido.', 400);
+          }
+      
+          // Buscar pessoa pelo número da pulseira ou QR Code
+          const { data: pessoa, error: pessoaErr } = await supabaseClient
             .from('pessoas')
             .select('*, empresas(nome)')
             .eq('evento_id', evento_id)
             .or(`numero_pulseira.eq.${codigo},qr_code.eq.${codigo}`)
             .single();
       
-          if (error || !data) {
+          if (pessoaErr || !pessoa) {
             return ApiResponse.error(res, 'Pulseira ou QR Code não encontrado.', 404);
           }
       
-          return ApiResponse.success(res, data);
+          // Buscar informações da pulseira (tipo, cor, áreas) baseado no número
+          const { data: tipoPulseira } = await supabaseClient
+            .from('evento_tipos_pulseira')
+            .select(`
+              id,
+              nome_tipo,
+              cor_hex,
+              numero_inicial,
+              numero_final,
+              pulseira_areas_permitidas (
+                area_id,
+                evento_areas (id, nome_area)
+              )
+            `)
+            .eq('evento_id', evento_id)
+            .lte('numero_inicial', numeroPulseira)
+            .gte('numero_final', numeroPulseira)
+            .single();
+      
+          // Montar resposta com dados da pessoa + informações da pulseira
+          const response = {
+            ...pessoa,
+            pulseira_info: tipoPulseira ? {
+              id: tipoPulseira.id,
+              nome_tipo: tipoPulseira.nome_tipo,
+              cor_hex: tipoPulseira.cor_hex,
+              numero_inicial: tipoPulseira.numero_inicial,
+              numero_final: tipoPulseira.numero_final,
+              areas_permitidas: tipoPulseira.pulseira_areas_permitidas?.map(a => ({
+                area_id: a.area_id,
+                nome_area: a.evento_areas?.nome_area
+              })) || []
+            } : null
+          };
+      
+          return ApiResponse.success(res, response);
         } catch (error) {
             logger.error('Erro ao consultar pulseira:', error.message);
             return ApiResponse.error(res, 'Erro interno ao consultar pulseira.');
@@ -468,8 +511,8 @@ class AccessController {
             const supabaseClient = req.supabase || supabase;
             
             const { data, error } = await supabaseClient
-                .from('areas')
-                .select('id, nome')
+                .from('evento_areas') // FIX C-10: tabela correta (era 'areas' que não existe)
+                .select('id, nome_area') // campo correto
                 .eq('evento_id', eventoId);
 
             if (error) throw error;
@@ -513,6 +556,347 @@ class AccessController {
         // Ver: Monitor.jsx e websocketService.js
         // Não remover — pode ser necessário no futuro
         return ApiResponse.success(res, { message: 'Pulso enviado para ponte de hardware.' });
+    }
+
+    // ============================================
+    // NOVO: CHECK-IN VIA PULSEIRA
+    // ============================================
+    async checkinPulseira(req, res) {
+        try {
+            const { pessoa_id, numero_pulseira } = req.body;
+            const eventoId = req.event?.id;
+            const supabaseClient = req.supabase || supabase;
+
+            if (!pessoa_id || !numero_pulseira) {
+                return ApiResponse.error(res, 'pessoa_id e numero_pulseira são obrigatórios', 400);
+            }
+
+            // Buscar pessoa
+            const { data: pessoa, error: pessoaErr } = await supabaseClient
+                .from('pessoas')
+                .select('*, empresas(nome)')
+                .eq('id', pessoa_id)
+                .eq('evento_id', eventoId)
+                .single();
+
+            if (pessoaErr || !pessoa) {
+                return ApiResponse.error(res, 'Pessoa não encontrada', 404);
+            }
+
+            // Validar status (não pode já estar em check-in)
+            if (pessoa.status_acesso === 'checkin_feito') {
+                return ApiResponse.error(res, 'Pessoa já está em check-in', 400);
+            }
+
+            // Buscar informações da pulseira (tipo, cor, áreas)
+            const numeroPulseiraInt = parseInt(numero_pulseira, 10);
+            const { data: tipoPulseira } = await supabaseClient
+                .from('evento_tipos_pulseira')
+                .select(`
+                    id,
+                    nome_tipo,
+                    cor_hex,
+                    alerta_duplicidade,
+                    pulseira_areas_permitidas (
+                        area_id,
+                        evento_areas (id, nome_area)
+                    )
+                `)
+                .eq('evento_id', eventoId)
+                .lte('numero_inicial', numeroPulseiraInt)
+                .gte('numero_final', numeroPulseiraInt)
+                .single();
+
+            // Verificar duplicidade de pulseira (se alerta_duplicidade estiver ativo)
+            if (tipoPulseira?.alerta_duplicidade) {
+                const { data: pulseiraExistente } = await supabaseClient
+                    .from('pessoas')
+                    .select('id, nome_completo')
+                    .eq('numero_pulseira', numero_pulseira)
+                    .eq('evento_id', eventoId)
+                    .neq('id', pessoa_id)
+                    .single();
+
+                if (pulseiraExistente) {
+                    logger.warn(`Pulseira ${numero_pulseira} já está em uso por ${pulseiraExistente.nome_completo}`);
+                    // Nãobloqueia, mas registra no log como alerta
+                }
+            }
+
+            // Salvar numero_pulseira na pessoa
+            await supabaseClient
+                .from('pessoas')
+                .update({ numero_pulseira, updated_at: new Date() })
+                .eq('id', pessoa_id);
+
+            // Montar info da pulseira para o log e resposta
+            const pulseiraInfo = tipoPulseira ? {
+                id: tipoPulseira.id,
+                nome_tipo: tipoPulseira.nome_tipo,
+                cor_hex: tipoPulseira.cor_hex,
+                areas_permitidas: tipoPulseira.pulseira_areas_permitidas?.map(a => ({
+                    area_id: a.area_id,
+                    nome_area: a.evento_areas?.nome_area
+                })) || []
+            } : null;
+
+            // Registrar log
+            const logData = {
+                evento_id: eventoId,
+                pessoa_id,
+                tipo: 'checkin',
+                metodo: 'pulseira',
+                numero_pulseira,
+                status_log: 'autorizado',
+                dispositivo_id: req.user?.id,
+                created_by: req.user.id,
+                localizacao: 'Check-in Pulseira'
+            };
+
+            await supabaseClient.from('logs_acesso').insert(logData);
+
+            // Atualizar status
+            await supabaseClient
+                .from('pessoas')
+                .update({ status_acesso: 'checkin_feito', updated_at: new Date() })
+                .eq('id', pessoa_id);
+
+            // WebSocket
+            websocketService.emit('new_access', {
+                ...logData,
+                pessoa_nome: pessoa.nome_completo,
+                metodo: 'pulseira',
+                status_log: 'autorizado',
+                pulseira_info: pulseiraInfo
+            }, eventoId);
+
+            // Dispatch webhook
+            webhookDispatcher.dispatchCheckin(eventoId, pessoa);
+
+            return ApiResponse.success(res, { success: true, pessoa, pulseira_info: pulseiraInfo });
+        } catch (error) {
+            logger.error('Erro no checkin pulseira:', error.message);
+            return ApiResponse.error(res, 'Erro ao processar check-in');
+        }
+    }
+
+    async checkoutPulseira(req, res) {
+        try {
+            const { numero_pulseira } = req.body;
+            const eventoId = req.event?.id;
+            const supabaseClient = req.supabase || supabase;
+
+            if (!numero_pulseira) {
+                return ApiResponse.error(res, 'numero_pulseira é obrigatório', 400);
+            }
+
+            // Buscar pessoa pela pulseira
+            const { data: pessoa, error: pessoaErr } = await supabaseClient
+                .from('pessoas')
+                .select('*, empresas(nome)')
+                .eq('numero_pulseira', numero_pulseira)
+                .eq('evento_id', eventoId)
+                .single();
+
+            if (pessoaErr || !pessoa) {
+                return ApiResponse.error(res, 'Pulseira não encontrada', 404);
+            }
+
+            if (pessoa.status_acesso !== 'checkin_feito') {
+                return ApiResponse.error(res, 'Pessoa não está em check-in', 400);
+            }
+
+            // Registrar log
+            const logData = {
+                evento_id: eventoId,
+                pessoa_id: pessoa.id,
+                tipo: 'checkout',
+                metodo: 'pulseira',
+                numero_pulseira,
+                status_log: 'autorizado',
+                dispositivo_id: req.user?.id,
+                created_by: req.user.id,
+                localizacao: 'Check-out Pulseira'
+            };
+
+            await supabaseClient.from('logs_acesso').insert(logData);
+
+            // Atualizar status
+            await supabaseClient
+                .from('pessoas')
+                .update({ status_acesso: 'checkout_feito', updated_at: new Date() })
+                .eq('id', pessoa.id);
+
+            // WebSocket
+            websocketService.emit('new_access', {
+                ...logData,
+                pessoa_nome: pessoa.nome_completo,
+                metodo: 'pulseira',
+                status_log: 'autorizado'
+            }, eventoId);
+
+            // Dispatch webhook
+            webhookDispatcher.dispatchCheckout(eventoId, pessoa);
+
+            return ApiResponse.success(res, { success: true, pessoa });
+        } catch (error) {
+            logger.error('Erro no checkout pulseira:', error.message);
+            return ApiResponse.error(res, 'Erro ao processar check-out');
+        }
+    }
+
+    async buscarPessoaPulseira(req, res) {
+        try {
+            const { codigo } = req.query;
+            const eventoId = req.event?.id;
+            const supabaseClient = req.supabase || supabase;
+
+            // Buscar por numero_pulseira ou CPF ou nome
+            let query = supabaseClient
+                .from('pessoas')
+                .select('id, nome_completo, cpf, funcao, status_acesso, numero_pulseira, foto_url, empresas(nome)')
+                .eq('evento_id', eventoId);
+
+            if (codigo) {
+                query = query.or(`numero_pulseira.eq.${codigo},cpf.eq.${codigo},nome_completo.ilike.%${codigo}%`);
+            }
+
+            const { data, error } = await query.limit(10);
+
+            if (error) throw error;
+
+            return ApiResponse.success(res, { pessoas: data || [] });
+        } catch (error) {
+            logger.error('Erro ao buscar pulseira:', error.message);
+            return ApiResponse.error(res, 'Erro ao buscar');
+        }
+    }
+
+    // ============================================
+    // NOVO: CHECK-IN VIA FACIAL (para terminais)
+    // ============================================
+    async checkinFacial(req, res) {
+        try {
+            const { terminal_id, face_encoding, foto_capturada, confianca } = req.body;
+            const supabaseClient = req.supabase || supabase;
+
+            // Validar terminal
+            const { data: terminal, error: termErr } = await supabaseClient
+                .from('terminais_faciais')
+                .select('*, eventos(id, nome)')
+                .eq('id', terminal_id)
+                .single();
+
+            if (termErr || !terminal) {
+                return res.status(404).json({ error: 'Terminal não encontrado' });
+            }
+
+            if (!terminal.ativo) {
+                return res.status(403).json({ error: 'Terminal inativo' });
+            }
+
+            const eventoId = terminal.evento_id;
+            const modo = terminal.modo;
+
+            // Buscar pessoa por face_encoding
+            const { data: pessoa, error: pessoaErr } = await supabaseClient
+                .from('pessoas')
+                .select('*, empresas(nome)')
+                .eq('face_encoding', face_encoding)
+                .eq('evento_id', eventoId)
+                .single();
+
+            if (pessoaErr || !pessoa) {
+                return res.status(404).json({ error: 'Pessoa não identificada' });
+            }
+
+            // Validar confiança
+            const minConfianca = terminal.biometric_confidence_min || 75;
+            let statusLog = 'autorizado';
+
+            if (confianca < 60) {
+                return res.status(403).json({ error: 'Acesso rejeitado - confiança insuficiente', confianca });
+            } else if (confianca < minConfianca) {
+                statusLog = 'confianca_baixa';
+            }
+
+            // Determinar tipo (checkin/checkout conforme modo)
+            let tipoAcesso = 'checkin';
+            const { data: ultimoLog } = await supabaseClient
+                .from('logs_acesso')
+                .select('tipo')
+                .eq('pessoa_id', pessoa.id)
+                .eq('evento_id', eventoId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+
+            const ultimoTipo = ultimoLog?.tipo;
+
+            if (modo === 'checkin') {
+                tipoAcesso = 'checkin';
+            } else if (modo === 'checkout') {
+                tipoAcesso = 'checkout';
+            } else {
+                // modo 'ambos' - Smart Access
+                tipoAcesso = (ultimoTipo === 'checkin') ? 'checkout' : 'checkin';
+            }
+
+            // Se modo não permite o tipo, rejeitar
+            if (modo === 'checkin' && tipoAcesso === 'checkout') {
+                return res.status(403).json({ error: 'Terminal configurado apenas para entrada' });
+            }
+            if (modo === 'checkout' && tipoAcesso === 'checkin') {
+                return res.status(403).json({ error: 'Terminal configurado apenas para saída' });
+            }
+
+            // Registrar log
+            const logData = {
+                evento_id: eventoId,
+                pessoa_id: pessoa.id,
+                tipo: tipoAcesso,
+                metodo: 'facial',
+                terminal_id,
+                status_log: statusLog,
+                confianca,
+                foto_capturada,
+                localizacao: terminal.area_nome || terminal.nome
+            };
+
+            await supabaseClient.from('logs_acesso').insert(logData);
+
+            // Atualizar status da pessoa
+            const novoStatus = tipoAcesso === 'checkin' ? 'checkin_feito' : 'checkout_feito';
+            await supabaseClient
+                .from('pessoas')
+                .update({ status_acesso: novoStatus, updated_at: new Date() })
+                .eq('id', pessoa.id);
+
+            // WebSocket
+            websocketService.emit('new_access', {
+                ...logData,
+                pessoa_nome: pessoa.nome_completo,
+                terminal_nome: terminal.nome,
+                area_nome: terminal.area_nome,
+                metodo: 'facial',
+                status_log: statusLog
+            }, eventoId);
+
+            return res.json({
+                success: true,
+                pessoa: {
+                    id: pessoa.id,
+                    nome: pessoa.nome_completo,
+                    foto_url: pessoa.foto_url
+                },
+                tipo: tipoAcesso,
+                status: statusLog,
+                confianca
+            });
+        } catch (error) {
+            logger.error('Erro no checkin facial:', error.message);
+            return res.status(500).json({ error: 'Erro interno' });
+        }
     }
 }
 

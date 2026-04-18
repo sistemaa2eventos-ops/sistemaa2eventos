@@ -49,7 +49,7 @@ const Checkin = () => {
     checkinResult, resultMessage, loading, manualSaving,
     operationMode, changeOperationMode, modoQuiosque, toggleQuiosque,
     searchQuery, handleSearch, searchResults,
-    rfidInputRef, recentLogs, realtimeStats,
+    rfidInputRef, recentLogs, realtimeStats, offlineCount,
     consultarPulseiraAPI, performCheckin
   } = useCheckin();
 
@@ -282,6 +282,42 @@ const Checkin = () => {
                                         <Typography variant="body1" sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.8 }}>
                                             <BadgeIcon sx={{ color: '#00D4FF' }} /> {selectedPessoa.funcao || 'Participante'}
                                         </Typography>
+                                        {/* Informações da Pulseira */}
+                                        {selectedPessoa.pulseira_info && (
+                                            <Box sx={{ mt: 2, p: 2, borderRadius: 2, bgcolor: 'rgba(0,0,0,0.3)', border: `1px solid ${selectedPessoa.pulseira_info.cor_hex}40` }}>
+                                                <Stack direction="row" alignItems="center" spacing={2}>
+                                                    <Box sx={{ 
+                                                        width: 24, 
+                                                        height: 24, 
+                                                        borderRadius: '50%', 
+                                                        bgcolor: selectedPessoa.pulseira_info.cor_hex,
+                                                        boxShadow: `0 0 10px ${selectedPessoa.pulseira_info.cor_hex}80`
+                                                    }} />
+                                                    <Box>
+                                                        <Typography variant="body2" fontWeight={800} sx={{ color: selectedPessoa.pulseira_info.cor_hex }}>
+                                                            {selectedPessoa.pulseira_info.nome_tipo?.toUpperCase()}
+                                                        </Typography>
+                                                        {selectedPessoa.pulseira_info.areas_permitidas?.length > 0 && (
+                                                            <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mt: 0.5 }}>
+                                                                {selectedPessoa.pulseira_info.areas_permitidas.map((area, idx) => (
+                                                                    <Chip 
+                                                                        key={idx}
+                                                                        label={area.nome_area}
+                                                                        size="small"
+                                                                        sx={{ 
+                                                                            height: 18, 
+                                                                            fontSize: '0.6rem',
+                                                                            bgcolor: 'rgba(255,255,255,0.1)',
+                                                                            color: '#fff'
+                                                                        }}
+                                                                    />
+                                                                ))}
+                                                            </Stack>
+                                                        )}
+                                                    </Box>
+                                                </Stack>
+                                            </Box>
+                                        )}
                                     </Stack>
 
                                     <Box sx={{ mt: 4, p: 2, bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 3 }}>
@@ -289,7 +325,7 @@ const Checkin = () => {
                                             <EventIcon sx={{ fontSize: 16 }} /> DIAS DE ACESSO
                                         </Typography>
                                         <Stack direction="row" spacing={1} flexWrap="wrap">
-                                            {(selectedPessoa.dias_trabalho || []).map(dia => {
+                                            {(selectedPessoa.dias_acesso || selectedPessoa.dias_trabalho || []).map(dia => {
                                                 const isHoje = dia === hojeLiteral;
                                                 return (
                                                     <Chip 

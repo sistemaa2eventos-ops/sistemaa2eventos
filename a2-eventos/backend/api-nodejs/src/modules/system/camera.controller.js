@@ -11,14 +11,26 @@ class CameraController {
             const evento_id = req.query.evento_id || req.headers['x-evento-id'];
             if (!evento_id) return res.status(400).json({ error: 'evento_id obrigatório' });
 
-            const { data, error } = await supabase
+            let { data, error } = await supabase
                 .from('cameras_ip')
                 .select('*, area:evento_areas(nome)')
                 .eq('evento_id', evento_id)
                 .order('created_at', { ascending: true });
 
-            if (error) throw error;
-            res.json({ success: true, data });
+            // Fallback: se a tabela ou join falhar, tentar sem o join
+            if (error) {
+                logger.warn('Fallback cameras sem join evento_areas:', error.message);
+                const retry = await supabase
+                    .from('cameras_ip')
+                    .select('*')
+                    .eq('evento_id', evento_id)
+                    .order('created_at', { ascending: true });
+
+                if (retry.error) throw retry.error;
+                data = retry.data;
+            }
+
+            res.json({ success: true, data: data || [] });
         } catch (error) {
             logger.error('Erro ao listar câmeras:', error);
             res.status(500).json({ error: 'Erro ao listar câmeras' });

@@ -42,7 +42,7 @@ class SyncScheduler {
             async () => {
                 const { supabase } = require('../../config/supabase');
                 const start = Date.now();
-                const { error } = await supabase.from('eventos').select('count').limit(1);
+                const { error } = await supabase.from('eventos').select('*', { count: 'exact', head: true });
                 const latency = Date.now() - start;
                 return { online: !error, latency };
             },
@@ -99,7 +99,7 @@ class SyncScheduler {
 
             // 3. Verificar Supabase
             const { supabase } = require('../../config/supabase');
-            const { error } = await supabase.from('eventos').select('count').limit(1);
+            const { error } = await supabase.from('eventos').select('*', { count: 'exact', head: true });
             checks.supabase = !error;
 
             // 4. Memória
@@ -147,7 +147,30 @@ class SyncScheduler {
             }
         });
 
-        // Health check a cada 30 segundos
+        // Health check de dispositivos a cada 5 minutos
+        cron.schedule('*/5 * * * *', async () => {
+            try {
+                if (!this.isRunning) {
+                    const deviceHealthCheck = require('./deviceHealthCheck.service');
+                    await deviceHealthCheck.checkAllDevices();
+                }
+            } catch (error) {
+                logger.error('[Scheduler] Erro no health check de dispositivos:', error);
+            }
+        });
+
+        // Processar fila de sync dos terminais a cada 60 segundos
+        cron.schedule('* * * * *', async () => {
+            try {
+                if (!this.isRunning) {
+                    await syncService.processTerminalQueue();
+                }
+            } catch (error) {
+                logger.error('[Scheduler] Erro no processamento da fila de terminais:', error);
+            }
+        });
+
+        // Health check de sistema a cada 30 segundos
         cron.schedule('*/30 * * * * *', async () => {
             if (!this.isRunning) {
                 const health = await this.checkSystemHealth();
@@ -188,9 +211,6 @@ class SyncScheduler {
             logger.info('👤 SINCRONIZAÇÃO MANUAL INICIADA');
 
             const result = await syncService.syncAll();
-            
-            // Força a validação de Bordas (Edge Sync) para o comando de Teste Imediato 
-            await syncService.runDailyAccessSync();
 
             const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 

@@ -12,10 +12,6 @@ class PublicController {
         try {
             const { token } = req.params;
             
-            console.log(`[DEBUG] === getCompanyByToken ===`);
-            console.log(`[DEBUG] Token recebido: "${token}"`);
-            
-            // Buscar empresa com o token
             const { data: empresa, error } = await supabase
                 .from('empresas')
                 .select(`
@@ -27,12 +23,12 @@ class PublicController {
                 .eq('registration_token', token)
                 .single();
 
-            console.log(`[DEBUG] Empresa encontrada:`, empresa ? empresa.id : 'NÃO ENCONTRADA');
-            console.log(`[DEBUG] Erro do Supabase:`, error);
-
             if (error || !empresa) {
-                return res.status(404).json({ error: 'Link de cadastro inválido ou inexistente.' });
+                logger.error({ err: error, token }, `[PortalPublico] Falha ao localizar empresa por token: ${token}`);
+                return res.status(404).json({ error: 'Link de cadastro inválido ou inexistente. Gere um novo convite no painel admin.' });
             }
+
+            console.log(`[PortalPublico] ✅ Empresa identificada: ${empresa.nome} para o evento ${empresa.eventos?.nome}`);
 
             const evento = empresa.eventos;
 
@@ -405,23 +401,33 @@ class PublicController {
                 return res.status(409).json({ error: 'Este CPF já está cadastrado para este evento.' });
             }
 
-            // 5. Salvar / Atualizar Pessoa
-            const qrData = await qrGenerator.generate(cpfLimpo);
+            // 5. Salvar / Atualizar Pessoa (QR code NÃO é gerado aqui - apenas após aprovação)
             const personaData = {
-                nome,
+                nome_completo: nome,
                 cpf: cpfLimpo,
-                email: email || null, // Email agora é opcional
+                email: email || null,
                 nome_mae: nome_mae || null,
                 data_nascimento: data_nascimento || null,
                 funcao: funcao || null,
                 foto_url: finalFotoUrl || null,
-                qr_code: qrData.code,
+                documento_foto: documento_foto || null,
+                // QR code NÃO é gerado agora - apenas quando aprovado
+                qr_code: null,
                 status_acesso: 'pendente',
                 origem_cadastro: 'externo',
-                dias_trabalho: dias_trabalho || [],
+                // Novos campos
+                tipo_pessoa: tipo_pessoa || 'colaborador',
+                fases_acesso: fases_acesso || [],
+                dias_acesso: dias_trabalho || [],
+                documentos_trabalho: documentosSalvos,
+                trabalha_area_tecnica: trabalho_area_tecnica || false,
+                trabalha_altura: trabalho_altura || false,
+                pagamento_validado: false,
+                codigo_ingresso: null,
+                origem_pagamento: null,
                 aceite_lgpd: true,
                 data_aceite_lgpd: new Date(),
-                registration_token: null, // Consome o token
+                registration_token: null,
                 registration_token_expires_at: null
             };
 

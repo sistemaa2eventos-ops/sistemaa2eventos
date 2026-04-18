@@ -235,15 +235,13 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
             }
 
             // 4. Tratar eventos inválidos
-            if (invalidEvents.length > 0) {
-                await connection.request()
-                    .input('ids', sql.VarChar, invalidEvents.join(','))
-                    .query(`
-                        UPDATE logs_acesso 
-                        SET sync_attempts = sync_attempts + 5,
-                            sync_error = 'Evento não encontrado no Supabase'
-                        WHERE id IN (SELECT value FROM STRING_SPLIT(@ids, ','))
-                    `);
+            if (invalidEventIds.length > 0) {
+                await connection.query(`
+                    UPDATE logs_acesso
+                    SET sync_attempts = COALESCE(sync_attempts, 0) + 5,
+                        sync_error = 'Evento não encontrado no Supabase'
+                    WHERE id = ANY($1)
+                `, [invalidEventIds]);
             }
 
             // 5. Registrar falhas
@@ -259,7 +257,7 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
                 duration,
                 synced: syncedIds.length,
                 failed: failedLogs.length,
-                invalid: invalidEvents.length,
+                invalid: invalidEventIds.length,
                 pending: totalPendente - syncedIds.length
             });
 
@@ -280,7 +278,7 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
             return {
                 synced: syncedIds.length,
                 failed: failedLogs.length,
-                invalid: invalidEvents.length,
+                invalid: invalidEventIds.length,
                 pending: totalPendente - syncedIds.length,
                 duration: `${duration}s`,
                 timestamp: this.stats.lastSync
@@ -301,23 +299,16 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
             for (const log of failedLogs) {
                 // Incrementar tentativas
                 await connection.query(`
-                    UPDATE logs_acesso 
+                    UPDATE logs_acesso
                     SET sync_attempts = COALESCE(sync_attempts, 0) + 1,
                         sync_error = $2,
                         updated_at = NOW()
                     WHERE id = $1
                     RETURNING sync_attempts;
                 `, [log.id, log.error || 'Unknown error']);
-
-                // Nota: sp_adicionar_retentativa seria uma tabela separada ou um log
-                // No Postgres, podemos manter apenas os logs com erros na própria tabela
             }
 
-            // Verificar tamanho da fila
-            const queueResult = await connection.request()
-                .query('SELECT COUNT(*) as total FROM sync_retry_queue');
-
-            this.stats.retryQueue = queueResult.recordset[0].total;
+            logger.debug(`Registradas ${failedLogs.length} falhas de sincronização`);
 
         } catch (error) {
             logger.error('Erro ao registrar falhas:', error);
@@ -332,59 +323,67 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
 
         let connection;
         try {
-            connection = await getConnection();
+            connection = await getPgConnection();
 
-            const result = await connection.request()
-                .query(`
-                    SELECT TOP 20 
-                        id, log_data, attempt_count, created_at
-                    FROM sync_retry_queue
-                    ORDER BY attempt_count ASC, created_at ASC
-                `);
+            // Buscar logs pendentes com muitas tentativas (retry)
+            const result = await connection.query(`
+                SELECT *
+                FROM logs_acesso
+                WHERE sync_attempts > 0 AND sync_attempts < 10
+                ORDER BY sync_attempts ASC, updated_at ASC
+                LIMIT 20
+            `);
 
-            const queue = result.recordset;
+            const queue = result.rows;
 
             if (queue.length === 0) {
                 logger.info('✅ Fila de retentativas vazia');
                 return { processed: 0 };
             }
 
-            logger.info(`📤 Processando ${queue.length} itens da fila...`);
+            logger.info(`📤 Processando ${queue.length} itens da fila de retentativas...`);
 
             let processed = 0;
-            for (const item of queue) {
+            for (const log of queue) {
                 try {
-                    const logData = JSON.parse(item.log_data);
+                    const logData = {
+                        id: log.id,
+                        evento_id: log.evento_id,
+                        pessoa_id: log.pessoa_id,
+                        tipo: log.tipo,
+                        metodo: log.metodo,
+                        dispositivo_id: log.dispositivo_id,
+                        confianca: log.confianca,
+                        created_at: log.created_at,
+                        created_by: log.created_by,
+                        localizacao: log.localizacao,
+                        foto_capturada: log.foto_capturada
+                    };
 
                     const { error } = await supabase
                         .from('logs_acesso')
                         .upsert(logData, { onConflict: 'id' });
 
                     if (!error) {
-                        await connection.request()
-                            .input('log_id', sql.UniqueIdentifier, logData.id)
-                            .query(`
-                                DELETE FROM sync_retry_queue WHERE id = @log_id;
-                                UPDATE logs_acesso 
-                                SET sincronizado = 1, sync_error = NULL 
-                                WHERE id = @log_id;
-                            `);
+                        // Sucesso — marcar como sincronizado
+                        await connection.query(
+                            'UPDATE logs_acesso SET sincronizado = true, sync_error = NULL WHERE id = $1',
+                            [log.id]
+                        );
 
                         processed++;
-                        logger.debug(`✅ Retentativa bem-sucedida: ${logData.id}`);
+                        logger.debug(`✅ Retentativa bem-sucedida: ${log.id}`);
                     } else {
-                        await connection.request()
-                            .input('id', sql.UniqueIdentifier, item.id)
-                            .query(`
-                                UPDATE sync_retry_queue 
-                                SET attempt_count = attempt_count + 1,
-                                    last_attempt = GETDATE()
-                                WHERE id = @id
-                            `);
+                        // Falha — incrementar tentativas
+                        await connection.query(
+                            'UPDATE logs_acesso SET sync_attempts = sync_attempts + 1, updated_at = NOW() WHERE id = $1',
+                            [log.id]
+                        );
+                        logger.warn(`⚠️ Retentativa falhou para ${log.id}: ${error.message}`);
                     }
 
                 } catch (error) {
-                    logger.error(`Erro ao processar retentativa ${item.id}:`, error);
+                    logger.error(`Erro ao processar retentativa ${log.id}:`, error);
                 }
 
                 await this.sleep(50);
@@ -599,13 +598,14 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
 
             // Auditoria de Sistema
             await auditService.log({
-                evento_id: results.logs?.evento_id || '00000000-0000-0000-0000-000000000000',
+                evento_id: '00000000-0000-0000-0000-000000000000', // Sistema-wide sync
                 acao: 'FULL_SYNC_COMPLETED',
                 recurso: 'SISTEMA',
-                detalhes: { 
-                    logs: results.logs?.synced, 
-                    pessoas: results.pessoas?.synced,
-                    duration: results.duration 
+                detalhes: {
+                    logsSync: results.logs?.synced || 0,
+                    logsFailed: results.logs?.failed || 0,
+                    pessoasSync: results.pessoas?.synced || 0,
+                    terminals: results.terminals || 0
                 }
             });
 
@@ -642,44 +642,75 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
     async addToTerminalQueue(dispositivoId, tipo, payload) {
         try {
             const connection = await getPgConnection();
+
+            // Buscar evento_id do dispositivo (necessário pois é NOT NULL na tabela)
+            const devResult = await connection.query(
+                'SELECT evento_id FROM dispositivos_acesso WHERE id = $1 LIMIT 1',
+                [dispositivoId]
+            );
+
+            const eventoId = devResult.rows[0]?.evento_id;
+            if (!eventoId) {
+                logger.warn(`[SyncQueue] Dispositivo ${dispositivoId} não encontrado ou sem evento_id. Comando ${tipo} descartado.`);
+                return;
+            }
+
             await connection.query(`
-                INSERT INTO terminal_sync_queue (dispositivo_id, tipo_comando, payload, status, created_at)
-                VALUES ($1, $2, $3, 'pendente', NOW())
-            `, [dispositivoId, tipo, JSON.stringify(payload)]);
+                INSERT INTO terminal_sync_queue (evento_id, dispositivo_id, tipo_comando, payload, status, created_at)
+                VALUES ($1, $2, $3, $4, 'pendente', NOW())
+            `, [eventoId, dispositivoId, tipo, JSON.stringify(payload)]);
+
             logger.info(`📝 [SyncQueue] Comando ${tipo} agendado para dispositivo ${dispositivoId}`);
         } catch (error) {
             logger.error(`❌ Erro ao enfileirar comando para terminal: ${error.message}`);
         }
     }
 
+
     /**
      * PROCESSAR FILA DE COMANDOS DOS TERMINAIS
      */
     async processTerminalQueue() {
         try {
-            const connection = await getConnection();
-            const { recordset: queue } = await connection.request()
-                .query(`
-                    SELECT TOP 10 q.*, d.ip_address, d.username, d.password, d.nome as device_name, d.config
-                    FROM terminal_sync_queue q
-                    JOIN dispositivos_acesso d ON q.dispositivo_id = d.id
-                    WHERE q.status IN ('pendente', 'erro') AND q.attempt_count < 5
-                    ORDER BY q.created_at ASC
-                `);
+            const connection = await getPgConnection();
 
-            if (!queue || queue.length === 0) return;
+            // Buscar fila pendente de sync para terminais online
+            const result = await connection.query(`
+                SELECT
+                    q.id, q.dispositivo_id, q.tipo_comando, q.pessoa_id, q.payload,
+                    q.status, q.attempt_count, q.created_at,
+                    d.ip_address, d.user_device, d.password_device, d.marca, d.nome as device_name, d.config
+                FROM terminal_sync_queue q
+                JOIN dispositivos_acesso d ON q.dispositivo_id = d.id
+                WHERE q.status IN ('pendente', 'erro')
+                  AND q.attempt_count < 5
+                  AND d.status_online = 'online'
+                ORDER BY q.created_at ASC
+                LIMIT 10
+            `);
+
+            const queue = result.rows;
+
+            if (!queue || queue.length === 0) {
+                return { processed: 0 };
+            }
+
+            logger.info(`📤 [SyncQueue] Processando ${queue.length} itens da fila...`);
 
             const DeviceFactory = require('./adapters/DeviceFactory');
+            let processed = 0;
 
             for (const item of queue) {
                 try {
-                    const terminal = { 
-                        id: item.dispositivo_id, 
-                        ip_address: item.ip_address, 
-                        username: item.username, 
-                        password: item.password,
-                        config: item.config 
+                    const terminal = {
+                        id: item.dispositivo_id,
+                        ip_address: item.ip_address,
+                        user_device: item.user_device,
+                        password_device: item.password_device,
+                        marca: item.marca,
+                        config: item.config
                     };
+
                     const service = DeviceFactory.getDevice(terminal);
                     const payload = JSON.parse(item.payload);
 
@@ -694,22 +725,30 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
                     }
 
                     // Sucesso
-                    await connection.query("UPDATE terminal_sync_queue SET status = 'sucesso', updated_at = NOW() WHERE id = $1", [item.id]);
-                    
+                    await connection.query(
+                        "UPDATE terminal_sync_queue SET status = 'sucesso', updated_at = NOW() WHERE id = $1",
+                        [item.id]
+                    );
+
+                    processed++;
                     logger.info(`✅ [SyncQueue] ${item.tipo_comando} executado com sucesso em ${item.device_name}`);
 
                 } catch (err) {
                     await connection.query(`
-                        UPDATE terminal_sync_queue 
-                        SET status = 'erro', 
-                            attempt_count = attempt_count + 1, 
-                            error_message = $2, 
-                            last_attempt = NOW() 
+                        UPDATE terminal_sync_queue
+                        SET status = 'erro',
+                            attempt_count = attempt_count + 1,
+                            error_message = $2,
+                            last_attempt = NOW()
                         WHERE id = $1
                     `, [item.id, err.message]);
                     logger.warn(`⚠️ [SyncQueue] Falha ao processar item ${item.id}: ${err.message}`);
                 }
             }
+
+            logger.info(`✅ [SyncQueue] ${processed} itens processados com sucesso`);
+            return { processed };
+
         } catch (error) {
             logger.error(`❌ Erro no processamento da fila de terminais: ${error.message}`);
         }
@@ -801,6 +840,428 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
             logger.error('Erro no Auto-Delete de usuário:', error);
         }
     }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════
+     * NOVAS FUNÇÕES: CONTROLE DE ACESSO POR ÁREA
+     * ═══════════════════════════════════════════════════════════════
+     */
+
+    /**
+     * SINCRONIZAR PESSOA POR ÁREA - Cadastra/Remove baseado em acesso granular
+     * Garante que pessoa SÓ aparece no leitor se tem autorização para aquela área
+     */
+    async syncEnrollmentByArea(pessoaId) {
+        try {
+            logger.info(`🔄 [AreaSync] Iniciando sync de áreas para pessoa ${pessoaId}...`);
+
+            // 1. Buscar dados da pessoa
+            const { data: pessoa, error: pessoaError } = await supabase
+                .from('pessoas')
+                .select('id, nome_completo, evento_id, status_acesso, foto_base64_cache, foto_base64_internal, foto_url')
+                .eq('id', pessoaId)
+                .single();
+
+            if (pessoaError || !pessoa) {
+                logger.warn(`⚠️ [AreaSync] Pessoa ${pessoaId} não encontrada`);
+                return;
+            }
+
+            // 2. Verificar se pessoa está autorizada (regra crítica)
+            if (pessoa.status_acesso !== 'autorizado') {
+                logger.info(`⏸️ [AreaSync] Pessoa ${pessoa.nome_completo} não está 'autorizado' (status: ${pessoa.status_acesso}). Pulando sync.`);
+                return;
+            }
+
+            // 3. Buscar áreas autorizadas para esta pessoa
+            const { data: areasAutorizadas, error: areasError } = await supabase
+                .from('pessoa_areas_acesso')
+                .select('area_id')
+                .eq('pessoa_id', pessoaId)
+                .eq('evento_id', pessoa.evento_id);
+
+            if (areasError) {
+                logger.error(`❌ [AreaSync] Erro ao buscar áreas: ${areasError.message}`);
+                return;
+            }
+
+            const areaIds = (areasAutorizadas || []).map(a => a.area_id);
+            logger.info(`📍 [AreaSync] Pessoa ${pessoa.nome_completo} tem acesso a ${areaIds.length} áreas`);
+
+            // 4. Buscar TODOS os dispositivos ativos do evento
+            const { data: dispositivos, error: dispError } = await supabase
+                .from('dispositivos_acesso')
+                .select('id, nome, area_id, ip_address, user_device, password_device, marca, config, status_online')
+                .eq('evento_id', pessoa.evento_id)
+                .eq('tipo', 'terminal_facial');
+
+            if (dispError || !dispositivos) {
+                logger.warn(`⚠️ [AreaSync] Nenhum dispositivo encontrado para evento ${pessoa.evento_id}`);
+                return;
+            }
+
+            const DeviceFactory = require('./adapters/DeviceFactory');
+            let cadastrados = 0;
+            let removidos = 0;
+
+            // 5. Iterar cada dispositivo e decidir se cadastra ou remove
+            for (const dispositivo of dispositivos) {
+                const pessoaTemAcessoNessaArea = areaIds.includes(dispositivo.area_id);
+
+                try {
+                    if (pessoaTemAcessoNessaArea) {
+                        // ✅ Pessoa tem acesso a esta área - CADASTRAR
+                        if (dispositivo.status_online === 'online') {
+                            const fotoBase64 = pessoa.foto_base64_cache || pessoa.foto_base64_internal || pessoa.foto_url;
+                            if (!fotoBase64) {
+                                logger.warn(`⚠️ [AreaSync] Pessoa ${pessoa.nome_completo} sem foto. Enfileirando...`);
+                                await this.addToTerminalQueue(dispositivo.id, 'enroll_face', {
+                                    pessoa,
+                                    fotoBase64: null
+                                });
+                                continue;
+                            }
+
+                            const service = DeviceFactory.getDevice(dispositivo);
+                            const optimizedPhoto = await imageProcessor.optimizeToBase64(fotoBase64);
+
+                            await service.enrollUser(pessoa, optimizedPhoto);
+
+                            // Log de sucesso
+                            await supabase.from('dispositivo_sync_log').insert({
+                                dispositivo_id: dispositivo.id,
+                                pessoa_id: pessoaId,
+                                area_id: dispositivo.area_id,
+                                evento_id: pessoa.evento_id,
+                                operacao: 'enroll',
+                                status: 'sucesso'
+                            });
+
+                            cadastrados++;
+                            logger.info(`✅ [AreaSync] ${pessoa.nome_completo} cadastrado em ${dispositivo.nome} (Área: ${dispositivo.area_id})`);
+                        } else {
+                            // Dispositivo offline - enfileira
+                            await this.addToTerminalQueue(dispositivo.id, 'enroll_face', {
+                                pessoa,
+                                fotoBase64: pessoa.foto_base64_cache || pessoa.foto_base64_internal
+                            });
+                            logger.info(`⏳ [AreaSync] ${dispositivo.nome} offline. Comando enfileirado.`);
+                        }
+                    } else {
+                        // ❌ Pessoa NÃO tem acesso a esta área - REMOVER
+                        if (dispositivo.status_online === 'online') {
+                            const service = DeviceFactory.getDevice(dispositivo);
+                            await service.deleteUser(pessoaId.substring(0, 8)); // Usar primeiros 8 chars do UUID como ID
+
+                            // Log de remoção
+                            await supabase.from('dispositivo_sync_log').insert({
+                                dispositivo_id: dispositivo.id,
+                                pessoa_id: pessoaId,
+                                area_id: dispositivo.area_id,
+                                evento_id: pessoa.evento_id,
+                                operacao: 'delete',
+                                status: 'sucesso'
+                            });
+
+                            removidos++;
+                            logger.info(`🗑️ [AreaSync] ${pessoa.nome_completo} removido de ${dispositivo.nome} (sem acesso)`);
+                        } else {
+                            // Dispositivo offline - enfileira remoção
+                            await this.addToTerminalQueue(dispositivo.id, 'delete_face', {
+                                hwUserId: pessoaId.substring(0, 8)
+                            });
+                        }
+                    }
+                } catch (err) {
+                    logger.error(`❌ [AreaSync] Erro ao processar ${dispositivo.nome}: ${err.message}`);
+                    await supabase.from('dispositivo_sync_log').insert({
+                        dispositivo_id: dispositivo.id,
+                        pessoa_id: pessoaId,
+                        area_id: dispositivo.area_id,
+                        evento_id: pessoa.evento_id,
+                        operacao: 'enroll',
+                        status: 'falha',
+                        mensagem_erro: err.message
+                    });
+                }
+            }
+
+            logger.info(`✅ [AreaSync] Sync de áreas concluído: ${cadastrados} cadastrados, ${removidos} removidos`);
+            return { cadastrados, removidos };
+
+        } catch (error) {
+            logger.error(`❌ [AreaSync] Erro crítico:`, error);
+        }
+    }
+
+    /**
+     * RESETAR E SINCRONIZAR DISPOSITIVO
+     * Limpa TODAS as faces do dispositivo e recadastra APENAS pessoas autorizadas para aquela área
+     */
+    async resetAndSyncDevice(dispositivoId) {
+        try {
+            logger.info(`🔄 [DeviceReset] Iniciando reset de dispositivo ${dispositivoId}...`);
+
+            // 1. Buscar dados do dispositivo
+            const { data: dispositivo, error: dispError } = await supabase
+                .from('dispositivos_acesso')
+                .select('id, nome, area_id, evento_id, ip_address, user_device, password_device, marca, config, status_online')
+                .eq('id', dispositivoId)
+                .single();
+
+            if (dispError || !dispositivo) {
+                logger.error(`❌ [DeviceReset] Dispositivo ${dispositivoId} não encontrado`);
+                return { success: false, error: 'Dispositivo não encontrado' };
+            }
+
+            // 2. Atualizar status do dispositivo
+            await supabase
+                .from('dispositivos_acesso')
+                .update({ sync_status: 'sincronizando' })
+                .eq('id', dispositivoId);
+
+            // 3. Se online, limpar faces do dispositivo
+            let cleaned = false;
+            if (dispositivo.status_online === 'online') {
+                try {
+                    const service = DeviceFactory.getDevice(dispositivo);
+                    // Chamar método de limpeza (se existir)
+                    if (service.clearAllFaces) {
+                        await service.clearAllFaces();
+                        cleaned = true;
+                        logger.info(`🧹 [DeviceReset] Todas as faces removidas de ${dispositivo.nome}`);
+                    }
+                } catch (err) {
+                    logger.warn(`⚠️ [DeviceReset] Falha ao limpar ${dispositivo.nome}: ${err.message}`);
+                }
+            }
+
+            // 4. Buscar pessoas com acesso a ESTA ÁREA específica
+            const { data: pessoasAutorizadas, error: pessoasError } = await supabase
+                .from('pessoas')
+                .select(`
+                    id, nome_completo, status_acesso, foto_base64_cache, foto_base64_internal, foto_url,
+                    pessoa_areas_acesso(area_id)
+                `)
+                .eq('evento_id', dispositivo.evento_id)
+                .eq('status_acesso', 'autorizado');
+
+            if (pessoasError || !pessoasAutorizadas) {
+                logger.warn(`⚠️ [DeviceReset] Nenhuma pessoa autorizada encontrada`);
+                return { success: true, cleaned, cadastrados: 0 };
+            }
+
+            // 5. Filtrar apenas pessoas com acesso à área deste dispositivo
+            const pessoasComAcesso = pessoasAutorizadas.filter(p => {
+                const areas = p.pessoa_areas_acesso || [];
+                return areas.some(a => a.area_id === dispositivo.area_id);
+            });
+
+            logger.info(`👥 [DeviceReset] ${pessoasComAcesso.length} pessoas com acesso à área ${dispositivo.area_id}`);
+
+            // 6. Cadastrar pessoas no dispositivo
+            const DeviceFactory = require('./adapters/DeviceFactory');
+            let cadastrados = 0;
+            let falhados = 0;
+
+            if (dispositivo.status_online === 'online') {
+                const service = DeviceFactory.getDevice(dispositivo);
+
+                for (const pessoa of pessoasComAcesso) {
+                    try {
+                        const fotoBase64 = pessoa.foto_base64_cache || pessoa.foto_base64_internal || pessoa.foto_url;
+                        if (!fotoBase64) {
+                            logger.warn(`⚠️ [DeviceReset] ${pessoa.nome_completo} sem foto. Enfileirando...`);
+                            await this.addToTerminalQueue(dispositivoId, 'enroll_face', {
+                                pessoa,
+                                fotoBase64: null
+                            });
+                            continue;
+                        }
+
+                        const optimizedPhoto = await imageProcessor.optimizeToBase64(fotoBase64);
+                        await service.enrollUser(pessoa, optimizedPhoto);
+
+                        await supabase.from('dispositivo_sync_log').insert({
+                            dispositivo_id: dispositivoId,
+                            pessoa_id: pessoa.id,
+                            area_id: dispositivo.area_id,
+                            evento_id: dispositivo.evento_id,
+                            operacao: 'enroll',
+                            status: 'sucesso'
+                        });
+
+                        cadastrados++;
+                        logger.info(`✅ [DeviceReset] ${pessoa.nome_completo} cadastrado em ${dispositivo.nome}`);
+                    } catch (err) {
+                        logger.error(`❌ [DeviceReset] Falha ao cadastrar ${pessoa.nome_completo}: ${err.message}`);
+                        falhados++;
+
+                        await supabase.from('dispositivo_sync_log').insert({
+                            dispositivo_id: dispositivoId,
+                            pessoa_id: pessoa.id,
+                            area_id: dispositivo.area_id,
+                            evento_id: dispositivo.evento_id,
+                            operacao: 'enroll',
+                            status: 'falha',
+                            mensagem_erro: err.message
+                        });
+                    }
+
+                    await this.sleep(100); // Pequeno delay entre cadastros
+                }
+            } else {
+                // Dispositivo offline - enfileira todos
+                for (const pessoa of pessoasComAcesso) {
+                    await this.addToTerminalQueue(dispositivoId, 'enroll_face', {
+                        pessoa,
+                        fotoBase64: pessoa.foto_base64_cache || pessoa.foto_base64_internal
+                    });
+                }
+                logger.info(`⏳ [DeviceReset] Dispositivo offline. ${pessoasComAcesso.length} comandos enfileirados.`);
+            }
+
+            // 7. Atualizar status do dispositivo
+            await supabase
+                .from('dispositivos_acesso')
+                .update({
+                    sync_status: falhados === 0 ? 'sucesso' : 'erro',
+                    ultima_sincronizacao: new Date(),
+                    faces_cadastradas: cadastrados
+                })
+                .eq('id', dispositivoId);
+
+            logger.info(`✅ [DeviceReset] Reset concluído: ${cadastrados} cadastrados, ${falhados} falhados`);
+            return { success: true, cleaned, cadastrados, falhados };
+
+        } catch (error) {
+            logger.error(`❌ [DeviceReset] Erro crítico:`, error);
+
+            // Marcar dispositivo com erro
+            await supabase
+                .from('dispositivos_acesso')
+                .update({ sync_status: 'erro' })
+                .eq('id', dispositivoId)
+                .catch(e => logger.error('Falha ao atualizar status:', e));
+
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * SINCRONIZAR MUDANÇA DE ÁREA
+     * Chamado quando uma pessoa ganha ou perde acesso a uma área
+     */
+    async syncAreaChange(pessoaId, areaId, acao, eventoId) {
+        try {
+            logger.info(`🔄 [AreaChange] ${acao === 'add' ? '✅ Adicionando' : '❌ Removendo'} acesso de pessoa ${pessoaId} à área ${areaId}...`);
+
+            // 1. Buscar dados da pessoa
+            const { data: pessoa } = await supabase
+                .from('pessoas')
+                .select('id, nome_completo, status_acesso, foto_base64_cache, foto_base64_internal')
+                .eq('id', pessoaId)
+                .single();
+
+            if (!pessoa) {
+                logger.warn(`⚠️ [AreaChange] Pessoa ${pessoaId} não encontrada`);
+                return;
+            }
+
+            // 2. Buscar dispositivo da área
+            const { data: dispositivo } = await supabase
+                .from('dispositivos_acesso')
+                .select('id, nome, ip_address, user_device, password_device, marca, config, status_online')
+                .eq('area_id', areaId)
+                .eq('evento_id', eventoId)
+                .single();
+
+            if (!dispositivo) {
+                logger.warn(`⚠️ [AreaChange] Nenhum dispositivo para área ${areaId}`);
+                return;
+            }
+
+            // 3. Executar ação
+            const DeviceFactory = require('./adapters/DeviceFactory');
+
+            if (acao === 'add') {
+                // Adicionar pessoa ao dispositivo
+                if (pessoa.status_acesso === 'autorizado') {
+                    if (dispositivo.status_online === 'online') {
+                        try {
+                            const fotoBase64 = pessoa.foto_base64_cache || pessoa.foto_base64_internal;
+                            if (fotoBase64) {
+                                const service = DeviceFactory.getDevice(dispositivo);
+                                const optimizedPhoto = await imageProcessor.optimizeToBase64(fotoBase64);
+                                await service.enrollUser(pessoa, optimizedPhoto);
+
+                                await supabase.from('dispositivo_sync_log').insert({
+                                    dispositivo_id: dispositivo.id,
+                                    pessoa_id: pessoaId,
+                                    area_id: areaId,
+                                    evento_id: eventoId,
+                                    operacao: 'enroll',
+                                    status: 'sucesso'
+                                });
+
+                                logger.info(`✅ [AreaChange] ${pessoa.nome_completo} adicionado a ${dispositivo.nome}`);
+                            }
+                        } catch (err) {
+                            logger.error(`❌ [AreaChange] Falha ao adicionar: ${err.message}`);
+                            await this.addToTerminalQueue(dispositivo.id, 'enroll_face', {
+                                pessoa,
+                                fotoBase64: pessoa.foto_base64_cache || pessoa.foto_base64_internal
+                            });
+                        }
+                    } else {
+                        // Offline - enfileira
+                        await this.addToTerminalQueue(dispositivo.id, 'enroll_face', {
+                            pessoa,
+                            fotoBase64: pessoa.foto_base64_cache || pessoa.foto_base64_internal
+                        });
+                    }
+                }
+            } else if (acao === 'remove') {
+                // Remover pessoa do dispositivo
+                if (dispositivo.status_online === 'online') {
+                    try {
+                        const service = DeviceFactory.getDevice(dispositivo);
+                        await service.deleteUser(pessoaId.substring(0, 8));
+
+                        await supabase.from('dispositivo_sync_log').insert({
+                            dispositivo_id: dispositivo.id,
+                            pessoa_id: pessoaId,
+                            area_id: areaId,
+                            evento_id: eventoId,
+                            operacao: 'delete',
+                            status: 'sucesso'
+                        });
+
+                        logger.info(`✅ [AreaChange] ${pessoa.nome_completo} removido de ${dispositivo.nome}`);
+                    } catch (err) {
+                        logger.error(`❌ [AreaChange] Falha ao remover: ${err.message}`);
+                        await this.addToTerminalQueue(dispositivo.id, 'delete_face', {
+                            hwUserId: pessoaId.substring(0, 8)
+                        });
+                    }
+                } else {
+                    // Offline - enfileira
+                    await this.addToTerminalQueue(dispositivo.id, 'delete_face', {
+                        hwUserId: pessoaId.substring(0, 8)
+                    });
+                }
+            }
+
+        } catch (error) {
+            logger.error(`❌ [AreaChange] Erro crítico:`, error);
+        }
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════
+     * FIM - NOVAS FUNÇÕES DE CONTROLE POR ÁREA
+     * ═══════════════════════════════════════════════════════════════
+     */
 
     /**
      * NIGHTLY SMART SYNC (Executado pelo Scheduler toda madrugada)

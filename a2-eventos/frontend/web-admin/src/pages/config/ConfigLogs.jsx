@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Grid, List, ListItem, ListItemText, Chip, Button, TextField, CircularProgress } from '@mui/material';
-import { History as LogsIcon, BugReport as BugIcon, Warning as WarningIcon, Download as DownloadIcon, Save as SaveIcon } from '@mui/icons-material';
+import { Box, Typography, Grid, List, ListItem, ListItemText, Chip, Button, TextField, CircularProgress, FormControl, InputLabel, Select, MenuItem, Stack } from '@mui/material';
+import { History as LogsIcon, BugReport as BugIcon, Warning as WarningIcon, Download as DownloadIcon, Save as SaveIcon, FilterList as FilterIcon } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import api from '../../services/api';
 import PageHeader from '../../components/common/PageHeader';
@@ -12,6 +12,13 @@ const ConfigLogs = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [sysLogs, setSysLogs] = useState([]);
+    const [filtros, setFiltros] = useState({
+        modulo: '',
+        nivel: '',
+        dataInicio: '',
+        dataFim: '',
+        usuario: ''
+    });
 
     const [retentionEdge, setRetentionEdge] = useState(30);
     const [retentionAdmin, setRetentionAdmin] = useState(90);
@@ -23,13 +30,52 @@ const ConfigLogs = () => {
 
     const loadLogs = async () => {
         try {
-            const { data } = await api.get('/monitor/system/logs?lines=50');
+            setLoading(true);
+            const params = new URLSearchParams();
+            if (filtros.nivel) params.append('level', filtros.nivel);
+            if (filtros.dataInicio) params.append('start_date', filtros.dataInicio);
+            if (filtros.dataFim) params.append('end_date', filtros.dataFim);
+            
+            const { data } = await api.get(`/monitor/system/logs?lines=50&${params.toString()}`);
             if (data?.success) {
                 setSysLogs(data.logs?.reverse() || []);
             }
         } catch (error) {
             enqueueSnackbar('Falha ao carregar syslogs', { variant: 'error' });
+        } finally {
+            setLoading(false);
         }
+    };
+
+    const handleFilterChange = (campo, valor) => {
+        setFiltros(prev => ({ ...prev, [campo]: valor }));
+    };
+
+    const handleApplyFilters = () => {
+        loadLogs();
+    };
+
+    const handleExportCSV = () => {
+        if (sysLogs.length === 0) return;
+        const csvContent = [
+            ['Timestamp', 'Level', 'Message'].join(','),
+            ...sysLogs.map(log => {
+                const isObj = typeof log === 'object' && log !== null;
+                return [
+                    isObj && log.timestamp ? new Date(log.timestamp).toISOString() : '',
+                    isObj ? (log.level || 'info') : 'info',
+                    isObj ? (log.message || '').replace(/,/g, ';') : log
+                ].join(',');
+            })
+        ].join('\n');
+        
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `logs_${new Date().toISOString()}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
     };
 
     const loadSettings = async () => {
@@ -83,22 +129,67 @@ const ConfigLogs = () => {
     return (
         <Box sx={{ p: { xs: 2, md: 4 } }}>
             <PageHeader
-                title="Auditoria & Logs (Syslog)"
-                subtitle="Monitore as atividades do painel, edições em banco e erros nativos."
-                breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Logs de Auditoria' }]}
+                title="Logs do Sistema"
+                subtitle="Monitore atividades, erros e auditoria do sistema."
+                breadcrumbs={[{ text: 'Configurações' }, { text: 'Logs do Sistema' }]}
             />
+
+            {/* FILTROS */}
+            <GlassCard sx={{ p: 2, mb: 3 }}>
+                <Stack direction={{ xs: 'flex', md: 'row' }} spacing={2} alignItems="center">
+                    <FilterIcon sx={{ color: '#00D4FF' }} />
+                    <FormControl size="small" sx={{ minWidth: 120 }}>
+                        <InputLabel>Nível</InputLabel>
+                        <Select
+                            value={filtros.nivel}
+                            label="Nível"
+                            onChange={(e) => handleFilterChange('nivel', e.target.value)}
+                        >
+                            <MenuItem value="">Todos</MenuItem>
+                            <MenuItem value="info">Info</MenuItem>
+                            <MenuItem value="warn">Warning</MenuItem>
+                            <MenuItem value="error">Error</MenuItem>
+                        </Select>
+                    </FormControl>
+                    <TextField
+                        size="small"
+                        type="date"
+                        label="Data Início"
+                        InputLabelProps={{ shrink: true }}
+                        value={filtros.dataInicio}
+                        onChange={(e) => handleFilterChange('dataInicio', e.target.value)}
+                    />
+                    <TextField
+                        size="small"
+                        type="date"
+                        label="Data Fim"
+                        InputLabelProps={{ shrink: true }}
+                        value={filtros.dataFim}
+                        onChange={(e) => handleFilterChange('dataFim', e.target.value)}
+                    />
+                    <Button variant="contained" onClick={handleApplyFilters}>
+                        Filtrar
+                    </Button>
+                </Stack>
+            </GlassCard>
 
             <Grid container spacing={4} sx={{ mt: 1 }}>
                 <Grid item xs={12} lg={8}>
-                    <GlassCard sx={{ p: 3, mb: 4, height: '100%' }}>
+                    <GlassCard sx={{ p: 3, height: '100%' }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                 <LogsIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
                                 <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff' }}>
-                                    ACTIVITY TRACKER
+                                    REGISTROS
                                 </Typography>
                             </Box>
-                            <Button startIcon={<DownloadIcon />} variant="outlined" sx={{ color: '#fff', borderColor: 'rgba(255,255,255,0.2)' }} size="small">
+                            <Button 
+                                startIcon={<DownloadIcon />} 
+                                variant="outlined" 
+                                sx={{ color: '#fff', borderColor: 'rgba(255,255,255,0.2)' }} 
+                                size="small"
+                                onClick={handleExportCSV}
+                            >
                                 EXPORTAR CSV
                             </Button>
                         </Box>
@@ -120,7 +211,7 @@ const ConfigLogs = () => {
                                         <Box>
                                             {level === 'error' ? <BugIcon color="error" /> :
                                                 (level === 'warn' || level === 'warning') ? <WarningIcon color="warning" /> :
-                                                    <Box sx={{ w: 24, h: 24, borderRadius: '50%', bgcolor: '#00D4FF', opacity: 0.2 }} />}
+                                                    <Box sx={{ width: 24, height: 24, borderRadius: '50%', bgcolor: '#00D4FF', opacity: 0.2 }} />}
                                         </Box>
                                         <ListItemText
                                             primary={msg}
@@ -133,60 +224,38 @@ const ConfigLogs = () => {
                                 );
                             })}
                         </List>
-
-                        <Box sx={{ textAlign: 'center', mt: 3 }}>
-                            <Button sx={{ color: '#00D4FF' }}>Carregar mais registros...</Button>
-                        </Box>
                     </GlassCard>
                 </Grid>
 
                 <Grid item xs={12} lg={4}>
-                    <GlassCard sx={{ p: 3, mb: 4, height: '100%' }}>
+                    <GlassCard sx={{ p: 3 }}>
                         <Typography variant="h6" sx={{ fontWeight: 700, color: '#FF3366', mb: 3 }}>
-                            NÍVEL DE RETENÇÃO
+                            RETENÇÃO
                         </Typography>
 
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                            O Syslog consome espaço no banco (Datawarehouse). Determine por quanto tempo os rastros operacionais devem ser guardados antes de auto-exclusão.
-                        </Typography>
+                        <TextField
+                            fullWidth
+                            label="Retenção Edge (dias)"
+                            type="number"
+                            value={retentionEdge}
+                            onChange={(e) => setRetentionEdge(e.target.value)}
+                            sx={{ mb: 2 }}
+                        />
+                        <TextField
+                            fullWidth
+                            label="Retenção Admin (dias)"
+                            type="number"
+                            value={retentionAdmin}
+                            onChange={(e) => setRetentionAdmin(e.target.value)}
+                            sx={{ mb: 3 }}
+                        />
 
-                        <Box sx={{ mb: 3 }}>
-                            <Typography variant="caption" sx={{ color: '#fff', fontWeight: 700 }}>Erros de Hardware (Edge)</Typography>
-                            <TextField
-                                fullWidth
-                                variant="standard"
-                                value={retentionEdge}
-                                onChange={(e) => setRetentionEdge(e.target.value)}
-                                type="number"
-                                InputProps={{ endAdornment: <Typography variant="h6" sx={{ color: '#00D4FF', fontWeight: 800 }}>DIAS</Typography>, sx: { color: '#00D4FF', fontSize: '1.5rem', fontWeight: 900 } }}
-                            />
-                        </Box>
+                        <NeonButton onClick={handleSave} disabled={saving} fullWidth>
+                            {saving ? "SALVANDO..." : "SALVAR"}
+                        </NeonButton>
 
-                        <Box sx={{ mb: 3 }}>
-                            <Typography variant="caption" sx={{ color: '#fff', fontWeight: 700 }}>Atividade Administrativa</Typography>
-                            <TextField
-                                fullWidth
-                                variant="standard"
-                                value={retentionAdmin}
-                                onChange={(e) => setRetentionAdmin(e.target.value)}
-                                type="number"
-                                InputProps={{ endAdornment: <Typography variant="h6" sx={{ color: '#00D4FF', fontWeight: 800 }}>DIAS</Typography>, sx: { color: '#00D4FF', fontSize: '1.5rem', fontWeight: 900 } }}
-                            />
-                        </Box>
-
-                        <Box sx={{ mb: 4 }}>
-                            <Typography variant="caption" sx={{ color: '#fff', fontWeight: 700 }}>Acessos Físicos (Check-ins)</Typography>
-                            <Typography variant="h5" sx={{ color: '#00D4FF', fontWeight: 900, mt: 1 }}>ETERNO</Typography>
-                        </Box>
-
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <NeonButton onClick={handleSave} disabled={saving} startIcon={<SaveIcon />}>
-                                {saving ? "SALVANDO..." : "SALVAR POLÍTICA"}
-                            </NeonButton>
-                        </Box>
-
-                        <Button fullWidth variant="outlined" color="error" sx={{ borderStyle: 'dashed' }} onClick={handleClearLogs}>
-                            LIMPAR SYS LOG MANUALMENTE
+                        <Button fullWidth variant="outlined" color="error" sx={{ mt: 2, borderStyle: 'dashed' }} onClick={handleClearLogs}>
+                            LIMPAR LOGS
                         </Button>
                     </GlassCard>
                 </Grid>

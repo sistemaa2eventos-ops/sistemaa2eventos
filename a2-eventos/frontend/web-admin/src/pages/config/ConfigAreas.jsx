@@ -8,6 +8,7 @@ import { useSnackbar } from 'notistack';
 import {
     Add as AddIcon,
     Delete as DeleteIcon,
+    Edit as EditIcon,
     Place as PlaceIcon
 } from '@mui/icons-material';
 import api from '../../services/api';
@@ -20,12 +21,13 @@ const ConfigAreas = () => {
     const [saving, setSaving] = useState(false);
     const [openDialog, setOpenDialog] = useState(false);
     const [areaToDelete, setAreaToDelete] = useState(null);
-    const [formData, setFormData] = useState({ nome: '', capacidade_maxima: 0 });
+    const [editingId, setEditingId] = useState(null);
+    const [formData, setFormData] = useState({ nome_area: '', capacidade_maxima: '' });
     const { enqueueSnackbar } = useSnackbar();
 
     const columns = [
         {
-            id: 'nome',
+            id: 'nome_area',
             label: 'NOME DA ÁREA',
             minWidth: 200,
             format: (val) => (
@@ -40,21 +42,30 @@ const ConfigAreas = () => {
             label: 'CAPACIDADE',
             minWidth: 100,
             align: 'center',
-            format: (val) => val || '-'
+            format: (val) => val || 'Ilimitada'
         },
         {
             id: 'acoes',
             label: 'AÇÕES',
-            minWidth: 100,
+            minWidth: 120,
             align: 'center',
             format: (value, row) => (
-                <IconButton
-                    size="small"
-                    onClick={() => handleDelete(row.id)}
-                    sx={{ color: 'error.main', bgcolor: 'rgba(255, 51, 102, 0.05)' }}
-                >
-                    <DeleteIcon fontSize="small" />
-                </IconButton>
+                <Stack direction="row" spacing={1} justifyContent="center">
+                    <IconButton
+                        size="small"
+                        onClick={() => handleOpenDialog(row)}
+                        sx={{ color: 'primary.main', bgcolor: 'rgba(0, 212, 255, 0.05)' }}
+                    >
+                        <EditIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                        size="small"
+                        onClick={() => handleDelete(row.id)}
+                        sx={{ color: 'error.main', bgcolor: 'rgba(255, 51, 102, 0.05)' }}
+                    >
+                        <DeleteIcon fontSize="small" />
+                    </IconButton>
+                </Stack>
             ),
         },
     ];
@@ -65,27 +76,61 @@ const ConfigAreas = () => {
 
     const loadAreas = async () => {
         try {
+            const eventoId = sessionStorage.getItem('active_evento_id') || localStorage.getItem('active_evento_id');
+            if (!eventoId) {
+                enqueueSnackbar('Selecione um evento para gerenciar as áreas.', { variant: 'info' });
+                setLoading(false);
+                return;
+            }
+
             setLoading(true);
-            const response = await api.get('/eventos/areas');
+            const response = await api.get('/config/areas', { 
+                params: { evento_id: eventoId } 
+            });
             setAreas(response.data.data || []);
         } catch (error) {
-            enqueueSnackbar('Falha ao carregar áreas.', { variant: 'error' });
+            console.error('Erro ao carregar áreas:', error);
+            enqueueSnackbar('Falha ao carregar áreas. Verifique sua conexão.', { variant: 'error' });
         } finally {
             setLoading(false);
         }
     };
 
+    const handleOpenDialog = (area = null) => {
+        if (area) {
+            setEditingId(area.id);
+            setFormData({
+                nome_area: area.nome_area || '',
+                capacidade_maxima: area.capacidade_maxima || ''
+            });
+        } else {
+            setEditingId(null);
+            setFormData({ nome_area: '', capacidade_maxima: '' });
+        }
+        setOpenDialog(true);
+    };
+
     const handleSave = async () => {
-        if (!formData.nome) return enqueueSnackbar('Nome é obrigatório.', { variant: 'warning' });
+        if (!formData.nome_area) return enqueueSnackbar('Nome é obrigatório.', { variant: 'warning' });
         try {
             setSaving(true);
-            const eid = localStorage.getItem('active_evento_id');
-            await api.post(`/eventos/${eid}/areas`, formData);
-            enqueueSnackbar('Área criada com sucesso!', { variant: 'success' });
+            if (editingId) {
+                await api.put(`/config/areas/${editingId}`, {
+                    nome_area: formData.nome_area,
+                    capacidade_maxima: formData.capacidade_maxima ? parseInt(formData.capacidade_maxima) : null
+                });
+                enqueueSnackbar('Área atualizada!', { variant: 'success' });
+            } else {
+                await api.post('/config/areas', {
+                    nome_area: formData.nome_area,
+                    capacidade_maxima: formData.capacidade_maxima ? parseInt(formData.capacidade_maxima) : null
+                });
+                enqueueSnackbar('Área criada com sucesso!', { variant: 'success' });
+            }
             setOpenDialog(false);
             loadAreas();
         } catch (error) {
-            enqueueSnackbar('Erro ao criar área.', { variant: 'error' });
+            enqueueSnackbar('Erro ao salvar área.', { variant: 'error' });
         } finally {
             setSaving(false);
         }
@@ -94,7 +139,7 @@ const ConfigAreas = () => {
     const handleDelete = async (id) => {
         if (!window.confirm('Excluir esta área permanentemente?')) return;
         try {
-            await api.delete(`/eventos/areas/${id}`);
+            await api.delete(`/config/areas/${id}`);
             enqueueSnackbar('Área removida.', { variant: 'success' });
             loadAreas();
         } catch (error) {
@@ -113,7 +158,7 @@ const ConfigAreas = () => {
                 <Button 
                     variant="contained" 
                     startIcon={<AddIcon />} 
-                    onClick={() => { setFormData({ nome: '', capacidade_maxima: 0 }); setOpenDialog(true); }}
+                    onClick={() => handleOpenDialog()}
                     sx={{ fontWeight: 700 }}
                 >
                     Nova Área
@@ -133,27 +178,31 @@ const ConfigAreas = () => {
             </Grid>
 
             <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="xs" fullWidth>
-                <DialogTitle sx={{ fontWeight: 700 }}>Nova Área de Acesso</DialogTitle>
+                <DialogTitle sx={{ fontWeight: 700 }}>
+                    {editingId ? 'Editar Área' : 'Nova Área de Acesso'}
+                </DialogTitle>
                 <DialogContent>
                     <Stack spacing={3} sx={{ mt: 1 }}>
                         <TextField 
                             label="Nome da Área" 
                             fullWidth 
-                            value={formData.nome}
-                            onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                            value={formData.nome_area}
+                            onChange={(e) => setFormData({ ...formData, nome_area: e.target.value })}
                         />
                         <TextField 
-                            label="Capacidade Máxima" 
+                            label="Capacidade Máxima (0 = ilimitada)" 
                             type="number" 
                             fullWidth 
                             value={formData.capacidade_maxima}
-                            onChange={(e) => setFormData({ ...formData, capacidade_maxima: parseInt(e.target.value) })}
+                            onChange={(e) => setFormData({ ...formData, capacidade_maxima: e.target.value })}
                         />
                     </Stack>
                 </DialogContent>
                 <DialogActions sx={{ p: 3 }}>
                     <Button onClick={() => setOpenDialog(false)}>Cancelar</Button>
-                    <Button variant="contained" onClick={handleSave} disabled={saving}>Salvar Área</Button>
+                    <Button variant="contained" onClick={handleSave} disabled={saving}>
+                        {editingId ? 'Salvar' : 'Criar'}
+                    </Button>
                 </DialogActions>
             </Dialog>
         </Box>

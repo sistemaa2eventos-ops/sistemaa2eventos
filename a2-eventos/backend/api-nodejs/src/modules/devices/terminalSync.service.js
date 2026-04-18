@@ -91,8 +91,6 @@ class TerminalSyncService {
 
             const service = DeviceFactory.getDevice(terminal);
             return await service.enrollUser(pessoa, fotoBase64);
-
-            return false;
         } catch (error) {
             logger.error(`Erro push terminal ${terminal.nome}:`, error.message);
             return false;

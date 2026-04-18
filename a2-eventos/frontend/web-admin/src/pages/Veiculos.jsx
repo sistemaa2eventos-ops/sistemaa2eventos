@@ -31,7 +31,8 @@ import {
     Block as BlockIcon,
     CheckCircle as CheckCircleIcon,
     MeetingRoom as PassagemIcon,
-    Cancel as CancelIcon
+    Cancel as CancelIcon,
+    Info as InfoIcon
 } from '@mui/icons-material';
 import api from '../services/api';
 import GlassCard from '../components/common/GlassCard';
@@ -257,9 +258,13 @@ const Veiculos = () => {
             const response = await api.get('/pessoas', {
                 params: { evento_id: eventoId, limit: 1000 }
             });
-            setPessoas(response.data.data || []);
+            // Extração segura do array de dados (PessoaController retorna { success: true, data: { data: [] } })
+            const rawData = response.data.data;
+            const arrayPessoas = Array.isArray(rawData?.data) ? rawData.data : (Array.isArray(rawData) ? rawData : []);
+            setPessoas(arrayPessoas);
         } catch (err) {
             console.error('Erro ao carregar pessoas:', err);
+            setPessoas([]);
         }
     }, [eventoId]);
 
@@ -604,7 +609,7 @@ const Veiculos = () => {
                         <Autocomplete
                             options={pessoas}
                             getOptionLabel={(option) => `${option.nome_completo} (${option.cpf})`}
-                            value={pessoas.find(p => p.id === formData.motorista_id) || null}
+                            value={Array.isArray(pessoas) ? (pessoas.find(p => p.id === formData.motorista_id) || null) : null}
                             onChange={(_, newValue) => setFormData({ ...formData, motorista_id: newValue?.id || '' })}
                             renderInput={(params) => <TextField {...params} label="Motorista Vinculado" placeholder="Busque por nome ou CPF" />}
                         />

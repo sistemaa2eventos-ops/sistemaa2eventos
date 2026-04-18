@@ -66,7 +66,7 @@ const theme = createTheme({
                 '::-webkit-scrollbar': { width: '6px', height: '6px' },
                 '::-webkit-scrollbar-track': { background: '#0A1628' },
                 '::-webkit-scrollbar-thumb': {
-                    background: 'linear-gradient(180deg, #00D4FF, #7B2FBE)',
+                    background: '#00D4FF',
                     borderRadius: '3px',
                 },
             },

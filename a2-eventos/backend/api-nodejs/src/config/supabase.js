@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
+const logger = require('../services/logger');
 
 // Validação de ambiente - VERIFICA SE AS CHAVES EXISTEM
 if (!process.env.SUPABASE_URL) {
@@ -14,10 +15,10 @@ if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error('❌ SUPABASE_SERVICE_ROLE_KEY não definida no arquivo .env');
 }
 
-console.log('🔌 Configurando cliente Supabase...');
-console.log(`📌 URL: ${process.env.SUPABASE_URL}`);
-console.log(`📌 Anon Key: ✅ carregada`);
-console.log(`📌 Service Role: ✅ carregada`);
+logger.info('🔌 Configurando cliente Supabase...');
+logger.info(`📌 URL: ${process.env.SUPABASE_URL}`);
+logger.info('📌 Anon Key: ✅ carregada');
+logger.info('📌 Service Role: ✅ carregada');
 
 // ============================================
 // CLIENTE 1: Com service_role (para backend)
@@ -56,33 +57,27 @@ const supabasePublic = createClient(
 // Testar conexão imediatamente
 (async () => {
     try {
-        console.log('🔄 Testando conexão com Supabase...');
+        logger.info('🔄 Testando conexão com Supabase...');
 
-        // Tenta uma consulta simples
-        const { data, error } = await supabase
+        const { count, error } = await supabase
             .from('eventos')
-            .select('count')
-            .limit(1);
+            .select('*', { count: 'exact', head: true });
 
         if (error) {
-            console.error('❌ ERRO AO CONECTAR COM SUPABASE:');
-            console.error(error.message);
+            logger.error({ err: error }, '❌ ERRO AO CONECTAR COM SUPABASE');
 
             if (error.message.includes('relation') || error.message.includes('does not exist')) {
-                console.error('⚠️ As tabelas ainda não foram criadas no Supabase!');
-                console.error('   Execute o script SQL no SQL Editor do Supabase primeiro.');
+                logger.warn('⚠️ As tabelas ainda não foram criadas no Supabase! Execute o script SQL primeiro.');
             }
 
             if (error.message.includes('JWT')) {
-                console.error('⚠️ Problema com a chave de autenticação!');
-                console.error('   Verifique se as chaves no .env estão corretas.');
+                logger.warn('⚠️ Problema com a chave de autenticação! Verifique o .env.');
             }
         } else {
-            console.log('✅ Conectado ao Supabase com sucesso!');
-            console.log('📊 Banco de dados respondendo normalmente.');
+            logger.info('✅ Conectado ao Supabase com sucesso!');
         }
     } catch (err) {
-        console.error('❌ ERRO INESPERADO:', err.message);
+        logger.error({ err }, '❌ ERRO INESPERADO na conexão Supabase');
     }
 })();
 

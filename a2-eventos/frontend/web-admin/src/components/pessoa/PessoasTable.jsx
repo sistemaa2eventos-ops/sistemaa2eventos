@@ -83,13 +83,13 @@ const PessoasTable = ({
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
               <Typography variant="caption" sx={{ color: 'text.secondary' }}>{row.funcao || 'Participante'}</Typography>
               <Chip
-                label={row.tipo_pessoa || 'colaborador'}
+                label={row.tipo_pessoa === 'colaborador' ? 'COLABORADOR' : (row.tipo_pessoa === 'visitante' ? 'VISITANTE' : (row.tipo_pessoa === 'participante' ? 'PARTICIPANTE' : row.tipo_pessoa?.toUpperCase() || 'COLABORADOR'))}
                 size="small"
                 sx={{
                   height: 16,
                   fontSize: '0.6rem',
-                  bgcolor: row.tipo_pessoa === 'visitante' ? 'rgba(0, 212, 255, 0.1)' : 'rgba(123, 47, 190, 0.1)',
-                  color: row.tipo_pessoa === 'visitante' ? '#00D4FF' : '#7B2FBE',
+                  bgcolor: row.tipo_pessoa === 'visitante' ? 'rgba(0, 212, 255, 0.1)' : (row.tipo_pessoa === 'participante' ? 'rgba(0, 255, 136, 0.1)' : 'rgba(123, 47, 190, 0.1)'),
+                  color: row.tipo_pessoa === 'visitante' ? '#00D4FF' : (row.tipo_pessoa === 'participante' ? '#00FF88' : '#7B2FBE'),
                   border: 'none'
                 }}
               />

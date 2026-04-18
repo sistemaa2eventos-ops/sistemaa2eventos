@@ -35,22 +35,37 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     let isMounted = true;
     const initAuth = async () => {
-      const storedToken = sessionStorage.getItem('token') || localStorage.getItem('token');
-      
+      // FIX 2.5: sessionStorage é o storage padrão (token morre ao fechar o browser)
+      // localStorage só é usado quando o usuário marcou "Lembrar de mim"
+      const sessionToken = sessionStorage.getItem('token');
+      const localToken = localStorage.getItem('token');
+      const storedToken = sessionToken || localToken;
+
       if (!storedToken) {
         if (isMounted) setLoading(false);
         return;
       }
-      
+
+      // Se o token veio do localStorage e não há sessão ativa no sessionStorage,
+      // significa que o usuário marcou "Lembrar de mim" — manter no localStorage.
+      // Caso contrário, apenas session token.
+      const fromRememberMe = !sessionToken && !!localToken;
+
       try {
         const response = await authService.me();
         if (response.success && response.user) {
           const { id, nome, email, nivel_acesso, avatar_url, evento_id, permissions, status } = response.user;
           const cleanUser = { id, nome, email, nivel_acesso, avatar_url, evento_id, permissions, status };
-          
+
           if (isMounted) {
             setUser(cleanUser);
             setToken(storedToken);
+            // Se NÃO veio de "lembrar de mim", garante que o token está apenas no sessionStorage
+            if (!fromRememberMe && localToken) {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              sessionStorage.setItem('token', storedToken);
+            }
           }
         } else {
           throw new Error('Sessão inválida');

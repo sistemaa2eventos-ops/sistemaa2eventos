@@ -36,7 +36,7 @@ if ($envRaw -notmatch "(?m)^NODE_ENV=production$") {
 
 Write-Step 3 "Gerando Tarball e Enviando arquivos para a VPS"
 if (Test-Path $TAR_FILE) { Remove-Item $TAR_FILE }
-tar.exe -czf $TAR_FILE --exclude="node_modules" --exclude=".git" backend frontend gateway database supabase docker-compose.yml GUIA_IMPLANTACAO.md
+tar.exe -czf $TAR_FILE --exclude="node_modules" --exclude=".git" --exclude="dist" --exclude=".vite" backend frontend gateway database supabase docker-compose.yml GUIA_IMPLANTACAO.md
 scp $TAR_FILE ${User}@${IP}:${AppPath}
 
 Write-Step 4 "Aplicando Build e Subindo via Docker Compose"
@@ -47,8 +47,8 @@ ssh "${User}@${IP}" @"
   tar -xzf $TAR_FILE
   echo '  Limpando cache e imagens antigas...'
   docker system prune -f
-  echo '  Iniciando Build (pode demorar)...'
-  docker-compose build --no-cache admin-web
+  echo '  Iniciando Build (api e admin-web)...'
+  docker-compose build --no-cache api admin-web
   echo '  Subindo servicos...'
   docker-compose up -d --remove-orphans
 "@

@@ -50,7 +50,7 @@ async function authenticate(req, res, next) {
             nivel_acesso: role,
             nome_completo: user.user_metadata?.nome_completo || user.email,
             evento_id: (() => {
-                const v = user.user_metadata?.evento_id;
+                const v = user.app_metadata?.evento_id || user.user_metadata?.evento_id;
                 return (v && v !== 'undefined' && v !== 'null') ? v : null;
             })(),
             status: 'ativo'
@@ -70,13 +70,21 @@ async function authenticate(req, res, next) {
 }
 
 const ROLE_ALIASES = {
-    'master': 'admin_master',  // Legado -> novo
-    'admin': 'operador',      // Legado -> operador
-    'supervisor': 'operador', // Legado -> operador
+    'master': 'admin_master',
+    'admin': 'admin',
+    'supervisor': 'supervisor',
     'operador': 'operador'
 };
 
 const normalize = (role) => ROLE_ALIASES[role] || role;
+
+/**
+ * Utilitário soberano para extração de Role
+ */
+const extractRole = (user) => {
+    if (!user) return 'operador';
+    return normalize(user.nivel_acesso || user.role);
+};
 
 /**
  * Middleware de autorização por papel (Role)
@@ -86,13 +94,14 @@ function authorize(...roles) {
         if (!req.user) return res.status(401).json({ error: 'Não autenticado' });
         if (roles.length === 0) return next();
         
-        const userRole = normalize(req.user.role || req.user.nivel_acesso);
+        const userRole = extractRole(req.user);
         const allowed = roles.map(normalize);
 
-        if (userRole === 'admin_master' || allowed.includes(userRole)) {
+        if (userRole === 'admin_master' || userRole === 'admin' || allowed.includes(userRole)) {
             return next();
         }
 
+        logger.warn(`🚫 [AUTH DISMISS] Acesso negado via authorize: UserID=${req.user.id}, Role=${userRole}, AllowedRoles=[${roles.join(',')}]`);
         return res.status(403).json({ error: 'Acesso negado' });
     };
 }
@@ -116,10 +125,10 @@ function checkPermission(recurso, acao) {
         
         const userRole = normalize(req.user.role || req.user.nivel_acesso);
 
-        // --- 🦅 SOBERANIA MASTER (Super Admin SaaS) ---
-        // Master pode atuar em qualquer evento. Aceita o ID do header para troca de contexto.
+        // --- 🦅 SOBERANIA MASTER / ADMIN (Super Admin SaaS) ---
+        // Master e Admin podem atuar em qualquer evento. Aceita o ID do header para troca de contexto.
         const _s = (v) => (v && v !== 'undefined' && v !== 'null') ? v : null;
-        if (userRole === 'master') {
+        if (userRole === 'admin_master' || userRole === 'master' || userRole === 'admin') {
             req.tenantId = _s(req.headers['x-evento-id']) || 
                           _s(req.query.evento_id) || 
                           (recurso === 'eventos' ? req.params.id : null) || 
@@ -155,10 +164,10 @@ function checkPermission(recurso, acao) {
             return next();
         }
 
-        logger.warn(`🚫 Permissão Negada: ${req.user.id} -> ${recurso}:${acao} no evento ${tenantId}`);
+        logger.warn(`🚫 [RBAC DENIED] ${recurso}:${acao} negado para UserID=${req.user.id}, Role=${userRole}, Evento=${tenantId}`);
         return res.status(403).json({ error: `Sem permissão de ${acao} no recurso ${recurso}` });
     };
 }
 
 
-module.exports = { authenticate, authorize, validateInternalApiKey, checkPermission };
+module.exports = { authenticate, authorize, validateInternalApiKey, checkPermission, normalize, extractRole };

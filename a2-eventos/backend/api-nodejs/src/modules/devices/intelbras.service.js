@@ -407,8 +407,8 @@ class IntelbrasService extends AccessDevice {
             // Configuração padrão Dahua/Intelbras para HTTP Client (Events)
             // Habilita o envio de eventos para o servidor
             // Obter token do dispositivo
-            const pushUrl = deviceAuth?.control_token 
-                ? `/api/intelbras/events?token=${deviceAuth.control_token}`
+            const pushUrl = this.config?.control_token
+                ? `/api/intelbras/events?token=${this.config.control_token}`
                 : '/api/intelbras/events';
 
             const params = {

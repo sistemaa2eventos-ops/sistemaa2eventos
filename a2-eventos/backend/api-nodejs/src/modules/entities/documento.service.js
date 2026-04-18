@@ -168,7 +168,7 @@ class DocumentoService {
 
         let query = supabaseClient
             .from('view_documentos_pendentes')
-            .select('*', { count: 'exact' });
+            .select('*, tipo_entidade:entity_type', { count: 'exact' });
 
         if (evento_id) {
             query = query.eq('evento_id', evento_id);
