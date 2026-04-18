@@ -42,6 +42,10 @@ secrets/
 private/
 credentials.json
 credentials*.json
+reset-password.js
+create-user.js
+test-*.js
+*-test.js
 
 # Cache
 .cache/
