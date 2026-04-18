@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
     Box, Typography, Stack, IconButton, Dialog, DialogTitle, DialogContent,
-    DialogActions, TextField, Button, Grid, Avatar, Chip, MenuItem, Select,
+    DialogActions, TextField, Button, Avatar, Chip, MenuItem, Select,
     FormControl, InputLabel, Tooltip, Switch
 } from '@mui/material';
 import {
@@ -12,7 +12,6 @@ import {
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 
-import ConfirmDialog from '../components/common/ConfirmDialog';
 import GlassCard from '../components/common/GlassCard';
 import PageHeader from '../components/common/PageHeader';
 import NeonButton from '../components/common/NeonButton';
@@ -27,14 +26,14 @@ const SearchWrapper = styled(Box)(({ theme }) => ({
     gap: theme.spacing(1), marginBottom: theme.spacing(3)
 }));
 
-const RoleChip = styled(Chip)(({ theme, role }) => ({
+const RoleChip = styled(Chip)(({ role }) => ({
     fontWeight: 700, fontSize: '0.65rem', height: 24, textTransform: 'uppercase',
     background: role === 'admin_master' || role === 'master' ? 'rgba(0, 212, 255, 0.1)' : 'rgba(0, 212, 255, 0.05)',
     color: role === 'admin_master' || role === 'master' ? '#00D4FF' : '#fff',
     border: `1px solid ${role === 'admin_master' || role === 'master' ? 'rgba(0, 212, 255, 0.2)' : 'rgba(255,255,255,0.1)'}`
 }));
 
-const StatusChip = styled(Chip)(({ theme, status }) => ({
+const StatusChip = styled(Chip)(({ status }) => ({
     fontWeight: 700, fontSize: '0.65rem', height: 24, textTransform: 'uppercase',
     background: status === 'ativo' ? 'rgba(0, 255, 136, 0.1)' : (status === 'pendente' ? 'rgba(255, 184, 0, 0.1)' : 'rgba(255, 51, 102, 0.1)'),
     color: status === 'ativo' ? '#00FF88' : (status === 'pendente' ? '#FFB800' : '#FF3366'),
@@ -47,12 +46,12 @@ const StatusChip = styled(Chip)(({ theme, status }) => ({
  */
 const Usuarios = () => {
     const {
-        usuarios, eventos, loading, deleteLoading, search, setSearch, page, setPage, totalCount,
-        openDialog, setOpenDialog, openDeleteConfirm, setOpenDeleteConfirm,
+        usuarios, eventos, loading, search, setSearch, page, setPage, totalCount,
+        openDialog, setOpenDialog, openDeleteConfirm: _openDeleteConfirm, setOpenDeleteConfirm: _setOpenDeleteConfirm,
         selectedUser, setSelectedUser, formData, setFormData,
         openPasswordDialog, setOpenPasswordDialog,
         resetingPassword, handleResetPassword,
-        handleOpenDialog, handleSave, handleApprove, handleToggleStatus, setUserToDelete
+        handleOpenDialog, handleSave, handleApprove, handleToggleStatus
     } = useUsuarios();
     const { user: currentUser } = useAuth();
     const [newPassword, setNewPassword] = useState('');
@@ -112,7 +111,11 @@ const Usuarios = () => {
         },
         {
             id: 'eventos', label: 'VÍNCULO', minWidth: 150,
-            format: (val) => val?.nome || 'A2 Eventos / NZT Central'
+            format: (val, row) => {
+                if (typeof val === 'object' && val?.nome) return val.nome;
+                if (row?.events?.nome) return row.events.nome;
+                return 'Global';
+            }
         },
         {
             id: 'acoes', label: 'AÇÕES', minWidth: 100, align: 'center',

@@ -23,10 +23,15 @@ export const useUsuarios = () => {
     const [eventos, setEventos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
-    
+    const [page, setPage] = useState(1);
+
     // Dialog States
     const [openDialog, setOpenDialog] = useState(false);
+    const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
+    const [openPasswordDialog, setOpenPasswordDialog] = useState(false);
+    const [resetingPassword, setResetingPassword] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
+    const [_userToDelete, setUserToDelete] = useState(null);
     
     // Formulário
     const [formData, setFormData] = useState({
@@ -61,13 +66,22 @@ export const useUsuarios = () => {
             const response = await api.get('/auth/users', {
                 params: { search }
             });
-            setUsuarios(response.data.users || []);
+            // Garantir formato correto dos dados
+            const users = (response.data.users || []).map(user => ({
+                ...user,
+                foto_url: user.foto_url || user.avatar_url || '',
+                email: user.email || '',
+                cpf: user.cpf || user.documento || '',
+                events: user.eventos || { nome: 'Global' }
+            }));
+            setUsuarios(users);
         } catch (error) {
             console.error('Erro ao buscar usuários:', error);
+            enqueueSnackbar('Erro ao buscar usuários', { variant: 'error' });
         } finally {
             setLoading(false);
         }
-    }, [search]);
+    }, [search, enqueueSnackbar]);
 
     useEffect(() => {
         loadUsuarios();
@@ -180,11 +194,37 @@ export const useUsuarios = () => {
         }
     };
 
+    const handleResetPassword = async (userId, newPassword) => {
+        try {
+            if (!newPassword || newPassword.length < 6) {
+                enqueueSnackbar('Senha deve ter pelo menos 6 caracteres.', { variant: 'warning' });
+                return;
+            }
+
+            setResetingPassword(true);
+            await api.post(`/auth/users/${userId}/reset-password`, {
+                nova_senha: newPassword,
+                confirmar_senha: newPassword
+            });
+            enqueueSnackbar('Senha resetada com sucesso!', { variant: 'success' });
+            setOpenPasswordDialog(false);
+        } catch (error) {
+            enqueueSnackbar(error.response?.data?.error || 'Erro ao resetar senha.', { variant: 'error' });
+        } finally {
+            setResetingPassword(false);
+        }
+    };
+
     return {
         usuarios, eventos, loading, search, setSearch,
+        page, setPage, totalCount: usuarios.length,
         openDialog, setOpenDialog,
+        openDeleteConfirm, setOpenDeleteConfirm,
+        openPasswordDialog, setOpenPasswordDialog,
+        resetingPassword,
         selectedUser, setSelectedUser, formData, setFormData,
-        handleOpenDialog, handleSave, handleApprove, handleToggleStatus,
+        userToDelete: selectedUser, setUserToDelete,
+        handleOpenDialog, handleSave, handleApprove, handleToggleStatus, handleResetPassword,
         MODULOS
     };
 };

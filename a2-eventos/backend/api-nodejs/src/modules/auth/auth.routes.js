@@ -44,8 +44,8 @@ router.put('/users/:userId', authenticate, authorize('admin_master'), authContro
 router.patch('/users/:userId/status', authenticate, authorize('admin_master'), authController.updateUserStatus);
 
 // ============================================
-// ADMIN: Reset de senha (deprecated - agora usa approve)
+// ADMIN: Reset de senha
 // ============================================
-// router.post('/admin/reset-password/:userId', authenticate, authorize('admin_master'), authController.adminResetPassword);
+router.post('/users/:userId/reset-password', authenticate, authorize('admin_master'), authController.adminResetPassword);
 
 module.exports = router;

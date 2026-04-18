@@ -383,19 +383,32 @@ class AuthController {
     }
 
     /**
-     * Listar usuários
+     * Listar usuários com busca por nome, email ou CPF
      */
     async listUsers(req, res) {
         try {
             const isAdminMaster = req.user?.nivel_acesso === 'admin_master';
-            
-            // Tentativa de busca com campos padrão do Supabase
+            const searchTerm = req.query.search?.toLowerCase() || '';
+
+            // Query base: buscar perfis com campos disponíveis
             let query = supabase
                 .from('perfis')
-                .select('id, nome_completo, nivel_acesso, status, evento_id, permissions, created_at')
+                .select(`
+                    id,
+                    nome_completo,
+                    nivel_acesso,
+                    status,
+                    evento_id,
+                    permissions,
+                    avatar_url,
+                    created_at,
+                    updated_at,
+                    eventos(nome),
+                    cpf:documento
+                `)
                 .order('nome_completo');
 
-            // Se não for admin_master, só mostra usuários do mesmo evento
+            // Se não for admin_master, filtra por evento
             if (!isAdminMaster && req.user?.evento_id) {
                 query = query.eq('evento_id', req.user.evento_id);
             }
@@ -403,33 +416,85 @@ class AuthController {
             const { data, error } = await query;
 
             if (error) {
-                logger.error('Erro Supabase ao listar perfis:', error);
+                logger.error('Erro ao listar perfis:', error);
 
-                // Fallback: Tentar com campos mínimos se a query completa falhar
-                if (error.message.includes('created_at') || error.message.includes('permissions') || error.message.includes('column')) {
-                    const { data: retryData, error: retryError } = await supabase
-                        .from('perfis')
-                        .select('id, nome_completo, nivel_acesso, status, evento_id')
-                        .order('nome_completo');
+                // Fallback simples: sem campos complexos
+                const { data: fallbackData, error: fallbackError } = await supabase
+                    .from('perfis')
+                    .select('id, nome_completo, nivel_acesso, status, evento_id, avatar_url')
+                    .order('nome_completo')
+                    .then(result => {
+                        if (!isAdminMaster && req.user?.evento_id) {
+                            return supabase
+                                .from('perfis')
+                                .select('id, nome_completo, nivel_acesso, status, evento_id, avatar_url')
+                                .eq('evento_id', req.user.evento_id)
+                                .order('nome_completo');
+                        }
+                        return result;
+                    });
 
-                    if (retryError) throw retryError;
-                    return res.json({ success: true, users: retryData });
-                }
+                if (fallbackError) throw fallbackError;
 
-                throw error;
+                // Aplicar busca em memória
+                const filtered = fallbackData.filter(user => {
+                    const name = user.nome_completo?.toLowerCase() || '';
+                    return !searchTerm || name.includes(searchTerm);
+                });
+
+                return res.json({
+                    success: true,
+                    users: filtered.map(u => ({
+                        ...u,
+                        foto_url: u.avatar_url,
+                        cpf: u.documento,
+                        email: '' // Sem email no fallback
+                    }))
+                });
             }
+
+            // Buscar emails dos usuários no auth.users
+            let emailMap = {};
+            try {
+                // Tentar buscar usuários da auth.users (Supabase Admin API)
+                const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+                if (!authError && authUsers) {
+                    // O retorno pode ser um array ou objeto com users array
+                    const users = Array.isArray(authUsers) ? authUsers : (authUsers.users || []);
+                    emailMap = Object.fromEntries(
+                        users.map(u => [u.id, u.email || ''])
+                    );
+                }
+            } catch (e) {
+                logger.warn('Não foi possível buscar emails do auth.users:', e.message);
+                // Continuar sem emails - eles estarão vazios
+            }
+
+            // Enriquecer dados e aplicar filtro de busca
+            const enrichedUsers = data
+                .map(user => ({
+                    ...user,
+                    foto_url: user.avatar_url,
+                    email: emailMap[user.id] || '',
+                    eventos: user.eventos?.[0] || { nome: 'Global' }
+                }))
+                .filter(user => {
+                    if (!searchTerm) return true;
+                    const nameMatch = user.nome_completo?.toLowerCase().includes(searchTerm);
+                    const emailMatch = user.email?.toLowerCase().includes(searchTerm);
+                    return nameMatch || emailMatch;
+                });
 
             res.json({
                 success: true,
-                users: data
+                users: enrichedUsers
             });
 
         } catch (error) {
             logger.error('Erro fatal ao listar perfis:', error);
-            res.status(500).json({ 
-                error: 'Erro ao buscar perfis', 
-                message: error.message,
-                details: error.details || error.hint 
+            res.status(500).json({
+                error: 'Erro ao buscar usuários',
+                message: process.env.NODE_ENV === 'development' ? error.message : 'Erro ao listar usuários'
             });
         }
     }
@@ -615,6 +680,64 @@ class AuthController {
         } catch (error) {
             logger.error('Erro ao definir evento ativo:', error);
             res.status(500).json({ error: 'Erro interno no servidor' });
+        }
+    }
+
+    /**
+     * Admin: Resetar senha de um usuário
+     */
+    async adminResetPassword(req, res) {
+        try {
+            const { userId } = req.params;
+            const { nova_senha, confirmar_senha } = req.body;
+
+            // Só admin_master pode resetar senhas
+            if (req.user?.nivel_acesso !== 'admin_master') {
+                return res.status(403).json({
+                    error: 'Apenas admin_master pode resetar senhas.'
+                });
+            }
+
+            // Validação básica
+            if (!nova_senha || nova_senha.length < 6) {
+                return res.status(400).json({
+                    error: 'A senha deve ter pelo menos 6 caracteres.'
+                });
+            }
+
+            if (nova_senha !== confirmar_senha) {
+                return res.status(400).json({
+                    error: 'As senhas não coincidem.'
+                });
+            }
+
+            // Não pode resetar senha de si mesmo
+            if (userId === req.user.id) {
+                return res.status(400).json({
+                    error: 'Você não pode resetar sua própria senha desta forma. Use "Alterar Senha".'
+                });
+            }
+
+            // Atualizar senha via Supabase Admin
+            const { error } = await supabase.auth.admin.updateUserById(userId, {
+                password: nova_senha
+            });
+
+            if (error) throw error;
+
+            logger.info(`🔑 Senha resetada por admin: ${userId} por ${req.user.id}`);
+
+            res.json({
+                success: true,
+                message: 'Senha resetada com sucesso'
+            });
+
+        } catch (error) {
+            logger.error('Erro ao resetar senha:', error);
+            res.status(500).json({
+                error: 'Erro ao resetar senha',
+                message: process.env.NODE_ENV === 'development' ? error.message : 'Erro interno'
+            });
         }
     }
 }
