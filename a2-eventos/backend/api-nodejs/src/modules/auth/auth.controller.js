@@ -419,20 +419,16 @@ class AuthController {
                 logger.error('Erro ao listar perfis:', error);
 
                 // Fallback simples: sem campos complexos
-                const { data: fallbackData, error: fallbackError } = await supabase
+                let fallbackQuery = supabase
                     .from('perfis')
                     .select('id, nome_completo, nivel_acesso, status, evento_id, avatar_url')
-                    .order('nome_completo')
-                    .then(result => {
-                        if (!isAdminMaster && req.user?.evento_id) {
-                            return supabase
-                                .from('perfis')
-                                .select('id, nome_completo, nivel_acesso, status, evento_id, avatar_url')
-                                .eq('evento_id', req.user.evento_id)
-                                .order('nome_completo');
-                        }
-                        return result;
-                    });
+                    .order('nome_completo');
+
+                if (!isAdminMaster && req.user?.evento_id) {
+                    fallbackQuery = fallbackQuery.eq('evento_id', req.user.evento_id);
+                }
+
+                const { data: fallbackData, error: fallbackError } = await fallbackQuery;
 
                 if (fallbackError) throw fallbackError;
 
