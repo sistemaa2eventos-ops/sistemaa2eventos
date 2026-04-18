@@ -12,10 +12,20 @@ module.exports = {
             jsx: true
         }
     },
-    extends: ['eslint:recommended'],
+    extends: ['eslint:recommended', 'plugin:react/recommended', 'plugin:react-hooks/recommended'],
+    plugins: ['react', 'react-hooks'],
+    settings: {
+        react: {
+            version: 'detect'
+        }
+    },
     ignorePatterns: ['dist/', 'node_modules/'],
     rules: {
-        'no-unused-vars': 'off',
-        'no-undef': 'off'
+        'no-unused-vars': ['error', {
+            'argsIgnorePattern': '^_',
+            'varsIgnorePattern': '^_'
+        }],
+        'no-undef': 'error',
+        'react/jsx-key': 'error'
     }
 };
