@@ -1,6 +1,5 @@
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
-const qrGenerator = require('../../utils/qrGenerator');
 const checkinService = require('./checkin.service');
 const validationService = require('./services/validation.service');
 const ApiResponse = require('../../utils/apiResponse');
@@ -9,13 +8,7 @@ const websocketService = require('../../services/websocketService'); // FIX C-02
 
 class AccessController {
     constructor() {
-        this.validateQRCode = this.validateQRCode.bind(this);
-        this.checkinQRCode = this.checkinQRCode.bind(this);
-        this.checkinBarcode = this.checkinBarcode.bind(this);
-        this.checkinRFID = this.checkinRFID.bind(this);
-        this.checkinManual = this.checkinManual.bind(this);
         this.checkout = this.checkout.bind(this);
-        this.checkoutQRCode = this.checkoutQRCode.bind(this);
         this.processFaceRecognition = this.processFaceRecognition.bind(this);
         this.getLogs = this.getLogs.bind(this);
         this.getRealtimeStats = this.getRealtimeStats.bind(this);
