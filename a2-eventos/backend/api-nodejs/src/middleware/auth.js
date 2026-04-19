@@ -1,6 +1,7 @@
 const { supabase, createClientForUser } = require('../config/supabase');
 const logger = require('../services/logger');
 const User = require('../models/User');
+const policyEngine = require('../modules/checkin/policy.service');
 
 /**
  * Middleware de autenticação soberano
@@ -159,7 +160,6 @@ function checkPermission(recurso, acao) {
         }
 
         // 2. Validar Permissão Granular (ACL) via PolicyEngine
-        const policyEngine = require('../modules/checkin/policy.service');
         if (await policyEngine.hasPermission(userRole, recurso, acao, tenantId)) {
             return next();
         }

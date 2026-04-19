@@ -5,6 +5,6 @@ const { authenticate, authorize } = require('../../middleware/auth');
 const { requireEvent } = require('../../middleware/eventMiddleware');
 
 // Somente Master e Supervisor podem ver logs de auditoria
-router.get('/', authenticate, requireEvent, authorize('master', 'supervisor'), auditController.list);
+router.get('/', authenticate, requireEvent, authorize('admin_master', 'supervisor'), auditController.list);
 
 module.exports = router;

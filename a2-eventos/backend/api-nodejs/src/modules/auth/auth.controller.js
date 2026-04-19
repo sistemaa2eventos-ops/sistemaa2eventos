@@ -387,38 +387,32 @@ class AuthController {
      */
     async listUsers(req, res) {
         try {
+            logger.info('📋 [listUsers] Iniciando...');
             const isAdminMaster = req.user?.nivel_acesso === 'admin_master';
             const searchTerm = req.query.search?.toLowerCase() || '';
+            logger.info(`[listUsers] User level: ${req.user?.nivel_acesso}, Search: "${searchTerm}"`);
 
             // Query base: buscar perfis com campos disponíveis
             let query = supabase
                 .from('perfis')
-                .select(`
-                    id,
-                    nome_completo,
-                    nivel_acesso,
-                    status,
-                    evento_id,
-                    permissions,
-                    avatar_url,
-                    created_at,
-                    updated_at,
-                    eventos(nome),
-                    cpf:documento
-                `)
+                .select(`id, nome_completo, nivel_acesso, status, evento_id, permissions, avatar_url, created_at, updated_at, eventos(nome)`)
                 .order('nome_completo');
 
             // Se não for admin_master, filtra por evento
             if (!isAdminMaster && req.user?.evento_id) {
+                logger.info(`[listUsers] Filtrando por evento: ${req.user.evento_id}`);
                 query = query.eq('evento_id', req.user.evento_id);
             }
 
+            logger.info('[listUsers] Executando query principal...');
             const { data, error } = await query;
 
             if (error) {
-                logger.error('Erro ao listar perfis:', error);
+                logger.error('[listUsers] ❌ Erro na query principal:', { error: error.message, code: error.code });
+                logger.info(`[listUsers] Detalhe do erro: ${JSON.stringify(error)}`);
 
                 // Fallback simples: sem campos complexos
+                logger.info('[listUsers] Tentando fallback sem eventos(nome)...');
                 let fallbackQuery = supabase
                     .from('perfis')
                     .select('id, nome_completo, nivel_acesso, status, evento_id, avatar_url')
@@ -430,7 +424,12 @@ class AuthController {
 
                 const { data: fallbackData, error: fallbackError } = await fallbackQuery;
 
-                if (fallbackError) throw fallbackError;
+                if (fallbackError) {
+                    logger.error('[listUsers] ❌ Fallback também falhou:', { error: fallbackError.message, code: fallbackError.code });
+                    throw fallbackError;
+                }
+
+                logger.info(`[listUsers] ✅ Fallback sucesso: ${fallbackData?.length || 0} usuários retornados`);
 
                 // Aplicar busca em memória
                 const filtered = fallbackData.filter(user => {
@@ -443,51 +442,36 @@ class AuthController {
                     users: filtered.map(u => ({
                         ...u,
                         foto_url: u.avatar_url,
-                        cpf: u.documento,
-                        email: '' // Sem email no fallback
+                        email: ''
                     }))
                 });
             }
 
-            // Buscar emails dos usuários no auth.users
-            let emailMap = {};
-            try {
-                // Tentar buscar usuários da auth.users (Supabase Admin API)
-                const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
-                if (!authError && authUsers) {
-                    // O retorno pode ser um array ou objeto com users array
-                    const users = Array.isArray(authUsers) ? authUsers : (authUsers.users || []);
-                    emailMap = Object.fromEntries(
-                        users.map(u => [u.id, u.email || ''])
-                    );
-                }
-            } catch (e) {
-                logger.warn('Não foi possível buscar emails do auth.users:', e.message);
-                // Continuar sem emails - eles estarão vazios
-            }
+            logger.info(`[listUsers] ✅ Query principal sucesso: ${data?.length || 0} usuários`);
 
             // Enriquecer dados e aplicar filtro de busca
             const enrichedUsers = data
                 .map(user => ({
                     ...user,
                     foto_url: user.avatar_url,
-                    email: emailMap[user.id] || '',
+                    email: '',
                     eventos: user.eventos?.[0] || { nome: 'Global' }
                 }))
                 .filter(user => {
                     if (!searchTerm) return true;
                     const nameMatch = user.nome_completo?.toLowerCase().includes(searchTerm);
-                    const emailMatch = user.email?.toLowerCase().includes(searchTerm);
-                    return nameMatch || emailMatch;
+                    return nameMatch;
                 });
 
+            logger.info(`[listUsers] ✅ Após filtro de busca: ${enrichedUsers.length} usuários`);
             res.json({
                 success: true,
                 users: enrichedUsers
             });
 
         } catch (error) {
-            logger.error('Erro fatal ao listar perfis:', error);
+            logger.error('[listUsers] ❌ ERRO FATAL:', { message: error?.message, code: error?.code });
+            logger.info(`[listUsers] Stack trace: ${error?.stack}`);
             res.status(500).json({
                 error: 'Erro ao buscar usuários',
                 message: process.env.NODE_ENV === 'development' ? error.message : 'Erro ao listar usuários'

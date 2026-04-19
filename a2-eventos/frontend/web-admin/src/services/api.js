@@ -24,6 +24,14 @@ api.interceptors.request.use((config) => {
   const token = sessionStorage.getItem('token') || localStorage.getItem('token');
 
   if (token && token !== 'undefined' && token !== 'null') {
+    // Debug: verificar estrutura do token
+    const segments = token.split('.');
+    if (segments.length !== 3) {
+      console.error('❌ Token JWT malformado! Segmentos:', segments.length);
+      console.error('Token recebido:', token);
+    } else {
+      log(`✅ Token válido: ${segments.length} segmentos`);
+    }
     config.headers.Authorization = `Bearer ${token}`;
   }
 
