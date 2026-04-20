@@ -27,6 +27,17 @@ router.get('/pulseira/buscar', sessionMiddleware, accessController.buscarPessoaP
 router.get('/pulseira/ultimo/:pessoa_id', sessionMiddleware, accessController.ultimoCheckin);
 
 // ============================================
+// CHECK-IN GENÉRICO (manual e qrcode — painel web)
+// ============================================
+router.post('/checkin/manual', sessionMiddleware, rateLimiter.access, accessController.checkinManual);
+router.post('/checkin/qrcode', sessionMiddleware, rateLimiter.access, accessController.checkinQrcode);
+
+// ============================================
+// CONSULTA DE PULSEIRA POR CÓDIGO (painel web)
+// ============================================
+router.get('/consultar-pulseira/:codigo', sessionMiddleware, accessController.consultarPulseira);
+
+// ============================================
 // GESTÃO DE TERMINAIS (apenas admin_master)
 // ============================================
 router.get('/terminais', sessionMiddleware, terminalController.list);
@@ -52,14 +63,12 @@ router.get('/stats/realtime', sessionMiddleware, accessController.getRealtimeSta
 router.post('/expulsar/:pessoa_id', sessionMiddleware, authorize('admin_master'), accessController.expulsar);
 
 // ============================================
-// DEPRECATED -Removidas:
-// - /validate/qrcode (substituir por busca de pulseira)
-// - /checkin/qrcode (substituir por pulseira/checkin)
-// - /checkin/barcode (removido)
-// - /checkin/rfid (removido)
-// - /checkin/manual (removido)
-// - /checkout/qrcode (substituir por pulseira/checkout)
-// - /vincular-pulseira-facial (funcionalidade integrida no checkin facial)
+// DEPRECATED (ainda removidas):
+// - /validate/qrcode
+// - /checkin/barcode
+// - /checkin/rfid
+// - /checkout/qrcode
+// - /vincular-pulseira-facial
 // ============================================
 
 module.exports = router;

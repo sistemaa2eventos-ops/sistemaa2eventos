@@ -19,6 +19,8 @@ class AccessController {
         this.consultarPulseira = this.consultarPulseira.bind(this);
         this.ultimoCheckin = this.ultimoCheckin.bind(this);
         this.acionarCatraca = this.acionarCatraca.bind(this);
+        this.checkinManual = this.checkinManual.bind(this);
+        this.checkinQrcode = this.checkinQrcode.bind(this);
     }
 
     async checkout(req, res) {
@@ -302,6 +304,76 @@ class AccessController {
         // Ver: Monitor.jsx e websocketService.js
         // Não remover — pode ser necessário no futuro
         return ApiResponse.success(res, { message: 'Pulso enviado para ponte de hardware.' });
+    }
+
+    // ============================================
+    // CHECK-IN MANUAL (por pessoa_id — painel web)
+    // ============================================
+    async checkinManual(req, res) {
+        try {
+            const { busca: pessoa_id, dispositivoId, tipo, sync_id, offline_timestamp } = req.body;
+            const eventoId = req.event?.id;
+            const supabaseClient = req.supabase || supabase;
+
+            if (!pessoa_id) return ApiResponse.error(res, 'ID do participante é obrigatório', 400);
+
+            const result = await checkinService.registrarAcesso(supabaseClient, {
+                pessoa_id,
+                evento_id: eventoId,
+                tipo: tipo || null,
+                metodo: 'manual',
+                dispositivo_id: dispositivoId || 'web-dashboard',
+                created_by: req.user?.id,
+                sync_id,
+                offline_timestamp
+            });
+
+            if (result.error) return ApiResponse.error(res, result.error, result.status || 400);
+            return ApiResponse.success(res, result);
+        } catch (error) {
+            logger.error('Erro no checkin manual:', error.message);
+            return ApiResponse.error(res, 'Erro ao processar check-in manual');
+        }
+    }
+
+    // ============================================
+    // CHECK-IN VIA QR CODE (painel web / offline sync)
+    // ============================================
+    async checkinQrcode(req, res) {
+        try {
+            const { qrCode, dispositivoId, tipo, sync_id, offline_timestamp } = req.body;
+            const eventoId = req.event?.id;
+            const supabaseClient = req.supabase || supabase;
+
+            if (!qrCode) return ApiResponse.error(res, 'QR Code é obrigatório', 400);
+
+            const { data: pessoa, error: pessoaErr } = await supabaseClient
+                .from('pessoas')
+                .select('*, empresas(nome)')
+                .eq('qr_code', qrCode)
+                .eq('evento_id', eventoId)
+                .single();
+
+            if (pessoaErr || !pessoa) return ApiResponse.error(res, 'QR Code não encontrado', 404);
+
+            const result = await checkinService.registrarAcesso(supabaseClient, {
+                pessoa_id: pessoa.id,
+                pessoa,
+                evento_id: eventoId,
+                tipo: tipo || null,
+                metodo: 'qrcode',
+                dispositivo_id: dispositivoId || 'web-dashboard',
+                created_by: req.user?.id,
+                sync_id,
+                offline_timestamp
+            });
+
+            if (result.error) return ApiResponse.error(res, result.error, result.status || 400);
+            return ApiResponse.success(res, result);
+        } catch (error) {
+            logger.error('Erro no checkin QR Code:', error.message);
+            return ApiResponse.error(res, 'Erro ao processar check-in QR Code');
+        }
     }
 
     // ============================================
