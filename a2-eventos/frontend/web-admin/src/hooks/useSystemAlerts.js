@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useSnackbar } from 'notistack';
 import io from 'socket.io-client';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,41 +9,45 @@ import { useAuth } from '../contexts/AuthContext';
  */
 export const useSystemAlerts = () => {
     const { user } = useAuth();
-    const { enqueueSnackbar } = useSnackbar();
+    const { enqueueSnackbar: _enqueueSnackbar } = useSnackbar();
+
+    // Ref estável para enqueueSnackbar — evita invalidar o useEffect a cada render
+    const snackRef = useRef(_enqueueSnackbar);
+    snackRef.current = _enqueueSnackbar;
+    const enqueueSnackbar = useCallback((...args) => snackRef.current(...args), []);
 
     useEffect(() => {
-        // Apenas Master e Admin recebem alertas de sistema
-        if (!user || !['master', 'admin'].includes(user.role)) return;
+        // Apenas admin_master recebe alertas de sistema
+        const role = user?.nivel_acesso;
+        if (!role || !['admin_master', 'admin'].includes(role)) return;
+
+        const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+        if (!token) return;
 
         const socketUrl = (import.meta.env.VITE_API_URL || '').replace(/\/api$/, '') || window.location.origin;
-        const socket = io(socketUrl, { 
+        const socket = io(socketUrl, {
             transports: ['polling', 'websocket'],
             reconnectionAttempts: 5,
-            query: { token: localStorage.getItem('token') }
+            auth: { token }
         });
 
         socket.on('connect', () => {
-            console.log('🛡️ [SystemWatcher] Conectado ao Gateway de Alertas');
             socket.emit('join_system_admin');
         });
 
         socket.on('system:alert', (payload) => {
-            console.warn('🚨 ALERTA DE SISTEMA:', payload);
-            
-            // O payload pode vir como um objeto com array 'alerts' ou um alerta único
             const alertList = payload.alerts || [payload];
 
             alertList.forEach(alert => {
                 const severity = alert.severity || alert.level || 'warning';
-                
-                enqueueSnackbar(alert.message || 'Alerta de integridade do sistema!', { 
+
+                enqueueSnackbar(alert.message || 'Alerta de integridade do sistema!', {
                     variant: severity === 'critical' ? 'error' : (severity === 'info' ? 'info' : 'warning'),
                     persist: severity === 'critical',
                     autoHideDuration: severity === 'critical' ? 10000 : 5000,
                     anchorOrigin: { vertical: 'top', horizontal: 'right' }
                 });
 
-                // Som de alerta apenas para críticos e avisos de hardware
                 if (severity === 'critical' || alert.type === 'DEVICE_OFFLINE') {
                     const audio = new Audio('/assets/notification.mp3');
                     audio.play().catch(() => {});
@@ -52,13 +56,11 @@ export const useSystemAlerts = () => {
         });
 
         socket.on('connect_error', (err) => {
-            console.error('❌ [SystemWatcher] Erro de conexão:', err.message);
+            if (import.meta.env.DEV) console.error('[SystemWatcher] Erro de conexão:', err.message);
         });
 
-        return () => {
-            if (socket) socket.disconnect();
-        };
-    }, [user, enqueueSnackbar]);
+        return () => socket.disconnect();
+    }, [user?.nivel_acesso, enqueueSnackbar]);
 
     return null;
 };

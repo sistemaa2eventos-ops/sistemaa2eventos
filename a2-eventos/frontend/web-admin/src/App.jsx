@@ -127,12 +127,12 @@ const AppContent = () => {
             <Route path="/eventos" element={<Eventos />} />
             <Route path="/empresas" element={<ProtectedRoute modulo="empresas"><Empresas /></ProtectedRoute>} />
             <Route path="/pessoas" element={<ProtectedRoute modulo="pessoas"><Pessoas /></ProtectedRoute>} />
-            <Route path="/auditoria" element={<ProtectedRoute modulo="auditoria"><AuditoriaDocumental /></ProtectedRoute>} />
+            <Route path="/auditoria" element={<ProtectedRoute modulo="auditoria_documentos"><AuditoriaDocumental /></ProtectedRoute>} />
             <Route path="/veiculos" element={<ProtectedRoute modulo="veiculos"><Veiculos /></ProtectedRoute>} />
-            <Route path="/reports" element={<ProtectedRoute modulo="reports"><Reports /></ProtectedRoute>} />
+            <Route path="/reports" element={<ProtectedRoute modulo="relatorios"><Reports /></ProtectedRoute>} />
             <Route path="/checkin" element={<ProtectedRoute modulo="checkin"><Checkin /></ProtectedRoute>} />
             <Route path="/checkout" element={<ProtectedRoute modulo="checkin"><Checkout /></ProtectedRoute>} />
-            <Route path="/monitor" element={<ProtectedRoute modulo="monitor"><Monitor /></ProtectedRoute>} />
+            <Route path="/monitor" element={<ProtectedRoute modulo="monitoramento"><Monitor /></ProtectedRoute>} />
             <Route path="/usuarios" element={<ProtectedRoute role="admin_master"><Usuarios /></ProtectedRoute>} />
             <Route path="/audit-logs" element={<ProtectedRoute role="admin_master"><AuditLogs /></ProtectedRoute>} />
             <Route path="/configuracoes" element={<ProtectedRoute role="admin_master"><Configuracoes /></ProtectedRoute>} />

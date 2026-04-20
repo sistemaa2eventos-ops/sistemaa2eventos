@@ -103,6 +103,7 @@ export const useMonitor = () => {
     }, [enqueueSnackbar]);
 
     const fetchCameras = useCallback(async () => {
+        if (!eventoId) return;
         try {
             const response = await api.get('/cameras', { params: { evento_id: eventoId } });
             setCameras(response.data.data || []);
@@ -112,6 +113,7 @@ export const useMonitor = () => {
     }, [eventoId, log]);
 
     const fetchWatchlist = useCallback(async () => {
+        if (!eventoId) return;
         try {
             const response = await api.get('/watchlist', { params: { evento_id: eventoId } });
             setWatchlist(response.data.data || []);
@@ -150,7 +152,12 @@ export const useMonitor = () => {
         if (!eventoId) return;
 
         const socketUrl = (import.meta.env.VITE_API_URL || '').replace(/\/api$/, '') || window.location.origin;
-        const socket = io(socketUrl, { transports: ['polling', 'websocket'], reconnectionAttempts: 10 });
+        const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+        const socket = io(socketUrl, {
+            transports: ['polling', 'websocket'],
+            reconnectionAttempts: 10,
+            auth: { token }
+        });
 
         socket.on('connect', () => {
             socket.emit('join_event', eventoId);
@@ -235,7 +242,7 @@ export const useMonitor = () => {
         logs: logsFiltrados,
         allLogs: logs,
         stats, loading, tick,
-        cameras, setCameras, fetchCameras,
+        cameras, setCameras, fetchCameras, fetchWatchlist,
         terminais, areas, dispositivosLista,
         selectedCameras, setSelectedCameras,
         watchlist, newCpf, setNewCpf, isTracking, activeAlert, setActiveAlert,

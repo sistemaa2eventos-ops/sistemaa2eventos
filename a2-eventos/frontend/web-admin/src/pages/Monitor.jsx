@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Box, Typography, Grid, Stack, Avatar, Tabs, Tab, 
+  Box, Typography, Grid, Stack, Avatar, Tabs, Tab,
   IconButton, TextField, MenuItem, Select, FormControl,
-  InputLabel, Button, Table, TableBody, TableCell, 
+  InputLabel, Button, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Paper, Chip,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  CircularProgress, Tooltip, Fade, Zoom
+  CircularProgress, Tooltip, Fade, Zoom, Divider
 } from '@mui/material';
+import { useSnackbar } from 'notistack';
 import {
   MonitorHeart as MonitorIcon, Search as SearchIcon,
   FiberManualRecord as DotIcon, Videocam as CameraIcon, 
@@ -44,10 +45,11 @@ const LogItem = styled(Box, { shouldForwardProp: (p) => p !== 'tipo' })(({ tipo,
 }));
 
 const Monitor = () => {
+  const { enqueueSnackbar } = useSnackbar();
   const [tabIndex, setTabIndex] = useState(0);
   const {
     logs, stats, loading, tick, areas, dispositivosLista, terminais,
-    cameras, setCameras, fetchCameras,
+    cameras, setCameras, fetchCameras, fetchWatchlist,
     watchlist, newCpf, setNewCpf, isTracking, activeAlert, setActiveAlert,
     sysStatus, sysLogs, sysPerf, sysError,
     addToWatchlist, removeFromWatchlist, fetchSystemHealth,
@@ -56,9 +58,13 @@ const Monitor = () => {
 
   // Dialogs States
   const [openCameraDialog, setOpenCameraDialog] = useState(false);
-  const [openContatoDialog, setOpenContatoDialog] = useState(false);
   const [editingCamera, setEditingCamera] = useState(null);
-  const [testResult, setTestResult] = useState(null);
+  const [testResults, setTestResults] = useState({});
+
+  // Chamar fetchSystemHealth ao entrar na aba Saúde
+  useEffect(() => {
+    if (tabIndex === 4) fetchSystemHealth();
+  }, [tabIndex, fetchSystemHealth]);
 
   const FABRICANTES = ['Intelbras', 'Hikvision', 'Genérica'];
 
@@ -76,17 +82,19 @@ const Monitor = () => {
     try {
         await api.post('/watchlist/upload', formData);
         enqueueSnackbar('CSV Importado com sucesso', { variant: 'success' });
+        fetchWatchlist();
     } catch (err) {
         enqueueSnackbar('Erro ao importar CSV', { variant: 'error' });
     }
   };
 
   const handleTestCamera = async (id) => {
+    setTestResults(prev => ({ ...prev, [id]: 'testing' }));
     try {
         const resp = await api.post(`/cameras/${id}/testar`);
-        setTestResult(resp.data);
+        setTestResults(prev => ({ ...prev, [id]: resp.data.online ? 'online' : 'offline' }));
     } catch (err) {
-        setTestResult({ online: false });
+        setTestResults(prev => ({ ...prev, [id]: 'offline' }));
     }
   };
 
@@ -244,7 +252,7 @@ const Monitor = () => {
                                         sx={{ fontWeight: 800 }}
                                       />
                                   </TableCell>
-                                  <TableCell>{t.last_seen ? format(new Date(t.last_seen), 'dd/MM HH:mm:ss') : 'Nuca Conectado'}</TableCell>
+                                  <TableCell>{t.last_seen ? format(new Date(t.last_seen), 'dd/MM HH:mm:ss') : 'Nunca Conectado'}</TableCell>
                               </TableRow>
                           ))}
                       </TableBody>
@@ -333,9 +341,21 @@ const Monitor = () => {
                                     onError={(e) => { e.target.src = '/assets/cam_offline.png' }}
                                 />
                             </Box>
-                            <Box sx={{ p: 1, display: 'flex', gap: 1 }}>
-                                <Button size="small" fullWidth variant="outlined" onClick={() => handleTestCamera(cam.id)}>TESTAR</Button>
-                                <Button size="small" fullWidth variant="contained">TELA CHEIA</Button>
+                            <Box sx={{ p: 1, display: 'flex', gap: 1, alignItems: 'center' }}>
+                                <Button
+                                    size="small" fullWidth variant="outlined"
+                                    disabled={testResults[cam.id] === 'testing'}
+                                    onClick={() => handleTestCamera(cam.id)}
+                                >
+                                    {testResults[cam.id] === 'testing' ? <CircularProgress size={14} /> : 'TESTAR'}
+                                </Button>
+                                {testResults[cam.id] && testResults[cam.id] !== 'testing' && (
+                                    <Chip
+                                        size="small"
+                                        label={testResults[cam.id] === 'online' ? 'ONLINE' : 'OFFLINE'}
+                                        color={testResults[cam.id] === 'online' ? 'success' : 'error'}
+                                    />
+                                )}
                             </Box>
                         </GlassCard>
                     </Grid>
@@ -369,15 +389,15 @@ const Monitor = () => {
           <DialogTitle>CONFIGURAÇÃO DE CÂMERA IP</DialogTitle>
           <DialogContent>
               <Stack spacing={2} pt={1}>
-                  <TextField label="Nome da Câmera" fullWidth value={editingCamera?.nome} onChange={(e) => setEditingCamera({...editingCamera, nome: e.target.value})} />
+                  <TextField label="Nome da Câmera" fullWidth value={editingCamera?.nome || ''} onChange={(e) => setEditingCamera({...editingCamera, nome: e.target.value})} />
                   <FormControl fullWidth>
                       <InputLabel>Fabricante</InputLabel>
-                      <Select label="Fabricante" value={editingCamera?.fabricante} onChange={(e) => setEditingCamera({...editingCamera, fabricante: e.target.value})}>
+                      <Select label="Fabricante" value={editingCamera?.fabricante || ''} onChange={(e) => setEditingCamera({...editingCamera, fabricante: e.target.value})}>
                           {FABRICANTES.map(f => <MenuItem key={f} value={f}>{f}</MenuItem>)}
                       </Select>
                   </FormControl>
-                  <TextField label="Endereço IP" fullWidth value={editingCamera?.ip_address} onChange={(e) => setEditingCamera({...editingCamera, ip_address: e.target.value})} />
-                  <TextField label="Snapshot URL (Manual)" fullWidth value={editingCamera?.snapshot_url} onChange={(e) => setEditingCamera({...editingCamera, snapshot_url: e.target.value})} helperText="Deixe vazio para usar o padrão do fabricante" />
+                  <TextField label="Endereço IP" fullWidth value={editingCamera?.ip_address || ''} onChange={(e) => setEditingCamera({...editingCamera, ip_address: e.target.value})} />
+                  <TextField label="Snapshot URL (Manual)" fullWidth value={editingCamera?.snapshot_url || ''} onChange={(e) => setEditingCamera({...editingCamera, snapshot_url: e.target.value})} helperText="Deixe vazio para usar o padrão do fabricante" />
               </Stack>
           </DialogContent>
           <DialogActions>

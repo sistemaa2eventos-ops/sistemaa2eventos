@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 
+const log = import.meta.env.DEV ? console.log : () => {};
+
 /**
  * useDashboard: Hook de inteligência para o painel principal do Web Admin.
  * Centraliza métricas de tempo real, fluxo 24h e logs de atividades recentes.
@@ -82,7 +84,7 @@ export const useDashboard = () => {
     // F-02: Escuta evento global de sincronização offline concluída para atualizar UI
     useEffect(() => {
         const handleGlobalRefresh = () => {
-            logger.info('🔄 Dashboard Refresh Triggered via Global Event');
+            log('Dashboard Refresh Triggered via Global Event');
             refresh();
         };
 

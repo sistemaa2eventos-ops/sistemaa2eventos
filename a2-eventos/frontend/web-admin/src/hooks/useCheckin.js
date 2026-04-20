@@ -60,7 +60,12 @@ export const useCheckin = (defaultMode) => {
         if (!eventoId) return;
 
         const socketUrl = (import.meta.env.VITE_API_URL || '').replace(/\/api$/, '') || window.location.origin;
-        const socket = io(socketUrl, { transports: ['polling', 'websocket'], reconnectionAttempts: 5 });
+        const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+        const socket = io(socketUrl, {
+            transports: ['polling', 'websocket'],
+            reconnectionAttempts: 5,
+            auth: { token }
+        });
 
         socket.on('connect', () => {
             socket.emit('join_event', eventoId);

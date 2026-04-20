@@ -23,6 +23,7 @@ export const MODULOS = [
   { key: 'auditoria_documentos', label: 'Auditoria', icon: 'FileText' },
   { key: 'monitoramento', label: 'Monitoramento', icon: 'Monitor' },
   { key: 'relatorios', label: 'Relatórios', icon: 'BarChart' },
+  { key: 'veiculos', label: 'Veículos', icon: 'Truck' },
   { key: 'checkin', label: 'Check-in', icon: 'LogIn' },
   { key: 'checkout', label: 'Check-out', icon: 'LogOut' }
 ];

@@ -91,6 +91,7 @@ function ConfigPermissoes() {
             auditoria_documentos: operador.permissions?.auditoria_documentos || false,
             monitoramento: operador.permissions?.monitoramento || false,
             relatorios: operador.permissions?.relatorios || false,
+            veiculos: operador.permissions?.veiculos || false,
             checkin: operador.permissions?.checkin || false,
             checkout: operador.permissions?.checkout || false
         });

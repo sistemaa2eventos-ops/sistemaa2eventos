@@ -213,7 +213,7 @@ const Sidebar = ({ open, onClose }) => {
         {
             text: t('sidebar.people', { defaultValue: 'Participantes' }),
             icon: <PessoaIcon />,
-            menuKey: 'participantes',
+            menuKey: 'pessoas',
             get path() {
                 const eid = localStorage.getItem('active_evento_id');
                 return eid ? `/pessoas?evento_id=${eid}` : '/pessoas';
@@ -223,7 +223,7 @@ const Sidebar = ({ open, onClose }) => {
         {
             text: 'Auditoria Documental',
             icon: <AssignmentTurnedInIcon />,
-            menuKey: 'auditoria',
+            menuKey: 'auditoria_documentos',
             get path() {
                 const eid = localStorage.getItem('active_evento_id');
                 return eid ? `/auditoria?evento_id=${eid}` : '/auditoria';
@@ -243,7 +243,7 @@ const Sidebar = ({ open, onClose }) => {
         {
             text: 'Frota LPR',
             icon: <CarIcon />,
-            menuKey: 'frota_lpr',
+            menuKey: 'veiculos',
             get path() {
                 const eid = localStorage.getItem('active_evento_id');
                 return eid ? `/veiculos?evento_id=${eid}` : '/veiculos';
@@ -274,7 +274,7 @@ const Sidebar = ({ open, onClose }) => {
         {
             text: t('sidebar.monitor', { defaultValue: 'Monitor' }),
             icon: <MonitorIcon />,
-            menuKey: 'monitor',
+            menuKey: 'monitoramento',
             get path() {
                 const eid = localStorage.getItem('active_evento_id');
                 return eid ? `/monitor?evento_id=${eid}` : '/monitor';
