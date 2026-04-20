@@ -159,8 +159,11 @@ class ValidationService {
     }
 
     async validateAccessRules(evento_id, pessoa, tipo, metodo, timestamp, confianca, area_id = null) {
-        // Permitir bypass se for pulseira (operador humano), caso contrário bloquear pendentes
-        if (pessoa.status_acesso === 'pendente' && metodo !== 'pulseira') {
+        // Operações manuais (admin web) e pulseira (operador físico) = decisão humana explícita
+        const isHumanOperator = metodo === 'pulseira' || metodo === 'manual';
+
+        // Permitir bypass se for operação humana, caso contrário bloquear pendentes
+        if (pessoa.status_acesso === 'pendente' && !isHumanOperator) {
             throw this._buildError('Cadastro Incompleto (Pendente)');
         }
 
@@ -194,9 +197,10 @@ class ValidationService {
         }
 
         // 1. Validação de Fase do Evento
-        // Regra: Apenas facial valida fase. Pulseira é bypass por serOperado por humano.
-        const skipPhaseCheck = allowOffhour && metodo === 'pulseira';
-        
+        // Operação humana (manual/pulseira) sempre bypassa fase — o operador decide.
+        // Facial/QRCode automático respeita allowOffhour.
+        const skipPhaseCheck = isHumanOperator || (allowOffhour && metodo !== 'facial');
+
         if (tipo === 'checkin' && !skipPhaseCheck) {
             const fasePermitida = await this.verificarFaseEvento(evento_id, pessoa, metodo);
             if (!fasePermitida) throw this._buildError('Fase do evento não permitida para este perfil');
@@ -219,9 +223,9 @@ class ValidationService {
         if (tipo === 'checkin') {
             const stats = await this.getRealtimeStatsInternal(evento_id);
             if (stats.presentes >= stats.capacidade && stats.capacidade > 0) {
-                // Permitir bypass para pulseira (operador humano decide)
-                if (metodo === 'pulseira') {
-                    logger.warn(`⚠️ [BYPASS] Cota excedida, liberada via pulseira`);
+                // Operação humana (pulseira/manual) pode ultrapassar cota — operador decide
+                if (isHumanOperator) {
+                    logger.warn(`⚠️ [BYPASS] Cota excedida, liberada via ${metodo}`);
                     quotaBypassed = true;
                 } else {
                     throw this._buildError('Capacidade máxima do evento atingida');
