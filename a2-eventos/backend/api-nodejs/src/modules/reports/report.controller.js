@@ -109,7 +109,7 @@ class ReportController {
             const { data: logs, error } = await query;
             if (error) throw error;
 
-            const { data: areas } = await supabase.from('areas_acesso').select('id, nome').eq('evento_id', evento_id);
+            const { data: areas } = await supabase.from('evento_areas').select('id, nome').eq('evento_id', evento_id);
             const areaMap = (areas || []).reduce((acc, a) => { acc[a.id] = a.nome; return acc; }, {});
 
             const stats = {};

@@ -187,7 +187,7 @@ class MonitorController {
 
             let { data, error } = await supabase
                 .from('dispositivos_acesso')
-                .select('id, nome, tipo, status, area_id, last_seen, evento_areas(nome)')
+                .select('id, nome, tipo, status, area_id, ultimo_heartbeat, evento_areas(nome)')
                 .eq('evento_id', evento_id)
                 .order('status', { ascending: false });
 
@@ -196,7 +196,7 @@ class MonitorController {
                 logger.warn('Fallback getTerminais sem join evento_areas:', error.message);
                 const retry = await supabase
                     .from('dispositivos_acesso')
-                    .select('id, nome, tipo, status, area_id, last_seen')
+                    .select('id, nome, tipo, status, area_id, ultimo_heartbeat')
                     .eq('evento_id', evento_id)
                     .order('status', { ascending: false });
 
