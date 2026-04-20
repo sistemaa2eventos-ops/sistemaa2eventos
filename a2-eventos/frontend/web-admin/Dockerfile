@@ -1,4 +1,4 @@
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 ARG VITE_API_URL=https://api.nzt.app.br/api
 

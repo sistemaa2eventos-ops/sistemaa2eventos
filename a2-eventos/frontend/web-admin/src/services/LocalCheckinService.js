@@ -125,7 +125,12 @@ class LocalCheckinService {
      * Listener para monitorar a conexão globalmente
      */
     iniciarListenerConexao(onSyncStart, onSyncEnd) {
-        window.addEventListener('online', async () => {
+        // Remover listener anterior se existir
+        if (this._onlineHandler) {
+            window.removeEventListener('online', this._onlineHandler);
+        }
+
+        this._onlineHandler = async () => {
             log('[LocalCheckinService] Conexão restaurada.');
             const count = await this.getPendenteCount();
             if (count > 0) {
@@ -133,7 +138,16 @@ class LocalCheckinService {
                 await this.sincronizarFila();
                 if (onSyncEnd) onSyncEnd();
             }
-        });
+        };
+
+        window.addEventListener('online', this._onlineHandler);
+    }
+
+    pararListenerConexao() {
+        if (this._onlineHandler) {
+            window.removeEventListener('online', this._onlineHandler);
+            this._onlineHandler = null;
+        }
     }
 
     async getPendenteCount() {

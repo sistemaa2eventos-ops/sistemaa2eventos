@@ -58,47 +58,24 @@ router.get('/stats', async (req, res) => {
     try {
         const empresaId = req.user.id;
 
-        // 1. Info da Empresa (Cota Total)
-        const { data: empresa } = await req.userClient
-            .from('empresas')
-            .select('quota')
-            .eq('id', empresaId)
-            .single();
+        // Paralelizar todas as queries — nenhuma depende do resultado de outra
+        const [empresaRes, aprovadosRes, docsRes, checkinsRes, logsRes] = await Promise.all([
+            req.userClient.from('empresas').select('quota').eq('id', empresaId).single(),
+            req.userClient.from('pessoa_evento_empresa').select('pessoa_id', { count: 'exact', head: true })
+                .eq('status_aprovacao', 'aprovado'),
+            req.userClient.from('pessoa_documentos').select('id', { count: 'exact', head: true })
+                .eq('status', 'pendente'),
+            req.userClient.from('pessoa_evento_empresa')
+                .select('pessoa_id, pessoas!inner(id, nome, status_acesso)')
+                .eq('status_aprovacao', 'aprovado')
+                .eq('pessoas.status_acesso', 'checkin_feito'),
+            req.userClient.from('logs_acesso').select('*, pessoas!inner(nome, cpf)')
+                .eq('tipo', 'CHECKIN').order('data_hora', { ascending: false }).limit(5)
+        ]);
 
-        const cotaTotal = empresa?.quota || 0;
-
-        // 2. Colaboradores Aprovados (Pivot)
-        const { data: pivotAprovados } = await req.userClient
-            .from('pessoa_evento_empresa')
-            .select('pessoa_id')
-            .eq('status_aprovacao', 'aprovado');
-
-        const totalCredenciados = pivotAprovados ? pivotAprovados.length : 0;
-
-        // 3. Documentos Pendentes / ECM
-        // RLS cuidará para puxarmos apenas documentos atrelados a pessoas vinculadas a essa empresa
-        const { data: docsPendentes } = await req.userClient
-            .from('pessoa_documentos')
-            .select('id', { count: 'exact', head: true })
-            .eq('status', 'pendente');
-
-        // 4. Pessoas com Check-in (M:N)
-        const { data: listCheckins } = await req.userClient
-            .from('pessoa_evento_empresa')
-            .select('pessoa_id, pessoas!inner(id, nome, status_acesso)')
-            .eq('status_aprovacao', 'aprovado')
-            .eq('pessoas.status_acesso', 'checkin_feito');
-
-        const presentesDesteMomento = listCheckins ? listCheckins.length : 0;
-
-        // Últimos Check-ins (Logs Recentes)
-        // Isso requer join. O RLS isola as Pessoas para esta tela
-        const { data: recentLogs } = await req.userClient
-            .from('logs_acesso')
-            .select('*, pessoas!inner(nome, cpf)')
-            .eq('tipo', 'CHECKIN')
-            .order('data_hora', { ascending: false })
-            .limit(5);
+        const cotaTotal = empresaRes.data?.quota || 0;
+        const totalCredenciados = aprovadosRes.count || 0;
+        const presentesDesteMomento = checkinsRes.data ? checkinsRes.data.length : 0;
 
         res.json({
             success: true,
@@ -107,9 +84,9 @@ router.get('/stats', async (req, res) => {
                 totalCredenciados,
                 cotaUsadaPerc: cotaTotal > 0 ? ((totalCredenciados / cotaTotal) * 100).toFixed(1) : 0,
                 presentesAgora: presentesDesteMomento,
-                ecmPendentes: docsPendentes ? docsPendentes.count : 0
+                ecmPendentes: docsRes.count || 0
             },
-            recent_activity: recentLogs || []
+            recent_activity: logsRes.data || []
         });
 
     } catch (error) {

@@ -87,30 +87,48 @@ class WebSocketService {
         });
 
         // Middleware de rate limit por IP (após autenticação)
-        this.io.use((socket, next) => {
+        this.io.use(async (socket, next) => {
             const ip = socket.handshake.address;
-            const now = Date.now();
             const limit = 20;
+            const windowSec = 60;
 
-            if (!rateLimitMap.has(ip)) {
-                rateLimitMap.set(ip, { count: 1, resetTime: now + 60000 });
-                return next();
+            try {
+                if (this.redisEnabled && this.pubClient) {
+                    // Rate limit via Redis (cluster-safe, persiste entre restarts)
+                    const key = `ws_rate:${ip}`;
+                    const count = await this.pubClient.incr(key);
+                    if (count === 1) await this.pubClient.expire(key, windowSec);
+
+                    if (count > limit) {
+                        logger.warn(`🛑 WebSocket Rate Limit Excedido (Redis) para IP: ${ip}`);
+                        return next(new Error('Rate limit exceeded. Try again later.'));
+                    }
+                    return next();
+                }
+
+                // Fallback: in-memory (single-node)
+                const now = Date.now();
+                if (!rateLimitMap.has(ip)) {
+                    rateLimitMap.set(ip, { count: 1, resetTime: now + windowSec * 1000 });
+                    return next();
+                }
+                const record = rateLimitMap.get(ip);
+                if (now > record.resetTime) {
+                    record.count = 1;
+                    record.resetTime = now + windowSec * 1000;
+                    return next();
+                }
+                if (record.count > limit) {
+                    logger.warn(`🛑 WebSocket Rate Limit Excedido (Memory) para IP: ${ip}`);
+                    return next(new Error('Rate limit exceeded. Try again later.'));
+                }
+                record.count++;
+                next();
+            } catch (err) {
+                // Se Redis falhar, permite a conexão (fail-open)
+                logger.error('Erro no rate limiter WS:', err.message);
+                next();
             }
-
-            const record = rateLimitMap.get(ip);
-            if (now > record.resetTime) {
-                record.count = 1;
-                record.resetTime = now + 60000;
-                return next();
-            }
-
-            if (record.count > limit) {
-                logger.warn(`🛑 WebSocket Rate Limit Excedido para IP: ${ip}`);
-                return next(new Error('Rate limit exceeded. Try again later.'));
-            }
-
-            record.count++;
-            next();
         });
 
         this.io.on('connection', (socket) => {
