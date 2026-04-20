@@ -13,7 +13,11 @@ export const useMonitor = () => {
     const [searchParams] = useSearchParams();
     const eventoId = searchParams.get('evento_id') || localStorage.getItem('active_evento_id');
 
-    const log = import.meta.env.DEV ? console.log : () => {};
+    // Referência estável para log — evitar new () => {} a cada render quequebraria
+    // as dependências dos useCallback e dispararia o useEffect de polling infinitamente.
+    const log = useCallback((...args) => {
+        if (import.meta.env.DEV) console.log(...args);
+    }, []);
 
     // States - Feed & Stats
     const [logs, setLogs] = useState([]);
