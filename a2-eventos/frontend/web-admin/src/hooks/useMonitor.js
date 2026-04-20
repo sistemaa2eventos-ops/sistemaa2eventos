@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSnackbar } from 'notistack';
 import { useSearchParams } from 'react-router-dom';
 import io from 'socket.io-client';
@@ -9,9 +9,16 @@ import api from '../services/api';
  * Centraliza WebSockets, polling de status e gerenciamento de watchlist.
  */
 export const useMonitor = () => {
-    const { enqueueSnackbar } = useSnackbar();
+    const { enqueueSnackbar: _enqueueSnackbar } = useSnackbar();
     const [searchParams] = useSearchParams();
     const eventoId = searchParams.get('evento_id') || localStorage.getItem('active_evento_id');
+
+    // Ref estável para enqueueSnackbar — notistack pode retornar nova referência a cada render,
+    // o que invalidaria fetchWatchlist e fetchSystemHealth (que estão nos deps do useEffect),
+    // disparando o loop infinito de polling.
+    const snackRef = useRef(_enqueueSnackbar);
+    snackRef.current = _enqueueSnackbar;
+    const enqueueSnackbar = useCallback((...args) => snackRef.current(...args), []);
 
     // Referência estável para log — evitar new () => {} a cada render quequebraria
     // as dependências dos useCallback e dispararia o useEffect de polling infinitamente.
