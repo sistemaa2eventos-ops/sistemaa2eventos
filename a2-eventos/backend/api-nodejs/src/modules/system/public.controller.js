@@ -477,21 +477,17 @@ class PublicController {
                 if (updErr) throw updErr;
                 finalPessoaId = targetId;
             } else {
+                logger.info(`[INSERT] Tentando inserir: ${JSON.stringify(personaData).substring(0, 200)}...`);
                 const { data: newPessoa, error: insErr } = await supabase
                     .from('pessoas')
                     .insert([{ ...personaData, evento_id: eventoId, empresa_id: empresaId }])
                     .select('id')
                     .single();
-                
+
+                logger.info(`[INSERT] Resultado: data=${JSON.stringify(newPessoa)}, error=${JSON.stringify(insErr)}`);
+
                 if (insErr) {
-                    console.error('❌ ERRO INSERT PESSOA:', {
-                        code: insErr.code,
-                        message: insErr.message,
-                        details: insErr.details,
-                        hint: insErr.hint,
-                        status: insErr.status
-                    });
-                    logger.error(`Erro ao inserir pessoa - Code: ${insErr.code}, Message: ${insErr.message}, Details: ${insErr.details}`);
+                    logger.error(`[INSERT ERROR] Code: ${insErr.code} | Message: ${insErr.message} | Details: ${insErr.details}`);
                     return res.status(400).json({
                         error: insErr.code === '23505' ? 'Este CPF já está cadastrado.' : 'Erro ao criar registro de colaborador.',
                         detail: insErr.message,
