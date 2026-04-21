@@ -209,7 +209,9 @@ logger.info('🌐 Modulo: HTTP ativo (Terminação SSL gerada pelo Nginx / Rever
 server.listen(PORT, async () => {
     try {
         logger.info(`🚀 Servidor A2 Eventos rodando na porta ${PORT}`);
-        websocketService.init(server);
+        await websocketService.init(server);
+        const agentService = require('./services/agentService');
+        agentService.init(websocketService.io);
         // Teste de conexão com PostgreSQL Edge (Apenas se habilitado)
         if (process.env.ENABLE_PG_EDGE === 'true') {
             await testPgConnection().catch(() => logger.warn('⚠️ Postgres Edge offline'));

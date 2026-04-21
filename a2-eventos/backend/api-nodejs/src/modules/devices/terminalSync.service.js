@@ -81,14 +81,34 @@ class TerminalSyncService {
     }
 
     /**
-     * Lógica de envio conforme a marca do terminal
+     * Lógica de envio conforme a marca do terminal.
+     * Se o terminal tiver agent_id, roteia via agente local.
+     * Se não, tenta conexão direta (legado / rede local acessível).
      */
     async pushToTerminal(pessoa, terminal) {
         try {
-            // Se a foto_url for apenas o caminho relativo no Supabase, precisamos da base64
             const fotoBase64 = await this.getFotoBase64(pessoa.foto_url);
             if (!fotoBase64) return false;
 
+            // Roteamento via agente local (múltiplas unidades / rede privada)
+            if (terminal.agent_id) {
+                const agentService = require('../../services/agentService');
+                logger.info(`🤖 [Agent] Roteando enrollUser via agente ${terminal.agent_id} para ${terminal.nome}`);
+                const result = await agentService.sendCommand(terminal.agent_id, 'enrollUser', {
+                    deviceId: terminal.id,
+                    config: {
+                        ip: terminal.ip_address,
+                        port: terminal.porta || 80,
+                        user: terminal.user_device,
+                        password: terminal.password_device
+                    },
+                    pessoa,
+                    fotoBase64
+                });
+                return result?.success !== false;
+            }
+
+            // Conexão direta (legado)
             const service = DeviceFactory.getDevice(terminal);
             return await service.enrollUser(pessoa, fotoBase64);
         } catch (error) {
