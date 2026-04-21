@@ -416,9 +416,21 @@ class PublicController {
                 return res.status(409).json({ error: 'Este CPF já está cadastrado para este evento.' });
             }
 
-            // 5. Salvar / Atualizar Pessoa (QR code NÃO é gerado aqui - apenas após aprovação)
-            const personaData = {
-                nome,
+            // 5. Descobrir schema real da tabela pessoas (nome vs nome_completo)
+            //    Faz um select rápido para ver quais colunas existem
+            const { data: schemaSample } = await supabase
+                .from('pessoas')
+                .select('*')
+                .limit(1);
+
+            const sampleKeys = schemaSample && schemaSample.length > 0 ? Object.keys(schemaSample[0]) : [];
+            const hasNomeCompleto = sampleKeys.includes('nome_completo');
+            const nameField = hasNomeCompleto ? 'nome_completo' : 'nome';
+            logger.info(`[Schema] Tabela pessoas usa campo: ${nameField} (colunas: ${sampleKeys.slice(0, 10).join(', ')}...)`);
+
+            // Salvar / Atualizar Pessoa (QR code NÃO é gerado aqui - apenas após aprovação)
+            const rawPersonaData = {
+                [nameField]: nome,
                 cpf: cpfLimpo,
                 email: email || null,
                 nome_mae: nome_mae || null,
@@ -426,25 +438,34 @@ class PublicController {
                 funcao: funcao || null,
                 foto_url: finalFotoUrl || null,
                 documento_foto: documento_foto || null,
-                // QR code NÃO é gerado agora - apenas quando aprovado
                 qr_code: null,
                 status_acesso: 'pendente',
                 origem_cadastro: 'externo',
-                // Novos campos
                 tipo_pessoa: tipo_pessoa || 'colaborador',
                 fases_acesso: fases_acesso || [],
                 dias_acesso: dias_trabalho || [],
-                documentos_trabalho: documentosSalvos,
+                dias_trabalho: dias_trabalho || [],
                 trabalha_area_tecnica: trabalho_area_tecnica || false,
                 trabalha_altura: trabalho_altura || false,
-                pagamento_validado: false,
-                codigo_ingresso: null,
-                origem_pagamento: null,
                 aceite_lgpd: true,
                 data_aceite_lgpd: new Date(),
                 registration_token: null,
                 registration_token_expires_at: null
             };
+
+            // Filtrar apenas campos que existem na tabela (evita 400 por coluna inexistente)
+            const personaData = {};
+            const ignoredFields = [];
+            for (const [key, value] of Object.entries(rawPersonaData)) {
+                if (sampleKeys.length === 0 || sampleKeys.includes(key)) {
+                    personaData[key] = value;
+                } else {
+                    ignoredFields.push(key);
+                }
+            }
+            if (ignoredFields.length > 0) {
+                logger.info(`[Schema] Campos ignorados (não existem na tabela): ${ignoredFields.join(', ')}`);
+            }
 
             let finalPessoaId = null;
 
