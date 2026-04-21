@@ -77,16 +77,15 @@ class DeviceController {
             // Auto-configurar Push
             if (marca === 'intelbras') {
                 try {
-                    const device = DeviceFactory.getDevice({ ip_address, porta, user, password, marca });
-
-                    // Tentar determinar IP do servidor
+                    const deviceInst = DeviceFactory.getDevice({ ip_address, porta, user, password, marca, control_token: data.control_token, config: data.config });
                     const serverIp = process.env.SERVER_IP || this._getLocalIp() || req.ip;
-                    logger.info(`⚙️ Auto-configurando Push para ${serverIp}...`);
+                    const serverPort = parseInt(process.env.PORT || 3001);
+                    logger.info(`⚙️ Auto-configurando Modo Online para ${serverIp}:${serverPort}...`);
 
-                    await device.configureEventPush(serverIp);
+                    // Modo online: dispositivo pergunta ao servidor antes de liberar
+                    await deviceInst.configureOnlineMode(serverIp, serverPort);
                 } catch (pushError) {
-                    logger.error(`⚠️ Erro ao auto-configurar push para ${nome}: ${pushError.message}`, pushError);
-                    // Não falhar a criação se o push falhar
+                    logger.error(`⚠️ Erro ao auto-configurar modo online para ${nome}: ${pushError.message}`);
                 }
             }
 

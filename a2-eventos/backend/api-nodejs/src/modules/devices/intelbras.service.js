@@ -400,13 +400,67 @@ class IntelbrasService extends AccessDevice {
      * Configurar HTTP Push de Eventos (V2/V3)
      * Configura o dispositivo para enviar eventos para o servidor
      */
+    /**
+     * Configura o dispositivo em MODO ONLINE.
+     *
+     * No modo online o dispositivo detecta a face e pergunta ao servidor
+     * se pode liberar. O servidor responde {"auth":"true"/"false"} e o
+     * dispositivo controla o relé sozinho — sem necessidade de conexão reversa.
+     *
+     * Baseado nos parâmetros reais da API Intelbras (config_online_mode):
+     *   PictureHttpUpload.*        → endpoint que recebe o evento com foto
+     *   Intelbras_ModeCfg.*        → modo online + keepalive
+     */
+    async configureOnlineMode(serverIp, serverPort = 3001) {
+        try {
+            logger.info(`⚙️ [Intelbras] Configurando MODO ONLINE no IP ${this.ip} → ${serverIp}:${serverPort}`);
+
+            const token = this.config?.control_token || '';
+            const qs    = token ? `?token=${token}` : '';
+
+            const onlinePath   = `/api/intelbras/online${qs}`;
+            const keepalivePath = `/api/intelbras/keepalive${qs}`;
+
+            // 1. Configurar endpoint de eventos com foto (PictureHttpUpload)
+            const paramsUpload = {
+                action: 'setConfig',
+                'PictureHttpUpload.Enable': 'true',
+                'PictureHttpUpload.UploadServerList[0].Address': serverIp,
+                'PictureHttpUpload.UploadServerList[0].Port': serverPort,
+                'PictureHttpUpload.UploadServerList[0].Uploadpath': onlinePath
+            };
+            const r1 = await this._get('/cgi-bin/configManager.cgi', paramsUpload);
+            logger.info(`📡 [Online] PictureHttpUpload: ${r1.trim()}`);
+
+            // 2. Configurar modo online + keepalive (Intelbras_ModeCfg)
+            const paramsMode = {
+                action: 'setConfig',
+                'Intelbras_ModeCfg.DeviceMode': '1',               // 0=offline, 1=online
+                'Intelbras_ModeCfg.KeepAlive.Enable': 'true',
+                'Intelbras_ModeCfg.KeepAlive.Interval': '30',
+                'Intelbras_ModeCfg.KeepAlive.Path': keepalivePath,
+                'Intelbras_ModeCfg.KeepAlive.TimeOut': '5',
+                'Intelbras_ModeCfg.RemoteCheckTimeout': '10'
+            };
+            const r2 = await this._get('/cgi-bin/configManager.cgi', paramsMode);
+            logger.info(`📡 [Online] ModeCfg: ${r2.trim()}`);
+
+            return r1.includes('OK') && r2.includes('OK');
+        } catch (error) {
+            logger.error(`❌ [Intelbras] Erro ao configurar modo online: ${error.message}`);
+            return false;
+        }
+    }
+
+    /**
+     * Configura o dispositivo em MODO PUSH/EVENTO (legado).
+     * O dispositivo reconhece localmente e apenas notifica o servidor.
+     * Mantido para compatibilidade.
+     */
     async configureEventPush(serverIp, serverPort = 3001) {
         try {
             logger.info(`⚙️ [Intelbras] Configurando Event Push no IP ${this.ip} para ${serverIp}:${serverPort}...`);
 
-            // Configuração padrão Dahua/Intelbras para HTTP Client (Events)
-            // Habilita o envio de eventos para o servidor
-            // Obter token do dispositivo
             const pushUrl = this.config?.control_token
                 ? `/api/intelbras/events?token=${this.config.control_token}`
                 : '/api/intelbras/events';
@@ -415,19 +469,18 @@ class IntelbrasService extends AccessDevice {
                 action: 'setConfig',
                 'HTTPClient.Server[0].Address': serverIp,
                 'HTTPClient.Server[0].Port': serverPort,
-                'HTTPClient.Server[0].RegisterUrl': pushUrl, // URL de registro/heartbeat
-                'HTTPClient.Server[0].EventsUrl': pushUrl,   // URL para enviar eventos
+                'HTTPClient.Server[0].RegisterUrl': pushUrl,
+                'HTTPClient.Server[0].EventsUrl': pushUrl,
                 'HTTPClient.Server[0].Enable': 'true',
-                'HTTPClient.Server[0].Interval': 30, // Heartbeat
+                'HTTPClient.Server[0].Interval': 30,
                 'HTTPClient.Enable': 'true'
             };
 
             const response = await this._get('/cgi-bin/configManager.cgi', params);
             logger.info(`📡 Resposta Config Push (${this.ip}): ${response.trim()}`);
-
             return response.includes('OK');
         } catch (error) {
-            logger.error(`❌ [Intelbras] Erro ao configurar Push:`, error.message);
+            logger.error(`❌ [Intelbras] Erro ao configurar Push: ${error.message}`);
             return false;
         }
     }
