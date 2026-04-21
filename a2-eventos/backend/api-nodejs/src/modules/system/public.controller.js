@@ -106,18 +106,21 @@ class PublicController {
                 return res.status(404).json({ error: 'Link corporativo inválido.' });
             }
 
-            // Selecionar os colaboradores apenas com campos seguros para exibição pública
+            // Selecionar os colaboradores — usa select('*') para resiliência de schema
             const { data: rawEmployees, error: empError } = await supabase
                 .from('pessoas')
-                .select('id, nome, funcao, status_acesso')
+                .select('*')
                 .eq('empresa_id', empresa.id)
                 .order('created_at', { ascending: false });
 
-            if (empError) throw empError;
+            if (empError) {
+                logger.error('Supabase error in getCompanyEmployeesByToken:', JSON.stringify(empError));
+                return res.status(500).json({ error: 'Erro ao buscar lista de credenciados', detail: empError.message, code: empError.code });
+            }
 
             const employees = (rawEmployees || []).map(emp => ({
                 id: emp.id,
-                nome: emp.nome,
+                nome: emp.nome_completo || emp.nome || 'Sem nome',
                 funcao: emp.funcao,
                 status_acesso: emp.status_acesso
             }));
@@ -126,7 +129,7 @@ class PublicController {
 
         } catch (error) {
             logger.error('Erro em getCompanyEmployeesByToken:', error);
-            res.status(500).json({ error: 'Erro ao buscar lista de credenciados' });
+            res.status(500).json({ error: 'Erro ao buscar lista de credenciados', detail: error.message });
         }
     }
 
@@ -415,7 +418,7 @@ class PublicController {
 
             // 5. Salvar / Atualizar Pessoa (QR code NÃO é gerado aqui - apenas após aprovação)
             const personaData = {
-                nome_completo: nome,
+                nome,
                 cpf: cpfLimpo,
                 email: email || null,
                 nome_mae: nome_mae || null,
@@ -460,9 +463,11 @@ class PublicController {
                     .single();
                 
                 if (insErr) {
-                    logger.error('Erro ao inserir nova pessoa:', insErr);
-                    return res.status(400).json({ 
-                        error: insErr.code === '23505' ? 'Este CPF já está cadastrado.' : 'Erro ao criar registro de colaborador.' 
+                    logger.error('Erro ao inserir nova pessoa:', JSON.stringify(insErr));
+                    return res.status(400).json({
+                        error: insErr.code === '23505' ? 'Este CPF já está cadastrado.' : 'Erro ao criar registro de colaborador.',
+                        detail: insErr.message,
+                        code: insErr.code
                     });
                 }
                 
