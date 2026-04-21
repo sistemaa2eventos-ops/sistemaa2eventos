@@ -15,7 +15,8 @@ import {
   ExpandMore as ExpandMoreIcon, ExpandLess as ExpandLessIcon,
   CheckCircle as OkIcon, Error as ErrIcon, Warning as WarnIcon,
   PowerSettingsNew as PowerIcon, Timeline as QueueIcon,
-  Videocam as CamIcon, RouterOutlined as RouterIcon
+  Videocam as CamIcon, RouterOutlined as RouterIcon,
+  ContentCopy as CopyIcon
 } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import PageHeader from '../../components/common/PageHeader';
@@ -25,34 +26,35 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import api from '../../services/api';
 
 // ── Paleta padronizada do sistema
-const CYAN  = '#00D4FF';
+const CYAN = '#00D4FF';
 const GREEN = '#00FF88';
-const RED   = '#FF3366';
-const PURP  = '#7B2FBE';
-const BG    = 'rgba(5,11,24,0.85)';
+const RED = '#FF3366';
+const PURP = '#7B2FBE';
+const BG = 'rgba(5,11,24,0.85)';
 
 // ── Helpers visuais
-const statusColor  = (s) => s === 'online' ? GREEN : RED;
-const statusLabel  = (s) => s === 'online' ? '● Online' : '○ Offline';
-const queueChip    = (s) => ({ sucesso: 'success', erro: 'error', pendente: 'warning', processando: 'info' }[s] ?? 'default');
+const statusColor = (s) => s === 'online' ? GREEN : RED;
+const statusLabel = (s) => s === 'online' ? '● Online' : '○ Offline';
+const queueChip = (s) => ({ sucesso: 'success', erro: 'error', pendente: 'warning', processando: 'info' }[s] ?? 'default');
 
 const FORM_DEFAULT = {
   id: null, nome: '', marca: 'intelbras', tipo: 'terminal_facial',
   ip_address: '', porta: 80, user_device: 'admin', password_device: '',
-  modo: 'ambos', area_nome: ''
+  modo: 'ambos', area_nome: '', offline_mode: 'fail_closed',
+  config: { fluxo: 'checkin', controla_rele: true }
 };
 
 export default function DispositivosPage() {
   const { enqueueSnackbar } = useSnackbar();
 
-  const [dispositivos, setDispositivos]   = useState([]);
-  const [queue, setQueue]                 = useState([]);
-  const [loading, setLoading]             = useState(true);
-  const [autoRefresh, setAutoRefresh]     = useState(true);
+  const [dispositivos, setDispositivos] = useState([]);
+  const [queue, setQueue] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   // Dialog estados
-  const [openDialog, setOpenDialog]       = useState(false);
-  const [isEditing, setIsEditing]         = useState(false);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   // Estados de ação por dispositivo
@@ -63,20 +65,20 @@ export default function DispositivosPage() {
   const [snapshotDialog, setSnapshotDialog] = useState({ open: false, url: null, nome: '' });
 
   // Test-connection dialog
-  const [testDialog, setTestDialog]       = useState({ open: false, result: null, testing: false });
-  const [testIp, setTestIp]               = useState('');
-  const [testPorta, setTestPorta]         = useState(80);
+  const [testDialog, setTestDialog] = useState({ open: false, result: null, testing: false });
+  const [testIp, setTestIp] = useState('');
+  const [testPorta, setTestPorta] = useState(80);
 
   // Formulário
-  const [formData, setFormData]           = useState(FORM_DEFAULT);
+  const [formData, setFormData] = useState(FORM_DEFAULT);
 
   // ── Carregamento
   const carregarDados = useCallback(async () => {
     try {
       setLoading(true);
       const [devRes, queueRes] = await Promise.allSettled([
-        api.get('/dispositivos'),
-        api.get('/dispositivos/queue')
+        api.get('/api/dispositivos'),
+        api.get('/api/dispositivos/queue')
       ]);
       setDispositivos(devRes.status === 'fulfilled' ? (devRes.value.data?.data ?? []) : []);
       setQueue(queueRes.status === 'fulfilled' ? (queueRes.value.data?.data ?? []) : []);
@@ -102,14 +104,27 @@ export default function DispositivosPage() {
 
   // ── Formulário
   const handleOpenDialog = (device = null) => {
-    setFormData(device ? { ...device } : { ...FORM_DEFAULT });
+    if (device) {
+      setFormData({
+        ...FORM_DEFAULT,
+        ...device,
+        config: { ...FORM_DEFAULT.config, ...(device.config || {}) }
+      });
+    } else {
+      setFormData({ ...FORM_DEFAULT, config: { ...FORM_DEFAULT.config } });
+    }
     setIsEditing(!!device);
     setOpenDialog(true);
   };
 
   const handleFormChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(p => ({ ...p, [name]: name === 'porta' ? parseInt(value) || 0 : value }));
+    const { name, value, type, checked } = e.target;
+    if (name.startsWith('config.')) {
+      const key = name.slice(7);
+      setFormData(p => ({ ...p, config: { ...(p.config || {}), [key]: type === 'checkbox' ? checked : value } }));
+    } else {
+      setFormData(p => ({ ...p, [name]: name === 'porta' ? parseInt(value) || 0 : value }));
+    }
   };
 
   const handleSave = async () => {
@@ -119,10 +134,10 @@ export default function DispositivosPage() {
     }
     try {
       if (isEditing) {
-        await api.put(`/dispositivos/${formData.id}`, formData);
+        await api.put(`/api/dispositivos/${formData.id}`, formData);
         enqueueSnackbar('Dispositivo atualizado', { variant: 'success' });
       } else {
-        await api.post('/dispositivos', formData);
+        await api.post('/api/dispositivos', formData);
         enqueueSnackbar('Dispositivo criado', { variant: 'success' });
       }
       setOpenDialog(false);
@@ -134,7 +149,7 @@ export default function DispositivosPage() {
 
   const handleDelete = async (id) => {
     try {
-      await api.delete(`/dispositivos/${id}`);
+      await api.delete(`/api/dispositivos/${id}`);
       enqueueSnackbar('Dispositivo removido', { variant: 'success' });
       setDeleteConfirm(null);
       carregarDados();
@@ -157,18 +172,18 @@ export default function DispositivosPage() {
     }
   };
 
-  const handleSync        = (id) => runAction(id, 'sync',    () => api.post(`/dispositivos/${id}/sync`),          'Sincronização iniciada');
-  const handleOpenDoor    = (id) => runAction(id, 'open',    () => api.post(`/dispositivos/${id}/remote-open`),   'Porta ABERTA (pulso)');
-  const handleUnlockDoor  = (id) => runAction(id, 'unlock',  () => api.post(`/dispositivos/${id}/remote-unlock`), 'Acesso LIBERADO permanentemente');
-  const handleLockDoor    = (id) => runAction(id, 'lock',    () => api.post(`/dispositivos/${id}/remote-lock`),   'Porta TRAVADA (bloqueio total)');
-  const handleCloseDoor   = (id) => runAction(id, 'close',   () => api.post(`/dispositivos/${id}/remote-close`),  'Porta retornada ao estado NORMAL');
-  const handleForceQueue  = (id) => runAction(id, 'queue',   () => api.post(`/dispositivos/${id}/force-queue`),   'Fila de pendências reprocessada');
+  const handleSync = (id) => runAction(id, 'sync', () => api.post(`/api/dispositivos/${id}/sync`), 'Sincronização iniciada');
+  const handleOpenDoor = (id) => runAction(id, 'open', () => api.post(`/api/dispositivos/${id}/remote-open`), 'Porta ABERTA (pulso)');
+  const handleUnlockDoor = (id) => runAction(id, 'unlock', () => api.post(`/api/dispositivos/${id}/remote-unlock`), 'Acesso LIBERADO permanentemente');
+  const handleLockDoor = (id) => runAction(id, 'lock', () => api.post(`/api/dispositivos/${id}/remote-lock`), 'Porta TRAVADA (bloqueio total)');
+  const handleCloseDoor = (id) => runAction(id, 'close', () => api.post(`/api/dispositivos/${id}/remote-close`), 'Porta retornada ao estado NORMAL');
+  const handleForceQueue = (id) => runAction(id, 'queue', () => api.post(`/api/dispositivos/${id}/force-queue`), 'Fila de pendências reprocessada');
 
   const handleConfigurePush = async (device) => {
     setDevLoading(device.id, 'push', true);
     try {
       const serverIp = prompt('IP do servidor (deixe vazio para auto-detectar):', '');
-      await api.post(`/dispositivos/${device.id}/configure-push`, { server_ip: serverIp || undefined });
+      await api.post(`/api/dispositivos/${device.id}/configure-push`, { server_ip: serverIp || undefined });
       enqueueSnackbar(`Push configurado em ${device.nome}`, { variant: 'success' });
     } catch (err) {
       enqueueSnackbar(`Erro no push: ${err.message}`, { variant: 'error' });
@@ -180,7 +195,7 @@ export default function DispositivosPage() {
   const handleSnapshot = async (device) => {
     setDevLoading(device.id, 'snap', true);
     try {
-      const res = await api.get(`/dispositivos/${device.id}/snapshot`, { responseType: 'blob' });
+      const res = await api.get(`/api/dispositivos/${device.id}/snapshot`, { responseType: 'blob' });
       const url = URL.createObjectURL(res.data);
       setSnapshotDialog({ open: true, url, nome: device.nome });
     } catch (err) {
@@ -194,7 +209,7 @@ export default function DispositivosPage() {
     if (!testIp) return;
     setTestDialog(p => ({ ...p, testing: true, result: null }));
     try {
-      const res = await api.post('/dispositivos/test-connection', { ip_address: testIp, porta: testPorta });
+      const res = await api.post('/api/dispositivos/test-connection', { ip_address: testIp, porta: testPorta });
       setTestDialog(p => ({ ...p, testing: false, result: { ok: true, msg: res.data.message } }));
     } catch (err) {
       const msg = err.response?.data?.error || err.message;
@@ -207,9 +222,9 @@ export default function DispositivosPage() {
 
   // ── Render de um card de dispositivo
   const renderCard = (device) => {
-    const expanded  = !!expandedCards[device.id];
-    const isOnline  = device.status_online === 'online';
-    const pending   = queueCount(device.id);
+    const expanded = !!expandedCards[device.id];
+    const isOnline = device.status_online === 'online';
+    const pending = queueCount(device.id);
 
     return (
       <Grid item xs={12} sm={6} lg={4} key={device.id}>
@@ -253,7 +268,15 @@ export default function DispositivosPage() {
             <Box sx={{ fontSize: '0.8rem', color: '#aaa', lineHeight: 1.8 }}>
               <Box>🌐 <code style={{ color: '#ccc' }}>{device.ip_address}:{device.porta || 80}</code></Box>
               {device.area_nome && <Box>📍 {device.area_nome}</Box>}
-              {device.modo      && <Box>⚙️ Modo: <b style={{ color: '#ccc' }}>{device.modo}</b></Box>}
+              {device.modo && <Box>⚙️ Registro: <b style={{ color: '#ccc' }}>{device.modo}</b>
+                {device.config?.fluxo && <> · Fluxo: <b style={{ color: CYAN }}>{device.config.fluxo}</b></>}
+              </Box>}
+              {device.config?.controla_rele === false && (
+                <Box sx={{ fontSize: '0.7rem', color: '#FFB800' }}>🔌 Sem controle de relé (modo online)</Box>
+              )}
+              {device.offline_mode === 'fail_open' && (
+                <Box sx={{ fontSize: '0.7rem', color: RED }}>⚠️ Fail Open — libera se offline</Box>
+              )}
               {device.ultimo_ping && (
                 <Box sx={{ fontSize: '0.7rem', color: '#666', mt: 0.5 }}>
                   ⏱️ Último ping: {new Date(device.ultimo_ping).toLocaleTimeString('pt-BR')}
@@ -363,15 +386,15 @@ export default function DispositivosPage() {
                 </span>
               </Tooltip>
 
-              {/* Config push */}
-              <Tooltip title="Configurar endpoint de push para este servidor">
+              {/* Config Online Mode */}
+              <Tooltip title="Enviar configuração de Modo Online ao dispositivo (requer acesso de rede direto)">
                 <span>
                   <Button variant="outlined" size="small"
                     startIcon={isDevLoading(device.id, 'push') ? <CircularProgress size={10} /> : <PushIcon />}
                     onClick={() => handleConfigurePush(device)}
                     disabled={isDevLoading(device.id, 'push')}
                     sx={{ color: PURP, borderColor: `${PURP}44`, fontSize: '0.7rem' }}>
-                    Config Push
+                    Config Online
                   </Button>
                 </span>
               </Tooltip>
@@ -491,7 +514,7 @@ export default function DispositivosPage() {
                       <TableCell sx={{ fontSize: '0.78rem', color: '#aaa' }}>
                         {item.tipo_comando === 'enroll_face' ? '👤 Enroll Face'
                           : item.tipo_comando === 'delete_face' ? '🗑️ Delete Face'
-                          : item.tipo_comando}
+                            : item.tipo_comando}
                       </TableCell>
                       <TableCell>
                         <Chip label={item.status} size="small" color={queueChip(item.status)} sx={{ fontSize: '0.65rem' }} />
@@ -571,11 +594,38 @@ export default function DispositivosPage() {
                   onChange={handleFormChange} fullWidth size="small" />
               </Grid>
             </Grid>
+            {isEditing && formData.control_token && (
+              <Box sx={{
+                background: 'rgba(0,212,255,0.05)', border: `1px solid ${CYAN}33`,
+                borderRadius: 1.5, p: 1.5
+              }}>
+                <Typography variant="caption" sx={{ color: '#888', display: 'block', mb: 0.5 }}>
+                  Token do dispositivo — use este token na URL de configuração do hardware
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <code style={{ color: CYAN, fontSize: '0.78rem', flex: 1, wordBreak: 'break-all' }}>
+                    {formData.control_token}
+                  </code>
+                  <Tooltip title="Copiar token">
+                    <IconButton size="small" onClick={() => {
+                      navigator.clipboard.writeText(formData.control_token);
+                      enqueueSnackbar('Token copiado!', { variant: 'success', autoHideDuration: 1500 });
+                    }}>
+                      <CopyIcon sx={{ fontSize: 16, color: CYAN }} />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+                <Typography variant="caption" sx={{ color: '#666', mt: 0.5, display: 'block' }}>
+                  URL Online Mode: <code style={{ color: '#888' }}>http://VPS_IP/api/intelbras/online?token={formData.control_token}</code>
+                </Typography>
+              </Box>
+            )}
+
             <Grid container spacing={2}>
               <Grid item xs={6}>
                 <FormControl fullWidth size="small">
-                  <InputLabel>Modo</InputLabel>
-                  <Select name="modo" value={formData.modo} onChange={handleFormChange} label="Modo">
+                  <InputLabel>Modo de Registro</InputLabel>
+                  <Select name="modo" value={formData.modo} onChange={handleFormChange} label="Modo de Registro">
                     <MenuItem value="checkin">Checkin</MenuItem>
                     <MenuItem value="checkout">Checkout</MenuItem>
                     <MenuItem value="ambos">Ambos</MenuItem>
@@ -583,10 +633,52 @@ export default function DispositivosPage() {
                 </FormControl>
               </Grid>
               <Grid item xs={6}>
-                <TextField label="Área" name="area_nome" value={formData.area_nome} onChange={handleFormChange}
+                <TextField label="Área / Local" name="area_nome" value={formData.area_nome} onChange={handleFormChange}
                   fullWidth size="small" placeholder="Ex: Entrada Principal" />
               </Grid>
             </Grid>
+
+            <Divider sx={{ borderColor: `${CYAN}22`, my: 1 }} />
+            <Typography variant="caption" sx={{ color: '#888', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>
+              Configurações de Controle de Acesso
+            </Typography>
+
+            <Grid container spacing={2}>
+              <Grid item xs={6}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Fluxo de Acesso</InputLabel>
+                  <Select name="config.fluxo" value={formData.config?.fluxo || 'checkin'} onChange={handleFormChange} label="Fluxo de Acesso">
+                    <MenuItem value="checkin">Checkin (entrada)</MenuItem>
+                    <MenuItem value="checkout">Checkout (saída)</MenuItem>
+                    <MenuItem value="toggle">Toggle (alternado)</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={6}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Modo Offline</InputLabel>
+                  <Select name="offline_mode" value={formData.offline_mode || 'fail_closed'} onChange={handleFormChange} label="Modo Offline">
+                    <MenuItem value="fail_closed">Fail Closed (negar acesso)</MenuItem>
+                    <MenuItem value="fail_open">Fail Open (liberar acesso)</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={formData.config?.controla_rele !== false}
+                  onChange={e => setFormData(p => ({ ...p, config: { ...(p.config || {}), controla_rele: e.target.checked } }))}
+                  size="small"
+                />
+              }
+              label={
+                <Typography variant="caption" sx={{ color: '#ccc' }}>
+                  Acionar relé/catraca via servidor (modo Push)
+                </Typography>
+              }
+            />
           </Box>
         </DialogContent>
         <DialogActions sx={{ borderTop: `1px solid ${CYAN}22`, p: 2 }}>

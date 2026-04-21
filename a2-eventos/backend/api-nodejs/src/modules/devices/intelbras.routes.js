@@ -8,14 +8,14 @@ const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 
 /**
- * Middleware simples para validar o Token de Push do Hardware
+ * Middleware para garantir que um token está presente.
+ * A validação por dispositivo (control_token) é feita no controller.
+ * Isso evita rejeitar dispositivos com tokens individuais válidos.
  */
 const validatePushToken = (req, res, next) => {
     const token = req.query.token || req.headers['x-push-token'];
-    const expectedToken = process.env.HARDWARE_PUSH_TOKEN || 'a2_sec_default_2026';
-
-    if (token !== expectedToken) {
-        return res.status(401).json({ error: 'Não autorizado: Token de hardware inválido' });
+    if (!token) {
+        return res.status(401).json({ error: 'Não autorizado: Token ausente. Configure o dispositivo com ?token=SEU_TOKEN' });
     }
     next();
 };

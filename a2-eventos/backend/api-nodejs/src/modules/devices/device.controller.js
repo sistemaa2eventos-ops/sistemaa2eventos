@@ -36,7 +36,7 @@ class DeviceController {
     // Cadastrar dispositivo
     async create(req, res) {
         try {
-            const { nome, marca, tipo, ip_address, porta, user, password } = req.body;
+            const { nome, marca, tipo, ip_address, porta, user, password, modo, area_nome, offline_mode } = req.body;
             let rtsp_url = '';
 
             // Lógica de Instanciação Polimórfica (Factory)
@@ -55,14 +55,17 @@ class DeviceController {
                 .insert([{
                     evento_id: req.event.id,
                     nome,
-                    marca, // Novo campo
+                    marca,
                     tipo,
                     ip_address,
                     porta,
-                    user_device: user, // Evitar conflito com keywords SQL
-                    password_device: password, // Armazenar de forma segura em prod
+                    user_device: user,
+                    password_device: password,
                     rtsp_url,
-                    config: req.body.config || { modo_identificacao: false },
+                    config: req.body.config || { fluxo: 'checkin', controla_rele: true },
+                    modo: modo || 'ambos',
+                    area_nome: area_nome || null,
+                    offline_mode: offline_mode || 'fail_closed',
                     status_online: 'offline'
                 }])
                 .select()
@@ -137,12 +140,13 @@ class DeviceController {
             const device = DeviceFactory.getDevice(deviceData);
             const targetIp = server_ip || process.env.SERVER_IP || this._getLocalIp() || req.ip;
 
-            const success = await device.configureEventPush(targetIp, server_port || 3001);
+            const targetPort = server_port || parseInt(process.env.PORT || 3001);
+            const success = await device.configureOnlineMode(targetIp, targetPort);
 
             if (success) {
-                res.json({ success: true, message: `Push configurado para ${targetIp}` });
+                res.json({ success: true, message: `Modo Online configurado → ${targetIp}:${targetPort}` });
             } else {
-                res.status(500).json({ error: 'Falha ao configurar push no dispositivo' });
+                res.status(500).json({ error: 'Falha ao configurar modo online no dispositivo' });
             }
 
         } catch (error) {
@@ -336,7 +340,7 @@ class DeviceController {
     async update(req, res) {
         try {
             const { id } = req.params;
-            const { nome, marca, tipo, ip_address, porta, user, password, user_device, password_device, config } = req.body;
+            const { nome, marca, tipo, ip_address, porta, user, password, user_device, password_device, config, modo, area_nome, offline_mode } = req.body;
 
             const updates = {};
             if (nome !== undefined) updates.nome = nome;
@@ -345,6 +349,9 @@ class DeviceController {
             if (ip_address !== undefined) updates.ip_address = ip_address;
             if (porta !== undefined) updates.porta = parseInt(porta, 10);
             if (config !== undefined) updates.config = config;
+            if (modo !== undefined) updates.modo = modo;
+            if (area_nome !== undefined) updates.area_nome = area_nome;
+            if (offline_mode !== undefined) updates.offline_mode = offline_mode;
 
             if (user_device !== undefined) updates.user_device = user_device;
             else if (user !== undefined) updates.user_device = user;
