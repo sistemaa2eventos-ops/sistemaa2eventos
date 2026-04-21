@@ -77,8 +77,8 @@ export default function DispositivosPage() {
     try {
       setLoading(true);
       const [devRes, queueRes] = await Promise.allSettled([
-        api.get('/api/dispositivos'),
-        api.get('/api/dispositivos/queue')
+        api.get('/dispositivos'),
+        api.get('/dispositivos/queue')
       ]);
       setDispositivos(devRes.status === 'fulfilled' ? (devRes.value.data?.data ?? []) : []);
       setQueue(queueRes.status === 'fulfilled' ? (queueRes.value.data?.data ?? []) : []);
@@ -134,10 +134,10 @@ export default function DispositivosPage() {
     }
     try {
       if (isEditing) {
-        await api.put(`/api/dispositivos/${formData.id}`, formData);
+        await api.put(`/dispositivos/${formData.id}`, formData);
         enqueueSnackbar('Dispositivo atualizado', { variant: 'success' });
       } else {
-        await api.post('/api/dispositivos', formData);
+        await api.post('/dispositivos', formData);
         enqueueSnackbar('Dispositivo criado', { variant: 'success' });
       }
       setOpenDialog(false);
@@ -149,7 +149,7 @@ export default function DispositivosPage() {
 
   const handleDelete = async (id) => {
     try {
-      await api.delete(`/api/dispositivos/${id}`);
+      await api.delete(`/dispositivos/${id}`);
       enqueueSnackbar('Dispositivo removido', { variant: 'success' });
       setDeleteConfirm(null);
       carregarDados();
@@ -172,18 +172,18 @@ export default function DispositivosPage() {
     }
   };
 
-  const handleSync = (id) => runAction(id, 'sync', () => api.post(`/api/dispositivos/${id}/sync`), 'Sincronização iniciada');
-  const handleOpenDoor = (id) => runAction(id, 'open', () => api.post(`/api/dispositivos/${id}/remote-open`), 'Porta ABERTA (pulso)');
-  const handleUnlockDoor = (id) => runAction(id, 'unlock', () => api.post(`/api/dispositivos/${id}/remote-unlock`), 'Acesso LIBERADO permanentemente');
-  const handleLockDoor = (id) => runAction(id, 'lock', () => api.post(`/api/dispositivos/${id}/remote-lock`), 'Porta TRAVADA (bloqueio total)');
-  const handleCloseDoor = (id) => runAction(id, 'close', () => api.post(`/api/dispositivos/${id}/remote-close`), 'Porta retornada ao estado NORMAL');
-  const handleForceQueue = (id) => runAction(id, 'queue', () => api.post(`/api/dispositivos/${id}/force-queue`), 'Fila de pendências reprocessada');
+  const handleSync = (id) => runAction(id, 'sync', () => api.post(`/dispositivos/${id}/sync`), 'Sincronização iniciada');
+  const handleOpenDoor = (id) => runAction(id, 'open', () => api.post(`/dispositivos/${id}/remote-open`), 'Porta ABERTA (pulso)');
+  const handleUnlockDoor = (id) => runAction(id, 'unlock', () => api.post(`/dispositivos/${id}/remote-unlock`), 'Acesso LIBERADO permanentemente');
+  const handleLockDoor = (id) => runAction(id, 'lock', () => api.post(`/dispositivos/${id}/remote-lock`), 'Porta TRAVADA (bloqueio total)');
+  const handleCloseDoor = (id) => runAction(id, 'close', () => api.post(`/dispositivos/${id}/remote-close`), 'Porta retornada ao estado NORMAL');
+  const handleForceQueue = (id) => runAction(id, 'queue', () => api.post(`/dispositivos/${id}/force-queue`), 'Fila de pendências reprocessada');
 
   const handleConfigurePush = async (device) => {
     setDevLoading(device.id, 'push', true);
     try {
       const serverIp = prompt('IP do servidor (deixe vazio para auto-detectar):', '');
-      await api.post(`/api/dispositivos/${device.id}/configure-push`, { server_ip: serverIp || undefined });
+      await api.post(`/dispositivos/${device.id}/configure-push`, { server_ip: serverIp || undefined });
       enqueueSnackbar(`Push configurado em ${device.nome}`, { variant: 'success' });
     } catch (err) {
       enqueueSnackbar(`Erro no push: ${err.message}`, { variant: 'error' });
@@ -195,7 +195,7 @@ export default function DispositivosPage() {
   const handleSnapshot = async (device) => {
     setDevLoading(device.id, 'snap', true);
     try {
-      const res = await api.get(`/api/dispositivos/${device.id}/snapshot`, { responseType: 'blob' });
+      const res = await api.get(`/dispositivos/${device.id}/snapshot`, { responseType: 'blob' });
       const url = URL.createObjectURL(res.data);
       setSnapshotDialog({ open: true, url, nome: device.nome });
     } catch (err) {
@@ -209,7 +209,7 @@ export default function DispositivosPage() {
     if (!testIp) return;
     setTestDialog(p => ({ ...p, testing: true, result: null }));
     try {
-      const res = await api.post('/api/dispositivos/test-connection', { ip_address: testIp, porta: testPorta });
+      const res = await api.post('/dispositivos/test-connection', { ip_address: testIp, porta: testPorta });
       setTestDialog(p => ({ ...p, testing: false, result: { ok: true, msg: res.data.message } }));
     } catch (err) {
       const msg = err.response?.data?.error || err.message;
@@ -549,7 +549,7 @@ export default function DispositivosPage() {
           {isEditing ? '✏️ Editar Dispositivo' : '➕ Novo Dispositivo'}
         </DialogTitle>
         <DialogContent sx={{ pt: 3 }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+          <Box component="form" autoComplete="off" onSubmit={(e) => e.preventDefault()} sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
             <TextField label="Nome" name="nome" value={formData.nome} onChange={handleFormChange} fullWidth size="small" required />
             <Grid container spacing={2}>
               <Grid item xs={6}>
