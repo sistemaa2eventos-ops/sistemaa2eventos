@@ -554,8 +554,9 @@ export default function DispositivosPage() {
             <Grid container spacing={2}>
               <Grid item xs={6}>
                 <FormControl fullWidth size="small">
-                  <InputLabel>Marca</InputLabel>
-                  <Select name="marca" value={formData.marca} onChange={handleFormChange} label="Marca">
+                  <InputLabel id="marca-label" htmlFor="marca-select">Marca</InputLabel>
+                  <Select labelId="marca-label" inputProps={{ id: 'marca-select', name: 'marca' }}
+                    value={formData.marca} onChange={handleFormChange} label="Marca">
                     <MenuItem value="intelbras">Intelbras</MenuItem>
                     <MenuItem value="hikvision">Hikvision</MenuItem>
                     <MenuItem value="dahua">Dahua</MenuItem>
@@ -564,8 +565,9 @@ export default function DispositivosPage() {
               </Grid>
               <Grid item xs={6}>
                 <FormControl fullWidth size="small">
-                  <InputLabel>Tipo</InputLabel>
-                  <Select name="tipo" value={formData.tipo} onChange={handleFormChange} label="Tipo">
+                  <InputLabel id="tipo-label" htmlFor="tipo-select">Tipo</InputLabel>
+                  <Select labelId="tipo-label" inputProps={{ id: 'tipo-select', name: 'tipo' }}
+                    value={formData.tipo} onChange={handleFormChange} label="Tipo">
                     <MenuItem value="terminal_facial">Terminal Facial</MenuItem>
                     <MenuItem value="camera">Câmera</MenuItem>
                     <MenuItem value="catraca">Catraca</MenuItem>
@@ -624,8 +626,9 @@ export default function DispositivosPage() {
             <Grid container spacing={2}>
               <Grid item xs={6}>
                 <FormControl fullWidth size="small">
-                  <InputLabel>Modo de Registro</InputLabel>
-                  <Select name="modo" value={formData.modo} onChange={handleFormChange} label="Modo de Registro">
+                  <InputLabel id="modo-label" htmlFor="modo-select">Modo de Registro</InputLabel>
+                  <Select labelId="modo-label" inputProps={{ id: 'modo-select', name: 'modo' }}
+                    value={formData.modo} onChange={handleFormChange} label="Modo de Registro">
                     <MenuItem value="checkin">Checkin</MenuItem>
                     <MenuItem value="checkout">Checkout</MenuItem>
                     <MenuItem value="ambos">Ambos</MenuItem>
@@ -646,8 +649,9 @@ export default function DispositivosPage() {
             <Grid container spacing={2}>
               <Grid item xs={6}>
                 <FormControl fullWidth size="small">
-                  <InputLabel>Fluxo de Acesso</InputLabel>
-                  <Select name="config.fluxo" value={formData.config?.fluxo || 'checkin'} onChange={handleFormChange} label="Fluxo de Acesso">
+                  <InputLabel id="fluxo-label" htmlFor="fluxo-select">Fluxo de Acesso</InputLabel>
+                  <Select labelId="fluxo-label" inputProps={{ id: 'fluxo-select', name: 'config.fluxo' }}
+                    value={formData.config?.fluxo || 'checkin'} onChange={handleFormChange} label="Fluxo de Acesso">
                     <MenuItem value="checkin">Checkin (entrada)</MenuItem>
                     <MenuItem value="checkout">Checkout (saída)</MenuItem>
                     <MenuItem value="toggle">Toggle (alternado)</MenuItem>
@@ -656,8 +660,9 @@ export default function DispositivosPage() {
               </Grid>
               <Grid item xs={6}>
                 <FormControl fullWidth size="small">
-                  <InputLabel>Modo Offline</InputLabel>
-                  <Select name="offline_mode" value={formData.offline_mode || 'fail_closed'} onChange={handleFormChange} label="Modo Offline">
+                  <InputLabel id="offline-mode-label" htmlFor="offline-mode-select">Modo Offline</InputLabel>
+                  <Select labelId="offline-mode-label" inputProps={{ id: 'offline-mode-select', name: 'offline_mode' }}
+                    value={formData.offline_mode || 'fail_closed'} onChange={handleFormChange} label="Modo Offline">
                     <MenuItem value="fail_closed">Fail Closed (negar acesso)</MenuItem>
                     <MenuItem value="fail_open">Fail Open (liberar acesso)</MenuItem>
                   </Select>
@@ -668,6 +673,8 @@ export default function DispositivosPage() {
             <FormControlLabel
               control={
                 <Switch
+                  id="controla-rele-switch"
+                  name="controla_rele"
                   checked={formData.config?.controla_rele !== false}
                   onChange={e => setFormData(p => ({ ...p, config: { ...(p.config || {}), controla_rele: e.target.checked } }))}
                   size="small"
