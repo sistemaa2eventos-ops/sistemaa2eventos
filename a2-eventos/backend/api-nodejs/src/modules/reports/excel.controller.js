@@ -13,7 +13,7 @@ class ExcelController {
             const sheet = workbook.addWorksheet('Colaboradores');
 
             sheet.columns = [
-                { header: 'nome *',   key: 'nome',   width: 35 },
+                { header: 'nome_completo *',   key: 'nome_completo',   width: 35 },
                 { header: 'cpf *',             key: 'cpf',             width: 18 },
                 { header: 'data_nascimento *', key: 'data_nascimento', width: 18 },
                 { header: 'nome_mae *',        key: 'nome_mae',        width: 35 },
@@ -28,7 +28,7 @@ class ExcelController {
             sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
 
             sheet.addRow({
-                nome: 'João da Silva',
+                nome_completo: 'João da Silva',
                 cpf: '000.000.000-00',
                 data_nascimento: '1990-01-15',
                 nome_mae: 'Maria da Silva',
@@ -86,12 +86,12 @@ class ExcelController {
                     const data_nasc_raw = row.getCell(8).value;
                     const funcaoRaw = row.getCell(9).value;
 
-                    const nome = nomeRaw ? String(nomeRaw).toUpperCase().trim().replace(/\s+/g, ' ') : null;
+                    const nome_completo = nomeRaw ? String(nomeRaw).toUpperCase().trim().replace(/\s+/g, ' ') : null;
                     const nome_mae = nome_mae_raw ? String(nome_mae_raw).toUpperCase().trim().replace(/\s+/g, ' ') : null;
                     const funcao = funcaoRaw ? String(funcaoRaw).toUpperCase().trim() : 'OPERACIONAL';
                     const cpf = cpfRaw;
 
-                    if (!emp_nome || !nome || !cpf || cpf.length !== 11 || !this.validateCPF(cpf)) {
+                    if (!emp_nome || !nome_completo || !cpf || cpf.length !== 11 || !this.validateCPF(cpf)) {
                         errors.push(`Linha ${rowNumber}: Nome da Empresa, Nome do Colaborador e CPF válido são obrigatórios. CPF informado: ${cpfRaw}`);
                         continue;
                     }
@@ -130,7 +130,7 @@ class ExcelController {
                     const { code } = await qrGenerator.generate(cpf);
 
                     const { error: funcError } = await supabase.from('pessoas').upsert({
-                        nome: nome,
+                        nome_completo: nome_completo,
                         cpf,
                         nome_mae: nome_mae || 'Pendente Análise',
                         data_nascimento: data_nasc_raw ? new Date(data_nasc_raw).toISOString().split('T')[0] : null,
@@ -171,9 +171,9 @@ class ExcelController {
 
             const { data: pessoas, error } = await supabase
                 .from('pessoas')
-                .select('nome, cpf, nome_mae, data_nascimento, funcao, status_acesso, empresas(nome)')
+                .select('nome_completo, cpf, nome_mae, data_nascimento, funcao, status_acesso, empresas(nome)')
                 .eq('evento_id', eventoId)
-                .order('nome');
+                .order('nome_completo');
 
             if (error) throw error;
 
@@ -181,7 +181,7 @@ class ExcelController {
             const worksheet = workbook.addWorksheet('Relatório de Participantes');
 
             worksheet.columns = [
-                { header: 'NOME COMPLETO', key: 'nome', width: 40 },
+                { header: 'NOME COMPLETO', key: 'nome_completo', width: 40 },
                 { header: 'CPF / ID', key: 'cpf', width: 20 },
                 { header: 'MÃE', key: 'nome_mae', width: 35 },
                 { header: 'DATA NASCIMENTO', key: 'data_nascimento', width: 20 },
@@ -196,7 +196,7 @@ class ExcelController {
 
             pessoas.forEach(f => {
                 worksheet.addRow({
-                    nome: f.nome?.toUpperCase(),
+                    nome_completo: f.nome_completo?.toUpperCase(),
                     cpf: f.cpf,
                     nome_mae: f.nome_mae?.toUpperCase(),
                     data_nascimento: f.data_nascimento ? new Date(f.data_nascimento).toLocaleDateString() : 'N/D',
@@ -245,9 +245,9 @@ class ExcelController {
 
             const { data, error } = await supabase
                 .from('view_pessoas_listagem')
-                .select('nome, cpf, funcao, empresa_nome, status_acesso, created_at')
+                .select('nome_completo, cpf, funcao, empresa_nome, status_acesso, created_at')
                 .eq('evento_id', evento_id)
-                .order('nome');
+                .order('nome_completo');
 
             if (error) return res.status(500).json({ error: 'Erro ao buscar dados.' });
 
@@ -255,7 +255,7 @@ class ExcelController {
             const sheet = workbook.addWorksheet('Pessoas');
 
             sheet.columns = [
-                { header: 'Nome Completo', key: 'nome', width: 35 },
+                { header: 'Nome Completo', key: 'nome_completo', width: 35 },
                 { header: 'CPF',          key: 'cpf',            width: 18 },
                 { header: 'Cargo',        key: 'funcao',           width: 25 },
                 { header: 'Empresa',      key: 'empresa_nome',    width: 30 },
@@ -294,7 +294,7 @@ class ExcelController {
                 sheet.getRow(2).font = { bold: true, color: { argb: 'FFFFFFFF' } };
                 sheet.getRow(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A237E' } };
 
-                const { data: pessoas } = await supabase.from('pessoas').select('id, nome, cpf, funcao, numero_pulseira').eq('empresa_id', empresa.id).eq('evento_id', evento_id).order('nome');
+                const { data: pessoas } = await supabase.from('pessoas').select('id, nome_completo, cpf, funcao, numero_pulseira').eq('empresa_id', empresa.id).eq('evento_id', evento_id).order('nome_completo');
 
                 for (const pessoa of (pessoas || [])) {
                     const inicio = `${data}T00:00:00`;
@@ -319,7 +319,7 @@ class ExcelController {
 
                     const horasFmt = detalhes.length > 0 ? (detalhes.length > 1 ? `${detalhes.join(' + ')} = ${Math.floor(totalMinutos / 60)}h${String(totalMinutos % 60).padStart(2, '0')}` : detalhes[0]) : '—';
 
-                    const row = sheet.addRow([pessoa.nome, pessoa.cpf, pessoa.funcao || '—', pessoa.numero_pulseira || '—', entradasFmt.join(' / ') || '—', saidasFmt.join(' / ') || '—', horasFmt]);
+                    const row = sheet.addRow([pessoa.nome_completo, pessoa.cpf, pessoa.funcao || '—', pessoa.numero_pulseira || '—', entradasFmt.join(' / ') || '—', saidasFmt.join(' / ') || '—', horasFmt]);
                     row.alignment = { wrapText: true, vertical: 'top' };
                 }
                 sheet.columns = [{ width: 35 }, { width: 16 }, { width: 25 }, { width: 14 }, { width: 22 }, { width: 22 }, { width: 28 }];

@@ -52,7 +52,7 @@ class PDFService {
                         rowY += 25;
                     }
 
-                    doc.fillColor('#333333').fontSize(9).text(p.nome?.substring(0, 35).toUpperCase(), 50, rowY);
+                    doc.fillColor('#333333').fontSize(9).text((p.nome_completo || p.nome)?.substring(0, 35).toUpperCase(), 50, rowY);
                     doc.text(p.cpf || 'N/D', 250, rowY);
                     doc.text(p.empresas?.nome?.substring(0, 15) || 'N/D', 350, rowY);
 
