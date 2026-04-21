@@ -154,7 +154,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
         });
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setLoading(true);
         setError('');
@@ -285,38 +285,61 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                 </div>
             )}
 
-            <div className="p-8 pb-6 border-b border-slate-800 relative z-10">
-                <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-3">
-                        <Image
-                            src="/logo.jpg"
-                            alt="NZT Logo"
-                            width={40}
-                            height={40}
-                            className="w-10 h-10 rounded-lg object-contain bg-white/10 p-1 mr-2"
-                            unoptimized
-                        />
-                        <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r tracking-tight" style={{ backgroundImage: `linear-gradient(to right, var(--brand-primary), var(--brand-secondary))` }}>
-                            {branding?.evento_nome || "NZT - Intelligent Control System"}
+            <div className="p-6 sm:p-8 pb-6 border-b border-slate-800 relative z-10">
+                {/* Header: Logo + Evento + Badge Vagas */}
+                <div className="flex items-start justify-between gap-4 mb-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex-shrink-0 w-11 h-11 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center overflow-hidden">
+                            <Image src="/logo.jpg" alt="NZT Logo" width={44} height={44} className="w-full h-full object-contain p-1" unoptimized />
+                        </div>
+                        <h1 className="text-xl sm:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r truncate leading-tight" style={{ backgroundImage: `linear-gradient(to right, var(--brand-primary, #06b6d4), var(--brand-secondary, #3b82f6))` }}>
+                            {branding?.evento_nome || "NZT — Intelligent Control"}
                         </h1>
                     </div>
-                    <span className="px-4 py-1.5 rounded-full text-sm font-semibold border flex items-center gap-2" style={{ backgroundColor: 'color-mix(in srgb, var(--brand-primary) 10%, transparent)', color: 'var(--brand-primary)', borderColor: 'color-mix(in srgb, var(--brand-primary) 20%, transparent)' }}>
-                        <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: 'var(--brand-primary)' }}></span>
-                        Vagas: {company.vagas === Infinity ? 'Ilimitado' : company.vagas}
-                    </span>
+                    <div className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border whitespace-nowrap" style={{ backgroundColor: 'color-mix(in srgb, var(--brand-primary, #06b6d4) 10%, transparent)', color: 'var(--brand-primary, #06b6d4)', borderColor: 'color-mix(in srgb, var(--brand-primary, #06b6d4) 25%, transparent)' }}>
+                        <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: 'var(--brand-primary, #06b6d4)' }}></span>
+                        {company.vagas === Infinity ? '∞ vagas' : `${company.vagas} vaga${company.vagas !== 1 ? 's' : ''}`}
+                    </div>
                 </div>
-                <p className="text-slate-400 text-lg">Área exclusiva para cadastro institucional: <span className="text-white font-medium">{company.nome}</span></p>
+                <p className="text-slate-500 text-sm">Cadastro institucional — <span className="text-slate-300 font-medium">{company.nome}</span></p>
 
                 {/* Stepper Progress */}
-                <div className="flex items-center mt-8 gap-4">
-                    <div className={`flex items-center gap-2 ${step >= 1 ? '' : 'text-slate-500'}`} style={step >= 1 ? { color: 'var(--brand-primary)' } : {}}>
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border`} style={step >= 1 ? { backgroundColor: 'color-mix(in srgb, var(--brand-primary) 20%, transparent)', borderColor: 'color-mix(in srgb, var(--brand-primary) 50%, transparent)' } : { backgroundColor: '#1e293b', borderColor: '#334155' }}>1</div>
-                        <span className="font-medium text-sm hidden sm:block">Identificação</span>
+                <div className="flex items-center mt-7 gap-3">
+                    {/* Step 1 */}
+                    <div className="flex items-center gap-2.5">
+                        <div
+                            className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm border-2 transition-all duration-300"
+                            style={step > 1
+                                ? { backgroundColor: '#10b981', borderColor: '#10b981', color: '#fff' }
+                                : step === 1
+                                    ? { backgroundColor: 'color-mix(in srgb, var(--brand-primary, #06b6d4) 20%, transparent)', borderColor: 'var(--brand-primary, #06b6d4)', color: 'var(--brand-primary, #06b6d4)' }
+                                    : { backgroundColor: '#1e293b', borderColor: '#334155', color: '#64748b' }
+                            }
+                        >
+                            {step > 1 ? <CheckCircle className="w-4 h-4" /> : '1'}
+                        </div>
+                        <div className="hidden sm:block">
+                            <p className="text-xs font-bold leading-none" style={step >= 1 ? { color: step > 1 ? '#10b981' : 'var(--brand-primary, #06b6d4)' } : { color: '#64748b' }}>Etapa 1</p>
+                            <p className="text-[11px] text-slate-500 leading-none mt-0.5">Identificação</p>
+                        </div>
                     </div>
-                    <div className={`flex-1 h-px`} style={{ backgroundColor: step >= 2 ? 'color-mix(in srgb, var(--brand-primary) 50%, transparent)' : '#1e293b' }}></div>
-                    <div className={`flex items-center gap-2 ${step >= 2 ? '' : 'text-slate-500'}`} style={step >= 2 ? { color: 'var(--brand-primary)' } : {}}>
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border`} style={step >= 2 ? { backgroundColor: 'color-mix(in srgb, var(--brand-primary) 20%, transparent)', borderColor: 'color-mix(in srgb, var(--brand-primary) 50%, transparent)' } : { backgroundColor: '#1e293b', borderColor: '#334155' }}>2</div>
-                        <span className="font-medium text-sm hidden sm:block">Profissional & LGPD</span>
+
+                    {/* Connector */}
+                    <div className="flex-1 h-0.5 rounded-full transition-all duration-500" style={{ backgroundColor: step >= 2 ? 'color-mix(in srgb, var(--brand-primary, #06b6d4) 40%, transparent)' : '#1e293b' }}></div>
+
+                    {/* Step 2 */}
+                    <div className="flex items-center gap-2.5">
+                        <div
+                            className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm border-2 transition-all duration-300"
+                            style={step === 2
+                                ? { backgroundColor: 'color-mix(in srgb, var(--brand-primary, #06b6d4) 20%, transparent)', borderColor: 'var(--brand-primary, #06b6d4)', color: 'var(--brand-primary, #06b6d4)' }
+                                : { backgroundColor: '#1e293b', borderColor: '#334155', color: '#64748b' }
+                            }
+                        >2</div>
+                        <div className="hidden sm:block">
+                            <p className="text-xs font-bold leading-none" style={step >= 2 ? { color: 'var(--brand-primary, #06b6d4)' } : { color: '#64748b' }}>Etapa 2</p>
+                            <p className="text-[11px] text-slate-500 leading-none mt-0.5">Profissional & LGPD</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -437,15 +460,22 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                             )}
                         </div>
 
-                        <div className="pt-4">
+                        <div className="pt-4 space-y-3">
+                            {!formData.foto_base64 && (
+                                <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400 text-sm">
+                                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                    <span>Tire ou envie uma foto biométrica para continuar.</span>
+                                </div>
+                            )}
                             <button
                                 type="button"
                                 onClick={() => setStep(2)}
                                 disabled={!formData.foto_base64}
-                                className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold py-4 rounded-xl hover:from-cyan-400 hover:to-blue-500 transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
+                                className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold py-4 rounded-xl hover:from-cyan-400 hover:to-blue-500 transition-all shadow-[0_0_20px_rgba(6,182,212,0.25)] disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base"
                             >
-                                {formData.foto_base64 ? <><Briefcase className="w-5 h-5" /> Continuar para Etapa 2</> : 'A biometria facial é obrigatória para prosseguir'}
-                                {formData.foto_base64 && <ChevronRight className="w-5 h-5" />}
+                                <Briefcase className="w-5 h-5" />
+                                Continuar para Etapa 2
+                                <ChevronRight className="w-5 h-5" />
                             </button>
                         </div>
                     </div>
@@ -474,31 +504,57 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                         </div>
                         )}
 
-                        <div className="p-6 bg-slate-800/40 border border-slate-700/60 rounded-3xl shadow-xl backdrop-blur-sm group transition-all hover:bg-slate-800/60">
-                            <label className="block text-sm font-semibold text-slate-300 mb-5 flex items-center gap-2">
-                                <div className="p-1.5 bg-cyan-500/10 rounded-lg"><Calendar className="w-4 h-4 text-cyan-400" /></div>
-                                Período de Acesso Solicitado
-                            </label>
-                            <div className="flex flex-wrap gap-2.5">
+                        <div className="bg-slate-800/40 border border-slate-700/60 rounded-3xl shadow-xl backdrop-blur-sm overflow-hidden">
+                            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-700/40">
+                                <div className="flex items-center gap-2">
+                                    <div className="p-1.5 bg-cyan-500/10 rounded-lg"><Calendar className="w-4 h-4 text-cyan-400" /></div>
+                                    <span className="text-sm font-semibold text-slate-200">Período de Acesso</span>
+                                    {formData.dias_trabalho.length > 0 && (
+                                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                                            {formData.dias_trabalho.length} selecionada{formData.dias_trabalho.length > 1 ? 's' : ''}
+                                        </span>
+                                    )}
+                                </div>
+                                {company.datas_disponiveis.length > 1 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const allSelected = company.datas_disponiveis.every(d => formData.dias_trabalho.includes(d));
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                dias_trabalho: allSelected ? [] : [...company.datas_disponiveis]
+                                            }));
+                                        }}
+                                        className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 transition-colors"
+                                    >
+                                        {company.datas_disponiveis.every(d => formData.dias_trabalho.includes(d)) ? 'Limpar' : 'Selecionar todas'}
+                                    </button>
+                                )}
+                            </div>
+                            <div className="p-5 flex flex-wrap gap-2.5">
                                 {company.datas_disponiveis.map(date => {
                                     const isSelected = formData.dias_trabalho.includes(date);
+                                    const displayDate = new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' });
                                     return (
                                         <button
                                             key={date}
                                             type="button"
                                             onClick={() => toggleDate(date)}
-                                            className={`px-5 py-3 rounded-2xl text-sm font-bold border transition-all duration-300 transform active:scale-95 ${isSelected
-                                                ? 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.4)]'
-                                                : 'bg-slate-900/60 text-slate-400 border-slate-700/50 hover:border-slate-500 hover:text-white'
-                                                }`}
+                                            className={`px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-200 transform active:scale-95 ${isSelected
+                                                ? 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white border-cyan-400/50 shadow-[0_0_16px_rgba(6,182,212,0.35)]'
+                                                : 'bg-slate-900/60 text-slate-400 border-slate-700/50 hover:border-slate-500/80 hover:text-slate-200 hover:bg-slate-800/60'
+                                            }`}
                                         >
-                                            {new Date(date).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
+                                            {displayDate}
                                         </button>
                                     );
                                 })}
                             </div>
                             {formData.dias_trabalho.length === 0 && (
-                                <p className="text-sm text-amber-400 mt-4 flex items-center gap-1.5 animate-pulse"><AlertCircle className="w-4 h-4" /> A seleção de ao menos uma data é obrigatória.</p>
+                                <div className="px-5 pb-4 flex items-center gap-1.5 text-xs text-amber-400">
+                                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                                    Selecione ao menos uma data para prosseguir.
+                                </div>
                             )}
                         </div>
 
@@ -567,45 +623,75 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                         </div>
 
                         {/* Strict LGPD Block */}
-                        <div className="p-6 border border-cyan-500/20 bg-cyan-950/20 rounded-3xl flex items-start gap-4 transition-all hover:bg-cyan-950/30">
-                            <div className="pt-1.5">
-                                <div className="relative flex items-center">
-                                    <input
-                                        required
-                                        type="checkbox"
-                                        id="lgpd-consent"
-                                        checked={formData.aceite_lgpd}
-                                        onChange={(e) => setFormData({ ...formData, aceite_lgpd: e.target.checked })}
-                                        className="peer sr-only"
-                                    />
-                                    <div className="w-7 h-7 border-2 border-slate-600 rounded-lg bg-slate-900 peer-checked:bg-cyan-500 peer-checked:border-cyan-500 transition-all duration-300 flex items-center justify-center shadow-lg peer-checked:shadow-cyan-500/30">
-                                        <CheckCircle className="w-5 h-5 text-white opacity-0 peer-checked:opacity-100 scale-50 peer-checked:scale-100 transition-all duration-300" />
-                                    </div>
+                        <div
+                            className={`p-6 border rounded-3xl flex items-start gap-4 transition-all duration-300 cursor-pointer ${
+                                formData.aceite_lgpd
+                                    ? 'border-cyan-500/50 bg-cyan-950/30 shadow-[0_0_20px_rgba(6,182,212,0.08)]'
+                                    : 'border-slate-700/80 bg-slate-900/40 hover:border-cyan-500/30 hover:bg-cyan-950/10'
+                            }`}
+                            onClick={() => setFormData(prev => ({ ...prev, aceite_lgpd: !prev.aceite_lgpd }))}
+                        >
+                            {/* Checkbox visual — input transparente sobreposto para capturar clique */}
+                            <div className="relative flex-shrink-0 mt-0.5">
+                                <div className={`w-7 h-7 border-2 rounded-lg flex items-center justify-center transition-all duration-300 ${
+                                    formData.aceite_lgpd
+                                        ? 'bg-cyan-500 border-cyan-500 shadow-lg shadow-cyan-500/30'
+                                        : 'bg-slate-900 border-slate-600'
+                                }`}>
+                                    {formData.aceite_lgpd && (
+                                        <CheckCircle className="w-5 h-5 text-white" />
+                                    )}
                                 </div>
+                                <input
+                                    required
+                                    type="checkbox"
+                                    id="lgpd-consent"
+                                    checked={formData.aceite_lgpd}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, aceite_lgpd: e.target.checked }))}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                    onClick={(e) => e.stopPropagation()}
+                                />
                             </div>
-                            <label htmlFor="lgpd-consent" className="text-sm text-slate-300 leading-relaxed cursor-pointer select-none">
+                            <div className="text-sm text-slate-300 leading-relaxed select-none">
                                 <strong className="text-white block mb-1 text-base tracking-tight">Termo de Consentimento - LGPD</strong>
-                                Declaro de forma livre, inequívoca e informada que li e aceito as <button type="button" onClick={(e) => { e.preventDefault(); setShowLGPDModal(true); }} className="text-cyan-400 hover:text-cyan-300 font-bold underline decoration-cyan-400/30 underline-offset-4">Políticas de Privacidade</button>. Autorizo expressamente o tratamento da minha biometria facial e documentos anexados única e exclusivamente para fins de credenciamento, auditoria e controle de acesso rigoroso, em conformidade com a <strong>Lei 13.709/2018</strong>.
-                            </label>
+                                Declaro de forma livre, inequívoca e informada que li e aceito as{' '}
+                                <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); setShowLGPDModal(true); }}
+                                    className="text-cyan-400 hover:text-cyan-300 font-bold underline decoration-cyan-400/30 underline-offset-4"
+                                >
+                                    Políticas de Privacidade
+                                </button>. Autorizo expressamente o tratamento da minha biometria facial e documentos anexados única e exclusivamente para fins de credenciamento, auditoria e controle de acesso rigoroso, em conformidade com a <strong>Lei 13.709/2018</strong>.
+                            </div>
                         </div>
 
-                        <div className="flex gap-4 pt-6">
+                        <div className="flex gap-3 pt-4">
                             <button
                                 type="button"
                                 onClick={() => setStep(1)}
-                                className="w-1/3 bg-slate-800 text-slate-300 font-semibold py-4 rounded-xl hover:bg-slate-700 border border-slate-700 transition-colors"
+                                className="flex-shrink-0 px-5 py-4 bg-slate-800/80 text-slate-300 font-semibold rounded-xl hover:bg-slate-700 border border-slate-700 transition-all flex items-center gap-2 text-sm"
                             >
-                                Voltar
+                                <ChevronRight className="w-4 h-4 rotate-180" /> Voltar
                             </button>
                             <button
                                 type="submit"
                                 disabled={loading || formData.dias_trabalho.length === 0 || !formData.aceite_lgpd}
-                                className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-4 rounded-xl hover:from-green-400 hover:to-emerald-500 transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-3 text-lg tracking-wide"
+                                className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-4 rounded-xl hover:from-green-400 hover:to-emerald-500 transition-all shadow-[0_0_20px_rgba(16,185,129,0.25)] disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center gap-2.5 text-base tracking-wide"
                             >
-                                {loading && <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
-                                {loading ? 'Criptografando Dados...' : 'AUTORIZAR INSCRIÇÃO'}
+                                {loading
+                                    ? <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Enviando...</>
+                                    : <><ShieldCheck className="w-5 h-5" /> CONFIRMAR INSCRIÇÃO</>
+                                }
                             </button>
                         </div>
+                        {(!formData.aceite_lgpd || formData.dias_trabalho.length === 0) && (
+                            <p className="text-center text-xs text-slate-500 pt-1">
+                                {!formData.aceite_lgpd && 'Aceite os termos LGPD'}
+                                {!formData.aceite_lgpd && formData.dias_trabalho.length === 0 && ' e '}
+                                {formData.dias_trabalho.length === 0 && 'selecione ao menos uma data'}
+                                {' '}para habilitar o envio.
+                            </p>
+                        )}
                     </div>
                 )}
             </form>

@@ -107,13 +107,20 @@ class PublicController {
             }
 
             // Selecionar os colaboradores apenas com campos seguros para exibição pública
-            const { data: employees, error: empError } = await supabase
+            const { data: rawEmployees, error: empError } = await supabase
                 .from('pessoas')
                 .select('id, nome, funcao, status_acesso')
                 .eq('empresa_id', empresa.id)
                 .order('created_at', { ascending: false });
 
             if (empError) throw empError;
+
+            const employees = (rawEmployees || []).map(emp => ({
+                id: emp.id,
+                nome: emp.nome,
+                funcao: emp.funcao,
+                status_acesso: emp.status_acesso
+            }));
 
             return res.json({ success: true, employees });
 
@@ -259,7 +266,12 @@ class PublicController {
                 foto_url,
                 foto_base64,
                 documentos,
-                aceite_lgpd
+                aceite_lgpd,
+                tipo_pessoa,
+                fases_acesso,
+                documento_foto,
+                trabalho_area_tecnica,
+                trabalho_altura
             } = req.body;
 
             // Validar aceite LGPD - aceitar como boolean ou string 'true'
@@ -501,7 +513,7 @@ class PublicController {
             res.status(201).json({
                 success: true,
                 message: 'Cadastro concluído! A empresa foi notificada.',
-                qr_code: qrData.image
+                qr_code: null
             });
 
         } catch (error) {
