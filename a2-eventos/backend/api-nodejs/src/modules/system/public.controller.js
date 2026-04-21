@@ -484,7 +484,14 @@ class PublicController {
                     .single();
                 
                 if (insErr) {
-                    logger.error('Erro ao inserir nova pessoa:', JSON.stringify(insErr));
+                    logger.error('Erro ao inserir nova pessoa:', {
+                        code: insErr.code,
+                        message: insErr.message,
+                        details: insErr.details,
+                        hint: insErr.hint,
+                        status: insErr.status,
+                        full: JSON.stringify(insErr)
+                    });
                     return res.status(400).json({
                         error: insErr.code === '23505' ? 'Este CPF já está cadastrado.' : 'Erro ao criar registro de colaborador.',
                         detail: insErr.message,
