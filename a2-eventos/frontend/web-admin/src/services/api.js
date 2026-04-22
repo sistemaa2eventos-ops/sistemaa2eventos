@@ -60,7 +60,9 @@ api.interceptors.response.use(
   (error) => {
     // Tratamento explicito do Rule 19: Timeout
     if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-      if (snackbarRef) snackbarRef('O servidor demorou para responder. Tente novamente.', { variant: 'error' });
+      if (snackbarRef && !error.config?.hideDefaultError) {
+        snackbarRef('O servidor demorou para responder. Tente novamente.', { variant: 'error' });
+      }
       return Promise.reject(error);
     }
 

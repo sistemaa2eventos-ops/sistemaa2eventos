@@ -192,10 +192,13 @@ export default function DispositivosPage() {
     }
   };
 
-  const handleSnapshot = async (device) => {
-    setDevLoading(device.id, 'snap', true);
     try {
-      const res = await api.get(`/dispositivos/${device.id}/snapshot`, { responseType: 'blob' });
+      // Regra 19: Timeout estendido para captura de hardware lenta e supressão de erro global para evitar duplicidade
+      const res = await api.get(`/dispositivos/${device.id}/snapshot`, { 
+        responseType: 'blob', 
+        timeout: 25000, 
+        hideDefaultError: true 
+      });
       const url = URL.createObjectURL(res.data);
       setSnapshotDialog({ open: true, url, nome: device.nome });
     } catch (err) {
@@ -233,6 +236,7 @@ export default function DispositivosPage() {
           border: `1px solid ${isOnline ? GREEN : 'rgba(255,51,102,0.3)'}`,
           backdropFilter: 'blur(12px)',
           borderRadius: 3,
+          minHeight: 215, // Fix CLS: Reserva altura mínima do card
           transition: 'box-shadow 0.3s',
           '&:hover': { boxShadow: `0 0 20px ${isOnline ? 'rgba(0,255,136,0.15)' : 'rgba(255,51,102,0.1)'}` }
         }}>
@@ -289,9 +293,11 @@ export default function DispositivosPage() {
           <CardActions sx={{ flexWrap: 'wrap', gap: 0.5, px: 2, pt: 0, pb: 1 }}>
             <Tooltip title="Sincronizar todos os rostos do evento">
               <span>
-                <Button size="small" startIcon={isDevLoading(device.id, 'sync') ? <CircularProgress size={12} /> : <SyncIcon />}
+                <Button size="small" 
+                  aria-label={`Sincronizar dados com ${device.nome}`}
+                  startIcon={isDevLoading(device.id, 'sync') ? <CircularProgress size={12} /> : <SyncIcon />}
                   onClick={() => handleSync(device.id)}
-                  disabled={isDevLoading(device.id, 'sync')}
+                  disabled={isDevLoading(device.id, 'sync') || !isOnline}
                   sx={{ color: CYAN, fontSize: '0.72rem', minWidth: 0 }}>
                   Sync
                 </Button>
@@ -301,9 +307,11 @@ export default function DispositivosPage() {
             {device.tipo === 'terminal_facial' || device.tipo === 'camera' ? (
               <Tooltip title="Ver snapshot da câmera">
                 <span>
-                  <Button size="small" startIcon={isDevLoading(device.id, 'snap') ? <CircularProgress size={12} /> : <SnapshotIcon />}
+                  <Button size="small" 
+                    aria-label={`Visualizar câmera de ${device.nome}`}
+                    startIcon={isDevLoading(device.id, 'snap') ? <CircularProgress size={12} /> : <SnapshotIcon />}
                     onClick={() => handleSnapshot(device)}
-                    disabled={isDevLoading(device.id, 'snap')}
+                    disabled={isDevLoading(device.id, 'snap') || !isOnline}
                     sx={{ color: '#FFB800', fontSize: '0.72rem', minWidth: 0 }}>
                     Câmera
                   </Button>
@@ -449,7 +457,16 @@ export default function DispositivosPage() {
 
         <Box sx={{ ml: 'auto' }}>
           <FormControlLabel
-            control={<Switch checked={autoRefresh} onChange={e => setAutoRefresh(e.target.checked)} size="small" />}
+            control={
+              <Switch 
+                id="auto-refresh-toggle"
+                name="auto_refresh"
+                checked={autoRefresh} 
+                onChange={e => setAutoRefresh(e.target.checked)} 
+                size="small" 
+                inputProps={{ 'aria-label': 'Ativar atualização automática de terminais' }}
+              />
+            }
             label={<Typography variant="caption" sx={{ color: '#888' }}>Auto-refresh 12s</Typography>}
           />
         </Box>
@@ -471,7 +488,15 @@ export default function DispositivosPage() {
             />
           </Box>
 
-          {dispositivos.length === 0 ? (
+          {loading && dispositivos.length === 0 ? (
+            <Grid container spacing={2}>
+              {[1, 2, 3].map((i) => (
+                <Grid item xs={12} sm={6} lg={4} key={i}>
+                  <Box sx={{ height: 215, bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 3, border: '1px solid rgba(255,255,255,0.05)' }} />
+                </Grid>
+              ))}
+            </Grid>
+          ) : dispositivos.length === 0 ? (
             <Alert severity="info" sx={{ background: 'rgba(0,212,255,0.05)', border: '1px solid rgba(0,212,255,0.15)' }}>
               Nenhum dispositivo cadastrado. Clique em <b>"Novo Dispositivo"</b> para começar.
             </Alert>
