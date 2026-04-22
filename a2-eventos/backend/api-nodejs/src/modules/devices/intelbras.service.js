@@ -89,7 +89,7 @@ class IntelbrasService extends AccessDevice {
      */
     async _post(path, params = {}, body, contentType = 'application/octet-stream') {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout para POST (H-01)
+        const timeout = setTimeout(() => controller.abort(), 20000); // 20s timeout para POST (hardware pode responder lentamente)
 
         try {
             const queryString = new URLSearchParams(params).toString();
@@ -139,6 +139,8 @@ class IntelbrasService extends AccessDevice {
                 throw new Error('Dados inválidos para cadastro no terminal: pessoa.id e pessoa.cpf ausentes.');
             }
 
+            const safeName = (pessoa.nome_completo || pessoa.nome || 'SEM NOME').trim().substring(0, 31);
+
             const hwUserId = pessoa.cpf 
                 ? pessoa.cpf.replace(/\D/g, '') 
                 : (pessoa.id ? pessoa.id.split('-')[0] : 'unknown');
@@ -147,34 +149,27 @@ class IntelbrasService extends AccessDevice {
             if (fotoBase64) {
                 const sizeInBytes = (fotoBase64.length * 3) / 4;
                 if (sizeInBytes > 200000) { // > 200KB
-                    logger.warn(`⚠️ [Intelbras] Foto para ${pessoa.nome} é muito grande (${Math.round(sizeInBytes/1024)}KB). Pode falhar no terminal.`);
+                    logger.warn(`⚠️ [Intelbras] Foto para ${safeName} é muito grande (${Math.round(sizeInBytes/1024)}KB). Pode falhar no terminal.`);
                 }
             } else {
-                logger.warn(`⚠️ [Intelbras] Tentativa de cadastro sem foto para ${pessoa.nome}`);
+                logger.warn(`⚠️ [Intelbras] Tentativa de cadastro sem foto para ${safeName}`);
             }
 
-            logger.info(`📸 [Intelbras] Cadastrando (V2): ${pessoa.nome || 'SEM NOME'} (ID Hardware: ${hwUserId}) no IP: ${this.ip}`);
+            logger.info(`📸 [Intelbras] Cadastrando (V2): ${safeName} (ID Hardware: ${hwUserId}) no IP: ${this.ip}`);
 
-            // 1. Criar/Atualizar Usuário (V2 JSON)
+            // 1. Criar/Atualizar Usuário (payload mínimo compatível com SS 5541)
             const userData = {
                 UserList: [{
                     UserID: String(hwUserId),
-                    UserName: pessoa.nome,
-                    UserType: 0,
-                    UserStatus: 0,
-                    Authority: 1,
-                    Doors: [0],
-                    TimeSections: [255],
-                    ValidFrom: "2019-01-01 00:00:00",
-                    ValidTo: "2037-12-31 23:59:59",
-                    UseTime: 200,
-                    IsFirstEnter: false,
-                    FirstEnterDoors: [0, 1],
-                    SpecialDaysSchedule: [255],
-                    CitizenIDNo: "",
-                    Password: ""
-                }],
-                id: 1
+                    UserName: safeName,
+                    UserType: 'Normal',
+                    AuthorizeTimePeriodList: [{ Index: 0, Enable: true }],
+                    Valid: {
+                        Enable: true,
+                        BeginTime: '2000-01-01 00:00:00',
+                        EndTime: '2037-12-31 23:59:59'
+                    }
+                }]
             };
 
             const addUserResponse = await this._postJson('/cgi-bin/AccessUser.cgi', { action: 'insertMulti' }, userData);
@@ -185,7 +180,7 @@ class IntelbrasService extends AccessDevice {
             const faceData = {
                 UserID: String(hwUserId),
                 Info: {
-                    UserName: pessoa.nome,
+                    UserName: safeName,
                     PhotoData: [base64Clean]
                 }
             };
@@ -199,7 +194,7 @@ class IntelbrasService extends AccessDevice {
                 // Estratégia: deletar o usuário completo via AccessUser (remove face automaticamente)
                 // e depois re-adicionar usuário + face.
                 if (faceError.message && faceError.message.includes('PhotoExist')) {
-                    logger.warn(`⚠️ [Intelbras] Face já existe para ${pessoa.nome} (ID: ${hwUserId}). Deletando usuário completo e re-cadastrando...`);
+                    logger.warn(`⚠️ [Intelbras] Face já existe para ${safeName} (ID: ${hwUserId}). Deletando usuário completo e re-cadastrando...`);
 
                     // 1. Deletar usuário inteiro (AccessUser.cgi remove também a face)
                     try {
@@ -234,11 +229,13 @@ class IntelbrasService extends AccessDevice {
                 }
             }
 
-            logger.info(`✅ [Intelbras] Sincronização V2 concluída: ${pessoa.nome}`);
+            logger.info(`✅ [Intelbras] Sincronização V2 concluída: ${safeName}`);
             return true;
 
         } catch (error) {
-            logger.error(`❌ [Intelbras] Erro ao cadastrar ${pessoa.nome}:`, error.message);
+            const safeName = (pessoa?.nome_completo || pessoa?.nome || 'SEM NOME');
+            const errorMsg = error.message || 'Erro de comunicação desconhecido';
+            logger.error(`❌ [Intelbras] Erro ao cadastrar ${safeName}:`, errorMsg);
             throw error;
         }
     }
@@ -411,7 +408,7 @@ class IntelbrasService extends AccessDevice {
      *   PictureHttpUpload.*        → endpoint que recebe o evento com foto
      *   Intelbras_ModeCfg.*        → modo online + keepalive
      */
-    async configureOnlineMode(serverIp, serverPort = 3001) {
+    async configureOnlineMode(serverIp, serverPort = 3001, options = {}) {
         try {
             logger.info(`⚙️ [Intelbras] Configurando MODO ONLINE no IP ${this.ip} → ${serverIp}:${serverPort}`);
 
@@ -421,12 +418,17 @@ class IntelbrasService extends AccessDevice {
             const onlinePath   = `/api/intelbras/online${qs}`;
             const keepalivePath = `/api/intelbras/keepalive${qs}`;
 
+            const useHttps = typeof options.useHttps === 'boolean'
+                ? options.useHttps
+                : Number(serverPort) === 443;
+
             // 1. Configurar endpoint de eventos com foto (PictureHttpUpload)
             const paramsUpload = {
                 action: 'setConfig',
                 'PictureHttpUpload.Enable': 'true',
                 'PictureHttpUpload.UploadServerList[0].Address': serverIp,
                 'PictureHttpUpload.UploadServerList[0].Port': serverPort,
+                'PictureHttpUpload.UploadServerList[0].HttpsEnable': useHttps ? 'true' : 'false',
                 'PictureHttpUpload.UploadServerList[0].Uploadpath': onlinePath
             };
             const r1 = await this._get('/cgi-bin/configManager.cgi', paramsUpload);
