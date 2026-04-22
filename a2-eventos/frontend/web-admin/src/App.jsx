@@ -136,7 +136,6 @@ const AppContent = () => {
             <Route path="/usuarios" element={<ProtectedRoute role="admin_master"><Usuarios /></ProtectedRoute>} />
             <Route path="/audit-logs" element={<ProtectedRoute role="admin_master"><AuditLogs /></ProtectedRoute>} />
             <Route path="/configuracoes" element={<ProtectedRoute role="admin_master"><Configuracoes /></ProtectedRoute>} />
-            <Route path="/config/geral" element={<ProtectedRoute role="admin_master"><ConfigGeral /></ProtectedRoute>} />
             <Route path="/config/idiomas" element={<ProtectedRoute role="admin_master"><ConfigIdiomas /></ProtectedRoute>} />
             <Route path="/config/notificacoes" element={<ProtectedRoute role="admin_master"><ConfigNotificacoes /></ProtectedRoute>} />
             <Route path="/config/integracoes" element={<ProtectedRoute role="admin_master"><ConfigIntegracoes /></ProtectedRoute>} />

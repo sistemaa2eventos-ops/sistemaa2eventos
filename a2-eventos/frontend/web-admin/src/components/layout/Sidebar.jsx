@@ -301,7 +301,6 @@ const Sidebar = ({ open, onClose }) => {
                 // --- GRUPO 1: CONFIGURAÇÕES DO EVENTO ---
                 { text: 'Central de Configurações', path: '/configuracoes', icon: <SettingsIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Gerenciar Eventos', path: '/eventos', icon: <EventIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Geral & Interface', path: '/config/geral', icon: <PaletteIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Credenciamento', path: '/config/credenciamento', icon: <CredIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Regras de Acesso', path: '/config/checkin', icon: <CheckConfigIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Áreas de Acesso', path: '/config/areas', icon: <AreaIcon sx={{ fontSize: 16 }} /> },
