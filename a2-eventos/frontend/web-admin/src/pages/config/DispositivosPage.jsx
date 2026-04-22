@@ -192,6 +192,8 @@ export default function DispositivosPage() {
     }
   };
 
+  const handleSnapshot = async (device) => {
+    setDevLoading(device.id, 'snap', true);
     try {
       // Regra 19: Timeout estendido para captura de hardware lenta e supressão de erro global para evitar duplicidade
       const res = await api.get(`/dispositivos/${device.id}/snapshot`, { 
