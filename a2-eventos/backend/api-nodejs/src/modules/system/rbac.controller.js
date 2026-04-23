@@ -38,7 +38,7 @@ class RbacController {
                 matrix: matrix || []
             });
         } catch (error) {
-            logger.error({ err: error }, 'Erro ao carregar matriz RBAC');
+            logger.error({ err: error, event_id: req.event?.id }, 'Failed to load RBAC matrix');
             return apiResponse.error(res, 'Erro ao carregar matriz: ' + error.message);
         }
     }
