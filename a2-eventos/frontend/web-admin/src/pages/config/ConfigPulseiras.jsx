@@ -168,10 +168,11 @@ const ConfigPulseiras = ({ embedded = false }) => {
 
     const loadData = async () => {
         try {
+        const eventoId = sessionStorage.getItem("active_evento_id") || localStorage.getItem("active_evento_id");
             setLoading(true);
             const [respPulseiras, respAreas] = await Promise.all([
-                api.get('/config/pulseiras'),
-                api.get('/config/areas')
+                api.get('/config/pulseiras', { params: { evento_id: eventoId } }),
+                api.get('/config/areas', { params: { evento_id: eventoId } })
             ]);
             setPulseiras(respPulseiras.data.data || []);
             setAreas(respAreas.data.data || []);
