@@ -46,7 +46,10 @@ class AccessController {
 
             return ApiResponse.success(res, result);
         } catch (error) {
-            logger.error('Erro no checkout:', error.message);
+            logger.error(
+                { err: error, person_id: pessoa_id, event_id: eventoId, method: metodo },
+                'Error registering checkout'
+            );
             return ApiResponse.error(res, 'Erro interno no servidor');
         }
     }
@@ -58,7 +61,10 @@ class AccessController {
         try {
             return ApiResponse.error(res, 'Reconhecimento facial em migração para motor de vetores. Use o terminal físico.', 501);
         } catch (error) {
-            logger.error('Erro no processamento facial:', error.message);
+            logger.error(
+                { err: error, event_id: req.event?.id },
+                'Error in face recognition processing'
+            );
             return ApiResponse.error(res, 'Falha crítica no motor biométrico.');
         }
     }
@@ -127,7 +133,10 @@ class AccessController {
 
             return ApiResponse.success(res, logs);
         } catch (error) {
-            logger.error('Erro ao listar logs (Busca Resiliente):', error.message);
+            logger.error(
+                { err: error, event_id: req.event?.id },
+                'Error fetching access logs'
+            );
             return ApiResponse.error(res, 'Erro ao buscar histórico de acessos (Resiliência Ativada).');
         }
     }
@@ -141,7 +150,10 @@ class AccessController {
 
             return ApiResponse.success(res, stats);
         } catch (error) {
-            logger.error('Erro ao buscar stats realtime:', error.message);
+            logger.error(
+                { err: error, event_id: req.event?.id },
+                'Error fetching realtime stats'
+            );
             return ApiResponse.error(res, 'Erro ao computar estatísticas.');
         }
     }
@@ -184,7 +196,10 @@ class AccessController {
 
             return ApiResponse.success(res, { message: 'Participante expulso com sucesso.', data: pessoa });
         } catch (error) {
-            logger.error('Erro ao expulsar participante:', error.message);
+            logger.error(
+                { err: error, person_id: pessoa_id, event_id: eventoId },
+                'Error expelling participant'
+            );
             return ApiResponse.error(res, 'Erro ao processar expulsão.');
         }
     }
@@ -262,7 +277,10 @@ class AccessController {
       
           return ApiResponse.success(res, response);
         } catch (error) {
-            logger.error('Erro ao consultar pulseira:', error.message);
+            logger.error(
+                { err: error, event_id: req.event?.id },
+                'Error querying bracelet'
+            );
             return ApiResponse.error(res, 'Erro interno ao consultar pulseira.');
         }
     }
@@ -282,7 +300,10 @@ class AccessController {
 
             return ApiResponse.success(res, { areas: data || [] });
         } catch (error) {
-            logger.error('Erro ao consultar áreas:', error.message);
+            logger.error(
+                { err: error, event_id: req.event?.id },
+                'Error querying areas'
+            );
             return ApiResponse.error(res, 'Erro ao consultar áreas.');
         }
     }
@@ -309,7 +330,10 @@ class AccessController {
       
           return ApiResponse.success(res, data);
         } catch (error) {
-            logger.error('Erro ao buscar último check-in:', error.message);
+            logger.error(
+                { err: error, person_id: pessoa_id, event_id: req.event?.id },
+                'Error fetching last checkin'
+            );
             return ApiResponse.error(res, 'Erro interno ao buscar último check-in.');
         }
     }
@@ -346,7 +370,10 @@ class AccessController {
             if (result.error) return ApiResponse.error(res, result.error, result.status || 400);
             return ApiResponse.success(res, result);
         } catch (error) {
-            logger.error('Erro no checkin manual:', error.message);
+            logger.error(
+                { err: error, person_id: pessoa_id, event_id: eventoId },
+                'Error in manual checkin'
+            );
             return ApiResponse.error(res, 'Erro ao processar check-in manual');
         }
     }
@@ -386,7 +413,10 @@ class AccessController {
             if (result.error) return ApiResponse.error(res, result.error, result.status || 400);
             return ApiResponse.success(res, result);
         } catch (error) {
-            logger.error('Erro no checkin QR Code:', error.message);
+            logger.error(
+                { err: error, qr_code: req.body?.qr_code, event_id: eventoId },
+                'Error in QR code checkin'
+            );
             return ApiResponse.error(res, 'Erro ao processar check-in QR Code');
         }
     }
@@ -458,7 +488,11 @@ class AccessController {
                     .single();
 
                 if (pulseiraExistente) {
-                    logger.warn(`Pulseira ${numero_pulseira} já está em uso por ${pulseiraExistente.nome_completo}`);
+                    logger.warn('Bracelet already in use', {
+                    bracelet_number: numero_pulseira,
+                    current_user: pulseiraExistente.nome_completo,
+                    event_id: eventoId
+                });
                     // Nãobloqueia, mas registra no log como alerta
                 }
             }
@@ -515,7 +549,10 @@ class AccessController {
 
             return ApiResponse.success(res, { success: true, pessoa, pulseira_info: pulseiraInfo });
         } catch (error) {
-            logger.error('Erro no checkin pulseira:', error.message);
+            logger.error(
+                { err: error, bracelet_number: numero_pulseira, event_id: eventoId },
+                'Error in bracelet checkin'
+            );
             return ApiResponse.error(res, 'Erro ao processar check-in');
         }
     }
@@ -580,7 +617,10 @@ class AccessController {
 
             return ApiResponse.success(res, { success: true, pessoa });
         } catch (error) {
-            logger.error('Erro no checkout pulseira:', error.message);
+            logger.error(
+                { err: error, bracelet_number: numero_pulseira, event_id: eventoId },
+                'Error in bracelet checkout'
+            );
             return ApiResponse.error(res, 'Erro ao processar check-out');
         }
     }
@@ -607,7 +647,10 @@ class AccessController {
 
             return ApiResponse.success(res, { pessoas: data || [] });
         } catch (error) {
-            logger.error('Erro ao buscar pulseira:', error.message);
+            logger.error(
+                { err: error, bracelet_id: id, event_id: req.event?.id },
+                'Error fetching bracelet'
+            );
             return ApiResponse.error(res, 'Erro ao buscar');
         }
     }
@@ -757,7 +800,10 @@ class AccessController {
                 confianca
             });
         } catch (error) {
-            logger.error('Erro no checkin facial:', error.message);
+            logger.error(
+                { err: error, event_id: req.event?.id, method: 'facial' },
+                'Error in facial checkin'
+            );
             return res.status(500).json({ error: 'Erro interno' });
         }
     }
