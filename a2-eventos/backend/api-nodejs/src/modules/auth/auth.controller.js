@@ -485,8 +485,8 @@ class AuthController {
      */
     async updateUser(req, res) {
         try {
-            const { userId } = req.params;
-            const { nome_completo, foto_url } = req.body;
+            const { id: userId } = req.params;
+            const { nome_completo, foto_url, evento_id, nivel_acesso } = req.body;
 
             // Só admin_master pode editar outros usuários
             if (req.user?.nivel_acesso !== 'admin_master' && userId !== req.user.id) {
@@ -498,6 +498,12 @@ class AuthController {
             const updateData = { updated_at: new Date() };
             if (nome_completo) updateData.nome_completo = nome_completo;
             if (foto_url) updateData.foto_url = foto_url;
+            if (nivel_acesso) updateData.nivel_acesso = nivel_acesso;
+            
+            // Permitir null para evento_id (usuário global)
+            if (req.body.hasOwnProperty('evento_id')) {
+                updateData.evento_id = evento_id || null;
+            }
 
             const { data, error } = await supabase
                 .from('perfis')
