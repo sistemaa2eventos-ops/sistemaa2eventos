@@ -1,0 +1,29 @@
+­ƒîÉ i18next is maintained with support from Locize ÔÇö consider powering your project with managed localization (AI, CDN, integrations): https://locize.com ­ƒÆÖ
+­ƒöî Configurando cliente Supabase...
+­ƒôî URL: https://zznrgwytywgjsjqdjfxn.supabase.co
+­ƒôî Anon Key: Ô£à carregada
+­ƒôî Service Role: Ô£à carregada
+­ƒöä Testando conex├úo com Supabase...
+C:\Projetos\Projeto_A2_Eventos\a2-eventos\backend\api-nodejs\node_modules\express\lib\router\route.js:216
+        throw new Error(msg);
+        ^
+
+Error: Route.get() requires a callback function but got a [object Undefined]
+    at Route.<computed> [as get] (C:\Projetos\Projeto_A2_Eventos\a2-eventos\backend\api-nodejs\node_modules\express\lib\router\route.js:216:15)
+    at proto.<computed> [as get] (C:\Projetos\Projeto_A2_Eventos\a2-eventos\backend\api-nodejs\node_modules\express\lib\router\index.js:521:19)
+    at Object.<anonymous> (C:\Projetos\Projeto_A2_Eventos\a2-eventos\backend\api-nodejs\src\modules\system\settings.routes.js:27:8)
+    at Module._compile (node:internal/modules/cjs/loader:1554:14)
+    at Object..js (node:internal/modules/cjs/loader:1706:10)
+    at Module.load (node:internal/modules/cjs/loader:1289:32)
+    at Function._load (node:internal/modules/cjs/loader:1108:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:220:24)
+    at Module.require (node:internal/modules/cjs/loader:1311:12)
+    at require (node:internal/modules/helpers:136:16)
+    at Object.<anonymous> (C:\Projetos\Projeto_A2_Eventos\a2-eventos\backend\api-nodejs\src\app.js:37:24)
+    at Module._compile (node:internal/modules/cjs/loader:1554:14)
+    at Object..js (node:internal/modules/cjs/loader:1706:10)
+    at Module.load (node:internal/modules/cjs/loader:1289:32)
+    at Function._load (node:internal/modules/cjs/loader:1108:12)
+
+Node.js v22.14.0

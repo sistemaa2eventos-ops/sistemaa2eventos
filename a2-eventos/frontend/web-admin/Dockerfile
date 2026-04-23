@@ -1,6 +1,8 @@
 FROM node:20-alpine AS builder
 
 ARG VITE_API_URL=https://api.nzt.app.br/api
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
 
 WORKDIR /app
 
@@ -9,6 +11,8 @@ RUN npm install --legacy-peer-deps && npm install @rollup/rollup-linux-x64-musl
 
 COPY . .
 ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
 RUN npm run build
 
 FROM nginx:alpine

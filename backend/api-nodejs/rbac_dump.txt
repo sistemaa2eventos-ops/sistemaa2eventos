@@ -1,0 +1,98 @@
+🔌 Configurando cliente Supabase...
+📌 URL: https://zznrgwytywgjsjqdjfxn.supabase.co
+📌 Anon Key: ✅ carregada
+📌 Service Role: ✅ carregada
+🔄 Testando conexão com Supabase...
+--- 🛡️ PERFIS (Roles) NO BANCO ---
+✅ Conectado ao Supabase com sucesso!
+📊 Banco de dados respondendo normalmente.
+[
+  {
+    "id": "e58661aa-8185-40d8-8799-62feb0b1c67c",
+    "nome": "master",
+    "descricao": "Top-level. Visualiza e opera configurações críticas multiplataforma.",
+    "is_system_role": true,
+    "created_at": "2026-02-24T10:05:50.816672+00:00"
+  },
+  {
+    "id": "301dced4-749f-4338-b563-a01be79ae835",
+    "nome": "admin",
+    "descricao": "Administrador técnico de tenant. Possui acesso total dentro dos limites visuais do seu ambiente.",
+    "is_system_role": true,
+    "created_at": "2026-02-24T10:05:50.816672+00:00"
+  },
+  {
+    "id": "895b14b4-7f1e-4e23-bdd8-eb22fd2c9450",
+    "nome": "supervisor",
+    "descricao": "Gerente tático. Visualiza reports analíticos, gerencia dados (pessoas/empresas/veículos), opera portaria.",
+    "is_system_role": true,
+    "created_at": "2026-02-24T10:05:50.816672+00:00"
+  },
+  {
+    "id": "55c89d22-7458-4830-b5fe-c42552443ea9",
+    "nome": "op_atendimento",
+    "descricao": "Agente final de credenciamento. Gerencia dados e roda terminais de Check-in/Check-out.",
+    "is_system_role": true,
+    "created_at": "2026-02-24T10:05:50.816672+00:00"
+  },
+  {
+    "id": "d1be7b82-98c7-44ad-848f-3f8a77c7be50",
+    "nome": "op_monitoramento",
+    "descricao": "Agente de \"Control Room\". Roda terminais de monitoramento e reports.",
+    "is_system_role": true,
+    "created_at": "2026-02-24T10:05:50.816672+00:00"
+  },
+  {
+    "id": "09ef5e48-97c8-4e53-bfe1-cdc7a78514b2",
+    "nome": "op_analista",
+    "descricao": "Agente de validação. Gerenciamento, aprovação/reprovação de documentos e dados.",
+    "is_system_role": true,
+    "created_at": "2026-02-24T10:05:50.816672+00:00"
+  },
+  {
+    "id": "3c172ab8-a9e7-4302-b2b2-b14efb873e55",
+    "nome": "cliente",
+    "descricao": "Acesso via link. Visualização e impressão tickets/QR Code.",
+    "is_system_role": true,
+    "created_at": "2026-02-24T10:05:50.816672+00:00"
+  },
+  {
+    "id": "396b1ea0-11da-4748-b0a5-b8c4dda3a19d",
+    "nome": "empresa",
+    "descricao": "Acesso restrito a inserção de colaboradores e fluxos de aprovação documental.",
+    "is_system_role": true,
+    "created_at": "2026-02-24T10:05:50.816672+00:00"
+  }
+]
+
+--- 🔑 PERMISSÕES NO BANCO ---
+[
+  {
+    "id": "c44b2fa6-cd50-424d-b894-4214449f4908",
+    "recurso": "documentos",
+    "acao": "aprovar",
+    "escopo": "evento",
+    "descricao": "Permite aprovar e rejeitar PDFs de NRs e ASOs na auditoria documental."
+  },
+  {
+    "id": "be6581f0-3747-4a2f-bd70-7f406c1c8021",
+    "recurso": "documentos",
+    "acao": "submeter",
+    "escopo": "empresa",
+    "descricao": "Permite fazer upload de arquivos da própria empresa."
+  },
+  {
+    "id": "541dda98-710e-4bf5-a5b3-4ef8542bf1f5",
+    "recurso": "reports",
+    "acao": "ler",
+    "escopo": "evento",
+    "descricao": "Permite visualizar gráficos logísticos de lotação."
+  },
+  {
+    "id": "445f274c-3482-4f76-9807-9ba2326e515f",
+    "recurso": "portaria",
+    "acao": "operar",
+    "escopo": "evento",
+    "descricao": "Acesso à página física de Check-in / Checkout para biometria e barras."
+  }
+]

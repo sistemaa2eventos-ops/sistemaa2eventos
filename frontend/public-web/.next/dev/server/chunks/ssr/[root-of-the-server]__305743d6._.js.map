@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 18, "column": 0}, "map": {"version":3,"sources":["file:///C:/Projetos/Projeto_A2_Eventos/a2-eventos/frontend/public-web/src/app/page.tsx"],"sourcesContent":["export default function Home() {\r\n  return (\r\n    <div className=\"min-h-screen flex items-center justify-center bg-gray-50\">\r\n      <div className=\"text-center\">\r\n        <h1 className=\"text-4xl font-bold text-blue-900 mb-4\">NZT - Intelligent access systems</h1>\r\n        <p className=\"text-gray-600 max-w-md mx-auto\">\r\n          Sistema de Credenciamento e Controle de Acesso.\r\n          <br />\r\n          Para se cadastrar, utilize o link fornecido pela sua empresa.\r\n        </p>\r\n      </div>\r\n    </div>\r\n  );\r\n}\r\n"],"names":[],"mappings":";;;;;;AAAe,SAAS;IACtB,qBACE,8OAAC;QAAI,WAAU;kBACb,cAAA,8OAAC;YAAI,WAAU;;8BACb,8OAAC;oBAAG,WAAU;8BAAwC;;;;;;8BACtD,8OAAC;oBAAE,WAAU;;wBAAiC;sCAE5C,8OAAC;;;;;wBAAK;;;;;;;;;;;;;;;;;;AAMhB"}}]
+}

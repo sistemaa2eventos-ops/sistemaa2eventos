@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  postgres_edge:
+    image: ankane/pgvector:v0.5.1
+    container_name: a2_eventos_pg_edge
+    restart: unless-stopped
+    volumes:
+      - pg_edge_data:/var/lib/postgresql/data
+      - ./backend/api-nodejs/src/scripts/init_pg_edge.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - a2_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:alpine
+    container_name: a2_eventos_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - a2_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./backend/api-nodejs
+    container_name: a2_eventos_api
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend/api-nodejs:/app
+      - /app/node_modules
+    depends_on:
+      postgres_edge:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - a2_net
+
+  ai_worker:
+    build:
+      context: ./backend/microservice-face-python
+    container_name: a2_eventos_ai_worker
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=America/Sao_Paulo
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - USE_REDIS=true
+    env_file:
+      - ./backend/microservice-face-python/.env
+    networks:
+      - a2_net
+
+  gateway:
+    image: nginx:alpine
+    container_name: a2_eventos_gateway
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      api:
+        condition: service_started
+    networks:
+      - a2_net
+
+  admin-web:
+    build:
+      context: ./frontend/web-admin
+    container_name: a2_eventos_admin_web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    networks:
+      - a2_net
+
+  cadastro-web:
+    build:
+      context: ./frontend/web-cadastro
+    container_name: a2_eventos_cadastro_web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    networks:
+      - a2_net
+
+networks:
+  a2_net:
+    driver: bridge
+
+volumes:
+  redis_data:
+  pg_edge_data:
