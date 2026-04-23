@@ -174,7 +174,7 @@ class IntelbrasService extends AccessDevice {
             };
 
             const addUserResponse = await this._postJson('/cgi-bin/AccessUser.cgi', { action: 'insertMulti' }, userData);
-            logger.info(`📡 Resposta insertMulti User (${this.ip}): ${addUserResponse.trim()}`);
+            logger.info('User registered on device', { device_ip: this.ip });
 
             // 2. Enviar Face via FaceInfoManager.cgi com upsert automático
             const base64Clean = fotoBase64.replace(/^data:image\/\w+;base64,/, '');
@@ -188,14 +188,14 @@ class IntelbrasService extends AccessDevice {
 
             try {
                 const addFaceResponse = await this._postJson('/cgi-bin/FaceInfoManager.cgi', { action: 'add' }, faceData);
-                logger.info(`📡 Resposta FaceInfoManager add (${this.ip}): ${addFaceResponse.trim()}`);
+                logger.info('Face registered on device', { device_ip: this.ip });
 
             } catch (faceError) {
                 // FaceInfoManager não tem endpoint de update/remove funcional neste firmware.
                 // Estratégia: deletar o usuário completo via AccessUser (remove face automaticamente)
                 // e depois re-adicionar usuário + face.
                 if (faceError.message && faceError.message.includes('PhotoExist')) {
-                    logger.warn(`⚠️ [Intelbras] Face já existe para ${safeName} (ID: ${hwUserId}). Deletando usuário completo e re-cadastrando...`);
+                    logger.warn('Face already registered, recreating user', { person_name: safeName, hw_user_id: hwUserId, device_ip: this.ip });
 
                     // 1. Deletar usuário inteiro (AccessUser.cgi remove também a face)
                     try {
@@ -203,9 +203,9 @@ class IntelbrasService extends AccessDevice {
                             action: 'removeMulti',
                             'UserIDList[0]': String(hwUserId)
                         });
-                        logger.info(`📡 Resposta removeMulti User (${this.ip}): ${delUserResponse.trim()}`);
+                        logger.info('User removed successfully', { hw_user_id: hwUserId, device_ip: this.ip });
                     } catch (delErr) {
-                        logger.warn(`⚠️ [Intelbras] Falha ao deletar usuário: ${delErr.message}`);
+                        logger.warn('Failed to remove existing user', { hw_user_id: hwUserId, device_ip: this.ip, error_reason: delErr.message });
                     }
 
                     // Aguarda o dispositivo processar
@@ -214,29 +214,29 @@ class IntelbrasService extends AccessDevice {
                     // 2. Re-criar o usuário
                     try {
                         const reAddUserResponse = await this._postJson('/cgi-bin/AccessUser.cgi', { action: 'insertMulti' }, userData);
-                        logger.info(`📡 Resposta re-insertMulti User (${this.ip}): ${reAddUserResponse.trim()}`);
+                        logger.info('User recreated successfully', { hw_user_id: hwUserId, device_ip: this.ip });
                     } catch (reUserErr) {
-                        logger.warn(`⚠️ [Intelbras] Falha ao re-criar usuário: ${reUserErr.message}`);
+                        logger.warn('Failed to recreate user', { hw_user_id: hwUserId, device_ip: this.ip, error_reason: reUserErr.message });
                     }
 
                     await new Promise(r => setTimeout(r, 300));
 
                     // 3. Re-adicionar a face
                     const retryFaceResponse = await this._postJson('/cgi-bin/FaceInfoManager.cgi', { action: 'add' }, faceData);
-                    logger.info(`📡 Resposta FaceInfoManager re-add (${this.ip}): ${retryFaceResponse.trim()}`);
+                    logger.info('Face re-registered successfully', { hw_user_id: hwUserId, device_ip: this.ip });
 
                 } else {
                     throw faceError;
                 }
             }
 
-            logger.info(`✅ [Intelbras] Sincronização V2 concluída: ${safeName}`);
+            logger.info('Person successfully registered on device', { person_name: safeName, device_ip: this.ip });
             return true;
 
         } catch (error) {
             const safeName = (pessoa?.nome_completo || pessoa?.nome || 'SEM NOME');
             const errorMsg = error.message || 'Erro de comunicação desconhecido';
-            logger.error(`❌ [Intelbras] Erro ao cadastrar ${safeName}:`, errorMsg);
+            logger.error({ device_ip: this.ip, person_name: safeName }, 'Error registering person');
             throw error;
         }
     }
@@ -252,10 +252,10 @@ class IntelbrasService extends AccessDevice {
                 action: 'removeMulti',
                 'UserIDList[0]': String(userId)
             });
-            logger.info(`📡 Resposta removeMulti User (${this.ip}): ${response.trim()}`);
+            logger.info('User removed from device', { hw_user_id: userId, device_ip: this.ip });
             return true;
         } catch (error) {
-            logger.error(`❌ [Intelbras] Erro ao remover ${userId}:`, error.message);
+            logger.error({ err: error, hw_user_id: userId, device_ip: this.ip }, 'Failed to remove user');
             return false;
         }
     }
@@ -272,10 +272,10 @@ class IntelbrasService extends AccessDevice {
                 });
             }
             const response = await this._get('/cgi-bin/AccessUser.cgi', params);
-            logger.info(`📡 Resposta listUsers (${this.ip}): ${response.trim()}`);
+            logger.info('Users listed from device', { device_ip: this.ip, user_count: userIds.length });
             return response;
         } catch (error) {
-            logger.error(`❌ [Intelbras] Erro ao listar usuários:`, error.message);
+            logger.error({ err: error, device_ip: this.ip }, 'Failed to list users');
             return null;
         }
     }
@@ -287,8 +287,8 @@ class IntelbrasService extends AccessDevice {
      */
     async displayMessage(text, duration = 3) {
         try {
-            logger.info(`📺 [Intelbras] Exibindo no display (${this.ip}): "${text}"`);
-            
+            logger.info('Displaying message on device', { device_ip: this.ip, message: text, duration_seconds: duration });
+
             // Dahua/Intelbras VSP (Video Station Protocol)
             // Muitos leitores Bio T aceitam overlay de texto via Log/Eventos
             // ou via este comando de ConfigManager se configurado
@@ -313,7 +313,7 @@ class IntelbrasService extends AccessDevice {
             }
             return true;
         } catch (error) {
-            logger.error(`❌ [Intelbras] Erro ao exibir mensagem: ${error.message}`);
+            logger.error({ err: error, device_ip: this.ip }, 'Failed to display message on device');
             return false;
         }
     }
@@ -328,7 +328,7 @@ class IntelbrasService extends AccessDevice {
             const channel = type === 'success' ? 1 : 2;
             // Commando genérico para trigger de buzzer se disponível via CGI
             // No Bio T, o próprio evento AccessControl gera som, mas podemos forçar
-            logger.debug(`🔊 [Intelbras] Beep ${type} no IP ${this.ip}`);
+            logger.debug('Playing sound on device', { device_ip: this.ip, sound_type: type });
             return true;
         } catch (error) {
             return false;
@@ -344,7 +344,7 @@ class IntelbrasService extends AccessDevice {
             });
             return true;
         } catch (error) {
-            logger.error(`❌ [Intelbras] Erro ao abrir porta:`, error.message);
+            logger.error({ err: error, device_ip: this.ip }, 'Failed to open door');
             return false;
         }
     }
@@ -356,10 +356,10 @@ class IntelbrasService extends AccessDevice {
                 action: 'unlockDoor',
                 Channel: 1
             });
-            logger.info(`🔓 [Intelbras] Porta LIBERADA permanentemente: ${this.ip}`);
+            logger.info('Door unlocked', { device_ip: this.ip, action: 'unlock' });
             return true;
         } catch (error) {
-            logger.error(`❌ [Intelbras] Erro ao liberar porta:`, error.message);
+            logger.error({ err: error, device_ip: this.ip }, 'Failed to unlock door');
             return false;
         }
     }
@@ -371,10 +371,10 @@ class IntelbrasService extends AccessDevice {
                 action: 'lockDoor',
                 Channel: 1
             });
-            logger.info(`🔒 [Intelbras] Porta TRAVADA permanentemente: ${this.ip}`);
+            logger.info('Door locked', { device_ip: this.ip, action: 'lock' });
             return true;
         } catch (error) {
-            logger.error(`❌ [Intelbras] Erro ao travar porta:`, error.message);
+            logger.error({ err: error, device_ip: this.ip }, 'Failed to lock door');
             return false;
         }
     }
@@ -386,10 +386,10 @@ class IntelbrasService extends AccessDevice {
                 action: 'closeDoor',
                 Channel: 1
             });
-            logger.info(`🚪 [Intelbras] Porta retornada ao estado NORMAL: ${this.ip}`);
+            logger.info('Door closed to normal state', { device_ip: this.ip, action: 'close' });
             return true;
         } catch (error) {
-            logger.error(`❌ [Intelbras] Erro ao fechar porta:`, error.message);
+            logger.error({ err: error, device_ip: this.ip }, 'Failed to close door');
             return false;
         }
     }
@@ -411,7 +411,7 @@ class IntelbrasService extends AccessDevice {
      */
     async configureOnlineMode(serverIp, serverPort = 3001, options = {}) {
         try {
-            logger.info(`⚙️ [Intelbras] Configurando MODO ONLINE no IP ${this.ip} → ${serverIp}:${serverPort}`);
+            logger.info('Configuring online mode', { device_ip: this.ip, server_ip: serverIp, server_port: serverPort });
 
             const token = this.config?.control_token || '';
             const qs    = token ? `?token=${token}` : '';
@@ -433,7 +433,7 @@ class IntelbrasService extends AccessDevice {
                 'PictureHttpUpload.UploadServerList[0].Uploadpath': onlinePath
             };
             const r1 = await this._get('/cgi-bin/configManager.cgi', paramsUpload);
-            logger.info(`📡 [Online] PictureHttpUpload: ${r1.trim()}`);
+            logger.info('Picture upload configured', { device_ip: this.ip, endpoint: 'PictureHttpUpload' });
 
             // 2. Configurar modo online + keepalive (Intelbras_ModeCfg)
             const paramsMode = {
@@ -446,11 +446,11 @@ class IntelbrasService extends AccessDevice {
                 'Intelbras_ModeCfg.RemoteCheckTimeout': '10'
             };
             const r2 = await this._get('/cgi-bin/configManager.cgi', paramsMode);
-            logger.info(`📡 [Online] ModeCfg: ${r2.trim()}`);
+            logger.info('Mode configuration applied', { device_ip: this.ip, mode: 'online', keepalive_enabled: true });
 
             return r1.includes('OK') && r2.includes('OK');
         } catch (error) {
-            logger.error(`❌ [Intelbras] Erro ao configurar modo online: ${error.message}`);
+            logger.error({ err: error, device_ip: this.ip }, 'Failed to configure online mode');
             return false;
         }
     }
@@ -462,7 +462,7 @@ class IntelbrasService extends AccessDevice {
      */
     async configureEventPush(serverIp, serverPort = 3001) {
         try {
-            logger.info(`⚙️ [Intelbras] Configurando Event Push no IP ${this.ip} para ${serverIp}:${serverPort}...`);
+            logger.info('Configuring event push mode', { device_ip: this.ip, server_ip: serverIp, server_port: serverPort });
 
             const pushUrl = this.config?.control_token
                 ? `/api/intelbras/events?token=${this.config.control_token}`
@@ -480,10 +480,10 @@ class IntelbrasService extends AccessDevice {
             };
 
             const response = await this._get('/cgi-bin/configManager.cgi', params);
-            logger.info(`📡 Resposta Config Push (${this.ip}): ${response.trim()}`);
+            logger.info('Event push configuration applied', { device_ip: this.ip, mode: 'push' });
             return response.includes('OK');
         } catch (error) {
-            logger.error(`❌ [Intelbras] Erro ao configurar Push: ${error.message}`);
+            logger.error({ err: error, device_ip: this.ip }, 'Failed to configure event push');
             return false;
         }
     }
