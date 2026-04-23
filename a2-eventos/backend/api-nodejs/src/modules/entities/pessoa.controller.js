@@ -191,7 +191,9 @@ class PessoaController {
             return ApiResponse.success(res, data);
         } catch (error) {
             logger.error('Erro ao gerar QR Code:', error);
-            return ApiResponse.error(res, error.message);
+            // Se for erro de validação (ex: pendente), retorna 400, senão 500
+            const status = error.message.includes('pendente') || error.message.includes('vinculada') ? 400 : 500;
+            return ApiResponse.error(res, error.message, status);
         }
     }
 
