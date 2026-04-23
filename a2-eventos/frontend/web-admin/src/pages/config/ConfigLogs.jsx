@@ -36,7 +36,7 @@ const ConfigLogs = () => {
             if (filtros.dataInicio) params.append('start_date', filtros.dataInicio);
             if (filtros.dataFim) params.append('end_date', filtros.dataFim);
             
-            const { data } = await api.get(`/monitor/system/logs?lines=50&${params.toString()}`);
+            const { data } = await api.get(`/monitor/logs?lines=50&${params.toString()}`);
             if (data?.success) {
                 setSysLogs(data.logs?.reverse() || []);
             }
@@ -111,7 +111,7 @@ const ConfigLogs = () => {
     const handleClearLogs = async () => {
         if (!window.confirm("Certeza que deseja esvaziar os arquivos de log do sistema?")) return;
         try {
-            await api.delete('/monitor/system/logs');
+            await api.delete('/monitor/logs');
             enqueueSnackbar('Logs limpos com sucesso!', { variant: 'success' });
             loadLogs();
         } catch (error) {
