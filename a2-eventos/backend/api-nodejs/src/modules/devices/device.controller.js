@@ -24,13 +24,26 @@ class DeviceController {
                 .order('nome', { ascending: true });
 
             if (error) {
-                logger.error(`❌ Erro Supabase [DeviceController.list]: ${error.message}`, error);
+                logger.error(
+                    { err: error, event_id: evento_id },
+                    'Failed to fetch devices from database'
+                );
                 throw error;
             }
 
+            logger.info('Devices listed', {
+                device_count: data?.length || 0,
+                event_id: evento_id,
+                user_id: req.user?.id,
+                user_role: req.user?.role
+            });
+
             res.json({ success: true, data });
         } catch (error) {
-            logger.error('Erro fatal ao listar dispositivos:', error);
+            logger.error(
+                { err: error, event_id: evento_id, user_id: req.user?.id },
+                'Error listing devices'
+            );
             res.status(500).json({ 
                 error: 'Erro ao buscar dispositivos', 
                 message: error.message,
@@ -85,7 +98,10 @@ class DeviceController {
             }
 
             if (!req.event?.id) {
-                logger.error(`❌ Tentativa de criar dispositivo sem evento_id: ${req.user.email}`);
+                logger.error(
+                    { user_email: req.user?.email, user_id: req.user?.id },
+                    'Attempt to create device without event context'
+                );
                 return res.status(400).json({ error: 'Contexto de evento (Nexus) não identificado. Recarregue a página.' });
             }
 
@@ -112,10 +128,23 @@ class DeviceController {
                 .single();
 
             if (error) {
-                logger.error(`❌ Erro no Supabase ao criar dispositivo: ${error.message}`, error);
+                logger.error(
+                    { err: error, event_id: req.event.id, device_name: nome },
+                    'Failed to create device in database'
+                );
                 throw error;
             }
-            logger.info(`📸 Dispositivo adicionado: ${nome} (${marca})`);
+
+            logger.info('Device created', {
+                device_id: data.id,
+                device_name: nome,
+                device_brand: marca,
+                device_type: tipo,
+                device_ip: ip_address,
+                device_port: normalizedPort,
+                event_id: req.event.id,
+                user_id: req.user?.id
+            });
 
             // Auto-configurar Push
             if (marca === 'intelbras') {
@@ -133,25 +162,34 @@ class DeviceController {
                     });
                     const callbackPort = process.env.HARDWARE_CALLBACK_PORT || process.env.SERVER_PORT || 80;
                     const target = this._resolvePushTarget(req, process.env.SERVER_IP, callbackPort);
-                    logger.info(`⚙️ Auto-configurando Modo Online para ${target.host}:${target.port}...`);
+
+                    logger.info('Configuring device online mode', {
+                        device_id: data.id,
+                        device_name: nome,
+                        callback_host: target.host,
+                        callback_port: target.port,
+                        use_https: Number(target.port) === 443
+                    });
 
                     // Modo online: dispositivo pergunta ao servidor antes de liberar
                     await deviceInst.configureOnlineMode(target.host, target.port, {
                         useHttps: Number(target.port) === 443
                     });
                 } catch (pushError) {
-                    logger.error(`⚠️ Erro ao auto-configurar modo online para ${nome}: ${pushError.message}`);
+                    logger.error(
+                        { err: pushError, device_id: data.id, device_name: nome },
+                        'Failed to configure device online mode'
+                    );
                 }
             }
 
             res.status(201).json({ success: true, data });
 
         } catch (error) {
-            logger.error(`🚨 Erro Crítico [DeviceController.create]: ${error.message}`, {
-                stack: error.stack,
-                body: req.body,
-                user: req.user?.id
-            });
+            logger.error(
+                { err: error, user_id: req.user?.id, device_name: req.body?.nome },
+                'Unexpected error creating device'
+            );
             res.status(500).json({ error: 'Falha interna ao criar dispositivo. Detalhes registrados no log.' });
         }
     }
@@ -285,7 +323,10 @@ class DeviceController {
             }
 
         } catch (error) {
-            logger.error('Erro ao configurar push:', error);
+            logger.error(
+                { err: error, device_id: req.params.id },
+                'Error configuring device push'
+            );
             res.status(500).json({ error: error.message });
         }
     }
@@ -296,10 +337,19 @@ class DeviceController {
             const { id } = req.params;
             const terminalSyncService = require('./terminalSync.service');
 
+            logger.info('Syncing device faces', {
+                device_id: id,
+                event_id: req.event?.id,
+                user_id: req.user?.id
+            });
+
             const result = await terminalSyncService.syncTerminal(id);
             res.json(result);
         } catch (error) {
-            logger.error('Erro ao sincronizar dispositivo:', error);
+            logger.error(
+                { err: error, device_id: req.params.id, event_id: req.event?.id },
+                'Error syncing device'
+            );
             res.status(500).json({ error: error.message });
         }
     }
@@ -361,7 +411,14 @@ class DeviceController {
             const success = await deviceService.openDoor();
 
             if (success) {
-                logger.info(`⚡ Comando OPEN enviado para ${deviceData.nome} (${deviceData.ip_address})`);
+                logger.info('Door open command sent', {
+                    device_id: id,
+                    device_name: deviceData.nome,
+                    device_ip: deviceData.ip_address,
+                    command_type: 'REMOTE_OPEN',
+                    event_id: req.event?.id,
+                    user_id: req.user?.id
+                });
                 res.json({ success: true, message: 'Comando enviado com sucesso.' });
             } else {
                 res.status(500).json({ error: 'Falha ao executar comando no hardware.' });
@@ -474,7 +531,10 @@ class DeviceController {
             res.send(snapshotBuffer);
 
         } catch (error) {
-            logger.error('Erro ao buscar snapshot:', error);
+            logger.error(
+                { err: error, device_id: req.params.id },
+                'Error capturing device snapshot'
+            );
             res.status(500).json({ error: 'Falha ao obter imagem da câmera' });
         }
     }
@@ -517,9 +577,20 @@ class DeviceController {
                 .single();
 
             if (error) throw error;
+
+            logger.info('Device updated', {
+                device_id: req.params.id,
+                event_id: req.event?.id,
+                user_id: req.user?.id,
+                updated_fields: Object.keys(req.body)
+            });
+
             res.json({ success: true, data });
         } catch (error) {
-            logger.error('Erro ao atualizar dispositivo:', error);
+            logger.error(
+                { err: error, device_id: req.params.id },
+                'Error updating device'
+            );
             res.status(500).json({ error: 'Erro ao atualizar dispositivo' });
         }
     }
@@ -555,9 +626,19 @@ class DeviceController {
             if (printer && printer.length > 0) {
                 const p = printer[0];
                 printerService.printViaNetwork(p.ip_address, p.porta || 9100, buffer);
-                logger.info(`🖨️ Etiqueta enviada para impressora ${p.nome} (${p.ip_address})`);
+                logger.info('Badge printed', {
+                    printer_id: p.id,
+                    printer_name: p.nome,
+                    printer_ip: p.ip_address,
+                    person_id: pessoa.id,
+                    event_id: evento_id || req.event?.id,
+                    user_id: req.user?.id
+                });
             } else {
-                logger.warn('⚠️ Nenhuma impressora configurada para este evento. Etiqueta gerada mas não enviada.');
+                logger.warn('No printer configured for badge printing', {
+                    event_id: evento_id || req.event?.id,
+                    person_id: pessoa.id
+                });
             }
 
             res.json({
@@ -570,7 +651,10 @@ class DeviceController {
                 }
             });
         } catch (error) {
-            logger.error('Erro ao imprimir etiqueta:', error);
+            logger.error(
+                { err: error, event_id: req.event?.id, user_id: req.user?.id },
+                'Error printing badge'
+            );
             res.status(500).json({ error: 'Erro ao gerar etiqueta' });
         }
     }
@@ -595,8 +679,11 @@ class DeviceController {
                 .limit(100);
 
             if (error) {
-                logger.error('Erro Supabase ao buscar fila de dispositivos:', error);
-                
+                logger.error(
+                    { err: error, event_id: evento_id },
+                    'Failed to fetch sync queue from database'
+                );
+
                 // Fallback se a junção falhar (ex: tabela dispositivos_acesso com nome diferente ou sem relação formal)
                 if (error.message.includes('relation') || error.message.includes('join')) {
                     const { data: simpleData, error: simpleError } = await supabase
@@ -618,10 +705,19 @@ class DeviceController {
                 device_name: item.dispositivos_acesso?.nome ?? (item.dispositivos_acesso?.[0]?.nome) ?? item.dispositivo_id
             }));
 
+            logger.info('Sync queue listed', {
+                queue_count: items.length,
+                event_id: evento_id,
+                user_id: req.user?.id
+            });
+
             res.json({ success: true, data: items });
         } catch (error) {
-            logger.error('Erro fatal ao buscar fila:', error);
-            res.status(500).json({ 
+            logger.error(
+                { err: error, event_id: req.event?.id, user_id: req.user?.id },
+                'Error fetching sync queue'
+            );
+            res.status(500).json({
                 error: 'Erro ao buscar fila de sincronização',
                 message: error.message,
                 details: error.details
@@ -632,12 +728,20 @@ class DeviceController {
     // Forçar reprocessamento da fila de um dispositivo
     async forceQueue(req, res) {
         try {
-            const { id } = req.params;
             const syncScheduler = require('./syncScheduler.service');
+
+            logger.info('Forcing queue reprocessing', {
+                event_id: req.event?.id,
+                user_id: req.user?.id
+            });
+
             await syncScheduler.runManualSync();
             res.json({ success: true, message: 'Fila reprocessada com sucesso.' });
         } catch (error) {
-            logger.error('Erro ao forçar fila:', error);
+            logger.error(
+                { err: error, event_id: req.event?.id, user_id: req.user?.id },
+                'Error forcing queue reprocessing'
+            );
             res.status(500).json({ error: error.message });
         }
     }
@@ -686,6 +790,15 @@ class DeviceController {
                 .update({ status_online: newStatus, ultimo_ping: new Date().toISOString() })
                 .eq('id', id);
 
+            logger.info('Device health checked', {
+                device_id: deviceData.id,
+                device_name: deviceData.nome,
+                device_ip: deviceData.ip_address,
+                online: tcpResult.online,
+                latency_ms: tcpResult.latency,
+                event_id: req.event?.id
+            });
+
             res.json({
                 success: true,
                 data: {
@@ -702,7 +815,10 @@ class DeviceController {
                 }
             });
         } catch (error) {
-            logger.error('Erro no health check:', error);
+            logger.error(
+                { err: error, device_id: req.params.id, event_id: req.event?.id },
+                'Error checking device health'
+            );
             res.status(500).json({ error: error.message });
         }
     }
