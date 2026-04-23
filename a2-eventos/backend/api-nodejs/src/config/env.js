@@ -9,8 +9,7 @@ const logger = require('../services/logger');
 const REQUIRED_ENV_VARS = [
   'SUPABASE_URL',
   'SUPABASE_ANON_KEY',
-  'NODE_ENV',
-  'API_URL'
+  'NODE_ENV'
 ];
 
 // Lista de variáveis OPCIONAIS (com fallback)
@@ -60,7 +59,7 @@ function validateEnvironment() {
   }
 
   // Validar API_URL em produção
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.NODE_ENV === 'production' && process.env.API_URL) {
     if (!process.env.API_URL.startsWith('https://')) {
       warnings.push('API_URL em produção deveria ser HTTPS');
     }
