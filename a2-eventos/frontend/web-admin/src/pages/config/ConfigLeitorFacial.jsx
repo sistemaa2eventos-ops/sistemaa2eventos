@@ -53,19 +53,7 @@ const ConfigLeitorFacial = () => {
 
     return (
         <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h6" sx={{ color: 'primary.main', fontWeight: 700 }}>
-                    📸 Gerenciamento de Leitores Faciais
-                </Typography>
-                <Button 
-                    variant="contained" 
-                    startIcon={<AddIcon />} 
-                    onClick={handleOpenDialog}
-                    sx={{ fontWeight: 700 }}
-                >
-                    Novo Terminal
-                </Button>
-            </Box>
+            {/* Cabeçalho redundante removido para evitar botões duplicados com o DeviceListPanel */}
 
             {!eventoId && (
                 <GlassCard sx={{ p: 3, mb: 3, border: '1px solid rgba(255, 193, 7, 0.4)', background: 'rgba(255, 193, 7, 0.05)' }}>
