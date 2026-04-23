@@ -114,7 +114,8 @@ const Pessoas = () => {
       const resp = await api.get(`/pessoas/${pessoa.id}/qrcode`);
       setQrImage(resp.data.data.image);
     } catch (e) {
-      enqueueSnackbar('Erro ao gerar imagem QR', { variant: 'error' });
+      const errorMsg = e.response?.data?.message || 'Erro ao gerar imagem QR';
+      enqueueSnackbar(errorMsg, { variant: 'error' });
       setOpenQR(false);
     } finally {
       setQrLoading(false);
