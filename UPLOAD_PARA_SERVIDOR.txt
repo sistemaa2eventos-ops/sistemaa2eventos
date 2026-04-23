@@ -1,0 +1,313 @@
+═══════════════════════════════════════════════════════════════════════════════
+  🚀 UPLOAD A2 EVENTOS PARA SERVIDOR DE PRODUÇÃO
+═══════════════════════════════════════════════════════════════════════════════
+
+📋 INFORMAÇÕES:
+  IP: 187.127.9.59
+  User: root
+  Senha: hoot
+  Domínios: painel.nzt.app.br | api.nzt.app.br | nzt.app.br
+
+═══════════════════════════════════════════════════════════════════════════════
+  PASSO 1: CONECTAR AO SERVIDOR VIA SSH
+═══════════════════════════════════════════════════════════════════════════════
+
+Abra o PowerShell ou CMD no Windows e execute:
+
+  ssh root@187.127.9.59
+
+Quando pedir senha, digite: hoot
+
+Depois que conectar, você estará no servidor (/root#).
+
+═══════════════════════════════════════════════════════════════════════════════
+  PASSO 2: PREPARAR DIRETÓRIOS NO SERVIDOR
+═══════════════════════════════════════════════════════════════════════════════
+
+Cole no terminal SSH do servidor:
+
+  mkdir -p /var/www/a2-eventos
+  cd /var/www/a2-eventos
+  apt-get update
+  apt-get install -y git curl wget nodejs npm
+
+Verifique:
+  node --version
+  npm --version
+
+═══════════════════════════════════════════════════════════════════════════════
+  PASSO 3: UPLOAD DE ARQUIVOS VIA SCP
+═══════════════════════════════════════════════════════════════════════════════
+
+ABRA OUTRO TERMINAL (local, não no servidor) e execute:
+
+Copiar backend:
+  scp -r c:\Projetos\Projeto_A2_Eventos\a2-eventos\backend root@187.127.9.59:/var/www/a2-eventos/
+
+Copiar frontend (build):
+  scp -r c:\Projetos\Projeto_A2_Eventos\a2-eventos\frontend\web-admin\dist root@187.127.9.59:/var/www/a2-eventos/frontend/web-admin/
+
+Copiar frontend (fontes):
+  scp -r c:\Projetos\Projeto_A2_Eventos\a2-eventos\frontend\web-admin\src root@187.127.9.59:/var/www/a2-eventos/frontend/web-admin/
+
+Copiar package.json do frontend:
+  scp c:\Projetos\Projeto_A2_Eventos\a2-eventos\frontend\web-admin\package.json root@187.127.9.59:/var/www/a2-eventos/frontend/web-admin/
+
+═══════════════════════════════════════════════════════════════════════════════
+  PASSO 4: INSTALAR DEPENDÊNCIAS NO SERVIDOR
+═══════════════════════════════════════════════════════════════════════════════
+
+Volte ao terminal SSH do servidor e execute:
+
+  # Backend
+  cd /var/www/a2-eventos/backend/api-nodejs
+  npm install --production --legacy-peer-deps
+
+  # Verificar checks
+  npm run check:all
+
+Se tudo passar sem erros, continuamos!
+
+═══════════════════════════════════════════════════════════════════════════════
+  PASSO 5: CONFIGURAR NGINX + SSL + SYSTEMD
+═══════════════════════════════════════════════════════════════════════════════
+
+Copie e cole todo este bloco no terminal SSH do servidor:
+
+════════════════════════════════════════════════════════════════════════════════
+[INÍCIO COLAR AQUI]
+
+# 1. Instalar Nginx, Certbot
+apt-get install -y nginx certbot python3-certbot-nginx ufw
+
+# 2. Configurar firewall
+ufw allow 22/tcp
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw --force enable
+
+# 3. Criar config Nginx
+cat > /etc/nginx/sites-available/a2-eventos << 'EOFNGINX'
+upstream backend {
+    server 127.0.0.1:3001;
+    keepalive 64;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name nzt.app.br painel.nzt.app.br api.nzt.app.br www.nzt.app.br;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$server_name$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name painel.nzt.app.br www.nzt.app.br nzt.app.br;
+
+    ssl_certificate /etc/letsencrypt/live/nzt.app.br/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/nzt.app.br/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    client_max_body_size 10M;
+    root /var/www/a2-eventos/frontend/web-admin/dist;
+    index index.html;
+
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location /api/ {
+        proxy_pass http://backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_redirect off;
+    }
+
+    location /health {
+        proxy_pass http://backend;
+        access_log off;
+    }
+
+    location /socket.io {
+        proxy_pass http://backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+        proxy_set_header Host $host;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name api.nzt.app.br;
+
+    ssl_certificate /etc/letsencrypt/live/api.nzt.app.br/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.nzt.app.br/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+
+    client_max_body_size 10M;
+
+    location / {
+        proxy_pass http://backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+}
+EOFNGINX
+
+# 4. Ativar config
+ln -sf /etc/nginx/sites-available/a2-eventos /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+nginx -t
+
+# 5. Criar pasta para certificados
+mkdir -p /var/www/certbot
+
+# 6. Gerar certificados SSL
+certbot certonly --webroot -w /var/www/certbot \
+    -d nzt.app.br \
+    -d www.nzt.app.br \
+    -d painel.nzt.app.br \
+    -d api.nzt.app.br \
+    --non-interactive \
+    --agree-tos \
+    -m nataliaalvesengenharia@gmail.com \
+    --keep-until-expiring
+
+# 7. Criar systemd service para API
+cat > /etc/systemd/system/a2-eventos-api.service << 'EOFSVC'
+[Unit]
+Description=A2 Eventos API Backend
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/a2-eventos/backend/api-nodejs
+ExecStart=/usr/bin/node src/app.js
+Restart=always
+RestartSec=10
+Environment="NODE_ENV=production"
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOFSVC
+
+# 8. Recarregar systemd
+systemctl daemon-reload
+systemctl enable a2-eventos-api.service
+
+# 9. Iniciar serviços
+systemctl start a2-eventos-api.service
+systemctl reload nginx
+
+# 10. Renewall automático de certificados
+cat > /etc/cron.d/certbot-renewal << 'EOFCRON'
+0 3 * * * /usr/bin/certbot renew --quiet && /usr/sbin/systemctl reload nginx
+EOFCRON
+
+echo "✅ DEPLOY CONCLUÍDO COM SUCESSO!"
+echo ""
+echo "🌐 Acessar em:"
+echo "   Frontend: https://painel.nzt.app.br"
+echo "   API: https://api.nzt.app.br"
+echo "   Raiz: https://nzt.app.br"
+echo ""
+echo "📊 Status:"
+echo "   systemctl status a2-eventos-api"
+echo ""
+echo "📝 Logs:"
+echo "   journalctl -u a2-eventos-api -f"
+
+[FIM COLAR AQUI]
+════════════════════════════════════════════════════════════════════════════════
+
+═══════════════════════════════════════════════════════════════════════════════
+  PASSO 6: VERIFICAR SE ESTÁ FUNCIONANDO
+═══════════════════════════════════════════════════════════════════════════════
+
+No terminal SSH, execute:
+
+  # Ver status da API
+  systemctl status a2-eventos-api
+
+  # Ver logs em tempo real
+  journalctl -u a2-eventos-api -f
+
+  # Testar health check
+  curl https://api.nzt.app.br/health
+
+  # Testar login (deve retornar erro de credencial ou sucesso)
+  curl -X POST https://api.nzt.app.br/api/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"email":"admin@test.com","password":"test"}'
+
+═══════════════════════════════════════════════════════════════════════════════
+  PASSO 7: ACESSAR NO NAVEGADOR
+═══════════════════════════════════════════════════════════════════════════════
+
+Abra seu navegador e acesse:
+
+  ✅ Frontend: https://painel.nzt.app.br
+  ✅ API: https://api.nzt.app.br
+  ✅ Health: https://api.nzt.app.br/health
+  ✅ Raiz: https://nzt.app.br
+
+═══════════════════════════════════════════════════════════════════════════════
+  🆘 TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════════════════
+
+Se a API não iniciar:
+  cd /var/www/a2-eventos/backend/api-nodejs
+  npm run check:all
+  NODE_ENV=production node src/app.js
+
+Se o Nginx tiver problema:
+  nginx -t
+  systemctl restart nginx
+
+Se certificado falhar:
+  certbot certonly --webroot -w /var/www/certbot \
+    -d nzt.app.br -d painel.nzt.app.br -d api.nzt.app.br \
+    --non-interactive --agree-tos -m nataliaalvesengenharia@gmail.com
+
+Se porta 3001 estiver em uso:
+  lsof -i :3001
+  kill -9 <PID>
+
+═══════════════════════════════════════════════════════════════════════════════
+  📞 SUPORTE
+═══════════════════════════════════════════════════════════════════════════════
+
+Email: nataliaalvesengenharia@gmail.com
+Servidor: 187.127.9.59
+Domínios: nzt.app.br | painel.nzt.app.br | api.nzt.app.br

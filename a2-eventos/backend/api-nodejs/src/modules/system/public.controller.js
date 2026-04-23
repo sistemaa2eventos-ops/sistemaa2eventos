@@ -28,7 +28,7 @@ class PublicController {
                 return res.status(404).json({ error: 'Link de cadastro inválido ou inexistente. Gere um novo convite no painel admin.' });
             }
 
-            console.log(`[PortalPublico] ✅ Empresa identificada: ${empresa.nome} para o evento ${empresa.eventos?.nome}`);
+            logger.info(`[PortalPublico] Empresa identificada: ${empresa.nome} para o evento ${empresa.eventos?.nome}`);
 
             const evento = empresa.eventos;
 
@@ -280,19 +280,13 @@ class PublicController {
             // Validar aceite LGPD - aceitar como boolean ou string 'true'
             const aceiteValido = aceite_lgpd === true || aceite_lgpd === 'true' || aceite_lgpd === 1 || aceite_lgpd === '1';
             if (!aceiteValido) {
-                console.log(`[DEBUG] aceite_lgpd recebido: "${aceite_lgpd}" (tipo: ${typeof aceite_lgpd})`);
                 return res.status(400).json({ error: 'O aceite dos termos de privacidade (LGPD) é obrigatório.' });
             }
 
-            // Remove validação de email - campo não é mais obrigatório no formulário público
-            // O email de confirmação será enviado para o email da empresa cadastrada
-
             // 1. Identificar Contexto do Token (Empresa ou Pessoa?)
             let context = null;
-            let targetId = null; 
+            let targetId = null;
             let activeContext = null;
-
-            console.log(`[DEBUG] Tentando registrar com token: "${token}"`);
 
             // Tenta Pessoa Primeiro (Convite Direto)
             const { data: pessoaContext } = await supabase
@@ -302,7 +296,6 @@ class PublicController {
                 .single();
 
             if (pessoaContext) {
-                console.log(`[DEBUG] Token encontrado na tabela PESSOAS. ID: ${pessoaContext.id}`);
                 context = 'PESSOA';
                 targetId = pessoaContext.id;
                 activeContext = pessoaContext;
@@ -313,9 +306,8 @@ class PublicController {
                     .select('id, evento_id, registration_token_expires_at, max_colaboradores')
                     .eq('registration_token', token)
                     .single();
-                
+
                 if (empresaContext) {
-                    console.log(`[DEBUG] Token encontrado na tabela EMPRESAS. ID: ${empresaContext.id}`);
                     context = 'EMPRESA';
                     targetId = empresaContext.id;
                     activeContext = empresaContext;
@@ -323,27 +315,12 @@ class PublicController {
             }
 
             if (!context || !activeContext) {
-                console.warn(`[WARN] Token não encontrado em nenhuma tabela: "${token}"`);
-                // Debug: verificar se existe algum token similar
-                const { data: allEmpresas } = await supabase
-                    .from('empresas')
-                    .select('id, nome, registration_token')
-                    .limit(5);
-                
-                const { data: allPessoas } = await supabase
-                    .from('pessoas')
-                    .select('id, nome, registration_token')
-                    .not('registration_token', 'is', null)
-                    .limit(5);
-                
-                console.log(`[DEBUG] Empresas com tokens:`, JSON.stringify(allEmpresas));
-                console.log(`[DEBUG] Pessoas com tokens:`, JSON.stringify(allPessoas));
+                logger.warn(`[RegisterEmployee] Token não encontrado: ${token.substring(0, 8)}...`);
                 return res.status(404).json({ error: 'Link de registro inválido ou expirado.' });
             }
 
             // Validar expiração
             if (activeContext.registration_token_expires_at && new Date(activeContext.registration_token_expires_at) < new Date()) {
-                console.warn(`[WARN] Token expirado: ${activeContext.registration_token_expires_at}`);
                 return res.status(403).json({ error: 'O link de registro expirou.' });
             }
 
@@ -412,7 +389,6 @@ class PublicController {
                 .maybeSingle();
 
             if (cpfExistente && context === 'EMPRESA') {
-                console.warn(`[WARN] CPF já cadastrado: ${cpfLimpo}`);
                 return res.status(409).json({ error: 'Este CPF já está cadastrado para este evento.' });
             }
 

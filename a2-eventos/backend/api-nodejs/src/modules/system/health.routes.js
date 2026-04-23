@@ -1,5 +1,4 @@
 const router = require('express').Router();
-const { supabase } = require('../../config/supabase');
 
 router.get('/health', async (req, res) => {
   const checks = {};

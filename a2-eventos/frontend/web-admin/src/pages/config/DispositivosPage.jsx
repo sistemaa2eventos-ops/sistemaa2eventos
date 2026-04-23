@@ -76,9 +76,10 @@ export default function DispositivosPage() {
   const carregarDados = useCallback(async () => {
     try {
       setLoading(true);
+      const eventoId = new URLSearchParams(window.location.search).get('evento_id') || localStorage.getItem('active_evento_id');
       const [devRes, queueRes] = await Promise.allSettled([
-        api.get('/dispositivos'),
-        api.get('/dispositivos/queue')
+        api.get('/dispositivos', { params: { evento_id: eventoId } }),
+        api.get('/dispositivos/queue', { params: { evento_id: eventoId } })
       ]);
       setDispositivos(devRes.status === 'fulfilled' ? (devRes.value.data?.data ?? []) : []);
       setQueue(queueRes.status === 'fulfilled' ? (queueRes.value.data?.data ?? []) : []);
@@ -619,8 +620,8 @@ export default function DispositivosPage() {
                   fullWidth size="small" />
               </Grid>
               <Grid item xs={6}>
-                <TextField label="Senha" name="password_device" type="password" value={formData.password_device}
-                  onChange={handleFormChange} fullWidth size="small" />
+                <TextField label="Senha" id="password_device" name="password_device" type="password" value={formData.password_device}
+                  onChange={handleFormChange} fullWidth size="small" autoComplete="current-password" />
               </Grid>
             </Grid>
             {isEditing && formData.control_token && (

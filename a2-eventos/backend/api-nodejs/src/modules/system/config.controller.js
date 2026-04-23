@@ -81,8 +81,8 @@ class ConfigController {
             const eventoId = req.event?.id;
 
             const updateData = { atualizado_em: new Date() };
-            if (nome_area) updateData.nome_area = nome_area;
-            if (capacidade_maxima) updateData.capacidade_maxima = capacidade_maxima;
+            if (nome_area !== undefined && nome_area !== null) updateData.nome_area = nome_area;
+            if (capacidade_maxima !== undefined && capacidade_maxima !== null) updateData.capacidade_maxima = capacidade_maxima;
 
             const { data, error } = await supabase
                 .from('evento_areas')
@@ -290,13 +290,13 @@ class ConfigController {
                 return res.status(400).json({ error: 'O número inicial não pode ser maior que o final' });
             }
 
-            // Atualizar pulseira
+            // Atualizar pulseira (usar !== undefined para aceitar valores 0 e string vazia)
             const updateData = { atualizado_em: new Date() };
-            if (nome_tipo) updateData.nome_tipo = nome_tipo;
-            if (cor_hex) updateData.cor_hex = cor_hex;
-            if (numero_inicial) updateData.numero_inicial = numero_inicial;
-            if (numero_final) updateData.numero_final = numero_final;
-            if (tipo_leitura) updateData.tipo_leitura = tipo_leitura;
+            if (nome_tipo !== undefined) updateData.nome_tipo = nome_tipo;
+            if (cor_hex !== undefined) updateData.cor_hex = cor_hex;
+            if (numero_inicial !== undefined) updateData.numero_inicial = numero_inicial;
+            if (numero_final !== undefined) updateData.numero_final = numero_final;
+            if (tipo_leitura !== undefined) updateData.tipo_leitura = tipo_leitura;
             if (prefixo_codigo !== undefined) updateData.prefixo_codigo = prefixo_codigo;
             if (alerta_duplicidade !== undefined) updateData.alerta_duplicidade = alerta_duplicidade;
             if (tempo_confirmacao_checkout !== undefined) updateData.tempo_confirmacao_checkout = tempo_confirmacao_checkout;

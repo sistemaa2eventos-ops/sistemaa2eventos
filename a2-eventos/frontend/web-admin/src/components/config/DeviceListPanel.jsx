@@ -21,6 +21,7 @@ const DeviceListPanel = ({
     loading, 
     fetchReaders, 
     handleOpenDialog, 
+    handleRemoteAction = () => {},
     handleTestDevice, 
     testingId, 
     handleSync, 

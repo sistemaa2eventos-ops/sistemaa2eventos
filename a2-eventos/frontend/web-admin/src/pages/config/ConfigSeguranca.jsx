@@ -26,21 +26,39 @@ const ConfigSeguranca = () => {
     const { enqueueSnackbar } = useSnackbar();
     const [verificandoConexao, setVerificandoConexao] = useState(false);
 
-    // Política de senhas
+    // Política de senhas — sincroniza com settings quando carregam
     const [politicaSenha, setPoliticaSenha] = useState({
-        tamanho_minimo: settings?.password_min_length || 8,
-        exigir_maiuscula: settings?.password_require_uppercase !== false,
-        exigir_numero: settings?.password_require_number !== false,
-        exigir_especial: settings?.password_require_special || false,
-        expiracao_dias: settings?.password_expiry_days || 0
+        tamanho_minimo: 8,
+        exigir_maiuscula: true,
+        exigir_numero: true,
+        exigir_especial: false,
+        expiracao_dias: 0
     });
 
     // Configurações 2FA
     const [config2FA, setConfig2FA] = useState({
-        exigir_admin_master: settings?.require_2fa_admin_master || false,
-        exigir_operadores: settings?.require_2fa_operators || false,
-        status_2fa: settings?.two_factor_configured ? 'configurado' : 'nao_configurado'
+        exigir_admin_master: false,
+        exigir_operadores: false,
+        status_2fa: 'nao_configurado'
     });
+
+    // Atualizar estado local quando settings carregarem do backend
+    React.useEffect(() => {
+        if (settings && settings.id) {
+            setPoliticaSenha({
+                tamanho_minimo: settings.password_min_length || 8,
+                exigir_maiuscula: settings.password_require_uppercase !== false,
+                exigir_numero: settings.password_require_number !== false,
+                exigir_especial: settings.password_require_special || false,
+                expiracao_dias: settings.password_expiry_days || 0
+            });
+            setConfig2FA({
+                exigir_admin_master: settings.require_2fa_admin_master || false,
+                exigir_operadores: settings.require_2fa_operators || false,
+                status_2fa: settings.two_factor_configured ? 'configurado' : 'nao_configurado'
+            });
+        }
+    }, [settings]);
 
     const handleForceLogout = async () => {
         if (!window.confirm('CUIDADO: Isso irá desconectar IMEDIATAMENTE todos os usuários logados no sistema (exceto você). Deseja prosseguir?')) return;
@@ -254,7 +272,7 @@ const ConfigSeguranca = () => {
                                 ⚠️ Zona de Risco
                             </Typography>
                             <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 2 }}>
-                                Encerrar todas as sessões disconnect todos os usuários exceto você.
+                                Encerrar todas as sessões desconecta todos os usuários exceto você.
                             </Typography>
                             <Button 
                                 variant="contained" 

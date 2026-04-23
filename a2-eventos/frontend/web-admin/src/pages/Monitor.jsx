@@ -194,12 +194,12 @@ const Monitor = () => {
                                     <Avatar src={log.pessoas?.foto_url} sx={{ width: 50, height: 50, border: '2px solid rgba(255,255,255,0.1)' }} />
                                     <Box sx={{ flex: 1 }}>
                                         <Typography variant="body1" fontWeight={800} color={isWatchlist ? '#FFB800' : '#fff'}>
-                                            {log.pessoas?.nome || 'Anônimo'}
+                                            {log.pessoas?.nome_completo || log.pessoas?.nome || 'Anônimo'}
                                             {isWatchlist && <Chip label="MONITORADO" size="small" sx={{ ml: 1, bgcolor: '#FFB800', color: '#000', fontWeight: 900, height: 20 }} />}
                                         </Typography>
                                         <Stack direction="row" spacing={2}>
                                             <Typography variant="caption" color="text.secondary">📍 {log.area_nome || 'Local Externo'}</Typography>
-                                            <Typography variant="caption" color="text.secondary">| Terminal: {log.dispositivo_nome || log.dispositivo_id}</Typography>
+                                            <Typography variant="caption" color="text.secondary">| Terminal: {log.dispositivos_acesso?.nome || log.dispositivo_nome || log.dispositivo_id}</Typography>
                                         </Stack>
                                     </Box>
                                     <Box sx={{ textAlign: 'right', minWidth: 120 }}>

@@ -4,6 +4,11 @@ const DeviceFactory = require('./adapters/DeviceFactory');
 
 class DeviceController {
 
+    constructor() {
+        this.create = this.create.bind(this);
+        this.configurePush = this.configurePush.bind(this);
+    }
+
     async list(req, res) {
         try {
             const evento_id = req.event?.id;
@@ -36,11 +41,44 @@ class DeviceController {
     // Cadastrar dispositivo
     async create(req, res) {
         try {
-            const { nome, marca, tipo, ip_address, porta, user, password, modo, area_nome, offline_mode } = req.body;
+            const {
+                nome,
+                marca,
+                tipo,
+                ip_address,
+                porta,
+                user,
+                password,
+                user_device,
+                password_device,
+                modo,
+                area_nome,
+                area_id,
+                offline_mode,
+                config
+            } = req.body;
+
+            const normalizedUserInput = typeof user_device === 'string' ? user_device.trim() : user_device;
+            const normalizedPasswordInput = typeof password_device === 'string' ? password_device.trim() : password_device;
+            const fallbackUserInput = typeof user === 'string' ? user.trim() : user;
+            const fallbackPasswordInput = typeof password === 'string' ? password.trim() : password;
+
+            const normalizedUser = normalizedUserInput || fallbackUserInput || process.env.INTELBRAS_DEFAULT_USER || 'admin';
+            const normalizedPassword = normalizedPasswordInput || fallbackPasswordInput || process.env.INTELBRAS_DEFAULT_PASS || 'admin123';
+            const normalizedAreaId = area_id ?? config?.area_id ?? null;
+            const normalizedPort = Number.isInteger(porta) ? porta : (parseInt(porta, 10) || 80);
             let rtsp_url = '';
 
             // Lógica de Instanciação Polimórfica (Factory)
-            const device = DeviceFactory.getDevice({ ip_address, porta, user, password, marca });
+            const device = DeviceFactory.getDevice({
+                ip_address,
+                porta: normalizedPort,
+                marca,
+                user_device: normalizedUser,
+                password_device: normalizedPassword,
+                user: normalizedUser,
+                password: normalizedPassword
+            });
             if (device.getRTSPUrl) {
                 rtsp_url = device.getRTSPUrl();
             }
@@ -58,12 +96,13 @@ class DeviceController {
                     marca,
                     tipo,
                     ip_address,
-                    porta,
-                    user_device: user,
-                    password_device: password,
+                    porta: normalizedPort,
+                    user_device: normalizedUser,
+                    password_device: normalizedPassword,
                     rtsp_url,
-                    config: req.body.config || { fluxo: 'checkin', controla_rele: true },
+                    config: config || { fluxo: 'checkin', controla_rele: true },
                     modo: modo || 'ambos',
+                    area_id: normalizedAreaId,
                     area_nome: area_nome || null,
                     offline_mode: offline_mode || 'fail_closed',
                     status_online: 'offline'
@@ -80,13 +119,25 @@ class DeviceController {
             // Auto-configurar Push
             if (marca === 'intelbras') {
                 try {
-                    const deviceInst = DeviceFactory.getDevice({ ip_address, porta, user, password, marca, control_token: data.control_token, config: data.config });
-                    const serverIp = process.env.SERVER_IP || this._getLocalIp() || req.ip;
-                    const serverPort = parseInt(process.env.PORT || 3001);
-                    logger.info(`⚙️ Auto-configurando Modo Online para ${serverIp}:${serverPort}...`);
+                    const deviceInst = DeviceFactory.getDevice({
+                        ip_address,
+                        porta: normalizedPort,
+                        marca,
+                        user_device: normalizedUser,
+                        password_device: normalizedPassword,
+                        user: normalizedUser,
+                        password: normalizedPassword,
+                        control_token: data.control_token,
+                        config: data.config
+                    });
+                    const callbackPort = process.env.HARDWARE_CALLBACK_PORT || process.env.SERVER_PORT || 80;
+                    const target = this._resolvePushTarget(req, process.env.SERVER_IP, callbackPort);
+                    logger.info(`⚙️ Auto-configurando Modo Online para ${target.host}:${target.port}...`);
 
                     // Modo online: dispositivo pergunta ao servidor antes de liberar
-                    await deviceInst.configureOnlineMode(serverIp, serverPort);
+                    await deviceInst.configureOnlineMode(target.host, target.port, {
+                        useHttps: Number(target.port) === 443
+                    });
                 } catch (pushError) {
                     logger.error(`⚠️ Erro ao auto-configurar modo online para ${nome}: ${pushError.message}`);
                 }
@@ -119,11 +170,83 @@ class DeviceController {
         return null;
     }
 
+    _normalizeRequestIp(ip) {
+        if (!ip) return null;
+        return String(ip).replace('::ffff:', '');
+    }
+
+    _resolvePushTarget(req, explicitHost, explicitPort) {
+        const forwardedProto = req.get('x-forwarded-proto');
+        const reqProto = forwardedProto ? forwardedProto.split(',')[0].trim() : (req.secure ? 'https' : 'http');
+
+        let host = explicitHost || null;
+        let port = explicitPort !== undefined && explicitPort !== null ? parseInt(explicitPort, 10) : null;
+
+        if (host && /^https?:\/\//i.test(host)) {
+            try {
+                const parsed = new URL(host);
+                host = parsed.hostname;
+                if (!port) {
+                    port = parsed.port ? parseInt(parsed.port, 10) : (parsed.protocol === 'https:' ? 443 : 80);
+                }
+            } catch {
+                // ignora URL inválida e mantém o valor bruto
+            }
+        }
+
+        if (host && host.includes(':') && !host.includes(']')) {
+            const [h, p] = host.split(':');
+            host = h;
+            if (!port && p) {
+                const parsed = parseInt(p, 10);
+                if (!Number.isNaN(parsed)) port = parsed;
+            }
+        }
+
+        if (!host) {
+            host = process.env.SERVER_IP || process.env.PUBLIC_API_HOST || process.env.API_PUBLIC_HOST || null;
+        }
+
+        if (!port) {
+            const envPort = process.env.SERVER_PORT || process.env.PUBLIC_API_PORT;
+            if (envPort) {
+                const parsed = parseInt(envPort, 10);
+                if (!Number.isNaN(parsed)) port = parsed;
+            }
+        }
+
+        if (!host) {
+            const forwardedHost = req.get('x-forwarded-host') || req.get('host');
+            if (forwardedHost) {
+                host = forwardedHost;
+                if (host.includes(':') && !host.includes(']')) {
+                    const [h, p] = host.split(':');
+                    host = h;
+                    if (!port && p) {
+                        const parsed = parseInt(p, 10);
+                        if (!Number.isNaN(parsed)) port = parsed;
+                    }
+                }
+            }
+        }
+
+        if (!host) {
+            host = this._getLocalIp() || this._normalizeRequestIp(req.ip);
+        }
+
+        if (!port) {
+            port = reqProto === 'https' ? 443 : (parseInt(process.env.PORT || 3001, 10) || 3001);
+        }
+
+        return { host, port, proto: reqProto };
+    }
+
     // Configurar Push Manualmente
     async configurePush(req, res) {
         try {
             const { id } = req.params;
-            const { server_ip, server_port } = req.body; // Opcional, se não vier usa auto-detect
+            const { server_ip, server_port } = req.body; // Opcional, se não vier usa host público
+            const callbackPort = server_port || process.env.HARDWARE_CALLBACK_PORT || process.env.SERVER_PORT || 80;
 
             const { data: deviceData, error } = await supabase
                 .from('dispositivos_acesso')
@@ -138,15 +261,26 @@ class DeviceController {
             }
 
             const device = DeviceFactory.getDevice(deviceData);
-            const targetIp = server_ip || process.env.SERVER_IP || this._getLocalIp() || req.ip;
+            const target = this._resolvePushTarget(req, server_ip, callbackPort);
+            let success = false;
+            let modeLabel = 'Push de Eventos';
 
-            const targetPort = server_port || parseInt(process.env.PORT || 3001);
-            const success = await device.configureOnlineMode(targetIp, targetPort);
+            if (typeof device.configureOnlineMode === 'function') {
+                success = await device.configureOnlineMode(target.host, target.port, {
+                    useHttps: Number(target.port) === 443
+                });
+                modeLabel = 'Modo Online';
+            } else if (typeof device.configureEventPush === 'function') {
+                success = await device.configureEventPush(target.host, target.port);
+                modeLabel = 'Push de Eventos';
+            } else {
+                return res.status(400).json({ error: 'Este dispositivo não suporta configuração remota de push.' });
+            }
 
             if (success) {
-                res.json({ success: true, message: `Modo Online configurado → ${targetIp}:${targetPort}` });
+                res.json({ success: true, message: `${modeLabel} configurado → ${target.host}:${target.port}` });
             } else {
-                res.status(500).json({ error: 'Falha ao configurar modo online no dispositivo' });
+                res.status(500).json({ error: `Falha ao configurar ${modeLabel.toLowerCase()} no dispositivo` });
             }
 
         } catch (error) {
@@ -183,7 +317,7 @@ class DeviceController {
                 client.destroy();
                 res.status(408).json({ success: false, error: 'Timeout: Terminal não respondeu no tempo limite.' });
             }
-        }, 5000);
+        }, 15000); // Aumentado de 5s para 15s para dispositivos lentos
 
         client.connect(porta || 80, ip_address, () => {
             finished = true;
@@ -197,7 +331,15 @@ class DeviceController {
                 finished = true;
                 clearTimeout(timeout);
                 client.destroy();
-                res.status(503).json({ success: false, error: `Falha na conexão: ${err.message}` });
+                let userMessage = `Falha na conexão: ${err.message}`;
+                if (err.code === 'ECONNREFUSED') {
+                    userMessage = `Conexão recusada (${ip_address}:${porta} não está aceitando conexões)`;
+                } else if (err.code === 'EHOSTUNREACH' || err.code === 'ENETUNREACH') {
+                    userMessage = `Host/rede inacessível (verifique o IP e conectividade)`;
+                } else if (err.code === 'ENOTFOUND') {
+                    userMessage = `Host não encontrado (verifique se o IP é válido)`;
+                }
+                res.status(503).json({ success: false, error: userMessage });
             }
         });
     }
@@ -340,7 +482,7 @@ class DeviceController {
     async update(req, res) {
         try {
             const { id } = req.params;
-            const { nome, marca, tipo, ip_address, porta, user, password, user_device, password_device, config, modo, area_nome, offline_mode } = req.body;
+            const { nome, marca, tipo, ip_address, porta, user, password, user_device, password_device, config, modo, area_nome, area_id, offline_mode } = req.body;
 
             const updates = {};
             if (nome !== undefined) updates.nome = nome;
@@ -350,14 +492,20 @@ class DeviceController {
             if (porta !== undefined) updates.porta = parseInt(porta, 10);
             if (config !== undefined) updates.config = config;
             if (modo !== undefined) updates.modo = modo;
+            if (area_id !== undefined) updates.area_id = area_id;
+            else if (config?.area_id !== undefined) updates.area_id = config.area_id;
             if (area_nome !== undefined) updates.area_nome = area_nome;
             if (offline_mode !== undefined) updates.offline_mode = offline_mode;
 
-            if (user_device !== undefined) updates.user_device = user_device;
-            else if (user !== undefined) updates.user_device = user;
+            const normalizedUserInput = typeof user_device === 'string' ? user_device.trim() : user_device;
+            const fallbackUserInput = typeof user === 'string' ? user.trim() : user;
+            if (normalizedUserInput) updates.user_device = normalizedUserInput;
+            else if (fallbackUserInput) updates.user_device = fallbackUserInput;
 
-            if (password_device !== undefined) updates.password_device = password_device;
-            else if (password !== undefined) updates.password_device = password;
+            const normalizedPasswordInput = typeof password_device === 'string' ? password_device.trim() : password_device;
+            const fallbackPasswordInput = typeof password === 'string' ? password.trim() : password;
+            if (normalizedPasswordInput) updates.password_device = normalizedPasswordInput;
+            else if (fallbackPasswordInput) updates.password_device = fallbackPasswordInput;
 
             const { data, error } = await supabase
                 .from('dispositivos_acesso')
@@ -515,7 +663,7 @@ class DeviceController {
 
                 const timeout = setTimeout(() => {
                     if (!done) { done = true; client.destroy(); resolve({ online: false, latency: null }); }
-                }, 4000);
+                }, 12000); // Aumentado de 4s para 12s
 
                 client.connect(deviceData.porta || 80, deviceData.ip_address, () => {
                     done = true;

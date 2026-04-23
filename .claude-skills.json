@@ -1,0 +1,56 @@
+{
+  "skills": [
+    {
+      "id": "deploy-protocol",
+      "name": "Deploy Protocol",
+      "command": "/deploy",
+      "description": "Mostra o protocolo padrão completo de deploy e configurações do sistema A2 Eventos",
+      "category": "deployment",
+      "enabled": true,
+      "version": "1.0",
+      "author": "Sovereign Master",
+      "created": "2026-04-23",
+      "documentation": "CLAUDE.md"
+    },
+    {
+      "id": "quick-deploy",
+      "name": "Quick Deploy Reference",
+      "command": "/quick-deploy",
+      "description": "Mostra referência rápida de deploy (1 página)",
+      "category": "deployment",
+      "enabled": true,
+      "version": "1.0",
+      "documentation": "QUICK_REFERENCE.txt"
+    },
+    {
+      "id": "system-map",
+      "name": "System Map",
+      "command": "/system-map",
+      "description": "Mostra mapa completo do sistema (onde está cada coisa)",
+      "category": "system",
+      "enabled": true,
+      "version": "1.0",
+      "documentation": "SYSTEM_MAP.md"
+    },
+    {
+      "id": "deploy-checklist",
+      "name": "Deploy Checklist",
+      "command": "/checklist",
+      "description": "Mostra checklist de deploy passo-a-passo",
+      "category": "deployment",
+      "enabled": true,
+      "version": "1.0",
+      "documentation": "DEPLOY_CHECKLIST.md"
+    },
+    {
+      "id": "troubleshoot",
+      "name": "Troubleshooting",
+      "command": "/troubleshoot",
+      "description": "Mostra guia de troubleshooting para problemas comuns",
+      "category": "support",
+      "enabled": true,
+      "version": "1.0",
+      "documentation": "CLAUDE.md (seção Troubleshooting)"
+    }
+  ]
+}

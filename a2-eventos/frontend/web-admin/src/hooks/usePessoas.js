@@ -178,20 +178,35 @@ export const usePessoas = () => {
       loadDocumentos(pessoa.id);
     };
 
-    const handleOpenDialog = (pessoa = null) => {
+    const handleOpenDialog = async (pessoa = null) => {
       setActiveStep(0);
       if (pessoa) {
-        setSelectedPessoa(pessoa);
-        setFormData({
-          ...pessoa,
-          nome_completo: pessoa.nome_completo || pessoa.nome || '',
-          data_nascimento: pessoa.data_nascimento ? format(new Date(pessoa.data_nascimento), "yyyy-MM-dd") : '',
-          tipo_pessoa: pessoa.tipo_pessoa || pessoa.categoria_operacional || 'colaborador',
-          // Novos campos de fase/dias
-          fases_acesso: Array.isArray(pessoa.fases_acesso) ? pessoa.fases_acesso : [],
-          dias_acesso: Array.isArray(pessoa.dias_acesso) ? pessoa.dias_acesso : [],
-          documentos_trabalho: Array.isArray(pessoa.documentos_trabalho) ? pessoa.documentos_trabalho : [],
-        });
+        setLoading(true);
+        try {
+            const resp = await api.get(`/pessoas/${pessoa.id}`);
+            const fullPessoa = resp.data.data;
+            setSelectedPessoa(fullPessoa);
+            
+            const fases_acesso = [];
+            if (fullPessoa.fase_montagem) fases_acesso.push('montagem');
+            if (fullPessoa.fase_showday) fases_acesso.push('evento');
+            if (fullPessoa.fase_desmontagem) fases_acesso.push('desmontagem');
+
+            setFormData({
+              ...fullPessoa,
+              nome_completo: fullPessoa.nome_completo || fullPessoa.nome || '',
+              data_nascimento: fullPessoa.data_nascimento ? format(new Date(fullPessoa.data_nascimento), "yyyy-MM-dd") : '',
+              tipo_pessoa: fullPessoa.tipo_pessoa || fullPessoa.categoria_operacional || 'colaborador',
+              fases_acesso: fases_acesso,
+              dias_acesso: Array.isArray(fullPessoa.dias_acesso) ? fullPessoa.dias_acesso : [],
+              documentos_trabalho: Array.isArray(fullPessoa.documentos_trabalho) ? fullPessoa.documentos_trabalho : [],
+            });
+        } catch(e) {
+            enqueueSnackbar('Erro ao carregar detalhes completos.', { variant: 'error' });
+        } finally {
+            setLoading(false);
+            setOpenDialog(true);
+        }
       } else {
         setSelectedPessoa(null);
         setFormData({
@@ -203,8 +218,8 @@ export const usePessoas = () => {
           codigo_ingresso: '', origem_pagamento: ''
         });
         setDocumentos([]);
+        setOpenDialog(true);
       }
-      setOpenDialog(true);
     };
 
     const handleCloseDialog = () => { setOpenDialog(false); setSelectedPessoa(null); };
@@ -214,6 +229,11 @@ export const usePessoas = () => {
       try {
         setSaving(true);
         let payload = { ...formData };
+        
+        payload.fase_montagem = payload.fases_acesso?.includes('montagem') || false;
+        payload.fase_showday = payload.fases_acesso?.includes('evento') || false;
+        payload.fase_desmontagem = payload.fases_acesso?.includes('desmontagem') || false;
+
         if (payload.foto_url && payload.foto_url.startsWith('data:image') && payload.cpf) {
           try {
             const { data: urlData } = await api.post('/pessoas/generate-upload-url', { cpf: payload.cpf });
@@ -279,7 +299,14 @@ export const usePessoas = () => {
         if (!formData.nome_completo || !formData.empresa_id) { enqueueSnackbar('Preencha Nome Completo e Empresa.', { variant: 'warning' }); return; }
         try {
           setSaving(true);
-          const response = await api.post('/pessoas', { ...formData, status_acesso: 'pendente' });
+          const tempPayload = { 
+              ...formData, 
+              status_acesso: 'pendente',
+              fase_montagem: formData.fases_acesso?.includes('montagem') || false,
+              fase_showday: formData.fases_acesso?.includes('evento') || false,
+              fase_desmontagem: formData.fases_acesso?.includes('desmontagem') || false
+          };
+          const response = await api.post('/pessoas', tempPayload);
           if (response.data.success) {
             const savedPessoa = response.data.data;
             setSelectedPessoa(savedPessoa);

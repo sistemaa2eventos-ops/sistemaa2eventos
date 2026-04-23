@@ -194,7 +194,7 @@ class PessoaService {
         // 🛡️ WHITELIST: filtrar campos extras vindos do frontend
         const ALLOWED_INSERT = new Set([
             'email', 'funcao', 'tipo_pessoa', 'nome_mae', 'data_nascimento',
-            'telefone', 'documento', 'dias_trabalho', 'foto_url', 'face_encoding',
+            'telefone', 'documento', 'dias_trabalho', 'dias_acesso', 'foto_url', 'face_encoding',
             'numero_pulseira', 'tipo_fluxo', 'fase_montagem', 'fase_showday',
             'fase_desmontagem', 'observacao', 'nome_credencial', 'passaporte',
             'trabalho_area_tecnica', 'trabalho_altura', 'pagamento_validado',
@@ -419,7 +419,7 @@ class PessoaService {
         const ALLOWED_COLUMNS = new Set([
             'nome_completo', 'cpf', 'email', 'funcao', 'tipo_pessoa',
             'nome_mae', 'data_nascimento', 'telefone', 'documento',
-            'dias_trabalho', 'foto_url', 'face_encoding', 'qr_code',
+            'dias_trabalho', 'dias_acesso', 'foto_url', 'face_encoding', 'qr_code',
             'numero_pulseira', 'tipo_fluxo', 'fase_montagem',
             'fase_showday', 'fase_desmontagem', 'bloqueado',
             'motivo_bloqueio', 'observacao', 'ativo', 'nome_credencial',

@@ -73,12 +73,12 @@ const PessoaFormDialog = ({
 
       </DialogTitle>
       
-      <DialogContent sx={{ p: 0, flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <DialogContent sx={{ p: 0, flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
         <Grid container sx={{ flex: 1, height: '100%' }}>
           <Grid item xs={12} md={5} sx={{
             borderRight: isMobile ? 'none' : '1px solid rgba(255, 255, 255, 0.05)',
             p: 4, display: 'flex', flexDirection: 'column', bgcolor: 'rgba(0,0,0,0.2)',
-            overflowY: 'auto', minHeight: 0
+            overflowY: 'auto', minHeight: 0, height: '100%'
           }}>
             {!isEmpresa && (
               <>
@@ -106,7 +106,7 @@ const PessoaFormDialog = ({
 
           </Grid>
 
-          <Grid item xs={12} md={7} sx={{ p: 5, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+          <Grid item xs={12} md={7} sx={{ p: 5, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' }}>
             {!isEmpresa && (
               <Stepper activeStep={activeStep} alternativeLabel sx={{
                 mb: 6,

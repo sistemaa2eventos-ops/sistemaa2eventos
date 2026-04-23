@@ -2,6 +2,24 @@ const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const axios = require('axios');
 
+// ── Whitelist de campos permitidos para câmeras (previne mass-assignment)
+const CAMERA_ALLOWED_FIELDS = [
+    'nome', 'ip_address', 'porta', 'fabricante', 'modelo',
+    'usuario', 'senha', 'snapshot_url', 'rtsp_url',
+    'area_id', 'tipo', 'resolucao', 'fps', 'ativo'
+];
+
+/** Extrai apenas campos permitidos do payload */
+function pickAllowed(body, allowedFields) {
+    const result = {};
+    for (const field of allowedFields) {
+        if (body[field] !== undefined) {
+            result[field] = body[field];
+        }
+    }
+    return result;
+}
+
 class CameraController {
     /**
      * Listar Câmeras do Evento
@@ -38,12 +56,14 @@ class CameraController {
     }
 
     /**
-     * Criar Câmera
+     * Criar Câmera (com whitelist de campos)
      */
     async create(req, res) {
         try {
             const evento_id = req.body.evento_id || req.headers['x-evento-id'];
-            const cameraData = req.body;
+            if (!evento_id) return res.status(400).json({ error: 'evento_id obrigatório' });
+
+            const cameraData = pickAllowed(req.body, CAMERA_ALLOWED_FIELDS);
 
             // Auto-preencher snapshot_url se fabricante for selecionado e URL estiver vazia
             if (cameraData.fabricante && !cameraData.snapshot_url) {
@@ -71,12 +91,16 @@ class CameraController {
     }
 
     /**
-     * Atualizar Câmera
+     * Atualizar Câmera (com whitelist de campos)
      */
     async update(req, res) {
         try {
             const { id } = req.params;
-            const updateData = req.body;
+            const updateData = pickAllowed(req.body, CAMERA_ALLOWED_FIELDS);
+
+            if (Object.keys(updateData).length === 0) {
+                return res.status(400).json({ error: 'Nenhum campo válido para atualizar' });
+            }
 
             const { data, error } = await supabase
                 .from('cameras_ip')
@@ -126,14 +150,13 @@ class CameraController {
             let latencia = 0;
 
             try {
-                // Timeout curto para teste
-                await axios.get(cam.snapshot_url, { 
+                await axios.get(cam.snapshot_url, {
                     timeout: 3000,
-                    auth: cam.usuario ? { username: cam.usuario, password: cam.senha } : null
+                    auth: cam.usuario ? { username: cam.usuario, password: cam.senha } : undefined
                 });
                 status = 'online';
                 latencia = Date.now() - start;
-            } catch (err) {
+            } catch {
                 status = 'offline';
             }
 
@@ -160,7 +183,7 @@ class CameraController {
             const response = await axios.get(cam.snapshot_url, {
                 responseType: 'arraybuffer',
                 timeout: 5000,
-                auth: cam.usuario ? { username: cam.usuario, password: cam.senha } : null
+                auth: cam.usuario ? { username: cam.usuario, password: cam.senha } : undefined
             });
 
             res.set('Content-Type', response.headers['content-type'] || 'image/jpeg');

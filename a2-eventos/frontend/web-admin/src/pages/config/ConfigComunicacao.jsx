@@ -39,23 +39,22 @@ const ConfigComunicacao = () => {
         loadTemplates();
     }, []);
 
+    const getEventoId = () => sessionStorage.getItem('active_evento_id') || localStorage.getItem('active_evento_id');
+
     const loadTemplates = async () => {
         try {
-            const eventoId = sessionStorage.getItem('active_evento_id') || localStorage.getItem('active_evento_id');
-            if (!eventoId) {
-                console.warn('Sem contexto de evento para carregar templates');
-                return;
-            }
+            const eventoId = getEventoId();
+            if (!eventoId) return;
 
             const { data } = await api.get('/messages/templates', {
                 params: { evento_id: eventoId }
             });
-            if (data.success) {
+            if (data.success && Array.isArray(data.data)) {
                 setTemplates(data.data);
                 if (data.data.length > 0) handleSelectTemplate(data.data[0]);
             }
         } catch (error) {
-            console.error('Erro ao carregar templates', error);
+            enqueueSnackbar('Erro ao carregar templates de mensagem', { variant: 'error' });
         }
     };
 
@@ -168,7 +167,7 @@ const ConfigComunicacao = () => {
         if (!selectedTemplate) return;
         setSavingTemplate(true);
         try {
-            const eventoId = localStorage.getItem('active_evento_id'); 
+            const eventoId = getEventoId();
             await api.post('/messages/templates', {
                 slug: selectedTemplate.slug,
                 canal: selectedTemplate.canal,
@@ -231,7 +230,15 @@ const ConfigComunicacao = () => {
                                     <TextField fullWidth label="Usuário Autenticação" value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} size="small" />
                                 </Grid>
                                 <Grid item xs={12} md={6}>
-                                    <TextField fullWidth label="Senha (App Password)" value={smtpPass} onChange={(e) => setSmtpPass(e.target.value)} type="password" size="small" />
+                                    <TextField 
+                                        fullWidth 
+                                        label="Senha (App Password)" 
+                                        value={smtpPass} 
+                                        onChange={(e) => setSmtpPass(e.target.value)} 
+                                        type="password" 
+                                        size="small" 
+                                        autoComplete="current-password"
+                                    />
                                 </Grid>
                             </Grid>
 
@@ -277,7 +284,15 @@ const ConfigComunicacao = () => {
                                     </TextField>
                                 </Grid>
                                 <Grid item xs={12}>
-                                    <TextField fullWidth label="Authorization Token (Bearer / Secret)" value={wppToken} onChange={(e) => setWppToken(e.target.value)} type="password" size="small" />
+                                    <TextField 
+                                        fullWidth 
+                                        label="Authorization Token (Bearer / Secret)" 
+                                        value={wppToken} 
+                                        onChange={(e) => setWppToken(e.target.value)} 
+                                        type="password" 
+                                        size="small" 
+                                        autoComplete="current-password"
+                                    />
                                 </Grid>
                                 <Grid item xs={12}>
                                     <TextField fullWidth label="ID do Telefone Remetente" value={wppPhoneId} onChange={(e) => setWppPhoneId(e.target.value)} placeholder="+55 11 99999-9999" size="small" />

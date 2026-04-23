@@ -11,6 +11,11 @@ class IntelbrasController {
         try {
             let eventData = req.body;
 
+            if (typeof eventData === 'string') {
+                const parsedMixed = this._parseMultipartMixedPayload(eventData);
+                if (parsedMixed) eventData = parsedMixed;
+            }
+
             // Normalização de multipart/form-data
             if (req.body && req.body.info && typeof req.body.info === 'string') {
                 try { eventData = JSON.parse(req.body.info); } catch (e) { logger.error(`[Intelbras] JSON parse error: ${e.message}`); }
@@ -182,15 +187,33 @@ class IntelbrasController {
         try {
             // 1. Parse do body (pode vir como JSON ou multipart)
             let body = req.body;
+            const rawBody = typeof req.body === 'string' ? req.body : null;
+
             if (typeof body === 'string') {
-                try { body = JSON.parse(body); } catch (_) {}
+                const parsedMixed = this._parseMultipartMixedPayload(body);
+                if (parsedMixed) body = parsedMixed;
+                else {
+                    try { body = JSON.parse(body); } catch (_) { body = {}; }
+                }
             }
 
             // Suporte ao formato de envio de eventos (multipart/mixed)
             const userID = body?.UserID || body?.userId || body?.card_no
-                || body?.cardNo || body?.Data?.UserID;
+                || body?.cardNo || body?.Data?.UserID
+                || this._extractUserIdFromRaw(rawBody);
+
+            // 🔍 DEBUG: Log completo do que foi recebido
+            logger.info(`[Online] REQUEST DEBUG:`, {
+                contentType: req.headers['content-type'],
+                bodyKeys: Object.keys(body || {}),
+                bodyFull: JSON.stringify(body),
+                rawBodyLength: rawBody?.length,
+                extractedUserID: userID,
+                queryToken: req.query.token
+            });
 
             if (!userID) {
+                logger.error(`[Online] ❌ ID NÃO IDENTIFICADO - Body recebido:`, { body, rawBody: rawBody?.substring(0, 500) });
                 return res.json({ message: 'ID não identificado', code: 200, auth: 'false' });
             }
 
@@ -291,6 +314,48 @@ class IntelbrasController {
             'QRCode': 'qrcode'
         };
         return map[intelbrasMethod] || 'face';
+    }
+
+    _parseMultipartMixedPayload(rawBody) {
+        if (!rawBody || typeof rawBody !== 'string') return null;
+
+        const start = rawBody.indexOf('{');
+        const end = rawBody.lastIndexOf('}');
+        if (start !== -1 && end > start) {
+            const jsonChunk = rawBody.slice(start, end + 1);
+            try {
+                return JSON.parse(jsonChunk);
+            } catch (_) {
+                // continua para fallback por regex
+            }
+        }
+
+        const fallbackUserId = this._extractUserIdFromRaw(rawBody);
+        if (fallbackUserId) return { UserID: fallbackUserId };
+
+        return null;
+    }
+
+    _extractUserIdFromRaw(rawBody) {
+        if (!rawBody || typeof rawBody !== 'string') return null;
+
+        const patterns = [
+            /"UserID"\s*:\s*"([^"\r\n]+)"/i,
+            /"card_no"\s*:\s*"([^"\r\n]+)"/i,
+            /UserID\s*=\s*([^\r\n;]+)/i,
+            /name="UserID"\s*\r?\n\r?\n([^\r\n-]+)/i,
+            /name="card_no"\s*\r?\n\r?\n([^\r\n-]+)/i
+        ];
+
+        for (const pattern of patterns) {
+            const match = rawBody.match(pattern);
+            if (match && match[1]) {
+                const value = String(match[1]).trim().replace(/^"|"$/g, '');
+                if (value) return value;
+            }
+        }
+
+        return null;
     }
 }
 

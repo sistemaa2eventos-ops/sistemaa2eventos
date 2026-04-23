@@ -3,6 +3,7 @@ const { testPgConnection } = require('../../config/pgEdge');
 const logger = require('../../services/logger');
 const syncService = require('../devices/sync.service');
 const cacheService = require('../../services/cacheService');
+const { extractRole } = require('../../middleware/auth');
 const os = require('os');
 const fsSync = require('fs');
 const fs = fsSync.promises;
@@ -345,8 +346,6 @@ class MonitorController {
      */
     async forceSync(req, res) {
         try {
-            // Verificar permissão
-            const { extractRole } = require('../../middleware/auth');
             if (!['admin', 'admin_master'].includes(extractRole(req.user))) {
                 return res.status(403).json({ error: 'Acesso negado' });
             }
@@ -372,7 +371,6 @@ class MonitorController {
      */
     async clearCache(req, res) {
         try {
-            const { extractRole } = require('../../middleware/auth');
             if (!['admin', 'admin_master'].includes(extractRole(req.user))) {
                 return res.status(403).json({ error: 'Acesso negado' });
             }
@@ -393,40 +391,27 @@ class MonitorController {
     }
     /**
      * Listar Watchlist de Monitoramento
+     * CONSOLIDADO: Usa tabela `watchlist` (mesma do watchlist.controller.js)
+     * para evitar fragmentação de dados em cenários de alta carga (10k+)
      */
     async listWatchlist(req, res) {
         try {
-            // --- NEXUS CONTEXT FALLBACK (v25.0) ---
             const evento_id = _s(req.event?.id) || _s(req.query.evento_id) || _s(req.user?.evento_id) || _s(req.headers['x-evento-id']);
 
             if (!evento_id) {
                 return res.status(400).json({ error: 'Falta vincular evento ativo para carregar watchlist.' });
             }
+
             const { data: watchlist, error } = await supabase
-                .from('monitor_watchlist')
+                .from('watchlist')
                 .select('*')
                 .eq('evento_id', evento_id)
+                .eq('ativo', true)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
 
-            if (watchlist && watchlist.length > 0) {
-                // População Manual Resiliente
-                const pessoaIds = [...new Set(watchlist.map(w => w.pessoa_id).filter(id => id))];
-                if (pessoaIds.length > 0) {
-                    const { data: pessoas } = await supabase
-                        .from('pessoas')
-                        .select('id, nome, foto_url, empresas(nome)')
-                        .in('id', pessoaIds);
-                    
-                    const pMap = (pessoas || []).reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
-                    watchlist.forEach(w => {
-                        if (w.pessoa_id && pMap[w.pessoa_id]) w.pessoas = pMap[w.pessoa_id];
-                    });
-                }
-            }
-
-            res.json({ success: true, data: watchlist });
+            res.json({ success: true, data: watchlist || [] });
         } catch (error) {
             logger.error('Erro ao listar watchlist:', error);
             res.status(500).json({ error: 'Erro interno no servidor' });
@@ -435,30 +420,32 @@ class MonitorController {
 
     /**
      * Adicionar à Watchlist
+     * CONSOLIDADO: Usa tabela `watchlist` com upsert por evento+cpf
      */
     async addToWatchlist(req, res) {
         try {
-            // --- NEXUS CONTEXT FALLBACK (v25.0) ---
             const evento_id = _s(req.event?.id) || _s(req.body?.evento_id) || _s(req.user?.evento_id) || _s(req.headers['x-evento-id']);
 
             if (!evento_id) {
                 return res.status(400).json({ error: 'Falta vincular evento ativo para adicionar à watchlist.' });
             }
-            const { cpf, pessoa_id, nome } = req.body;
+            const { cpf, nome, motivo } = req.body;
 
-            if (!cpf && !pessoa_id) {
-                return res.status(400).json({ error: 'Informe CPF ou Pessoa' });
+            if (!cpf) {
+                return res.status(400).json({ error: 'CPF é obrigatório' });
             }
 
             const { data, error } = await supabase
-                .from('monitor_watchlist')
-                .insert([{
+                .from('watchlist')
+                .upsert([{
                     evento_id,
-                    pessoa_id: pessoa_id || null,
-                    cpf: cpf || null,
+                    cpf: String(cpf).replace(/\D/g, ''),
                     nome: nome || 'Alvo Monitorado',
-                    is_active: true
-                }])
+                    motivo: motivo || 'Adicionado via monitor',
+                    nivel_alerta: 'alto',
+                    ativo: true,
+                    adicionado_por: req.user?.id
+                }], { onConflict: 'evento_id,cpf' })
                 .select()
                 .single();
 
@@ -472,11 +459,11 @@ class MonitorController {
 
     /**
      * Remover da Watchlist
+     * CONSOLIDADO: Usa tabela `watchlist`
      */
     async removeFromWatchlist(req, res) {
         try {
             const { id } = req.params;
-            // --- NEXUS CONTEXT FALLBACK (v25.0) ---
             const evento_id = _s(req.event?.id) || _s(req.query.evento_id) || _s(req.user?.evento_id) || _s(req.headers['x-evento-id']);
 
             if (!evento_id) {
@@ -484,7 +471,7 @@ class MonitorController {
             }
 
             const { error } = await supabase
-                .from('monitor_watchlist')
+                .from('watchlist')
                 .delete()
                 .eq('id', id)
                 .eq('evento_id', evento_id);

@@ -94,7 +94,7 @@ class AccessController {
             if (pessoaIds.length > 0) {
                 const { data: pessoasData } = await supabaseClient
                     .from('pessoas')
-                    .select('id, nome, cpf, foto_url, empresa_id, empresas(nome)')
+                    .select('id, nome_completo, cpf, foto_url, empresa_id, empresas(nome)')
                     .in('id', pessoaIds);
 
                 // Passo 3: Mapear os dados para enriquecer os logs
@@ -106,6 +106,21 @@ class AccessController {
                 logs.forEach(log => {
                     if (log.pessoa_id && pessoasMap[log.pessoa_id]) {
                         log.pessoas = pessoasMap[log.pessoa_id];
+                    }
+                });
+            }
+
+            // Passo 4: Coletar e mapear Dispositivos para obter o NOME
+            const dispositivoIds = [...new Set(logs.map(l => l.dispositivo_id).filter(id => id))];
+            if (dispositivoIds.length > 0) {
+                const { data: dispData } = await supabaseClient
+                    .from('dispositivos_acesso')
+                    .select('id, nome')
+                    .in('id', dispositivoIds);
+                const dispMap = (dispData || []).reduce((acc, d) => { acc[d.id] = d.nome; return acc; }, {});
+                logs.forEach(log => {
+                    if (log.dispositivo_id && dispMap[log.dispositivo_id]) {
+                        log.dispositivo_nome = dispMap[log.dispositivo_id];
                     }
                 });
             }
@@ -606,11 +621,34 @@ class AccessController {
             const supabaseClient = req.supabase || supabase;
 
             // Validar terminal
-            const { data: terminal, error: termErr } = await supabaseClient
+            let { data: terminal, error: termErr } = await supabaseClient
                 .from('terminais_faciais')
                 .select('*, eventos(id, nome)')
                 .eq('id', terminal_id)
                 .single();
+
+            // Compatibilidade: fallback para dispositivos_acesso (modelo consolidado)
+            if (termErr || !terminal) {
+                const { data: dispositivo, error: dispErr } = await supabaseClient
+                    .from('dispositivos_acesso')
+                    .select('id, evento_id, nome, area_nome, modo, config')
+                    .eq('id', terminal_id)
+                    .eq('tipo', 'terminal_facial')
+                    .single();
+
+                if (!dispErr && dispositivo) {
+                    terminal = {
+                        id: dispositivo.id,
+                        evento_id: dispositivo.evento_id,
+                        nome: dispositivo.nome,
+                        area_nome: dispositivo.area_nome,
+                        modo: dispositivo.modo || 'ambos',
+                        ativo: true,
+                        biometric_confidence_min: dispositivo.config?.biometric_confidence_min
+                    };
+                    termErr = null;
+                }
+            }
 
             if (termErr || !terminal) {
                 return res.status(404).json({ error: 'Terminal não encontrado' });

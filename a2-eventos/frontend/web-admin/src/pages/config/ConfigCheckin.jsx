@@ -33,7 +33,7 @@ const ConfigCheckin = () => {
         <Box sx={{ p: 4 }}>
             <PageHeader
                 title="Regras de Acesso"
-                subtitle="Configurecheck-in, biometria e comportamentos de acesso."
+                subtitle="Configure check-in, biometria e comportamentos de acesso."
                 breadcrumbs={[{ text: 'Configurações' }, { text: 'Regras de Acesso' }]}
             />
 

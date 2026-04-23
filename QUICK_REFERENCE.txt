@@ -1,0 +1,151 @@
+================================================================================
+                    QUICK REFERENCE — A2 Eventos Deploy
+================================================================================
+
+🚀 DEPLOY COMMAND (Escolha um)
+─────────────────────────────────────────────────────────────────────────────
+
+  ./deploy.sh full       ← COMPLETO (20-30 min) - Usar sempre que possível
+  ./deploy.sh quick      ← RÁPIDO (10-15 min) - Mudanças pequenas
+  ./deploy.sh check      ← VERIFICAR (2 min) - Sem fazer mudanças
+  ./deploy.sh restart    ← REINICIAR (5 min) - Reset rápido
+  ./deploy.sh logs       ← VER LOGS em tempo real
+
+================================================================================
+
+📋 BEFORE EVERY DEPLOY
+─────────────────────────────────────────────────────────────────────────────
+
+  1. git status          # Sem mudanças não-commitadas
+  2. git fetch origin    # Buscar código remoto
+  3. cat .env | head -5  # Verificar variáveis críticas
+  4. df -h               # Ter >5GB livres
+  5. ping painel.nzt.app.br  # Conectividade teste
+
+================================================================================
+
+🏗️ ARQUITETURA (Memorizar)
+─────────────────────────────────────────────────────────────────────────────
+
+  USUÁRIO
+    ↓
+  CLOUDFLARE (DNS: painel.nzt.app.br)
+    ↓
+  HOSTINGER VPS (IP: X.X.X.X)
+    ↓
+  NGINX (porta 80/443) ← Proxy reverso
+    ├─→ Backend (3001) ← Node.js API
+    ├─→ Frontend (3000) ← React web
+    └─→ Device Push ← Intelbras webhooks
+         ↓
+      SUPABASE (PostgreSQL cloud)
+
+================================================================================
+
+🔑 VARIÁVEIS CRÍTICAS (.env)
+─────────────────────────────────────────────────────────────────────────────
+
+  Obrigatórias:
+  ✓ SUPABASE_URL=https://[projeto].supabase.co
+  ✓ SUPABASE_ANON_KEY=eyJ...
+  ✓ API_URL=https://painel.nzt.app.br
+  ✓ NODE_ENV=production
+
+================================================================================
+
+⚡ ATALHOS DOCKER
+─────────────────────────────────────────────────────────────────────────────
+
+  docker-compose up -d          ← Iniciar
+  docker-compose down           ← Parar
+  docker-compose ps             ← Ver status
+  docker-compose logs -f        ← Ver logs (ctrl+c sair)
+  docker-compose build --no-cache ← Rebuildar
+  docker system prune -af       ← Limpar (CUIDADO!)
+
+================================================================================
+
+✅ TESTES APÓS DEPLOY
+─────────────────────────────────────────────────────────────────────────────
+
+  L1: curl -s http://localhost:3001/health | jq .
+      → Deve retornar: { "status": "ok" }
+
+  L2: curl -s http://localhost:3000 | grep -q "DOCTYPE"
+      → Se retorna, Frontend OK
+
+  L3: curl -s -I https://painel.nzt.app.br
+      → Deve ser 200 ou 301
+
+  L4: docker-compose logs --tail=50 | grep -i "error"
+      → Não deve ter erros críticos
+
+================================================================================
+
+🔴 SOS — ALGO DEU ERRADO
+─────────────────────────────────────────────────────────────────────────────
+
+  502 Bad Gateway?
+    → docker logs a2-eventos-api --tail=20
+    → curl http://localhost:3001/health
+
+  Cannot connect to Docker?
+    → sudo systemctl start docker
+
+  Port already in use?
+    → sudo lsof -i :80
+    → sudo kill -9 [PID]
+
+  Supabase error?
+    → echo $SUPABASE_URL
+    → curl -s -I $SUPABASE_URL
+
+  ROLLBACK RÁPIDO:
+    → git revert HEAD
+    → git push origin master
+    → ./deploy.sh quick
+
+================================================================================
+
+📞 IMPORTANTES
+─────────────────────────────────────────────────────────────────────────────
+
+  Frontend:  https://painel.nzt.app.br
+  Backend:   https://painel.nzt.app.br/api
+  Intelbras: http://192.168.1.17 (user: admin / pass: admin123)
+  Supabase:  https://supabase.io → Seu projeto
+  Cloudflare: https://dash.cloudflare.com
+
+================================================================================
+
+📊 STATUS CHECK (5 comandos)
+─────────────────────────────────────────────────────────────────────────────
+
+  1. docker ps            → Todos containers Up?
+  2. curl localhost:3001  → Backend OK?
+  3. curl localhost:3000  → Frontend OK?
+  4. curl painel.nzt.app.br → HTTPS OK?
+  5. docker logs app --tail=20 | grep -i error → Erros?
+
+  SE TODOS PASSAREM → ✅ SUCESSO
+
+================================================================================
+
+💾 HISTÓRICO DESTA SESSÃO
+─────────────────────────────────────────────────────────────────────────────
+
+  Fixes implementados:
+  ✅ SMTP verification endpoint (503 → 200)
+  ✅ Device connection timeout (5s → 15s)
+  ✅ Debug logging para Intelbras online mode
+  ✅ Melhor mensagens de erro (ECONNREFUSED, etc)
+  ✅ Protocolo padrão de deploy criado
+
+================================================================================
+
+Última atualização: 2026-04-23
+Arquivo completo: CLAUDE.md
+Checklist detalhado: DEPLOY_CHECKLIST.md
+Script automático: deploy.sh
+
+================================================================================

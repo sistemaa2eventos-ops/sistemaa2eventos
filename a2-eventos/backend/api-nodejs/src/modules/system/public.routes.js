@@ -45,4 +45,9 @@ router.post('/register/:token', registerLimiter, publicController.registerEmploy
 router.get('/portal/invite/:token', publicController.validateInvite);
 router.post('/portal/cadastro', publicController.submitCadastro);
 
+// --- Rota Pública de Teste SMTP (sem autenticação) ---
+// Usada pelo painel administrativo para testar credenciais antes de salvar
+const settingsController = require('./settings.controller');
+router.post('/settings/verify-smtp', settingsController.verifySmtp);
+
 module.exports = router;

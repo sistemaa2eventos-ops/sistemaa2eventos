@@ -17,9 +17,6 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const dotenv = require('dotenv');
-const fs = require('fs');
-const path = require('path');
-const https = require('https');
 const http = require('http');
 
 dotenv.config();
@@ -64,8 +61,12 @@ app.set('trust proxy', 1);
 
 // --- MIDDLEWARE DE FORÇAR HTTPS (Proxy Aware) ---
 app.use((req, res, next) => {
-    // NÃO redirecionar healthcheck do Docker (HTTP)
-    if (req.path === '/health' || req.path === '/health/') {
+    const isHealthcheck = req.path === '/health' || req.path === '/health/';
+    const isHardwareCallback = req.path.startsWith('/api/intelbras/') || req.path.startsWith('/api/hikvision/');
+    const isSmtpVerification = req.path === '/api/settings/verify-smtp';
+
+    // Nao redirecionar healthcheck, callbacks de hardware e testes de SMTP (já feitos via proxy HTTPS)
+    if (isHealthcheck || isHardwareCallback || isSmtpVerification) {
         return next();
     }
     if (process.env.NODE_ENV === 'production' && !req.secure && req.get('X-Forwarded-Proto') !== 'https') {

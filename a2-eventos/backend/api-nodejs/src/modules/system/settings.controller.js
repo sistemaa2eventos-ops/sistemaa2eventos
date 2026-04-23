@@ -2,6 +2,40 @@ const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const crypto = require('crypto');
 
+// ── Whitelist de campos permitidos para system_settings (previne mass-assignment)
+const SETTINGS_ALLOWED_FIELDS = [
+    'system_name', 'theme_neon_enabled', 'language',
+    'biometric_login_enabled', 'cloud_sync_enabled', 'api_url',
+    'alert_operator_login', 'alert_event_peak', 'alert_peak_threshold',
+    'biometric_sensitivity', 'liveness_check_enabled',
+    'anti_passback_enabled', 'checkin_cooldown_min',
+    'biometric_confidence', 'biometric_confianca_baixa',
+    'jwt_expiry', 'cron_reset_hora', 'cron_relatorio_hora',
+    'log_retention_days', 'logo_url', 'config',
+    // SMTP
+    'smtp_enabled', 'smtp_host', 'smtp_port', 'smtp_email', 'smtp_user', 'smtp_pass',
+    // WhatsApp
+    'wpp_enabled', 'wpp_provider', 'wpp_token', 'wpp_phone_id',
+    // Segurança
+    'password_min_length', 'password_require_uppercase', 'password_require_number',
+    'password_require_special', 'password_expiry_days',
+    'require_2fa_admin_master', 'require_2fa_operators',
+    // Checkin
+    'horario_inicio', 'horario_fim', 'allow_offhour_checkin',
+    'block_unauthorized_days', 'cooldown_pulseira'
+];
+
+/** Extrai apenas campos permitidos do payload */
+function pickAllowed(body, allowedFields) {
+    const result = {};
+    for (const field of allowedFields) {
+        if (body[field] !== undefined) {
+            result[field] = body[field];
+        }
+    }
+    return result;
+}
+
 class SettingsController {
     // Retorna as configurações base do sistema (sempre id = 1)
     async getSettings(req, res) {
@@ -47,11 +81,14 @@ class SettingsController {
         }
     }
 
-    // Atualiza as configurações
+    // Atualiza as configurações (com whitelist de campos)
     async updateSettings(req, res) {
         try {
-            const payload = req.body;
-            delete payload.id;
+            const payload = pickAllowed(req.body, SETTINGS_ALLOWED_FIELDS);
+
+            if (Object.keys(payload).length === 0) {
+                return res.status(400).json({ error: 'Nenhum campo válido para atualizar' });
+            }
 
             const { data, error } = await supabase
                 .from('system_settings')
@@ -203,7 +240,7 @@ class SettingsController {
                     .select('*')
                     .order('created_at', { ascending: false })
                     .limit(50);
-                
+
                 if (altError) return res.json({ success: true, count: 0, data: [] });
                 return res.json({ success: true, count: altData.length, data: altData });
             }
@@ -215,28 +252,75 @@ class SettingsController {
         }
     }
 
-    // Verifica o status do servidor SMTP
+    // Verifica o status do servidor SMTP com credenciais do request
     async verifySmtp(req, res) {
         try {
-            const emailService = require('../../services/emailService');
-            // O comando verify() testa a conexão e autenticação com o servidor SMTP
-            const result = await emailService.transporter.verify();
-            
+            const nodemailer = require('nodemailer');
+            const { host, port, user, pass } = req.body;
+
+            logger.info(`[SMTP Test] Iniciando verificação: host=${host}, port=${port}, user=${user}`);
+
+            if (!host || !port || !user || !pass) {
+                logger.warn('[SMTP Test] Parâmetros obrigatórios faltando');
+                return res.status(400).json({
+                    success: false,
+                    error: 'Host, porta, usuário e senha são obrigatórios.'
+                });
+            }
+
+            // Criar transporter temporário com credenciais do request
+            const testTransporter = nodemailer.createTransport({
+                host,
+                port: parseInt(port, 10),
+                secure: parseInt(port, 10) === 465, // TLS para porta 465, STARTTLS para outras
+                auth: {
+                    user,
+                    pass
+                },
+                tls: {
+                    rejectUnauthorized: false // Para servidores com certificados auto-assinados
+                }
+            });
+
+            logger.info('[SMTP Test] Transporter criado, testando conexão...');
+            // Testar conexão
+            const result = await testTransporter.verify();
+
+            logger.info(`[SMTP Test] Resultado da verificação: ${result}`);
+
             if (result) {
-                res.json({ 
-                    success: true, 
+                res.json({
+                    success: true,
                     message: 'Conexão SMTP estabelecida e autenticada com sucesso.',
-                    detail: process.env.SMTP_HOST 
+                    detail: host
                 });
             } else {
                 throw new Error('Servidor recusou a conexão.');
             }
         } catch (error) {
-            logger.error('Falha na verificação SMTP:', error);
-            res.status(503).json({ 
-                success: false, 
-                error: 'Falha na conexão SMTP.', 
-                detail: error.message 
+            logger.error(`[SMTP Test] Falha na verificação SMTP: ${error.message}`, {
+                code: error.code,
+                errno: error.errno,
+                syscall: error.syscall,
+                hostname: error.hostname,
+                stack: error.stack
+            });
+
+            let userFriendlyError = 'Falha na conexão SMTP.';
+            if (error.code === 'EAUTH') {
+                userFriendlyError = 'Usuário ou senha (App Password) incorretos/rejeitados pelo servidor.';
+            } else if (error.code === 'ESOCKET') {
+                userFriendlyError = 'Timeout ou porta bloqueada (Verifique HOST e PORTA).';
+            } else if (error.code === 'ENOTFOUND') {
+                userFriendlyError = 'Host SMTP não encontrado (Verifique o endereço do servidor).';
+            } else if (error.message?.includes('STARTTLS')) {
+                userFriendlyError = 'Erro no protocolo TLS. Tente mudar a porta (587 para STARTTLS, 465 para TLS).';
+            }
+
+            res.status(503).json({
+                success: false,
+                error: userFriendlyError,
+                detail: error.message
             });
         }
     }
@@ -244,7 +328,6 @@ class SettingsController {
     // Verifica o status do gateway de WhatsApp
     async verifyWpp(req, res) {
         try {
-            // Por enquanto retornar falso ou não configurado
             res.json({ success: false, message: 'Gateway WhatsApp não configurado neste ambiente.' });
         } catch (error) {
             res.status(500).json({ error: 'Erro ao verificar WhatsApp' });
@@ -253,31 +336,31 @@ class SettingsController {
 
     // --- NOVOS ENDPOINTS (CONSOLIDAÇÃO) ---
 
+    /**
+     * Gerar API Key — CONSOLIDADO: usa tabela system_api_keys
+     * (mesmo destino que createApiKey, mas com prefixo nzt_ e nome automático)
+     */
     async generateApiKey(req, res) {
         try {
-            const key = 'nzt_' + crypto.randomBytes(32).toString('hex');
-            
-            // Buscar config atual
-            const { data } = await supabase
-                .from('system_settings')
-                .select('config')
-                .eq('id', 1)
+            const token = 'nzt_' + crypto.randomBytes(32).toString('hex');
+            const name = `Gerado por ${req.user?.email || 'sistema'}`;
+            const expires_at = new Date();
+            expires_at.setDate(expires_at.getDate() + 365);
+
+            const { data, error } = await supabase
+                .from('system_api_keys')
+                .insert([{
+                    name,
+                    token,
+                    expires_at: expires_at.toISOString(),
+                    created_by: req.user?.email
+                }])
+                .select()
                 .single();
 
-            const config = data?.config || {};
-            const keys = config.api_keys || [];
-            keys.push({
-                key,
-                created_at: new Date().toISOString(),
-                created_by: req.user?.email,
-                active: true
-            });
+            if (error) throw error;
 
-            await supabase.from('system_settings')
-                .update({ config: { ...config, api_keys: keys } })
-                .eq('id', 1);
-
-            res.json({ success: true, key });
+            res.json({ success: true, key: token, data });
         } catch (error) {
             logger.error('Erro ao gerar API Key:', error);
             res.status(500).json({ error: 'Erro ao gerar chave de API' });
@@ -301,7 +384,6 @@ class SettingsController {
 
     async forceLogoutAll(req, res) {
         try {
-            // Buscar todos os usuários exceto o que executou
             const { data: users } = await supabase
                 .from('perfis')
                 .select('id')
@@ -330,7 +412,7 @@ class SettingsController {
                 }, 5000);
             }
 
-            logger.info(`🔐 Force logout executado por ${req.user.email}`);
+            logger.info(`[SECURITY] Force logout executado por ${req.user.email}`);
             res.json({ success: true, message: `${users?.length || 0} usuários desconectados.` });
         } catch (error) {
             logger.error('Erro ao forçar logout:', error);

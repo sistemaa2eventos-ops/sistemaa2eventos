@@ -7,6 +7,25 @@ const multer = require('multer');
 // Usar storage em memória temporário para fotos de passagem rápida
 const upload = multer({ storage: multer.memoryStorage() });
 
+const parseMultipartMixed = express.text({
+    type: (req) => (req.headers['content-type'] || '').toLowerCase().includes('multipart/mixed'),
+    limit: '15mb'
+});
+
+const parseIntelbrasBody = (req, res, next) => {
+    const contentType = (req.headers['content-type'] || '').toLowerCase();
+
+    if (contentType.includes('multipart/form-data')) {
+        return upload.any()(req, res, next);
+    }
+
+    if (contentType.includes('multipart/mixed')) {
+        return parseMultipartMixed(req, res, next);
+    }
+
+    return next();
+};
+
 /**
  * Middleware para garantir que um token está presente.
  * A validação por dispositivo (control_token) é feita no controller.
@@ -25,7 +44,7 @@ const validatePushToken = (req, res, next) => {
  * @desc    Recebe eventos em tempo real (Modo Push/Evento)
  * @access  Protected by Push Token
  */
-router.post('/events', validatePushToken, upload.any(), intelbrasController.handleEventPush.bind(intelbrasController));
+router.post('/events', validatePushToken, parseIntelbrasBody, intelbrasController.handleEventPush.bind(intelbrasController));
 
 /**
  * @route   POST /api/intelbras/online
@@ -36,7 +55,7 @@ router.post('/events', validatePushToken, upload.any(), intelbrasController.hand
  *            Intelbras_ModeCfg.DeviceMode=1
  * @access  Protected by Push Token
  */
-router.post('/online', validatePushToken, upload.any(), intelbrasController.handleOnlineMode.bind(intelbrasController));
+router.post('/online', validatePushToken, parseIntelbrasBody, intelbrasController.handleOnlineMode.bind(intelbrasController));
 router.get('/online', validatePushToken, intelbrasController.handleOnlineMode.bind(intelbrasController));
 
 /**

@@ -53,7 +53,7 @@ export const useLeitorFacial = () => {
 
     const fetchAreas = async () => {
         try {
-            const response = await api.get('/config/areas');
+            const response = await api.get('/config/areas', { params: { evento_id: eventoId } });
             setAreas(response.data.data || []);
         } catch (error) {
             console.error('Erro ao buscar áreas:', error);

@@ -172,7 +172,7 @@ class LGPDService {
                 .from('pessoas')
                 .select('id')
                 .eq('evento_id', ev.id)
-                .is('cpf', 'not.null'); // Se CPF é null, provável que já foi anonimizado
+                .not('cpf', 'is', null); // Se CPF é null, provável que já foi anonimizado
 
             if (pessoas && pessoas.length > 0) {
                 for (const p of pessoas) {
