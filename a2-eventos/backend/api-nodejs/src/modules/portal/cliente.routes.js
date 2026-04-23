@@ -146,6 +146,14 @@ router.post('/documento', upload.single('arquivo'), async (req, res) => {
 
         // Tenta buscar as categorias de documento na tabela ou insere direto
         // O padrão das NRs de Funcionários é na mesma tabela `pessoa_documentos`, mudando o `tipo_doc`
+        // Buscar evento_id da pessoa
+        const { data: pessoaData } = await supabase
+            .from("pessoas")
+            .select("evento_id")
+            .eq("id", pessoaId)
+            .single();
+        const eventoId = pessoaData?.evento_id;
+
         const { data, error } = await supabase
             .from('pessoa_documentos')
             .insert([{
@@ -154,7 +162,8 @@ router.post('/documento', upload.single('arquivo'), async (req, res) => {
                 tipo_doc: tipo_doc, // 'meia_entrada', 'pcd', 'termo_responsabilidade'
                 url_arquivo: uploadResult.publicUrl,
                 status: 'pendente',
-                criado_por_user_id: pessoaId // Auditor do Upload
+                criado_por_user_id: pessoaId, // Auditor do Upload
+                evento_id: eventoId,
             }])
             .select()
             .single();
