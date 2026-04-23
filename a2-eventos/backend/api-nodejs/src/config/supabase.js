@@ -15,10 +15,9 @@ if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error('❌ SUPABASE_SERVICE_ROLE_KEY não definida no arquivo .env');
 }
 
-logger.info('🔌 Configurando cliente Supabase...');
-logger.info(`📌 URL: ${process.env.SUPABASE_URL}`);
-logger.info('📌 Anon Key: ✅ carregada');
-logger.info('📌 Service Role: ✅ carregada');
+logger.info('Initializing Supabase client');
+logger.info('Supabase credentials loaded', { supabase_url: process.env.SUPABASE_URL });
+logger.info('Authentication keys loaded', { anon_key_loaded: true, service_role_loaded: true });
 
 // ============================================
 // CLIENTE 1: Com service_role (para backend)
@@ -57,27 +56,27 @@ const supabasePublic = createClient(
 // Testar conexão imediatamente
 (async () => {
     try {
-        logger.info('🔄 Testando conexão com Supabase...');
+        logger.info('Testing Supabase connection');
 
         const { count, error } = await supabase
             .from('eventos')
             .select('*', { count: 'exact', head: true });
 
         if (error) {
-            logger.error({ err: error }, '❌ ERRO AO CONECTAR COM SUPABASE');
+            logger.error({ err: error }, 'Failed to connect to Supabase');
 
             if (error.message.includes('relation') || error.message.includes('does not exist')) {
-                logger.warn('⚠️ As tabelas ainda não foram criadas no Supabase! Execute o script SQL primeiro.');
+                logger.warn('Database tables not yet created. Run migration SQL first.', { error_type: 'missing_tables' });
             }
 
             if (error.message.includes('JWT')) {
-                logger.warn('⚠️ Problema com a chave de autenticação! Verifique o .env.');
+                logger.warn('Authentication key problem. Check .env file.', { error_type: 'jwt_error' });
             }
         } else {
-            logger.info('✅ Conectado ao Supabase com sucesso!');
+            logger.info('Successfully connected to Supabase', { table: 'eventos', row_count: count });
         }
     } catch (err) {
-        logger.error({ err }, '❌ ERRO INESPERADO na conexão Supabase');
+        logger.error({ err }, 'Unexpected error during Supabase connection test');
     }
 })();
 
@@ -112,7 +111,7 @@ async function uploadImage(bucket, path, fileBuffer, contentType) {
             url: urlData.publicUrl
         };
     } catch (error) {
-        logger.error({ err: error }, 'Erro no upload');
+        logger.error({ err: error, bucket, path }, 'Failed to upload image to storage');
         return {
             success: false,
             error: error.message
@@ -134,7 +133,7 @@ async function deleteImage(bucket, path) {
 
         return { success: true };
     } catch (error) {
-        logger.error({ err: error }, 'Erro ao deletar imagem');
+        logger.error({ err: error, bucket, path }, 'Failed to delete image from storage');
         return {
             success: false,
             error: error.message
@@ -158,7 +157,7 @@ async function getPessoasComFace(eventoId = null) {
     const { data, error } = await query;
 
     if (error) {
-        logger.error({ err: error }, 'Erro ao buscar pessoas com face');
+        logger.error({ err: error, event_id: eventoId }, 'Failed to fetch people with face data');
         return [];
     }
 
@@ -175,7 +174,7 @@ async function registrarLog(logData) {
         .select();
 
     if (error) {
-        logger.error({ err: error }, 'Erro ao registrar log');
+        logger.error({ err: error, table: 'logs_acesso' }, 'Failed to register access log');
         return null;
     }
 
@@ -196,7 +195,7 @@ async function atualizarStatusPessoa(pessoaId, status) {
         .select();
 
     if (error) {
-        logger.error({ err: error }, 'Erro ao atualizar status');
+        logger.error({ err: error, person_id: pessoaId, status }, 'Failed to update person status');
         return null;
     }
 
@@ -214,7 +213,7 @@ async function getEventoConfig(eventoId) {
         .single();
 
     if (error) {
-        logger.error({ err: error }, 'Erro ao buscar config do evento');
+        logger.error({ err: error, event_id: eventoId }, 'Failed to fetch event configuration');
         return null;
     }
 
