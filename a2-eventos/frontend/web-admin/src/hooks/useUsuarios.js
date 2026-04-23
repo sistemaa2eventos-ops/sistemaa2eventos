@@ -134,8 +134,8 @@ export const useUsuarios = () => {
                 enqueueSnackbar('E-mail é obrigatório.', { variant: 'warning' });
                 return;
             }
-            if (!formData.evento_id && formData.nivel_acesso === 'operador') {
-                enqueueSnackbar('O vínculo com um evento é obrigatório para operadores.', { variant: 'warning' });
+            if (!formData.evento_id) {
+                enqueueSnackbar('O vínculo com um evento é obrigatório.', { variant: 'warning' });
                 return;
             }
 
@@ -153,12 +153,11 @@ export const useUsuarios = () => {
                 }
                 enqueueSnackbar('Permissões atualizadas!', { variant: 'success' });
             } else {
-                // Criar convite
+                // Criar convite — sempre operador
                 await api.post('/auth/invite', {
                     email: formData.email,
                     nome_completo: formData.nome_completo,
-                    nivel_acesso: formData.nivel_acesso || 'operador',
-                    evento_id: formData.evento_id || null
+                    evento_id: formData.evento_id
                 });
                 enqueueSnackbar('Convite enviado!', { variant: 'success' });
             }

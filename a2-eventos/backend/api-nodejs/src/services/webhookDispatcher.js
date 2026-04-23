@@ -28,12 +28,12 @@ class WebhookDispatcher {
                 .contains('eventos', [tipo_evento]);
 
             if (error) {
-                logger.error('Erro ao buscar webhooks:', error.message);
+                logger.error({ err: error }, 'Failed to fetch webhooks');
                 return;
             }
 
             if (!webhooks || webhooks.length === 0) {
-                logger.info(`Nenhum webhook ativo para evento ${tipo_evento}`);
+                logger.info('No active webhooks found', { event_type: tipo_evento });
                 return;
             }
 
@@ -42,9 +42,9 @@ class WebhookDispatcher {
                 this.fireAndForget(webhook.target_url, tipo_evento, payload, webhook.id);
             }
 
-            logger.info(`Webhooks dispatched: ${webhooks.length} para evento ${tipo_evento}`);
+            logger.info('Webhooks dispatched', { webhook_count: webhooks.length, event_type: tipo_evento });
         } catch (error) {
-            logger.error('Erro ao dispatch webhooks:', error.message);
+            logger.error({ err: error }, 'Failed to dispatch webhooks');
         }
     }
 
@@ -76,20 +76,20 @@ class WebhookDispatcher {
                     clearTimeout(timeoutId);
 
                     if (response.ok) {
-                        logger.info(`Webhook ${webhookId} dispatchado com sucesso para ${url}`);
+                        logger.info('Webhook dispatched successfully', { webhook_id: webhookId, target_url: url, event_type: tipo_evento });
                         return;
                     } else {
-                        logger.warn(`Webhook ${webhookId} retornou status ${response.status}`);
+                        logger.warn('Webhook returned non-OK status', { webhook_id: webhookId, status_code: response.status, event_type: tipo_evento });
                     }
                 } catch (error) {
-                    logger.warn(`Tentativa ${attempt}/${this.retryAttempts} falhou para webhook ${webhookId}: ${error.message}`);
+                    logger.warn('Webhook dispatch attempt failed', { webhook_id: webhookId, attempt: attempt, max_attempts: this.retryAttempts, event_type: tipo_evento, error_reason: error.message });
                     if (attempt < this.retryAttempts) {
                         await this.delay(this.retryDelay * attempt);
                     }
                 }
             }
 
-            logger.error(`Webhook ${webhookId} falhou após ${this.retryAttempts} tentativas`);
+            logger.error('Webhook failed after all retry attempts', { webhook_id: webhookId, max_attempts: this.retryAttempts, event_type: tipo_evento });
         });
     }
 

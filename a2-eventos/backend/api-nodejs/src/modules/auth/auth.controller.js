@@ -115,12 +115,7 @@ class AuthController {
      */
     async invite(req, res) {
         try {
-            const {
-                email,
-                nome_completo,
-                nivel_acesso = 'operador',
-                evento_id
-            } = req.body;
+            const { email, nome_completo, evento_id } = req.body;
 
             // Só admin_master pode criar convites
             if (req.user?.nivel_acesso !== 'admin_master') {
@@ -129,17 +124,10 @@ class AuthController {
                 });
             }
 
-            // Validar permissão para níveis superiores
-            if (nivel_acesso !== 'operador' && req.user?.nivel_acesso !== 'admin_master') {
-                return res.status(403).json({
-                    error: 'Apenas admin_master pode criar usuários de nível superior.'
-                });
-            }
-
-            // Validar campos obrigatórios (evento_id é opcional para níveis superiores/master)
-            if (!email || !nome_completo || (nivel_acesso === 'operador' && !evento_id)) {
+            // Todos os novos usuários são operadores vinculados a um evento
+            if (!email || !nome_completo || !evento_id) {
                 return res.status(400).json({
-                    error: 'Email, nome completo e evento (para operadores) são obrigatórios'
+                    error: 'Email, nome completo e evento são obrigatórios.'
                 });
             }
 
@@ -148,8 +136,8 @@ class AuthController {
                 redirectTo: `${process.env.FRONTEND_URL || 'https://painel.nzt.app.br'}/reset-password`,
                 data: {
                     nome_completo,
-                    nivel_acesso,
-                    evento_id: evento_id || null
+                    nivel_acesso: 'operador',
+                    evento_id
                 }
             });
 
@@ -160,20 +148,20 @@ class AuthController {
                 });
             }
 
-            // Criar perfil com status 'pendente' e permissões default
+            // Criar perfil com status 'pendente' — sempre operador
             const { error: perfilError } = await supabase
                 .from('perfis')
                 .insert({
                     id: data.user.id,
                     nome_completo,
-                    nivel_acesso: nivel_acesso || 'operador',
-                    evento_id: evento_id || null,
+                    nivel_acesso: 'operador',
+                    evento_id,
                     status: 'pendente',
                     permissions: {
                         dashboard: true,
-                        empresas: nivel_acesso === 'master' || nivel_acesso === 'admin_master',
-                        pessoas: nivel_acesso === 'master' || nivel_acesso === 'admin_master',
-                        auditoria_documentos: nivel_acesso === 'master' || nivel_acesso === 'admin_master',
+                        empresas: false,
+                        pessoas: false,
+                        auditoria_documentos: false,
                         monitoramento: true,
                         relatorios: true,
                         checkin: true,
@@ -486,23 +474,20 @@ class AuthController {
     async updateUser(req, res) {
         try {
             const { id: userId } = req.params;
-            const { nome_completo, foto_url, evento_id, nivel_acesso } = req.body;
+            const { nome_completo, foto_url, evento_id } = req.body;
 
             // Só admin_master pode editar outros usuários
             if (req.user?.nivel_acesso !== 'admin_master' && userId !== req.user.id) {
-                return res.status(403).json({
-                    error: 'Apenas admin_master pode editar outros usuários.'
-                });
+                return res.status(403).json({ error: 'Sem permissão para editar este usuário' });
             }
 
             const updateData = { updated_at: new Date() };
             if (nome_completo) updateData.nome_completo = nome_completo;
             if (foto_url) updateData.foto_url = foto_url;
-            if (nivel_acesso) updateData.nivel_acesso = nivel_acesso;
             
-            // Permitir null para evento_id (usuário global)
-            if (req.body.hasOwnProperty('evento_id')) {
-                updateData.evento_id = evento_id || null;
+            // Atualizar evento vinculado (obrigatório para operadores)
+            if (req.body.hasOwnProperty('evento_id') && evento_id) {
+                updateData.evento_id = evento_id;
             }
 
             const { data, error } = await supabase

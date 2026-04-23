@@ -28,9 +28,9 @@ const SearchWrapper = styled(Box)(({ theme }) => ({
 
 const RoleChip = styled(Chip)(({ role }) => ({
     fontWeight: 700, fontSize: '0.65rem', height: 24, textTransform: 'uppercase',
-    background: role === 'admin_master' || role === 'master' ? 'rgba(0, 212, 255, 0.1)' : 'rgba(0, 212, 255, 0.05)',
-    color: role === 'admin_master' || role === 'master' ? '#00D4FF' : '#fff',
-    border: `1px solid ${role === 'admin_master' || role === 'master' ? 'rgba(0, 212, 255, 0.2)' : 'rgba(255,255,255,0.1)'}`
+    background: role === 'admin_master' ? 'rgba(0, 212, 255, 0.1)' : 'rgba(0, 212, 255, 0.05)',
+    color: role === 'admin_master' ? '#00D4FF' : '#fff',
+    border: `1px solid ${role === 'admin_master' ? 'rgba(0, 212, 255, 0.2)' : 'rgba(255,255,255,0.1)'}`
 }));
 
 const StatusChip = styled(Chip)(({ status }) => ({
@@ -56,9 +56,8 @@ const Usuarios = () => {
     const { user: currentUser } = useAuth();
     const [newPassword, setNewPassword] = useState('');
 
-    // Definição da Hierarquia de Peso
-    const roleWeights = { admin_master: 2, master: 2, admin: 0, supervisor: 0, operador: 1 };
-    const currentUserWeight = roleWeights[currentUser?.nivel_acesso] || 1;
+    // admin_master pode gerenciar todos; operador não gerencia ninguém
+    const isAdmin = currentUser?.nivel_acesso === 'admin_master';
 
     const columns = [
         {
@@ -79,20 +78,18 @@ const Usuarios = () => {
         { id: 'cpf', label: 'CPF', minWidth: 150 },
         {
             id: 'nivel_acesso', label: 'CARGO', minWidth: 100,
-            format: (val) => {
-                const isAdmin = val === 'admin_master' || val === 'master';
-                return (
+            format: (val) => (
                 <RoleChip 
                     role={val} 
-                    label={val === 'operador' ? 'OPERADOR' : (val === 'admin_master' ? 'ADMIN MASTER' : val.toUpperCase())} 
+                    label={val === 'admin_master' ? 'ADMIN MASTER' : 'OPERADOR'} 
                     sx={{ 
-                        background: isAdmin ? 'rgba(0, 212, 255, 0.2)' : 'rgba(255,255,255,0.05)',
-                        color: isAdmin ? '#00D4FF' : '#fff',
-                        border: `1px solid ${isAdmin ? '#00D4FF' : 'rgba(255,255,255,0.1)'}`,
-                        boxShadow: isAdmin ? '0 0 10px rgba(0, 212, 255, 0.3)' : 'none'
+                        background: val === 'admin_master' ? 'rgba(0, 212, 255, 0.2)' : 'rgba(255,255,255,0.05)',
+                        color: val === 'admin_master' ? '#00D4FF' : '#fff',
+                        border: `1px solid ${val === 'admin_master' ? '#00D4FF' : 'rgba(255,255,255,0.1)'}`,
+                        boxShadow: val === 'admin_master' ? '0 0 10px rgba(0, 212, 255, 0.3)' : 'none'
                     }}
                 />
-            )}
+            )
         },
         {
             id: 'status', label: 'STATUS', minWidth: 100,
@@ -120,8 +117,7 @@ const Usuarios = () => {
         {
             id: 'acoes', label: 'AÇÕES', minWidth: 100, align: 'center',
             format: (_, row) => {
-                const targetWeight = roleWeights[row.nivel_acesso] || 1;
-                const canManage = currentUserWeight > targetWeight || (currentUser?.nivel_acesso === 'admin_master') || (currentUser?.nivel_acesso === 'master');
+                const canManage = isAdmin && row.nivel_acesso !== 'admin_master';
 
                 return (
                     <Stack direction="row" spacing={1} justifyContent="center">
@@ -143,7 +139,7 @@ const Usuarios = () => {
                         {row.status !== 'pendente' && (
                             <Tooltip title={canManage ? "Ativar/Inativar" : "Privilégio Insuficiente"}>
                                 <span>
-                                    <Switch size="small" checked={row.status === 'ativo'} disabled={!canManage || row.nivel_acesso === 'master'} onChange={() => handleToggleStatus(row.id, row.status)} color="info" />
+                                    <Switch size="small" checked={row.status === 'ativo'} disabled={!canManage} onChange={() => handleToggleStatus(row.id, row.status)} color="info" />
                                 </span>
                             </Tooltip>
                         )}
@@ -188,23 +184,9 @@ const Usuarios = () => {
                             <TextField label="Email" fullWidth value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
                         )}
 
-                        <FormControl fullWidth>
-                            <InputLabel>Nível de Acesso</InputLabel>
-                            <Select value={formData.nivel_acesso} label="Nível de Acesso" onChange={(e) => setFormData({ ...formData, nivel_acesso: e.target.value })}>
-                                {(currentUser?.nivel_acesso === 'master' || currentUser?.nivel_acesso === 'admin_master') && (
-                                    <MenuItem value="master">MASTER (GOD MODE)</MenuItem>
-                                )}
-                                <MenuItem value="admin_master">ADMIN MASTER</MenuItem>
-                                <MenuItem value="admin">ADMINISTRADOR</MenuItem>
-                                <MenuItem value="supervisor">SUPERVISOR</MenuItem>
-                                <MenuItem value="operador">OPERADOR</MenuItem>
-                            </Select>
-                        </FormControl>
-
-                        <FormControl fullWidth>
+                        <FormControl fullWidth required>
                             <InputLabel>Evento Vinculado</InputLabel>
                             <Select value={formData.evento_id} label="Evento Vinculado" onChange={(e) => setFormData({ ...formData, evento_id: e.target.value })}>
-                                <MenuItem value="">A2 Eventos / NZT Central (Global)</MenuItem>
                                 {eventos.map(e => <MenuItem key={e.id} value={e.id}>{e.nome}</MenuItem>)}
                             </Select>
                         </FormControl>
