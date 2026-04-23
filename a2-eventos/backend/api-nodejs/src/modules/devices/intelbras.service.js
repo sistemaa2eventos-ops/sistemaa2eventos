@@ -45,7 +45,7 @@ class IntelbrasService extends AccessDevice {
             const arrayBuffer = await res.arrayBuffer();
             return Buffer.from(arrayBuffer);
         } catch (error) {
-            logger.error(`❌ [Intelbras] Snapshot error on ${this.ip}: ${error.message}`);
+            logger.error({ err: error, device_ip: this.ip }, 'Error capturing snapshot');
             throw error;
         }
     }
@@ -60,7 +60,7 @@ class IntelbrasService extends AccessDevice {
         try {
             const queryString = new URLSearchParams(params).toString();
             const url = `${this.baseUrl}${path}?${queryString}`;
-            logger.debug(`[Intelbras] [GET] URL: ${url} (User: ${this.user})`);
+            logger.debug('Intelbras GET request', { device_ip: this.ip, path, user: this.user });
 
             const client = await this.getDigestClient();
             const res = await client.fetch(url, {
@@ -70,13 +70,13 @@ class IntelbrasService extends AccessDevice {
 
             const text = await res.text();
             if (!res.ok) {
-                logger.error(`[Intelbras] [GET] Failed: ${res.status} ${res.statusText} - Body: ${text}`);
+                logger.error({ device_ip: this.ip, status: res.status }, 'Intelbras GET failed');
                 throw new Error(`Request failed with status code ${res.status}: ${text}`);
             }
             return text;
         } catch (error) {
             if (error.name === 'AbortError') {
-                logger.error(`[Intelbras] [GET] Timeout after 10s: ${path}`);
+                logger.error({ device_ip: this.ip, path }, 'Intelbras GET timeout');
                 throw new Error('Dispositivo indisponível (Timeout)');
             }
             throw error;
@@ -95,7 +95,7 @@ class IntelbrasService extends AccessDevice {
         try {
             const queryString = new URLSearchParams(params).toString();
             const url = `${this.baseUrl}${path}${queryString ? '?' + queryString : ''}`;
-            logger.debug(`[Intelbras] [POST] URL: ${url} (Content-Type: ${contentType})`);
+            logger.debug('Intelbras POST request', { device_ip: this.ip, path, content_type: contentType });
 
             const client = await this.getDigestClient();
             const res = await client.fetch(url, {
@@ -107,13 +107,13 @@ class IntelbrasService extends AccessDevice {
 
             const text = await res.text();
             if (!res.ok) {
-                logger.error(`[Intelbras] [POST] Failed: ${res.status} ${res.statusText} - Body: ${text}`);
+                logger.error({ device_ip: this.ip, status: res.status }, 'Intelbras POST failed');
                 throw new Error(`Request failed with status code ${res.status}: ${text}`);
             }
             return text;
         } catch (error) {
             if (error.name === 'AbortError') {
-                logger.error(`[Intelbras] [POST] Timeout: ${path}`);
+                logger.error({ device_ip: this.ip, path }, 'Intelbras POST timeout');
                 throw new Error('Dispositivo indisponível ou rede lenta (Timeout)');
             }
             throw error;
@@ -150,13 +150,13 @@ class IntelbrasService extends AccessDevice {
             if (fotoBase64) {
                 const sizeInBytes = (fotoBase64.length * 3) / 4;
                 if (sizeInBytes > 200000) { // > 200KB
-                    logger.warn(`⚠️ [Intelbras] Foto para ${safeName} é muito grande (${Math.round(sizeInBytes/1024)}KB). Pode falhar no terminal.`);
+                    logger.warn('Large photo may fail on terminal', { person_name: safeName, size_kb: Math.round(sizeInBytes/1024) });
                 }
             } else {
-                logger.warn(`⚠️ [Intelbras] Tentativa de cadastro sem foto para ${safeName}`);
+                logger.warn('Registration attempt without photo', { person_name: safeName });
             }
 
-            logger.info(`📸 [Intelbras] Cadastrando (V2): ${safeName} (ID Hardware: ${hwUserId}) no IP: ${this.ip}`);
+            logger.info('Registering person on Intelbras (V2)', { person_name: safeName, hw_user_id: hwUserId, device_ip: this.ip });
 
             // 1. Criar/Atualizar Usuário (payload mínimo compatível com SS 5541)
             const userData = {
