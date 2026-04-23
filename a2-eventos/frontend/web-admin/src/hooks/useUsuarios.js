@@ -134,8 +134,8 @@ export const useUsuarios = () => {
                 enqueueSnackbar('E-mail é obrigatório.', { variant: 'warning' });
                 return;
             }
-            if (!formData.evento_id) {
-                enqueueSnackbar('Evento é obrigatório.', { variant: 'warning' });
+            if (!formData.evento_id && formData.nivel_acesso === 'operador') {
+                enqueueSnackbar('O vínculo com um evento é obrigatório para operadores.', { variant: 'warning' });
                 return;
             }
 
@@ -147,7 +147,7 @@ export const useUsuarios = () => {
                 // Sependente, atualizar evento
                 if (formData.evento_id !== selectedUser.evento_id) {
                     await api.put(`/auth/users/${selectedUser.id}`, {
-                        evento_id: formData.evento_id,
+                    evento_id: formData.evento_id || null,
                         nome_completo: formData.nome_completo
                     });
                 }
@@ -157,8 +157,8 @@ export const useUsuarios = () => {
                 await api.post('/auth/invite', {
                     email: formData.email,
                     nome_completo: formData.nome_completo,
-                    nivel_acesso: 'operador',
-                    evento_id: formData.evento_id
+                    nivel_acesso: formData.nivel_acesso || 'operador',
+                    evento_id: formData.evento_id || null
                 });
                 enqueueSnackbar('Convite enviado!', { variant: 'success' });
             }

@@ -129,26 +129,27 @@ class AuthController {
                 });
             }
 
-            // Só operador pode ser criado por meio de convite
-            if (nivel_acesso !== 'operador') {
-                return res.status(400).json({
-                    error: 'Apenas operadores podem ser criados via convite.'
+            // Validar permissão para níveis superiores
+            if (nivel_acesso !== 'operador' && req.user?.nivel_acesso !== 'admin_master') {
+                return res.status(403).json({
+                    error: 'Apenas admin_master pode criar usuários de nível superior.'
                 });
             }
 
-            // Validar campos obrigatórios
-            if (!email || !nome_completo || !evento_id) {
+            // Validar campos obrigatórios (evento_id é opcional para níveis superiores/master)
+            if (!email || !nome_completo || (nivel_acesso === 'operador' && !evento_id)) {
                 return res.status(400).json({
-                    error: 'Email, nome completo e evento são obrigatórios'
+                    error: 'Email, nome completo e evento (para operadores) são obrigatórios'
                 });
             }
 
-            // Criar convite no Supabase Auth
+            // Criar convite no Supabase Auth com link de redirecionamento para o frontend
             const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
+                redirectTo: `${process.env.FRONTEND_URL || 'https://painel.nzt.app.br'}/reset-password`,
                 data: {
                     nome_completo,
                     nivel_acesso,
-                    evento_id
+                    evento_id: evento_id || null
                 }
             });
 
@@ -165,18 +166,18 @@ class AuthController {
                 .insert({
                     id: data.user.id,
                     nome_completo,
-                    nivel_acesso: 'operador',
-                    evento_id,
+                    nivel_acesso: nivel_acesso || 'operador',
+                    evento_id: evento_id || null,
                     status: 'pendente',
                     permissions: {
                         dashboard: true,
-                        empresas: false,
-                        pessoas: false,
-                        auditoria_documentos: false,
-                        monitoramento: false,
-                        relatorios: false,
-                        checkin: false,
-                        checkout: false
+                        empresas: nivel_acesso === 'master' || nivel_acesso === 'admin_master',
+                        pessoas: nivel_acesso === 'master' || nivel_acesso === 'admin_master',
+                        auditoria_documentos: nivel_acesso === 'master' || nivel_acesso === 'admin_master',
+                        monitoramento: true,
+                        relatorios: true,
+                        checkin: true,
+                        checkout: true
                     }
                 });
 

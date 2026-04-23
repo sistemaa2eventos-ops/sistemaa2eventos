@@ -191,7 +191,12 @@ const Usuarios = () => {
                         <FormControl fullWidth>
                             <InputLabel>Nível de Acesso</InputLabel>
                             <Select value={formData.nivel_acesso} label="Nível de Acesso" onChange={(e) => setFormData({ ...formData, nivel_acesso: e.target.value })}>
-                                {currentUser?.nivel_acesso === 'master' && <MenuItem value="master">MASTER (GOD MODE)</MenuItem>}
+                                {(currentUser?.nivel_acesso === 'master' || currentUser?.nivel_acesso === 'admin_master') && (
+                                    <MenuItem value="master">MASTER (GOD MODE)</MenuItem>
+                                )}
+                                <MenuItem value="admin_master">ADMIN MASTER</MenuItem>
+                                <MenuItem value="admin">ADMINISTRADOR</MenuItem>
+                                <MenuItem value="supervisor">SUPERVISOR</MenuItem>
                                 <MenuItem value="operador">OPERADOR</MenuItem>
                             </Select>
                         </FormControl>
