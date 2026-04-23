@@ -44,7 +44,7 @@ class HikvisionService extends AccessDevice {
             const arrayBuffer = await res.arrayBuffer();
             return Buffer.from(arrayBuffer);
         } catch (error) {
-            logger.error(`❌ [Hikvision] Snapshot error on ${this.ip}: ${error.message}`);
+            logger.error({ err: error, device_ip: this.ip }, 'Error capturing snapshot');
             throw error;
         }
     }
@@ -74,7 +74,7 @@ class HikvisionService extends AccessDevice {
             }
             return text;
         } catch (error) {
-            logger.error(`❌ [Hikvision ISAPI] Erro: ${error.message}`);
+            logger.error({ err: error, device_ip: this.ip }, 'ISAPI request failed');
             throw error;
         } finally {
             clearTimeout(timeout);
@@ -87,7 +87,7 @@ class HikvisionService extends AccessDevice {
     async enrollUser(pessoa, fotoBase64) {
         try {
             const hwUserId = pessoa.cpf ? pessoa.cpf.replace(/\D/g, '') : pessoa.id.split('-')[0];
-            logger.info(`📸 [Hikvision] Cadastrando: ${pessoa.nome} (ID: ${hwUserId}) no IP: ${this.ip}`);
+            logger.info('Registering person on Hikvision', { person_name: pessoa.nome, hw_user_id: hwUserId, device_ip: this.ip });
 
             // 1. Criar UserInfo via ISAPI
             const userInfo = {
@@ -119,10 +119,10 @@ class HikvisionService extends AccessDevice {
             };
 
             // Envio simplificado: Firmware moderno aceita payload json base64, firmware legado exige multipart.
-            logger.info(`✅ [Hikvision] Sincronização concluída: ${pessoa.nome}`);
+            logger.info('Person successfully registered on device', { person_name: pessoa.nome, device_ip: this.ip });
             return true;
         } catch (error) {
-            logger.error(`❌ [Hikvision] Falha no Enroll de ${pessoa.nome}`);
+            logger.error({ err: error, person_name: pessoa?.nome, device_ip: this.ip }, 'Failed to register person');
             throw error;
         }
     }
@@ -152,7 +152,7 @@ class HikvisionService extends AccessDevice {
     async unlockDoor() {
         try {
             await this._request('/ISAPI/AccessControl/RemoteControl/door/1', 'PUT', '<RemoteControlDoor><cmd>remainOpen</cmd></RemoteControlDoor>', 'application/xml');
-            logger.info(`🔓 [Hikvision] Porta LIBERADA permanentemente: ${this.ip}`);
+            logger.info('Door unlocked', { device_ip: this.ip, action: 'unlock' });
             return true;
         } catch (e) { return false; }
     }
@@ -161,7 +161,7 @@ class HikvisionService extends AccessDevice {
     async lockDoor() {
         try {
             await this._request('/ISAPI/AccessControl/RemoteControl/door/1', 'PUT', '<RemoteControlDoor><cmd>remainClosed</cmd></RemoteControlDoor>', 'application/xml');
-            logger.info(`🔒 [Hikvision] Porta TRAVADA permanentemente: ${this.ip}`);
+            logger.info('Door locked', { device_ip: this.ip, action: 'lock' });
             return true;
         } catch (e) { return false; }
     }
@@ -170,7 +170,7 @@ class HikvisionService extends AccessDevice {
     async closeDoor() {
         try {
             await this._request('/ISAPI/AccessControl/RemoteControl/door/1', 'PUT', '<RemoteControlDoor><cmd>normal</cmd></RemoteControlDoor>', 'application/xml');
-            logger.info(`🚪 [Hikvision] Porta retornada ao estado NORMAL: ${this.ip}`);
+            logger.info('Door closed to normal state', { device_ip: this.ip, action: 'close' });
             return true;
         } catch (e) { return false; }
     }
@@ -199,13 +199,13 @@ class HikvisionService extends AccessDevice {
                 </HttpHostNotification>
             </HttpHostNotificationList>`.trim();
 
-            logger.info(`📡 [Hikvision] Configurando HTTP Host 1 em ${this.ip} -> ${serverIp}:${serverPort}`);
-            
+            logger.info('Configuring event push', { device_ip: this.ip, server_ip: serverIp, server_port: serverPort });
+
             await this._request('/ISAPI/Event/notification/httpHosts/1', 'PUT', xmlBody, 'application/xml');
-            
+
             return true;
         } catch (error) {
-            logger.error(`❌ [Hikvision] Falha ao configurar Push: ${error.message}`);
+            logger.error({ err: error, device_ip: this.ip }, 'Failed to configure event push');
             throw error;
         }
     }
