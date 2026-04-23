@@ -3,6 +3,7 @@ const router = express.Router();
 const settingsController = require('./settings.controller');
 const { getDbMetrics } = require('./metrics.controller');
 const { authenticate, checkPermission } = require('../../middleware/auth');
+const { smtpValidators, handleValidationErrors } = require('../../middleware/validators');
 
 // Todas as rotas com autenticação
 router.use(authenticate);

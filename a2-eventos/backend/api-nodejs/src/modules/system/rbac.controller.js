@@ -1,5 +1,6 @@
 const { supabase } = require('../../config/supabase');
 const apiResponse = require('../../utils/apiResponse');
+const logger = require('../../services/logger');
 
 /**
  * Controller para gerenciar a Matríz de Permissões (RBAC) por Evento
@@ -37,7 +38,7 @@ class RbacController {
                 matrix: matrix || []
             });
         } catch (error) {
-            console.error('❌ Erro no RBAC:', error);
+            logger.error({ err: error }, 'Erro ao carregar matriz RBAC');
             return apiResponse.error(res, 'Erro ao carregar matriz: ' + error.message);
         }
     }

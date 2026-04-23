@@ -1,6 +1,7 @@
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const DeviceFactory = require('./adapters/DeviceFactory');
+const { TIMEOUT_CONFIG } = require('../../config/timeouts');
 
 class DeviceController {
 
@@ -317,7 +318,7 @@ class DeviceController {
                 client.destroy();
                 res.status(408).json({ success: false, error: 'Timeout: Terminal não respondeu no tempo limite.' });
             }
-        }, 15000); // Aumentado de 5s para 15s para dispositivos lentos
+        }, TIMEOUT_CONFIG.DEVICE_CONNECTION); // Timeout padronizado em config/timeouts.js
 
         client.connect(porta || 80, ip_address, () => {
             finished = true;
@@ -663,7 +664,7 @@ class DeviceController {
 
                 const timeout = setTimeout(() => {
                     if (!done) { done = true; client.destroy(); resolve({ online: false, latency: null }); }
-                }, 12000); // Aumentado de 4s para 12s
+                }, TIMEOUT_CONFIG.DEVICE_HEALTH_CHECK); // Timeout padronizado
 
                 client.connect(deviceData.porta || 80, deviceData.ip_address, () => {
                     done = true;

@@ -4,6 +4,7 @@ const { authenticate, authorize } = require('../../middleware/auth');
 const { requireEvent } = require('../../middleware/eventMiddleware');
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
+const { deviceValidators, handleValidationErrors } = require('../../middleware/validators');
 
 const deviceController = require('./device.controller');
 
@@ -18,10 +19,20 @@ router.get('/', deviceController.list);
 router.get('/queue', deviceController.getQueue);
 
 // Cadastrar dispositivo (Admin/Supervisor)
-router.post('/', authorize('admin', 'supervisor'), deviceController.create);
+router.post('/',
+  authorize('admin', 'supervisor'),
+  deviceValidators.create,
+  handleValidationErrors,
+  deviceController.create
+);
 
 // Testar conexão
-router.post('/test-connection', authorize('admin', 'supervisor'), deviceController.testConnection);
+router.post('/test-connection',
+  authorize('admin', 'supervisor'),
+  deviceValidators.testConnection,
+  handleValidationErrors,
+  deviceController.testConnection
+);
 
 // Deletar dispositivo (Admin)
 router.delete('/:id', authorize('admin'), deviceController.delete);
@@ -44,7 +55,12 @@ router.get('/:id/snapshot', deviceController.getSnapshot);
 /**
  * Atualizar configuração de dispositivo
  */
-router.put('/:id', authorize('admin', 'supervisor'), deviceController.update);
+router.put('/:id',
+  authorize('admin', 'supervisor'),
+  deviceValidators.update,
+  handleValidationErrors,
+  deviceController.update
+);
 
 // Comandos de Atuação Remota
 router.post('/:id/remote-open', authorize('admin', 'supervisor'), deviceController.remoteOpen);

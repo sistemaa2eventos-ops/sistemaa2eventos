@@ -1,13 +1,20 @@
 // ⏰ CRÍTICO: Definir timezone ANTES de qualquer outro código
 process.env.TZ = 'America/Sao_Paulo';
 
+const dotenv = require('dotenv');
+dotenv.config();
+
+// 🔒 CRÍTICO: Validar environment variables IMEDIATAMENTE após dotenv.config()
+const { validateEnvironment } = require('./config/env');
+const ENV = validateEnvironment();
+
 // FIX 4.2: Sentry deve ser inicializado antes de qualquer outro módulo
 const Sentry = require('@sentry/node');
-if (process.env.SENTRY_DSN) {
+if (ENV.SENTRY_DSN) {
     Sentry.init({
-        dsn: process.env.SENTRY_DSN,
-        environment: process.env.NODE_ENV || 'production',
-        tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+        dsn: ENV.SENTRY_DSN,
+        environment: ENV.NODE_ENV,
+        tracesSampleRate: ENV.NODE_ENV === 'production' ? 0.1 : 1.0,
         integrations: [Sentry.httpIntegration()]
     });
 }
@@ -16,10 +23,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
-const dotenv = require('dotenv');
 const http = require('http');
-
-dotenv.config();
 
 const { testPgConnection } = require('./config/pgEdge');
 const { supabase } = require('./config/supabase');
@@ -179,24 +183,24 @@ app.use('/api/cameras', cameraRoutes);
 app.use('/api/public', rateLimiter.public, publicRoutes); // FIX I-10: rate limiter dedicado para rotas públicas
 
 // ============================================
-// GLOBAL ERROR HANDLER — FIX I-06 + 4.2
+// GLOBAL ERROR HANDLER — FIX CRÍTICO #3
 // Deve vir APÓS todas as rotas.
 // Previne stack traces em produção, centraliza logs e reporta ao Sentry.
 // ============================================
-// eslint-disable-next-line no-unused-vars
-app.use((err, req, res, next) => {
-    const status = err.status || err.statusCode || 500;
-    const isDev = process.env.NODE_ENV === 'development';
-    logger.error({ err, url: req.originalUrl, method: req.method }, 'Erro não tratado capturado pelo global handler');
-    // FIX 4.2: Captura no Sentry apenas erros de servidor (5xx), não erros de cliente (4xx)
-    if (status >= 500 && process.env.SENTRY_DSN) {
-        Sentry.captureException(err);
-    }
-    return res.status(status).json({
-        error: isDev ? err.message : 'Erro interno do servidor.',
-        ...(isDev && { stack: err.stack })
+const { errorHandler } = require('./middleware/errorHandler');
+
+// 404 handler (deve vir antes do error handler)
+app.use((req, res) => {
+    res.status(404).json({
+        success: false,
+        error: 'Rota não encontrada',
+        path: req.path,
+        method: req.method
     });
 });
+
+// Global error handler (deve ser o último middleware)
+app.use(errorHandler);
 
 const websocketService = require('./services/websocketService');
 const PORT = process.env.PORT || 3001;

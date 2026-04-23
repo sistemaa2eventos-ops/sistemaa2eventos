@@ -38,7 +38,7 @@ let pool = null;
 
 async function getConnection() {
     // DESATIVADO: Operação Êxodo Supremo v27.5
-    // console.log('🔌 Conexão SQL Server legado ignorada por design.');
+    // logger.debug('🔌 Conexão SQL Server legado ignorada por design.');
     return null;
 }
 

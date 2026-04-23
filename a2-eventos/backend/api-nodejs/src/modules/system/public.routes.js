@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const rateLimit = require('express-rate-limit');
 const publicController = require('./public.controller');
+const { smtpValidators, handleValidationErrors } = require('../../middleware/validators');
 
 
 // --- 🛡️ LIMITADORES DE TAXA (Hardening de Rotas Públicas) ---
@@ -48,6 +49,10 @@ router.post('/portal/cadastro', publicController.submitCadastro);
 // --- Rota Pública de Teste SMTP (sem autenticação) ---
 // Usada pelo painel administrativo para testar credenciais antes de salvar
 const settingsController = require('./settings.controller');
-router.post('/settings/verify-smtp', settingsController.verifySmtp);
+router.post('/settings/verify-smtp',
+  smtpValidators.verify,
+  handleValidationErrors,
+  settingsController.verifySmtp
+);
 
 module.exports = router;

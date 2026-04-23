@@ -112,7 +112,7 @@ async function uploadImage(bucket, path, fileBuffer, contentType) {
             url: urlData.publicUrl
         };
     } catch (error) {
-        console.error('Erro no upload:', error);
+        logger.error({ err: error }, 'Erro no upload');
         return {
             success: false,
             error: error.message
@@ -134,7 +134,7 @@ async function deleteImage(bucket, path) {
 
         return { success: true };
     } catch (error) {
-        console.error('Erro ao deletar imagem:', error);
+        logger.error({ err: error }, 'Erro ao deletar imagem');
         return {
             success: false,
             error: error.message
@@ -158,7 +158,7 @@ async function getPessoasComFace(eventoId = null) {
     const { data, error } = await query;
 
     if (error) {
-        console.error('Erro ao buscar pessoas com face:', error);
+        logger.error({ err: error }, 'Erro ao buscar pessoas com face');
         return [];
     }
 
@@ -175,7 +175,7 @@ async function registrarLog(logData) {
         .select();
 
     if (error) {
-        console.error('Erro ao registrar log:', error);
+        logger.error({ err: error }, 'Erro ao registrar log');
         return null;
     }
 
@@ -196,7 +196,7 @@ async function atualizarStatusPessoa(pessoaId, status) {
         .select();
 
     if (error) {
-        console.error('Erro ao atualizar status:', error);
+        logger.error({ err: error }, 'Erro ao atualizar status');
         return null;
     }
 
@@ -214,7 +214,7 @@ async function getEventoConfig(eventoId) {
         .single();
 
     if (error) {
-        console.error('Erro ao buscar config do evento:', error);
+        logger.error({ err: error }, 'Erro ao buscar config do evento');
         return null;
     }
 
