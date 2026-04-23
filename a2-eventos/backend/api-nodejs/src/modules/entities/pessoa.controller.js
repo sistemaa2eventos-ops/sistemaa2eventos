@@ -25,7 +25,10 @@ class PessoaController {
 
             return ApiResponse.success(res, result);
         } catch (error) {
-            logger.error('Erro ao listar pessoas:', error);
+            logger.error(
+                { err: error, event_id: req.event?.id },
+                'Error listing people'
+            );
             return ApiResponse.error(res, error.message);
         }
     }
@@ -44,7 +47,10 @@ class PessoaController {
 
             return ApiResponse.success(res, data);
         } catch (error) {
-            logger.error('Erro na busca de pessoas:', error);
+            logger.error(
+                { err: error, search_query: req.query.q, event_id: req.event?.id },
+                'Error searching people'
+            );
             return ApiResponse.error(res, 'Erro interno ao realizar busca');
         }
     }
@@ -77,7 +83,10 @@ class PessoaController {
                 publicUrl: publicUrlData.data.publicUrl
             });
         } catch (error) {
-            logger.error('Erro ao gerar URL pre-assinada (Admin):', error);
+            logger.error(
+                { err: error, event_id: req.event?.id },
+                'Error generating presigned URL'
+            );
             return ApiResponse.error(res, 'Erro ao gerar upload URL');
         }
     }
@@ -97,7 +106,10 @@ class PessoaController {
 
             return ApiResponse.success(res, result, 201);
         } catch (error) {
-            logger.error('Erro ao criar pessoa:', error);
+            logger.error(
+                { err: error, person_name: req.body?.nome_completo, event_id: req.event?.id },
+                'Error creating person'
+            );
             return ApiResponse.error(res, error.message);
         }
     }
@@ -120,7 +132,10 @@ class PessoaController {
 
             return ApiResponse.success(res, data);
         } catch (error) {
-            logger.error('Erro ao alternar bloqueio:', error);
+            logger.error(
+                { err: error, person_id: req.params.id, blocked: req.body?.bloqueado },
+                'Error toggling person block status'
+            );
             return ApiResponse.error(res, error.message);
         }
     }
@@ -136,7 +151,10 @@ class PessoaController {
 
             return ApiResponse.success(res, data);
         } catch (error) {
-            logger.error('Erro ao buscar pessoa por ID:', error);
+            logger.error(
+                { err: error, person_id: req.params.id },
+                'Error fetching person by ID'
+            );
             return ApiResponse.error(res, 'Registro não encontrado', 404);
         }
     }
@@ -155,7 +173,10 @@ class PessoaController {
 
             return ApiResponse.success(res, data);
         } catch (error) {
-            logger.error('Erro ao atualizar pessoa:', error);
+            logger.error(
+                { err: error, person_id: req.params.id, event_id: req.event?.id },
+                'Error updating person'
+            );
             return ApiResponse.error(res, error.message);
         }
     }
@@ -174,7 +195,10 @@ class PessoaController {
 
             return ApiResponse.success(res, { message: 'Participante removido com sucesso.' });
         } catch (error) {
-            logger.error('Erro ao deletar pessoa:', error);
+            logger.error(
+                { err: error, person_id: req.params.id },
+                'Error deleting person'
+            );
             return ApiResponse.error(res, 'Erro ao remover participante');
         }
     }
@@ -190,7 +214,10 @@ class PessoaController {
 
             return ApiResponse.success(res, data);
         } catch (error) {
-            logger.error('Erro ao gerar QR Code:', error);
+            logger.error(
+                { err: error, person_id: req.params.id },
+                'Error generating QR code'
+            );
             // Se for erro de validação (ex: pendente), retorna 400, senão 500
             const status = error.message.includes('pendente') || error.message.includes('vinculada') ? 400 : 500;
             return ApiResponse.error(res, error.message, status);
@@ -240,7 +267,11 @@ class PessoaController {
                 const cpf = currentPessoa.cpf || id;
                 const qrData = await qrGenerator.generate(cpf);
                 updateData.qr_code = qrData.code;
-                logger.info(`QR Code gerado para ${currentPessoa.nome_completo} (ID: ${id})`);
+                logger.info('QR code generated', {
+                    person_id: id,
+                    person_name: currentPessoa.nome_completo,
+                    event_id: req.event?.id
+                });
             }
 
             // 4. Atualizar Status
@@ -253,7 +284,10 @@ class PessoaController {
                 .single();
 
             if (error) {
-                logger.error('Erro no updateStatus:', error);
+                logger.error(
+                    { err: error, person_id: pessoa.id },
+                    'Error in updateStatus'
+                );
                 return ApiResponse.error(res, 'Erro ao atualizar status.', 500);
             }
 
@@ -268,16 +302,25 @@ class PessoaController {
                             empresa.nome,
                             updateData.qr_code
                         );
-                        logger.info(`E-mail de aprovação enviado para ${empresa.email}`);
+                        logger.info('Approval email sent', {
+                            company_id: empresa.id,
+                            company_email: empresa.email
+                        });
                     } catch (emailErr) {
-                        logger.error('Falha ao enviar e-mail:', emailErr.message);
+                        logger.error(
+                            { err: emailErr, company_email: empresa.email },
+                            'Failed to send approval email'
+                        );
                     }
                 }
             }
 
             return ApiResponse.success(res, { success: true, data });
         } catch (error) {
-            logger.error('Erro catch no updateStatus:', error);
+            logger.error(
+                { err: error, person_id: req.params.id },
+                'Error in updateStatus catch'
+            );
             return ApiResponse.error(res, error.message, 500);
         }
     }
@@ -320,7 +363,10 @@ class PessoaController {
                 .eq('evento_id', tenantId);
 
             if (pivotError) {
-                logger.error('Erro ao aprovar pivot:', pivotError);
+                logger.error(
+                    { err: pivotError, person_id: pessoa.id },
+                    'Error approving pivot'
+                );
             }
 
             // 2. Gerar QR Code apenas se não existir
@@ -336,7 +382,10 @@ class PessoaController {
                     .eq('id', id);
 
                 qrCodeGenerated = qrData;
-                logger.info(`QR Code gerado na aprovação: ${pessoa.nome_completo}`);
+                logger.info('QR code generated on approval', {
+                    person_id: pessoa.id,
+                    person_name: pessoa.nome_completo
+                });
             } else {
                 // Apenas atualizar status
                 await supabaseClient
@@ -347,7 +396,11 @@ class PessoaController {
 
             // 3. 🆕 VINCULAR ÁREAS DE ACESSO (novo fluxo)
             if (areas_autorizadas && Array.isArray(areas_autorizadas) && areas_autorizadas.length > 0) {
-                logger.info(`🔐 [Approve] Vinculando ${areas_autorizadas.length} áreas para ${pessoa.nome_completo}...`);
+                logger.info('Linking authorized areas on approval', {
+                    person_id: pessoa.id,
+                    person_name: pessoa.nome_completo,
+                    area_count: areas_autorizadas.length
+                });
 
                 // Limpar áreas antigas (se houver)
                 await supabaseClient
@@ -369,7 +422,10 @@ class PessoaController {
                     .insert(areaVinculos);
 
                 if (vinculoError) {
-                    logger.error('Erro ao vincular áreas:', vinculoError);
+                    logger.error(
+                    { err: vinculoError, person_id: pessoa.id },
+                    'Error linking areas'
+                );
                     return ApiResponse.error(res, 'Erro ao vincular áreas de acesso', 500);
                 }
 
@@ -378,13 +434,24 @@ class PessoaController {
                 setImmediate(async () => {
                     try {
                         const result = await syncService.syncEnrollmentByArea(id);
-                        logger.info(`✅ [Approve] Sync por área concluído: ${result.cadastrados} cadastrados, ${result.removidos} removidos`);
+                        logger.info('Area sync completed on approval', {
+                            registered: result.cadastrados,
+                            removed: result.removidos,
+                            person_id: pessoa.id
+                        });
                     } catch (err) {
-                        logger.error('❌ [Approve] Erro ao sincronizar por área:', err);
+                        logger.error(
+                            { err, person_id: pessoa.id },
+                            'Error syncing by area on approval'
+                        );
                     }
                 });
 
-                logger.info(`✅ [Approve] ${areas_autorizadas.length} áreas vinculadas. Sync iniciado assincronamente.`);
+                logger.info('Areas linked and sync started on approval', {
+                    area_count: areas_autorizadas.length,
+                    person_id: pessoa.id,
+                    async: true
+                });
             }
 
             await auditService.logEntity(req, 'APPROVE_PERSON', 'PESSOAS', id, {
@@ -399,7 +466,10 @@ class PessoaController {
                 areas_sincronizadas: areas_autorizadas?.length || 0
             });
         } catch (error) {
-            logger.error('Erro na aprovação:', error);
+            logger.error(
+                { err: error, person_id: req.params.id },
+                'Error approving person'
+            );
             return ApiResponse.error(res, error.message, 500);
         }
     }
@@ -451,7 +521,10 @@ class PessoaController {
                 message: 'Pessoa reprovada com sucesso'
             });
         } catch (error) {
-            logger.error('Erro na reprovação:', error);
+            logger.error(
+                { err: error, person_id: req.params.id },
+                'Error rejecting person'
+            );
             return ApiResponse.error(res, error.message, 500);
         }
     }
