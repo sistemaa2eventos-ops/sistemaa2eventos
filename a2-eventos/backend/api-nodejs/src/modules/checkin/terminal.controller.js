@@ -75,10 +75,10 @@ class TerminalController {
 
             if (error) throw error;
 
-            logger.info(`Terminal atualizado: ${id}`);
+            logger.info('Terminal updated', { terminal_id: id, event_id: eventoId });
             res.json({ success: true, terminal: data });
         } catch (error) {
-            logger.error('Erro ao atualizar terminal:', error);
+            logger.error({ err: error, terminal_id: id, event_id: eventoId }, 'Failed to update terminal');
             res.status(500).json({ error: 'Erro ao atualizar terminal' });
         }
     }
@@ -96,10 +96,10 @@ class TerminalController {
 
             if (error) throw error;
 
-            logger.info(`Terminal deletado: ${id}`);
+            logger.info('Terminal deleted', { terminal_id: id, event_id: eventoId });
             res.json({ success: true });
         } catch (error) {
-            logger.error('Erro ao deletar terminal:', error);
+            logger.error({ err: error, terminal_id: id, event_id: eventoId }, 'Failed to delete terminal');
             res.status(500).json({ error: 'Erro ao deletar terminal' });
         }
     }
