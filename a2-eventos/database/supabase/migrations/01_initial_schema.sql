@@ -91,9 +91,9 @@ CREATE TABLE IF NOT EXISTS pessoas (
     status_acesso VARCHAR(30) DEFAULT 'pendente' 
         CHECK (status_acesso IN ('autorizado', 'pendente', 'recusado', 'bloqueado', 'verificacao', 'checkin_feito', 'checkout_feito')),
     origem_cadastro VARCHAR(20) DEFAULT 'externo' CHECK (origem_cadastro IN ('interno', 'externo', 'totem')),
-    fase_montagem BOOLEAN DEFAULT false,
-    fase_showday BOOLEAN DEFAULT false,
-    fase_desmontagem BOOLEAN DEFAULT false,
+    fase_montagem BOOLEAN DEFAULT true,
+    fase_showday BOOLEAN DEFAULT true,
+    fase_desmontagem BOOLEAN DEFAULT true,
     bloqueado BOOLEAN DEFAULT false,
     motivo_bloqueio TEXT,
     observacao TEXT,
