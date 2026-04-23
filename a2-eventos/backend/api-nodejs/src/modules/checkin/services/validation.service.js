@@ -24,6 +24,19 @@ class ValidationService {
 
         const hojeLiteral = getHojeLocal();
         
+        logger.info({
+            hojeLiteral,
+            datasMontagem,
+            datasEvento,
+            datasDesmontagem,
+            pessoa_fases: {
+                montagem: pessoa.fase_montagem,
+                showday: pessoa.fase_showday,
+                desmontagem: pessoa.fase_desmontagem
+            },
+            pessoa_nome: pessoa.nome_completo || pessoa.nome
+        }, '[FaseEvento] Diagnóstico de validação de fase');
+
         // Lógica Inclusiva: Identifica todas as fases que ocorrem hoje
         const ocorrendoHoje = {
             montagem: datasMontagem.includes(hojeLiteral),
@@ -33,6 +46,7 @@ class ValidationService {
 
         // Se hoje não está em nenhuma das listas, mas o evento TEM datas, bloqueia por segurança
         if (!ocorrendoHoje.montagem && !ocorrendoHoje.showday && !ocorrendoHoje.desmontagem) {
+            logger.warn({ hojeLiteral, datasMontagem, datasEvento, datasDesmontagem }, '[FaseEvento] Hoje não consta em nenhuma lista de datas do evento — BLOQUEADO');
             return false;
         }
 
@@ -41,7 +55,12 @@ class ValidationService {
         const permitidoShowday = ocorrendoHoje.showday && !!pessoa.fase_showday;
         const permitidoDesmontagem = ocorrendoHoje.desmontagem && !!pessoa.fase_desmontagem;
 
-        return permitidoMontagem || permitidoShowday || permitidoDesmontagem;
+        const resultado = permitidoMontagem || permitidoShowday || permitidoDesmontagem;
+        if (!resultado) {
+            logger.warn({ ocorrendoHoje, permitidoMontagem, permitidoShowday, permitidoDesmontagem, pessoa_nome: pessoa.nome_completo || pessoa.nome }, '[FaseEvento] Pessoa não autorizada para a fase vigente — BLOQUEADO');
+        }
+
+        return resultado;
     }
 
     async getRealtimeStatsInternal(evento_id) {

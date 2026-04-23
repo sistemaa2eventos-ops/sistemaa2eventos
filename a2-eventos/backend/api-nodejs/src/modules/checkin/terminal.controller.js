@@ -16,7 +16,7 @@ class TerminalController {
 
             res.json({ success: true, terminais: data });
         } catch (error) {
-            logger.error('Erro ao listar terminais:', error);
+            logger.error({ err: error, event_id: eventoId }, 'Failed to list terminals');
             res.status(500).json({ error: 'Erro ao listar terminais' });
         }
     }
@@ -43,10 +43,10 @@ class TerminalController {
 
             if (error) throw error;
 
-            logger.info(`Terminal criado: ${nome} (ID: ${data.id})`);
+            logger.info('Terminal created', { terminal_id: data.id, terminal_name: nome, event_id: eventoId });
             res.json({ success: true, terminal: data });
         } catch (error) {
-            logger.error('Erro ao criar terminal:', error);
+            logger.error({ err: error, terminal_name: nome, event_id: eventoId }, 'Failed to create terminal');
             res.status(500).json({ error: 'Erro ao criar terminal' });
         }
     }

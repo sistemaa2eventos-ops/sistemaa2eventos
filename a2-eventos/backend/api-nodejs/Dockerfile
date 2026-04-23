@@ -1,5 +1,10 @@
 FROM node:20-alpine
 
+# Instalar timezone data — Alpine não inclui por padrão
+# Sem isso, TZ=America/Sao_Paulo não funciona corretamente
+RUN apk add --no-cache tzdata
+ENV TZ=America/Sao_Paulo
+
 WORKDIR /app
 
 RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
