@@ -185,8 +185,8 @@ const Checkin = () => {
                         <Typography variant="caption" color="text.secondary">ÚLTIMOS LOGS</Typography>
                         <Stack spacing={1} mt={1}>
                             {recentLogs.slice(0, 3).map(log => (
-                                <Typography key={log.id} variant="caption" noWrap sx={{ opacity: 0.4 }}>
-                                    {log.pessoa_nome || log.pessoas?.nome}: {log.tipo?.toUpperCase()}
+                                <Typography key={log.id} variant="caption" noWrap sx={{ opacity: 0.6 }}>
+                                    {log.pessoa_nome || log.pessoas?.nome_completo || log.pessoas?.nome || 'Pessoa'}: {log.tipo?.toUpperCase() || log.tipo_acesso?.toUpperCase()}
                                 </Typography>
                             ))}
                         </Stack>

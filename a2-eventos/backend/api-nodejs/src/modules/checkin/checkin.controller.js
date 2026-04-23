@@ -112,6 +112,7 @@ class AccessController {
                 logs.forEach(log => {
                     if (log.pessoa_id && pessoasMap[log.pessoa_id]) {
                         log.pessoas = pessoasMap[log.pessoa_id];
+                        log.pessoa_nome = pessoasMap[log.pessoa_id].nome_completo;
                     }
                 });
             }
