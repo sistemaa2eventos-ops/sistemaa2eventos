@@ -1,6 +1,7 @@
 const logger = require('../../services/logger');
 const FormData = require('form-data');
 const AccessDevice = require('./adapters/AccessDevice');
+const { TIMEOUT_CONFIG } = require('../../config/timeouts');
 
 class IntelbrasService extends AccessDevice {
     constructor(config) {
@@ -54,7 +55,7 @@ class IntelbrasService extends AccessDevice {
      */
     async _get(path, params = {}) {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000); // 5s timeout (H-01)
+        const timeout = setTimeout(() => controller.abort(), TIMEOUT_CONFIG.DEVICE_CONNECTION);
 
         try {
             const queryString = new URLSearchParams(params).toString();
@@ -89,7 +90,7 @@ class IntelbrasService extends AccessDevice {
      */
     async _post(path, params = {}, body, contentType = 'application/octet-stream') {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 20000); // 20s timeout para POST (hardware pode responder lentamente)
+        const timeout = setTimeout(() => controller.abort(), TIMEOUT_CONFIG.HARDWARE_CALLBACK);
 
         try {
             const queryString = new URLSearchParams(params).toString();

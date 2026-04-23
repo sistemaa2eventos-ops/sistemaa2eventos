@@ -1,5 +1,6 @@
 const logger = require('../../services/logger');
 const AccessDevice = require('./adapters/AccessDevice');
+const { TIMEOUT_CONFIG } = require('../../config/timeouts');
 
 class HikvisionService extends AccessDevice {
     constructor(config) {
@@ -50,7 +51,7 @@ class HikvisionService extends AccessDevice {
 
     async _request(path, method, body = null, contentType = 'application/json') {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000);
+        const timeout = setTimeout(() => controller.abort(), TIMEOUT_CONFIG.HARDWARE_CALLBACK);
 
         try {
             const url = `${this.baseUrl}${path}`;

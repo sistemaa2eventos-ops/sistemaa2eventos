@@ -1,5 +1,6 @@
 const { supabase } = require('../config/supabase');
 const logger = require('./logger');
+const { TIMEOUT_CONFIG } = require('../config/timeouts');
 
 /**
  * Serviço de Dispatch de Webhooks
@@ -55,7 +56,7 @@ class WebhookDispatcher {
             for (let attempt = 1; attempt <= this.retryAttempts; attempt++) {
                 try {
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 10000);
+                    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_CONFIG.API_REQUEST);
 
                     const response = await fetch(url, {
                         method: 'POST',
