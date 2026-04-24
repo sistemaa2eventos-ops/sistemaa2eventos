@@ -67,3 +67,24 @@ __pycache__/
 .Python
 venv/
 env/
+
+# ===== CLEANUP RULES (Phase 1 Audit 2026-04-23) =====
+
+# Root-level duplicates (canonical source is a2-eventos/)
+/gateway/
+/frontend/
+/appnzt/
+
+# Deploy scripts with credentials — NEVER commit
+temp_deploy.sh
+SCRIPT_PRONTO_COPIAR_COLAR.sh
+SCRIPT_FINAL_VALIDADO.sh
+
+# Docker-compose backups — should not be in git
+docker-compose.yml.backup.*
+
+# Outdated encoded configs
+*.b64
+
+# Build artifacts
+*.tar.gz

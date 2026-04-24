@@ -200,10 +200,10 @@ post_deploy_check() {
         log_error "Backend não respondeu"
     fi
 
-    # 3. Health check frontend
+    # 3. Health check frontend (admin-web nao expoe porta — testar via container)
     log_info "Testando frontend..."
-    if curl -s http://localhost:3000 | grep -q "DOCTYPE"; then
-        log_success "Frontend respondendo (http://localhost:3000)"
+    if docker exec a2_eventos_admin_web wget -q --spider http://localhost/ 2>/dev/null; then
+        log_success "Frontend respondendo (admin-web container)"
     else
         log_warn "Frontend pode estar inicializando..."
     fi

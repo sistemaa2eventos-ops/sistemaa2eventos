@@ -491,7 +491,7 @@ SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_EMAIL=sistemaa2eventos@gmail.com
 SMTP_USER=sistemaa2eventos@gmail.com
-SMTP_PASS=sugxuzjwcoytlhtp
+SMTP_PASS=<app-password-do-gmail>  # Gere em: myaccount.google.com → Security → App passwords
 ```
 
 ### **Node Environment**
