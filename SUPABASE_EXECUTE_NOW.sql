@@ -17,7 +17,7 @@
 -- FASE 1: CORREÇÃO DE ERRORS
 -- ════════════════════════════════════════════════════════════════════════════════════
 
-\echo '=== FASE 1: Corrigindo VIEW ==='
+-- FASE 1: Corrigindo VIEW
 
 DROP VIEW IF EXISTS view_documentos_pendentes CASCADE;
 CREATE VIEW view_documentos_pendentes AS
@@ -35,13 +35,13 @@ FROM empresa_documentos d
 LEFT JOIN empresas e ON e.id = d.empresa_id
 WHERE d.status = 'pendente';
 
-\echo '✅ View recriada com SECURITY INVOKER'
+-- echo '✅ View recriada com SECURITY INVOKER'
 
 -- ════════════════════════════════════════════════════════════════════════════════════
 -- FASE 2: CORREÇÃO DE WARNINGS
 -- ════════════════════════════════════════════════════════════════════════════════════
 
-\echo '=== FASE 2a: Removendo políticas inseguras ==='
+-- echo '=== FASE 2a: Removendo políticas inseguras ==='
 
 DO $$
 DECLARE
@@ -57,9 +57,9 @@ BEGIN
     END LOOP;
 END $$;
 
-\echo '✅ Políticas "allow_all" removidas'
+-- echo '✅ Políticas "allow_all" removidas'
 
-\echo '=== FASE 2b: Corrigindo search_path em funções ==='
+-- echo '=== FASE 2b: Corrigindo search_path em funções ==='
 
 DO $$
 DECLARE
@@ -77,13 +77,13 @@ BEGIN
     END LOOP;
 END $$;
 
-\echo '✅ Search_path configurado em todas as funções'
+-- echo '✅ Search_path configurado em todas as funções'
 
 -- ════════════════════════════════════════════════════════════════════════════════════
 -- FASE 3: CRIAÇÃO DE POLÍTICAS DE SEGURANÇA (RLS)
 -- ════════════════════════════════════════════════════════════════════════════════════
 
-\echo '=== FASE 3: Criando RLS Policies ==='
+-- echo '=== FASE 3: Criando RLS Policies ==='
 
 -- TABELAS PRINCIPAIS
 -- ════════════════════════════════════════════════════════════════════════════════════
@@ -280,13 +280,13 @@ DROP POLICY IF EXISTS service_access ON consent_records;
 CREATE POLICY "master_access" ON consent_records FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') = 'master');
 CREATE POLICY "service_access" ON consent_records FOR ALL USING ((auth.jwt() ->> 'role') = 'service_role');
 
-\echo '✅ RLS Policies criadas para 20+ tabelas'
+-- echo '✅ RLS Policies criadas para 20+ tabelas'
 
 -- ════════════════════════════════════════════════════════════════════════════════════
 -- VERIFICAÇÃO FINAL
 -- ════════════════════════════════════════════════════════════════════════════════════
 
-\echo '=== VERIFICAÇÃO FINAL ==='
+-- echo '=== VERIFICAÇÃO FINAL ==='
 
 SELECT
     '✅ SEGURANÇA CORRIGIDA!' AS status,
