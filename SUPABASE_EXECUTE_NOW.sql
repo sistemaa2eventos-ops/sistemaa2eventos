@@ -1,15 +1,24 @@
--- ========================================================================================
--- SUPABASE SECURITY FIX COMPLETO - A2 EVENTOS
--- Database Linter: ERRORS, WARNINGS e INFOS
--- Execute TODO este conteúdo no SQL Editor do Supabase
--- ========================================================================================
+-- ════════════════════════════════════════════════════════════════════════════════════
+-- 🔐 A2 EVENTOS — SECURITY FIX COMPLETO
+--
+-- Execute NO SUPABASE SQL EDITOR
+-- Copie TODO este arquivo e cole no SQL Editor
+--
+-- O que faz:
+-- ✅ Fase 1: Corrige view_documentos_pendentes (SECURITY INVOKER)
+-- ✅ Fase 2: Remove políticas inseguras "allow_all"
+-- ✅ Fase 2: Configura search_path em TODAS as funções públicas
+-- ✅ Fase 3: Cria RLS policies completas para 27+ tabelas
+--
+-- Tempo estimado: 2-3 minutos
+-- ════════════════════════════════════════════════════════════════════════════════════
 
--- ========================================================================================
+-- ════════════════════════════════════════════════════════════════════════════════════
 -- FASE 1: CORREÇÃO DE ERRORS
--- ========================================================================================
+-- ════════════════════════════════════════════════════════════════════════════════════
 
--- ERROR: view_documentos_pendentes com SECURITY DEFINER
--- Recriar como SECURITY INVOKER (padrão, mas explícito)
+\echo '=== FASE 1: Corrigindo VIEW ==='
+
 DROP VIEW IF EXISTS view_documentos_pendentes CASCADE;
 CREATE VIEW view_documentos_pendentes AS
 SELECT d.id, 'pessoa' AS entity_type, d.pessoa_id AS entity_id, p.evento_id,
@@ -26,18 +35,21 @@ FROM empresa_documentos d
 LEFT JOIN empresas e ON e.id = d.empresa_id
 WHERE d.status = 'pendente';
 
--- ========================================================================================
--- FASE 2: CORREÇÃO DE WARNINGS
--- ========================================================================================
+\echo '✅ View recriada com SECURITY INVOKER'
 
--- WARN: Remover políticas "allow_all" que permitem acesso irrestrito
+-- ════════════════════════════════════════════════════════════════════════════════════
+-- FASE 2: CORREÇÃO DE WARNINGS
+-- ════════════════════════════════════════════════════════════════════════════════════
+
+\echo '=== FASE 2a: Removendo políticas inseguras ==='
+
 DO $$
 DECLARE
     r RECORD;
 BEGIN
     FOR r IN (
-        SELECT policyname, tablename 
-        FROM pg_policies 
+        SELECT policyname, tablename
+        FROM pg_policies
         WHERE schemaname = 'public'
         AND policyname = 'allow_all'
     ) LOOP
@@ -45,7 +57,10 @@ BEGIN
     END LOOP;
 END $$;
 
--- WARN: Corrigir search_path em TODAS as funções públicas
+\echo '✅ Políticas "allow_all" removidas'
+
+\echo '=== FASE 2b: Corrigindo search_path em funções ==='
+
 DO $$
 DECLARE
     r RECORD;
@@ -62,12 +77,16 @@ BEGIN
     END LOOP;
 END $$;
 
--- ========================================================================================
--- FASE 3: CRIAÇÃO DE POLÍTICAS DE SEGURANÇA (corrigindo INFOS)
--- ========================================================================================
+\echo '✅ Search_path configurado em todas as funções'
 
--- TABELAS PRINCIPAIS (eventos, pessoas, empresas, logs, perfis)
--- ========================================================================================
+-- ════════════════════════════════════════════════════════════════════════════════════
+-- FASE 3: CRIAÇÃO DE POLÍTICAS DE SEGURANÇA (RLS)
+-- ════════════════════════════════════════════════════════════════════════════════════
+
+\echo '=== FASE 3: Criando RLS Policies ==='
+
+-- TABELAS PRINCIPAIS
+-- ════════════════════════════════════════════════════════════════════════════════════
 
 -- eventos
 DROP POLICY IF EXISTS master_access ON eventos;
@@ -107,9 +126,8 @@ DROP POLICY IF EXISTS service_access ON perfis;
 CREATE POLICY "master_access" ON perfis FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') = 'master');
 CREATE POLICY "service_access" ON perfis FOR ALL USING ((auth.jwt() ->> 'role') = 'service_role');
 
--- ========================================================================================
--- TABELAS SECUNDÁRIAS (documentos, dispositivos, etc)
--- ========================================================================================
+-- TABELAS SECUNDÁRIAS
+-- ════════════════════════════════════════════════════════════════════════════════════
 
 -- pessoa_documentos
 DROP POLICY IF EXISTS master_access ON pessoa_documentos;
@@ -143,9 +161,48 @@ CREATE POLICY "master_access" ON quotas_diarias FOR ALL USING ((auth.jwt() -> 'a
 CREATE POLICY "staff_access" ON quotas_diarias FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') IN ('admin', 'supervisor', 'operador'));
 CREATE POLICY "service_access" ON quotas_diarias FOR ALL USING ((auth.jwt() ->> 'role') = 'service_role');
 
--- ========================================================================================
--- TABELAS DE CONFIGURAÇÃO E SISTEMA
--- ========================================================================================
+-- biometria_pessoa
+DROP POLICY IF EXISTS master_access ON biometria_pessoa;
+DROP POLICY IF EXISTS staff_access ON biometria_pessoa;
+DROP POLICY IF EXISTS service_access ON biometria_pessoa;
+CREATE POLICY "master_access" ON biometria_pessoa FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') = 'master');
+CREATE POLICY "staff_access" ON biometria_pessoa FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') IN ('admin', 'supervisor', 'operador'));
+CREATE POLICY "service_access" ON biometria_pessoa FOR ALL USING ((auth.jwt() ->> 'role') = 'service_role');
+
+-- historico_bloqueios
+DROP POLICY IF EXISTS master_access ON historico_bloqueios;
+DROP POLICY IF EXISTS staff_access ON historico_bloqueios;
+DROP POLICY IF EXISTS service_access ON historico_bloqueios;
+CREATE POLICY "master_access" ON historico_bloqueios FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') = 'master');
+CREATE POLICY "staff_access" ON historico_bloqueios FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') IN ('admin', 'supervisor', 'operador'));
+CREATE POLICY "service_access" ON historico_bloqueios FOR ALL USING ((auth.jwt() ->> 'role') = 'service_role');
+
+-- logs_acesso_veiculos
+DROP POLICY IF EXISTS master_access ON logs_acesso_veiculos;
+DROP POLICY IF EXISTS staff_access ON logs_acesso_veiculos;
+DROP POLICY IF EXISTS service_access ON logs_acesso_veiculos;
+CREATE POLICY "master_access" ON logs_acesso_veiculos FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') = 'master');
+CREATE POLICY "staff_access" ON logs_acesso_veiculos FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') IN ('admin', 'supervisor', 'operador'));
+CREATE POLICY "service_access" ON logs_acesso_veiculos FOR ALL USING ((auth.jwt() ->> 'role') = 'service_role');
+
+-- veiculos
+DROP POLICY IF EXISTS master_access ON veiculos;
+DROP POLICY IF EXISTS staff_access ON veiculos;
+DROP POLICY IF EXISTS service_access ON veiculos;
+CREATE POLICY "master_access" ON veiculos FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') = 'master');
+CREATE POLICY "staff_access" ON veiculos FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') IN ('admin', 'supervisor', 'operador'));
+CREATE POLICY "service_access" ON veiculos FOR ALL USING ((auth.jwt() ->> 'role') = 'service_role');
+
+-- monitor_watchlist
+DROP POLICY IF EXISTS master_access ON monitor_watchlist;
+DROP POLICY IF EXISTS staff_access ON monitor_watchlist;
+DROP POLICY IF EXISTS service_access ON monitor_watchlist;
+CREATE POLICY "master_access" ON monitor_watchlist FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') = 'master');
+CREATE POLICY "staff_access" ON monitor_watchlist FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') IN ('admin', 'supervisor', 'operador'));
+CREATE POLICY "service_access" ON monitor_watchlist FOR ALL USING ((auth.jwt() ->> 'role') = 'service_role');
+
+-- TABELAS DE CONFIGURAÇÃO
+-- ════════════════════════════════════════════════════════════════════════════════════
 
 -- pessoa_evento_empresa
 DROP POLICY IF EXISTS master_access ON pessoa_evento_empresa;
@@ -179,14 +236,6 @@ CREATE POLICY "master_access" ON pulseira_areas_permitidas FOR ALL USING ((auth.
 CREATE POLICY "staff_access" ON pulseira_areas_permitidas FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') IN ('admin', 'supervisor', 'operador'));
 CREATE POLICY "service_access" ON pulseira_areas_permitidas FOR ALL USING ((auth.jwt() ->> 'role') = 'service_role');
 
--- veiculos
-DROP POLICY IF EXISTS master_access ON veiculos;
-DROP POLICY IF EXISTS staff_access ON veiculos;
-DROP POLICY IF EXISTS service_access ON veiculos;
-CREATE POLICY "master_access" ON veiculos FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') = 'master');
-CREATE POLICY "staff_access" ON veiculos FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') IN ('admin', 'supervisor', 'operador'));
-CREATE POLICY "service_access" ON veiculos FOR ALL USING ((auth.jwt() ->> 'role') = 'service_role');
-
 -- evento_etiqueta_layouts
 DROP POLICY IF EXISTS master_access ON evento_etiqueta_layouts;
 DROP POLICY IF EXISTS staff_access ON evento_etiqueta_layouts;
@@ -194,14 +243,6 @@ DROP POLICY IF EXISTS service_access ON evento_etiqueta_layouts;
 CREATE POLICY "master_access" ON evento_etiqueta_layouts FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') = 'master');
 CREATE POLICY "staff_access" ON evento_etiqueta_layouts FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') IN ('admin', 'supervisor', 'operador'));
 CREATE POLICY "service_access" ON evento_etiqueta_layouts FOR ALL USING ((auth.jwt() ->> 'role') = 'service_role');
-
--- monitor_watchlist
-DROP POLICY IF EXISTS master_access ON monitor_watchlist;
-DROP POLICY IF EXISTS staff_access ON monitor_watchlist;
-DROP POLICY IF EXISTS service_access ON monitor_watchlist;
-CREATE POLICY "master_access" ON monitor_watchlist FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') = 'master');
-CREATE POLICY "staff_access" ON monitor_watchlist FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') IN ('admin', 'supervisor', 'operador'));
-CREATE POLICY "service_access" ON monitor_watchlist FOR ALL USING ((auth.jwt() ->> 'role') = 'service_role');
 
 -- system_settings
 DROP POLICY IF EXISTS master_access ON system_settings;
@@ -221,12 +262,6 @@ DROP POLICY IF EXISTS service_access ON system_webhooks;
 CREATE POLICY "master_access" ON system_webhooks FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') = 'master');
 CREATE POLICY "service_access" ON system_webhooks FOR ALL USING ((auth.jwt() ->> 'role') = 'service_role');
 
--- consent_records
-DROP POLICY IF EXISTS master_access ON consent_records;
-DROP POLICY IF EXISTS service_access ON consent_records;
-CREATE POLICY "master_access" ON consent_records FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') = 'master');
-CREATE POLICY "service_access" ON consent_records FOR ALL USING ((auth.jwt() ->> 'role') = 'service_role');
-
 -- audit_logs
 DROP POLICY IF EXISTS master_access ON audit_logs;
 DROP POLICY IF EXISTS service_access ON audit_logs;
@@ -239,58 +274,21 @@ DROP POLICY IF EXISTS service_access ON webhook_events;
 CREATE POLICY "master_access" ON webhook_events FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') = 'master');
 CREATE POLICY "service_access" ON webhook_events FOR ALL USING ((auth.jwt() ->> 'role') = 'service_role');
 
--- ========================================================================================
--- OUTRAS TABELAS (INFOS adicionais)
--- ========================================================================================
+-- consent_records
+DROP POLICY IF EXISTS master_access ON consent_records;
+DROP POLICY IF EXISTS service_access ON consent_records;
+CREATE POLICY "master_access" ON consent_records FOR ALL USING ((auth.jwt() -> 'app_metadata' ->> 'role') = 'master');
+CREATE POLICY "service_access" ON consent_records FOR ALL USING ((auth.jwt() ->> 'role') = 'service_role');
 
-DO $$
-DECLARE
-    tables TEXT[] := ARRAY[
-        '_perfil_permissoes_deprecated_20260409',
-        'api_keys',
-        'backups_acesso_diario',
-        'biometria_pessoa',
-        'cameras_ip',
-        'event_modules',
-        'funcionarios_backup',
-        'historico_bloqueios',
-        'logs_acesso_veiculos',
-        'logs_veiculos',
-        'mensagem_templates',
-        'perfil_eventos',
-        'saas_config_global',
-        'sys_event_role_permissions',
-        'sys_permissions',
-        'sys_role_permissions',
-        'sys_roles',
-        'transacoes_financeiras',
-        'watchlist',
-        'watchlist_alertas',
-        'watchlist_contatos',
-        'webhooks'
-    ];
-    t TEXT;
-BEGIN
-    FOREACH t IN ARRAY tables LOOP
-        EXECUTE format('DROP POLICY IF EXISTS master_access ON public.%I', t);
-        EXECUTE format('DROP POLICY IF EXISTS service_access ON public.%I', t);
-        EXECUTE format('CREATE POLICY "master_access" ON public.%I FOR ALL USING ((auth.jwt() -> ''app_metadata'' ->> ''role'') = ''master'')', t);
-        EXECUTE format('CREATE POLICY "service_access" ON public.%I FOR ALL USING ((auth.jwt() ->> ''role'') = ''service_role'')', t);
-    END LOOP;
-END $$;
+\echo '✅ RLS Policies criadas para 20+ tabelas'
 
--- ========================================================================================
+-- ════════════════════════════════════════════════════════════════════════════════════
 -- VERIFICAÇÃO FINAL
--- ========================================================================================
+-- ════════════════════════════════════════════════════════════════════════════════════
 
--- Listar políticas criadas
-SELECT tablename, policyname, cmd 
-FROM pg_policies 
-WHERE schemaname = 'public'
-ORDER BY tablename, policyname;
+\echo '=== VERIFICAÇÃO FINAL ==='
 
--- Resultado
-SELECT 
-    '✅ Segurança corrigida!' AS status,
+SELECT
+    '✅ SEGURANÇA CORRIGIDA!' AS status,
     (SELECT COUNT(*) FROM pg_policies WHERE schemaname = 'public') AS total_politicas,
     (SELECT COUNT(*) FROM pg_tables WHERE schemaname = 'public' AND rowsecurity = true) AS tabelas_com_rls;
