@@ -6,19 +6,16 @@
 CERT_PATH="/etc/nginx/certs/origin.pem"
 KEY_PATH="/etc/nginx/certs/origin.key"
 
-# Verificar se os certificados válidos existem (originais da Cloudflare)
+# Verificar se os certificados válidos existem
 if [ -f "$CERT_PATH" ] && [ -f "$KEY_PATH" ]; then
-    # Verificar se é um certificado válido (não auto-assinado temporário)
-    if grep -q "A2Eventos" "$CERT_PATH" 2>/dev/null; then
-        echo "⚠️ Certificado auto-assinado detectado. Regenerando..."
-        rm -f "$CERT_PATH" "$KEY_PATH"
+    # Verificar se é da Cloudflare (certificado de produção)
+    if grep -q "CloudFlare" "$CERT_PATH" 2>/dev/null; then
+        echo "🔐 Certificado Cloudflare Origin encontrado. Iniciando com segurança máxima."
     else
-        echo "🔐 Certificados SSL válidos encontrados. Iniciando com segurança máxima."
+        echo "🔐 Certificados SSL encontrados. Iniciando Nginx."
     fi
-fi
-
-# Se não existem certificados válidos, gerar temporários
-if [ ! -f "$CERT_PATH" ] || [ ! -f "$KEY_PATH" ]; then
+else
+    # Se não existem certificados, gerar temporários
     echo "⚠️ Certificados SSL não encontrados em $CERT_PATH"
     echo "🛠️ Gerando certificados auto-assinados temporários..."
     
