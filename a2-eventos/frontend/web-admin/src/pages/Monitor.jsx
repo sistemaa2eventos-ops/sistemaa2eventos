@@ -252,7 +252,7 @@ const Monitor = () => {
                                         sx={{ fontWeight: 800 }}
                                       />
                                   </TableCell>
-                                  <TableCell>{t.last_seen ? format(new Date(t.last_seen), 'dd/MM HH:mm:ss') : 'Nunca Conectado'}</TableCell>
+                                  <TableCell>{t.ultimo_ping ? format(new Date(t.ultimo_ping), 'dd/MM HH:mm:ss') : 'Nunca Conectado'}</TableCell>
                               </TableRow>
                           ))}
                       </TableBody>

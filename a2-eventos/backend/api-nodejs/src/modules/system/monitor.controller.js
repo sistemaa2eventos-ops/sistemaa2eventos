@@ -57,7 +57,7 @@ class MonitorController {
                 supabase.from('dispositivos_acesso')
                     .select('*', { count: 'exact', head: true })
                     .eq('evento_id', evento_id)
-                    .eq('status', 'online'),
+                    .eq('status_online', 'online'),
 
                 // Últimos check-ins (Resiliente: Sem Join)
                 supabase.from('logs_acesso')
@@ -188,18 +188,18 @@ class MonitorController {
 
             let { data, error } = await supabase
                 .from('dispositivos_acesso')
-                .select('id, nome, tipo, status, area_id, ultimo_heartbeat, evento_areas(nome)')
+                .select('id, nome, tipo, status:status_online, area_id, ultimo_ping, evento_areas(nome)')
                 .eq('evento_id', evento_id)
-                .order('status', { ascending: false });
+                .order('status_online', { ascending: false });
 
             // Fallback: se o join com evento_areas falhar, buscar sem o join
             if (error) {
                 logger.warn('Fallback getTerminais sem join evento_areas:', error.message);
                 const retry = await supabase
                     .from('dispositivos_acesso')
-                    .select('id, nome, tipo, status, area_id, ultimo_heartbeat')
+                    .select('id, nome, tipo, status:status_online, area_id, ultimo_ping')
                     .eq('evento_id', evento_id)
-                    .order('status', { ascending: false });
+                    .order('status_online', { ascending: false });
 
                 if (retry.error) throw retry.error;
                 data = retry.data;

@@ -67,12 +67,14 @@ class IntelbrasController {
                         dispositivoConfig = dispositivo.config || {};
                         deviceAuth = dispositivo;
 
-                        // Atualizar metadata de segurança do dispositivo
+                        // Atualizar metadata de segurança e STATUS ONLINE do dispositivo
                         await supabase
                             .from('dispositivos_acesso')
                             .update({ 
                                 last_push_ip: devIp,
-                                last_push_at: new Date().toISOString()
+                                last_push_at: new Date().toISOString(),
+                                status_online: 'online',
+                                ultimo_ping: new Date().toISOString()
                             })
                             .eq('id', dispositivo.id);
 
@@ -257,15 +259,28 @@ class IntelbrasController {
 
             if (!pessoa) return deny(`Pessoa não encontrada: ${userID}`);
 
-            // 4. Verificar status de acesso
-            const STATUSES_PERMITIDOS = ['autorizado', 'checkin_feito', 'entrada'];
-            const statusOk = STATUSES_PERMITIDOS.includes(pessoa.status_acesso);
+            // 4. Validar políticas de acesso via ValidationService
+            const ValidationService = require('../checkin/services/validation.service');
+            const validation = new ValidationService();
+            const tipoFluxo = config.fluxo || 'checkin';
+            const timestamp = new Date();
 
-            if (!statusOk) return deny(`Status não permite acesso: ${pessoa.status_acesso}`);
+            const validationResult = await validation.validateAccessRules(
+                eventoId, 
+                pessoa, 
+                tipoFluxo === 'toggle' ? 'checkin' : tipoFluxo, 
+                'face', 
+                timestamp, 
+                body?.Similarity || 100, 
+                config.area_id
+            );
+
+            if (!validationResult.allowed) {
+                return deny(`Negado: ${validationResult.error || 'Não autorizado'}`);
+            }
 
             // 5. Registrar log de acesso (não-bloqueante)
             const nome = pessoa.nome_completo || 'Desconhecido';
-            const tipoFluxo = config.fluxo || 'checkin';
 
             checkinService.registrarAcesso(supabase, {
                 pessoa_id: pessoa.id,
@@ -296,9 +311,15 @@ class IntelbrasController {
         const pushToken = req.query.token;
 
         try {
-            let q = supabase.from('dispositivos_acesso');
-            if (pushToken) q = q.update({ status_online: 'online', last_push_at: new Date().toISOString() }).eq('control_token', pushToken);
-            else q = q.update({ status_online: 'online', last_push_at: new Date().toISOString() }).ilike('ip_address', `%${devIp}%`);
+            const updateData = { 
+                status_online: 'online', 
+                ultimo_ping: new Date().toISOString(),
+                last_push_at: new Date().toISOString() 
+            };
+            
+            let q = supabase.from('dispositivos_acesso').update(updateData);
+            if (pushToken) q = q.eq('control_token', pushToken);
+            else q = q.ilike('ip_address', `%${devIp}%`);
             await q;
         } catch (_) {}
 
