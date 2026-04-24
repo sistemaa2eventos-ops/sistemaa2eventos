@@ -10,11 +10,11 @@
 
 -- ERROR: view_documentos_pendentes com SECURITY DEFINER
 -- Recriar como SECURITY INVOKER (padrão, mas explícito)
-DROP VIEW IF EXISTS view_documentos_pendentes;
+DROP VIEW IF EXISTS view_documentos_pendentes CASCADE;
 CREATE VIEW view_documentos_pendentes AS
 SELECT d.id, 'pessoa' AS entity_type, d.pessoa_id AS entity_id, p.evento_id,
        d.titulo, d.tipo_doc, d.url_arquivo, d.status, d.data_inclusao AS created_at,
-       p.nome AS entidade_nome, p.cpf AS entidade_doc
+       p.nome_completo AS entidade_nome, p.cpf AS entidade_doc
 FROM pessoa_documentos d
 LEFT JOIN pessoas p ON p.id = d.pessoa_id
 WHERE d.status = 'pendente'
