@@ -88,3 +88,7 @@ docker-compose.yml.backup.*
 
 # Build artifacts
 *.tar.gz
+
+# Code dump files
+codigo_*.txt
+codigo_completo.txt

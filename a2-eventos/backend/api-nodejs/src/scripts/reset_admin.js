@@ -8,8 +8,13 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 
 async function resetAdmin() {
     try {
-        const email = 'admin@a2eventos.com.br';
-        const password = 'NexusAdmin123!'; // definindo uma senha padrão para o teste
+        const email = process.argv[2] || 'admin@a2eventos.com.br';
+        const password = process.argv[3] || process.env.ADMIN_PASSWORD;
+        if (!password) {
+            console.error('Uso: node reset_admin.js [email] <senha>');
+            console.error('  ou defina ADMIN_PASSWORD no ambiente');
+            process.exit(1);
+        }
 
         console.log(`Buscando usuário ${email}...`);
         const { data: users, error: listError } = await supabase.auth.admin.listUsers();

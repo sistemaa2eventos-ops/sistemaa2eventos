@@ -3,12 +3,16 @@ const { supabasePublic } = require('./src/config/supabase');
 async function testLogin() {
     console.log('🔐 Testando autenticação no Supabase...\n');
 
-    // Use EXATAMENTE os mesmos dados que você criou no SQL
-    const email = 'admin@a2eventos.com.br';
-    const password = 'Admin@2026!';
+    const email = process.argv[2] || 'admin@a2eventos.com.br';
+    const password = process.argv[3] || process.env.TEST_PASSWORD;
+    if (!password) {
+        console.error('Uso: node test-auth.js [email] <senha>');
+        console.error('  ou defina TEST_PASSWORD no ambiente');
+        process.exit(1);
+    }
 
     console.log(`📧 Email: ${email}`);
-    console.log(`🔑 Password: ${password}\n`);
+    console.log(`🔑 Password: ${'*'.repeat(password.length)}\n`);
 
     try {
         const { data, error } = await supabasePublic.auth.signInWithPassword({
