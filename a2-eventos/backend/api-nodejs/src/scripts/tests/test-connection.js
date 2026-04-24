@@ -81,10 +81,14 @@ async function testAll() {
 
             // Testar autenticação (opcional)
             console.log(`\n   🔐 Testando autenticação...`);
-            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+            const testPassword = process.env.TEST_PASSWORD;
+            if (!testPassword) {
+                console.log(`   ⏭️  Login pulado: defina TEST_PASSWORD para testar`);
+            }
+            const { data: authData, error: authError } = testPassword ? await supabase.auth.signInWithPassword({
                 email: 'admin@a2eventos.com.br',
-                password: 'Admin@2026!'
-            });
+                password: testPassword
+            }) : { data: null, error: { message: 'TEST_PASSWORD nao definido' } };
 
             if (authError) {
                 console.log(`   ⚠️  Login não testado: ${authError.message}`);

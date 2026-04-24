@@ -137,7 +137,7 @@ Intelbras Terminal:
 
 Gmail SMTP:
   Email: sistemaa2eventos@gmail.com
-  Senha: sugxuzjwcoytlhtp (App Password)
+  Senha: <app-password-no-env>
   Host: smtp.gmail.com:587
 
 Supabase:

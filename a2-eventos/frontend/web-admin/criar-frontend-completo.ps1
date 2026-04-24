@@ -1707,7 +1707,7 @@ Acesse: http://localhost:3000
 ## Login
 
 - Email: admin@a2eventos.com.br
-- Senha: Admin@2026!
+- Senha: (definida via reset_admin.js)
 
 ## Estrutura
 
@@ -1740,4 +1740,4 @@ Write-Host "   npm install"
 Write-Host "   npm start"
 Write-Host ""
 Write-Host "🌐 Acesse: http://localhost:3000" -ForegroundColor Cyan
-Write-Host "👤 Login: admin@a2eventos.com.br / Admin@2026!" -ForegroundColor Cyan
+Write-Host "👤 Login: admin@a2eventos.com.br / (senha definida via reset_admin.js)" -ForegroundColor Cyan

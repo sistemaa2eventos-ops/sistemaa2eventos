@@ -24,7 +24,7 @@ Acesse: http://localhost:3000
 ## Login
 
 - Email: admin@a2eventos.com.br
-- Senha: Admin@2026!
+- Senha: (definida via `reset_admin.js` ou pelo admin do sistema)
 
 ## Estrutura
 

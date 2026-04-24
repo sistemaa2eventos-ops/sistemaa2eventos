@@ -8,7 +8,8 @@ const http = require('http');
 
 const BASE_URL = 'http://localhost:3001';
 const EMAIL = process.argv[2] || 'admin@a2eventos.com.br';
-const SENHA = process.argv[3] || 'Admin@2026!';
+const SENHA = process.argv[3] || process.env.TEST_PASSWORD;
+if (!SENHA) { console.error('Uso: node test-api.js [email] <senha>  ou defina TEST_PASSWORD'); process.exit(1); }
 
 let token = null;
 let passed = 0;

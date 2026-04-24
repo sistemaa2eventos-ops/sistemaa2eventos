@@ -236,17 +236,17 @@ INTELBRAS_DEFAULT_PASS=admin123
 ```
 SMTP_HOST=smtp.gmail.com
 SMTP_USER=sistemaa2eventos@gmail.com
-SMTP_PASS=sugxuzjwcoytlhtp
+SMTP_PASS=<ver-arquivo-.env>
 ```
 ✅ Credenciais presentes (App Password Gmail)
 
 **Segurança**
 ```
-JWT_SECRET=a2eventos_secret_key_mass_events_2026
-INTERNAL_API_KEY=a2eventos_sync_2026
-SUPABASE_JWT_SECRET=h7RS40u/K3YIPZyF/...
+JWT_SECRET=<ver-arquivo-.env>
+INTERNAL_API_KEY=<ver-arquivo-.env>
+SUPABASE_JWT_SECRET=<ver-arquivo-.env>
 ```
-⚠️ Secrets hardcoded no .env — **CUIDADO EM GIT**
+⚠️ Secrets devem estar APENAS no .env — **NUNCA no git**
 
 **Biometria**
 ```

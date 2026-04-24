@@ -4,7 +4,8 @@ const { v4: uuidv4 } = require('uuid');
 
 const API_URL = process.env.API_URL || 'http://localhost:3001/api';
 // Pegamos um token interno válido, ou usar a key de ambiente se tivermos
-const API_KEY = process.env.INTERNAL_API_KEY || 'a2eventos_sync_2026';
+const API_KEY = process.env.INTERNAL_API_KEY;
+if (!API_KEY) { console.error('Defina INTERNAL_API_KEY no ambiente'); process.exit(1); }
 
 // Precisaremos simular alguns QR Codes válidos ou fazer chamadas para o access/checkin
 async function runConcurrencyTest(numRequests = 50) {

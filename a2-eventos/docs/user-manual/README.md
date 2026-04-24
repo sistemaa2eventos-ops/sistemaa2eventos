@@ -15,7 +15,7 @@ O A2 Eventos é um sistema completo de controle de acesso.
 ## Acesso ao Sistema
 - **Local:** http://localhost:3000
 - **Email:** admin@a2eventos.com.br
-- **Senha:** Admin@2026!
+- **Senha:** (definida no primeiro acesso ou via `reset_admin.js`)
 
 ## Dashboard
 O dashboard exibe estatísticas em tempo real.

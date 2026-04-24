@@ -92,3 +92,6 @@ docker-compose.yml.backup.*
 # Code dump files
 codigo_*.txt
 codigo_completo.txt
+
+# Test scripts with secrets
+test_jwt_integrity.js
