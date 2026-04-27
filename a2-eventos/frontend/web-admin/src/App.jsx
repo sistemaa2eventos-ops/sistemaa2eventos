@@ -11,7 +11,7 @@ import { SnackbarProvider, useSnackbar } from 'notistack';
 import { setGlobalSnackbar } from './services/api';
 
 // Layout
-import Sidebar from './components/layout/Sidebar';
+import MainLayout from './components/layout/MainLayout';
 import { Box } from '@mui/material';
 import ProtectedRoute from './components/common/ProtectedRoute'; // FIX I-09
 
@@ -118,52 +118,49 @@ const AppContent = () => {
   }
 
   return (
-    <Box sx={{ display: 'flex' }}>
-      <Sidebar />
-      <Box component="main" sx={{ flexGrow: 1, bgcolor: 'background.default', minHeight: '100vh' }}>
-        <Suspense fallback={<LoadingOverlay />}>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/eventos" element={<Eventos />} />
-            <Route path="/empresas" element={<ProtectedRoute modulo="empresas"><Empresas /></ProtectedRoute>} />
-            <Route path="/pessoas" element={<ProtectedRoute modulo="pessoas"><Pessoas /></ProtectedRoute>} />
-            <Route path="/auditoria" element={<ProtectedRoute modulo="auditoria_documentos"><AuditoriaDocumental /></ProtectedRoute>} />
-            <Route path="/veiculos" element={<ProtectedRoute modulo="veiculos"><Veiculos /></ProtectedRoute>} />
-            <Route path="/reports" element={<ProtectedRoute modulo="relatorios"><Reports /></ProtectedRoute>} />
-            <Route path="/checkin" element={<ProtectedRoute modulo="checkin"><Checkin /></ProtectedRoute>} />
-            <Route path="/checkout" element={<ProtectedRoute modulo="checkin"><Checkout /></ProtectedRoute>} />
-            <Route path="/monitor" element={<ProtectedRoute modulo="monitoramento"><Monitor /></ProtectedRoute>} />
-            <Route path="/usuarios" element={<ProtectedRoute role="admin_master"><Usuarios /></ProtectedRoute>} />
-            <Route path="/audit-logs" element={<ProtectedRoute role="admin_master"><AuditLogs /></ProtectedRoute>} />
-            <Route path="/configuracoes" element={<ProtectedRoute role="admin_master"><Configuracoes /></ProtectedRoute>} />
-            <Route path="/config/idiomas" element={<ProtectedRoute role="admin_master"><ConfigIdiomas /></ProtectedRoute>} />
-            <Route path="/config/notificacoes" element={<ProtectedRoute role="admin_master"><ConfigNotificacoes /></ProtectedRoute>} />
-            <Route path="/config/integracoes" element={<ProtectedRoute role="admin_master"><ConfigIntegracoes /></ProtectedRoute>} />
-            <Route path="/config/etiquetas" element={<ProtectedRoute role="admin_master"><ConfigEtiquetas /></ProtectedRoute>} />
-            <Route path="/config/dispositivos" element={<ProtectedRoute role="admin_master"><DispositivosPage /></ProtectedRoute>} />
-            <Route path="/config/cameras" element={<ProtectedRoute role="admin_master"><ConfigCameras /></ProtectedRoute>} />
-            <Route path="/config/banco-dados" element={<ProtectedRoute role="admin_master"><ConfigBancoDados /></ProtectedRoute>} />
-            <Route path="/config/credenciamento" element={<ProtectedRoute role="admin_master"><ConfigCredenciamento /></ProtectedRoute>} />
-            <Route path="/config/areas" element={<ProtectedRoute role="admin_master"><ConfigAreas /></ProtectedRoute>} />
-            <Route path="/config/pulseiras" element={<ProtectedRoute role="admin_master"><ConfigPulseiras /></ProtectedRoute>} />
-            <Route path="/config/terminais" element={<ProtectedRoute role="admin_master"><ConfigTerminais /></ProtectedRoute>} />
-            <Route path="/config/checkin" element={<ProtectedRoute role="admin_master"><ConfigCheckin /></ProtectedRoute>} />
-            <Route path="/config/veiculos" element={<ProtectedRoute role="admin_master"><ConfigVeiculos /></ProtectedRoute>} />
-            <Route path="/config/seguranca" element={<ProtectedRoute role="admin_master"><ConfigSeguranca /></ProtectedRoute>} />
-            <Route path="/config/logs" element={<ProtectedRoute role="admin_master"><ConfigLogs /></ProtectedRoute>} />
-            <Route path="/config/comunicacao" element={<ProtectedRoute role="admin_master"><ConfigComunicacao /></ProtectedRoute>} />
-            <Route path="/config/webhooks" element={<ProtectedRoute role="admin_master"><ConfigWebhooks /></ProtectedRoute>} />
-            <Route path="/config/gamificacao" element={<ProtectedRoute role="admin_master"><ConfigGamificacao /></ProtectedRoute>} />
-            <Route path="/config/permissoes" element={<ProtectedRoute role="admin_master"><ConfigPermissoes /></ProtectedRoute>} />
-            <Route path="/config/cron" element={<ProtectedRoute role="admin_master"><ConfigCron /></ProtectedRoute>} />
-            {/* <Route path="/financeiro" element={<Financeiro />} /> */}
-            <Route path="/portal" element={<PortalCadastro />} />
-            <Route path="/login" element={<Navigate to="/" />} />
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </Suspense>
-      </Box>
-    </Box>
+    <MainLayout>
+      <Suspense fallback={<LoadingOverlay />}>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/eventos" element={<Eventos />} />
+          <Route path="/empresas" element={<ProtectedRoute modulo="empresas"><Empresas /></ProtectedRoute>} />
+          <Route path="/pessoas" element={<ProtectedRoute modulo="pessoas"><Pessoas /></ProtectedRoute>} />
+          <Route path="/auditoria" element={<ProtectedRoute modulo="auditoria_documentos"><AuditoriaDocumental /></ProtectedRoute>} />
+          <Route path="/veiculos" element={<ProtectedRoute modulo="veiculos"><Veiculos /></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute modulo="relatorios"><Reports /></ProtectedRoute>} />
+          <Route path="/checkin" element={<ProtectedRoute modulo="checkin"><Checkin /></ProtectedRoute>} />
+          <Route path="/checkout" element={<ProtectedRoute modulo="checkin"><Checkout /></ProtectedRoute>} />
+          <Route path="/monitor" element={<ProtectedRoute modulo="monitoramento"><Monitor /></ProtectedRoute>} />
+          <Route path="/usuarios" element={<ProtectedRoute role="admin_master"><Usuarios /></ProtectedRoute>} />
+          <Route path="/audit-logs" element={<ProtectedRoute role="admin_master"><AuditLogs /></ProtectedRoute>} />
+          <Route path="/configuracoes" element={<ProtectedRoute role="admin_master"><Configuracoes /></ProtectedRoute>} />
+          <Route path="/config/idiomas" element={<ProtectedRoute role="admin_master"><ConfigIdiomas /></ProtectedRoute>} />
+          <Route path="/config/notificacoes" element={<ProtectedRoute role="admin_master"><ConfigNotificacoes /></ProtectedRoute>} />
+          <Route path="/config/integracoes" element={<ProtectedRoute role="admin_master"><ConfigIntegracoes /></ProtectedRoute>} />
+          <Route path="/config/etiquetas" element={<ProtectedRoute role="admin_master"><ConfigEtiquetas /></ProtectedRoute>} />
+          <Route path="/config/dispositivos" element={<ProtectedRoute role="admin_master"><DispositivosPage /></ProtectedRoute>} />
+          <Route path="/config/cameras" element={<ProtectedRoute role="admin_master"><ConfigCameras /></ProtectedRoute>} />
+          <Route path="/config/banco-dados" element={<ProtectedRoute role="admin_master"><ConfigBancoDados /></ProtectedRoute>} />
+          <Route path="/config/credenciamento" element={<ProtectedRoute role="admin_master"><ConfigCredenciamento /></ProtectedRoute>} />
+          <Route path="/config/areas" element={<ProtectedRoute role="admin_master"><ConfigAreas /></ProtectedRoute>} />
+          <Route path="/config/pulseiras" element={<ProtectedRoute role="admin_master"><ConfigPulseiras /></ProtectedRoute>} />
+          <Route path="/config/terminais" element={<ProtectedRoute role="admin_master"><ConfigTerminais /></ProtectedRoute>} />
+          <Route path="/config/checkin" element={<ProtectedRoute role="admin_master"><ConfigCheckin /></ProtectedRoute>} />
+          <Route path="/config/veiculos" element={<ProtectedRoute role="admin_master"><ConfigVeiculos /></ProtectedRoute>} />
+          <Route path="/config/seguranca" element={<ProtectedRoute role="admin_master"><ConfigSeguranca /></ProtectedRoute>} />
+          <Route path="/config/logs" element={<ProtectedRoute role="admin_master"><ConfigLogs /></ProtectedRoute>} />
+          <Route path="/config/comunicacao" element={<ProtectedRoute role="admin_master"><ConfigComunicacao /></ProtectedRoute>} />
+          <Route path="/config/webhooks" element={<ProtectedRoute role="admin_master"><ConfigWebhooks /></ProtectedRoute>} />
+          <Route path="/config/gamificacao" element={<ProtectedRoute role="admin_master"><ConfigGamificacao /></ProtectedRoute>} />
+          <Route path="/config/permissoes" element={<ProtectedRoute role="admin_master"><ConfigPermissoes /></ProtectedRoute>} />
+          <Route path="/config/cron" element={<ProtectedRoute role="admin_master"><ConfigCron /></ProtectedRoute>} />
+          {/* <Route path="/financeiro" element={<Financeiro />} /> */}
+          <Route path="/portal" element={<PortalCadastro />} />
+          <Route path="/login" element={<Navigate to="/" />} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </Suspense>
+    </MainLayout>
   );
 };
 

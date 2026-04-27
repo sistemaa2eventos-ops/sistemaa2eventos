@@ -124,10 +124,10 @@ const Pessoas = () => {
 
 
   return (
-    <Box sx={{ p: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
+    <Box sx={{ p: { xs: 1, md: 4 } }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'flex-start' }, mb: 4, gap: 2 }}>
         <PageHeader title="PAINEL DE PESSOAS" subtitle={eventoIdParam ? `Filtrando pessoas do evento.` : "Visualize e modifique as permissões de acesso biográfico."} breadcrumbs={[{ text: 'Dashboard' }, { text: 'Participantes' }]} />
-        <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mt: { xs: 0, md: 2 }, width: { xs: '100%', md: 'auto' } }}>
           <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleDownloadTemplate} sx={{ borderColor: 'rgba(255,255,255,0.3)', color: '#fff' }}>Baixar Template</Button>
           <Button variant="outlined" startIcon={<UploadIcon />} onClick={() => setOpenImport(true)} sx={{ borderColor: 'rgba(0,255,136,0.3)', color: '#00FF88' }}>Importar Lote</Button>
           <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExport} disabled={saving} sx={{ borderColor: 'rgba(123,47,190,0.5)', color: '#7B2FBE' }}>{saving ? 'Exportando...' : 'Exportar Lote'}</Button>

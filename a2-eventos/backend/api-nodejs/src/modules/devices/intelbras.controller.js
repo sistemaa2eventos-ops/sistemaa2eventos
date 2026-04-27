@@ -260,8 +260,7 @@ class IntelbrasController {
             if (!pessoa) return deny(`Pessoa não encontrada: ${userID}`);
 
             // 4. Validar políticas de acesso via ValidationService
-            const ValidationService = require('../checkin/services/validation.service');
-            const validation = new ValidationService();
+            const validation = require('../checkin/services/validation.service');
             const tipoFluxo = config.fluxo || 'checkin';
             const timestamp = new Date();
 

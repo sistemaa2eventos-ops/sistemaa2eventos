@@ -169,5 +169,33 @@ function checkPermission(recurso, acao) {
     };
 }
 
+/**
+ * Middleware para validar API Key via header X-API-Key ou Authorization Bearer token
+ * Usado por webhooks que não requerem autenticação de usuário
+ */
+function validateApiKey(req, res, next) {
+    const apiKey = req.headers['x-api-key'] || req.headers['authorization']?.replace('Bearer ', '');
 
-module.exports = { authenticate, authorize, validateInternalApiKey, checkPermission, normalize, extractRole };
+    if (!apiKey) {
+        logger.warn(`🚫 Webhook sem API key: ${req.path}`);
+        return res.status(401).json({
+            error: 'API Key obrigatória',
+            code: 'MISSING_API_KEY'
+        });
+    }
+
+    // Validar contra INTERNAL_API_KEY do environment
+    const expectedKey = process.env.INTERNAL_API_KEY || process.env.API_KEY;
+
+    if (apiKey !== expectedKey) {
+        logger.warn(`🚫 API Key inválida para: ${req.path}`);
+        return res.status(403).json({
+            error: 'API Key inválida',
+            code: 'INVALID_API_KEY'
+        });
+    }
+
+    next();
+}
+
+module.exports = { authenticate, authorize, validateInternalApiKey, validateApiKey, checkPermission, normalize, extractRole };

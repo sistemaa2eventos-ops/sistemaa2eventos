@@ -1,0 +1,288 @@
+services:
+  postgres_edge:
+    image: ankane/pgvector:v0.5.1
+    container_name: a2_eventos_pg_edge
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PG_EDGE_USER:-a2_edge_user}
+      POSTGRES_PASSWORD: ${PG_EDGE_PASSWORD:-a2_edge_password}
+      POSTGRES_DB: ${PG_EDGE_DB:-a2_edge_db}
+    volumes:
+      - pg_edge_data:/var/lib/postgresql/data
+      - ./backend/api-nodejs/src/scripts/init_pg_edge.sql:/docker-entrypoint-initdb.d/init_pg_edge.sql
+    networks:
+      - a2_net
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U a2_edge_user -d a2_edge_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  redis:
+    image: redis:7-alpine
+    container_name: a2_eventos_redis
+    restart: unless-stopped
+    command: redis-server --rdbchecksum no --rdb-save-incremental-fsync yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - a2_net
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  api:
+    build:
+      context: ./backend/api-nodejs
+    container_name: a2_eventos_api
+    restart: unless-stopped
+    ports:
+      - "3003:3001"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres_edge:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - TZ=America/Sao_Paulo
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - USE_REDIS=true
+      - PG_EDGE_HOST=postgres_edge
+    env_file:
+      - ./backend/api-nodejs/.env
+    networks:
+      - a2_net
+    healthcheck:
+      test: [ "CMD-SHELL", "node -e \"require('http').get('http://localhost:3001/health', (r) => { if (r.statusCode === 200) process.exit(0); else process.exit(1); }).on('error', () => process.exit(1))\"" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
+
+  gateway:
+    build:
+      context: ./gateway
+    container_name: a2_eventos_gateway
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      api:
+        condition: service_started
+      admin-web:
+        condition: service_started
+      cadastro-web:
+        condition: service_started
+    networks:
+      - a2_net
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./backend/api-nodejs/src/certs:/etc/nginx/certs:ro
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q 'running' /run/nginx.pid || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  admin-web:
+    build:
+      context: ./frontend/web-admin
+      args:
+        VITE_API_URL: /api
+    container_name: a2_eventos_admin_web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      - TZ=America/Sao_Paulo
+      - NODE_ENV=production
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+    networks:
+      - a2_net
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  cadastro-web:
+    build:
+      context: ./frontend/public-web
+    container_name: a2_eventos_cadastro_web
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      - TZ=America/Sao_Paulo
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=${API_URL:-https://api.nzt.app.br}
+      - NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+    networks:
+      - a2_net
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/ || exit 1" ]
+      interval: 45s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+
+  ai_worker:
+    build:
+      context: ./backend/microservice-face-python
+    container_name: a2_eventos_ai_worker
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=America/Sao_Paulo
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - USE_REDIS=true
+    env_file:
+      - ./backend/microservice-face-python/.env
+    networks:
+      - a2_net
+    volumes:
+      - ai_models:/root/.insightface/models
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  camera-service:
+    build:
+      context: ./backend/camera-service
+    container_name: a2_eventos_camera
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres_edge:
+        condition: service_healthy
+      api:
+        condition: service_started
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=America/Sao_Paulo
+      - PG_EDGE_HOST=postgres_edge
+      - PG_EDGE_PORT=5432
+      - PG_EDGE_USER=${PG_EDGE_USER:-a2_edge_user}
+      - PG_EDGE_PASSWORD=${PG_EDGE_PASSWORD:-a2_edge_password}
+      - PG_EDGE_DB=${PG_EDGE_DB:-a2_edge_db}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - A2_API_URL=http://api:3001
+      - A2_API_KEY=${A2_API_KEY:-a2eventos_sync_2026}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - FACE_TOLERANCE=0.55
+      - MIN_FACE_SIZE=150
+      - CONFIDENCE_THRESHOLD=0.65
+      - FRAME_SKIP=3
+    env_file:
+      - ./backend/camera-service/.env
+    volumes:
+      - ai_models:/root/.insightface/models
+      - camera_snapshots:/tmp/camera-snapshots
+    networks:
+      - a2_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  camera-alert-worker:
+    build:
+      context: ./backend/camera-service
+    container_name: a2_eventos_camera_alerts
+    restart: unless-stopped
+    command: ["python", "-m", "src.alert_worker"]
+    depends_on:
+      redis:
+        condition: service_healthy
+      camera-service:
+        condition: service_started
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=America/Sao_Paulo
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_CHANNEL=detections
+      - A2_API_URL=http://api:3001
+      - A2_API_KEY=${A2_API_KEY:-a2eventos_sync_2026}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - STORAGE_BUCKET=camera-snapshots
+      - LOG_LEVEL=INFO
+    env_file:
+      - ./backend/camera-service/.env
+    volumes:
+      - camera_snapshots:/tmp/camera-snapshots
+    networks:
+      - a2_net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+networks:
+  a2_net:
+    driver: bridge
+
+volumes:
+  redis_data:
+  pg_edge_data:
+  ai_models:
+  camera_snapshots:

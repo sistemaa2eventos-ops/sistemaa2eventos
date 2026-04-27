@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, FlatList, Image, ActivityIndicator, RefreshControl } from 'react-native';
+import { StyleSheet, View, FlatList, Image, ActivityIndicator, RefreshControl, TouchableOpacity, ScrollView } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '@/services/apiService';
@@ -7,31 +7,38 @@ import { format } from 'date-fns';
 
 export default function MonitoringScreen() {
     const [logs, setLogs] = useState<any[]>([]);
+    const [cameras, setCameras] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [activeTab, setActiveTab] = useState<'logs' | 'cameras'>('logs');
+    const [filter, setFilter] = useState<'all' | 'face'>('all');
 
     useEffect(() => {
-        loadLogs();
-        const interval = setInterval(loadLogs, 10000); // Polling cada 10s
+        loadData();
+        const interval = setInterval(loadData, 10000); 
         return () => clearInterval(interval);
-    }, []);
+    }, [activeTab]);
 
-    const loadLogs = async () => {
+    const loadData = async () => {
         try {
-            const data = await apiService.getRecentLogs(30);
-            setLogs(data || []);
-        } catch (error: any) {
-            // Se o erro for "Falta vincular evento", não é fatal — apenas não há evento selecionado ainda
-            if (error.message?.includes('vincular evento') || error.message?.includes('Falta vincular')) {
-                console.log('ℹ️ Nenhum evento ativo vinculado. Aguardando seleção.');
+            if (activeTab === 'logs') {
+                const data = await apiService.getRecentLogs(50);
+                setLogs(data || []);
             } else {
-                console.error('Erro ao carregar logs:', error);
+                const camData = await apiService.getCameras();
+                setCameras(camData || []);
             }
+        } catch (error: any) {
+            console.error('Erro ao carregar dados:', error);
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
     };
+
+    const filteredLogs = filter === 'face' 
+        ? logs.filter(l => l.metodo === 'facereader' || l.metodo === 'face' || !!l.pessoas?.foto_url)
+        : logs;
 
     const renderLogItem = ({ item }: { item: any }) => (
         <View style={styles.logCard}>
@@ -43,7 +50,7 @@ export default function MonitoringScreen() {
                 <View style={styles.logInfo}>
                     <ThemedText style={styles.name}>{item.pessoas?.nome?.toUpperCase()}</ThemedText>
                     <ThemedText style={styles.meta}>
-                        {item.empresas?.nome} • {item.metodo?.toUpperCase()}
+                        {item.empresas?.nome || 'VISITANTE'} • {item.metodo?.toUpperCase()}
                     </ThemedText>
                 </View>
                 <View style={[styles.statusBadge, {
@@ -60,13 +67,30 @@ export default function MonitoringScreen() {
             <View style={styles.logFooter}>
                 <Ionicons name="time-outline" size={14} color="#90A4AE" />
                 <ThemedText style={styles.timeText}>
-                    {format(new Date(item.created_at), "HH:mm:ss 'em' dd/MM")}
+                    {format(new Date(item.created_at), "HH:mm:ss")}
                 </ThemedText>
                 <View style={{ flex: 1 }} />
-                <Ionicons name="hardware-chip-outline" size={14} color="#00D4FF" />
+                <Ionicons name={item.metodo === 'face' ? "eye-outline" : "qr-code-outline"} size={14} color="#00D4FF" />
                 <ThemedText style={styles.deviceText}>
-                    {item.dispositivo_id || 'TERMINAL NEXUS'}
+                    {item.dispositivos?.nome || 'TERMINAL NEXUS'}
                 </ThemedText>
+            </View>
+        </View>
+    );
+
+    const renderCameraItem = ({ item }: { item: any }) => (
+        <View style={styles.cameraCard}>
+            <Image 
+                source={{ uri: item.snapshot_url || 'https://via.placeholder.com/640x360?text=CAM_OFFLINE' }} 
+                style={styles.cameraPreview}
+                resizeMode="cover"
+            />
+            <View style={styles.cameraOverlay}>
+                <View style={styles.cameraStatus}>
+                    <View style={styles.liveDot} />
+                    <ThemedText style={styles.cameraName}>{item.nome.toUpperCase()}</ThemedText>
+                </View>
+                <ThemedText style={styles.cameraIp}>{item.ip || 'RTMP STREAM'}</ThemedText>
             </View>
         </View>
     );
@@ -74,8 +98,45 @@ export default function MonitoringScreen() {
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <ThemedText style={styles.title}>NEXUS MONITOR</ThemedText>
-                <ThemedText style={styles.subtitle}>FLUXO DE ACESSO EM TEMPO REAL</ThemedText>
+                <View style={styles.titleRow}>
+                    <ThemedText style={styles.title}>NEXUS MONITOR</ThemedText>
+                    <View style={styles.badge}>
+                        <ThemedText style={styles.badgeText}>LIVE</ThemedText>
+                    </View>
+                </View>
+
+                <View style={styles.tabContainer}>
+                    <TouchableOpacity 
+                        style={[styles.tab, activeTab === 'logs' && styles.activeTab]}
+                        onPress={() => setActiveTab('logs')}
+                    >
+                        <ThemedText style={[styles.tabText, activeTab === 'logs' && styles.activeTabText]}>LOGS</ThemedText>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                        style={[styles.tab, activeTab === 'cameras' && styles.activeTab]}
+                        onPress={() => setActiveTab('cameras')}
+                    >
+                        <ThemedText style={[styles.tabText, activeTab === 'cameras' && styles.activeTabText]}>CÂMERAS IP</ThemedText>
+                    </TouchableOpacity>
+                </View>
+
+                {activeTab === 'logs' && (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterContainer}>
+                        <TouchableOpacity 
+                            style={[styles.filterChip, filter === 'all' && styles.activeFilter]}
+                            onPress={() => setFilter('all')}
+                        >
+                            <ThemedText style={styles.filterText}>TODOS OS ACESSOS</ThemedText>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                            style={[styles.filterChip, filter === 'face' && styles.activeFilter]}
+                            onPress={() => setFilter('face')}
+                        >
+                            <Ionicons name="eye-outline" size={14} color={filter === 'face' ? '#fff' : '#00D4FF'} style={{ marginRight: 5 }} />
+                            <ThemedText style={styles.filterText}>BIOMETRIA FACIAL</ThemedText>
+                        </TouchableOpacity>
+                    </ScrollView>
+                )}
             </View>
 
             {loading && !refreshing ? (
@@ -84,24 +145,26 @@ export default function MonitoringScreen() {
                 </View>
             ) : (
                 <FlatList
-                    data={logs}
+                    data={activeTab === 'logs' ? filteredLogs : cameras}
                     keyExtractor={(item) => item.id}
-                    renderItem={renderLogItem}
+                    renderItem={activeTab === 'logs' ? renderLogItem : renderCameraItem}
                     contentContainerStyle={styles.list}
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
                             onRefresh={() => {
                                 setRefreshing(true);
-                                loadLogs();
+                                loadData();
                             }}
                             tintColor="#00D4FF"
                         />
                     }
                     ListEmptyComponent={
                         <View style={styles.empty}>
-                            <Ionicons name="scan-outline" size={60} color="rgba(144, 164, 174, 0.2)" />
-                            <ThemedText style={styles.emptyText}>AGUARDANDO ACESSOS...</ThemedText>
+                            <Ionicons name={activeTab === 'logs' ? "scan-outline" : "videocam-off-outline"} size={60} color="rgba(144, 164, 174, 0.2)" />
+                            <ThemedText style={styles.emptyText}>
+                                {activeTab === 'logs' ? 'AGUARDANDO ACESSOS EM TEMPO REAL...' : 'NENHUMA CÂMERA IP VINCULADA.'}
+                            </ThemedText>
                         </View>
                     }
                 />
@@ -118,10 +181,16 @@ const styles = StyleSheet.create({
     header: {
         paddingTop: 60,
         paddingHorizontal: 20,
-        paddingBottom: 20,
+        paddingBottom: 15,
         backgroundColor: '#0A1628',
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(0, 212, 255, 0.2)',
+    },
+    titleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        marginBottom: 20,
     },
     title: {
         fontFamily: 'Orbitron-Bold',
@@ -129,12 +198,64 @@ const styles = StyleSheet.create({
         color: '#00D4FF',
         letterSpacing: 2,
     },
-    subtitle: {
-        fontFamily: 'Orbitron-Medium',
+    badge: {
+        backgroundColor: '#FF3366',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    badgeText: {
+        fontFamily: 'Orbitron-Bold',
+        fontSize: 8,
+        color: '#fff',
+    },
+    tabContainer: {
+        flexDirection: 'row',
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderRadius: 10,
+        padding: 4,
+        marginBottom: 15,
+    },
+    tab: {
+        flex: 1,
+        paddingVertical: 8,
+        alignItems: 'center',
+        borderRadius: 8,
+    },
+    activeTab: {
+        backgroundColor: 'rgba(0, 212, 255, 0.2)',
+    },
+    tabText: {
+        fontFamily: 'Orbitron-Bold',
         fontSize: 10,
         color: '#90A4AE',
-        letterSpacing: 1,
-        marginTop: 4,
+    },
+    activeTabText: {
+        color: '#00D4FF',
+    },
+    filterContainer: {
+        flexDirection: 'row',
+        marginBottom: 5,
+    },
+    filterChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 212, 255, 0.05)',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 212, 255, 0.2)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        marginRight: 10,
+    },
+    activeFilter: {
+        backgroundColor: '#00D4FF',
+        borderColor: '#00D4FF',
+    },
+    filterText: {
+        fontFamily: 'Orbitron-Bold',
+        fontSize: 8,
+        color: '#fff',
     },
     center: {
         flex: 1,
@@ -208,6 +329,50 @@ const styles = StyleSheet.create({
         fontSize: 8,
         color: '#00D4FF',
     },
+    cameraCard: {
+        backgroundColor: '#000',
+        borderRadius: 15,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 212, 255, 0.3)',
+        marginBottom: 15,
+        height: 200,
+    },
+    cameraPreview: {
+        width: '100%',
+        height: '100%',
+        opacity: 0.8,
+    },
+    cameraOverlay: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        padding: 15,
+        backgroundColor: 'rgba(5, 11, 24, 0.7)',
+    },
+    cameraStatus: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    liveDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#FF3366',
+    },
+    cameraName: {
+        fontFamily: 'Orbitron-Bold',
+        fontSize: 12,
+        color: '#fff',
+    },
+    cameraIp: {
+        fontFamily: 'Orbitron-Regular',
+        fontSize: 9,
+        color: '#90A4AE',
+        marginTop: 4,
+    },
     empty: {
         flex: 1,
         height: 400,
@@ -217,9 +382,11 @@ const styles = StyleSheet.create({
     },
     emptyText: {
         fontFamily: 'Orbitron-Bold',
-        fontSize: 12,
+        fontSize: 10,
         color: '#90A4AE',
         marginTop: 15,
         letterSpacing: 2,
+        textAlign: 'center',
+        paddingHorizontal: 40,
     }
 });

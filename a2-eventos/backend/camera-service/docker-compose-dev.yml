@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  video-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: camera-video-server
+    ports:
+      - "8000:8000"
+      - "8765:8765"
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
+      - /tmp/camera-snapshots:/tmp/camera-snapshots
+    environment:
+      - USE_GPU=false
+      - REDIS_HOST=localhost
+      - REDIS_PORT=6379
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

@@ -30,6 +30,7 @@ router.get('/test-supabase', checkPermission('configuracoes', 'escrita'), settin
 router.get('/sync-history', checkPermission('configuracoes', 'leitura'), settingsController.getSyncHistory);
 
 // Comunicação
+router.post('/verify-smtp', checkPermission('configuracoes', 'escrita'), settingsController.verifySmtp);
 router.post('/verify-wpp', checkPermission('configuracoes', 'escrita'), settingsController.verifyWpp);
 router.post('/test-email', checkPermission('configuracoes', 'escrita'), settingsController.testEmail);
 

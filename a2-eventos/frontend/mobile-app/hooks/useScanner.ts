@@ -121,6 +121,26 @@ export const useScanner = () => {
                 setTimeout(() => { setScanned(false); setProcessing(false); }, 2500);
             }
         }
+    const handleBraceletCheck = async (serial: string) => {
+        if (processing || !serial) return;
+        setProcessing(true);
+
+        try {
+            const data = await apiService.validateBracelet(serial);
+            showFeedback('#00FF88', `✓ PULSEIRA VÁLIDA: ${data.tipo || 'LOTE OK'}`, 2500);
+            
+            if (data.pessoa_id) {
+                setTimeout(() => {
+                    router.push(`/employee/${data.pessoa_id}` as any);
+                    setProcessing(false);
+                }, 1000);
+            } else {
+                setProcessing(false);
+            }
+        } catch (error: any) {
+            showFeedback('#FF3366', `✗ ${error.message || 'PULSEIRA INVÁLIDA'}`, 3000);
+            setProcessing(false);
+        }
     };
 
     return {
@@ -134,6 +154,7 @@ export const useScanner = () => {
         feedbackText,
         feedbackOpacity,
         handleBarCodeScanned,
+        handleBraceletCheck,
         router
     };
 };

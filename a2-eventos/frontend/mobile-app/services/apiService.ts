@@ -288,5 +288,47 @@ export const apiService = {
         } catch (error) {
             console.error('❌ Erro no prefetch offline:', error);
         }
+    },
+
+    /**
+     * Buscar lista de câmeras IP monitoradas
+     */
+    async getCameras() {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Não autenticado');
+
+        const response = await fetch(`${BACKEND_URL}/cameras`, {
+            headers: {
+                'Authorization': `Bearer ${session.access_token}`
+            }
+        });
+
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Erro ao buscar câmeras');
+        return result.data || [];
+    },
+
+    /**
+     * Validar manual de pulseira/serial
+     */
+    async validateBracelet(serial: string) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Não autenticado');
+
+        const event = await eventService.getNextEvent();
+
+        const response = await fetch(`${BACKEND_URL}/access/validate/bracelet`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+                ...(event?.id ? { 'x-evento-id': event.id } : {})
+            },
+            body: JSON.stringify({ serial })
+        });
+
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Pulseira inválida ou não encontrada');
+        return result.data;
     }
 };

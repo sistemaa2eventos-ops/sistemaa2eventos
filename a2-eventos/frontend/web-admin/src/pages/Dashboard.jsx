@@ -71,10 +71,10 @@ const Dashboard = () => {
     ];
 
     return (
-        <Box sx={{ p: 4 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 4 }}>
+        <Box sx={{ p: { xs: 1, md: 4 } }}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'flex-start' }, mb: 4 }}>
                 <PageHeader title="A2 Eventos / NZT Dashboard" subtitle="Telemetria e controle de fluxo biométrico em tempo real." />
-                <Stack direction="row" spacing={2} alignItems="center">
+                <Stack direction="row" spacing={2} alignItems="center" sx={{ alignSelf: { xs: 'flex-end', md: 'center' } }}>
                     {stats.dispositivos_online > 0 && <Chip label={`${stats.dispositivos_online} Leitores Online`} color="success" size="small" variant="outlined" sx={{ fontWeight: 800 }} />}
                     <IconButton onClick={refresh} sx={{ animation: refreshing ? 'spin 2s linear infinite' : 'none' }}>
                         <RefreshIcon />

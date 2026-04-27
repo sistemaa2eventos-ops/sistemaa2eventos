@@ -367,7 +367,12 @@ const Sidebar = ({ open, onClose }) => {
                             disabled={item.disabled}
                             onClick={(e) => {
                                 if (item.disabled) return;
-                                hasChildren ? handleSubMenuToggle(item.text, e) : navigate(item.path);
+                                if (hasChildren) {
+                                    handleSubMenuToggle(item.text, e);
+                                } else {
+                                    navigate(item.path);
+                                    if (isMobile && onClose) onClose();
+                                }
                             }}
                             sx={{
                                 opacity: item.disabled ? 0.3 : 1,
@@ -400,7 +405,10 @@ const Sidebar = ({ open, onClose }) => {
                                     <NavItem
                                         key={child.text}
                                         active={location.pathname === child.path ? 1 : 0}
-                                        onClick={() => navigate(child.path)}
+                                        onClick={() => {
+                                            navigate(child.path);
+                                            if (isMobile && onClose) onClose();
+                                        }}
                                         sx={{ pl: child.icon ? 3.5 : 4, mb: 0.3, py: 0.5 }}
                                     >
                                         {child.icon && (

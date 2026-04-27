@@ -252,21 +252,49 @@ class SettingsController {
         }
     }
 
-    // Verifica o status do servidor SMTP com credenciais do request
+    // Verifica o status do servidor SMTP com credenciais do request ou do banco
     async verifySmtp(req, res) {
         try {
+            logger.info('[SMTP Test] Body recebido:', req.body);
             const nodemailer = require('nodemailer');
-            const { host, port, user, pass } = req.body;
+            let { 
+                host: h, smtp_host, 
+                port: p, smtp_port, 
+                user: u, smtp_user, 
+                pass: pw, smtp_pass 
+            } = req.body;
+
+            let host = h || smtp_host;
+            let port = p || smtp_port;
+            let user = u || smtp_user;
+            let pass = pw || smtp_pass;
+
+            // Se nao veio nada no body, busca do banco de dados (id 1)
+            if (!host || !port || !user || !pass) {
+                const { data: currentSettings } = await supabase
+                    .from('system_settings')
+                    .select('smtp_host, smtp_port, smtp_user, smtp_pass')
+                    .eq('id', 1)
+                    .single();
+                
+                if (currentSettings) {
+                    host = host || currentSettings.smtp_host;
+                    port = port || currentSettings.smtp_port;
+                    user = user || currentSettings.smtp_user;
+                    pass = pass || currentSettings.smtp_pass;
+                }
+            }
 
             logger.info(`[SMTP Test] Iniciando verificação: host=${host}, port=${port}, user=${user}`);
 
             if (!host || !port || !user || !pass) {
-                logger.warn('[SMTP Test] Parâmetros obrigatórios faltando');
+                logger.warn('[SMTP Test] Parâmetros obrigatórios faltando mesmo após fallback');
                 return res.status(400).json({
                     success: false,
-                    error: 'Host, porta, usuário e senha são obrigatórios.'
+                    error: 'Configurações de SMTP não encontradas ou incompletas.'
                 });
             }
+
 
             // Criar transporter temporário com credenciais do request
             const testTransporter = nodemailer.createTransport({

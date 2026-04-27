@@ -12,6 +12,7 @@ import { notificationService } from '@/services/notificationService';
 import { offlineService } from '@/services/offlineService';
 import { apiService } from '@/services/apiService';
 import { SyncManager } from '@/services/SyncManager';
+import { WatchlistAlert } from '@/components/WatchlistAlert';
 import '@/config/i18n'; // Global i18n init
 
 export const unstable_settings = {
@@ -89,6 +90,7 @@ function RootLayoutNav() {
         <Stack.Screen name="(auth)/register" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'MODAL' }} />
       </Stack>
+      <WatchlistAlert />
     </>
   );
 }

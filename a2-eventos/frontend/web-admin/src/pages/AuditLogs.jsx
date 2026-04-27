@@ -152,11 +152,11 @@ const AuditLogs = () => {
     }
 
     return (
-        <Box p={3} sx={{ position: 'relative' }}>
-            {/* Header Secutiry Label */}
-            <Box mb={4} display="flex" justifyContent="space-between" alignItems="flex-end">
+        <Box sx={{ p: { xs: 1, md: 3 }, position: 'relative', overflowX: 'hidden' }}>
+            {/* Header Security Label */}
+            <Box mb={4} display="flex" flexDirection={{ xs: 'column', md: 'row' }} gap={2} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'flex-end' }}>
                 <Box>
-                    <Stack direction="row" spacing={2} alignItems="center" mb={1}>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'flex-start', sm: 'center' }} mb={1}>
                         <HistoryIcon sx={{ color: '#00D4FF', fontSize: 32 }} />
                         <Typography
                             variant="h4"
@@ -170,7 +170,7 @@ const AuditLogs = () => {
                             LOGS DE AUDITORIA
                         </Typography>
                     </Stack>
-                    <Typography variant="body2" color="textSecondary" sx={{ ml: 6 }}>
+                    <Typography variant="body2" color="textSecondary" sx={{ ml: { xs: 0, sm: 6 }, mt: { xs: 1, sm: 0} }}>
                         Trilha de transparência operacional e histórico de ações administrativas.
                     </Typography>
                 </Box>

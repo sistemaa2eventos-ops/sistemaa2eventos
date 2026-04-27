@@ -9,6 +9,10 @@ build/
 .env.*.local
 .env.production
 .env.staging
+.env.development
+.env.test
+.env.local
+.env.*.local
 *.pem
 *.key
 *.p8

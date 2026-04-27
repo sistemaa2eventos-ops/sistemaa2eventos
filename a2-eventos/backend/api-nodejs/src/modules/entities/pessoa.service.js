@@ -333,7 +333,7 @@ class PessoaService {
                 .eq('id', empresa_id)
                 .single();
             
-            const portalUrl = process.env.PUBLIC_PORTAL_URL || 'http://localhost:3000';
+            const portalUrl = process.env.PUBLIC_PORTAL_URL || 'http://localhost:3002';
             const inviteLink = `${portalUrl}/register/${registrationToken}`;
             
             emailService.sendEmployeeInvite(

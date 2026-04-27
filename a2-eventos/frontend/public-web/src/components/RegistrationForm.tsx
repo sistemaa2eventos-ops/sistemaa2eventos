@@ -7,6 +7,7 @@ import api from '@/lib/api';
 import PhotoCapture from './PhotoCapture';
 import PhotoEditor from './PhotoEditor';
 import { useTranslation } from 'react-i18next';
+import { isValidCPF, maskCPF } from '@/utils/validators';
 
 interface BrandingData {
     evento_nome?: string;
@@ -140,7 +141,12 @@ export default function RegistrationForm({ token, company, branding, requiredFie
 
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
+        let { name, value } = e.target;
+        
+        if (name === 'cpf') {
+            value = maskCPF(value);
+        }
+
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
@@ -172,36 +178,44 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                     });
 
                     if (urlData.success && urlData.uploadUrl) {
-                    // 2. Converter base64 para Blob para upload binário
-                    const base64Data = formData.foto_base64.split(',')[1];
-                    const byteCharacters = atob(base64Data);
-                    const byteNumbers = new Array(byteCharacters.length);
-                    for (let i = 0; i < byteCharacters.length; i++) {
-                        byteNumbers[i] = byteCharacters.charCodeAt(i);
-                    }
-                    const byteArray = new Uint8Array(byteNumbers);
-                    const blob = new Blob([byteArray], { type: 'image/jpeg' });
-
-                    // 3. Fazer upload direto para o Supabase Storage via PUT
-                    const uploadRes = await fetch(urlData.uploadUrl, {
-                        method: 'PUT',
-                        body: blob,
-                        headers: {
-                            'Content-Type': 'image/jpeg',
+                        const base64Data = formData.foto_base64.split(',')[1];
+                        const byteCharacters = atob(base64Data);
+                        const byteNumbers = new Array(byteCharacters.length);
+                        for (let i = 0; i < byteCharacters.length; i++) {
+                            byteNumbers[i] = byteCharacters.charCodeAt(i);
                         }
-                    });
+                        const byteArray = new Uint8Array(byteNumbers);
+                        const blob = new Blob([byteArray], { type: 'image/jpeg' });
 
-                    if (!uploadRes.ok) {
-                        throw new Error('Falha ao enviar foto para o servidor corporativo.');
-                    }
+                        const uploadRes = await fetch(urlData.uploadUrl, {
+                            method: 'PUT',
+                            body: blob,
+                            headers: { 'Content-Type': 'image/jpeg' }
+                        });
 
-                    photoUrl = urlData.publicUrl || urlData.uploadUrl.split('?')[0];
+                        if (!uploadRes.ok) {
+                            throw new Error('Falha crítica na transmissão da biometria facial.');
+                        }
+
+                        photoUrl = urlData.publicUrl || urlData.uploadUrl.split('?')[0];
                     }
-                } catch (err) {
-                    console.error('Falha no fluxo de upload:', err);
-                    // Não travamos o processo total por erro na foto, 
-                    // mas podemos logar ou setar um erro se for mandatório.
+                } catch (err: any) {
+                    // Auditoria: Erro na foto agora é fatal para evitar cadastros sem biometria
+                    setError(err.message || 'Erro ao processar sua foto facial. Tente novamente.');
+                    setLoading(false);
+                    return;
                 }
+            } else if (isRequired('foto')) {
+                setError('A foto biometria é obrigatória.');
+                setLoading(false);
+                return;
+            }
+
+            // Validação de CPF Real
+            if (!isValidCPF(cleanCpf)) {
+                setError('O CPF informado é inválido.');
+                setLoading(false);
+                return;
             }
 
             const payloadData: {

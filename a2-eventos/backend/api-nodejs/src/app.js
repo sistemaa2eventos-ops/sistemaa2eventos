@@ -59,6 +59,7 @@ const messageRoutes = require('./modules/system/message.routes');
 const lgpdRoutes = require('./modules/system/lgpd.routes');
 const watchlistRoutes = require('./modules/system/watchlist.routes');
 const cameraRoutes = require('./modules/system/camera.routes');
+const cameraWebhookRoutes = require('./modules/camera/camera-webhook.routes');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -68,9 +69,10 @@ app.use((req, res, next) => {
     const isHealthcheck = req.path === '/health' || req.path === '/health/';
     const isHardwareCallback = req.path.startsWith('/api/intelbras/') || req.path.startsWith('/api/hikvision/');
     const isSmtpVerification = req.path === '/api/settings/verify-smtp';
+    const isLocalhost = req.get('host').includes('localhost') || req.get('host').includes('127.0.0.1');
 
-    // Nao redirecionar healthcheck, callbacks de hardware e testes de SMTP (já feitos via proxy HTTPS)
-    if (isHealthcheck || isHardwareCallback || isSmtpVerification) {
+    // Nao redirecionar healthcheck, callbacks de hardware, testes de SMTP ou localhost
+    if (isHealthcheck || isHardwareCallback || isSmtpVerification || isLocalhost) {
         return next();
     }
     if (process.env.NODE_ENV === 'production' && !req.secure && req.get('X-Forwarded-Proto') !== 'https') {
@@ -78,6 +80,7 @@ app.use((req, res, next) => {
     }
     next();
 });
+
 
 const { i18next, middleware } = require('./config/i18n');
 app.use(middleware.handle(i18next));
@@ -180,6 +183,7 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/lgpd', lgpdRoutes);
 app.use('/api/watchlist', watchlistRoutes);
 app.use('/api/cameras', cameraRoutes);
+app.use('/api/camera', cameraWebhookRoutes); // Camera Service webhooks
 app.use('/api/public', rateLimiter.public, publicRoutes); // FIX I-10: rate limiter dedicado para rotas públicas
 
 // ============================================

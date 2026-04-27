@@ -290,8 +290,8 @@ const Empresas = () => {
   };
 
   return (
-    <Box sx={{ p: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
+    <Box sx={{ p: { xs: 1, md: 4 } }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'flex-start' }, mb: 4, gap: 2 }}>
         <PageHeader
           title="PAINEL DE EMPRESAS"
           subtitle={eventoIdParam ? `Filtrando empresas do evento: ${localStorage.getItem('active_evento_nome')}` : "Gerencie as entidades terceirizadas do ecossistema."}
@@ -300,7 +300,7 @@ const Empresas = () => {
         <NeonButton
           startIcon={<AddIcon />}
           onClick={handleNew}
-          sx={{ mt: 2 }}
+          sx={{ mt: { xs: 0, md: 2 }, width: { xs: '100%', md: 'auto' } }}
         >
           Anexar Empresa
         </NeonButton>

@@ -35,10 +35,10 @@ class VectorService {
             // 0 = Cópia Perfeita, 2 = Completamente oposto.
             // Para exibição amigável, confiança = 1 - distância
             const result = await pool.query(`
-                SELECT id, nome, status_acesso, 1 - (face_embedding <=> $1) as confidence
+                SELECT id, nome, status_acesso, 1 - (face_encoding <=> $1) as confidence
                 FROM pessoas
-                WHERE face_embedding IS NOT NULL
-                ORDER BY face_embedding <=> $1 ASC
+                WHERE face_encoding IS NOT NULL
+                ORDER BY face_encoding <=> $1 ASC
                 LIMIT 1
             `, [pgVectorStr]);
 

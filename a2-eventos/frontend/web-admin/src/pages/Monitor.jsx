@@ -99,7 +99,7 @@ const Monitor = () => {
   };
 
   return (
-    <Box sx={{ p: 4, maxWidth: 1600, margin: '0 auto' }}>
+    <Box sx={{ p: { xs: 1, md: 4 }, maxWidth: 1600, margin: '0 auto' }}>
       <PageHeader
         title="NZT Intelligence Monitor"
         subtitle="Centro de Comando e Segurança Biométrica"
@@ -152,7 +152,7 @@ const Monitor = () => {
       {tabIndex === 0 && (
         <Grid container spacing={3}>
             <Grid item xs={12}>
-                <GlassCard sx={{ p: 2, mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
+                <GlassCard sx={{ p: 2, mb: 2, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, alignItems: { xs: 'stretch', md: 'center' } }}>
                     <FilterIcon sx={{ color: '#00D4FF' }} />
                     <FormControl size="small" sx={{ minWidth: 200 }}>
                         <InputLabel>ÁREA</InputLabel>
@@ -266,9 +266,9 @@ const Monitor = () => {
           <Grid container spacing={3}>
               <Grid item xs={12} md={8}>
                   <GlassCard sx={{ p: 3 }}>
-                      <Stack direction="row" justifyContent="space-between" mb={3}>
+                      <Stack direction={{ xs: 'column', md: 'row' }} gap={2} justifyContent="space-between" mb={3}>
                         <Typography variant="h6" fontWeight={900} color="#FFB800">CPFS MONITORADOS</Typography>
-                        <Stack direction="row" spacing={1}>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
                             <Button variant="outlined" component="label" startIcon={<UploadIcon />}>
                                 IMPORTAR CSV
                                 <input type="file" hidden accept=".csv" onChange={handleUploadCSV} />

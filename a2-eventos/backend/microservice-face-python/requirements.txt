@@ -7,3 +7,6 @@ loguru>=0.7.0
 requests>=2.31.0
 python-dotenv>=1.0.0
 Pillow>=10.0.0
+insightface>=0.7.3
+onnxruntime>=1.15.0
+scipy>=1.10.0
