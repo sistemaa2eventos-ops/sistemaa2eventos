@@ -173,7 +173,7 @@ class AuthController {
             const { data: existingEmail, error: emailCheckError } = await supabase
                 .from('perfis')
                 .select('id')
-                .eq('id', supabase.auth.users.email, normalizedEmail)
+                .eq('email', normalizedEmail)
                 .limit(1);
 
             if (!emailCheckError && existingEmail && existingEmail.length > 0) {
