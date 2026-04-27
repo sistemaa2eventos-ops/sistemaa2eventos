@@ -1,6 +1,14 @@
 const { supabase, supabasePublic } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const cacheService = require('../../services/cacheService');
+const {
+    validateEmail,
+    validatePhone,
+    validatePermissions,
+    formatPhone,
+    normalizeEmail,
+    getDefaultPermissions
+} = require('../../utils/validators');
 
 class AuthController {
     /**
@@ -111,85 +119,158 @@ class AuthController {
     }
 
     /**
-     * Criar convite para novo usuário
+     * Criar convite para novo operador do painel
+     * Apenas admin_master pode criar operadores
+     * Permissões começam desligadas (tudo false) - admin_master ativa conforme precisa
      */
     async invite(req, res) {
         try {
-            const { email, nome_completo, evento_id } = req.body;
+            const { email, nome_completo, telefone, evento_id, permissions } = req.body;
 
             // Só admin_master pode criar convites
             if (req.user?.nivel_acesso !== 'admin_master') {
                 return res.status(403).json({
-                    error: 'Apenas admin_master pode criar convites.'
+                    error: 'Apenas admin_master pode criar operadores.'
                 });
             }
 
-            // Todos os novos usuários são operadores vinculados a um evento
+            // Validações de campos obrigatórios
             if (!email || !nome_completo || !evento_id) {
                 return res.status(400).json({
                     error: 'Email, nome completo e evento são obrigatórios.'
                 });
             }
 
+            // Validar formato de email
+            const normalizedEmail = normalizeEmail(email);
+            if (!validateEmail(normalizedEmail)) {
+                return res.status(400).json({
+                    error: 'Email inválido. Verifique o formato.'
+                });
+            }
+
+            // Validar telefone se fornecido
+            if (telefone && !validatePhone(telefone)) {
+                return res.status(400).json({
+                    error: 'Telefone inválido. Use formato: (XX) 9XXXX-XXXX ou (XX) XXXX-XXXX'
+                });
+            }
+
+            // Validar que evento_id existe
+            const { data: eventoExists, error: eventoError } = await supabase
+                .from('eventos')
+                .select('id')
+                .eq('id', evento_id)
+                .single();
+
+            if (eventoError || !eventoExists) {
+                return res.status(400).json({
+                    error: 'Evento não encontrado. Verifique o evento_id.'
+                });
+            }
+
+            // Verificar se email já existe como operador
+            const { data: existingEmail, error: emailCheckError } = await supabase
+                .from('perfis')
+                .select('id')
+                .eq('id', supabase.auth.users.email, normalizedEmail)
+                .limit(1);
+
+            if (!emailCheckError && existingEmail && existingEmail.length > 0) {
+                return res.status(409).json({
+                    error: 'Este email já está cadastrado como operador.'
+                });
+            }
+
+            // Validar e processar permissões (se fornecidas)
+            let finalPermissions;
+            if (permissions) {
+                const permValidation = validatePermissions(permissions);
+                if (!permValidation.valid) {
+                    return res.status(400).json({
+                        error: permValidation.reason
+                    });
+                }
+                finalPermissions = permissions;
+            } else {
+                // PADRÃO: Tudo desligado - admin_master ativa conforme precisa
+                finalPermissions = {
+                    dashboard: true,        // Dashboard é obrigatório
+                    empresas: false,
+                    pessoas: false,
+                    auditoria_documentos: false,
+                    monitoramento: false,
+                    relatorios: false,
+                    checkin: false,
+                    checkout: false,
+                    dispositivos: false,
+                    usuarios: false
+                };
+            }
+
             // Criar convite no Supabase Auth com link de redirecionamento para o frontend
-            const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
+            const { data, error } = await supabase.auth.admin.inviteUserByEmail(normalizedEmail, {
                 redirectTo: `${process.env.FRONTEND_URL || 'https://painel.nzt.app.br'}/reset-password`,
                 data: {
                     nome_completo,
                     nivel_acesso: 'operador',
-                    evento_id
+                    evento_id,
+                    telefone: telefone ? telefone.replace(/[^\d]/g, '') : null
                 }
             });
 
             if (error) {
                 logger.error(`Erro ao enviar convite: ${error.message}`);
                 return res.status(400).json({
-                    error: error.message
+                    error: error.message || 'Erro ao enviar convite'
                 });
             }
 
-            // Criar perfil com status 'pendente' — sempre operador
+            // Criar perfil com dados completos
+            // Sempre nível_acesso = 'operador' (não 'admin_master')
             const { error: perfilError } = await supabase
                 .from('perfis')
                 .insert({
                     id: data.user.id,
-                    nome_completo,
-                    nivel_acesso: 'operador',
+                    email: normalizedEmail,
+                    nome_completo: nome_completo.trim(),
+                    telefone: telefone ? telefone.replace(/[^\d]/g, '') : null,
+                    // ❌ CPF removido - é exclusivo de pessoas (participantes)
+                    nivel_acesso: 'operador',  // ← SEMPRE operador
                     evento_id,
                     status: 'pendente',
-                    permissions: {
-                        dashboard: true,
-                        empresas: false,
-                        pessoas: false,
-                        auditoria_documentos: false,
-                        monitoramento: true,
-                        relatorios: true,
-                        checkin: true,
-                        checkout: true
-                    }
+                    permissions: finalPermissions,
+                    created_by: req.user.id,
+                    created_at: new Date().toISOString()
                 });
 
             if (perfilError) {
                 logger.error(`Erro ao criar perfil: ${perfilError.message}`);
+                return res.status(400).json({
+                    error: 'Usuário criado no Supabase, mas houve erro ao salvar perfil.'
+                });
             }
 
-            logger.info(`✅ Convite enviado para: ${email} (operador, evento: ${evento_id})`);
+            logger.info(`✅ Operador criado: ${normalizedEmail} (evento: ${evento_id}, status: pendente) por ${req.user.id}`);
 
             res.status(201).json({
                 success: true,
-                message: 'Convite enviado com sucesso',
+                message: 'Operador criado com sucesso. Email de convite enviado. Aguarde que ele defina a senha e então aprove.',
                 user: {
                     id: data.user.id,
-                    email: data.user.email,
+                    email: normalizedEmail,
                     nome_completo,
+                    telefone: telefone ? formatPhone(telefone) : null,
                     nivel_acesso: 'operador',
-                    status: 'pendente'
+                    status: 'pendente',
+                    permissions: finalPermissions,
+                    evento_id
                 }
             });
 
         } catch (error) {
-            logger.error('Erro no convite:', error);
-            res.status(500).json({ error: 'Erro interno no servidor' });
+            logger.error('Erro ao criar operador:', error);
+            res.status(500).json({ error: 'Erro interno ao criar operador' });
         }
     }
 
@@ -384,7 +465,7 @@ class AuthController {
             // Query base: buscar perfis com campos disponíveis
             let query = supabase
                 .from('perfis')
-                .select(`id, nome_completo, nivel_acesso, status, evento_id, permissions, avatar_url, created_at, updated_at, eventos(nome)`)
+                .select(`id, email, nome_completo, telefone, nivel_acesso, status, evento_id, permissions, created_at, updated_at, eventos(nome)`)
                 .order('nome_completo');
 
             // Se não for admin_master, filtra por evento
@@ -404,7 +485,7 @@ class AuthController {
                 logger.info('[listUsers] Tentando fallback sem eventos(nome)...');
                 let fallbackQuery = supabase
                     .from('perfis')
-                    .select('id, nome_completo, nivel_acesso, status, evento_id, avatar_url')
+                    .select('id, nome_completo, nivel_acesso, status, evento_id, telefone, permissions, email')
                     .order('nome_completo');
 
                 if (!isAdminMaster && req.user?.evento_id) {
@@ -430,8 +511,8 @@ class AuthController {
                     success: true,
                     users: filtered.map(u => ({
                         ...u,
-                        foto_url: u.avatar_url,
-                        email: ''
+                        email: u.email || '',
+                        telefone: u.telefone ? formatPhone(u.telefone) : null
                     }))
                 });
             }
@@ -442,8 +523,8 @@ class AuthController {
             const enrichedUsers = data
                 .map(user => ({
                     ...user,
-                    foto_url: user.avatar_url,
-                    email: '',
+                    email: user.email || '',
+                    telefone: user.telefone ? formatPhone(user.telefone) : null,
                     eventos: user.eventos?.[0] || { nome: 'Global' }
                 }))
                 .filter(user => {
@@ -469,25 +550,78 @@ class AuthController {
     }
 
     /**
-     * Atualizar usuário
+     * Atualizar operador
+     * Operadores podem atualizar apenas seus próprios dados básicos
+     * Admin master pode atualizar qualquer operador e suas permissões
      */
     async updateUser(req, res) {
         try {
             const { id: userId } = req.params;
-            const { nome_completo, foto_url, evento_id } = req.body;
+            const { nome_completo, telefone, evento_id, permissions } = req.body;
 
             // Só admin_master pode editar outros usuários
-            if (req.user?.nivel_acesso !== 'admin_master' && userId !== req.user.id) {
-                return res.status(403).json({ error: 'Sem permissão para editar este usuário' });
+            // Operadores podem editar apenas seus próprios dados básicos (nome, telefone)
+            const isSelf = userId === req.user.id;
+            const isAdminMaster = req.user?.nivel_acesso === 'admin_master';
+
+            if (!isSelf && !isAdminMaster) {
+                return res.status(403).json({
+                    error: 'Sem permissão. Operadores podem editar apenas seus próprios dados básicos.'
+                });
             }
 
             const updateData = { updated_at: new Date() };
-            if (nome_completo) updateData.nome_completo = nome_completo;
-            if (foto_url) updateData.foto_url = foto_url;
-            
-            // Atualizar evento vinculado (obrigatório para operadores)
-            if (req.body.hasOwnProperty('evento_id') && evento_id) {
+
+            // Qualquer um pode atualizar seu próprio nome e telefone
+            if (nome_completo) {
+                updateData.nome_completo = nome_completo.trim();
+            }
+
+            // Validar e atualizar telefone
+            if (telefone !== undefined) {
+                if (telefone && !validatePhone(telefone)) {
+                    return res.status(400).json({
+                        error: 'Telefone inválido. Use formato: (XX) 9XXXX-XXXX ou (XX) XXXX-XXXX'
+                    });
+                }
+                updateData.telefone = telefone ? telefone.replace(/[^\d]/g, '') : null;
+            }
+
+            // ❌ CPF removido - não existe mais em perfis
+
+            // Atualizar evento vinculado (apenas admin_master)
+            if (isAdminMaster && req.body.hasOwnProperty('evento_id') && evento_id) {
+                // Validar que evento_id existe
+                const { data: eventoExists, error: eventoError } = await supabase
+                    .from('eventos')
+                    .select('id')
+                    .eq('id', evento_id)
+                    .single();
+
+                if (eventoError || !eventoExists) {
+                    return res.status(400).json({
+                        error: 'Evento não encontrado. Verifique o evento_id.'
+                    });
+                }
                 updateData.evento_id = evento_id;
+            }
+
+            // Atualizar permissões (APENAS admin_master pode)
+            // Operadores NÃO podem alterar suas próprias permissões
+            if (permissions) {
+                if (!isAdminMaster) {
+                    return res.status(403).json({
+                        error: 'Operadores não podem alterar suas próprias permissões. Solicite ao admin_master.'
+                    });
+                }
+
+                const permValidation = validatePermissions(permissions);
+                if (!permValidation.valid) {
+                    return res.status(400).json({
+                        error: permValidation.reason
+                    });
+                }
+                updateData.permissions = permissions;
             }
 
             const { data, error } = await supabase
@@ -499,16 +633,20 @@ class AuthController {
 
             if (error) throw error;
 
-            logger.info(`👤 Usuário atualizado: ${userId}`);
+            logger.info(`👤 Operador atualizado: ${userId} por ${req.user.id}`);
 
             res.json({
                 success: true,
-                message: 'Usuário atualizado com sucesso',
-                user: data
+                message: 'Operador atualizado com sucesso',
+                user: {
+                    ...data,
+                    // ❌ CPF não retorna mais (não existe em perfis)
+                    telefone: data.telefone ? formatPhone(data.telefone) : null
+                }
             });
 
         } catch (error) {
-            logger.error('Erro ao atualizar usuário:', error);
+            logger.error('Erro ao atualizar operador:', error);
             res.status(500).json({ error: 'Erro interno no servidor' });
         }
     }

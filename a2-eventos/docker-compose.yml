@@ -60,6 +60,7 @@ services:
       - REDIS_PORT=6379
       - USE_REDIS=true
       - PG_EDGE_HOST=postgres_edge
+      - PUBLIC_PORTAL_URL=${PUBLIC_PORTAL_URL:-https://cadastro.nzt.app.br}
     env_file:
       - ./backend/api-nodejs/.env
     networks:

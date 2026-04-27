@@ -16,7 +16,6 @@ import GlassCard from '../components/common/GlassCard';
 import PageHeader from '../components/common/PageHeader';
 import NeonButton from '../components/common/NeonButton';
 import DataTable from '../components/common/DataTable';
-import PhotoCapture from '../components/common/PhotoCapture';
 import { useUsuarios } from '../hooks/useUsuarios';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -61,10 +60,6 @@ const Usuarios = () => {
 
     const columns = [
         {
-            id: 'foto_url', label: 'ID FOTO', minWidth: 80,
-            format: (val) => <Avatar src={val} sx={{ width: 40, height: 40, border: '1px solid rgba(0,212,255,0.3)' }} />
-        },
-        {
             id: 'nome_completo', label: 'OPERADOR', minWidth: 250,
             format: (val, row) => (
                 <Box>
@@ -75,7 +70,7 @@ const Usuarios = () => {
                 </Box>
             )
         },
-        { id: 'cpf', label: 'CPF', minWidth: 150 },
+        { id: 'telefone', label: 'TELEFONE', minWidth: 150 },
         {
             id: 'nivel_acesso', label: 'CARGO', minWidth: 100,
             format: (val) => (
@@ -175,14 +170,13 @@ const Usuarios = () => {
                 <DialogTitle sx={{ fontFamily: 'Orbitron', fontWeight: 700 }}>{selectedUser ? 'PRIVILÉGIOS' : 'NOVA CREDENCIAL'}</DialogTitle>
                 <DialogContent>
                     <Stack spacing={3} sx={{ pt: 2 }}>
-                        <PhotoCapture onPhotoCaptured={(url) => setFormData({ ...formData, foto_url: url })} initialPhoto={formData.foto_url} />
-                        <TextField label="Nome Completo" fullWidth value={formData.nome_completo} onChange={(e) => setFormData({ ...formData, nome_completo: e.target.value })} />
-                        <TextField label="CPF" fullWidth value={formData.cpf} onChange={(e) => setFormData({ ...formData, cpf: e.target.value })} />
-                        <TextField label="Data Nascimento" type="date" fullWidth InputLabelProps={{ shrink: true }} value={formData.data_nascimento} onChange={(e) => setFormData({ ...formData, data_nascimento: e.target.value })} />
-                        
                         {!selectedUser && (
-                            <TextField label="Email" fullWidth value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+                            <TextField label="Email" fullWidth placeholder="operador@empresa.com" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required />
                         )}
+
+                        <TextField label="Nome Completo" fullWidth placeholder="João Silva" value={formData.nome_completo} onChange={(e) => setFormData({ ...formData, nome_completo: e.target.value })} required />
+
+                        <TextField label="Telefone" fullWidth placeholder="(11) 98765-4321" value={formData.telefone} onChange={(e) => setFormData({ ...formData, telefone: e.target.value })} />
 
                         <FormControl fullWidth required>
                             <InputLabel>Evento Vinculado</InputLabel>
@@ -190,6 +184,43 @@ const Usuarios = () => {
                                 {eventos.map(e => <MenuItem key={e.id} value={e.id}>{e.nome}</MenuItem>)}
                             </Select>
                         </FormControl>
+
+                        {/* Permissões */}
+                        {selectedUser && (
+                            <Box>
+                                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2, color: '#00D4FF' }}>PERMISSÕES</Typography>
+                                <Stack spacing={1}>
+                                    {[
+                                        { key: 'dashboard', label: 'Dashboard' },
+                                        { key: 'pessoas', label: 'Pessoas' },
+                                        { key: 'empresas', label: 'Empresas' },
+                                        { key: 'checkin', label: 'Check-in' },
+                                        { key: 'checkout', label: 'Check-out' },
+                                        { key: 'monitoramento', label: 'Monitoramento' },
+                                        { key: 'relatorios', label: 'Relatórios' },
+                                        { key: 'auditoria_documentos', label: 'Auditoria Documentos' },
+                                        { key: 'dispositivos', label: 'Dispositivos' },
+                                        { key: 'usuarios', label: 'Usuários' }
+                                    ].map(perm => (
+                                        <Box key={perm.key} sx={{ display: 'flex', alignItems: 'center' }}>
+                                            <Switch
+                                                size="small"
+                                                disabled={perm.key === 'dashboard'}
+                                                checked={formData.permissions[perm.key] || false}
+                                                onChange={(e) => setFormData({
+                                                    ...formData,
+                                                    permissions: {
+                                                        ...formData.permissions,
+                                                        [perm.key]: e.target.checked
+                                                    }
+                                                })}
+                                            />
+                                            <Typography variant="body2" sx={{ ml: 1 }}>{perm.label}</Typography>
+                                        </Box>
+                                    ))}
+                                </Stack>
+                            </Box>
+                        )}
                     </Stack>
                 </DialogContent>
                 <DialogActions sx={{ p: 3 }}>

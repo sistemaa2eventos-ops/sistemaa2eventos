@@ -37,6 +37,7 @@ export const useUsuarios = () => {
     const [formData, setFormData] = useState({
         email: '',
         nome_completo: '',
+        telefone: '',
         nivel_acesso: 'operador',
         evento_id: '',
         permissions: {
@@ -47,7 +48,9 @@ export const useUsuarios = () => {
             monitoramento: false,
             relatorios: false,
             checkin: false,
-            checkout: false
+            checkout: false,
+            dispositivos: false,
+            usuarios: false
         }
     });
 
@@ -69,10 +72,8 @@ export const useUsuarios = () => {
             // Garantir formato correto dos dados
             const users = (response.data.users || []).map(user => ({
                 ...user,
-                foto_url: user.foto_url || user.avatar_url || '',
                 email: user.email || '',
-                cpf: user.cpf || user.documento || '',
-                events: user.eventos || { nome: 'Global' }
+                eventos: user.eventos || { nome: 'Global' }
             }));
             setUsuarios(users);
         } catch (error) {
@@ -93,6 +94,7 @@ export const useUsuarios = () => {
             setFormData({
                 email: user.email || '',
                 nome_completo: user.nome_completo || '',
+                telefone: user.telefone || '',
                 nivel_acesso: user.nivel_acesso || 'operador',
                 evento_id: user.evento_id || '',
                 permissions: user.permissions || {
@@ -103,7 +105,9 @@ export const useUsuarios = () => {
                     monitoramento: false,
                     relatorios: false,
                     checkin: false,
-                    checkout: false
+                    checkout: false,
+                    dispositivos: false,
+                    usuarios: false
                 }
             });
         } else {
@@ -111,6 +115,7 @@ export const useUsuarios = () => {
             setFormData({
                 email: '',
                 nome_completo: '',
+                telefone: '',
                 nivel_acesso: 'operador',
                 evento_id: '',
                 permissions: {
@@ -121,7 +126,9 @@ export const useUsuarios = () => {
                     monitoramento: false,
                     relatorios: false,
                     checkin: false,
-                    checkout: false
+                    checkout: false,
+                    dispositivos: false,
+                    usuarios: false
                 }
             });
         }
@@ -157,7 +164,9 @@ export const useUsuarios = () => {
                 await api.post('/auth/invite', {
                     email: formData.email,
                     nome_completo: formData.nome_completo,
-                    evento_id: formData.evento_id
+                    telefone: formData.telefone || null,
+                    evento_id: formData.evento_id,
+                    permissions: formData.permissions
                 });
                 enqueueSnackbar('Convite enviado!', { variant: 'success' });
             }
