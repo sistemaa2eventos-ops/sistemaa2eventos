@@ -50,7 +50,7 @@ const Checkin = () => {
     operationMode, changeOperationMode, modoQuiosque, toggleQuiosque,
     searchQuery, handleSearch, searchResults,
     rfidInputRef, recentLogs, realtimeStats, offlineCount,
-    consultarPulseiraAPI, performCheckin
+    performCheckin
   } = useCheckin();
 
   const [pulseiraValue, setPulseiraValue] = useState('');
@@ -92,7 +92,7 @@ const Checkin = () => {
 
   const handlePulseiraKeyDown = (e) => {
     if (e.key === 'Enter') {
-        consultarPulseiraAPI(pulseiraValue);
+        performCheckin('pulseira', pulseiraValue);
         setPulseiraValue('');
         setShowPulseiraInput(false);
     }
@@ -243,7 +243,7 @@ const Checkin = () => {
                                         sx={{ width: 400, '& .MuiOutlinedInput-root': { borderRadius: 4, height: 70, fontSize: '1.5rem', textAlign: 'center' } }}
                                     />
                                     <Stack direction="row" spacing={2} sx={{ mt: 4 }}>
-                                        <NeonButton onClick={() => consultarPulseiraAPI(pulseiraValue)}>CONFIRMAR MANUAL</NeonButton>
+                                        <NeonButton onClick={() => { performCheckin('pulseira', pulseiraValue); setPulseiraValue(''); setShowPulseiraInput(false); }}>CONFIRMAR MANUAL</NeonButton>
                                         <NeonButton onClick={() => setShowPulseiraInput(false)} color="error">VOLTAR</NeonButton>
                                     </Stack>
                                 </CameraOverlay>
