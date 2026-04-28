@@ -240,7 +240,6 @@ class AuthController {
                     evento_id,
                     status: 'pendente',
                     permissions: finalPermissions,
-                    created_by: req.user.id,
                     created_at: new Date().toISOString()
                 });
 
