@@ -16,7 +16,6 @@ SELECT
     p.id,
     p.nome_completo,
     p.evento_id,
-    p.criado_em,
     CASE
         WHEN EXISTS (SELECT 1 FROM empresas e WHERE e.evento_id = p.evento_id LIMIT 1)
         THEN 'tem_empresa'
@@ -26,8 +25,7 @@ FROM pessoas p
 WHERE NOT EXISTS (
     SELECT 1 FROM pessoa_evento_empresa pee
     WHERE pee.pessoa_id = p.id
-)
-ORDER BY p.criado_em DESC;
+);
 
 -- 3. Criar registros de pivot para pessoas órfãs (vincular a primeira empresa do evento)
 INSERT INTO pessoa_evento_empresa (pessoa_id, evento_id, empresa_id, status_aprovacao, cargo_funcao)
