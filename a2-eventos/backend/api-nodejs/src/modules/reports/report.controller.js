@@ -119,25 +119,24 @@ class ReportController {
                 user: req.event?.user_id
             });
 
-            // logs_acesso não possui area_id diretamente
-            // Obtemos dados dos logs vinculados aos dispositivos
-            let query = supabase
+            // Não há FK entre logs_acesso e dispositivos
+            // Fazer query separadas e combinar manualmente
+            let logsQuery = supabase
                 .from('logs_acesso')
-                .select('dispositivo_id, tipo, created_at, dispositivos(id, localizacao)')
+                .select('dispositivo_id, tipo, created_at')
                 .eq('evento_id', evento_id);
 
-            if (data_inicio) query = query.gte('created_at', data_inicio);
-            if (data_fim) query = query.lte('created_at', data_fim);
+            if (data_inicio) logsQuery = logsQuery.gte('created_at', data_inicio);
+            if (data_fim) logsQuery = logsQuery.lte('created_at', data_fim);
 
-            const { data: logs, error } = await query;
-            if (error) {
-                logger.error(`❌ Erro na query porArea:`, {
-                    message: error.message,
-                    code: error.code,
-                    details: error.details,
-                    status: error.status
+            const { data: logs, error: logsError } = await logsQuery;
+            if (logsError) {
+                logger.error(`❌ Erro ao buscar logs:`, {
+                    message: logsError.message,
+                    code: logsError.code,
+                    details: logsError.details
                 });
-                throw error;
+                throw logsError;
             }
 
             // Se não houver logs, retornar relatório vazio
@@ -145,10 +144,30 @@ class ReportController {
                 return res.json({ success: true, data: [] });
             }
 
-            // Agrupar por localização do dispositivo (ou por ID do dispositivo)
+            // Buscar todos os dispositivos do evento
+            const { data: dispositivos, error: dispError } = await supabase
+                .from('dispositivos')
+                .select('id, localizacao')
+                .eq('evento_id', evento_id);
+
+            if (dispError) {
+                logger.error(`❌ Erro ao buscar dispositivos:`, {
+                    message: dispError.message,
+                    code: dispError.code
+                });
+                throw dispError;
+            }
+
+            // Criar mapa de dispositivos para lookup rápido
+            const dispositivoMap = {};
+            (dispositivos || []).forEach(d => {
+                dispositivoMap[d.id] = d.localizacao || 'Localização Desconhecida';
+            });
+
+            // Agrupar por localização do dispositivo
             const stats = {};
             logs.forEach(log => {
-                const localizacao = log.dispositivos?.localizacao || 'Localização Desconhecida';
+                const localizacao = dispositivoMap[log.dispositivo_id] || 'Localização Desconhecida';
                 const key = log.dispositivo_id || 'unknown';
 
                 if (!stats[key]) {
