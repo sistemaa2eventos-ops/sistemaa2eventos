@@ -328,8 +328,18 @@ class ConfigController {
 
             res.json({ success: true, message: 'Pulseira atualizada com sucesso', data: pulseira });
         } catch (error) {
-            logger.error('Erro ao atualizar pulseira:', error);
-            res.status(500).json({ error: 'Erro ao atualizar pulseira.' });
+            logger.error('❌ Erro ao atualizar pulseira:', {
+                message: error.message,
+                details: error.details,
+                hint: error.hint,
+                code: error.code,
+                fullError: JSON.stringify(error)
+            });
+            res.status(500).json({
+                error: 'Erro ao atualizar pulseira.',
+                details: error.message,
+                hint: error.hint
+            });
         }
     }
 
