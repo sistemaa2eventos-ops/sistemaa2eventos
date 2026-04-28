@@ -537,30 +537,26 @@ class PessoaService {
         // Buscar pessoa com status da pivot
         const { data: pessoa, error } = await supabaseClient
             .from('pessoas')
-            .select('id, cpf, qr_code, evento_id, status_acesso')
+            .select('id, cpf, qr_code, evento_id, status_acesso, ativo, bloqueado')
             .eq('id', id)
             .eq('evento_id', tenantId)
             .single();
 
         if (error || !pessoa) throw new Error('Pessoa não encontrada ou acesso negado.');
 
-        // Verificar aprovação via pivot table
-        const { data: pivot, error: pivotError } = await supabaseClient
-            .from('pessoa_evento_empresa')
-            .select('status_aprovacao')
-            .eq('pessoa_id', id)
-            .eq('evento_id', tenantId)
-            .in('status_aprovacao', ['aprovado', 'pendente'])
-            .limit(1)
-            .single();
-
-        if (pivotError || !pivot) {
-            throw new Error('Pessoa não vinculada a este evento.');
+        // Verificar se pessoa está autorizada (verifica status_acesso)
+        if (pessoa.status_acesso !== 'autorizado') {
+            throw new Error('Pessoa não está autorizada. Status: ' + pessoa.status_acesso);
         }
 
-        // QR Code só para aprovados
-        if (pivot.status_aprovacao !== 'aprovado') {
-            throw new Error('Pessoa pendente de aprovação. Aguarde a confirmação.');
+        // Verificar se está ativa
+        if (pessoa.ativo === false) {
+            throw new Error('Pessoa inativa. Não é possível gerar QR code.');
+        }
+
+        // Verificar se está bloqueada
+        if (pessoa.bloqueado === true) {
+            throw new Error('Pessoa bloqueada. Não é possível gerar QR code.');
         }
 
         // Se já tem um código, retorna. Se não tem, gera novo.
