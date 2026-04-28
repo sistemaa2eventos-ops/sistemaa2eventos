@@ -94,6 +94,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
                     'qr_code': 'QR CODE',
                     'barcode_ean13': 'EAN-13',
                     'barcode_128': 'CODE 128',
+                    'barcode_39': 'CODE 39',
                     'number_only': 'SOMENTE NÚMERO'
                 };
                 return (
@@ -385,6 +386,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
                                 <MenuItem value="qr_code">QR Code</MenuItem>
                                 <MenuItem value="barcode_ean13">EAN-13</MenuItem>
                                 <MenuItem value="barcode_128">CODE 128</MenuItem>
+                                <MenuItem value="barcode_39">CODE 39</MenuItem>
                             </Select>
                         </FormControl>
 

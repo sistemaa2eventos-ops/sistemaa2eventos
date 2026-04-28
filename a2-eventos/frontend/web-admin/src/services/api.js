@@ -12,7 +12,7 @@ const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 const api = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
+  timeout: 15000,  // Aumentado de 10s para 15s (dispositivos WiFi podem ser lentos)
   headers: {
     'Content-Type': 'application/json',
   },

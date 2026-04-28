@@ -156,25 +156,35 @@ export const useCheckin = (defaultMode) => {
 
         try {
             setManualSaving(true);
-            const payload = {
-                dispositivoId: 'web-dashboard',
-                evento_id: eventoId,
-                tipo: operationMode === 'auto' ? null : operationMode
-            };
+            let res;
 
-            if (metodo === 'qrcode') {
-                payload.qrCode = extraValue;
-            } else if (metodo === 'pulseira') {
-                payload.busca = targetPessoa.id;
-                payload.rfid = extraValue; // O código da pulseira vira o RFID para o backend
+            // CHECK-IN VIA PULSEIRA: Usar endpoint específico que vincula a pulseira à pessoa
+            if (metodo === 'pulseira') {
+                console.log('📱 Check-in via Pulseira:', { pessoa_id: targetPessoa.id, numero_pulseira: extraValue });
+                res = await api.post(`/access/pulseira/checkin`, {
+                    pessoa_id: targetPessoa.id,
+                    numero_pulseira: extraValue,
+                    tipo: operationMode === 'auto' ? null : operationMode
+                });
             } else {
-                payload.busca = targetPessoa.id;
+                // CHECK-IN MANUAL ou QRCODE: Usar fluxo existente
+                const payload = {
+                    dispositivoId: 'web-dashboard',
+                    evento_id: eventoId,
+                    tipo: operationMode === 'auto' ? null : operationMode
+                };
+
+                if (metodo === 'qrcode') {
+                    payload.qrCode = extraValue;
+                } else {
+                    payload.busca = targetPessoa.id;
+                }
+
+                res = await localCheckinService.realizarCheckin(payload, metodo === 'qrcode' ? 'qrcode' : 'manual');
             }
 
-            const res = await localCheckinService.realizarCheckin(payload, metodo === 'qrcode' ? 'qrcode' : 'manual');
-            
             const finalData = res.data?.data || res.data || res;
-            
+
             if (res.status === 'erro_negocio' || (finalData && finalData.tipo === 'negado')) {
                 setCheckinResult('negado');
                 setResultMessage(finalData.erro || finalData.observacao || 'Acesso não autorizado.');
