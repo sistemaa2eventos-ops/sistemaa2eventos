@@ -313,16 +313,25 @@ class ConfigController {
 
             // Atualizar áreas permitidas se fornecidas
             if (areas_permitidas !== undefined) {
+                logger.info(`🔄 Atualizando áreas para pulseira ${id}:`, { areas_permitidas });
+
                 // Remover áreas existentes
-                await supabase.from('pulseira_areas_permitidas').delete().eq('pulseira_id', id);
-                
+                const { error: deleteErr } = await supabase.from('pulseira_areas_permitidas').delete().eq('pulseira_id', id);
+                if (deleteErr) logger.warn(`⚠️ Erro ao deletar áreas antigas:`, deleteErr);
+
                 // Inserir novas áreas
                 if (Array.isArray(areas_permitidas) && areas_permitidas.length > 0) {
                     const permits = areas_permitidas.map(area_id => ({
                         pulseira_id: id,
                         area_id: area_id
                     }));
-                    await supabase.from('pulseira_areas_permitidas').insert(permits);
+                    logger.info(`📌 Inserindo ${permits.length} áreas:`, permits);
+                    const { error: insertErr } = await supabase.from('pulseira_areas_permitidas').insert(permits);
+                    if (insertErr) {
+                        logger.error(`❌ Erro ao inserir áreas:`, { message: insertErr.message, details: insertErr.details });
+                    } else {
+                        logger.info(`✅ Áreas inseridas com sucesso`);
+                    }
                 }
             }
 
