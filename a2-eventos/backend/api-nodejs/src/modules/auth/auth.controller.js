@@ -1,6 +1,7 @@
 const { supabase, supabasePublic } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const cacheService = require('../../services/cacheService');
+const emailService = require('../../services/emailService');
 const {
     validateEmail,
     validatePhone,
@@ -208,10 +209,11 @@ class AuthController {
                 };
             }
 
-            // Criar convite no Supabase Auth com link de redirecionamento para o frontend
-            const { data, error } = await supabase.auth.admin.inviteUserByEmail(normalizedEmail, {
-                redirectTo: `${process.env.FRONTEND_URL || 'https://painel.nzt.app.br'}/reset-password`,
-                data: {
+            // 1. Criar usuário no Supabase Auth (sem enviar email automático)
+            const { data, error } = await supabase.auth.admin.createUser({
+                email: normalizedEmail,
+                email_confirm: false,
+                user_metadata: {
                     nome_completo,
                     nivel_acesso: 'operador',
                     evento_id,
@@ -220,13 +222,26 @@ class AuthController {
             });
 
             if (error) {
-                logger.error(`Erro ao enviar convite: ${error.message}`);
+                logger.error(`Erro ao criar usuário: ${error.message}`);
                 return res.status(400).json({
-                    error: error.message || 'Erro ao enviar convite'
+                    error: error.message || 'Erro ao criar usuário'
                 });
             }
 
-            // Criar perfil com dados completos
+            // 2. Gerar link de ativação
+            const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+                type: 'invite',
+                email: normalizedEmail,
+                options: {
+                    redirectTo: `${process.env.FRONTEND_URL || 'https://painel.nzt.app.br'}/reset-password`
+                }
+            });
+
+            if (linkError) {
+                logger.warn(`Erro ao gerar link de ativação: ${linkError.message}`);
+            }
+
+            // 3. Criar perfil com dados completos
             // Sempre nível_acesso = 'operador' (não 'admin_master')
             const { error: perfilError } = await supabase
                 .from('perfis')
@@ -248,6 +263,17 @@ class AuthController {
                 return res.status(400).json({
                     error: 'Usuário criado no Supabase, mas houve erro ao salvar perfil.'
                 });
+            }
+
+            // 4. Enviar email de convite via SMTP customizado
+            const activationLink = linkData?.properties?.action_link;
+            if (activationLink) {
+                try {
+                    await emailService.sendOperatorInvite(normalizedEmail, nome_completo, activationLink);
+                } catch (emailError) {
+                    logger.error(`Erro ao enviar email de convite: ${emailError.message}`);
+                    // Não bloquear o fluxo se o email falhar - usuário foi criado
+                }
             }
 
             logger.info(`✅ Operador criado: ${normalizedEmail} (evento: ${evento_id}, status: pendente) por ${req.user.id}`);

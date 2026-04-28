@@ -267,6 +267,45 @@ class EmailService {
         }
     }
 
+    /**
+     * Envia convite de acesso ao painel administrativo para novo operador
+     * @param {string} email Email do operador
+     * @param {string} nomeOperador Nome completo do operador
+     * @param {string} link Link de ativação/reset-password
+     */
+    async sendOperatorInvite(email, nomeOperador, link) {
+        try {
+            const mailOptions = {
+                from: `"A2 Eventos - Painel Admin" <${process.env.SMTP_USER || 'no-reply@a2eventos.com.br'}>`,
+                to: email,
+                subject: `Você foi convidado para acessar o Painel A2 Eventos`,
+                html: `
+                    <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 12px; overflow: hidden;">
+                        <div style="background: #050B18; padding: 30px; text-align: center;">
+                            <h1 style="color: #00D4FF; margin: 0; font-size: 22px; letter-spacing: 2px;">A2 EVENTOS</h1>
+                            <p style="color: #8899BB; margin: 8px 0 0;">Painel Administrativo</p>
+                        </div>
+                        <div style="padding: 40px; color: #333; line-height: 1.6;">
+                            <p>Olá, <strong>${nomeOperador}</strong>.</p>
+                            <p>Você foi cadastrado como operador no sistema A2 Eventos. Para ativar seu acesso e definir sua senha, clique no botão abaixo:</p>
+                            <div style="text-align: center; margin: 35px 0;">
+                                <a href="${link}" style="background: linear-gradient(135deg, #00D4FF 0%, #094798 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">ATIVAR MINHA CONTA</a>
+                            </div>
+                            <p style="font-size: 13px; color: #777;"><em>Este link expira em 24 horas. Caso não reconheça este convite, ignore este e-mail.</em></p>
+                        </div>
+                        <div style="background: #f5f5f5; padding: 20px; text-align: center; font-size: 11px; color: #999;">
+                            © 2026 A2 Eventos | suporte@nzt.app.br
+                        </div>
+                    </div>
+                `
+            };
+            await this.transporter.sendMail(mailOptions);
+            logger.info(`📧 [Operator Invite] Convite enviado para: ${email}`);
+        } catch (error) {
+            logger.error(`❌ [Operator Invite] Erro ao enviar convite de operador para ${email}:`, error.message);
+            throw error;
+        }
+    }
 
 }
 
