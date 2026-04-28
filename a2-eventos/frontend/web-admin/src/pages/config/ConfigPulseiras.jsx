@@ -59,7 +59,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
         cor_hex: '#00D4FF',
         numero_inicial: '',
         numero_final: '',
-        tipo_leitura: 'combinada',
+        tipo_leitura: 'qr_code',
         areas_permitidas: [],
         prefixo_codigo: '',
         alerta_duplicidade: true,
@@ -191,7 +191,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
                 cor_hex: pulseira.cor_hex || '#00D4FF',
                 numero_inicial: pulseira.numero_inicial || '',
                 numero_final: pulseira.numero_final || '',
-                tipo_leitura: pulseira.tipo_leitura || 'combinada',
+                tipo_leitura: pulseira.tipo_leitura || 'qr_code',
                 areas_permitidas: pulseira.pulseira_areas_permitidas?.map(p => p.area_id) || [],
                 prefixo_codigo: pulseira.prefixo_codigo || '',
                 alerta_duplicidade: pulseira.alerta_duplicidade !== false,
@@ -204,7 +204,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
                 cor_hex: '#00D4FF',
                 numero_inicial: '',
                 numero_final: '',
-                tipo_leitura: 'combinada',
+                tipo_leitura: 'qr_code',
                 areas_permitidas: [],
                 prefixo_codigo: '',
                 alerta_duplicidade: true,
@@ -241,6 +241,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
                 numero_final: parseInt(numero_final),
                 tempo_confirmacao_checkout: parseInt(formData.tempo_confirmacao_checkout) || 3
             };
+            console.log('📤 Enviando payload de pulseira:', payload);
 
             if (editingId) {
                 await api.put(`/config/pulseiras/${editingId}`, payload);
@@ -380,10 +381,10 @@ const ConfigPulseiras = ({ embedded = false }) => {
                                 input={<OutlinedInput label="Método de Leitura Principal" />}
                                 MenuProps={MenuProps}
                             >
-                                <MenuItem value="numerada">Somente Número</MenuItem>
-                                <MenuItem value="qrcode">QR Code</MenuItem>
-                                <MenuItem value="barcode">Código de Barras</MenuItem>
-                                <MenuItem value="combinada">Combinada (QR + Código)</MenuItem>
+                                <MenuItem value="number_only">Somente Número</MenuItem>
+                                <MenuItem value="qr_code">QR Code</MenuItem>
+                                <MenuItem value="barcode_ean13">EAN-13</MenuItem>
+                                <MenuItem value="barcode_128">CODE 128</MenuItem>
                             </Select>
                         </FormControl>
 
