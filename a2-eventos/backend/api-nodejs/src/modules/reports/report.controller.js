@@ -53,7 +53,12 @@ class ReportController {
 
             res.json({ success: true, total: count || 0, data: report });
         } catch (error) {
-            logger.error('Erro ao gerar relatório diário:', error);
+            logger.error('Erro ao gerar relatório diário:', {
+                message: error.message,
+                code: error.code,
+                details: error.details,
+                stack: error.stack
+            });
             res.status(500).json({ error: 'Erro ao processar relatório' });
         }
     }
@@ -92,7 +97,12 @@ class ReportController {
 
             res.json({ success: true, summary });
         } catch (error) {
-            logger.error('Erro no resumo por empresa:', error);
+            logger.error('Erro no resumo por empresa:', {
+                message: error.message,
+                code: error.code,
+                details: error.details,
+                stack: error.stack
+            });
             res.status(500).json({ error: 'Erro interno' });
         }
     }
@@ -102,30 +112,70 @@ class ReportController {
             const { data_inicio, data_fim } = req.query;
             const evento_id = req.event.id;
 
-            let query = supabase.from('logs_acesso').select('area_id, tipo, created_at').eq('evento_id', evento_id);
+            // logs_acesso não possui area_id diretamente
+            // Obtemos dados dos logs vinculados aos dispositivos
+            let query = supabase
+                .from('logs_acesso')
+                .select('dispositivo_id, tipo, created_at, dispositivos(id, localizacao)')
+                .eq('evento_id', evento_id);
+
             if (data_inicio) query = query.gte('created_at', data_inicio);
             if (data_fim) query = query.lte('created_at', data_fim);
 
             const { data: logs, error } = await query;
             if (error) throw error;
 
-            const { data: areas } = await supabase.from('evento_areas').select('id, nome').eq('evento_id', evento_id);
-            const areaMap = (areas || []).reduce((acc, a) => { acc[a.id] = a.nome; return acc; }, {});
+            // Se não houver logs, retornar relatório vazio
+            if (!logs || logs.length === 0) {
+                return res.json({ success: true, data: [] });
+            }
 
+            // Agrupar por localização do dispositivo (ou por ID do dispositivo)
             const stats = {};
             logs.forEach(log => {
-                const areaNome = areaMap[log.area_id] || 'Área Padrão';
-                if (!stats[areaNome]) stats[areaNome] = { area: areaNome, entradas: 0, saidas: 0, picos: {} };
-                
-                if (log.tipo === 'checkin' || log.tipo === 'entrada') stats[areaNome].entradas++;
-                if (log.tipo === 'checkout' || log.tipo === 'saida') stats[areaNome].saidas++;
-                
+                const localizacao = log.dispositivos?.localizacao || 'Localização Desconhecida';
+                const key = log.dispositivo_id || 'unknown';
+
+                if (!stats[key]) {
+                    stats[key] = {
+                        area: localizacao,
+                        entradas: 0,
+                        saidas: 0,
+                        picos: {}
+                    };
+                }
+
+                if (log.tipo === 'checkin' || log.tipo === 'entrada') stats[key].entradas++;
+                if (log.tipo === 'checkout' || log.tipo === 'saida') stats[key].saidas++;
+
                 const hora = new Date(log.created_at).getHours();
-                stats[areaNome].picos[hora] = (stats[areaNome].picos[hora] || 0) + 1;
+                stats[key].picos[hora] = (stats[key].picos[hora] || 0) + 1;
             });
 
-            const data = Object.values(stats).map(s => {
-                const picoHora = Object.entries(s.picos).sort((a,b) => b[1] - a[1])[0];
+            // Consolidar por nome de área (agrupar dispositivos da mesma área)
+            const consolidado = {};
+            Object.values(stats).forEach(stat => {
+                const areaNome = stat.area;
+                if (!consolidado[areaNome]) {
+                    consolidado[areaNome] = {
+                        area: areaNome,
+                        entradas: 0,
+                        saidas: 0,
+                        picos: {}
+                    };
+                }
+                consolidado[areaNome].entradas += stat.entradas;
+                consolidado[areaNome].saidas += stat.saidas;
+
+                // Mesclar picos
+                Object.entries(stat.picos).forEach(([hora, qtd]) => {
+                    consolidado[areaNome].picos[hora] =
+                        (consolidado[areaNome].picos[hora] || 0) + qtd;
+                });
+            });
+
+            const data = Object.values(consolidado).map(s => {
+                const picoHora = Object.entries(s.picos).sort((a, b) => b[1] - a[1])[0];
                 return {
                     area: s.area,
                     entradas: s.entradas,
@@ -136,8 +186,16 @@ class ReportController {
 
             res.json({ success: true, data });
         } catch (error) {
-            logger.error('Erro no relatório por área:', error);
-            res.status(500).json({ error: 'Erro interno' });
+            logger.error('Erro no relatório por área:', {
+                message: error.message,
+                code: error.code,
+                details: error.details,
+                stack: error.stack
+            });
+            res.status(500).json({
+                error: 'Erro ao processar relatório',
+                details: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
         }
     }
 
@@ -170,7 +228,12 @@ class ReportController {
 
             res.json({ success: true, data: Object.values(stats) });
         } catch (error) {
-            logger.error('Erro no relatório por empresa:', error);
+            logger.error('Erro no relatório por empresa:', {
+                message: error.message,
+                code: error.code,
+                details: error.details,
+                stack: error.stack
+            });
             res.status(500).json({ error: 'Erro interno' });
         }
     }
@@ -195,17 +258,22 @@ class ReportController {
                 const disp = dispMap[log.dispositivo_id] || { nome: 'Terminal Desconhecido', localizacao: '—' };
                 const key = log.dispositivo_id || 'unknown';
                 if (!stats[key]) stats[key] = { terminal: disp.nome, localizacao: disp.localizacao, total: 0, entradas: 0, saidas: 0, erros: 0 };
-                
+
                 stats[key].total++;
                 if (log.tipo === 'checkin' || log.tipo === 'entrada') stats[key].entradas++;
                 else if (log.tipo === 'checkout' || log.tipo === 'saida') stats[key].saidas++;
-                
+
                 if (log.observacao?.toLowerCase().includes('erro') || log.observacao?.toLowerCase().includes('negado')) stats[key].erros++;
             });
 
             res.json({ success: true, data: Object.values(stats) });
         } catch (error) {
-            logger.error('Erro no relatório por leitor:', error);
+            logger.error('Erro no relatório por leitor:', {
+                message: error.message,
+                code: error.code,
+                details: error.details,
+                stack: error.stack
+            });
             res.status(500).json({ error: 'Erro interno' });
         }
     }
@@ -248,7 +316,12 @@ class ReportController {
 
             res.json({ success: true, data: Object.values(stats) });
         } catch (error) {
-            logger.error('Erro no relatório por função:', error);
+            logger.error('Erro no relatório por função:', {
+                message: error.message,
+                code: error.code,
+                details: error.details,
+                stack: error.stack
+            });
             res.status(500).json({ error: 'Erro interno' });
         }
     }
@@ -257,7 +330,7 @@ class ReportController {
         try {
             const evento_id = req.event.id;
             const { data: counts, error } = await supabase.rpc('count_pessoas_by_status', { ev_id: evento_id });
-            
+
             // Fallback se a RPC não existir
             if (error) {
                 const { data: pessoas } = await supabase.from('pessoas').select('status_acesso').eq('evento_id', evento_id);
@@ -272,7 +345,12 @@ class ReportController {
 
             res.json({ success: true, data: counts });
         } catch (error) {
-            logger.error('Erro no relatório por status:', error);
+            logger.error('Erro no relatório por status:', {
+                message: error.message,
+                code: error.code,
+                details: error.details,
+                stack: error.stack
+            });
             res.status(500).json({ error: 'Erro interno' });
         }
     }
@@ -283,7 +361,7 @@ class ReportController {
     async getRanking(req, res) {
         try {
             const evento_id = req.event.id;
-            
+
             const { data: settingsData } = await supabase
                 .from('system_settings')
                 .select('gamification_enabled, gamification_points_scan, gamification_points_earlybird, gamification_points_checkin')
@@ -340,7 +418,12 @@ class ReportController {
             const ranking = Object.values(scores).sort((a, b) => b.score - a.score).slice(0, 10);
             res.json({ success: true, enabled: true, data: ranking });
         } catch (error) {
-            logger.error('Erro ao gerar ranking:', error);
+            logger.error('Erro ao gerar ranking:', {
+                message: error.message,
+                code: error.code,
+                details: error.details,
+                stack: error.stack
+            });
             res.status(500).json({ error: 'Erro ao calcular gamificação' });
         }
     }
@@ -375,7 +458,12 @@ class ReportController {
             res.setHeader('Content-Type', 'application/pdf');
             res.send(pdfBuffer);
         } catch (error) {
-            logger.error('Erro ao gerar PDF de presença:', error);
+            logger.error('Erro ao gerar PDF de presença:', {
+                message: error.message,
+                code: error.code,
+                details: error.details,
+                stack: error.stack
+            });
             res.status(500).json({ error: 'Falha ao gerar relatório PDF.' });
         }
     }
