@@ -328,7 +328,8 @@ class ConfigController {
                     logger.info(`📌 Inserindo ${permits.length} áreas:`, permits);
                     const { error: insertErr } = await supabase.from('pulseira_areas_permitidas').insert(permits);
                     if (insertErr) {
-                        logger.error(`❌ Erro ao inserir áreas:`, { message: insertErr.message, details: insertErr.details });
+                        logger.error(`❌ Erro ao inserir áreas: ${JSON.stringify(insertErr)}`);
+                        throw insertErr;
                     } else {
                         logger.info(`✅ Áreas inseridas com sucesso`);
                     }
