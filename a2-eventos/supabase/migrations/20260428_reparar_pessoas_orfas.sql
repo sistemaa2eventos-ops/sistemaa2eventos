@@ -47,8 +47,7 @@ WHERE NOT EXISTS (
 AND EXISTS (
     SELECT 1 FROM empresas e
     WHERE e.evento_id = p.evento_id
-)
-ON CONFLICT (pessoa_id, evento_id, empresa_id) DO NOTHING;
+);
 
 -- 4. Verificar resultado
 SELECT
