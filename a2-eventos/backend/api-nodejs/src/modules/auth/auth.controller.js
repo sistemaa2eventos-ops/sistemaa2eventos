@@ -875,6 +875,66 @@ class AuthController {
             });
         }
     }
+
+    /**
+     * Deletar usuário (operador)
+     */
+    async deleteUser(req, res) {
+        try {
+            const { userId } = req.params;
+
+            // Só admin_master pode deletar
+            if (req.user?.nivel_acesso !== 'admin_master') {
+                return res.status(403).json({
+                    error: 'Apenas admin_master pode deletar usuários.'
+                });
+            }
+
+            // Não permitir deletar admin_master
+            const { data: perfilData, error: perfilError } = await supabase
+                .from('perfis')
+                .select('nivel_acesso')
+                .eq('id', userId)
+                .single();
+
+            if (perfilError || !perfilData) {
+                return res.status(404).json({
+                    error: 'Usuário não encontrado.'
+                });
+            }
+
+            if (perfilData.nivel_acesso === 'admin_master') {
+                return res.status(403).json({
+                    error: 'Não é possível deletar um admin_master.'
+                });
+            }
+
+            // Deletar do Supabase Auth
+            const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+            if (authError) {
+                logger.warn(`Erro ao deletar usuário do Supabase Auth: ${authError.message}`);
+            }
+
+            // Deletar do perfis
+            const { error: deleteError } = await supabase
+                .from('perfis')
+                .delete()
+                .eq('id', userId);
+
+            if (deleteError) throw deleteError;
+
+            logger.info(`🗑️  Operador deletado: ${userId} por ${req.user.id}`);
+
+            res.json({
+                success: true,
+                message: 'Operador deletado com sucesso'
+            });
+
+        } catch (error) {
+            logger.error('Erro ao deletar usuário:', error);
+            res.status(500).json({ error: 'Erro ao deletar usuário' });
+        }
+    }
 }
 
 module.exports = new AuthController();

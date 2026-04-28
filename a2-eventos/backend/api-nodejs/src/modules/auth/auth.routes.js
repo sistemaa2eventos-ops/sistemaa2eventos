@@ -43,6 +43,9 @@ router.put('/users/:userId', authenticate, authorize('admin_master'), authContro
 // Ativar/Inativar usuário (apenas admin_master) — FIX C-06
 router.patch('/users/:userId/status', authenticate, authorize('admin_master'), authController.updateUserStatus);
 
+// Deletar usuário (apenas admin_master) — FIX C-06
+router.delete('/users/:userId', authenticate, authorize('admin_master'), authController.deleteUser);
+
 // ============================================
 // ADMIN: Reset de senha
 // ============================================
