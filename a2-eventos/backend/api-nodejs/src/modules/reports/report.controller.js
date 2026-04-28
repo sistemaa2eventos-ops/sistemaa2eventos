@@ -112,6 +112,13 @@ class ReportController {
             const { data_inicio, data_fim } = req.query;
             const evento_id = req.event.id;
 
+            logger.info(`📊 porArea solicitado`, {
+                evento_id,
+                data_inicio,
+                data_fim,
+                user: req.event?.user_id
+            });
+
             // logs_acesso não possui area_id diretamente
             // Obtemos dados dos logs vinculados aos dispositivos
             let query = supabase
@@ -123,7 +130,15 @@ class ReportController {
             if (data_fim) query = query.lte('created_at', data_fim);
 
             const { data: logs, error } = await query;
-            if (error) throw error;
+            if (error) {
+                logger.error(`❌ Erro na query porArea:`, {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details,
+                    status: error.status
+                });
+                throw error;
+            }
 
             // Se não houver logs, retornar relatório vazio
             if (!logs || logs.length === 0) {
@@ -186,15 +201,19 @@ class ReportController {
 
             res.json({ success: true, data });
         } catch (error) {
-            logger.error('Erro no relatório por área:', {
-                message: error.message,
+            const errorInfo = {
+                message: error.message || String(error),
                 code: error.code,
+                status: error.status,
+                hint: error.hint,
                 details: error.details,
-                stack: error.stack
-            });
+                fullError: JSON.stringify(error)
+            };
+            console.error('❌ ERRO porArea:', errorInfo);
+            logger.error('Erro no relatório por área: ' + JSON.stringify(errorInfo));
             res.status(500).json({
                 error: 'Erro ao processar relatório',
-                details: process.env.NODE_ENV === 'development' ? error.message : undefined
+                details: process.env.NODE_ENV === 'development' ? errorInfo.message : undefined
             });
         }
     }
