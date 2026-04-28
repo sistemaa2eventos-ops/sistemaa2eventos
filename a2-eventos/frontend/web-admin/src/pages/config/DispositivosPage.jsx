@@ -40,7 +40,7 @@ const queueChip = (s) => ({ sucesso: 'success', erro: 'error', pendente: 'warnin
 const FORM_DEFAULT = {
   id: null, nome: '', marca: 'intelbras', tipo: 'terminal_facial',
   ip_address: '', porta: 80, user_device: 'admin', password_device: '',
-  modo: 'ambos', area_nome: '', offline_mode: 'fail_closed',
+  modo: 'ambos', area_id: null, area_nome: '', offline_mode: 'fail_closed',
   config: { fluxo: 'checkin', controla_rele: true }
 };
 
@@ -49,6 +49,7 @@ export default function DispositivosPage() {
 
   const [dispositivos, setDispositivos] = useState([]);
   const [queue, setQueue] = useState([]);
+  const [areas, setAreas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
 
@@ -77,12 +78,14 @@ export default function DispositivosPage() {
     try {
       setLoading(true);
       const eventoId = new URLSearchParams(window.location.search).get('evento_id') || localStorage.getItem('active_evento_id');
-      const [devRes, queueRes] = await Promise.allSettled([
+      const [devRes, queueRes, areasRes] = await Promise.allSettled([
         api.get('/dispositivos', { params: { evento_id: eventoId } }),
-        api.get('/dispositivos/queue', { params: { evento_id: eventoId } })
+        api.get('/dispositivos/queue', { params: { evento_id: eventoId } }),
+        api.get('/config/areas', { params: { evento_id: eventoId } })
       ]);
       setDispositivos(devRes.status === 'fulfilled' ? (devRes.value.data?.data ?? []) : []);
       setQueue(queueRes.status === 'fulfilled' ? (queueRes.value.data?.data ?? []) : []);
+      setAreas(areasRes.status === 'fulfilled' ? (areasRes.value.data?.data ?? []) : []);
     } catch (err) {
       enqueueSnackbar('Erro ao carregar dados: ' + err.message, { variant: 'error' });
     } finally {
@@ -215,7 +218,10 @@ export default function DispositivosPage() {
     if (!testIp) return;
     setTestDialog(p => ({ ...p, testing: true, result: null }));
     try {
-      const res = await api.post('/dispositivos/test-connection', { ip_address: testIp, porta: testPorta });
+      const res = await api.post('/dispositivos/test-connection', { ip_address: testIp, porta: testPorta }, {
+        timeout: 15000,  // 15 segundos - dispositivos WiFi podem ser lentos
+        hideDefaultError: true
+      });
       setTestDialog(p => ({ ...p, testing: false, result: { ok: true, msg: res.data.message } }));
     } catch (err) {
       const msg = err.response?.data?.error || err.message;
@@ -664,8 +670,24 @@ export default function DispositivosPage() {
                 </FormControl>
               </Grid>
               <Grid item xs={6}>
-                <TextField label="Área / Local" name="area_nome" value={formData.area_nome} onChange={handleFormChange}
-                  fullWidth size="small" placeholder="Ex: Entrada Principal" />
+                <FormControl fullWidth size="small">
+                  <InputLabel id="area-label">Área / Local</InputLabel>
+                  <Select labelId="area-label" inputProps={{ id: 'area-select', name: 'area_id' }}
+                    value={formData.area_id || ''} label="Área / Local"
+                    onChange={(e) => {
+                      const selected = areas.find(a => a.id === e.target.value);
+                      setFormData(p => ({
+                        ...p,
+                        area_id: e.target.value,
+                        area_nome: selected?.nome_area || ''
+                      }));
+                    }}>
+                    <MenuItem value=""><em>Nenhuma</em></MenuItem>
+                    {areas.map(area => (
+                      <MenuItem key={area.id} value={area.id}>{area.nome_area}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </Grid>
             </Grid>
 
