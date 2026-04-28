@@ -8,7 +8,7 @@ import {
     Add as AddIcon, Edit as EditIcon,
     Search as SearchIcon, Email as EmailIcon, LockReset as ResetIcon,
     CheckCircle as AtivoIcon, HourglassEmpty as PendenteIcon, Cancel as InativoIcon,
-    Check as ApproveIcon
+    Check as ApproveIcon, Delete as DeleteIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 
@@ -50,7 +50,7 @@ const Usuarios = () => {
         selectedUser, setSelectedUser, formData, setFormData,
         openPasswordDialog, setOpenPasswordDialog,
         resetingPassword, handleResetPassword,
-        handleOpenDialog, handleSave, handleApprove, handleToggleStatus
+        handleOpenDialog, handleSave, handleApprove, handleToggleStatus, handleDeleteUser
     } = useUsuarios();
     const { user: currentUser } = useAuth();
     const [newPassword, setNewPassword] = useState('');
@@ -104,13 +104,16 @@ const Usuarios = () => {
         {
             id: 'eventos', label: 'VÍNCULO', minWidth: 150,
             format: (val, row) => {
+                // Tentar buscar o nome do evento de várias formas
                 if (typeof val === 'object' && val?.nome) return val.nome;
+                if (row?.eventos?.nome) return row.eventos.nome;
                 if (row?.events?.nome) return row.events.nome;
-                return 'Global';
+                if (row?.evento_nome) return row.evento_nome;
+                return row?.evento_id ? `Evento: ${row.evento_id.substring(0, 8)}...` : 'Sem vínculo';
             }
         },
         {
-            id: 'acoes', label: 'AÇÕES', minWidth: 100, align: 'center',
+            id: 'acoes', label: 'AÇÕES', minWidth: 120, align: 'center',
             format: (_, row) => {
                 const canManage = isAdmin && row.nivel_acesso !== 'admin_master';
 
@@ -138,6 +141,11 @@ const Usuarios = () => {
                                 </span>
                             </Tooltip>
                         )}
+                        <Tooltip title={canManage ? "Deletar Operador" : "Privilégio Insuficiente"}>
+                            <span>
+                                <IconButton size="small" disabled={!canManage} onClick={() => { setSelectedUser(row); setOpenDeleteConfirm(true); }} sx={{ color: '#FF3366' }}><DeleteIcon fontSize="small" /></IconButton>
+                            </span>
+                        </Tooltip>
                     </Stack>
                 );
             },
@@ -239,6 +247,30 @@ const Usuarios = () => {
                 <DialogActions sx={{ p: 3 }}>
                     <Button onClick={() => setOpenPasswordDialog(false)} disabled={resetingPassword}>CANCELAR</Button>
                     <NeonButton onClick={() => handleResetPassword(selectedUser.id, newPassword)} loading={resetingPassword}>CONFIRMAR RESET</NeonButton>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={_openDeleteConfirm} onClose={() => setOpenDeleteConfirm(false)} maxWidth="xs" fullWidth>
+                <DialogTitle sx={{ fontFamily: 'Orbitron', fontWeight: 700, color: '#FF3366' }}>DELETAR OPERADOR</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" sx={{ mt: 2, mb: 2, color: 'text.primary' }}>
+                        Tem certeza que deseja deletar o operador <b>{selectedUser?.nome_completo}</b>?
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                        ⚠️ Esta ação não pode ser desfeita. O operador perderá acesso ao sistema.
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ p: 3 }}>
+                    <Button onClick={() => setOpenDeleteConfirm(false)} sx={{ color: 'text.secondary' }}>CANCELAR</Button>
+                    <Button
+                        onClick={() => {
+                            handleDeleteUser(selectedUser.id);
+                            setOpenDeleteConfirm(false);
+                        }}
+                        sx={{ color: '#FF3366', fontWeight: 'bold', '&:hover': { background: 'rgba(255, 51, 102, 0.1)' } }}
+                    >
+                        CONFIRMAR DELETE
+                    </Button>
                 </DialogActions>
             </Dialog>
         </Box>

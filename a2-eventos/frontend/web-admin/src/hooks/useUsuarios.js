@@ -222,6 +222,16 @@ export const useUsuarios = () => {
         }
     };
 
+    const handleDeleteUser = async (userId) => {
+        try {
+            await api.delete(`/auth/users/${userId}`);
+            enqueueSnackbar('Operador deletado com sucesso!', { variant: 'success' });
+            loadUsuarios();
+        } catch (error) {
+            enqueueSnackbar(error.response?.data?.error || 'Erro ao deletar operador.', { variant: 'error' });
+        }
+    };
+
     return {
         usuarios, eventos, loading, search, setSearch,
         page, setPage, totalCount: usuarios.length,
@@ -231,7 +241,7 @@ export const useUsuarios = () => {
         resetingPassword,
         selectedUser, setSelectedUser, formData, setFormData,
         userToDelete: selectedUser, setUserToDelete,
-        handleOpenDialog, handleSave, handleApprove, handleToggleStatus, handleResetPassword,
+        handleOpenDialog, handleSave, handleApprove, handleToggleStatus, handleResetPassword, handleDeleteUser,
         MODULOS
     };
 };
