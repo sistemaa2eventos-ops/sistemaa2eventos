@@ -1,8 +1,5 @@
--- ============================================
--- Migração: Reparar pessoas órfãs
--- Data: 2026-04-28
--- Descrição: Encontra pessoas sem vínculo na pivot e cria os registros
--- ============================================
+-- Migração: Reparar pessoas órfãs (2026-04-28)
+-- Encontra pessoas sem vínculo na pivot e cria os registros
 
 -- 1. Ver quantas pessoas órfãs existem
 SELECT
@@ -32,8 +29,7 @@ WHERE NOT EXISTS (
 )
 ORDER BY p.criado_em DESC;
 
--- 3. Criar registros de pivot para pessoas órfãs
--- Para cada pessoa órfã, vincular à PRIMEIRA empresa do evento
+-- 3. Criar registros de pivot para pessoas órfãs (vincular a primeira empresa do evento)
 INSERT INTO pessoa_evento_empresa (pessoa_id, evento_id, empresa_id, status_aprovacao, cargo_funcao)
 SELECT DISTINCT
     p.id,
