@@ -28,7 +28,7 @@ WHERE NOT EXISTS (
 );
 
 -- 3. Criar registros de pivot para pessoas órfãs (vincular a primeira empresa do evento)
-INSERT INTO pessoa_evento_empresa (pessoa_id, evento_id, empresa_id, status_aprovacao, cargo_funcao)
+INSERT INTO pessoa_evento_empresa (pessoa_id, evento_id, empresa_id, status_aprovacao, cargo_funcao, created_at, updated_at)
 SELECT DISTINCT
     p.id,
     p.evento_id,
@@ -37,8 +37,10 @@ SELECT DISTINCT
         WHERE e.evento_id = p.evento_id
         LIMIT 1
     ) as empresa_id,
-    'pendente' as status_aprovacao,
-    'Participante' as cargo_funcao
+    'aprovado' as status_aprovacao,
+    'Participante' as cargo_funcao,
+    CURRENT_TIMESTAMP as created_at,
+    CURRENT_TIMESTAMP as updated_at
 FROM pessoas p
 WHERE NOT EXISTS (
     SELECT 1 FROM pessoa_evento_empresa pee

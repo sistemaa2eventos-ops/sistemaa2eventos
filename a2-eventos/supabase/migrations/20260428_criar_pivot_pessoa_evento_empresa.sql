@@ -24,8 +24,8 @@ CREATE TABLE IF NOT EXISTS pessoa_evento_empresa (
     status_aprovacao VARCHAR(20) DEFAULT 'pendente'
         CHECK (status_aprovacao IN ('pendente', 'aprovado', 'recusado')),
     cargo_funcao VARCHAR(255) DEFAULT 'Participante',
-    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     -- Garantir que uma pessoa não pode ser vinculada 2x ao mesmo evento/empresa
     UNIQUE(pessoa_id, evento_id, empresa_id)
@@ -68,11 +68,11 @@ CREATE POLICY "admin_can_delete" ON pessoa_evento_empresa
     FOR DELETE
     USING ((auth.jwt() ->> 'nivel_acesso') = 'admin_master');
 
--- 10. Criar função para atualizar atualizado_em automaticamente
+-- 10. Criar função para atualizar updated_at automaticamente
 CREATE OR REPLACE FUNCTION update_pessoa_evento_empresa_timestamp()
 RETURNS TRIGGER AS $$
 BEGIN
-    NEW.atualizado_em = CURRENT_TIMESTAMP;
+    NEW.updated_at = CURRENT_TIMESTAMP;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
