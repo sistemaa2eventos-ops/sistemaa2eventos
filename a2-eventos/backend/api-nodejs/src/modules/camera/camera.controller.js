@@ -5,6 +5,7 @@
 
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
+const websocketService = require('../../services/websocketService');
 
 /**
  * POST /api/detections
@@ -79,8 +80,7 @@ const handleDetection = async (req, res) => {
             };
 
             // Broadcast para todos os clientes WebSocket
-            // TODO: Integrar com Socket.IO do sistema A2
-            // io.emit('system:alert', alert);
+            websocketService.emit('system:alert', alert);
 
             logger.warn(`🚨 ALERTA WATCHLIST: ${nome || plate} em ${camera_name}`);
         }

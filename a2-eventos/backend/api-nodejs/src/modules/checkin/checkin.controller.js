@@ -426,8 +426,10 @@ class AccessController {
     // NOVO: CHECK-IN VIA PULSEIRA
     // ============================================
     async checkinPulseira(req, res) {
+        let numero_pulseira;
         try {
-            const { pessoa_id, numero_pulseira } = req.body;
+            const { pessoa_id } = req.body;
+            numero_pulseira = req.body.numero_pulseira;
             const eventoId = req.event?.id;
             const supabaseClient = req.supabase || supabase;
 
@@ -559,8 +561,9 @@ class AccessController {
     }
 
     async checkoutPulseira(req, res) {
+        let numero_pulseira;
         try {
-            const { numero_pulseira } = req.body;
+            numero_pulseira = req.body.numero_pulseira;
             const eventoId = req.event?.id;
             const supabaseClient = req.supabase || supabase;
 

@@ -146,7 +146,7 @@ class ReportController {
 
             // Buscar todos os dispositivos do evento
             const { data: dispositivos, error: dispError } = await supabase
-                .from('dispositivos')
+                .from('dispositivos_acesso')
                 .select('id, localizacao')
                 .eq('evento_id', evento_id);
 
@@ -249,19 +249,21 @@ class ReportController {
             const { data: logs, error } = await query;
             if (error) throw error;
 
-            const { data: pessoasCount } = await supabase.from('pessoas').select('empresa_id, status_acesso').eq('evento_id', evento_id);
+            const { data: pessoasCount } = await supabase.from('pessoas').select('empresa_id, status_acesso, empresas(nome)').eq('evento_id', evento_id);
 
             const stats = {};
+            // Contar todas as pessoas por empresa (independente de terem logs no período)
+            (pessoasCount || []).forEach(p => {
+                const empNome = p.empresas?.nome || 'Sem Empresa';
+                if (!stats[empNome]) stats[empNome] = { empresa: empNome, pessoas: 0, entradas: 0, saidas: 0, bloqueados: 0, expulsos: 0 };
+                stats[empNome].pessoas++;
+            });
+
             logs.forEach(log => {
                 const empNome = log.pessoas?.empresas?.nome || 'Sem Empresa';
                 if (!stats[empNome]) stats[empNome] = { empresa: empNome, pessoas: 0, entradas: 0, saidas: 0, bloqueados: 0, expulsos: 0 };
                 if (log.tipo === 'checkin' || log.tipo === 'entrada') stats[empNome].entradas++;
                 if (log.tipo === 'checkout' || log.tipo === 'saida') stats[empNome].saidas++;
-            });
-
-            pessoasCount.forEach(p => {
-                // Aqui precisaríamos do nome da empresa para as pessoas que não tiveram logs no período.
-                // Para simplificar e manter performance, focamos em quem teve logs ou usamos o summary anterior.
             });
 
             res.json({ success: true, data: Object.values(stats) });
@@ -288,7 +290,7 @@ class ReportController {
             const { data: logs, error } = await query;
             if (error) throw error;
 
-            const { data: dispositivos } = await supabase.from('dispositivos').select('id, nome, localizacao').eq('evento_id', evento_id);
+            const { data: dispositivos } = await supabase.from('dispositivos_acesso').select('id, nome, localizacao').eq('evento_id', evento_id);
             const dispMap = (dispositivos || []).reduce((acc, d) => { acc[d.id] = d; return acc; }, {});
 
             const stats = {};
@@ -331,24 +333,26 @@ class ReportController {
             const stats = {};
             pessoas.forEach(p => {
                 const func = p.funcao || 'NÃO DEFINIDO';
-                if (!stats[func]) stats[func] = { funcao: func, total: 0, presentes: 0, entradas_hoje: 0, saidas_hoje: 0 };
+                if (!stats[func]) stats[func] = { funcao: func, total: 0, presentes: 0, entradas_periodo: 0, saidas_periodo: 0 };
                 stats[func].total++;
                 if (p.status_acesso === 'checkin_feito' || p.status_acesso === 'entrada') stats[func].presentes++;
             });
 
-            // Buscar logs de hoje para as colunas extras
-            const hoje = new Date().toISOString().split('T')[0];
-            const { data: logsHoje } = await supabase
+            // Buscar logs do período filtrado (data_inicio/data_fim ou hoje como padrão)
+            const inicioPadrao = `${new Date().toISOString().split('T')[0]}T00:00:00`;
+            let logsQuery = supabase
                 .from('logs_acesso')
                 .select('tipo, pessoas!inner(funcao)')
                 .eq('evento_id', evento_id)
-                .gte('created_at', `${hoje}T00:00:00`);
+                .gte('created_at', data_inicio || inicioPadrao);
+            if (data_fim) logsQuery = logsQuery.lte('created_at', data_fim);
+            const { data: logsHoje } = await logsQuery;
 
             (logsHoje || []).forEach(log => {
                 const func = log.pessoas?.funcao || 'NÃO DEFINIDO';
                 if (stats[func]) {
-                    if (log.tipo === 'checkin' || log.tipo === 'entrada') stats[func].entradas_hoje++;
-                    if (log.tipo === 'checkout' || log.tipo === 'saida') stats[func].saidas_hoje++;
+                    if (log.tipo === 'checkin' || log.tipo === 'entrada') stats[func].entradas_periodo++;
+                    if (log.tipo === 'checkout' || log.tipo === 'saida') stats[func].saidas_periodo++;
                 }
             });
 
