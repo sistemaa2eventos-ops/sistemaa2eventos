@@ -427,10 +427,11 @@ class AccessController {
     // ============================================
     async checkinPulseira(req, res) {
         let numero_pulseira;
+        let eventoId;
         try {
             const { pessoa_id } = req.body;
             numero_pulseira = req.body.numero_pulseira;
-            const eventoId = req.event?.id;
+            eventoId = req.event?.id;
             const supabaseClient = req.supabase || supabase;
 
             if (!pessoa_id || !numero_pulseira) {
@@ -562,9 +563,10 @@ class AccessController {
 
     async checkoutPulseira(req, res) {
         let numero_pulseira;
+        let eventoId;
         try {
             numero_pulseira = req.body.numero_pulseira;
-            const eventoId = req.event?.id;
+            eventoId = req.event?.id;
             const supabaseClient = req.supabase || supabase;
 
             if (!numero_pulseira) {
