@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -w \"\\\\nHTTP_CODE: %{http_code}\\\\n\" https://painel.nzt.app.br/health)",
+      "Bash(curl -s -w \"\\\\nHTTP_CODE: %{http_code}\\\\n\" \"https://painel.nzt.app.br/api/reports/daily\")",
+      "Bash(curl -s -w \"\\\\nHTTP_CODE: %{http_code}\\\\n\" \"https://painel.nzt.app.br/api/eventos\")",
+      "Bash(curl -s -I https://painel.nzt.app.br)",
+      "Bash(curl -s \"https://painel.nzt.app.br/\")",
+      "Bash(bash /tmp/vps_status.sh)",
+      "Bash(bash /tmp/update_vps.sh)",
+      "Bash(curl -s -H \"Authorization: Bearer test\" \"http://localhost:3001/api/reports/por-area?evento_id=test\")",
+      "Bash(curl -s -w \"\\\\nHTTP_CODE: %{http_code}\\\\n\" https://painel.nzt.app.br/api/reports/por-area?evento_id=4e1b5934-034d-4e61)",
+      "Bash(ssh -o ConnectTimeout=5 root@painel.nzt.app.br \"cd ~/Projeto_A2_Eventos/a2-eventos && docker-compose logs api --tail=50 | grep -A 5 'porArea\\\\|area\\\\|error' | tail -30\")",
+      "Bash(curl -v \"https://painel.nzt.app.br/api/reports/por-area?evento_id=4e1b5934-034d-4e61-8c7e-11e3da4f3a8&data_inicio=2026-04-28T00:00&data_fim=2026-04-28T23:59\")",
+      "Bash(curl -s 'https://painel.nzt.app.br/api/reports/por-area?evento_id=4e1b5934-034d-4e61-8c7e-11e3da4f3a8' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c')",
+      "Bash(curl -s -w '\\\\nHTTP_CODE: %{http_code}\\\\n' 'https://painel.nzt.app.br/api/reports/por-area?evento_id=4e1b5934-034d-4e61-8c7e-11e3da4f3a8&data_inicio=2026-04-28T00:00&data_fim=2026-04-28T23:59&empresa_id=' -H 'Authorization: Bearer test_token')",
+      "Bash(bash /tmp/verify_smtp_implementation.sh)",
+      "Bash(grep -i \"\\\\.jsx\\\\|\\\\.js$\")",
+      "Bash(docker-compose -f a2-eventos/docker-compose.yml config --services)",
+      "Read(//c//**)",
+      "Bash(grep -n \"buscarPessoaPulseira\\\\|checkinFacial\" c:\\\\\\\\Projetos\\\\\\\\Projeto_A2_Eventos\\\\\\\\a2-eventos\\\\\\\\backend\\\\\\\\api-nodejs\\\\\\\\src\\\\\\\\modules\\\\\\\\checkin\\\\\\\\checkin.controller.js)",
+      "Bash(docker-compose -f ~/Projeto_A2_Eventos/docker-compose.yml build a2_eventos_admin_web --no-cache)",
+      "Read(//mnt/**)"
+    ],
+    "additionalDirectories": [
+      "\\tmp",
+      "C:\\Users\\SD_Ad\\.claude\\projects\\c--Projetos-Projeto-A2_Eventos\\memory"
+    ]
+  }
+}

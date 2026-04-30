@@ -1,0 +1,28 @@
+{
+    "success": {
+        "module_toggled": "Estado del módulo actualizado con éxito.",
+        "checkin": "Registro de entrada exitoso",
+        "checkout": "Registro de salida exitoso",
+        "access_granted": "Acceso concedido",
+        "sync": "Datos sincronizados con éxito"
+    },
+    "error": {
+        "internal_server": "Error interno del servidor",
+        "not_authenticated": "No autenticado",
+        "module_disabled_qrcode": "Módulo de registro con código QR deshabilitado para este evento.",
+        "module_disabled_barcode": "Módulo de registro con código de barras deshabilitado para este evento.",
+        "module_disabled_face": "Módulo de reconocimiento facial deshabilitado para este evento.",
+        "qr_required": "El código QR es obligatorio",
+        "barcode_required": "El parámetro de búsqueda es obligatorio",
+        "face_required": "Datos faciales incompletos",
+        "rfid_required": "La etiqueta RFID es obligatoria",
+        "credential_not_found": "Credencial no encontrada o evento no válido",
+        "already_checked_in": "La persona ya ha registrado su entrada",
+        "not_checked_in": "La persona no está registrada en el evento",
+        "phase_not_allowed": "Fase del evento no permitida para tu perfil",
+        "blocked_person": "Persona bloqueada",
+        "blocked_company": "Empresa bloqueada",
+        "incomplete_registration": "Registro incompleto (Pendiente)",
+        "date_not_allowed": "Acceso no autorizado para la fecha de hoy"
+    }
+}

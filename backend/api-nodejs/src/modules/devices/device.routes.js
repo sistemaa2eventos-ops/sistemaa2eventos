@@ -1,0 +1,46 @@
+const express = require('express');
+const router = express.Router();
+const { authenticate, authorize } = require('../../middleware/auth');
+const { requireEvent } = require('../../middleware/eventMiddleware');
+const { supabase } = require('../../config/supabase');
+const logger = require('../../services/logger');
+
+const deviceController = require('./device.controller');
+
+// Todas as rotas de dispositivos requerem autenticação e contexto de evento
+router.use(authenticate);
+router.use(requireEvent);
+
+// Listar dispositivos
+router.get('/', deviceController.list);
+
+// Cadastrar dispositivo (Admin/Supervisor)
+router.post('/', authorize('admin', 'supervisor'), deviceController.create);
+
+// Testar conexão
+router.post('/test-connection', authorize('admin', 'supervisor'), deviceController.testConnection);
+
+// Deletar dispositivo (Admin)
+router.delete('/:id', authorize('admin'), deviceController.delete);
+
+// Forçar sincronização de faces (Admin/Supervisor)
+router.post('/:id/sync', authorize('admin', 'supervisor'), deviceController.sync);
+
+// Configurar Push de Eventos (Intelbras)
+router.post('/:id/configure-push', authorize('admin', 'supervisor'), deviceController.configurePush);
+
+// Pegar Snapshot (JPEG) da câmera proxy
+router.get('/:id/snapshot', deviceController.getSnapshot);
+
+/**
+ * Atualizar configuração de dispositivo
+ */
+router.put('/:id', authorize('admin', 'supervisor'), deviceController.update);
+
+/**
+ * Imprimir etiqueta/credencial via impressora térmica
+ */
+router.post('/print-label', authorize('admin', 'supervisor', 'operador'), deviceController.printLabel);
+
+module.exports = router;
+

@@ -1,0 +1,29 @@
+# A2 Eventos - Face Recognition Microservice Configuration
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1
+  debug: false
+
+face_recognition:
+  tolerance: 0.6
+  min_face_size: 150
+  quality_threshold: 0.7
+  cache_size: 100
+  model: "hog"  # hog (CPU) ou cnn (GPU)
+
+cameras: []
+  # - id: "cam-entrada-1"
+  #   url: "rtsp://admin:senha@192.168.1.100:554/cam/realmonitor"
+  #   location: "Entrada Principal"
+
+database:
+  supabase_url: ""
+  supabase_key: ""
+  sql_server_host: "PC-DO-ADORNO\\SQLEXPRESS"
+  sql_server_db: "A2Eventos"
+
+logging:
+  level: "INFO"
+  file: "logs/face_service.log"

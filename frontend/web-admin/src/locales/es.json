@@ -1,0 +1,21 @@
+{
+    "sidebar": {
+        "dashboard": "Panel de Control",
+        "events": "Eventos",
+        "people": "Personas",
+        "reports": "Informes",
+        "monitor": "Monitor en Vivo",
+        "devices": "Dispositivos",
+        "settings": "Configuraciones",
+        "logout": "Cerrar Sesión"
+    },
+    "dashboard": {
+        "title": "Resumen",
+        "total_events": "Total de Eventos",
+        "total_people": "Total de Personas",
+        "active_devices": "Dispositivos Activos",
+        "total_accesses": "Accesos Registrados",
+        "recent_events": "Eventos Recientes",
+        "recent_activity": "Actividad Reciente"
+    }
+}

@@ -1,0 +1,15 @@
+{
+    "registration": {
+        "title": "Acreditación Oficial",
+        "subtitle": "Complete sus datos para solicitar acceso.",
+        "document": "Documento / Pasaporte",
+        "full_name": "Nombre Completo",
+        "email": "Correo Profesional",
+        "phone": "Teléfono / WhatsApp",
+        "company": "Empresa / Organización",
+        "role": "Cargo / Función",
+        "submit": "ENVIAR SOLICITUD",
+        "success_message": "Su solicitud ha sido enviada. Por favor, espere el correo de confirmación.",
+        "error_message": "Ocurrió un error al procesar su registro."
+    }
+}

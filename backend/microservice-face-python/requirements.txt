@@ -1,0 +1,9 @@
+opencv-python
+numpy
+Pillow
+insightface
+onnxruntime
+fastapi
+uvicorn[standard]
+pydantic
+loguru

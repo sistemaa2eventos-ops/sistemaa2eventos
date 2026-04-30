@@ -1,0 +1,21 @@
+{
+    "sidebar": {
+        "dashboard": "Dashboard",
+        "events": "Events",
+        "people": "People",
+        "reports": "Reports",
+        "monitor": "Live Monitor",
+        "devices": "Devices",
+        "settings": "Settings",
+        "logout": "Logout"
+    },
+    "dashboard": {
+        "title": "Overview",
+        "total_events": "Total Events",
+        "total_people": "Total People",
+        "active_devices": "Active Devices",
+        "total_accesses": "Recorded Accesses",
+        "recent_events": "Recent Events",
+        "recent_activity": "Recent Activity"
+    }
+}
