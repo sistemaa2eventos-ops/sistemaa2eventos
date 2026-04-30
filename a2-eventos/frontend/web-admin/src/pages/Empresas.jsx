@@ -188,19 +188,30 @@ const Empresas = () => {
     }
   };
 
-  const handleGerarConvite = async (row) => {
+  const handleGerarConvite = async (row, forceRefresh = false) => {
     try {
-      const { data } = await api.post(`/empresas/${row.id}/gerar-convite`);
+      // Se já tem token e não estamos forçando refresh, apenas mostra o que tem
+      if (row.registration_token && !forceRefresh) {
+        const publicUrl = 'https://cadastro.nzt.app.br';
+        const link = `${publicUrl}/register/${row.registration_token}`;
+        setInviteResult({ link, empresa: row });
+        setOpenInviteDialog(true);
+        return;
+      }
+
+      const { data } = await api.post(`/empresas/${row.id}/gerar-convite`, { refresh: forceRefresh });
       setInviteResult({
         link: data.link,
         empresa: row
       });
       setOpenInviteDialog(true);
-      // Opcional: Copia automaticamente também, mas o foco é o modal
-      await navigator.clipboard.writeText(data.link);
-      enqueueSnackbar('Link gerado com sucesso!', { variant: 'success' });
+      
+      if (data.isNew) {
+        await navigator.clipboard.writeText(data.link);
+        enqueueSnackbar('Novo link gerado e copiado!', { variant: 'success' });
+      }
     } catch (err) {
-      enqueueSnackbar('Erro ao gerar convite.', { variant: 'error' });
+      enqueueSnackbar('Erro ao processar convite.', { variant: 'error' });
     }
   };
 
@@ -544,6 +555,17 @@ const Empresas = () => {
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
             <Button onClick={() => setOpenInviteDialog(false)}>FECHAR</Button>
+            <Button 
+                size="small"
+                onClick={() => {
+                    if (window.confirm('Deseja realmente invalidar o link atual e gerar um novo? O link antigo parará de funcionar.')) {
+                        handleGerarConvite(inviteResult.empresa, true);
+                    }
+                }}
+                sx={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem' }}
+            >
+                RECICLAR LINK
+            </Button>
         </DialogActions>
       </Dialog>
     </Box>

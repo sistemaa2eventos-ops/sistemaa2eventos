@@ -128,45 +128,49 @@ class EmpresaController {
     async gerarConvite(req, res) {
         try {
             const { id } = req.params;
-            const crypto = require('crypto');
-            const token = crypto.randomUUID();
-            const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 dias
-
+            const { refresh } = req.body || {};
             const supabaseClient = req.supabase || supabase;
             
-            // 1. Obter dados da empresa (nome e email)
+            // 1. Obter dados da empresa (nome, email e token atual)
             const { data: empresa, error: fetchError } = await supabaseClient
                 .from('empresas')
-                .select('nome, email')
+                .select('nome, email, registration_token')
                 .eq('id', id)
                 .single();
             
             if (fetchError || !empresa) return res.status(404).json({ error: 'Empresa não encontrada' });
 
-            // 2. Atualizar Token no Banco
-            const { error: updateError } = await supabaseClient
-                .from('empresas')
-                .update({
-                    registration_token: token,
-                    registration_token_expires_at: null // Token válido permanentemente
-                })
-                .eq('id', id);
+            let token = empresa.registration_token;
 
-            if (updateError) return res.status(500).json({ error: 'Erro ao gerar convite no banco' });
+            // 2. Se não tem token ou se pediu refresh, gera um novo
+            if (!token || refresh) {
+                const crypto = require('crypto');
+                token = crypto.randomUUID();
+                
+                const { error: updateError } = await supabaseClient
+                    .from('empresas')
+                    .update({
+                        registration_token: token,
+                        registration_token_expires_at: null // Token válido permanentemente
+                    })
+                    .eq('id', id);
 
-            // 3. Enviar e-mail real via EmailService (Assíncrono para performance)
-            const portalUrl = process.env.PUBLIC_PORTAL_URL || 'http://localhost:3002';
-            const link = `${portalUrl}/register/${token}`;
-            
-            if (empresa.email) {
-                emailService.sendCompanyInvite(empresa.email, empresa.nome, link)
-                    .catch(e => logger.error('❌ Erro silencioso ao enviar convite B2B:', e));
-            } else {
-                logger.warn(`⚠️ Empresa ${id} (${empresa.nome}) não possui e-mail cadastrado.`);
+                if (updateError) return res.status(500).json({ error: 'Erro ao gerar convite no banco' });
+                logger.info(`🔄 Novo token gerado para empresa ${empresa.nome}: ${token}`);
             }
 
-            logger.info(`🔗 Convite de onboarding enviado para empresa ${empresa.nome} (${empresa.email})`);
-            res.json({ success: true, link, token });
+            // 3. Enviar e-mail real via EmailService (Apenas se for novo ou se explicitamente solicitado, mas aqui mantemos o envio se houver email)
+            const portalUrl = process.env.PUBLIC_PORTAL_URL || 'https://cadastro.nzt.app.br';
+            const link = `${portalUrl}/register/${token}`;
+            
+            // Só enviamos e-mail se for um novo token ou se o usuário pediu (para não spammar)
+            // No entanto, para manter compatibilidade com o comportamento anterior de "gerar e enviar", mantemos o envio.
+            if (empresa.email && (!empresa.registration_token || refresh)) {
+                emailService.sendCompanyInvite(empresa.email, empresa.nome, link)
+                    .catch(e => logger.error('❌ Erro silencioso ao enviar convite B2B:', e));
+            }
+
+            res.json({ success: true, link, token, isNew: !empresa.registration_token || refresh });
         } catch (error) {
             logger.error('Erro geral ao gerar convite:', error);
             res.status(500).json({ error: 'Falha interna' });

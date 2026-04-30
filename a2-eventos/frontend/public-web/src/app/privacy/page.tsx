@@ -15,7 +15,7 @@ export default function PrivacyPage() {
 
         try {
             const endpoint = action === 'portability' ? '/lgpd/portability' : '/lgpd/forget-me';
-             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://api.nzt.app.br'}/api${endpoint}`, {
+             const res = await fetch(`/api${endpoint}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
