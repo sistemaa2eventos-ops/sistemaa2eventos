@@ -61,6 +61,7 @@ services:
       - USE_REDIS=true
       - PG_EDGE_HOST=postgres_edge
       - PUBLIC_PORTAL_URL=${PUBLIC_PORTAL_URL:-https://cadastro.nzt.app.br}
+      - A2_API_KEY=${A2_API_KEY:-a2eventos_sync_2026}
     env_file:
       - ./backend/api-nodejs/.env
     networks:
