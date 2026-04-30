@@ -229,8 +229,14 @@ const ConfigPulseiras = ({ embedded = false }) => {
 
     const handleSave = async () => {
         const { nome_tipo, numero_inicial, numero_final } = formData;
-        if (!nome_tipo || numero_inicial === '' || numero_final === '') {
-            enqueueSnackbar('Preencha as informações do lote numérico e nome da pulseira.', { variant: 'warning' });
+        const nInicial = parseInt(numero_inicial);
+        const nFinal = parseInt(numero_final);
+        if (!nome_tipo || isNaN(nInicial) || isNaN(nFinal)) {
+            enqueueSnackbar('Preencha o nome e os números inicial/final com valores válidos.', { variant: 'warning' });
+            return;
+        }
+        if (nFinal < nInicial) {
+            enqueueSnackbar('O número final deve ser maior ou igual ao número inicial.', { variant: 'warning' });
             return;
         }
 
@@ -238,11 +244,10 @@ const ConfigPulseiras = ({ embedded = false }) => {
             setSaving(true);
             const payload = {
                 ...formData,
-                numero_inicial: parseInt(numero_inicial),
-                numero_final: parseInt(numero_final),
+                numero_inicial: nInicial,
+                numero_final: nFinal,
                 tempo_confirmacao_checkout: parseInt(formData.tempo_confirmacao_checkout) || 3
             };
-            console.log('📤 Enviando payload de pulseira:', payload);
 
             if (editingId) {
                 await api.put(`/config/pulseiras/${editingId}`, payload);

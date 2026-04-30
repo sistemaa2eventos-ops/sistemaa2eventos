@@ -57,7 +57,7 @@ const Checkout = () => {
     operationMode, changeOperationMode, modoQuiosque, toggleQuiosque,
     searchQuery, handleSearch, searchResults,
     rfidInputRef, recentLogs,
-    performCheckin
+    performCheckin, eventoId
   } = useCheckin('checkout');
 
   const [pulseiraValue, setPulseiraValue] = useState('');
@@ -67,20 +67,19 @@ const Checkout = () => {
 
   const SCANNER_ID = `checkout-scanner-nzt`;
 
-  // Fetch último checkin para tempo de permanência
+  // Busca o último check-in da pessoa para calcular tempo de permanência
   const fetchUltimoCheckin = useCallback(async (pessoaId) => {
+    if (!pessoaId || !eventoId) return;
     try {
-        const response = await api.get(`/checkin/ultimo-checkin/${pessoaId}`);
-        if (response.data.success && response.data.data) {
-            setEntradaAtiva(response.data.data.created_at);
-        } else {
-            setEntradaAtiva(null);
-        }
-    } catch (error) {
-        console.error("Erro ao buscar permanência:", error);
+        const response = await api.get('/access/logs', {
+            params: { evento_id: eventoId, pessoa_id: pessoaId, tipo: 'checkin', limit: 1 }
+        });
+        const logs = response.data?.data || [];
+        setEntradaAtiva(logs.length > 0 ? logs[0].created_at : null);
+    } catch {
         setEntradaAtiva(null);
     }
-  }, []);
+  }, [eventoId]);
 
   useEffect(() => {
     if (selectedPessoa?.id) {
@@ -134,7 +133,7 @@ const Checkout = () => {
       setTimeout(startScanner, 100);
     }
     return () => { if (html5QrCode?.isScanning) html5QrCode.stop(); };
-  }, [activeScanner, performCheckin, setActiveScanner, SCANNER_ID]);
+  }, [activeScanner, performCheckin, setActiveScanner]);
 
   // Auto-focus Pulseira
   useEffect(() => {

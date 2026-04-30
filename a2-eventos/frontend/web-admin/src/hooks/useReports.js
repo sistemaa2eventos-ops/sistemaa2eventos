@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useSnackbar } from 'notistack';
 import { useSearchParams } from 'react-router-dom';
 import { format, startOfDay, endOfDay } from 'date-fns';
@@ -101,13 +101,12 @@ export const useReports = () => {
             if (!routes[type]) return;
 
             const response = await api.get(routes[type], {
-                params: { 
-                    eventoId: eventoId, // Mantendo legacia se necessário
+                params: {
                     evento_id: eventoId,
                     data_inicio: dateStart,
                     data_fim: dateEnd,
                     empresa_id: empresaId,
-                    format 
+                    format
                 },
                 responseType: 'blob'
             });

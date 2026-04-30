@@ -133,17 +133,17 @@ const Monitor = () => {
                  </Stack>
 
                  <Stack direction="row" spacing={3} mt={3}>
-                    <Avatar src={activeAlert.pessoa?.foto_url} sx={{ width: 100, height: 100, border: '4px solid #fff' }} />
+                    <Avatar src={activeAlert?.pessoa?.foto_url} sx={{ width: 100, height: 100, border: '4px solid #fff' }} />
                     <Box>
-                        <Typography variant="h4" fontWeight={900}>{activeAlert.target_name}</Typography>
-                        <Typography variant="h6" sx={{ opacity: 0.8 }}>CPF: {activeAlert.pessoa?.cpf}</Typography>
-                        <Chip label={activeAlert.watchlist?.nivel_alerta || 'ALTO RISCO'} sx={{ mt: 1, bgcolor: '#fff', color: '#FF3366', fontWeight: 900 }} />
+                        <Typography variant="h4" fontWeight={900}>{activeAlert?.target_name || activeAlert?.pessoa?.nome || 'Alvo Detectado'}</Typography>
+                        <Typography variant="h6" sx={{ opacity: 0.8 }}>CPF: {activeAlert?.pessoa?.cpf || '—'}</Typography>
+                        <Chip label={activeAlert?.watchlist?.nivel_alerta || 'ALTO RISCO'} sx={{ mt: 1, bgcolor: '#fff', color: '#FF3366', fontWeight: 900 }} />
                     </Box>
                  </Stack>
                  <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.2)' }} />
-                 <Typography variant="body1"><b>LOCAL:</b> {activeAlert.location}</Typography>
-                 <Typography variant="body1"><b>EVENTO:</b> {activeAlert.metodo?.toUpperCase()}</Typography>
-                 <Typography variant="caption" sx={{ mt: 2, display: 'block', opacity: 0.6 }}>Detectado em: {new Date(activeAlert.timestamp).toLocaleString()}</Typography>
+                 <Typography variant="body1"><b>LOCAL:</b> {activeAlert?.location || '—'}</Typography>
+                 <Typography variant="body1"><b>EVENTO:</b> {activeAlert?.metodo?.toUpperCase() || '—'}</Typography>
+                 <Typography variant="caption" sx={{ mt: 2, display: 'block', opacity: 0.6 }}>Detectado em: {activeAlert?.timestamp ? new Date(activeAlert.timestamp).toLocaleString() : '—'}</Typography>
              </Box>
           </Fade>
       )}

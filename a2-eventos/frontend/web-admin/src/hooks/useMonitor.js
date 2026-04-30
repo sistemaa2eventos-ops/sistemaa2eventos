@@ -87,17 +87,16 @@ export const useMonitor = () => {
 
     const fetchSystemHealth = useCallback(async () => {
         setSysError(false);
-        try {
-            const [statusR, logsR, perfR] = await Promise.all([
-                api.get('/monitor/system-status'),
-                api.get('/monitor/logs?lines=30'),
-                api.get('/monitor/performance')
-            ]);
-            setSysStatus(statusR.data);
-            setSysLogs(logsR.data.logs || []);
-            setSysPerf(perfR.data);
-        } catch (error) {
-            enqueueSnackbar('Falha ao obter saúde do sistema', { variant: 'error' });
+        const [statusR, logsR, perfR] = await Promise.allSettled([
+            api.get('/monitor/system-status'),
+            api.get('/monitor/logs?lines=30'),
+            api.get('/monitor/performance')
+        ]);
+        if (statusR.status === 'fulfilled') setSysStatus(statusR.value.data);
+        if (logsR.status === 'fulfilled') setSysLogs(logsR.value.data.logs || []);
+        if (perfR.status === 'fulfilled') setSysPerf(perfR.value.data);
+        if ([statusR, logsR, perfR].some(r => r.status === 'rejected')) {
+            enqueueSnackbar('Falha parcial ao obter saúde do sistema', { variant: 'warning' });
             setSysError(true);
         }
     }, [enqueueSnackbar]);

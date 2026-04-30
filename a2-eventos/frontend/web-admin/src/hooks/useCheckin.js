@@ -33,6 +33,7 @@ export const useCheckin = (defaultMode) => {
     const [realtimeStats, setRealtimeStats] = useState(null);
 
     const rfidInputRef = useRef(null);
+    const resetTimerRef = useRef(null);
 
     const updateOfflineCount = useCallback(async () => {
         const count = await localCheckinService.getPendenteCount();
@@ -160,7 +161,6 @@ export const useCheckin = (defaultMode) => {
 
             // CHECK-IN VIA PULSEIRA: Usar endpoint específico que vincula a pulseira à pessoa
             if (metodo === 'pulseira') {
-                console.log('📱 Check-in via Pulseira:', { pessoa_id: targetPessoa.id, numero_pulseira: extraValue });
                 res = await api.post(`/access/pulseira/checkin`, {
                     pessoa_id: targetPessoa.id,
                     numero_pulseira: extraValue,
@@ -193,8 +193,9 @@ export const useCheckin = (defaultMode) => {
                 setResultMessage('CHECK-IN REALIZADO');
             }
 
-            // Reset automático após 3s
-            setTimeout(() => {
+            // Reset automático após 3s (cleanup evita setState após unmount)
+            clearTimeout(resetTimerRef.current);
+            resetTimerRef.current = setTimeout(() => {
                 setSelectedPessoa(null);
                 setCheckinResult(null);
                 setResultMessage('');
@@ -204,10 +205,10 @@ export const useCheckin = (defaultMode) => {
 
             loadInitialData();
         } catch (error) {
-            console.error('Erro no processamento do check-in:', error);
             setCheckinResult('negado');
             setResultMessage(error.response?.data?.error || 'Falha na comunicação com o servidor.');
-            setTimeout(() => {
+            clearTimeout(resetTimerRef.current);
+            resetTimerRef.current = setTimeout(() => {
                 setCheckinResult(null);
                 setResultMessage('');
             }, 3000);
@@ -232,7 +233,8 @@ export const useCheckin = (defaultMode) => {
 
     const changeOperationMode = (mode) => {
         setOperationMode(mode);
-        localStorage.setItem('nzt_op_mode', mode);
+        // Só persiste se não há modo forçado pela página (ex: 'checkout')
+        if (!defaultMode) localStorage.setItem('nzt_op_mode', mode);
     };
 
     return {
