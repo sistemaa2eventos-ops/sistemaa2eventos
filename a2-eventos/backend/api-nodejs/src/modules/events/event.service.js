@@ -40,11 +40,16 @@ class EventService {
      */
     async getById(supabaseClient, id) {
         const [eventoResult, modulesResult] = await Promise.all([
-            supabaseClient.from('eventos').select('*, empresas(*)').eq('id', id).single(),
+            supabaseClient.from('eventos').select('*, empresas(*)').eq('id', id).maybeSingle(),
             supabaseClient.from('event_modules').select('*').eq('evento_id', id)
         ]);
 
         if (eventoResult.error) throw eventoResult.error;
+        if (!eventoResult.data) {
+            const err = new Error('Evento não encontrado');
+            err.status = 404;
+            throw err;
+        }
 
         return {
             ...eventoResult.data,

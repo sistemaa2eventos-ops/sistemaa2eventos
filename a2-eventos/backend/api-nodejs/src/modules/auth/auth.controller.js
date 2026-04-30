@@ -42,7 +42,7 @@ class AuthController {
                 .from('perfis')
                 .select('*')
                 .eq('id', data.user.id)
-                .single();
+                .maybeSingle();
 
             if (perfilError) {
                 logger.error(`Erro ao buscar perfil: ${perfilError.message}`);

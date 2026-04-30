@@ -518,13 +518,20 @@ class DeviceController {
                 .from('dispositivos_acesso')
                 .select('*')
                 .eq('id', id)
-                .single();
+                .maybeSingle();
 
-            if (error || !deviceData) throw new Error('Dispositivo não encontrado');
+            if (error) throw error;
+            if (!deviceData) return res.status(404).json({ error: 'Dispositivo não encontrado' });
 
             const deviceService = DeviceFactory.getDevice(deviceData);
 
-            const snapshotBuffer = await deviceService.getSnapshot();
+            const SNAPSHOT_TIMEOUT = 20000;
+            const snapshotBuffer = await Promise.race([
+                deviceService.getSnapshot(),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Timeout ao capturar imagem do dispositivo')), SNAPSHOT_TIMEOUT)
+                )
+            ]);
 
             res.set('Content-Type', 'image/jpeg');
             res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -574,9 +581,10 @@ class DeviceController {
                 .eq('id', id)
                 .eq('evento_id', req.event.id)
                 .select()
-                .single();
+                .maybeSingle();
 
             if (error) throw error;
+            if (!data) return res.status(404).json({ error: 'Dispositivo não encontrado ou sem permissão' });
 
             logger.info('Device updated', {
                 device_id: req.params.id,

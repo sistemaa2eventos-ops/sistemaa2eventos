@@ -63,7 +63,7 @@ class PolicyEngine {
                         )
                     `)
                     .eq('nome', roleName)
-                    .single();
+                    .maybeSingle();
 
                 data = result.data;
                 error = result.error;
@@ -145,9 +145,10 @@ class PolicyEngine {
                     )
                 `)
                 .eq('nome', roleName)
-                .single();
+                .maybeSingle();
 
             if (error) throw error;
+            if (!data) return [];
 
             return (data?.sys_role_permissions || [])
                 .map(rp => rp.sys_permissions)
