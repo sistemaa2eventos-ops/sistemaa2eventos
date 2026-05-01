@@ -29,5 +29,6 @@ router.get('/export/empresa', authenticate, checkPermission('relatorios', 'leitu
 router.get('/export/leitor', authenticate, checkPermission('relatorios', 'leitura'), excelController.exportPorLeitor);
 router.get('/export/funcao', authenticate, checkPermission('relatorios', 'leitura'), excelController.exportPorFuncao);
 router.get('/export/status', authenticate, checkPermission('relatorios', 'leitura'), excelController.exportPorStatus);
+router.get('/export/ponto',  authenticate, checkPermission('relatorios', 'leitura'), excelController.exportPonto);
 
 module.exports = router;

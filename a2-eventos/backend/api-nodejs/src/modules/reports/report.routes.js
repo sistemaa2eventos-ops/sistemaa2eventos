@@ -20,4 +20,8 @@ router.get('/por-leitor',  checkPermission('relatorios', 'leitura'), reportContr
 router.get('/por-funcao',  checkPermission('relatorios', 'leitura'), reportController.porFuncao);
 router.get('/por-status',  checkPermission('relatorios', 'leitura'), reportController.porStatus);
 
+// Relatórios de Ponto (controle de jornada)
+router.get('/ponto',         checkPermission('relatorios', 'leitura'), reportController.ponto);
+router.get('/ponto-resumo',  checkPermission('relatorios', 'leitura'), reportController.pontoResumo);
+
 module.exports = router;

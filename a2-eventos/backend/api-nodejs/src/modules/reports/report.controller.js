@@ -398,6 +398,173 @@ class ReportController {
     }
 
     /**
+     * Relatório de Ponto — Todas as entradas/saídas por pessoa/área/dia
+     * GET /reports/ponto?data_inicio=...&data_fim=...&pessoa_id=...&empresa_id=...&area_id=...
+     */
+    async ponto(req, res) {
+        try {
+            const { data_inicio, data_fim, pessoa_id, empresa_id, area_id, page = 1, limit = 100 } = req.query;
+            const evento_id = req.event.id;
+            const from = (parseInt(page) - 1) * parseInt(limit);
+
+            // Buscar logs de checkin/checkout ordenados
+            let query = supabase
+                .from('logs_acesso')
+                .select(`
+                    id, tipo, metodo, area_id, numero_pulseira, created_at, pessoa_id,
+                    pessoas!inner(id, nome_completo, cpf, empresa_id, foto_url, numero_pulseira)
+                `, { count: 'exact' })
+                .eq('evento_id', evento_id)
+                .in('tipo', ['checkin', 'checkout'])
+                .order('created_at', { ascending: true });
+
+            if (data_inicio) query = query.gte('created_at', data_inicio);
+            if (data_fim) query = query.lte('created_at', data_fim);
+            if (pessoa_id) query = query.eq('pessoa_id', pessoa_id);
+            if (empresa_id) query = query.eq('pessoas.empresa_id', empresa_id);
+            if (area_id) query = query.eq('area_id', area_id);
+
+            const { data: logs, count, error } = await query.range(from, from + parseInt(limit) - 1);
+            if (error) throw error;
+
+            // Buscar nomes de empresas e áreas
+            const empIds = [...new Set((logs || []).map(l => l.pessoas?.empresa_id).filter(Boolean))];
+            const areaIds = [...new Set((logs || []).map(l => l.area_id).filter(Boolean))];
+
+            const [empRes, areaRes] = await Promise.all([
+                empIds.length > 0
+                    ? supabase.from('empresas').select('id, nome').in('id', empIds)
+                    : { data: [] },
+                areaIds.length > 0
+                    ? supabase.from('evento_areas').select('id, nome_area').in('id', areaIds)
+                    : { data: [] }
+            ]);
+
+            const empMap = (empRes.data || []).reduce((a, e) => { a[e.id] = e.nome; return a; }, {});
+            const areaMap = (areaRes.data || []).reduce((a, e) => { a[e.id] = e.nome_area; return a; }, {});
+
+            // Formatar resposta
+            const data = (logs || []).map(log => ({
+                id: log.id,
+                tipo: log.tipo,
+                metodo: log.metodo,
+                horario: log.created_at,
+                area: areaMap[log.area_id] || null,
+                area_id: log.area_id,
+                pulseira: log.numero_pulseira,
+                pessoa_id: log.pessoa_id,
+                pessoa: log.pessoas?.nome_completo,
+                cpf: log.pessoas?.cpf,
+                foto_url: log.pessoas?.foto_url,
+                empresa: empMap[log.pessoas?.empresa_id] || 'Sem Empresa'
+            }));
+
+            res.json({ success: true, total: count || 0, data });
+        } catch (error) {
+            logger.error('Erro no relatório de ponto:', { message: error.message, code: error.code });
+            res.status(500).json({ error: 'Erro ao processar relatório de ponto' });
+        }
+    }
+
+    /**
+     * Relatório de Ponto Resumido — Primeira entrada, última saída, total horas por pessoa/dia
+     * GET /reports/ponto-resumo?data_inicio=...&data_fim=...&empresa_id=...&area_id=...
+     */
+    async pontoResumo(req, res) {
+        try {
+            const { data_inicio, data_fim, empresa_id, area_id } = req.query;
+            const evento_id = req.event.id;
+
+            // Buscar todos os logs de checkin/checkout do período
+            let query = supabase
+                .from('logs_acesso')
+                .select(`
+                    tipo, area_id, created_at, pessoa_id,
+                    pessoas!inner(id, nome_completo, cpf, empresa_id, numero_pulseira)
+                `)
+                .eq('evento_id', evento_id)
+                .in('tipo', ['checkin', 'checkout'])
+                .order('created_at', { ascending: true });
+
+            if (data_inicio) query = query.gte('created_at', data_inicio);
+            if (data_fim) query = query.lte('created_at', data_fim);
+            if (empresa_id) query = query.eq('pessoas.empresa_id', empresa_id);
+            if (area_id) query = query.eq('area_id', area_id);
+
+            const { data: logs, error } = await query;
+            if (error) throw error;
+
+            // Agrupar por pessoa + dia
+            const grouped = {};
+            (logs || []).forEach(log => {
+                const dia = log.created_at.split('T')[0];
+                const key = `${log.pessoa_id}_${dia}`;
+
+                if (!grouped[key]) {
+                    grouped[key] = {
+                        pessoa_id: log.pessoa_id,
+                        pessoa: log.pessoas?.nome_completo,
+                        cpf: log.pessoas?.cpf,
+                        pulseira: log.pessoas?.numero_pulseira,
+                        empresa_id: log.pessoas?.empresa_id,
+                        dia,
+                        primeira_entrada: null,
+                        ultima_saida: null,
+                        entradas: 0,
+                        saidas: 0
+                    };
+                }
+
+                if (log.tipo === 'checkin') {
+                    grouped[key].entradas++;
+                    if (!grouped[key].primeira_entrada || log.created_at < grouped[key].primeira_entrada) {
+                        grouped[key].primeira_entrada = log.created_at;
+                    }
+                } else if (log.tipo === 'checkout') {
+                    grouped[key].saidas++;
+                    if (!grouped[key].ultima_saida || log.created_at > grouped[key].ultima_saida) {
+                        grouped[key].ultima_saida = log.created_at;
+                    }
+                }
+            });
+
+            // Resolver nomes de empresas
+            const empIds = [...new Set(Object.values(grouped).map(g => g.empresa_id).filter(Boolean))];
+            const { data: empData } = empIds.length > 0
+                ? await supabase.from('empresas').select('id, nome').in('id', empIds)
+                : { data: [] };
+            const empMap = (empData || []).reduce((a, e) => { a[e.id] = e.nome; return a; }, {});
+
+            // Calcular total de horas e formatar
+            const data = Object.values(grouped).map(g => {
+                let totalHoras = null;
+                if (g.primeira_entrada && g.ultima_saida) {
+                    const diffMs = new Date(g.ultima_saida) - new Date(g.primeira_entrada);
+                    totalHoras = Math.round((diffMs / 3600000) * 100) / 100; // 2 casas decimais
+                }
+
+                return {
+                    pessoa: g.pessoa,
+                    cpf: g.cpf,
+                    pulseira: g.pulseira,
+                    empresa: empMap[g.empresa_id] || 'Sem Empresa',
+                    dia: g.dia,
+                    primeira_entrada: g.primeira_entrada,
+                    ultima_saida: g.ultima_saida,
+                    total_horas: totalHoras,
+                    entradas: g.entradas,
+                    saidas: g.saidas
+                };
+            }).sort((a, b) => a.dia.localeCompare(b.dia) || a.pessoa.localeCompare(b.pessoa));
+
+            res.json({ success: true, total: data.length, data });
+        } catch (error) {
+            logger.error('Erro no resumo de ponto:', { message: error.message, code: error.code });
+            res.status(500).json({ error: 'Erro ao processar resumo de ponto' });
+        }
+    }
+
+    /**
      * Ranking de Engajamento (Gamificação)
     */
     async getRanking(req, res) {

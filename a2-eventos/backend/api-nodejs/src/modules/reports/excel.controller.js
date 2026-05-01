@@ -434,6 +434,66 @@ class ExcelController {
     // Aliases para compatibilidade com rotas antigas/específicas
     downloadTemplatePessoas = this.downloadTemplate;
     importPessoas = this.importEmployees;
+
+    async exportPonto(req, res) {
+        try {
+            const reportController = require('./report.controller');
+            // Capturar dados do relatório de ponto resumido
+            let reportData = null;
+            const mockRes = { json: (d) => { reportData = d; } };
+            await reportController.pontoResumo(req, mockRes);
+
+            if (!reportData?.data) throw new Error('Sem dados de ponto');
+
+            const workbook = new ExcelJS.Workbook();
+            const sheet = workbook.addWorksheet('Controle de Ponto');
+
+            sheet.columns = [
+                { header: 'PESSOA',           key: 'pessoa',            width: 35 },
+                { header: 'CPF',              key: 'cpf',               width: 16 },
+                { header: 'PULSEIRA',         key: 'pulseira',          width: 14 },
+                { header: 'EMPRESA',          key: 'empresa',           width: 30 },
+                { header: 'DIA',              key: 'dia',               width: 14 },
+                { header: 'PRIMEIRA ENTRADA', key: 'primeira_entrada',  width: 22 },
+                { header: 'ÚLTIMA SAÍDA',     key: 'ultima_saida',      width: 22 },
+                { header: 'TOTAL HORAS',      key: 'total_horas',       width: 14 },
+                { header: 'QTD ENTRADAS',     key: 'entradas',          width: 14 },
+                { header: 'QTD SAÍDAS',       key: 'saidas',            width: 14 },
+            ];
+
+            const headerRow = sheet.getRow(1);
+            headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A237E' } };
+
+            reportData.data.forEach(row => {
+                const formatTime = (iso) => {
+                    if (!iso) return '—';
+                    return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                };
+                sheet.addRow({
+                    pessoa: row.pessoa,
+                    cpf: row.cpf,
+                    pulseira: row.pulseira || '—',
+                    empresa: row.empresa,
+                    dia: row.dia,
+                    primeira_entrada: formatTime(row.primeira_entrada),
+                    ultima_saida: formatTime(row.ultima_saida),
+                    total_horas: row.total_horas != null ? `${row.total_horas}h` : '—',
+                    entradas: row.entradas,
+                    saidas: row.saidas
+                });
+            });
+
+            const fileName = `Controle_Ponto_${req.query.data_inicio || 'geral'}.xlsx`;
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
+            await workbook.xlsx.write(res);
+            res.end();
+        } catch (error) {
+            logger.error('Erro ao exportar ponto:', error);
+            res.status(500).json({ error: 'Erro ao gerar planilha de ponto' });
+        }
+    }
 }
 
 module.exports = new ExcelController();

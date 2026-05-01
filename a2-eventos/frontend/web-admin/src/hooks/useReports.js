@@ -29,6 +29,7 @@ export const useReports = () => {
     const [reportLeitor, setReportLeitor] = useState([]);
     const [reportFuncao, setReportFuncao] = useState([]);
     const [reportStatus, setReportStatus] = useState([]);
+    const [reportPonto, setReportPonto] = useState([]);
 
     const loadLogs = useCallback(async (p = 1) => {
         if (!eventoId) return;
@@ -63,14 +64,16 @@ export const useReports = () => {
                 empresa: '/reports/por-empresa',
                 leitor: '/reports/por-leitor',
                 funcao: '/reports/por-funcao',
-                status: '/reports/por-status'
+                status: '/reports/por-status',
+                ponto: '/reports/ponto-resumo'
             };
             const setters = {
                 area: setReportArea,
                 empresa: setReportEmpresa,
                 leitor: setReportLeitor,
                 funcao: setReportFuncao,
-                status: setReportStatus
+                status: setReportStatus,
+                ponto: setReportPonto
             };
 
             if (!endpoints[tab]) return;
@@ -95,7 +98,8 @@ export const useReports = () => {
                 leitor: '/excel/export-leitor',
                 funcao: '/excel/export-funcao',
                 status: '/excel/export-status',
-                diario: '/excel/export/relatorio-diario'
+                diario: '/excel/export/relatorio-diario',
+                ponto: '/excel/export/ponto'
             };
 
             if (!routes[type]) return;
@@ -147,7 +151,7 @@ export const useReports = () => {
         loading, empresaId, setEmpresaId,
         dateStart, setDateStart, dateEnd, setDateEnd,
         dailyLogs, totalLogs, page, setPage: loadLogs,
-        reportArea, reportEmpresa, reportLeitor, reportFuncao, reportStatus,
+        reportArea, reportEmpresa, reportLeitor, reportFuncao, reportStatus, reportPonto,
         loadLogs, loadTab, handleExport, handleExportPDF,
         refresh: loadLogs
     };
