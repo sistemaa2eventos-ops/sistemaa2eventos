@@ -12,6 +12,7 @@ import {
     Add as AddIcon
 } from '@mui/icons-material';
 import GlassCard from '../../components/common/GlassCard';
+import PageHeader from '../../components/common/PageHeader';
 import NeonButton from '../../components/common/NeonButton';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useLeitorFacial } from '../../hooks/useLeitorFacial';
@@ -52,8 +53,12 @@ const ConfigLeitorFacial = () => {
     } = useLeitorFacial();
 
     return (
-        <Box>
-            {/* Cabeçalho redundante removido para evitar botões duplicados com o DeviceListPanel */}
+        <Box sx={{ p: { xs: 2, md: 4 } }}>
+            <PageHeader
+                title="Terminais & Dispositivos"
+                subtitle="Gerencie leitores faciais, configure biometria e sincronize faces nos terminais de acesso."
+                breadcrumbs={[{ text: 'Configurações' }, { text: 'Terminais & Dispositivos' }]}
+            />
 
             {!eventoId && (
                 <GlassCard sx={{ p: 3, mb: 3, border: '1px solid rgba(255, 193, 7, 0.4)', background: 'rgba(255, 193, 7, 0.05)' }}>

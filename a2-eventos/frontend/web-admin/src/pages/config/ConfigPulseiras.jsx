@@ -289,6 +289,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
                     <PageHeader
                         title="Matriz de Pulseiras"
                         subtitle="Provisione lotes e aplique políticas restritivas de zonas baseadas em matriz de cores."
+                        breadcrumbs={[{ text: 'Configurações' }, { text: 'Matriz de Pulseiras' }]}
                     />
                     <NeonButton
                         startIcon={<AddIcon />}

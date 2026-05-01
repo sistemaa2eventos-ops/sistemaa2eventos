@@ -2,7 +2,7 @@ import React from 'react';
 import {
     Box, Typography, Switch, List, ListItem,
     ListItemIcon, ListItemText, ListItemSecondaryAction,
-    Divider, Grid, CircularProgress, Slider, Button
+    Divider, Grid, CircularProgress, Slider
 } from '@mui/material';
 import { 
     NotificationsActive as NotifyIcon, 
@@ -13,6 +13,8 @@ import {
 } from '@mui/icons-material';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
 import GlassCard from '../../components/common/GlassCard';
+import PageHeader from '../../components/common/PageHeader';
+import NeonButton from '../../components/common/NeonButton';
 
 const ConfigNotificacoes = () => {
     const { settings, setSettings, loading, saving, handleSave } = useSystemSettings();
@@ -20,10 +22,12 @@ const ConfigNotificacoes = () => {
     if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>;
 
     return (
-        <Box>
-            <Typography variant="h6" sx={{ color: 'primary.main', mb: 3, fontWeight: 700 }}>
-                🔔 Alertas & Notificações Globais
-            </Typography>
+        <Box sx={{ p: { xs: 2, md: 4 } }}>
+            <PageHeader
+                title="Alertas & Notificações Globais"
+                subtitle="Configure os canais e limiares de disparo de alertas do sistema."
+                breadcrumbs={[{ text: 'Configurações' }, { text: 'Alertas & Notificações' }]}
+            />
 
             <Grid container spacing={3}>
                 <Grid item xs={12}>
@@ -94,15 +98,9 @@ const ConfigNotificacoes = () => {
 
                 <Grid item xs={12}>
                     <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={() => handleSave()}
-                            disabled={saving}
-                            sx={{ fontWeight: 700, px: 4, borderRadius: 2 }}
-                        >
+                        <NeonButton onClick={() => handleSave()} disabled={saving}>
                             {saving ? 'Salvando...' : 'Salvar Alterações'}
-                        </Button>
+                        </NeonButton>
                     </Box>
                 </Grid>
             </Grid>

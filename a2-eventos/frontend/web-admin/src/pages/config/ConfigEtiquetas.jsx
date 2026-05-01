@@ -108,7 +108,7 @@ const ConfigEtiquetas = () => {
             <PageHeader
                 title="Impressão & Etiquetas"
                 subtitle="Configure os drivers de impressão térmica e layout de credenciais."
-                breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Impressão' }]}
+                breadcrumbs={[{ text: 'Configurações' }, { text: 'Impressão & Etiquetas' }]}
             />
             <Grid container spacing={4} sx={{ mt: 1 }}>
                 {/* COLUNA ESQUERDA: CONFIGURAÇÕES GERAIS E MENU DE ELEMENTOS */}

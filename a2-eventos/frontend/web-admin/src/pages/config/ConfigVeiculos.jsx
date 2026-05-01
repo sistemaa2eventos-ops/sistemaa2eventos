@@ -67,7 +67,7 @@ const ConfigVeiculos = () => {
             <PageHeader
                 title="Veículos & Estacionamento"
                 subtitle="Integre câmeras LPR (Leitura de Placas) e Cancelas."
-                breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Veículos' }]}
+                breadcrumbs={[{ text: 'Configurações' }, { text: 'Veículos & Estacionamento' }]}
             />
 
             <Grid container spacing={4} sx={{ mt: 1 }}>

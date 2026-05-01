@@ -196,7 +196,7 @@ const ConfigComunicacao = () => {
             <PageHeader
                 title="Módulo de Comunicação (SMTP/SMS)"
                 subtitle="Integre gateways nativos para disparar aprovações e links de credenciamento web e whatsapp."
-                breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'E-mail & SMS' }]}
+                breadcrumbs={[{ text: 'Configurações' }, { text: 'Módulo de Comunicação' }]}
             />
 
             <Grid container spacing={4} sx={{ mt: 1 }}>
