@@ -32,6 +32,7 @@ export const useCheckin = (defaultMode) => {
     const [offlineCount, setOfflineCount] = useState(0);
     const [realtimeStats, setRealtimeStats] = useState(null);
     const [areaId, setAreaId] = useState(localStorage.getItem('nzt_area_id') || null);
+    const [eventAreas, setEventAreas] = useState([]);
 
     const rfidInputRef = useRef(null);
     const resetTimerRef = useRef(null);
@@ -44,14 +45,16 @@ export const useCheckin = (defaultMode) => {
     const loadInitialData = useCallback(async () => {
         if (!eventoId) return;
         try {
-            const [logRes, eventRes, statsRes] = await Promise.all([
+            const [logRes, eventRes, statsRes, areasRes] = await Promise.all([
                 api.get(`/access/logs`, { params: { limit: 10, evento_id: eventoId } }),
                 api.get(`/eventos/${eventoId}`),
-                api.get('/access/stats/realtime', { params: { evento_id: eventoId } })
+                api.get('/access/stats/realtime', { params: { evento_id: eventoId } }),
+                api.get(`/eventos/${eventoId}/areas`).catch(() => ({ data: { data: [] } }))
             ]);
             setRecentLogs(logRes.data.data || []);
             setEventModules(eventRes.data.data?.event_modules || []);
             setRealtimeStats(statsRes.data.data || null);
+            setEventAreas(areasRes.data.data || areasRes.data || []);
         } catch (error) {
             console.error('Erro ao carregar dados de check-in:', error);
         }
@@ -122,10 +125,30 @@ export const useCheckin = (defaultMode) => {
         }
     };
 
-    const handleSelectPessoa = (pessoa) => {
+    const handleSelectPessoa = async (pessoa) => {
         setSelectedPessoa(pessoa);
         setSearchResults([]);
         setSearchQuery('');
+
+        // Enriquecer com áreas autorizadas (se existirem)
+        if (pessoa?.id && eventoId) {
+            try {
+                const { data: areasRes } = await api.get(`/access/pulseira/buscar`, {
+                    params: { codigo: pessoa.cpf || pessoa.id }
+                });
+                // Se retornou a mesma pessoa com mais dados, mesclar
+                const found = areasRes.data?.[0] || areasRes.data;
+                if (found?.areas_autorizadas?.length > 0) {
+                    // Buscar nomes das áreas
+                    const areaNames = eventAreas.filter(a => found.areas_autorizadas.includes(a.id));
+                    setSelectedPessoa(prev => ({
+                        ...prev,
+                        areas_autorizadas: found.areas_autorizadas,
+                        areas_info: areaNames.map(a => ({ area_id: a.id, nome_area: a.nome_area }))
+                    }));
+                }
+            } catch { /* silencioso */ }
+        }
     };
 
     const consultarPulseiraAPI = async (codigo) => {
@@ -264,7 +287,7 @@ export const useCheckin = (defaultMode) => {
         searchResults, setSearchResults,
         eventModules, rfidInputRef,
         recentLogs, offlineCount, realtimeStats,
-        areaId, changeAreaId,
+        areaId, changeAreaId, eventAreas,
         consultarPulseiraAPI,
         performCheckin,
         eventoId
