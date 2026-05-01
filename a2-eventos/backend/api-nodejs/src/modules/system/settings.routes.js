@@ -22,11 +22,12 @@ router.delete('/apikeys/:id', checkPermission('configuracoes', 'escrita'), setti
 
 router.get('/webhooks', checkPermission('configuracoes', 'escrita'), settingsController.getWebhooks);
 router.post('/webhooks', checkPermission('configuracoes', 'escrita'), settingsController.createWebhook);
+router.put('/webhooks/:id', checkPermission('configuracoes', 'escrita'), settingsController.updateWebhook);
+router.post('/webhooks/:id/test', checkPermission('configuracoes', 'escrita'), settingsController.testWebhook);
 router.delete('/webhooks/:id', checkPermission('configuracoes', 'escrita'), settingsController.deleteWebhook);
 
 // Auditoria
 router.get('/test-connection', checkPermission('configuracoes', 'escrita'), settingsController.testConnection);
-router.get('/test-supabase', checkPermission('configuracoes', 'escrita'), settingsController.testConnection);
 router.get('/sync-history', checkPermission('configuracoes', 'leitura'), settingsController.getSyncHistory);
 
 // Comunicação

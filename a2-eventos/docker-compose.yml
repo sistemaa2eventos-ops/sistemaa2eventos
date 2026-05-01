@@ -7,6 +7,7 @@ services:
       POSTGRES_USER: ${PG_EDGE_USER:-a2_edge_user}
       POSTGRES_PASSWORD: ${PG_EDGE_PASSWORD:-a2_edge_password}
       POSTGRES_DB: ${PG_EDGE_DB:-a2_edge_db}
+      TZ: America/Sao_Paulo
     volumes:
       - pg_edge_data:/var/lib/postgresql/data
       - ./backend/api-nodejs/src/scripts/init_pg_edge.sql:/docker-entrypoint-initdb.d/init_pg_edge.sql

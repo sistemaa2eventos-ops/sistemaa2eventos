@@ -178,20 +178,76 @@ class SettingsController {
 
     async createWebhook(req, res) {
         try {
-            const { trigger_event, target_url, is_active } = req.body;
-            if (!trigger_event || !target_url) return res.status(400).json({ error: 'Evento e URL são obrigatórios' });
+            const { trigger_event, target_url, is_active, descricao } = req.body;
+            if (!trigger_event || !target_url) {
+                return res.status(400).json({ error: 'Evento e URL são obrigatórios' });
+            }
+
+            try { new URL(target_url); } catch {
+                return res.status(400).json({ error: 'URL inválida. Use o formato https://dominio.com/endpoint' });
+            }
+
+            const VALID_EVENTS = ['CHECKIN', 'CHECKOUT', 'NOVO_CADASTRO', 'PESSOA_BLOQUEADA', 'ALERTA'];
+            if (!VALID_EVENTS.includes(trigger_event)) {
+                return res.status(400).json({ error: `Evento inválido. Use: ${VALID_EVENTS.join(', ')}` });
+            }
 
             const { data, error } = await supabase
                 .from('system_webhooks')
-                .insert([{ trigger_event, target_url, is_active: is_active !== false }])
+                .insert([{ trigger_event, target_url, is_active: is_active !== false, descricao: descricao || null }])
                 .select()
                 .single();
 
             if (error) throw error;
             res.json({ success: true, data });
         } catch (error) {
-            logger.error('Erro ao criar webhook no Supabase:', error);
+            logger.error('Erro ao criar webhook:', error);
             res.status(500).json({ error: 'Erro ao criar webhook' });
+        }
+    }
+
+    async updateWebhook(req, res) {
+        try {
+            const { id } = req.params;
+            const { is_active, descricao } = req.body;
+
+            const updateData = {};
+            if (is_active !== undefined) updateData.is_active = is_active;
+            if (descricao !== undefined) updateData.descricao = descricao;
+
+            const { data, error } = await supabase
+                .from('system_webhooks')
+                .update(updateData)
+                .eq('id', id)
+                .select()
+                .single();
+
+            if (error) throw error;
+            res.json({ success: true, data });
+        } catch (error) {
+            logger.error('Erro ao atualizar webhook:', error);
+            res.status(500).json({ error: 'Erro ao atualizar webhook' });
+        }
+    }
+
+    async testWebhook(req, res) {
+        try {
+            const { id } = req.params;
+            const { data: webhook, error } = await supabase
+                .from('system_webhooks')
+                .select('target_url, trigger_event')
+                .eq('id', id)
+                .single();
+
+            if (error || !webhook) return res.status(404).json({ error: 'Webhook não encontrado' });
+
+            const webhookDispatcher = require('../../services/webhookDispatcher');
+            const result = await webhookDispatcher.testDispatch(webhook.target_url, webhook.trigger_event);
+
+            res.json({ success: result.success, ...result });
+        } catch (error) {
+            logger.error('Erro ao testar webhook:', error);
+            res.status(500).json({ error: 'Erro ao testar webhook' });
         }
     }
 
@@ -206,7 +262,7 @@ class SettingsController {
             if (error) throw error;
             res.json({ success: true, message: 'Webhook excluído com sucesso' });
         } catch (error) {
-            logger.error('Erro ao excluir webhook no Supabase:', error);
+            logger.error('Erro ao excluir webhook:', error);
             res.status(500).json({ error: 'Erro ao remover webhook' });
         }
     }

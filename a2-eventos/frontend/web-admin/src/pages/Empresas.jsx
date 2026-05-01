@@ -170,6 +170,11 @@ const Empresas = () => {
     }
 
     const cleanPhone = telefone.replace(/\D/g, '');
+    let waPhone = cleanPhone;
+    if (waPhone && waPhone.length <= 11 && !waPhone.startsWith('55')) {
+      waPhone = `55${waPhone}`;
+    }
+
     const eventoNome = localStorage.getItem('active_evento_nome') || 'Evento';
     const publicUrl = 'https://cadastro.nzt.app.br'; // Fallback base
     
@@ -181,10 +186,10 @@ const Empresas = () => {
         `Segue o link para registro da equipe da *${row.nome}* no evento *${eventoNome}*:\n\n` +
         `${link}`
       );
-      window.open(`https://wa.me/55${cleanPhone}?text=${body}`, '_blank');
+      window.open(`https://wa.me/${waPhone}?text=${body}`, '_blank');
     } else {
       // Caso contrário, apenas abre o chat
-      window.open(`https://wa.me/55${cleanPhone}`, '_blank');
+      window.open(`https://wa.me/${waPhone}`, '_blank');
     }
   };
 
@@ -241,6 +246,10 @@ const Empresas = () => {
     const responsavel = inviteResult.empresa.responsavel || 'Responsável';
     const telefone = inviteResult.empresa.telefone || inviteResult.empresa.responsavel_telefone || '';
     const cleanPhone = telefone.replace(/\D/g, '');
+    let waPhone = cleanPhone;
+    if (waPhone && waPhone.length <= 11 && !waPhone.startsWith('55')) {
+      waPhone = `55${waPhone}`;
+    }
     
     // Garantir que usamos o link gerado, que agora vem no formato correto do backend
     const body = encodeURIComponent(
@@ -250,7 +259,7 @@ const Empresas = () => {
       `${inviteResult.link}`
     );
     
-    return `https://wa.me/55${cleanPhone}?text=${body}`;
+    return `https://wa.me/${waPhone}?text=${body}`;
   };
 
   const handleOpenEdit = (empresa) => {

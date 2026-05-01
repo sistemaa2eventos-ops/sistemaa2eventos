@@ -20,7 +20,9 @@
       "Read(//c//**)",
       "Bash(grep -n \"buscarPessoaPulseira\\\\|checkinFacial\" c:\\\\\\\\Projetos\\\\\\\\Projeto_A2_Eventos\\\\\\\\a2-eventos\\\\\\\\backend\\\\\\\\api-nodejs\\\\\\\\src\\\\\\\\modules\\\\\\\\checkin\\\\\\\\checkin.controller.js)",
       "Bash(docker-compose -f ~/Projeto_A2_Eventos/docker-compose.yml build a2_eventos_admin_web --no-cache)",
-      "Read(//mnt/**)"
+      "Read(//mnt/**)",
+      "Read(//c/c/Projetos/Projeto_A2_Eventos/a2-eventos/backend/**)",
+      "Read(//c/c/Projetos/Projeto_A2_Eventos/a2-eventos/backendapi-nodejs/src/modules/**)"
     ],
     "additionalDirectories": [
       "\\tmp",
