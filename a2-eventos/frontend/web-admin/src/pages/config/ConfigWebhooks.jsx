@@ -18,6 +18,7 @@ import {
 } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import GlassCard from '../../components/common/GlassCard';
+import PageHeader from '../../components/common/PageHeader';
 import api from '../../services/api';
 import { formatDistanceToNow, isPast, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -222,10 +223,12 @@ const ConfigWebhooks = () => {
 
     // ── Render ─────────────────────────────────
     return (
-        <Box>
-            <Typography variant="h6" sx={{ color: 'primary.main', mb: 3, fontWeight: 700 }}>
-                🔗 Integrações: API Keys & Webhooks
-            </Typography>
+        <Box sx={{ p: { xs: 2, md: 4 } }}>
+            <PageHeader
+                title="API Keys & Webhooks"
+                subtitle="Gerencie chaves de acesso à API e configure gatilhos de integração com sistemas externos."
+                breadcrumbs={[{ text: 'Configurações' }, { text: 'API Keys & Webhooks' }]}
+            />
 
             <Grid container spacing={3}>
 

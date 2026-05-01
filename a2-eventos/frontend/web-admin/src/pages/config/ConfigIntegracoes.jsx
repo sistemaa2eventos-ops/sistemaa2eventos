@@ -16,6 +16,7 @@ import {
 import { useSnackbar } from 'notistack';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
 import GlassCard from '../../components/common/GlassCard';
+import PageHeader from '../../components/common/PageHeader';
 import api from '../../services/api';
 
 const ConfigIntegracoes = () => {
@@ -67,10 +68,12 @@ const ConfigIntegracoes = () => {
     };
 
     return (
-        <Box>
-            <Typography variant="h6" sx={{ color: 'primary.main', mb: 3, fontWeight: 700 }}>
-                🔌 Integrações & Gateways Externos
-            </Typography>
+        <Box sx={{ p: { xs: 2, md: 4 } }}>
+            <PageHeader
+                title="Integrações & Gateways Externos"
+                subtitle="Monitore o status dos serviços conectados e configure integrações com plataformas externas."
+                breadcrumbs={[{ text: 'Configurações' }, { text: 'Integrações' }]}
+            />
 
             <Grid container spacing={3}>
                 {/* STATUS DOS SERVIÇOS CORE */}

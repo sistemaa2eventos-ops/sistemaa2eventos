@@ -18,6 +18,7 @@ import { useSnackbar } from 'notistack';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
 import GlassCard from '../../components/common/GlassCard';
 import NeonButton from '../../components/common/NeonButton';
+import PageHeader from '../../components/common/PageHeader';
 import api from '../../services/api';
 
 // Todas as horas do dia em intervalos de 30 min
@@ -110,10 +111,12 @@ const ConfigCron = () => {
     }
 
     return (
-        <Box>
-            <Typography variant="h6" sx={{ color: 'primary.main', mb: 3, fontWeight: 700 }}>
-                🤖 Automação & Jobs em Background
-            </Typography>
+        <Box sx={{ p: { xs: 2, md: 4 } }}>
+            <PageHeader
+                title="Automação & Jobs em Background"
+                subtitle="Configure horários de execução dos jobs e dispare ações manuais de manutenção."
+                breadcrumbs={[{ text: 'Configurações' }, { text: 'Automação' }]}
+            />
 
             {/* Aviso: mudanças de horário são aplicadas em tempo real */}
             <Alert severity="info" sx={{ mb: 3, bgcolor: 'rgba(0,212,255,0.05)', color: '#E8F4FD', border: '1px solid rgba(0,212,255,0.2)' }}>

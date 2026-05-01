@@ -14,6 +14,8 @@ import {
 import api from '../../services/api';
 import GlassCard from '../../components/common/GlassCard';
 import DataTable from '../../components/common/DataTable';
+import PageHeader from '../../components/common/PageHeader';
+import NeonButton from '../../components/common/NeonButton';
 
 const ConfigAreas = () => {
     const [areas, setAreas] = useState([]);
@@ -150,20 +152,17 @@ const ConfigAreas = () => {
     if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>;
 
     return (
-        <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h6" sx={{ color: 'primary.main', fontWeight: 700 }}>
-                    📍 Gestão de Áreas & Zonas
-                </Typography>
-                <Button 
-                    variant="contained" 
-                    startIcon={<AddIcon />} 
-                    onClick={() => handleOpenDialog()}
-                    sx={{ fontWeight: 700 }}
-                >
-                    Nova Área
-                </Button>
-            </Box>
+        <Box sx={{ p: { xs: 2, md: 4 } }}>
+            <PageHeader
+                title="Gestão de Áreas & Zonas"
+                subtitle="Crie e gerencie as áreas de acesso do evento. Cada área pode ser associada a um ou mais leitores."
+                breadcrumbs={[{ text: 'Configurações' }, { text: 'Áreas & Zonas' }]}
+                action={
+                    <NeonButton startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>
+                        Nova Área
+                    </NeonButton>
+                }
+            />
 
             <Grid container spacing={3}>
                 <Grid item xs={12}>
