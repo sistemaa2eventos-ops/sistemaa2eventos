@@ -49,12 +49,12 @@ export const useCheckin = (defaultMode) => {
                 api.get(`/access/logs`, { params: { limit: 10, evento_id: eventoId } }),
                 api.get(`/eventos/${eventoId}`),
                 api.get('/access/stats/realtime', { params: { evento_id: eventoId } }),
-                api.get(`/eventos/${eventoId}/areas`).catch(() => ({ data: { data: [] } }))
+                api.get('/config/areas', { params: { evento_id: eventoId } }).catch(() => ({ data: { data: [] } }))
             ]);
             setRecentLogs(logRes.data.data || []);
             setEventModules(eventRes.data.data?.event_modules || []);
             setRealtimeStats(statsRes.data.data || null);
-            setEventAreas(areasRes.data.data || areasRes.data || []);
+            setEventAreas(areasRes.data.data || []);
         } catch (error) {
             console.error('Erro ao carregar dados de check-in:', error);
         }
@@ -125,29 +125,19 @@ export const useCheckin = (defaultMode) => {
         }
     };
 
-    const handleSelectPessoa = async (pessoa) => {
+    const handleSelectPessoa = (pessoa) => {
         setSelectedPessoa(pessoa);
         setSearchResults([]);
         setSearchQuery('');
 
-        // Enriquecer com áreas autorizadas (se existirem)
-        if (pessoa?.id && eventoId) {
-            try {
-                const { data: areasRes } = await api.get(`/access/pulseira/buscar`, {
-                    params: { codigo: pessoa.cpf || pessoa.id }
-                });
-                // Se retornou a mesma pessoa com mais dados, mesclar
-                const found = areasRes.data?.[0] || areasRes.data;
-                if (found?.areas_autorizadas?.length > 0) {
-                    // Buscar nomes das áreas
-                    const areaNames = eventAreas.filter(a => found.areas_autorizadas.includes(a.id));
-                    setSelectedPessoa(prev => ({
-                        ...prev,
-                        areas_autorizadas: found.areas_autorizadas,
-                        areas_info: areaNames.map(a => ({ area_id: a.id, nome_area: a.nome_area }))
-                    }));
-                }
-            } catch { /* silencioso */ }
+        if (pessoa?.areas_autorizadas?.length > 0 && eventAreas.length > 0) {
+            const areaNames = eventAreas.filter(a => pessoa.areas_autorizadas.includes(a.id));
+            if (areaNames.length > 0) {
+                setSelectedPessoa(prev => ({
+                    ...prev,
+                    areas_info: areaNames.map(a => ({ area_id: a.id, nome_area: a.nome_area }))
+                }));
+            }
         }
     };
 
@@ -159,7 +149,6 @@ export const useCheckin = (defaultMode) => {
             if (res.data.success) {
                 const pessoa = res.data.data;
                 handleSelectPessoa(pessoa);
-                // Auto-confirmar check-in se encontrar pulseira (Ref correção flow)
                 performCheckin('pulseira', codigo, pessoa.id);
             }
         } catch (error) {

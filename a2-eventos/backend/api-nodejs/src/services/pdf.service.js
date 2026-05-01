@@ -66,7 +66,7 @@ class PDFService {
                 const pages = doc.bufferedPageRange();
                 for (let i = 0; i < pages.count; i++) {
                     doc.switchToPage(i);
-                    doc.fillColor('#999999').fontSize(8).text(`Página ${i + 1} de ${pages.count} - A2 Eventos SaaS Nexus`, 50, 800, { align: 'center' });
+                    doc.fillColor('#999999').fontSize(8).text(`Página ${i + 1} de ${pages.count} - A2 Eventos SaaS Credenciamento`, 50, 800, { align: 'center' });
                 }
 
                 doc.end();

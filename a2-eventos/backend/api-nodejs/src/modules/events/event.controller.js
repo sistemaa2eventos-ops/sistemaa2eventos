@@ -210,9 +210,9 @@ class EventoController {
 
             const { data, error } = await supabaseClient
                 .from('evento_areas')
-                .select('id, nome, descricao')
+                .select('id, nome_area')
                 .eq('evento_id', id)
-                .order('nome', { ascending: true });
+                .order('nome_area', { ascending: true });
 
             if (error) throw error;
 

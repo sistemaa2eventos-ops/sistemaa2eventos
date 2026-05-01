@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Html5Qrcode } from "html5-qrcode";
 import {
-  Box, Typography, Grid, Stack, TextField, 
+  Box, Typography, Grid, Stack, TextField,
   Avatar, CircularProgress, List, ListItemText,
-  ListItemButton, Chip, Fade, Zoom,
-  FormControl, Select, MenuItem
+  ListItemButton, Chip, Fade, Zoom
 } from '@mui/material';
+import AreaSelector from '../components/common/AreaSelector';
+import AuthorizedAreasChips from '../components/common/AuthorizedAreasChips';
 import {
   QrCodeScanner as ScannerIcon, 
   CheckCircle as SuccessIcon, Cancel as ErrorIcon, Search as SearchIcon,
@@ -192,44 +193,7 @@ const Checkout = () => {
         </NeonButton>
       </Box>
 
-      {/* SELETOR DE ÁREA (Portaria/Saída) */}
-      {eventAreas.length > 0 && (
-        <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-            📍 PORTARIA / ÁREA:
-          </Typography>
-          <FormControl size="small" sx={{ minWidth: 250 }}>
-            <Select
-              value={areaId || ''}
-              onChange={(e) => changeAreaId(e.target.value || null)}
-              displayEmpty
-              sx={{
-                borderRadius: 3,
-                bgcolor: 'rgba(255,51,102,0.05)',
-                border: '1px solid rgba(255,51,102,0.2)',
-                '& .MuiSelect-select': { py: 1 }
-              }}
-            >
-              <MenuItem value=""><em>Todas as áreas (global)</em></MenuItem>
-              {eventAreas.map(area => (
-                <MenuItem key={area.id} value={area.id}>
-                  {area.nome_area}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          {areaId && (
-            <Chip
-              label={eventAreas.find(a => a.id === areaId)?.nome_area || 'Área selecionada'}
-              color="error"
-              size="small"
-              variant="outlined"
-              onDelete={() => changeAreaId(null)}
-              sx={{ fontWeight: 700 }}
-            />
-          )}
-        </Box>
-      )}
+      <AreaSelector areas={eventAreas} value={areaId} onChange={changeAreaId} accentColor="#FF3366" />
       <Grid container spacing={3} justifyContent={modoQuiosque ? 'center' : 'flex-start'}>
         
         {/* BUSCA (Esquerda no Normal, Superior no Quiosque) */}
@@ -402,31 +366,7 @@ const Checkout = () => {
                                         )}
                                     </Stack>
 
-                                    {/* Áreas autorizadas (enriquecido via handleSelectPessoa) */}
-                                    {selectedPessoa.areas_info?.length > 0 && !selectedPessoa.pulseira_info && (
-                                        <Box sx={{ mt: 2, p: 1.5, borderRadius: 2, bgcolor: 'rgba(255, 51, 102, 0.05)', border: '1px solid rgba(255, 51, 102, 0.15)' }}>
-                                            <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-                                                🔑 ÁREAS AUTORIZADAS
-                                            </Typography>
-                                            <Stack direction="row" spacing={0.5} flexWrap="wrap">
-                                                {selectedPessoa.areas_info.map((area, idx) => (
-                                                    <Chip
-                                                        key={idx}
-                                                        label={area.nome_area}
-                                                        size="small"
-                                                        sx={{
-                                                            height: 22,
-                                                            fontSize: '0.7rem',
-                                                            fontWeight: 700,
-                                                            bgcolor: 'rgba(255, 51, 102, 0.1)',
-                                                            color: '#FF3366',
-                                                            border: '1px solid rgba(255, 51, 102, 0.3)'
-                                                        }}
-                                                    />
-                                                ))}
-                                            </Stack>
-                                        </Box>
-                                    )}
+                                    <AuthorizedAreasChips pessoa={selectedPessoa} accentColor="#FF3366" />
 
                                     <Box sx={{ mt: 3, p: 2, bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 3 }}>
                                         <Typography variant="caption" color="text.secondary">ÚLTIMA ATIVIDADE</Typography>

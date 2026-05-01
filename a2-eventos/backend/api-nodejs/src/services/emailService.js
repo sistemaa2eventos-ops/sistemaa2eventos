@@ -29,12 +29,12 @@ class EmailService {
 
         try {
             const mailOptions = {
-                from: `"Nexus Control - A2 Eventos" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
+                from: `"CREDENCIAMENTO - A2 EVENTOS" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
                 to: email,
                 subject: 'Confirmação de Solicitação de Credenciamento ✔',
                 html: `
                     <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
-                        <h2 style="color: #00D4FF; background-color: #050B18; padding: 15px; border-radius: 8px;">A2 Eventos - Nexus Control</h2>
+                        <h2 style="color: #00D4FF; background-color: #050B18; padding: 15px; border-radius: 8px;">CREDENCIAMENTO - A2 EVENTOS</h2>
                         <p>Olá, <strong>${nome}</strong>!</p>
                         <p>Sua solicitação de credenciamento para atuar junto à <strong>${empresaNome}</strong> foi recebida com sucesso em nossa base de dados.</p>
                         <p>Seus dados biométricos e documentais estão sendo validados por nossa inteligência artificial e em breve sua credencial estará pronta para uso nos terminais de acesso facial.</p>
@@ -56,7 +56,7 @@ class EmailService {
     async sendDataPortability(email, nome, data) {
         try {
             const mailOptions = {
-                from: `"Nexus Control - LGPD" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
+                from: `"CREDENCIAMENTO - LGPD" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
                 to: email,
                 subject: 'Relatório de Portabilidade de Dados (Art. 18 LGPD) 📑',
                 html: `
@@ -66,7 +66,7 @@ class EmailService {
                         <p>Em conformidade com o seu direito de portabilidade (Art. 18, V da LGPD), anexamos a este e-mail todos os seus dados pessoais e de tratamento vinculados ao sistema A2 Eventos.</p>
                         <p>O arquivo está em formato JSON para garantir a interoperabilidade entre sistemas.</p>
                         <hr style="border: 0; border-top: 1px solid #ddd; margin: 20px 0;" />
-                        <p style="font-size: 11px; color: #888;">Controlador: A2 Eventos | Operador: Nexus Control System</p>
+                        <p style="font-size: 11px; color: #888;">Controlador: A2 Eventos | Operador: CREDENCIAMENTO - A2 EVENTOS</p>
                     </div>
                 `,
                 attachments: [
@@ -90,7 +90,7 @@ class EmailService {
     async sendForgetMeConfirmation(email, nome) {
         try {
             const mailOptions = {
-                from: `"Nexus Control - LGPD" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
+                from: `"CREDENCIAMENTO - LGPD" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
                 to: email,
                 subject: 'Confirmação de Direito ao Esquecimento 🔒',
                 html: `
@@ -113,17 +113,17 @@ class EmailService {
     async sendDailyReport(email, eventoNome, data, workbookBuffer) {
         try {
             const mailOptions = {
-                from: `"Nexus Analytics" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
+                from: `"CREDENCIAMENTO - Analytics" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
                 to: email,
                 subject: `Relatório Diário - ${eventoNome} - ${data} 📊`,
                 html: `
                     <div style="font-family: Arial, sans-serif; padding: 20px;">
-                        <h2 style="color: #1A237E;">Nexus Control - Relatório Diário Operacional</h2>
+                        <h2 style="color: #1A237E;">CREDENCIAMENTO - Relatório Diário Operacional</h2>
                         <p>Olá,</p>
                         <p>Segue em anexo o relatório operacional consolidado do evento <strong>${eventoNome}</strong> referente ao dia <strong>${data}</strong>.</p>
                         <p>Este relatório contém o detalhamento de horas trabalhadas agrupado por empresa.</p>
                         <hr style="border: 0; border-top: 1px solid #ddd; margin: 20px 0;" />
-                        <p style="font-size: 11px; color: #888;">Gerado automaticamente pelo Sistema Nexus Analytics - A2 Eventos.</p>
+                        <p style="font-size: 11px; color: #888;">Gerado automaticamente pelo Sistema de CREDENCIAMENTO - A2 Eventos.</p>
                     </div>
                 `,
                 attachments: [
@@ -146,13 +146,13 @@ class EmailService {
     async sendCompanyInvite(email, nomeEmpresa, link) {
         try {
             const mailOptions = {
-                from: `"Nexus Control - Cadastro B2B" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
+                from: `"CREDENCIAMENTO - Cadastro B2B" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
                 to: email,
                 subject: `Portal de Credenciamento - ${nomeEmpresa} 🏢`,
                 html: `
                     <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
                         <div style="background: #050B18; padding: 30px; text-align: center;">
-                            <h1 style="color: #00D4FF; margin: 0; font-size: 24px; letter-spacing: 2px;">NEXUS CONTROL</h1>
+                            <h1 style="color: #00D4FF; margin: 0; font-size: 24px; letter-spacing: 2px;">CREDENCIAMENTO BIOMÉTRICO</h1>
                         </div>
                         <div style="padding: 40px; color: #333; line-height: 1.6;">
                             <h2 style="color: #050B18;">Olá, ${nomeEmpresa}!</h2>
@@ -183,7 +183,7 @@ class EmailService {
     async sendEmployeeInvite(email, nomePessoa, nomeEmpresa, link) {
         try {
             const mailOptions = {
-                from: `"Nexus Control - ${nomeEmpresa}" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
+                from: `"CREDENCIAMENTO - ${nomeEmpresa}" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
                 to: email,
                 subject: `Convite de Credenciamento - ${nomeEmpresa} 🪪`,
                 html: `
@@ -203,7 +203,7 @@ class EmailService {
                             <p style="font-size: 13px; color: #777;"><em>Importante: Sem a conclusão deste cadastro e o upload da foto, seu acesso aos recintos do evento será bloqueado.</em></p>
                         </div>
                         <div style="background: #f9f9f9; padding: 20px; text-align: center; font-size: 11px; color: #999;">
-                            Plataforma Operada por A2 Eventos | Nexus Control
+                            Plataforma Operada por A2 Eventos | CREDENCIAMENTO
                         </div>
                     </div>
                 `

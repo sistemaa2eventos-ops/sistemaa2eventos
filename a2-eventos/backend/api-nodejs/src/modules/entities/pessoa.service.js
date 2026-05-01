@@ -171,10 +171,22 @@ class PessoaService {
         const { data: pessoas, error: pesErr } = await pesQuery.limit(100);
         if (pesErr) throw pesErr;
 
-        // Passo 3: Unificar com empresas
+        // Passo 3: Unificar com empresas e buscar áreas autorizadas em batch
         const eIds = [...new Set(pivots.map(p => p.empresa_id))];
-        const { data: empData } = await supabaseClient.from('empresas').select('id, nome').in('id', eIds);
-        const empMap = (empData || []).reduce((acc, e) => { acc[e.id] = e; return acc; }, {});
+        const [empResult, areasResult] = await Promise.all([
+            supabaseClient.from('empresas').select('id, nome').in('id', eIds),
+            supabaseClient.from('pessoa_areas_acesso')
+                .select('pessoa_id, area_id')
+                .in('pessoa_id', pIds)
+                .eq('evento_id', eventoId)
+        ]);
+
+        const empMap = (empResult.data || []).reduce((acc, e) => { acc[e.id] = e; return acc; }, {});
+        const areasMap = (areasResult.data || []).reduce((acc, a) => {
+            if (!acc[a.pessoa_id]) acc[a.pessoa_id] = [];
+            acc[a.pessoa_id].push(a.area_id);
+            return acc;
+        }, {});
         const pesMap = (pessoas || []).reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
 
         return pivots.map(p => {
@@ -182,11 +194,12 @@ class PessoaService {
             if (!pessoa) return null;
             return {
                 ...pessoa,
-                nome: pessoa.nome_completo, // Compatibilidade com frontend
+                nome: pessoa.nome_completo,
                 status: pessoa.status_acesso,
                 empresas: empMap[p.empresa_id] || { nome: 'Sem Empresa' },
                 vinculo_id: p.id,
-                status_pivot: p.status_aprovacao
+                status_pivot: p.status_aprovacao,
+                areas_autorizadas: areasMap[pessoa.id] || []
             };
         }).filter(p => p !== null);
     }
