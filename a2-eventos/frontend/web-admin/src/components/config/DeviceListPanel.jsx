@@ -10,25 +10,29 @@ import {
     Wifi as WifiIcon,
     WifiOff as WifiOffIcon,
     PowerSettingsNew as PowerIcon,
-    VpnKey as VpnKeyIcon
+    VpnKey as VpnKeyIcon,
+    ContentCopy as CopyIcon
 } from '@mui/icons-material';
+import { useSnackbar } from 'notistack';
 import GlassCard from '../common/GlassCard';
 import NeonButton from '../common/NeonButton';
 import DataTable from '../common/DataTable';
 
-const DeviceListPanel = ({ 
-    readers, 
-    loading, 
-    fetchReaders, 
-    handleOpenDialog, 
+const DeviceListPanel = ({
+    readers,
+    loading,
+    fetchReaders,
+    handleOpenDialog,
     handleRemoteAction = () => {},
-    handleTestDevice, 
-    testingId, 
-    handleSync, 
-    syncingId, 
-    setDeviceToDelete, 
-    setOpenDeleteConfirm 
+    handleTestDevice,
+    testingId,
+    handleSync,
+    syncingId,
+    setDeviceToDelete,
+    setOpenDeleteConfirm,
+    hideHeader = false
 }) => {
+    const { enqueueSnackbar } = useSnackbar();
     const columns = [
         {
             id: 'nome',
@@ -54,14 +58,25 @@ const DeviceListPanel = ({
             )
         },
         { id: 'ip_address', label: 'ENDEREÇO IP', minWidth: 120 },
-        { 
-            id: 'control_token', 
-            label: 'ID DE SEGURANÇA (TOKEN)', 
+        {
+            id: 'control_token',
+            label: 'TOKEN DE SEGURANÇA',
             minWidth: 160,
             format: (val) => (
-                <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#00D4FF', background: 'rgba(0,212,255,0.05)', p: 0.5, borderRadius: 1 }}>
-                    {val ? val.split('-')[0] + '-...' : 'N/A'}
-                </Typography>
+                <Stack direction="row" alignItems="center" spacing={0.5}>
+                    <Tooltip title={val || 'Sem token'}>
+                        <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#00D4FF', background: 'rgba(0,212,255,0.05)', p: 0.5, borderRadius: 1 }}>
+                            {val ? val.slice(0, 8) + '...' : 'N/A'}
+                        </Typography>
+                    </Tooltip>
+                    {val && (
+                        <Tooltip title="Copiar token">
+                            <IconButton size="small" onClick={() => { navigator.clipboard.writeText(val); enqueueSnackbar('Token copiado!', { variant: 'info' }); }}>
+                                <CopyIcon sx={{ fontSize: 12, color: 'text.secondary' }} />
+                            </IconButton>
+                        </Tooltip>
+                    )}
+                </Stack>
             )
         },
         {
@@ -174,21 +189,23 @@ const DeviceListPanel = ({
 
     return (
         <GlassCard sx={{ p: 3, mb: 4 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <RefreshIcon
-                        sx={{ color: '#00D4FF', cursor: 'pointer' }}
-                        onClick={fetchReaders}
-                        className={loading ? 'ani-spin' : ''}
-                    />
-                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff' }}>
-                        TERMINAIS FACIAIS
-                    </Typography>
+            {!hideHeader && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <RefreshIcon
+                            sx={{ color: '#00D4FF', cursor: 'pointer' }}
+                            onClick={fetchReaders}
+                            className={loading ? 'ani-spin' : ''}
+                        />
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff' }}>
+                            TERMINAIS FACIAIS
+                        </Typography>
+                    </Box>
+                    <NeonButton startIcon={<AddIcon />} size="small" onClick={() => handleOpenDialog()}>
+                        NOVO TERMINAL
+                    </NeonButton>
                 </Box>
-                <NeonButton startIcon={<AddIcon />} size="small" onClick={() => handleOpenDialog()}>
-                    NOVO TERMINAL
-                </NeonButton>
-            </Box>
+            )}
             <DataTable
                 columns={columns}
                 data={readers}

@@ -5,7 +5,7 @@ import {
   InputLabel, Button, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Paper, Chip,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  CircularProgress, Tooltip, Fade, Zoom, Divider
+  CircularProgress, LinearProgress, Tooltip, Fade, Zoom, Divider, Alert
 } from '@mui/material';
 import { useSnackbar } from 'notistack';
 import {
@@ -181,11 +181,22 @@ const Monitor = () => {
                 </GlassCard>
 
                 <GlassCard sx={{ height: 'calc(100vh - 350px)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                    <Box sx={{ p: 2, background: 'rgba(0,0,0,0.3)', display: 'flex', justifyContent: 'space-between' }}>
+                    <Box sx={{ p: 2, background: 'rgba(0,0,0,0.3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Typography variant="subtitle2" fontWeight={800} color="#00D4FF">FEED DE ACESSOS REAIS</Typography>
-                        <Typography variant="caption" color="#00FF88">● {logs.length} EVENTOS NO BUFFER</Typography>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                            {loading && <CircularProgress size={12} sx={{ color: '#00D4FF' }} />}
+                            <Typography variant="caption" color="#00FF88">● {logs.length} EVENTOS NO BUFFER</Typography>
+                        </Stack>
                     </Box>
+                    {loading && logs.length === 0 && <LinearProgress sx={{ height: 2 }} />}
                     <Box sx={{ flex: 1, overflowY: 'auto' }}>
+                        {!loading && logs.length === 0 && (
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 2, opacity: 0.5 }}>
+                                <MonitorIcon sx={{ fontSize: 48, color: '#00D4FF' }} />
+                                <Typography variant="body2" color="text.secondary">Nenhum acesso registrado ainda.</Typography>
+                                <Typography variant="caption" color="text.secondary">Os eventos aparecerão aqui em tempo real conforme as pessoas passam pelos leitores.</Typography>
+                            </Box>
+                        )}
                         {logs.map((log, idx) => {
                             const isNegado = log.tipo === 'negado' || log.resultado === 'negado';
                             const isWatchlist = watchlist.some(w => w.cpf === log.pessoas?.cpf);
@@ -389,23 +400,61 @@ const Monitor = () => {
           <DialogTitle>CONFIGURAÇÃO DE CÂMERA IP</DialogTitle>
           <DialogContent>
               <Stack spacing={2} pt={1}>
-                  <TextField label="Nome da Câmera" fullWidth value={editingCamera?.nome || ''} onChange={(e) => setEditingCamera({...editingCamera, nome: e.target.value})} />
-                  <FormControl fullWidth>
+                  <TextField
+                      label="Nome da Câmera" fullWidth required
+                      value={editingCamera?.nome || ''}
+                      onChange={(e) => setEditingCamera({...editingCamera, nome: e.target.value})}
+                      error={openCameraDialog && !editingCamera?.nome}
+                      helperText={openCameraDialog && !editingCamera?.nome ? 'Nome obrigatório.' : ''}
+                  />
+                  <FormControl fullWidth required>
                       <InputLabel>Fabricante</InputLabel>
                       <Select label="Fabricante" value={editingCamera?.fabricante || ''} onChange={(e) => setEditingCamera({...editingCamera, fabricante: e.target.value})}>
                           {FABRICANTES.map(f => <MenuItem key={f} value={f}>{f}</MenuItem>)}
                       </Select>
                   </FormControl>
-                  <TextField label="Endereço IP" fullWidth value={editingCamera?.ip_address || ''} onChange={(e) => setEditingCamera({...editingCamera, ip_address: e.target.value})} />
-                  <TextField label="Snapshot URL (Manual)" fullWidth value={editingCamera?.snapshot_url || ''} onChange={(e) => setEditingCamera({...editingCamera, snapshot_url: e.target.value})} helperText="Deixe vazio para usar o padrão do fabricante" />
+                  <TextField
+                      label="Endereço IP" fullWidth required
+                      placeholder="192.168.1.100"
+                      value={editingCamera?.ip_address || ''}
+                      onChange={(e) => setEditingCamera({...editingCamera, ip_address: e.target.value})}
+                      error={openCameraDialog && editingCamera?.ip_address && !/^(\d{1,3}\.){3}\d{1,3}$/.test(editingCamera.ip_address)}
+                      helperText="Formato: 192.168.1.100"
+                  />
+                  <TextField
+                      label="Porta HTTP" type="number" fullWidth
+                      placeholder="80"
+                      value={editingCamera?.porta || 80}
+                      onChange={(e) => setEditingCamera({...editingCamera, porta: parseInt(e.target.value, 10) || 80})}
+                      inputProps={{ min: 1, max: 65535 }}
+                      helperText="Porta padrão: 80"
+                  />
+                  <TextField
+                      label="Snapshot URL (opcional)" fullWidth
+                      placeholder="http://IP/cgi-bin/snapshot.cgi"
+                      value={editingCamera?.snapshot_url || ''}
+                      onChange={(e) => setEditingCamera({...editingCamera, snapshot_url: e.target.value})}
+                      error={editingCamera?.snapshot_url && (() => { try { new URL(editingCamera.snapshot_url); return false; } catch { return true; } })()}
+                      helperText="Deixe vazio para usar o padrão do fabricante (baseado no IP)"
+                  />
               </Stack>
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={{ p: 2 }}>
               <Button onClick={() => setOpenCameraDialog(false)}>CANCELAR</Button>
               <Button variant="contained" onClick={async () => {
-                   await api.post('/cameras', editingCamera);
-                   fetchCameras();
-                   setOpenCameraDialog(false);
+                  if (!editingCamera?.nome || !editingCamera?.ip_address) {
+                      enqueueSnackbar('Nome e IP são obrigatórios.', { variant: 'warning' });
+                      return;
+                  }
+                  try {
+                      await api.post('/cameras', editingCamera);
+                      enqueueSnackbar('Câmera cadastrada com sucesso!', { variant: 'success' });
+                      fetchCameras();
+                      setOpenCameraDialog(false);
+                      setEditingCamera(null);
+                  } catch (err) {
+                      enqueueSnackbar(err.response?.data?.error || 'Erro ao salvar câmera.', { variant: 'error' });
+                  }
               }}>SALVAR</Button>
           </DialogActions>
       </Dialog>

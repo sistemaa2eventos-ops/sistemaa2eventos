@@ -5,9 +5,17 @@ const excelController = require('../reports/excel.controller');
 const emailService = require('../../services/emailService');
 
 class CronController {
-    /**
-     * Inicia as rotinas agendadas (CRON Jobs)
-     */
+    constructor() {
+        this._resetTask     = null;
+        this._relatorioTask = null;
+    }
+
+    // Converte "HH:mm" para expressão cron "mm HH * * *"
+    _toCron(hhmm) {
+        const [h, m] = (hhmm || '03:00').split(':');
+        return `${m || '00'} ${h || '03'} * * *`;
+    }
+
     async start() {
         logger.info('⏰ Inicializando CRON Jobs...');
 
@@ -15,43 +23,53 @@ class CronController {
         let relatorioH = '03:30';
 
         try {
-            const { data } = await supabase.from('system_settings').select('cron_reset_hora, cron_relatorio_hora').eq('id', 1).single();
+            const { data } = await supabase
+                .from('system_settings')
+                .select('cron_reset_hora, cron_relatorio_hora')
+                .eq('id', 1)
+                .single();
             if (data) {
-                resetH = data.cron_reset_hora || resetH;
+                resetH    = data.cron_reset_hora    || resetH;
                 relatorioH = data.cron_relatorio_hora || relatorioH;
             }
         } catch (err) {
             logger.error('Erro ao buscar horários de CRON no banco:', err);
         }
 
-        // Formato HH:mm -> mm HH * * *
-        const resetCron = `${resetH.split(':')[1] || '00'} ${resetH.split(':')[0] || '03'} * * *`;
-        const relatorioCron = `${relatorioH.split(':')[1] || '30'} ${relatorioH.split(':')[0] || '03'} * * *`;
+        this._scheduleConfigurableJobs(resetH, relatorioH);
 
-        // 1. Fechamento de Turno Diário
-        cron.schedule(resetCron, async () => {
-            logger.info(`🔄 [CRON] Iniciando Fechamento de Turno (${resetH})...`);
-            await this.resetTurnos();
+        // Jobs fixos (não configuráveis pelo usuário) — Promise não awaited intencionalmente;
+        // erros capturados internamente via try/catch em cada método.
+        cron.schedule('*/5 * * * *', () => {
+            this.autoCheckoutRoutine().catch(e => logger.error('[CRON] autoCheckoutRoutine falhou:', e));
+        });
+        cron.schedule('0 4 * * *', () => {
+            logger.info('🔄 [CRON] Revogação de Documentos (ECM)...');
+            this.revogarDocumentosVencidos().catch(e => logger.error('[CRON] revogarDocumentosVencidos falhou:', e));
+        });
+    }
+
+    // Agenda (ou reagenda) apenas os jobs configuráveis pelo usuário
+    _scheduleConfigurableJobs(resetH, relatorioH) {
+        if (this._resetTask)     { this._resetTask.stop();     this._resetTask = null; }
+        if (this._relatorioTask) { this._relatorioTask.stop(); this._relatorioTask = null; }
+
+        this._resetTask = cron.schedule(this._toCron(resetH), () => {
+            logger.info(`🔄 [CRON] Fechamento de Turno (${resetH})...`);
+            this.resetTurnos().catch(e => logger.error('[CRON] resetTurnos falhou:', e));
         });
 
-        // 2. Relatório Diário Agendado
-        cron.schedule(relatorioCron, async () => {
-            logger.info(`🔄 [CRON] Gerando Relatórios Diários (${relatorioH})...`);
-            // O resetTurnos já envia relatórios para quem foi resetado. 
-            // Mas se quisermos um envio global independente de quem estava preso:
-            await this.enviarRelatoriosGlobais();
+        this._relatorioTask = cron.schedule(this._toCron(relatorioH), () => {
+            logger.info(`🔄 [CRON] Relatórios Diários (${relatorioH})...`);
+            this.enviarRelatoriosGlobais().catch(e => logger.error('[CRON] enviarRelatoriosGlobais falhou:', e));
         });
 
-        // Rodar a cada 5 minutos para monitorar a trava do Auto Check-out Global
-        cron.schedule('*/5 * * * *', async () => {
-            await this.autoCheckoutRoutine();
-        });
+        logger.info(`⏰ [CRON] Reagendado: Reset=${resetH}, Relatório=${relatorioH}`);
+    }
 
-        // Rodar todos os dias às 04:00 da manhã para invalidar documentos vencidos
-        cron.schedule('0 4 * * *', async () => {
-            logger.info('🔄 [CRON] Iniciando rotina de Revogação de Documentos (ECM)...');
-            await this.revogarDocumentosVencidos();
-        });
+    // Chamado pelo settings.controller quando cron_reset_hora ou cron_relatorio_hora mudam
+    reschedule(resetH, relatorioH) {
+        this._scheduleConfigurableJobs(resetH, relatorioH);
     }
 
     /**

@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
-    Box, Typography, Switch, Slider, 
-    Divider, Grid, CircularProgress, Button,
+    Box, Typography, Switch, Slider,
+    Divider, Grid, CircularProgress,
     Alert, FormControl, InputLabel, Select, MenuItem,
-    TextField
+    TextField, LinearProgress
 } from '@mui/material';
-import { 
+import {
     History as HistoryIcon,
     Security as SecurityIcon,
     Timer as TimerIcon,
@@ -15,6 +15,7 @@ import {
 import { useSnackbar } from 'notistack';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
 import GlassCard from '../../components/common/GlassCard';
+import NeonButton from '../../components/common/NeonButton';
 import PageHeader from '../../components/common/PageHeader';
 
 const ConfigCheckin = () => {
@@ -152,7 +153,7 @@ const ConfigCheckin = () => {
 
                 {/* SEÇÃO: Horário de Funcionamento */}
                 <Grid item xs={12} md={6}>
-                    <GlassCard sx={{ p: 3 }}>
+                    <GlassCard sx={{ p: 3, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
                             <TimeIcon sx={{ color: '#00D4FF' }} />
                             <Typography variant="subtitle1" sx={{ color: '#fff', fontWeight: 700 }}>
@@ -208,7 +209,7 @@ const ConfigCheckin = () => {
 
                 {/* SEÇÃO: Restrições de Dias */}
                 <Grid item xs={12} md={6}>
-                    <GlassCard sx={{ p: 3 }}>
+                    <GlassCard sx={{ p: 3, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
                             <TimerIcon sx={{ color: '#00D4FF' }} />
                             <Typography variant="subtitle1" sx={{ color: '#fff', fontWeight: 700 }}>
@@ -236,16 +237,20 @@ const ConfigCheckin = () => {
                 </Grid>
 
                 <Grid item xs={12}>
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={() => handleSave()}
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2, mt: 2 }}>
+                        {saving && <LinearProgress sx={{ width: 160 }} />}
+                        <NeonButton
+                            onClick={() => {
+                                if (horarioInicio >= horarioFim) {
+                                    enqueueSnackbar('O horário de início deve ser anterior ao horário de fim.', { variant: 'warning' });
+                                    return;
+                                }
+                                handleSave();
+                            }}
                             disabled={saving}
-                            sx={{ fontWeight: 700, px: 4, borderRadius: 2 }}
                         >
                             {saving ? 'Salvando...' : 'Salvar Alterações'}
-                        </Button>
+                        </NeonButton>
                     </Box>
                 </Grid>
             </Grid>

@@ -98,6 +98,19 @@ class SettingsController {
 
             if (error) throw error;
 
+            // Reagendar cron jobs configuráveis se os horários mudaram (sem precisar reiniciar o servidor)
+            if (payload.cron_reset_hora || payload.cron_relatorio_hora) {
+                try {
+                    const cronController = require('../events/cron.controller');
+                    cronController.reschedule(
+                        data.cron_reset_hora    || '03:00',
+                        data.cron_relatorio_hora || '03:30'
+                    );
+                } catch (cronErr) {
+                    logger.warn('Cron reschedule falhou (não crítico):', cronErr.message);
+                }
+            }
+
             res.json({ success: true, message: 'Configurações atualizadas com sucesso', data });
         } catch (error) {
             logger.error('Erro ao atualizar system_settings no Supabase:', error);
