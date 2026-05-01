@@ -475,6 +475,33 @@ class PublicController {
                 finalPessoaId = newPessoa.id;
             }
 
+            // 5.1. Garantir registro pivot pessoa_evento_empresa
+            // Pessoas cadastradas via link não têm esse vínculo criado automaticamente,
+            // o que as torna invisíveis na busca do check-in (searchPessoas filtra por pivot).
+            const { data: pivotExistente } = await supabase
+                .from('pessoa_evento_empresa')
+                .select('id')
+                .eq('pessoa_id', finalPessoaId)
+                .eq('evento_id', eventoId)
+                .maybeSingle();
+
+            if (!pivotExistente) {
+                const { error: pivotErr } = await supabase
+                    .from('pessoa_evento_empresa')
+                    .insert([{
+                        pessoa_id: finalPessoaId,
+                        empresa_id: empresaId,
+                        evento_id: eventoId,
+                        status_aprovacao: 'pendente',
+                        cargo_funcao: funcao || nome
+                    }]);
+                if (pivotErr) {
+                    logger.warn(`[Pivot] Falha ao criar vínculo pessoa_evento_empresa: ${pivotErr.message}`);
+                } else {
+                    logger.info(`[Pivot] Vínculo pessoa_evento_empresa criado para pessoa ${finalPessoaId}`);
+                }
+            }
+
             // 6. Vincular Documentos
             if (documentosSalvos.length > 0) {
                 await supabase.from('pessoa_documentos').insert(

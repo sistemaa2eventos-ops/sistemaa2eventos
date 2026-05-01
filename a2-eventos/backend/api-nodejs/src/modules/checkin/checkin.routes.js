@@ -33,6 +33,12 @@ router.post('/checkin/manual', sessionMiddleware, rateLimiter.access, accessCont
 router.post('/checkin/qrcode', sessionMiddleware, rateLimiter.access, accessController.checkinQrcode);
 
 // ============================================
+// CREDENCIAMENTO — Fluxo principal do dia do evento
+// Barcode → busca tipo pulseira → vincula áreas → auto check-in
+// ============================================
+router.post('/credenciar-pulseira', sessionMiddleware, rateLimiter.access, accessController.credenciarPulseira);
+
+// ============================================
 // CONSULTA DE PULSEIRA POR CÓDIGO (painel web)
 // ============================================
 router.get('/consultar-pulseira/:codigo', sessionMiddleware, accessController.consultarPulseira);

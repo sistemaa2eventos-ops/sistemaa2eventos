@@ -22,13 +22,13 @@ class DatabaseService {
     }
 
     async registerAccessTransaction(logId, timestamp, payload, pessoa, new_status) {
-        const { evento_id, pessoa_id, tipo, metodo, dispositivo_id, confianca, foto_capturada, created_by, sync_id } = payload;
+        const { evento_id, pessoa_id, tipo, metodo, dispositivo_id, confianca, foto_capturada, created_by, sync_id, area_id } = payload;
         
         let rpcResult = { success: true };
 
         const logPayload = {
             id: logId, evento_id, pessoa_id, tipo, metodo, dispositivo_id,
-            confianca, foto_capturada, created_by, sync_id, created_at: timestamp
+            confianca, foto_capturada, created_by, sync_id, area_id, created_at: timestamp
         };
 
         try {
@@ -36,7 +36,7 @@ class DatabaseService {
                 .from('logs_acesso')
                 .insert([{
                     id: logId, evento_id, pessoa_id, tipo, metodo,
-                    dispositivo_id, confianca, foto_capturada,
+                    dispositivo_id, confianca, foto_capturada, area_id,
                     created_at: timestamp.toISOString(),
                     created_by
                 }]);

@@ -48,8 +48,8 @@ class CheckinService {
 
 
 
-        // 2. Determinar tipo inteligente (Toggle ou Primeiro do Dia)
-        const tipoFinal = await ValidationService.determineSmartAccessType(pessoa_id, evento_id, accessData.tipo);
+        // 2. Determinar tipo inteligente (Toggle ou Primeiro do Dia) — POR ÁREA
+        const tipoFinal = await ValidationService.determineSmartAccessType(pessoa_id, evento_id, accessData.tipo, area_id);
         const timestamp = offline_timestamp ? new Date(offline_timestamp) : new Date();
 
         // 3. Validar políticas de acesso
@@ -65,7 +65,7 @@ class CheckinService {
                 timestamp,
                 {
                     evento_id, pessoa_id, tipo: tipoFinal, metodo,
-                    dispositivo_id, created_by, sync_id,
+                    dispositivo_id, created_by, sync_id, area_id,
                     confianca: accessData.confianca || null,
                     foto_capturada: accessData.foto_capturada || null,
                     observacao: (validation && validation.quotaBypassed) ? '⚠️ BYPASS_COTA (Capacidade Excedida)' : null

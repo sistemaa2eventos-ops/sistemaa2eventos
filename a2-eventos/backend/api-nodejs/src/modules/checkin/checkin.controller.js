@@ -21,6 +21,7 @@ class AccessController {
         this.acionarCatraca = this.acionarCatraca.bind(this);
         this.checkinManual = this.checkinManual.bind(this);
         this.checkinQrcode = this.checkinQrcode.bind(this);
+        this.credenciarPulseira = this.credenciarPulseira.bind(this);
     }
 
     async checkout(req, res) {
@@ -87,7 +88,7 @@ class AccessController {
 
             if (start_date) query = query.gte('created_at', start_date);
             if (end_date) query = query.lte('created_at', end_date);
-            if (tipo) query = query.eq('tipo_acesso', tipo);
+            if (tipo) query = query.eq('tipo', tipo);
 
             const { data: logs, error: logsError } = await query;
             if (logsError) throw logsError;
@@ -351,7 +352,7 @@ class AccessController {
     // ============================================
     async checkinManual(req, res) {
         try {
-            const { busca: pessoa_id, dispositivoId, tipo, sync_id, offline_timestamp } = req.body;
+            const { busca: pessoa_id, dispositivoId, tipo, sync_id, offline_timestamp, area_id } = req.body;
             const eventoId = req.event?.id;
             const supabaseClient = req.supabase || supabase;
 
@@ -365,7 +366,8 @@ class AccessController {
                 dispositivo_id: dispositivoId || 'web-dashboard',
                 created_by: req.user?.id,
                 sync_id,
-                offline_timestamp
+                offline_timestamp,
+                area_id: area_id || null
             });
 
             if (result.error) return ApiResponse.error(res, result.error, result.status || 400);
@@ -384,7 +386,7 @@ class AccessController {
     // ============================================
     async checkinQrcode(req, res) {
         try {
-            const { qrCode, dispositivoId, tipo, sync_id, offline_timestamp } = req.body;
+            const { qrCode, dispositivoId, tipo, sync_id, offline_timestamp, area_id } = req.body;
             const eventoId = req.event?.id;
             const supabaseClient = req.supabase || supabase;
 
@@ -408,7 +410,8 @@ class AccessController {
                 dispositivo_id: dispositivoId || 'web-dashboard',
                 created_by: req.user?.id,
                 sync_id,
-                offline_timestamp
+                offline_timestamp,
+                area_id: area_id || null
             });
 
             if (result.error) return ApiResponse.error(res, result.error, result.status || 400);
@@ -432,6 +435,7 @@ class AccessController {
             const { pessoa_id } = req.body;
             numero_pulseira = req.body.numero_pulseira;
             eventoId = req.event?.id;
+            const area_id = req.body.area_id || null;
             const supabaseClient = req.supabase || supabase;
 
             if (!pessoa_id || !numero_pulseira) {
@@ -450,27 +454,12 @@ class AccessController {
                 return ApiResponse.error(res, 'Pessoa não encontrada', 404);
             }
 
-            // Validar status (não pode já estar em check-in)
-            if (pessoa.status_acesso === 'checkin_feito') {
-                return ApiResponse.error(res, 'Pessoa já está em check-in', 400);
-            }
-
-            // ALTO #3: Validar fase do evento para Pulseira
-            try {
-                await validationService.validateAccessRules(eventoId, pessoa, 'checkin', 'pulseira', new Date(), null);
-            } catch (validationError) {
-                return ApiResponse.error(res, validationError.message, validationError.status || 403);
-            }
-
-            // Buscar informações da pulseira (tipo, cor, áreas)
+            // Buscar tipo de pulseira pela faixa numérica
             const numeroPulseiraInt = parseInt(numero_pulseira, 10);
             const { data: tipoPulseira } = await supabaseClient
                 .from('evento_tipos_pulseira')
                 .select(`
-                    id,
-                    nome_tipo,
-                    cor_hex,
-                    alerta_duplicidade,
+                    id, nome_tipo, cor_hex, alerta_duplicidade,
                     pulseira_areas_permitidas (
                         area_id,
                         evento_areas (id, nome_area)
@@ -481,7 +470,7 @@ class AccessController {
                 .gte('numero_final', numeroPulseiraInt)
                 .single();
 
-            // Verificar duplicidade de pulseira (se alerta_duplicidade estiver ativo)
+            // Verificar duplicidade de pulseira
             if (tipoPulseira?.alerta_duplicidade) {
                 const { data: pulseiraExistente } = await supabaseClient
                     .from('pessoas')
@@ -492,22 +481,30 @@ class AccessController {
                     .single();
 
                 if (pulseiraExistente) {
-                    logger.warn('Bracelet already in use', {
-                    bracelet_number: numero_pulseira,
-                    current_user: pulseiraExistente.nome_completo,
-                    event_id: eventoId
-                });
-                    // Nãobloqueia, mas registra no log como alerta
+                    logger.warn(`⚠️ Pulseira ${numero_pulseira} já vinculada a ${pulseiraExistente.nome_completo}`);
                 }
             }
 
-            // Salvar numero_pulseira na pessoa
-            await supabaseClient
-                .from('pessoas')
-                .update({ numero_pulseira, updated_at: new Date() })
-                .eq('id', pessoa_id);
+            // Salvar numero_pulseira e tipo_pulseira_id na pessoa
+            const updateData = { numero_pulseira, updated_at: new Date() };
+            if (tipoPulseira?.id) updateData.tipo_pulseira_id = tipoPulseira.id;
+            await supabaseClient.from('pessoas').update(updateData).eq('id', pessoa_id);
 
-            // Montar info da pulseira para o log e resposta
+            // Delegar ao fluxo centralizado (inclui validações, watchlist, anti-passback, websocket)
+            const result = await checkinService.registrarAcesso(supabaseClient, {
+                pessoa_id,
+                pessoa,
+                evento_id: eventoId,
+                tipo: req.body.tipo || null, // null = Smart Access decide
+                metodo: 'pulseira',
+                dispositivo_id: 'web-dashboard',
+                created_by: req.user?.id,
+                area_id
+            });
+
+            if (result.error) return ApiResponse.error(res, result.error, result.status || 400);
+
+            // Montar info da pulseira para resposta
             const pulseiraInfo = tipoPulseira ? {
                 id: tipoPulseira.id,
                 nome_tipo: tipoPulseira.nome_tipo,
@@ -518,46 +515,16 @@ class AccessController {
                 })) || []
             } : null;
 
-            // Registrar log
-            const logData = {
-                evento_id: eventoId,
-                pessoa_id,
-                tipo: 'checkin',
-                metodo: 'pulseira',
-                numero_pulseira,
-                status_log: 'autorizado',
-                dispositivo_id: req.user?.id,
-                created_by: req.user.id,
-                localizacao: 'Check-in Pulseira'
-            };
-
-            await supabaseClient.from('logs_acesso').insert(logData);
-
-            // Atualizar status
-            await supabaseClient
-                .from('pessoas')
-                .update({ status_acesso: 'checkin_feito', updated_at: new Date() })
-                .eq('id', pessoa_id);
-
-            // WebSocket
-            websocketService.emit('new_access', {
-                ...logData,
-                pessoa_nome: pessoa.nome_completo,
-                metodo: 'pulseira',
-                status_log: 'autorizado',
-                pulseira_info: pulseiraInfo
-            }, eventoId);
-
             // Dispatch webhook
             webhookDispatcher.dispatchCheckin(eventoId, pessoa);
 
-            return ApiResponse.success(res, { success: true, pessoa, pulseira_info: pulseiraInfo });
+            return ApiResponse.success(res, { ...result, pulseira_info: pulseiraInfo });
         } catch (error) {
             logger.error(
                 { err: error, bracelet_number: numero_pulseira, event_id: eventoId },
                 'Error in bracelet checkin'
             );
-            return ApiResponse.error(res, 'Erro ao processar check-in');
+            return ApiResponse.error(res, error.message || 'Erro ao processar check-in');
         }
     }
 
@@ -567,6 +534,7 @@ class AccessController {
         try {
             numero_pulseira = req.body.numero_pulseira;
             eventoId = req.event?.id;
+            const area_id = req.body.area_id || null;
             const supabaseClient = req.supabase || supabase;
 
             if (!numero_pulseira) {
@@ -585,49 +553,163 @@ class AccessController {
                 return ApiResponse.error(res, 'Pulseira não encontrada', 404);
             }
 
-            if (pessoa.status_acesso !== 'checkin_feito') {
-                return ApiResponse.error(res, 'Pessoa não está em check-in', 400);
-            }
-
-            // Registrar log
-            const logData = {
-                evento_id: eventoId,
+            // Delegar ao fluxo centralizado com tipo forçado 'checkout'
+            const result = await checkinService.registrarAcesso(supabaseClient, {
                 pessoa_id: pessoa.id,
+                pessoa,
+                evento_id: eventoId,
                 tipo: 'checkout',
                 metodo: 'pulseira',
-                numero_pulseira,
-                status_log: 'autorizado',
-                dispositivo_id: req.user?.id,
-                created_by: req.user.id,
-                localizacao: 'Check-out Pulseira'
-            };
+                dispositivo_id: 'web-dashboard',
+                created_by: req.user?.id,
+                area_id
+            });
 
-            await supabaseClient.from('logs_acesso').insert(logData);
-
-            // Atualizar status
-            await supabaseClient
-                .from('pessoas')
-                .update({ status_acesso: 'checkout_feito', updated_at: new Date() })
-                .eq('id', pessoa.id);
-
-            // WebSocket
-            websocketService.emit('new_access', {
-                ...logData,
-                pessoa_nome: pessoa.nome_completo,
-                metodo: 'pulseira',
-                status_log: 'autorizado'
-            }, eventoId);
+            if (result.error) return ApiResponse.error(res, result.error, result.status || 400);
 
             // Dispatch webhook
             webhookDispatcher.dispatchCheckout(eventoId, pessoa);
 
-            return ApiResponse.success(res, { success: true, pessoa });
+            return ApiResponse.success(res, { ...result, pessoa });
         } catch (error) {
             logger.error(
                 { err: error, bracelet_number: numero_pulseira, event_id: eventoId },
                 'Error in bracelet checkout'
             );
-            return ApiResponse.error(res, 'Erro ao processar check-out');
+            return ApiResponse.error(res, error.message || 'Erro ao processar check-out');
+        }
+    }
+
+    // ============================================
+    // CREDENCIAR PULSEIRA (Fase 3 — Fluxo principal do evento)
+    // Escaneia barcode → busca tipo_pulseira → vincula áreas → auto check-in
+    // ============================================
+    async credenciarPulseira(req, res) {
+        try {
+            const { pessoa_id, numero_pulseira, area_id } = req.body;
+            const eventoId = req.event?.id;
+            const supabaseClient = req.supabase || supabase;
+
+            if (!pessoa_id || !numero_pulseira) {
+                return ApiResponse.error(res, 'pessoa_id e numero_pulseira são obrigatórios', 400);
+            }
+
+            // 1. Buscar pessoa
+            const { data: pessoa, error: pessoaErr } = await supabaseClient
+                .from('pessoas')
+                .select('*, empresas(nome)')
+                .eq('id', pessoa_id)
+                .eq('evento_id', eventoId)
+                .single();
+
+            if (pessoaErr || !pessoa) {
+                return ApiResponse.error(res, 'Pessoa não encontrada', 404);
+            }
+
+            // 2. Buscar tipo de pulseira pela faixa numérica
+            const numeroPulseiraInt = parseInt(numero_pulseira, 10);
+            const { data: tipoPulseira } = await supabaseClient
+                .from('evento_tipos_pulseira')
+                .select(`
+                    id, nome_tipo, cor_hex, alerta_duplicidade,
+                    pulseira_areas_permitidas (
+                        area_id,
+                        evento_areas (id, nome_area)
+                    )
+                `)
+                .eq('evento_id', eventoId)
+                .lte('numero_inicial', numeroPulseiraInt)
+                .gte('numero_final', numeroPulseiraInt)
+                .single();
+
+            // 3. Verificar duplicidade
+            if (tipoPulseira?.alerta_duplicidade) {
+                const { data: existente } = await supabaseClient
+                    .from('pessoas')
+                    .select('id, nome_completo')
+                    .eq('numero_pulseira', numero_pulseira)
+                    .eq('evento_id', eventoId)
+                    .neq('id', pessoa_id)
+                    .single();
+
+                if (existente) {
+                    return ApiResponse.error(res,
+                        `Pulseira ${numero_pulseira} já vinculada a ${existente.nome_completo}`, 409);
+                }
+            }
+
+            // 4. Vincular áreas de acesso (pessoa_areas_acesso)
+            const areasVinculadas = [];
+            if (tipoPulseira?.pulseira_areas_permitidas?.length > 0) {
+                for (const perm of tipoPulseira.pulseira_areas_permitidas) {
+                    const { error: areaErr } = await supabaseClient
+                        .from('pessoa_areas_acesso')
+                        .upsert({
+                            pessoa_id,
+                            area_id: perm.area_id,
+                            evento_id: eventoId,
+                            criado_por: req.user?.id
+                        }, { onConflict: 'pessoa_id,area_id' });
+
+                    if (!areaErr) {
+                        areasVinculadas.push({
+                            area_id: perm.area_id,
+                            nome_area: perm.evento_areas?.nome_area
+                        });
+                    }
+                }
+
+                // Atualizar cache areas_autorizadas na pessoa
+                const areaIds = areasVinculadas.map(a => a.area_id);
+                await supabaseClient
+                    .from('pessoas')
+                    .update({ areas_autorizadas: areaIds })
+                    .eq('id', pessoa_id);
+            }
+
+            // 5. Salvar pulseira na pessoa
+            const updateData = { numero_pulseira, updated_at: new Date() };
+            if (tipoPulseira?.id) updateData.tipo_pulseira_id = tipoPulseira.id;
+            await supabaseClient.from('pessoas').update(updateData).eq('id', pessoa_id);
+
+            // 6. Auto CHECK-IN via fluxo centralizado
+            const result = await checkinService.registrarAcesso(supabaseClient, {
+                pessoa_id,
+                pessoa: { ...pessoa, numero_pulseira },
+                evento_id: eventoId,
+                tipo: 'checkin',
+                metodo: 'barcode',
+                dispositivo_id: 'web-dashboard',
+                created_by: req.user?.id,
+                area_id: area_id || null
+            });
+
+            if (result.error) return ApiResponse.error(res, result.error, result.status || 400);
+
+            // 7. Montar resposta enriquecida
+            const pulseiraInfo = tipoPulseira ? {
+                id: tipoPulseira.id,
+                nome_tipo: tipoPulseira.nome_tipo,
+                cor_hex: tipoPulseira.cor_hex,
+                areas_permitidas: areasVinculadas
+            } : null;
+
+            logger.info(`🏷️ [Credenciar] Pulseira ${numero_pulseira} → ${pessoa.nome_completo} | ${areasVinculadas.length} áreas`);
+
+            return ApiResponse.success(res, {
+                ...result,
+                pulseira_info: pulseiraInfo,
+                areas_vinculadas: areasVinculadas,
+                pessoa: {
+                    id: pessoa.id,
+                    nome: pessoa.nome_completo,
+                    foto_url: pessoa.foto_url,
+                    empresa: pessoa.empresas?.nome
+                }
+            });
+        } catch (error) {
+            logger.error({ err: error, event_id: req.event?.id }, 'Error in credenciarPulseira');
+            return ApiResponse.error(res, error.message || 'Erro ao credenciar pulseira');
         }
     }
 
@@ -654,7 +736,7 @@ class AccessController {
             return ApiResponse.success(res, { pessoas: data || [] });
         } catch (error) {
             logger.error(
-                { err: error, bracelet_id: id, event_id: req.event?.id },
+                { err: error, bracelet_code: req.query?.codigo, event_id: req.event?.id },
                 'Error fetching bracelet'
             );
             return ApiResponse.error(res, 'Erro ao buscar');

@@ -147,18 +147,24 @@ export const useUsuarios = () => {
             }
 
             if (selectedUser) {
+                // Atualizar email se foi alterado
+                if (formData.email && formData.email.trim() !== selectedUser.email) {
+                    await api.put(`/auth/users/${selectedUser.id}/email`, {
+                        email: formData.email.trim()
+                    });
+                }
                 // Atualizar permissões
                 await api.put(`/auth/users/${selectedUser.id}/permissions`, {
                     permissions: formData.permissions
                 });
-                // Sependente, atualizar evento
-                if (formData.evento_id !== selectedUser.evento_id) {
+                // Atualizar nome e evento se necessário
+                if (formData.evento_id !== selectedUser.evento_id || formData.nome_completo !== selectedUser.nome_completo) {
                     await api.put(`/auth/users/${selectedUser.id}`, {
-                    evento_id: formData.evento_id || null,
+                        evento_id: formData.evento_id || null,
                         nome_completo: formData.nome_completo
                     });
                 }
-                enqueueSnackbar('Permissões atualizadas!', { variant: 'success' });
+                enqueueSnackbar('Usuário atualizado!', { variant: 'success' });
             } else {
                 // Criar convite — sempre operador
                 await api.post('/auth/invite', {

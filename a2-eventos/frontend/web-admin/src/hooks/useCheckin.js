@@ -31,6 +31,7 @@ export const useCheckin = (defaultMode) => {
     const [recentLogs, setRecentLogs] = useState([]);
     const [offlineCount, setOfflineCount] = useState(0);
     const [realtimeStats, setRealtimeStats] = useState(null);
+    const [areaId, setAreaId] = useState(localStorage.getItem('nzt_area_id') || null);
 
     const rfidInputRef = useRef(null);
     const resetTimerRef = useRef(null);
@@ -152,26 +153,34 @@ export const useCheckin = (defaultMode) => {
     };
 
     const performCheckin = async (metodo, extraValue = null, forcedPessoaId = null) => {
-        const targetPessoa = forcedPessoaId ? { id: forcedPessoaId } : selectedPessoa;
+        let targetPessoa = forcedPessoaId ? { id: forcedPessoaId } : selectedPessoa;
+
+        // Se é pulseira/barcode e não tem pessoa selecionada, buscar pela pulseira primeiro
+        if (!targetPessoa && metodo === 'pulseira' && extraValue) {
+            await consultarPulseiraAPI(extraValue);
+            return; // consultarPulseiraAPI já seleciona a pessoa e mostra resultado
+        }
+
         if (!targetPessoa && metodo !== 'qrcode') return;
 
         try {
             setManualSaving(true);
             let res;
 
-            // CHECK-IN VIA PULSEIRA: Usar endpoint específico que vincula a pulseira à pessoa
+            // CREDENCIAMENTO via BARCODE/PULSEIRA: endpoint novo que vincula áreas + auto check-in
             if (metodo === 'pulseira') {
-                res = await api.post(`/access/pulseira/checkin`, {
+                res = await api.post(`/access/credenciar-pulseira`, {
                     pessoa_id: targetPessoa.id,
                     numero_pulseira: extraValue,
-                    tipo: operationMode === 'auto' ? null : operationMode
+                    area_id: areaId
                 });
             } else {
                 // CHECK-IN MANUAL ou QRCODE: Usar fluxo existente
                 const payload = {
                     dispositivoId: 'web-dashboard',
                     evento_id: eventoId,
-                    tipo: operationMode === 'auto' ? null : operationMode
+                    tipo: operationMode === 'auto' ? null : operationMode,
+                    area_id: areaId
                 };
 
                 if (metodo === 'qrcode') {
@@ -237,6 +246,12 @@ export const useCheckin = (defaultMode) => {
         if (!defaultMode) localStorage.setItem('nzt_op_mode', mode);
     };
 
+    const changeAreaId = (id) => {
+        setAreaId(id);
+        if (id) localStorage.setItem('nzt_area_id', id);
+        else localStorage.removeItem('nzt_area_id');
+    };
+
     return {
         selectedPessoa, setSelectedPessoa: handleSelectPessoa,
         activeScanner, setActiveScanner,
@@ -249,6 +264,7 @@ export const useCheckin = (defaultMode) => {
         searchResults, setSearchResults,
         eventModules, rfidInputRef,
         recentLogs, offlineCount, realtimeStats,
+        areaId, changeAreaId,
         consultarPulseiraAPI,
         performCheckin,
         eventoId

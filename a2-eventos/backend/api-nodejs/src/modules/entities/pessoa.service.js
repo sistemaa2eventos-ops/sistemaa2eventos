@@ -67,9 +67,22 @@ class PessoaService {
             query = query.range(offset, offset + limit - 1);
         }
 
+        // Mapeamento de grupos de status para as abas do painel de pessoas
+        const STATUS_GROUPS = {
+            ativos:    ['autorizado', 'checkin_feito', 'checkout_feito'],
+            pendentes: ['pendente', 'verificacao'],
+            bloqueados: ['bloqueado', 'expulso']
+        };
+
         // Filtros Adicionais
         if (filters.status) {
-            query = query.eq('status_acesso', filters.status.toLowerCase());
+            const statusKey = filters.status.toLowerCase();
+            const group = STATUS_GROUPS[statusKey];
+            if (group) {
+                query = query.in('status_acesso', group);
+            } else {
+                query = query.eq('status_acesso', statusKey);
+            }
         }
         if (busca) {
             query = query.or(`nome.ilike.%${busca}%,cpf.ilike.%${busca}%,email.ilike.%${busca}%`);
@@ -82,11 +95,11 @@ class PessoaService {
         }
 
         let { data, count, error } = await query;
-        
+
         // --- FALLBACK ESTRATÉGICO: Se a View falhar, tentamos a tabela base ---
         if (error) {
             logger.error(`[PessoaService.listByEvent] View falhou (provável schema drift), tentando fallback para tabela 'pessoas':`, error);
-            
+
             let fallbackQuery = supabaseClient
                 .from('pessoas')
                 .select('id, nome_completo, cpf, email, status_acesso, created_at, empresa_id', { count: 'exact' })
@@ -97,7 +110,13 @@ class PessoaService {
                 fallbackQuery = fallbackQuery.range(offset, offset + limit - 1);
             }
             if (filters.status) {
-                fallbackQuery = fallbackQuery.eq('status_acesso', filters.status.toLowerCase());
+                const statusKey = filters.status.toLowerCase();
+                const group = STATUS_GROUPS[statusKey];
+                if (group) {
+                    fallbackQuery = fallbackQuery.in('status_acesso', group);
+                } else {
+                    fallbackQuery = fallbackQuery.eq('status_acesso', statusKey);
+                }
             }
             if (busca) {
                 fallbackQuery = fallbackQuery.or(`nome_completo.ilike.%${busca}%,cpf.ilike.%${busca}%,email.ilike.%${busca}%`);

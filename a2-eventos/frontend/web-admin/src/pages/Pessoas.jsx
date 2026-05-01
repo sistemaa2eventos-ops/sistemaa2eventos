@@ -137,14 +137,15 @@ const Pessoas = () => {
       </Box>
 
       <GlassCard glowColor="#7B2FBE" sx={{ p: 3, mb: 3 }}>
-        <Tabs 
-          value={statusFilter} 
-          onChange={(e, val) => setStatusFilter(val)} 
+        <Tabs
+          value={statusFilter}
+          onChange={(e, val) => setStatusFilter(val)}
           sx={{ mb: 3, '& .MuiTab-root': { color: 'rgba(255,255,255,0.5)' }, '& .Mui-selected': { color: '#00D4FF !important' }, '& .MuiTabs-indicator': { backgroundColor: '#00D4FF' } }}
         >
           <Tab value="TODOS" label="TODOS" />
-          <Tab value="ATIVO" label="ATIVOS" />
-          <Tab value="PENDENTE" label="PENDENTES" />
+          <Tab value="ativos" label="ATIVOS" />
+          <Tab value="pendentes" label="PENDENTES" />
+          <Tab value="bloqueados" label="BLOQUEADOS" sx={{ '&.Mui-selected': { color: '#FF3366 !important' }, '&:not(.Mui-selected):hover': { color: 'rgba(255,51,102,0.6)' } }} />
         </Tabs>
 
         <SearchWrapper>

@@ -877,6 +877,70 @@ class AuthController {
     }
 
     /**
+     * Atualizar email de um operador (admin_master only)
+     * Atualiza simultaneamente no Supabase Auth e na tabela perfis.
+     */
+    async updateEmail(req, res) {
+        try {
+            const { userId } = req.params;
+            const { email: newEmail } = req.body;
+
+            if (req.user?.nivel_acesso !== 'admin_master') {
+                return res.status(403).json({
+                    error: 'Apenas admin_master pode alterar o email de usuários.'
+                });
+            }
+
+            if (!newEmail || !validateEmail(newEmail.trim())) {
+                return res.status(400).json({ error: 'Email inválido.' });
+            }
+
+            const emailLimpo = newEmail.trim().toLowerCase();
+
+            // Verificar se email já está em uso por outro usuário
+            const { data: emailExiste } = await supabase
+                .from('perfis')
+                .select('id')
+                .eq('email', emailLimpo)
+                .neq('id', userId)
+                .maybeSingle();
+
+            if (emailExiste) {
+                return res.status(409).json({ error: 'Este email já está em uso por outro usuário.' });
+            }
+
+            // Atualizar no Supabase Auth (fonte de verdade da identidade)
+            const { error: authError } = await supabase.auth.admin.updateUserById(userId, {
+                email: emailLimpo
+            });
+
+            if (authError) {
+                logger.error(`Erro ao atualizar email no Supabase Auth: ${authError.message}`);
+                return res.status(400).json({ error: 'Erro ao atualizar email no sistema de autenticação.' });
+            }
+
+            // Atualizar na tabela perfis (mantém consistência)
+            const { error: dbError } = await supabase
+                .from('perfis')
+                .update({ email: emailLimpo, updated_at: new Date() })
+                .eq('id', userId);
+
+            if (dbError) throw dbError;
+
+            logger.info(`📧 Email atualizado: ${userId} → ${emailLimpo} por ${req.user.id}`);
+
+            res.json({
+                success: true,
+                message: 'Email atualizado com sucesso'
+            });
+
+        } catch (error) {
+            logger.error('Erro ao atualizar email:', error);
+            res.status(500).json({ error: 'Erro interno ao atualizar email' });
+        }
+    }
+
+    /**
      * Deletar usuário (operador)
      */
     async deleteUser(req, res) {

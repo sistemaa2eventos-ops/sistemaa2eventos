@@ -178,9 +178,15 @@ const Usuarios = () => {
                 <DialogTitle sx={{ fontFamily: 'Orbitron', fontWeight: 700 }}>{selectedUser ? 'PRIVILÉGIOS' : 'NOVA CREDENCIAL'}</DialogTitle>
                 <DialogContent>
                     <Stack spacing={3} sx={{ pt: 2 }}>
-                        {!selectedUser && (
-                            <TextField label="Email" fullWidth placeholder="operador@empresa.com" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required />
-                        )}
+                        <TextField
+                            label="Email"
+                            fullWidth
+                            placeholder="operador@empresa.com"
+                            value={formData.email}
+                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                            required
+                            helperText={selectedUser ? 'Alterar o email substituirá o email de login do operador.' : undefined}
+                        />
 
                         <TextField label="Nome Completo" fullWidth placeholder="João Silva" value={formData.nome_completo} onChange={(e) => setFormData({ ...formData, nome_completo: e.target.value })} required />
 

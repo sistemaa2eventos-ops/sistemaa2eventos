@@ -46,6 +46,9 @@ router.patch('/users/:userId/status', authenticate, authorize('admin_master'), a
 // Deletar usuário (apenas admin_master) — FIX C-06
 router.delete('/users/:userId', authenticate, authorize('admin_master'), authController.deleteUser);
 
+// Atualizar email do usuário (apenas admin_master)
+router.put('/users/:userId/email', authenticate, authorize('admin_master'), authController.updateEmail);
+
 // ============================================
 // ADMIN: Reset de senha
 // ============================================

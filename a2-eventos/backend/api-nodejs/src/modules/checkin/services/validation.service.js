@@ -115,18 +115,23 @@ class ValidationService {
         };
     }
 
-    async isFirstAccessOfDay(pessoa_id, evento_id) {
+    async isFirstAccessOfDay(pessoa_id, evento_id, area_id = null) {
         const hoje = getHojeLocal();
         const start = `${hoje}T00:00:00.000Z`;
         const end = `${hoje}T23:59:59.999Z`;
 
-        const { count, error } = await supabase
+        let query = supabase
             .from('logs_acesso')
             .select('id', { count: 'exact', head: true })
             .eq('pessoa_id', pessoa_id)
             .eq('evento_id', evento_id)
+            .in('tipo', ['checkin', 'checkout'])
             .gte('created_at', start)
             .lte('created_at', end);
+
+        if (area_id) query = query.eq('area_id', area_id);
+
+        const { count, error } = await query;
 
         if (error) {
             logger.error(`Erro ao verificar primeiro acesso do dia para ${pessoa_id}:`, error);
@@ -136,26 +141,30 @@ class ValidationService {
         return count === 0;
     }
 
-    async determineSmartAccessType(pessoa_id, evento_id, requestedTipo = null) {
-        // Regra: Primeiro do dia é sempre CHECK-IN
-        const isFirst = await this.isFirstAccessOfDay(pessoa_id, evento_id);
+    async determineSmartAccessType(pessoa_id, evento_id, requestedTipo = null, area_id = null) {
+        // Se o tipo foi solicitado manualmente, respeita (ex: página de checkout força 'checkout')
+        if (requestedTipo) return requestedTipo;
+
+        // Regra: Primeiro do dia NAQUELA ÁREA é sempre CHECK-IN
+        const isFirst = await this.isFirstAccessOfDay(pessoa_id, evento_id, area_id);
         if (isFirst) {
-            logger.info(`✨ [SmartAccess] Primeiro acesso do dia para ${pessoa_id}. Forçando CHECK-IN.`);
+            logger.info(`✨ [SmartAccess] Primeiro acesso do dia para ${pessoa_id} (area: ${area_id || 'global'}). Forçando CHECK-IN.`);
             return 'checkin';
         }
 
-        // Se o tipo foi solicitado manualmente, respeita
-        if (requestedTipo) return requestedTipo;
-
-        const { data: lastLog } = await supabase
+        // Toggle: último log DAQUELA ÁREA define se é check-in ou checkout
+        let query = supabase
             .from('logs_acesso')
             .select('tipo')
             .eq('pessoa_id', pessoa_id)
             .eq('evento_id', evento_id)
             .in('tipo', ['checkin', 'checkout'])
             .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
+            .limit(1);
+
+        if (area_id) query = query.eq('area_id', area_id);
+
+        const { data: lastLog } = await query.single();
 
         if (!lastLog || lastLog.tipo === 'checkout') return 'checkin';
         return 'checkout';
@@ -257,24 +266,33 @@ class ValidationService {
             throw this._buildError(`Baixa confiança biométrica: ${confianca}% (Piso: ${targetConfidence}%)`);
         }
 
+        // 5. Anti-passback (cooldown por área)
+        if (cooldown > 0) {
+            await this.validateAntiPassback(evento_id, pessoa.id, tipo, metodo, cooldown, area_id);
+        }
+
         return { quotaBypassed, cooldown, targetConfidence };
     }
 
     /**
      * Validar anti-passback (evitar check-in/checkout duplo rápido)
      */
-    async validateAntiPassback(evento_id, pessoa_id, tipo, metodo, cooldownMinutos) {
+    async validateAntiPassback(evento_id, pessoa_id, tipo, metodo, cooldownMinutos, area_id = null) {
         if (cooldownMinutos <= 0) return true;
 
-        const { data: lastLog } = await supabase
+        let query = supabase
             .from('logs_acesso')
             .select('created_at, tipo')
             .eq('pessoa_id', pessoa_id)
             .eq('evento_id', evento_id)
             .in('tipo', ['checkin', 'checkout'])
             .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
+            .limit(1);
+
+        // Anti-passback por área: cooldown é por área, não global
+        if (area_id) query = query.eq('area_id', area_id);
+
+        const { data: lastLog } = await query.single();
 
         if (!lastLog) return true;
 
