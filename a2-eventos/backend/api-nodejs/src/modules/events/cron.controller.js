@@ -139,7 +139,8 @@ class CronController {
                 pessoa_id: p.id,
                 evento_id: p.evento_id,
                 tipo: 'checkout',
-                metodo: 'sistema_timeout',
+                metodo: 'manual',
+                observacao: 'AUTO_CHECKOUT_TIMEOUT',
                 created_at: new Date().toISOString()
             }));
 
@@ -185,7 +186,8 @@ class CronController {
                 pessoa_id: p.id,
                 evento_id: p.evento_id,
                 tipo: 'checkout',
-                metodo: 'sistema_cron',
+                metodo: 'manual',
+                observacao: 'CHECKOUT_FORCADO_CRON',
                 confianca: null,
                 created_at: new Date().toISOString()
             }));

@@ -188,7 +188,7 @@ class MonitorController {
 
             let { data, error } = await supabase
                 .from('dispositivos_acesso')
-                .select('id, nome, tipo, status:status_online, area_id, ultimo_ping, evento_areas(nome)')
+                .select('id, nome, tipo, status:status_online, area_id, ultimo_ping, evento_areas(nome_area)')
                 .eq('evento_id', evento_id)
                 .order('status_online', { ascending: false });
 

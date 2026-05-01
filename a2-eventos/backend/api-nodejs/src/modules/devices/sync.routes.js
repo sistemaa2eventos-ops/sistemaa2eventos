@@ -144,7 +144,7 @@ router.post('/logs/batch', validateInternalApiKey, async (req, res) => {
                     log.evento_id,
                     log.pessoa_id,
                     log.tipo || 'checkin',
-                    log.metodo || 'face',
+                    log.metodo || 'facial',
                     log.dispositivo_id || 'facial-camera',
                     log.confianca || null,
                     log.foto_capturada || null

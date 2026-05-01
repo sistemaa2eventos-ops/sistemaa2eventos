@@ -95,13 +95,13 @@ class HikvisionController {
     _mapMethod(hikMethod) {
         // Mapeamento ISAPI para interno
         const map = {
-            'face': 'face',
-            'card': 'rfid',
-            'fp': 'biometry',
+            'face': 'facial',
+            'card': 'pulseira',
+            'fp': 'facial',
             'pw': 'manual',
             'qr': 'qrcode'
         };
-        return map[hikMethod] || 'face';
+        return map[hikMethod] || 'facial';
     }
 }
 

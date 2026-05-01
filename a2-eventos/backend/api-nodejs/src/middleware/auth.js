@@ -111,7 +111,7 @@ function authorize(...roles) {
  * Middleware para API Key interna
  */
 function validateInternalApiKey(req, res, next) {
-    const expectedKey = process.env.A2_API_KEY || process.env.INTERNAL_API_KEY || 'a2eventos_sync_2026';
+    const expectedKey = process.env.A2_API_KEY || process.env.INTERNAL_API_KEY || process.env.API_KEY || 'a2eventos_sync_2026';
     if (req.headers['x-api-key'] !== expectedKey) {
         return res.status(401).json({ error: 'API key inválida' });
     }
@@ -185,8 +185,8 @@ function validateApiKey(req, res, next) {
         });
     }
 
-    // Validar contra INTERNAL_API_KEY do environment
-    const expectedKey = process.env.INTERNAL_API_KEY || process.env.API_KEY;
+    // Validar contra chave principal da integração
+    const expectedKey = process.env.A2_API_KEY || process.env.INTERNAL_API_KEY || process.env.API_KEY;
 
     if (apiKey !== expectedKey) {
         logger.warn(`🚫 API Key inválida para: ${req.path}`);

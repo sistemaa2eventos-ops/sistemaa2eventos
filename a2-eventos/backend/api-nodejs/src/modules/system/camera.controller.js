@@ -31,7 +31,7 @@ class CameraController {
 
             let { data, error } = await supabase
                 .from('cameras_ip')
-                .select('*, area:evento_areas(nome)')
+                .select('*, area:evento_areas(nome_area)')
                 .eq('evento_id', evento_id)
                 .order('created_at', { ascending: true });
 

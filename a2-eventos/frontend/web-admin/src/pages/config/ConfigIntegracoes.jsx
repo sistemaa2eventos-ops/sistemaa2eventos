@@ -36,7 +36,7 @@ const ConfigIntegracoes = () => {
     const checkStatus = async () => {
         try {
             const [db, smtp] = await Promise.all([
-                api.get('/settings/test-supabase', { timeout: 5000 }).catch(error => {
+                api.get('/settings/test-connection', { timeout: 5000 }).catch(error => {
                     console.error('Falha teste Supabase:', error);
                     return { data: { success: false, message: error.message } };
                 }),

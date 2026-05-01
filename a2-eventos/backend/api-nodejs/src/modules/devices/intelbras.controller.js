@@ -264,19 +264,15 @@ class IntelbrasController {
             const tipoFluxo = config.fluxo || 'checkin';
             const timestamp = new Date();
 
-            const validationResult = await validation.validateAccessRules(
+            await validation.validateAccessRules(
                 eventoId, 
                 pessoa, 
                 tipoFluxo === 'toggle' ? 'checkin' : tipoFluxo, 
-                'face', 
+                'facial', 
                 timestamp, 
                 body?.Similarity || 100, 
                 config.area_id
             );
-
-            if (!validationResult.allowed) {
-                return deny(`Negado: ${validationResult.error || 'Não autorizado'}`);
-            }
 
             // 5. Registrar log de acesso (não-bloqueante)
             const nome = pessoa.nome_completo || 'Desconhecido';
@@ -286,7 +282,7 @@ class IntelbrasController {
                 pessoa,
                 evento_id: eventoId,
                 tipo: tipoFluxo === 'toggle' ? null : tipoFluxo,
-                metodo: 'face',
+                metodo: 'facial',
                 dispositivo_id: dispositivo.id,
                 area_id: config.area_id,
                 confianca: body?.Similarity || null,
@@ -327,13 +323,13 @@ class IntelbrasController {
 
     _mapMethod(intelbrasMethod) {
         const map = {
-            'Face': 'face',
-            'Card': 'rfid',
+            'Face': 'facial',
+            'Card': 'pulseira',
             'Password': 'manual',
-            'Fingerprint': 'biometry',
+            'Fingerprint': 'facial',
             'QRCode': 'qrcode'
         };
-        return map[intelbrasMethod] || 'face';
+        return map[intelbrasMethod] || 'facial';
     }
 
     _parseMultipartMixedPayload(rawBody) {

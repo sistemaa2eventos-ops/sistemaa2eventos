@@ -147,7 +147,7 @@ class WatchlistController {
             const evento_id = req.query.evento_id || req.headers['x-evento-id'];
             const { data, error } = await supabase
                 .from('watchlist_alertas')
-                .select('*, watchlist(nome, cpf), pessoa:pessoas(nome, foto_url), dispositivo:dispositivos_acesso(nome), area:evento_areas(nome)')
+                .select('*, watchlist(nome, cpf), pessoa:pessoas(nome, foto_url), dispositivo:dispositivos_acesso(nome), area:evento_areas(nome_area)')
                 .eq('evento_id', evento_id)
                 .order('hora', { ascending: false })
                 .limit(50);

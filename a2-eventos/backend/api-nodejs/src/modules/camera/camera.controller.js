@@ -111,7 +111,7 @@ const handleDetection = async (req, res) => {
                                 evento_id: evento.id,
                                 pessoa_id: pessoa.id,
                                 tipo: 'checkin',
-                                metodo: 'face',
+                                metodo: 'facial',
                                 dispositivo_id: camera_id,
                                 confianca: confidence,
                                 foto_capturada: snapshot_url,
