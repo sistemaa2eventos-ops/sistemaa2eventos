@@ -135,6 +135,25 @@ class WebSocketService {
             const userInfo = socket.user ? `${socket.user.email} (${socket.user.role})` : socket.id;
             logger.info(`🔌 WS conectado: ${userInfo}`);
 
+            // 🔒 Rate limiter por socket (eventos críticos: max 10 por segundo)
+            const socketRateLimiter = {
+                count: 0,
+                resetTime: Date.now() + 1000,
+                checkLimit: function() {
+                    const now = Date.now();
+                    if (now > this.resetTime) {
+                        this.count = 1;
+                        this.resetTime = now + 1000;
+                        return true;
+                    }
+                    if (this.count > 10) {
+                        return false;
+                    }
+                    this.count++;
+                    return true;
+                }
+            };
+
             // Auto-join na room do evento do usuário (extraído do JWT)
             if (socket.user?.evento_id) {
                 socket.join(`evento_${socket.user.evento_id}`);
@@ -142,6 +161,13 @@ class WebSocketService {
             }
 
             socket.on('join_event', (eventoId) => {
+                // 🔒 Aplicar rate limiting
+                if (!socketRateLimiter.checkLimit()) {
+                    logger.warn(`🛑 [WS Rate Limit] join_event excedido para ${socket.user?.email}`);
+                    socket.emit('error', { code: 'RATE_LIMIT', message: 'Muitos eventos. Aguarde.' });
+                    return;
+                }
+
                 // Masters podem se juntar a qualquer room; outros apenas ao próprio evento
                 const isMaster = socket.user?.role === 'master' || socket.user?.role === 'admin_master';
                 if (!isMaster && socket.user?.evento_id && socket.user.evento_id !== eventoId) {
@@ -153,6 +179,13 @@ class WebSocketService {
             });
 
             socket.on('join_system_admin', () => {
+                // 🔒 Aplicar rate limiting
+                if (!socketRateLimiter.checkLimit()) {
+                    logger.warn(`🛑 [WS Rate Limit] join_system_admin excedido para ${socket.user?.email}`);
+                    socket.emit('error', { code: 'RATE_LIMIT', message: 'Muitos eventos. Aguarde.' });
+                    return;
+                }
+
                 // Apenas admin_master e master podem entrar na sala global
                 const allowed = ['master', 'admin_master', 'admin'];
                 if (!allowed.includes(socket.user?.role)) {

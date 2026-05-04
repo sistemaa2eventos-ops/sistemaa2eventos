@@ -242,9 +242,17 @@ class ReportController {
             const { data_inicio, data_fim } = req.query;
             const evento_id = req.event.id;
 
+            // Validar formato de datas (YYYY-MM-DD)
+            if (data_inicio && !/^\d{4}-\d{2}-\d{2}/.test(data_inicio)) {
+                return res.status(400).json({ error: 'data_inicio deve estar em formato YYYY-MM-DD' });
+            }
+            if (data_fim && !/^\d{4}-\d{2}-\d{2}/.test(data_fim)) {
+                return res.status(400).json({ error: 'data_fim deve estar em formato YYYY-MM-DD' });
+            }
+
             let query = supabase.from('logs_acesso').select('tipo, pessoas!inner(empresa_id, empresas(nome))').eq('evento_id', evento_id);
-            if (data_inicio) query = query.gte('created_at', data_inicio);
-            if (data_fim) query = query.lte('created_at', data_fim);
+            if (data_inicio) query = query.gte('created_at', new Date(data_inicio).toISOString());
+            if (data_fim) query = query.lte('created_at', new Date(data_fim).toISOString());
 
             const { data: logs, error } = await query;
             if (error) throw error;

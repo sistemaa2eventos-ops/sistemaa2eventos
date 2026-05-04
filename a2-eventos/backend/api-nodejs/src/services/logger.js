@@ -9,9 +9,12 @@ const SENSITIVE_KEYS = new Set([
 
 // Redact paths para pino suprimir campos em JSON aninhado
 const redactPaths = [
-    'password', 'token', 'cpf', 'qr_code', 'face_encoding',
-    'foto_capturada', 'foto_base64_internal', 'session',
-    '*.password', '*.token', '*.cpf', '*.face_encoding'
+    'password', 'senha', 'token', 'access_token', 'refresh_token',
+    'cpf', 'qr_code', 'face_encoding', 'credit_card', 'cvv',
+    'password_device', 'photo_capturada', 'foto_base64_internal', 'session',
+    'authorization', 'service_role_key',
+    '*.password', '*.senha', '*.token', '*.access_token', '*.cpf', '*.face_encoding',
+    '*.credit_card', '*.password_device', '*.authorization'
 ];
 
 const isDev = process.env.NODE_ENV === 'development';
