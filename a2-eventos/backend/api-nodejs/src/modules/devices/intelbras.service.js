@@ -9,7 +9,10 @@ class IntelbrasService extends AccessDevice {
         this.ip = config.ip_address;
         this.port = config.porta || 80;
         this.user = config.user_device || config.user || process.env.INTELBRAS_DEFAULT_USER || 'admin';
-        this.pass = config.password_device || config.password || process.env.INTELBRAS_DEFAULT_PASS || 'admin123';
+        if (!config.password_device && !config.password && !process.env.INTELBRAS_DEFAULT_PASS) {
+            throw new Error(`Dispositivo Intelbras ${this.ip} requer password configurada`);
+        }
+        this.pass = config.password_device || config.password || process.env.INTELBRAS_DEFAULT_PASS;
         this.baseUrl = `http://${this.ip}:${this.port}`;
         this.digestClient = null;
     }

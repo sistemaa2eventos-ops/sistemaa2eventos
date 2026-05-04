@@ -30,12 +30,12 @@ const uniqueOrigins = [...new Set(allowedOrigins)];
 
 /**
  * Verifica se a origem é permitida.
- * Aceita origens explícitas + qualquer IP na faixa 192.168.x.x com porta.
+ * Rejeita requisições sem origin header (CSRF protection).
+ * Aceita apenas origens explicitamente whitelistadas.
  */
 function isOriginAllowed(origin) {
-    if (!origin) return true; // Permitir requests sem origin (ex: ferramentas, curl)
+    if (!origin) return false; // Rejeitar requests sem origin (CSRF protection)
     if (uniqueOrigins.includes(origin)) return true;
-    if (/^http:\/\/192\.168\.\d+\.\d+(:\d+)?$/.test(origin)) return true;
     return false;
 }
 
