@@ -8,9 +8,31 @@ on:
   workflow_dispatch: # Permite disparar o deploy manualmente pela interface do GitHub
 
 jobs:
+  test-backend:
+    name: Rodar Suíte de Testes (Jest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend/api-nodejs
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          
+      - name: Instalar dependências
+        run: npm install
+        
+      - name: Rodar Testes
+        run: npm test
+
   deploy:
     name: Deploy para VPS Hostinger
     runs-on: ubuntu-latest
+    needs: test-backend
     
     steps:
       - name: Checkout repository
