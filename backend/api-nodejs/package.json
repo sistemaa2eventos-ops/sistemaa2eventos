@@ -10,7 +10,8 @@
     "dev": "nodemon src/app.js",
     "test": "jest",
     "sync:manual": "node src/scripts/manual-sync.js",
-    "db:check": "node src/scripts/check-database.js"
+    "db:check": "node src/scripts/check-database.js",
+    "ai:sync": "node src/scripts/generate-embeddings.js"
   },
   "dependencies": {
     "@sentry/node": "^10.71.0",

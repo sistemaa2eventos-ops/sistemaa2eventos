@@ -65,6 +65,24 @@ async def extract_face(req: ExtractRequest):
         if img is None:
             raise HTTPException(status_code=400, detail="Imagem decodificada inválida")
 
+        # 🛡️ LIVENESS / ANTI-SPOOFING (Estático)
+        # Calcula a variância do operador Laplaciano (Foco / Textura)
+        # Fotos de celulares (spoofing) ou impressões costumam perder textura/alta frequência
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+        
+        # Threshold empírico. Ajuste conforme as condições de luz das câmeras.
+        # Imagens muito nítidas (pessoas reais) ficam acima de 100.
+        is_live = laplacian_var > 65.0
+        
+        if not is_live:
+             return {
+                 "success": False, 
+                 "message": "FALHA DE LIVENESS: Imagem muito borrada ou possível tentativa de Spoofing (foto de tela).", 
+                 "liveness_score": laplacian_var,
+                 "is_live": False
+             }
+
         if not INSIGHTFACE_AVAILABLE:
             # Mock de 512 posições se não conseguir buildar o C++ native
             return {"success": True, "embedding": [0.0] * 512, "mock": True}
@@ -84,7 +102,9 @@ async def extract_face(req: ExtractRequest):
         return {
             "success": True,
             "embedding": embedding,
-            "det_score": float(largest_face.det_score)
+            "det_score": float(largest_face.det_score),
+            "liveness_score": laplacian_var,
+            "is_live": True
         }
 
     except Exception as e:
