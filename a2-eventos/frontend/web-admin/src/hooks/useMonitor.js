@@ -56,9 +56,6 @@ export const useMonitor = () => {
     const [areas, setAreas] = useState([]);
     const [dispositivosLista, setDispositivosLista] = useState([]);
 
-    // Audio Alert
-    const alertAudio = useMemo(() => new Audio('/assets/alarm.mp3'), []);
-
     const fetchData = useCallback(async () => {
         if (!eventoId) return;
         try {
@@ -185,7 +182,6 @@ export const useMonitor = () => {
                 watchlist: alert.watchlist
             };
             setActiveAlert(formattedAlert);
-            alertAudio.play().catch(() => null);
             setTimeout(() => setActiveAlert(null), 10000);
         });
 

@@ -58,6 +58,11 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Silenciar erros de requisições canceladas (ex: navegação rápida)
+    if (axios.isCancel(error)) {
+      return Promise.reject(error);
+    }
+
     // Tratamento explicito do Rule 19: Timeout
     if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
       if (snackbarRef && !error.config?.hideDefaultError) {

@@ -5,6 +5,7 @@
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",
+    "start:intelbras": "node src/intelbras-app.js",
     "predev": "node src/scripts/kill-port.js",
     "dev": "nodemon src/app.js",
     "test": "node test-connection.js",
@@ -12,6 +13,8 @@
     "db:check": "node src/scripts/check-database.js"
   },
   "dependencies": {
+    "@sentry/node": "^10.71.0",
+    "@sentry/profiling-node": "^10.71.0",
     "@socket.io/redis-adapter": "^8.3.0",
     "@supabase/supabase-js": "^2.95.3",
     "axios": "^1.13.5",

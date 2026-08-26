@@ -18,7 +18,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Query
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Query, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, HTMLResponse
 from pydantic import BaseModel
@@ -68,13 +68,34 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Configuração de CORS Segura
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS")
+if allowed_origins_env:
+    origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+else:
+    # Desenvolvimento
+    origins = ["http://localhost:3000", "https://painel.nzt.app.br"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Dependência de Autenticação via API Key (aceita via Header ou Query parameter)
+async def verify_api_key(
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None)
+):
+    expected_key = os.getenv("A2_API_KEY", "")
+    if expected_key:
+        key_to_check = x_api_key or api_key
+        if not key_to_check or key_to_check != expected_key:
+            logger.warning("🚫 Tentativa de acesso não autorizada com chave de API inválida.")
+            raise HTTPException(status_code=401, detail="Chave de API inválida ou ausente")
+    return x_api_key or api_key
 
 # ============================================
 # INICIALIZAÇÃO DO INSIGHTFACE
@@ -489,7 +510,7 @@ async def health():
         "cameras_total": len(camera_manager)
     }
 
-@app.get("/stats")
+@app.get("/stats", dependencies=[Depends(verify_api_key)])
 async def stats():
     """Estatísticas de todas as câmeras"""
     return {
@@ -498,7 +519,7 @@ async def stats():
         'insightface_available': INSIGHTFACE_AVAILABLE
     }
 
-@app.post("/cameras/start")
+@app.post("/cameras/start", dependencies=[Depends(verify_api_key)])
 async def start_camera(camera_id: str):
     """Inicia uma câmera específica"""
     if camera_id in camera_manager:
@@ -506,7 +527,7 @@ async def start_camera(camera_id: str):
         return {"success": True, "message": f"Câmera {camera_id} iniciada"}
     raise HTTPException(status_code=404, detail="Câmera não encontrada")
 
-@app.post("/cameras/stop")
+@app.post("/cameras/stop", dependencies=[Depends(verify_api_key)])
 async def stop_camera(camera_id: str):
     """Para uma câmera específica"""
     if camera_id in camera_manager:
@@ -514,7 +535,7 @@ async def stop_camera(camera_id: str):
         return {"success": True, "message": f"Câmera {camera_id} parada"}
     raise HTTPException(status_code=404, detail="Câmera não encontrada")
 
-@app.get("/stream/{camera_id}")
+@app.get("/stream/{camera_id}", dependencies=[Depends(verify_api_key)])
 async def stream_camera(camera_id: str):
     """Stream MJPEG de uma câmera"""
     if camera_id not in camera_manager:
@@ -532,7 +553,7 @@ async def stream_camera(camera_id: str):
     
     return StreamingResponse(generate(), media_type="multipart/x-mixed-replace; boundary=frame")
 
-@app.get("/snapshot/{camera_id}")
+@app.get("/snapshot/{camera_id}", dependencies=[Depends(verify_api_key)])
 async def get_snapshot(camera_id: str):
     """Captura snapshot atual de uma câmera"""
     if camera_id not in camera_manager:
@@ -569,7 +590,7 @@ async def websocket_alerts(websocket: WebSocket):
 # ============================================
 # ENDPOINTS DE ENROLMENT (Cadastro)
 # ============================================
-@app.post("/enroll/face")
+@app.post("/enroll/face", dependencies=[Depends(verify_api_key)])
 async def enroll_face(
     cpf: str = Query(...),
     nome: str = Query(...),
@@ -627,7 +648,7 @@ async def enroll_face(
         logger.error(f"Erro ao cadastrar face: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/enroll/plate")
+@app.post("/enroll/plate", dependencies=[Depends(verify_api_key)])
 async def enroll_plate(
     placa: str = Query(...),
     proprietario: str = Query(...),
@@ -656,7 +677,7 @@ async def enroll_plate(
 # ============================================
 # ENDPOINTS DE WATCHLIST
 # ============================================
-@app.post("/watchlist/cpf")
+@app.post("/watchlist/cpf", dependencies=[Depends(verify_api_key)])
 async def add_watchlist_cpf(
     cpf: str = Query(...),
     nome: Optional[str] = Query(None),
@@ -670,7 +691,7 @@ async def add_watchlist_cpf(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/watchlist/cpf/{cpf}")
+@app.delete("/watchlist/cpf/{cpf}", dependencies=[Depends(verify_api_key)])
 async def remove_watchlist_cpf(cpf: str):
     """Remove CPF da watchlist"""
     try:
@@ -679,7 +700,7 @@ async def remove_watchlist_cpf(cpf: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/watchlist/plate")
+@app.post("/watchlist/plate", dependencies=[Depends(verify_api_key)])
 async def add_watchlist_placa(
     placa: str = Query(...),
     proprietario: Optional[str] = Query(None),
@@ -697,7 +718,7 @@ async def add_watchlist_placa(
 # ============================================
 # ENDPOINTS DE CONSULTA
 # ============================================
-@app.get("/detections")
+@app.get("/detections", dependencies=[Depends(verify_api_key)])
 async def list_detections(
     evento_id: Optional[str] = None,
     tipo: Optional[str] = None,
@@ -710,7 +731,7 @@ async def list_detections(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/enrollments")
+@app.get("/enrollments", dependencies=[Depends(verify_api_key)])
 async def list_enrollments(evento_id: Optional[str] = None):
     """Lista embeddings cadastrados"""
     try:
@@ -722,7 +743,7 @@ async def list_enrollments(evento_id: Optional[str] = None):
 # ============================================
 # PROCESSAMENTO EXTERNO (Webhook)
 # ============================================
-@app.post("/webhook/detection")
+@app.post("/webhook/detection", dependencies=[Depends(verify_api_key)])
 async def webhook_detection(alert: DetectionAlert):
     """Recebe detecção e notifica sistema principal"""
     try:

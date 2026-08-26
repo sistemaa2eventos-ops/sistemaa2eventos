@@ -13,6 +13,8 @@ build/
 .env.test
 .env.local
 .env.*.local
+**/.env
+**/.env.*
 *.pem
 *.key
 *.p8
@@ -49,7 +51,10 @@ credentials*.json
 reset-password.js
 create-user.js
 test-*.js
+**/*test-*.js
 *-test.js
+**/*keys.txt
+keys.txt
 
 # Cache
 .cache/
@@ -99,3 +104,5 @@ codigo_completo.txt
 
 # Test scripts with secrets
 test_jwt_integrity.js
+test-login.js
+test-users-endpoint.js

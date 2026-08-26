@@ -1,0 +1,36 @@
+name: Deploy Automático A2 Eventos
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch: # Permite disparar o deploy manualmente pela interface do GitHub
+
+jobs:
+  deploy:
+    name: Deploy para VPS Hostinger
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Executar Deploy via SSH no VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          # Mude o diretório abaixo (cd) se o projeto estiver em outro local no VPS
+          script: |
+            echo "Iniciando processo de deploy..."
+            cd /root/Projeto_A2_Eventos
+            
+            # Garante que o script tem permissão de execução
+            chmod +x deploy.sh
+            
+            # Executa o deploy rápido
+            ./deploy.sh quick
+            
+            echo "Deploy disparado pelo GitHub Actions finalizado."

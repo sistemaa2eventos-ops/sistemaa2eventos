@@ -12,6 +12,18 @@ const { i18next, middleware } = require('./config/i18n');
 
 dotenv.config();
 
+const Sentry = require("@sentry/node");
+const { nodeProfilingIntegration } = require("@sentry/profiling-node");
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN_BACKEND || "https://f69531af6f2fb198152abfc419c690bc@o4511978719346688.ingest.us.sentry.io/4511978757554176",
+  integrations: [
+    nodeProfilingIntegration(),
+  ],
+  tracesSampleRate: 1.0, 
+  profilesSampleRate: 1.0,
+});
+
 const { testConnection } = require('./config/database');
 const { testPgConnection } = require('./config/pgEdge');
 const { supabase } = require('./config/supabase');
@@ -20,6 +32,7 @@ const cloudSyncWorker = require('./workers/cloud_sync_worker');
 const logger = require('./services/logger');
 const cronController = require('./modules/events/cron.controller');
 const rateLimiter = require('./middleware/rateLimiter');
+const errorHandler = require('./middleware/errorHandler');
 
 const authRoutes = require('./modules/auth/auth.routes');
 const syncRoutes = require('./modules/devices/sync.routes');
@@ -41,6 +54,10 @@ const portalEmpresaRoutes = require('./modules/portal/empresa.routes');
 const portalClienteRoutes = require('./modules/portal/cliente.routes');
 
 const app = express();
+
+app.use(Sentry.Handlers.requestHandler());
+app.use(Sentry.Handlers.tracingHandler());
+
 const httpServer = createServer(app);
 
 // 🌍 INTERNACIONALIZAÇÃO (i18n)
@@ -94,12 +111,12 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // Rotas
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', rateLimiter.auth, authRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/empresas', empresaRoutes);
 app.use('/api/pessoas', pessoaRoutes);
 app.use('/api/eventos', eventoRoutes);
-app.use('/api/access', accessRoutes);
+app.use('/api/access', rateLimiter.access, accessRoutes);
 app.use('/api/monitor', monitorRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/devices', deviceRoutes);
@@ -113,6 +130,12 @@ app.use('/api/documentos', documentosRoutes);
 app.use('/api/portal/empresa', portalEmpresaRoutes);
 app.use('/api/portal/cliente', portalClienteRoutes);
 app.use('/public', publicRoutes);
+
+// O The error handler deve ser antes de qualquer outro error middleware
+app.use(Sentry.Handlers.errorHandler());
+
+// Middleware Central de Tratamento de Erros (deve ser o último a ser registrado)
+app.use(errorHandler);
 
 const websocketService = require('./services/websocketService');
 

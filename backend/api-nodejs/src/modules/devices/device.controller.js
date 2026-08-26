@@ -1,11 +1,13 @@
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const DeviceFactory = require('./adapters/DeviceFactory');
+const { testTcpConnection } = require('../../utils/network');
+const AppError = require('../../shared/errors/AppError');
 
 class DeviceController {
 
     // Listar todos os dispositivos
-    async list(req, res) {
+    async list(req, res, next) {
         try {
             let query = supabase.from('dispositivos_acesso').select('*');
             const evento_id = req.event.id;
@@ -14,12 +16,12 @@ class DeviceController {
             if (error) throw error;
             res.json({ success: true, data });
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            next(error);
         }
     }
 
     // Cadastrar dispositivo
-    async create(req, res) {
+    async create(req, res, next) {
         try {
             const { nome, marca, tipo, ip_address, porta, user, password } = req.body;
             let rtsp_url = '';
@@ -35,7 +37,7 @@ class DeviceController {
                 .insert([{
                     evento_id: req.event.id,
                     nome,
-                    marca, // Novo campo
+                    marca, 
                     tipo,
                     ip_address,
                     porta,
@@ -54,13 +56,13 @@ class DeviceController {
             // Auto-configurar Push
             if (marca === 'intelbras') {
                 try {
-                    const device = DeviceFactory.getDevice({ ip_address, porta, user, password, marca });
+                    const deviceInstance = DeviceFactory.getDevice({ ip_address, porta, user, password, marca });
 
                     // Tentar determinar IP do servidor
                     const serverIp = process.env.SERVER_IP || this._getLocalIp() || req.ip;
                     logger.info(`⚙️ Auto-configurando Push para ${serverIp}...`);
 
-                    await device.configureEventPush(serverIp);
+                    await deviceInstance.configureEventPush(serverIp);
                 } catch (pushError) {
                     logger.error('Erro ao auto-configurar push:', pushError);
                     // Não falhar a criação se o push falhar
@@ -70,8 +72,7 @@ class DeviceController {
             res.status(201).json({ success: true, data });
 
         } catch (error) {
-            logger.error('Erro ao criar dispositivo:', error);
-            res.status(500).json({ error: error.message });
+            next(error);
         }
     }
 
@@ -91,7 +92,7 @@ class DeviceController {
     }
 
     // Configurar Push Manualmente
-    async configurePush(req, res) {
+    async configurePush(req, res, next) {
         try {
             const { id } = req.params;
             const { server_ip, server_port } = req.body; // Opcional, se não vier usa auto-detect
@@ -102,10 +103,12 @@ class DeviceController {
                 .eq('id', id)
                 .single();
 
-            if (error || !deviceData) throw new Error('Dispositivo não encontrado');
+            if (error || !deviceData) {
+                throw new AppError('Dispositivo não encontrado', 404, 'DEVICE_NOT_FOUND');
+            }
 
             if (deviceData.marca !== 'intelbras') {
-                return res.status(400).json({ error: 'Apenas dispositivos Intelbras suportam config de push via API' });
+                throw new AppError('Apenas dispositivos Intelbras suportam config de push via API', 400, 'BAD_REQUEST');
             }
 
             const device = DeviceFactory.getDevice(deviceData);
@@ -116,17 +119,16 @@ class DeviceController {
             if (success) {
                 res.json({ success: true, message: `Push configurado para ${targetIp}` });
             } else {
-                res.status(500).json({ error: 'Falha ao configurar push no dispositivo' });
+                throw new AppError('Falha ao configurar push no dispositivo', 500, 'PUSH_CONFIG_FAILED');
             }
 
         } catch (error) {
-            logger.error('Erro ao configurar push:', error);
-            res.status(500).json({ error: error.message });
+            next(error);
         }
     }
 
     // Sincronizar dispositivo (Forçar envio de todos os rostos)
-    async sync(req, res) {
+    async sync(req, res, next) {
         try {
             const { id } = req.params;
             const terminalSyncService = require('./terminalSync.service');
@@ -134,46 +136,30 @@ class DeviceController {
             const result = await terminalSyncService.syncTerminal(id);
             res.json(result);
         } catch (error) {
-            logger.error('Erro ao sincronizar dispositivo:', error);
-            res.status(500).json({ error: error.message });
+            next(error);
         }
     }
 
-    // Testar Conexão (Real TCP Check)
-    async testConnection(req, res) {
-        const { ip_address, porta } = req.body;
-        const net = require('net');
-
-        const client = new net.Socket();
-        let finished = false;
-
-        const timeout = setTimeout(() => {
-            if (!finished) {
-                finished = true;
-                client.destroy();
-                res.status(408).json({ success: false, error: 'Timeout: Terminal não respondeu no tempo limite.' });
+    // Testar Conexão (Real TCP Check via network helper)
+    async testConnection(req, res, next) {
+        try {
+            const { ip_address, porta } = req.body;
+            if (!ip_address) {
+                throw new AppError('IP é obrigatório', 400, 'MISSING_PARAMS');
             }
-        }, 5000);
 
-        client.connect(porta || 80, ip_address, () => {
-            finished = true;
-            clearTimeout(timeout);
-            client.destroy();
+            await testTcpConnection(ip_address, porta || 80, 5000);
             res.json({ success: true, message: `Conexão estabelecida com sucesso em ${ip_address}:${porta || 80}` });
-        });
-
-        client.on('error', (err) => {
-            if (!finished) {
-                finished = true;
-                clearTimeout(timeout);
-                client.destroy();
-                res.status(503).json({ success: false, error: `Falha na conexão: ${err.message}` });
-            }
-        });
+        } catch (error) {
+            // Em caso de timeout ou erro de conexão, enviamos resposta com status correto
+            const isTimeout = error.message.includes('Timeout');
+            const statusCode = isTimeout ? 408 : 503;
+            res.status(statusCode).json({ success: false, error: error.message });
+        }
     }
 
     // Deletar dispositivo
-    async delete(req, res) {
+    async delete(req, res, next) {
         try {
             const { id } = req.params;
             const { error } = await supabase
@@ -184,12 +170,12 @@ class DeviceController {
             if (error) throw error;
             res.json({ success: true, message: 'Dispositivo removido.' });
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            next(error);
         }
     }
 
     // Obter Snapshot (JPEG) da câmera proxy
-    async getSnapshot(req, res) {
+    async getSnapshot(req, res, next) {
         try {
             const { id } = req.params;
             const { data: deviceData, error } = await supabase
@@ -198,10 +184,11 @@ class DeviceController {
                 .eq('id', id)
                 .single();
 
-            if (error || !deviceData) throw new Error('Dispositivo não encontrado');
+            if (error || !deviceData) {
+                throw new AppError('Dispositivo não encontrado', 404, 'DEVICE_NOT_FOUND');
+            }
 
             const deviceService = DeviceFactory.getDevice(deviceData);
-
             const snapshotBuffer = await deviceService.getSnapshot();
 
             res.set('Content-Type', 'image/jpeg');
@@ -209,13 +196,12 @@ class DeviceController {
             res.send(snapshotBuffer);
 
         } catch (error) {
-            logger.error('Erro ao buscar snapshot:', error);
-            res.status(500).json({ error: 'Falha ao obter imagem da câmera' });
+            next(new AppError('Falha ao obter imagem da câmera', 500, 'SNAPSHOT_FAILED'));
         }
     }
 
     // Atualizar configuração de dispositivo
-    async update(req, res) {
+    async update(req, res, next) {
         try {
             const { id } = req.params;
             const { nome, marca, tipo, ip_address, porta, user, password, user_device, password_device, config } = req.body;
@@ -245,16 +231,17 @@ class DeviceController {
             if (error) throw error;
             res.json({ success: true, data });
         } catch (error) {
-            logger.error('Erro ao atualizar dispositivo:', error);
-            res.status(500).json({ error: 'Erro ao atualizar dispositivo' });
+            next(error);
         }
     }
 
     // Imprimir etiqueta/credencial via impressora térmica
-    async printLabel(req, res) {
+    async printLabel(req, res, next) {
         try {
             const { pessoa_id, evento_id } = req.body;
-            if (!pessoa_id) return res.status(400).json({ error: 'pessoa_id é obrigatório' });
+            if (!pessoa_id) {
+                throw new AppError('pessoa_id é obrigatório', 400, 'MISSING_PARAMS');
+            }
 
             // Buscar dados da pessoa e empresa
             const { data: pessoa, error } = await supabase
@@ -264,7 +251,7 @@ class DeviceController {
                 .single();
 
             if (error || !pessoa) {
-                return res.status(404).json({ error: 'Pessoa não encontrada' });
+                throw new AppError('Pessoa não encontrada', 404, 'PERSON_NOT_FOUND');
             }
 
             // Buscar impressora configurada para o evento
@@ -296,8 +283,7 @@ class DeviceController {
                 }
             });
         } catch (error) {
-            logger.error('Erro ao imprimir etiqueta:', error);
-            res.status(500).json({ error: 'Erro ao gerar etiqueta' });
+            next(error);
         }
     }
 }

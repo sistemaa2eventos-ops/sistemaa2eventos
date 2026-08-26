@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional, List, Dict
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Query, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Query, Form, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
@@ -45,13 +45,33 @@ MIN_FACE_SIZE = int(os.getenv("MIN_FACE_SIZE", "150"))
 # FastAPI App
 app = FastAPI(title="A2 Eventos - Enrollment Service", version="1.0.0")
 
+# Configuração de CORS Segura
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS")
+if allowed_origins_env:
+    origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+else:
+    origins = ["http://localhost:3000", "https://painel.nzt.app.br"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Dependência de Autenticação via API Key
+async def verify_api_key(
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None)
+):
+    expected_key = os.getenv("A2_API_KEY", "")
+    if expected_key:
+        key_to_check = x_api_key or api_key
+        if not key_to_check or key_to_check != expected_key:
+            logger.warning("🚫 Tentativa de acesso não autorizada com chave de API inválida.")
+            raise HTTPException(status_code=401, detail="Chave de API inválida ou ausente")
+    return x_api_key or api_key
 
 # InsightFace
 face_app = None
@@ -104,7 +124,7 @@ async def health():
     }
 
 
-@app.post("/enroll/face", response_model=EnrollmentResult)
+@app.post("/enroll/face", response_model=EnrollmentResult, dependencies=[Depends(verify_api_key)])
 async def enroll_face(
     cpf: str = Query(..., description="CPF do pessoa"),
     nome: str = Query(..., description="Nome completo"),
@@ -211,7 +231,7 @@ async def enroll_face(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/enroll/plate", response_model=PlateEnrollmentResult)
+@app.post("/enroll/plate", response_model=PlateEnrollmentResult, dependencies=[Depends(verify_api_key)])
 async def enroll_plate(
     placa: str = Query(..., description="Número da placa"),
     proprietario: str = Query(..., description="Nome do proprietário"),
@@ -259,7 +279,7 @@ async def enroll_plate(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/enrollments")
+@app.get("/enrollments", dependencies=[Depends(verify_api_key)])
 async def list_enrollments(evento_id: Optional[str] = None):
     """Lista todos os embeddings cadastrados"""
     try:
@@ -284,7 +304,7 @@ async def list_enrollments(evento_id: Optional[str] = None):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/enrollments/faces")
+@app.get("/enrollments/faces", dependencies=[Depends(verify_api_key)])
 async def list_face_enrollments(evento_id: Optional[str] = None):
     """Lista apenas cadastros de faces (para dashboard)"""
     try:
@@ -308,7 +328,7 @@ async def list_face_enrollments(evento_id: Optional[str] = None):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/enrollments/plates")
+@app.get("/enrollments/plates", dependencies=[Depends(verify_api_key)])
 async def list_plate_enrollments(evento_id: Optional[str] = None):
     """Lista cadastros de placas"""
     try:
@@ -333,7 +353,7 @@ async def list_plate_enrollments(evento_id: Optional[str] = None):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.delete("/enrollments/face/{cpf}")
+@app.delete("/enrollments/face/{cpf}", dependencies=[Depends(verify_api_key)])
 async def delete_face_enrollment(cpf: str):
     """Remove cadastro facial (desativa)"""
     try:
@@ -344,7 +364,7 @@ async def delete_face_enrollment(cpf: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/enroll/validate")
+@app.post("/enroll/validate", dependencies=[Depends(verify_api_key)])
 async def validate_photo(
     foto: UploadFile = File(...),
     min_quality: float = Query(0.25, description="Qualidade mínima aceitável")
@@ -412,7 +432,7 @@ async def validate_photo(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/stats")
+@app.get("/stats", dependencies=[Depends(verify_api_key)])
 async def stats():
     """Estatísticas do serviço de enrollment"""
     try:

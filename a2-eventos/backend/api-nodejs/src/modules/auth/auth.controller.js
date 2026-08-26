@@ -581,7 +581,7 @@ class AuthController {
      */
     async updateUser(req, res) {
         try {
-            const { id: userId } = req.params;
+            const { userId } = req.params;
             const { nome_completo, telefone, evento_id, permissions } = req.body;
 
             // Só admin_master pode editar outros usuários

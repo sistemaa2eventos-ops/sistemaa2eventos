@@ -22,12 +22,29 @@
       "Bash(docker-compose -f ~/Projeto_A2_Eventos/docker-compose.yml build a2_eventos_admin_web --no-cache)",
       "Read(//mnt/**)",
       "Read(//c/c/Projetos/Projeto_A2_Eventos/a2-eventos/backend/**)",
-      "Read(//c/c/Projetos/Projeto_A2_Eventos/a2-eventos/backendapi-nodejs/src/modules/**)"
+      "Read(//c/c/Projetos/Projeto_A2_Eventos/a2-eventos/backendapi-nodejs/src/modules/**)",
+      "Bash(node -e \"require\\('@mui/icons-material/LockClock'\\)\")",
+      "Bash(curl -s http://localhost:3003/)",
+      "Bash(python -m json.tool)",
+      "Bash(git log *)",
+      "Bash(git apply *)",
+      "Bash(grep -E \"\\\\.\\(jsx|js\\)$\")",
+      "Bash(chmod +x /tmp/setup-monitoring.sh)",
+      "Bash(bash /tmp/setup-monitoring.sh)",
+      "Bash(chmod +x /tmp/criar-scripts-vps.sh)",
+      "Bash(npm --version)",
+      "Bash(grep -r \"\\\\.raw\\\\|\\\\.query\\\\|sql\\\\`\" /c/Projetos/Projeto_A2_Eventos/a2-eventos/backend/api-nodejs/src --include=\"*.js\")",
+      "Bash(xargs wc *)",
+      "Bash(npm --prefix a2-eventos/backend/api-nodejs run check:syntax)",
+      "Bash(bash /root/Projeto_A2_Eventos/backup-supabase.sh)"
     ],
     "additionalDirectories": [
       "\\tmp",
       "C:\\Users\\SD_Ad\\.claude\\projects\\c--Projetos-Projeto-A2_Eventos\\memory",
-      "C:\\Users\\SD_Ad\\.claude\\plans"
+      "C:\\Users\\SD_Ad\\.claude\\plans",
+      "c:\\tmp",
+      "\\root\\Projeto_A2_Eventos",
+      "c:\\root\\Projeto_A2_Eventos"
     ]
   }
 }

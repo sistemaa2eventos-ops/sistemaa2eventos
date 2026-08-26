@@ -33,9 +33,43 @@ export const useSystemAlerts = () => {
 
         socket.on('connect', () => {
             socket.emit('join_system_admin');
+            
+            // Join active event room to receive watchlist alerts
+            const activeEventoId = localStorage.getItem('active_evento_id') || user?.evento_id;
+            if (activeEventoId) {
+                socket.emit('join_event', activeEventoId);
+            }
+        });
+
+        // Global watchlist alerts (Facial Reader / check-in)
+        socket.on('watchlist_alert', (alert) => {
+            const targetName = alert.pessoa?.nome || 'Alvo';
+            const cpf = alert.pessoa?.cpf || 'CPF não informado';
+            const location = alert.area || alert.terminal || 'Leitor Facial';
+            const status = alert.tipo === 'negado' ? 'Acesso Negado' : 'Acesso Liberado';
+
+            enqueueSnackbar(`🚨 DETECÇÃO DE ALVO: ${targetName} (CPF: ${cpf}) no ${location} [${status}]`, {
+                variant: 'error',
+                persist: true,
+                anchorOrigin: { vertical: 'top', horizontal: 'right' }
+            });
         });
 
         socket.on('system:alert', (payload) => {
+            // Watchlist alerts from Cameras
+            if (payload.tipo === 'camera_watchlist_alert') {
+                const target = payload.detection_type === 'face'
+                    ? `Alvo Monitorado: ${payload.nome} (CPF: ${payload.cpf})`
+                    : `Veículo Monitorado: ${payload.plate}`;
+
+                enqueueSnackbar(`🚨 DETECÇÃO DE WATCHLIST: ${target} na Câmera ${payload.camera_name} (${payload.location || 'Sem local'})`, {
+                    variant: 'error',
+                    persist: true,
+                    anchorOrigin: { vertical: 'top', horizontal: 'right' }
+                });
+                return;
+            }
+
             const alertList = payload.alerts || [payload];
 
             alertList.forEach(alert => {

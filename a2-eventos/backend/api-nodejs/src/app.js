@@ -114,6 +114,9 @@ const corsOptions = {
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH']
 };
 
+// Healthcheck routes (bypasses CORS and rate limiting)
+app.use(require('./modules/system/health.routes'));
+
 app.use(cors(corsOptions));
 app.use(compression());
 app.use(express.json({
@@ -154,8 +157,6 @@ app.use(auditMiddleware);
 // Permite que controllers usem RLS nativamente via `req.supabase || supabase`
 const { injectSupabaseClient } = require('./middleware/supabaseClient');
 app.use(injectSupabaseClient);
-
-app.use(require('./modules/system/health.routes'));
 
 // Rotas
 app.use('/api/auth', authRoutes);
