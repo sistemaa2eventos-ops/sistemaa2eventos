@@ -43,6 +43,29 @@ import NeonButton from '../components/common/NeonButton';
 import { styled } from '@mui/material/styles';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+
+const MotionGrid = motion(Grid);
+const MotionBox = motion(Box);
+
+const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.15
+        }
+    }
+};
+
+const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: {
+        y: 0,
+        opacity: 1,
+        transition: { type: 'spring', stiffness: 100 }
+    }
+};
 
 const StatValue = styled(Typography)(({ theme, color }) => ({
     fontSize: '2.5rem',
@@ -235,10 +258,10 @@ const Dashboard = () => {
                 </Stack>
             </Box>
 
-            <Grid container spacing={3}>
+            <MotionGrid container spacing={3} variants={containerVariants} initial="hidden" animate="visible">
                 {/* Stats Cards */}
                 {cards.map((card, index) => (
-                    <Grid item xs={12} sm={6} md={3} key={index}>
+                    <MotionGrid item xs={12} sm={6} md={3} key={index} variants={itemVariants}>
                         <GlassCard glowColor={card.color} sx={{ p: 3 }}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                                 <Box
@@ -267,11 +290,11 @@ const Dashboard = () => {
                                 {String(card.value).padStart(2, '0')}
                             </StatValue>
                         </GlassCard>
-                    </Grid>
+                    </MotionGrid>
                 ))}
 
                 {/* Chart - Fluxo de Acessos 24h */}
-                <Grid item xs={12} md={7}>
+                <MotionGrid item xs={12} md={7} variants={itemVariants}>
                     <GlassCard sx={{ p: 3, height: '400px' }}>
                         <Typography variant="h6" sx={{ color: '#00D4FF', mb: 3, fontWeight: 700 }}>
                             FLUXO DE ACESSOS (24H)
@@ -320,10 +343,10 @@ const Dashboard = () => {
                             </AreaChart>
                         </ResponsiveContainer>
                     </GlassCard>
-                </Grid>
+                </MotionGrid>
 
                 {/* Recent Activity */}
-                <Grid item xs={12} md={5}>
+                <MotionGrid item xs={12} md={5} variants={itemVariants}>
                     <GlassCard sx={{ p: 0, height: '400px', overflow: 'hidden' }}>
                         <Box sx={{ p: 3, borderBottom: '1px solid rgba(0, 212, 255, 0.1)' }}>
                             <Typography variant="h6" sx={{ color: '#7B2FBE', fontWeight: 700 }}>
@@ -334,18 +357,18 @@ const Dashboard = () => {
                             <RecentCheckins logs={recentCheckins} />
                         </Box>
                     </GlassCard>
-                </Grid>
+                </MotionGrid>
 
                 {/* Recent registrations */}
-                <Grid item xs={12}>
+                <MotionGrid item xs={12} variants={itemVariants}>
                     <GlassCard sx={{ p: 3 }}>
                         <Typography variant="h6" sx={{ color: '#00FF88', mb: 3, fontWeight: 700 }}>
                             ÚLTIMOS CADASTROS
                         </Typography>
                         <RecentAdditions pessoas={recentPessoas} />
                     </GlassCard>
-                </Grid>
-            </Grid>
+                </MotionGrid>
+            </MotionGrid>
         </Box>
     );
 };
