@@ -356,6 +356,7 @@ const PessoaFormDialog = ({
                 </Box>
               )}
             </Box>
+            </Box>
           </Grid>
         </Grid>
       </DialogContent>
