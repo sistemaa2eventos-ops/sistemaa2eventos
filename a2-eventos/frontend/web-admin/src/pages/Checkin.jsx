@@ -392,6 +392,7 @@ const Checkin = () => {
                             </GlassCard>
                         </DialogContent>
                     </Dialog>
+                )}
             </Box>
         </Grid>
       </Grid>
