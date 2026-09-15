@@ -554,7 +554,6 @@ const Empresas = () => {
                 </Box>
               )}
             </Box>
-            </Box>
           )}
           </Box>
         </DialogContent>
