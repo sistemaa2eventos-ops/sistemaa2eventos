@@ -5,7 +5,7 @@ import {
 import {
     Business as BusinessIcon, People as PeopleIcon, Login as LoginIcon,
     Logout as LogoutIcon, Refresh as RefreshIcon, TrendingUp as TrendingUpIcon,
-    CheckCircle as CheckIcon, Event as EventIcon,
+    CheckCircle as CheckIcon, Event as EventIcon, Autorenew as AutorenewIcon
 } from '@mui/icons-material';
 import {
     Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip as ReTooltip, XAxis, YAxis
@@ -47,8 +47,14 @@ const Dashboard = () => {
     const navigate = useNavigate();
     const {
         stats, fluxData, recentCheckins, recentPessoas,
-        loading, refreshing, eventoId, refresh
+        loading, refreshing, resetting, eventoId, refresh, handleDailyReset
     } = useDashboard();
+
+    const confirmDailyReset = () => {
+        if (window.confirm("Atenção: O Reset Diário alterará o status de acesso de todos que não estejam no evento para 'ausente', iniciando um novo dia. Deseja prosseguir?")) {
+            handleDailyReset();
+        }
+    };
 
     if (!eventoId) {
         return (
@@ -76,6 +82,14 @@ const Dashboard = () => {
                 <PageHeader title="A2 Eventos / NZT Dashboard" subtitle="Telemetria e controle de fluxo biométrico em tempo real." />
                 <Stack direction="row" spacing={2} alignItems="center" sx={{ alignSelf: { xs: 'flex-end', md: 'center' } }}>
                     {stats.dispositivos_online > 0 && <Chip label={`${stats.dispositivos_online} Leitores Online`} color="success" size="small" variant="outlined" sx={{ fontWeight: 800 }} />}
+                    <NeonButton 
+                        startIcon={<AutorenewIcon />} 
+                        onClick={confirmDailyReset} 
+                        disabled={resetting}
+                        color="warning"
+                    >
+                        {resetting ? 'Resetando...' : 'Reset Diário'}
+                    </NeonButton>
                     <IconButton onClick={refresh} sx={{ animation: refreshing ? 'spin 2s linear infinite' : 'none' }}>
                         <RefreshIcon />
                     </IconButton>

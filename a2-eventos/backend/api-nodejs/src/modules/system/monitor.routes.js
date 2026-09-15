@@ -9,6 +9,7 @@ router.use(authenticate);
 
 // Dashboard principal (requireEvent aplicado UMA vez)
 router.get('/dashboard', requireEvent, monitorController.dashboard);
+router.post('/dashboard/reset-diario', checkPermission('monitor', 'escrita'), requireEvent, monitorController.resetDiario);
 
 // Rotas de sistema (não requerem evento)
 router.get('/system-status', checkPermission('monitor', 'leitura'), monitorController.systemStatus);

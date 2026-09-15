@@ -16,6 +16,7 @@ export const useDashboard = () => {
 
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [resetting, setResetting] = useState(false);
     const [stats, setStats] = useState({
         total_empresas: 0, total_pessoas: 0, checkins_hoje: 0,
         checkouts_hoje: 0, presentes: 0, dispositivos_online: 0,
@@ -74,6 +75,19 @@ export const useDashboard = () => {
         loadDashboardData();
     };
 
+    const handleDailyReset = async () => {
+        if (!eventoId) return;
+        try {
+            setResetting(true);
+            await api.post('/monitor/dashboard/reset-diario', { evento_id: eventoId });
+            refresh();
+        } catch (error) {
+            console.error('Erro no reset diário:', error);
+        } finally {
+            setResetting(false);
+        }
+    };
+
     useEffect(() => {
         loadDashboardData();
         return () => {
@@ -94,6 +108,6 @@ export const useDashboard = () => {
 
     return {
         stats, fluxData, recentCheckins, recentPessoas,
-        loading, refreshing, eventoId, refresh
+        loading, refreshing, resetting, eventoId, refresh, handleDailyReset
     };
 };

@@ -482,6 +482,35 @@ class MonitorController {
             logger.error('Erro ao remover da watchlist:', error);
             res.status(500).json({ error: 'Erro interno no servidor' });
         }
+    /**
+     * Reset Diário
+     * Reinicia o status de acesso de todos os colaboradores do evento,
+     * exceto aqueles que ainda estão presentes (checkin_feito).
+     */
+    async resetDiario(req, res) {
+        try {
+            const evento_id = _s(req.event?.id) || _s(req.body?.evento_id) || _s(req.user?.evento_id) || _s(req.headers['x-evento-id']);
+
+            if (!evento_id) {
+                return res.status(400).json({ error: 'Falta vincular evento ativo para reset diário.' });
+            }
+
+            // Atualiza status_acesso para 'ausente' onde status_acesso != 'checkin_feito'
+            const { data, error } = await supabase
+                .from('pessoas')
+                .update({ status_acesso: 'ausente' })
+                .eq('evento_id', evento_id)
+                .neq('status_acesso', 'checkin_feito');
+
+            if (error) throw error;
+            
+            logger.info(`🔄 Reset diário executado no evento ${evento_id} pelo usuário ${req.user?.id || 'Admin'}`);
+
+            res.json({ success: true, message: 'Reset diário concluído com sucesso. Novo dia iniciado.' });
+        } catch (error) {
+            logger.error('Erro no reset diário:', error);
+            res.status(500).json({ error: 'Erro interno no servidor' });
+        }
     }
 }
 

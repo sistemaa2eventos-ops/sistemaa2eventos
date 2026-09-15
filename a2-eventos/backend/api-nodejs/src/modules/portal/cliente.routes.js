@@ -153,17 +153,14 @@ router.post('/documento', upload.single('arquivo'), async (req, res) => {
             .eq("id", pessoaId)
             .single();
         const eventoId = pessoaData?.evento_id;
-
         const { data, error } = await supabase
             .from('pessoa_documentos')
             .insert([{
                 pessoa_id: pessoaId,
                 titulo: titulo,
-                tipo_doc: tipo_doc, // 'meia_entrada', 'pcd', 'termo_responsabilidade'
-                url_arquivo: uploadResult.publicUrl,
-                status: 'pendente',
-                criado_por_user_id: pessoaId, // Auditor do Upload
-                evento_id: eventoId,
+                tipo_doc: tipo_doc,
+                url_arquivo: uploadResult.url,
+                status: 'pendente'
             }])
             .select()
             .single();
