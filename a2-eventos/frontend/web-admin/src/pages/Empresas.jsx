@@ -362,11 +362,52 @@ const Empresas = () => {
         />
       </GlassCard>
 
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth disableRestoreFocus>
-        <DialogTitle sx={{ fontFamily: '"Orbitron", sans-serif', fontWeight: 700, letterSpacing: '2px' }}>
+      <Dialog 
+        open={openDialog} 
+        onClose={() => setOpenDialog(false)} 
+        maxWidth="md" 
+        fullWidth 
+        disableRestoreFocus
+        PaperProps={{
+          sx: {
+            bgcolor: 'rgba(10, 25, 41, 0.95)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(0, 212, 255, 0.15)',
+            borderRadius: 3,
+            minHeight: { xs: '100%', md: '80vh' },
+            maxHeight: { xs: '100%', md: '90vh' },
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            backgroundImage: 'none',
+            boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 40px rgba(0,212,255,0.05)'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          fontFamily: '"Orbitron", sans-serif', 
+          fontWeight: 700, 
+          letterSpacing: '1px', 
+          color: '#fff', 
+          borderBottom: '1px solid rgba(255, 255, 255, 0.05)', 
+          py: 2.5, 
+          px: 4 
+        }}>
           {selectedEmpresa ? 'MODIFICAR EMPRESA' : 'ANEXAR NOVA EMPRESA'}
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ 
+          p: { xs: 3, md: 5 }, 
+          pr: { xs: 3, md: 2 }, 
+          overflowY: 'auto', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          minHeight: 0, 
+          height: '100%', 
+          '&::-webkit-scrollbar': { width: '6px' }, 
+          '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.3)', borderRadius: '10px' }, 
+          '&::-webkit-scrollbar-track': { background: 'transparent' } 
+        }}>
+          <Box sx={{ pr: { xs: 0, md: 2 }, pb: 4, flex: 1 }}>
           <Stepper activeStep={activeStep} alternativeLabel sx={{ pt: 3, mb: 4 }}>
             {steps.map((label) => (
               <Step key={label}>
@@ -409,7 +450,67 @@ const Empresas = () => {
                   <TextField label="Cota Total Max." type="number" fullWidth value={formData.max_colaboradores} onChange={(e) => setFormData({ ...formData, max_colaboradores: e.target.value })} />
                 </Grid>
               </Grid>
-              <TextField label="Notas de Operação e Logística" fullWidth multiline rows={4} value={formData.observacao} onChange={(e) => setFormData({ ...formData, observacao: e.target.value })} />
+              <TextField label="Notas de Operação e Logística" fullWidth multiline rows={2} value={formData.observacao} onChange={(e) => setFormData({ ...formData, observacao: e.target.value })} />
+
+              {activeEvent && formData && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="subtitle2" sx={{ color: '#00D4FF', mb: 1, fontWeight: 700 }}>DIAS PERMITIDOS PARA ACESSO (TERCEIRIZADOS)</Typography>
+                  <Divider sx={{ mb: 2, borderColor: 'rgba(255,255,255,0.1)' }} />
+                  <Box 
+                    sx={{ 
+                      maxHeight: 250, 
+                      overflowY: 'auto', 
+                      pr: 2, 
+                      border: '1px solid rgba(0, 212, 255, 0.1)',
+                      borderRadius: 2,
+                      p: 2,
+                      bgcolor: 'rgba(0,0,0,0.1)',
+                      '&::-webkit-scrollbar': { width: '6px' }, 
+                      '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.4)', borderRadius: '10px' },
+                      '&::-webkit-scrollbar-track': { background: 'rgba(255,255,255,0.05)' }
+                    }}
+                  >
+                    <Stack spacing={2.5}>
+                      {['montagem', 'evento', 'desmontagem'].map(phase => {
+                        const dates = (activeEvent && activeEvent[`datas_${phase}`]) || [];
+                        if (!Array.isArray(dates) || dates.length === 0) return null;
+                        return (
+                          <Box key={phase}>
+                            <Typography variant="caption" sx={{ color: '#00FF88', textTransform: 'uppercase', fontWeight: 800, display: 'block', mb: 1 }}>{phase}</Typography>
+                            <Grid container spacing={1}>
+                              {dates.map(date => {
+                                const isChecked = Array.isArray(formData?.datas_presenca) && formData.datas_presenca.includes(date);
+                                return (
+                                  <Grid item key={date}>
+                                    <FormControlLabel 
+                                      control={
+                                        <Checkbox 
+                                          size="small" 
+                                          checked={!!isChecked} 
+                                          onChange={() => {
+                                            const currentDates = formData.datas_presenca || [];
+                                            const newDates = currentDates.includes(date)
+                                              ? currentDates.filter(d => d !== date)
+                                              : [...currentDates, date];
+                                            setFormData({ ...formData, datas_presenca: newDates });
+                                          }}
+                                          sx={{ color: 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: '#00FF88' }, p: 0.5 }} 
+                                        />
+                                      } 
+                                      label={<Typography variant="caption" sx={{ color: isChecked ? '#fff' : 'rgba(255,255,255,0.6)' }}>{date ? format(new Date(date + 'T00:00:00'), "dd/MM") : '--/--'}</Typography>} 
+                                      sx={{ m: 0, mr: 1, border: '1px solid rgba(255,255,255,0.05)', borderRadius: 1, px: 1, py: 0.5, bgcolor: isChecked ? 'rgba(0,255,136,0.05)' : 'transparent' }}
+                                    />
+                                  </Grid>
+                                );
+                              })}
+                            </Grid>
+                          </Box>
+                        );
+                      })}
+                    </Stack>
+                  </Box>
+                </Box>
+              )}
             </Box>
           )}
 
@@ -453,12 +554,14 @@ const Empresas = () => {
                 </Box>
               )}
             </Box>
+            </Box>
           )}
+          </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 3, justifyContent: 'space-between' }}>
-          <Button onClick={() => setOpenDialog(false)} disabled={saving} sx={{ color: 'text.secondary' }}>CANCELAR</Button>
-          <Box>
-            {activeStep > 0 && <Button onClick={() => setActiveStep(prev => prev - 1)} sx={{ mr: 1, color: '#fff' }}>Voltar</Button>}
+        <DialogActions sx={{ p: 3, px: 6, justifyContent: 'space-between', borderTop: '1px solid rgba(255, 255, 255, 0.05)', bgcolor: 'rgba(10, 25, 41, 0.5)' }}>
+          <Button onClick={() => setOpenDialog(false)} disabled={saving} sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, '&:hover': { color: '#FF3366' } }}>ABORTAR</Button>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            {activeStep > 0 && <Button onClick={() => setActiveStep(prev => prev - 1)} sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, '&:hover': { color: '#fff' } }}>VOLTAR</Button>}
             {activeStep < steps.length - 1 ? (
               <NeonButton onClick={() => setActiveStep(prev => prev + 1)}>PRÓXIMA ETAPA</NeonButton>
             ) : (

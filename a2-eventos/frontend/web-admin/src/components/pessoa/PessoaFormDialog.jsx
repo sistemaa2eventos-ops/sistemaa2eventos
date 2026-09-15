@@ -47,16 +47,17 @@ const PessoaFormDialog = ({
       fullScreen={isMobile}
       PaperProps={{
         sx: {
-          bgcolor: 'rgba(10, 25, 41, 0.98)',
+          bgcolor: 'rgba(10, 25, 41, 0.95)',
           backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(0, 212, 255, 0.1)',
+          border: '1px solid rgba(0, 212, 255, 0.15)',
           borderRadius: 3,
-          minHeight: isMobile ? '100%' : '600px',
+          minHeight: isMobile ? '100%' : '80vh',
           maxHeight: isMobile ? '100%' : '90vh',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          backgroundImage: 'none'
+          backgroundImage: 'none',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 40px rgba(0,212,255,0.05)'
         }
       }}
     >
@@ -106,8 +107,9 @@ const PessoaFormDialog = ({
 
           </Grid>
 
-          <Grid item xs={12} md={7} sx={{ p: 5, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' }}>
-            {!isEmpresa && (
+          <Grid item xs={12} md={7} sx={{ p: { xs: 3, md: 5 }, pr: { xs: 3, md: 2 }, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%', '&::-webkit-scrollbar': { width: '6px' }, '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.3)', borderRadius: '10px' }, '&::-webkit-scrollbar-track': { background: 'transparent' } }}>
+            <Box sx={{ pr: { xs: 0, md: 2 }, pb: 4, flex: 1 }}>
+              {!isEmpresa && (
               <Stepper activeStep={activeStep} alternativeLabel sx={{
                 mb: 6,
                 '& .MuiStepConnector-line': { borderColor: 'rgba(255,255,255,0.05)' },

@@ -38,12 +38,53 @@ const EventFormDialog = ({
     handleClearAll,
     handleDateToggle
 }) => {
+    const isNew = !selectedEvento;
+
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-            <DialogTitle sx={{ fontFamily: '"Orbitron", sans-serif', fontWeight: 700, letterSpacing: '2px' }}>
-                {selectedEvento ? 'MODIFICAR EVENTO' : 'INICIAR NOVO EVENTO'}
+        <Dialog 
+            open={open} 
+            onClose={onClose} 
+            maxWidth="md" 
+            fullWidth
+            PaperProps={{
+                sx: {
+                    bgcolor: 'rgba(10, 25, 41, 0.95)',
+                    backdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(0, 212, 255, 0.15)',
+                    borderRadius: 3,
+                    minHeight: { xs: '100%', md: '80vh' },
+                    maxHeight: { xs: '100%', md: '90vh' },
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden',
+                    backgroundImage: 'none',
+                    boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 40px rgba(0,212,255,0.05)'
+                }
+            }}
+        >
+            <DialogTitle sx={{ 
+                fontFamily: '"Orbitron", sans-serif', 
+                fontWeight: 700, 
+                letterSpacing: '2px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.05)', 
+                py: 2.5, 
+                px: 4 
+            }}>
+                {isNew ? 'NOVO EVENTO' : 'MODIFICAR EVENTO'}
             </DialogTitle>
-            <DialogContent>
+            <DialogContent sx={{ 
+                p: { xs: 3, md: 5 }, 
+                pr: { xs: 3, md: 2 }, 
+                overflowY: 'auto', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                minHeight: 0, 
+                height: '100%', 
+                '&::-webkit-scrollbar': { width: '6px' }, 
+                '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.3)', borderRadius: '10px' }, 
+                '&::-webkit-scrollbar-track': { background: 'transparent' } 
+            }}>
+                <Box sx={{ pr: { xs: 0, md: 2 }, pb: 4, flex: 1 }}>
                 <Tabs
                     value={tabValue}
                     onChange={(e, v) => setTabValue(v)}
@@ -291,7 +332,7 @@ const EventFormDialog = ({
                                 ))}
                             </FormGroup>
                         </Box>
-                    </Box> // Close the <Box> that started at line 57
+                    </Box>
                 ) : (
                     <Box>
                         {!formData.data_inicio || !formData.data_fim ? (
@@ -348,9 +389,12 @@ const EventFormDialog = ({
                         )}
                     </Box>
                 )}
+                </Box>
             </DialogContent>
-            <DialogActions sx={{ p: 3 }}>
-                <Button onClick={onClose} disabled={saving} sx={{ color: 'text.secondary' }}>ABORTAR</Button>
+            <DialogActions sx={{ p: 3, px: 6, justifyContent: 'space-between', borderTop: '1px solid rgba(255, 255, 255, 0.05)', bgcolor: 'rgba(10, 25, 41, 0.5)' }}>
+                <Button onClick={onClose} disabled={saving} sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, '&:hover': { color: '#FF3366' } }}>
+                    CANCELAR
+                </Button>
                 <NeonButton onClick={handleSave} loading={saving}>SALVAR E ATIVAR</NeonButton>
             </DialogActions>
         </Dialog>

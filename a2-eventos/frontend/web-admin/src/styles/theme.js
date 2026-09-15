@@ -63,11 +63,14 @@ const theme = createTheme({
                     background: 'linear-gradient(135deg, #050B18 0%, #0A1628 50%, #050B18 100%)',
                     minHeight: '100vh',
                 },
-                '::-webkit-scrollbar': { width: '6px', height: '6px' },
-                '::-webkit-scrollbar-track': { background: '#0A1628' },
+                '::-webkit-scrollbar': { width: '8px', height: '8px' },
+                '::-webkit-scrollbar-track': { background: 'transparent' },
                 '::-webkit-scrollbar-thumb': {
-                    background: '#00D4FF',
-                    borderRadius: '3px',
+                    background: 'rgba(0, 212, 255, 0.3)',
+                    borderRadius: '10px',
+                },
+                '::-webkit-scrollbar-thumb:hover': {
+                    background: 'rgba(0, 212, 255, 0.6)',
                 },
             },
         },
