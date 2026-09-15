@@ -3,7 +3,8 @@ import { Html5Qrcode } from "html5-qrcode";
 import {
   Box, Typography, Grid, Stack, IconButton, TextField,
   Avatar, CircularProgress, List, ListItemText,
-  ListItemButton, Chip, Fade, Zoom
+  ListItemButton, Chip, Fade, Zoom, Dialog, DialogTitle,
+  DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel
 } from '@mui/material';
 import AreaSelector from '../components/common/AreaSelector';
 import AuthorizedAreasChips from '../components/common/AuthorizedAreasChips';
@@ -58,6 +59,10 @@ const Checkin = () => {
 
   const [pulseiraValue, setPulseiraValue] = useState('');
   const [showPulseiraInput, setShowPulseiraInput] = useState(false);
+  
+  // States for Modal
+  const [selectedTipoPulseira, setSelectedTipoPulseira] = useState('');
+  const [numeroPulseiraModal, setNumeroPulseiraModal] = useState('');
 
   // QR Scanner Lifecycle
   useEffect(() => {
@@ -203,9 +208,29 @@ const Checkin = () => {
         {/* CARD E AÇÕES (Direita no Normal, Inferior no Quiosque) */}
         <Grid item xs={12} md={modoQuiosque ? 10 : 8} lg={modoQuiosque ? 8 : 8}>
             <Box sx={{ position: 'relative', height: '100%', minHeight: 600 }}>
-                {selectedPessoa ? (
-                    <Fade in={!!selectedPessoa}>
-                        <GlassCard sx={{ p: modoQuiosque ? 5 : 4, height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+                {!selectedPessoa && (
+                    <GlassCard sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Stack alignItems="center" spacing={2} sx={{ opacity: 0.1 }}>
+                            <BadgeIcon sx={{ fontSize: 180 }} />
+                            <Typography variant="h5" fontWeight={700}>BUSQUE UM PARTICIPANTE PARA INICIAR</Typography>
+                        </Stack>
+                    </GlassCard>
+                )}
+                {selectedPessoa && (
+                    <Dialog 
+                        open={!!selectedPessoa} 
+                        onClose={() => { setSelectedPessoa(null); setNumeroPulseiraModal(''); setSelectedTipoPulseira(''); }}
+                        maxWidth="md"
+                        fullWidth
+                        PaperProps={{
+                            sx: {
+                                bgcolor: 'transparent',
+                                boxShadow: 'none'
+                            }
+                        }}
+                    >
+                        <DialogContent sx={{ p: 0 }}>
+                            <GlassCard sx={{ p: modoQuiosque ? 5 : 4, height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
                             {/* FEEDBACK OVERLAY */}
                             {checkinResult && (
                                 <FeedbackOverlay status={checkinResult}>
@@ -287,103 +312,92 @@ const Checkin = () => {
                                         <Typography variant="body1" sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.8 }}>
                                             <BadgeIcon sx={{ color: '#00D4FF' }} /> {selectedPessoa.funcao || 'Participante'}
                                         </Typography>
-                                        {/* Informações da Pulseira */}
-                                        {selectedPessoa.pulseira_info && (
-                                            <Box sx={{ mt: 2, p: 2, borderRadius: 2, bgcolor: 'rgba(0,0,0,0.3)', border: `1px solid ${selectedPessoa.pulseira_info.cor_hex}40` }}>
-                                                <Stack direction="row" alignItems="center" spacing={2}>
-                                                    <Box sx={{ 
-                                                        width: 24, 
-                                                        height: 24, 
-                                                        borderRadius: '50%', 
-                                                        bgcolor: selectedPessoa.pulseira_info.cor_hex,
-                                                        boxShadow: `0 0 10px ${selectedPessoa.pulseira_info.cor_hex}80`
-                                                    }} />
-                                                    <Box>
-                                                        <Typography variant="body2" fontWeight={800} sx={{ color: selectedPessoa.pulseira_info.cor_hex }}>
-                                                            {selectedPessoa.pulseira_info.nome_tipo?.toUpperCase()}
-                                                        </Typography>
-                                                        {selectedPessoa.pulseira_info.areas_permitidas?.length > 0 && (
-                                                            <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mt: 0.5 }}>
-                                                                {selectedPessoa.pulseira_info.areas_permitidas.map((area, idx) => (
-                                                                    <Chip 
-                                                                        key={idx}
-                                                                        label={area.nome_area}
-                                                                        size="small"
-                                                                        sx={{ 
-                                                                            height: 18, 
-                                                                            fontSize: '0.6rem',
-                                                                            bgcolor: 'rgba(255,255,255,0.1)',
-                                                                            color: '#fff'
-                                                                        }}
-                                                                    />
-                                                                ))}
-                                                            </Stack>
-                                                        )}
-                                                    </Box>
-                                                </Stack>
-                                            </Box>
-                                        )}
                                     </Stack>
 
                                     <AuthorizedAreasChips pessoa={selectedPessoa} accentColor="#00D4FF" />
-
-                                    <Box sx={{ mt: 4, p: 2, bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 3 }}>
-                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                            <EventIcon sx={{ fontSize: 16 }} /> DIAS DE ACESSO
-                                        </Typography>
-                                        <Stack direction="row" spacing={1} flexWrap="wrap">
-                                            {(selectedPessoa.dias_acesso || selectedPessoa.dias_trabalho || []).map(dia => {
-                                                const isHoje = dia === hojeLiteral;
-                                                return (
-                                                    <Chip 
-                                                        key={dia} 
-                                                        label={new Date(dia + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                                                        size="small"
-                                                        sx={{ 
-                                                            bgcolor: isHoje ? 'rgba(0,255,136,0.1)' : 'rgba(255,255,255,0.05)',
-                                                            color: isHoje ? '#00FF88' : '#fff',
-                                                            border: isHoje ? '1px solid #00FF88' : '1px solid rgba(255,255,255,0.1)',
-                                                            fontWeight: isHoje ? 900 : 400
-                                                        }}
-                                                    />
-                                                );
-                                            })}
+                                    
+                                    <Box sx={{ mt: 3, p: 2, bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 3 }}>
+                                        <Typography variant="subtitle2" color="#00D4FF" mb={2}>ATRIBUIR PULSEIRA</Typography>
+                                        <Stack direction="row" spacing={2}>
+                                            <FormControl fullWidth>
+                                                <InputLabel id="tipo-pulseira-label" sx={{ color: 'rgba(255,255,255,0.7)' }}>Tipo (Lote)</InputLabel>
+                                                <Select
+                                                    labelId="tipo-pulseira-label"
+                                                    value={selectedTipoPulseira}
+                                                    label="Tipo (Lote)"
+                                                    onChange={(e) => setSelectedTipoPulseira(e.target.value)}
+                                                    sx={{ 
+                                                        bgcolor: 'rgba(0,0,0,0.2)', 
+                                                        color: '#fff',
+                                                        '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.1)' }
+                                                    }}
+                                                >
+                                                    {(pulseiraTypes || []).map(t => (
+                                                        <MenuItem key={t.id} value={t.id}>
+                                                            {t.nome_tipo} ({t.cor_hex})
+                                                        </MenuItem>
+                                                    ))}
+                                                </Select>
+                                            </FormControl>
+                                            <TextField 
+                                                fullWidth
+                                                label="Número da Pulseira"
+                                                value={numeroPulseiraModal}
+                                                onChange={(e) => setNumeroPulseiraModal(e.target.value)}
+                                                sx={{ 
+                                                    '& .MuiOutlinedInput-root': { 
+                                                        bgcolor: 'rgba(0,0,0,0.2)', 
+                                                        color: '#fff' 
+                                                    },
+                                                    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' }
+                                                }}
+                                            />
                                         </Stack>
                                     </Box>
+
                                 </Grid>
                             </Grid>
 
-                            {/* ACTIONS FOOTER */}
-                            <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                                <Grid container spacing={2}>
-                                    <Grid item xs={12} md={4}>
-                                        <ActionButton fullWidth onClick={() => performCheckin('manual')} disabled={manualSaving || loading}>
-                                            <LoginIcon sx={{ mr: 1, fontSize: 30 }} /> CHECK-IN MANUAL
-                                            {manualSaving && <CircularProgress size={20} sx={{ ml: 2 }} />}
-                                        </ActionButton>
+                                {/* ACTIONS FOOTER */}
+                                <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <Grid container spacing={2}>
+                                        <Grid item xs={12} md={6}>
+                                            <ActionButton 
+                                                fullWidth 
+                                                onClick={() => {
+                                                    if (selectedTipoPulseira && numeroPulseiraModal) {
+                                                        handleLinkPulseiraAndCheckin(selectedPessoa.id, selectedTipoPulseira, numeroPulseiraModal);
+                                                    } else {
+                                                        performCheckin('manual');
+                                                    }
+                                                }} 
+                                                disabled={manualSaving || loading}
+                                            >
+                                                <LoginIcon sx={{ mr: 1, fontSize: 30 }} /> {(selectedTipoPulseira && numeroPulseiraModal) ? "VINCULAR & ENTRADA" : "CHECK-IN S/ PULSEIRA"}
+                                                {manualSaving && <CircularProgress size={20} sx={{ ml: 2 }} />}
+                                            </ActionButton>
+                                        </Grid>
+                                        <Grid item xs={12} md={3}>
+                                            <ActionButton fullWidth variant="outlined" onClick={() => setActiveScanner(true)} disabled={manualSaving || loading}>
+                                                <ScannerIcon sx={{ mr: 1, fontSize: 30 }} /> QR
+                                            </ActionButton>
+                                        </Grid>
+                                        <Grid item xs={12} md={3}>
+                                            <ActionButton fullWidth variant="outlined" onClick={() => { setSelectedPessoa(null); setNumeroPulseiraModal(''); setSelectedTipoPulseira(''); }} disabled={manualSaving || loading}>
+                                                <CloseIcon sx={{ mr: 1, fontSize: 30 }} /> CANCELAR
+                                            </ActionButton>
+                                        </Grid>
                                     </Grid>
-                                    <Grid item xs={12} md={4}>
-                                        <ActionButton fullWidth variant="outlined" onClick={() => setActiveScanner(true)} disabled={manualSaving || loading}>
-                                            <ScannerIcon sx={{ mr: 1, fontSize: 30 }} /> QR CODE
-                                        </ActionButton>
-                                    </Grid>
-                                    <Grid item xs={12} md={4}>
-                                        <ActionButton fullWidth variant="outlined" onClick={() => setShowPulseiraInput(true)} disabled={manualSaving || loading}>
-                                            <BadgeIcon sx={{ mr: 1, fontSize: 30 }} /> PULSEIRA / BARCODE
-                                        </ActionButton>
-                                    </Grid>
-                                </Grid>
-                            </Box>
-                        </GlassCard>
-                    </Fade>
-                ) : (
+                                </Box>
+                            </GlassCard>
+                        </DialogContent>
+                    </Dialog>
                     <GlassCard sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <Stack alignItems="center" spacing={2} sx={{ opacity: 0.1 }}>
                             <BadgeIcon sx={{ fontSize: 180 }} />
                             <Typography variant="h5" fontWeight={700}>BUSQUE UM PARTICIPANTE PARA INICIAR</Typography>
                         </Stack>
                     </GlassCard>
-                )}
             </Box>
         </Grid>
       </Grid>

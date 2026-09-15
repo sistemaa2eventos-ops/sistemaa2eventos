@@ -194,221 +194,122 @@ const Checkout = () => {
       </Box>
 
       <AreaSelector areas={eventAreas} value={areaId} onChange={changeAreaId} accentColor="#FF3366" />
-      <Grid container spacing={3} justifyContent={modoQuiosque ? 'center' : 'flex-start'}>
+      <Grid container spacing={3} sx={{ flex: 1, minHeight: 600 }}>
         
-        {/* BUSCA (Esquerda no Normal, Superior no Quiosque) */}
-        <Grid item xs={12} md={modoQuiosque ? 10 : 4} lg={modoQuiosque ? 8 : 4}>
-            <GlassCard sx={{ p: 3, height: modoQuiosque ? 'auto' : 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column' }}>
-                <Typography variant="subtitle2" fontWeight={800} color="#FF3366" mb={2}>PORTARIA / SAÍDA</Typography>
-                <TextField
-                    fullWidth
-                    autoFocus={!modoQuiosque}
-                    placeholder="BUSCAR NOME OU CPF PARA SAÍDA..."
-                    value={searchQuery}
-                    onChange={(e) => handleSearch(e.target.value)}
-                    InputProps={{ 
-                        startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />,
-                        sx: { borderRadius: 4, height: 60, fontSize: '1.2rem', bgcolor: 'rgba(255,255,255,0.03)' }
-                    }}
-                />
+        {/* LADO ESQUERDO: Operação (Input Pulseira) */}
+        <Grid item xs={12} md={6}>
+            <GlassCard sx={{ p: 4, height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+                <Typography variant="h5" fontWeight={900} color="#FF3366" mb={1} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <LogoutIcon /> SAÍDA POR PULSEIRA
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.7, mb: 4 }}>
+                    Realize o checkout bipando ou digitando o número da pulseira.
+                </Typography>
 
-                <Box sx={{ mt: 2, flex: 1, overflow: 'auto' }}>
-                    {searchResults.length > 0 ? (
-                        <List>
-                            {searchResults.map(p => (
-                                <ListItemButton 
-                                    key={p.id} 
-                                    onClick={() => setSelectedPessoa(p)}
-                                    sx={{ borderRadius: 3, mb: 1, border: '1px solid rgba(255,255,255,0.05)' }}
-                                >
-                                    <Avatar src={p.foto_url} sx={{ width: 45, height: 45, mr: 2, bgcolor: '#FF3366' }}>{p.nome[0]}</Avatar>
-                                    <ListItemText 
-                                        primary={p.nome} 
-                                        secondary={p.cpf || 'Sem CPF'}
-                                        primaryTypographyProps={{ fontWeight: 700 }}
-                                    />
-                                    <Chip label={p.status_acesso === 'checkin_feito' ? 'DENTRO' : 'FORA'} size="small" variant="outlined" sx={{ opacity: 0.6 }} />
-                                </ListItemButton>
-                            ))}
-                        </List>
-                    ) : (
-                        searchQuery.length >= 3 && !loading && (
-                            <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', opacity: 0.5, mt: 4 }}>
-                                Nenhum participante encontrado.
-                            </Typography>
-                        )
-                    )}
-                </Box>
-
-                {!modoQuiosque && (
-                    <Box sx={{ pt: 2, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                        <Typography variant="subtitle2" fontWeight={800} color="#FF3366" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                           <HistoryIcon sx={{ fontSize: 18 }} /> ÚLTIMOS CHECKOUTS
-                        </Typography>
-                        <Stack spacing={1} sx={{ maxHeight: 200, overflow: 'auto' }}>
-                            {checkoutLogs.map(log => (
-                                <Box key={log.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 2 }}>
-                                    <Typography variant="caption" fontWeight={700} noWrap sx={{ maxWidth: '140px' }}>
-                                        {log.pessoa_nome || log.pessoas?.nome}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                        {new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </Typography>
-                                </Box>
-                            ))}
-                            {checkoutLogs.length === 0 && <Typography variant="caption" sx={{ opacity: 0.3, textAlign: 'center' }}>Sem registros recentes</Typography>}
-                        </Stack>
-                    </Box>
+                {/* FEEDBACK OVERLAY */}
+                {checkinResult && (
+                    <FeedbackOverlay status={checkinResult}>
+                        <Zoom in={!!checkinResult}>
+                            <Box sx={{ textAlign: 'center' }}>
+                                {checkinResult === 'sucesso' ? <CheckoutIcon sx={{ fontSize: 130, color: '#FF3366' }} /> : <WarningIcon sx={{ fontSize: 130, color: '#FFA500' }} />}
+                                <Typography variant="h3" fontWeight={900} mt={2}>
+                                    {checkinResult === 'sucesso' ? 'CHECKOUT REALIZADO' : 'ATENÇÃO'}
+                                </Typography>
+                                <Typography variant="h6" sx={{ opacity: 0.8 }}>{resultMessage}</Typography>
+                            </Box>
+                        </Zoom>
+                    </FeedbackOverlay>
                 )}
+
+                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <TextField 
+                        fullWidth
+                        autoFocus={!modoQuiosque}
+                        inputRef={rfidInputRef}
+                        placeholder="NÚMERO DA PULSEIRA"
+                        value={pulseiraValue}
+                        onChange={(e) => setPulseiraValue(e.target.value)}
+                        onKeyDown={handlePulseiraKeyDown}
+                        InputProps={{ 
+                            startAdornment: <BadgeIcon sx={{ color: '#FF3366', mr: 2, fontSize: 30 }} />,
+                            sx: { borderRadius: 4, height: 90, fontSize: '2rem', bgcolor: 'rgba(255,255,255,0.03)', textAlign: 'center' }
+                        }}
+                    />
+                    <Stack direction="row" spacing={2} sx={{ mt: 4 }}>
+                        <ActionButton fullWidth onClick={() => { performCheckin('pulseira', pulseiraValue); setPulseiraValue(''); }}>
+                            BAIXAR PULSEIRA
+                        </ActionButton>
+                    </Stack>
+                </Box>
             </GlassCard>
         </Grid>
 
-        {/* CARD E AÇÕES (Direita no Normal, Inferior no Quiosque) */}
-        <Grid item xs={12} md={modoQuiosque ? 10 : 8} lg={modoQuiosque ? 8 : 8}>
-            <Box sx={{ position: 'relative', height: '100%', minHeight: 600 }}>
-                {selectedPessoa ? (
-                    <Fade in={!!selectedPessoa}>
-                        <GlassCard sx={{ p: modoQuiosque ? 5 : 4, height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-                            {/* FEEDBACK OVERLAY */}
-                            {checkinResult && (
-                                <FeedbackOverlay status={checkinResult}>
-                                    <Zoom in={!!checkinResult}>
-                                        <Box sx={{ textAlign: 'center' }}>
-                                            {checkinResult === 'sucesso' ? <CheckoutIcon sx={{ fontSize: 130, color: '#FF3366' }} /> : <WarningIcon sx={{ fontSize: 130, color: '#FFA500' }} />}
-                                            <Typography variant="h3" fontWeight={900} mt={2}>
-                                                {checkinResult === 'sucesso' ? 'CHECKOUT REALIZADO' : 'ATENÇÃO'}
-                                            </Typography>
-                                            <Typography variant="h6" sx={{ opacity: 0.8 }}>{resultMessage}</Typography>
-                                            {checkinResult === 'sucesso' && (
-                                                <Stack spacing={1} sx={{ mt: 3 }}>
-                                                    <Typography variant="h5" sx={{ opacity: 0.7 }}>
-                                                        {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                                                    </Typography>
-                                                    {permanencia && (
-                                                        <Typography variant="h6" color="#FF3366" fontWeight={800}>
-                                                            Permanência: {permanencia}
-                                                        </Typography>
-                                                    )}
-                                                </Stack>
-                                            )}
+        {/* LADO DIREITO: Monitoramento em Tempo Real */}
+        <Grid item xs={12} md={6}>
+            <GlassCard sx={{ p: 4, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <Typography variant="h5" fontWeight={900} color="#fff" mb={1} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <HistoryIcon sx={{ color: '#FF3366' }} /> MONITORAMENTO DE SAÍDAS
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.7, mb: 3 }}>
+                    Acompanhamento em tempo real dos colaboradores descredenciados.
+                </Typography>
+
+                <Box sx={{ flex: 1, overflowY: 'auto', pr: 1 }}>
+                    <Stack spacing={2}>
+                        {checkoutLogs.map(log => {
+                            const pessoa = log.pessoas || {};
+                            return (
+                                <Fade in key={log.id}>
+                                    <Box sx={{ 
+                                        p: 3, 
+                                        bgcolor: 'rgba(255, 51, 102, 0.05)', 
+                                        borderRadius: 3, 
+                                        border: '1px solid rgba(255, 51, 102, 0.2)',
+                                        display: 'flex',
+                                        gap: 3,
+                                        alignItems: 'center'
+                                    }}>
+                                        <Avatar 
+                                            src={pessoa.foto_url} 
+                                            sx={{ width: 60, height: 60, bgcolor: '#FF3366', border: '2px solid rgba(255,51,102,0.5)' }}
+                                        >
+                                            {pessoa.nome?.[0]}
+                                        </Avatar>
+                                        <Box sx={{ flex: 1 }}>
+                                            <Typography variant="h6" fontWeight={800} color="#fff">{pessoa.nome_completo || pessoa.nome}</Typography>
+                                            <Stack direction="row" spacing={3} mt={1} sx={{ opacity: 0.8 }}>
+                                                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                    <BadgeIcon fontSize="small" sx={{ color: '#FF3366' }} /> {pessoa.funcao || 'N/A'}
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                    <CompanyIcon fontSize="small" sx={{ color: '#FF3366' }} /> {pessoa.empresas?.nome || 'N/A'}
+                                                </Typography>
+                                            </Stack>
+                                            <Stack direction="row" spacing={3} mt={1}>
+                                                <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                    <TimeIcon fontSize="small" /> Checkout: {new Date(log.created_at).toLocaleTimeString()}
+                                                </Typography>
+                                            </Stack>
                                         </Box>
-                                    </Zoom>
-                                </FeedbackOverlay>
-                            )}
-
-                            {/* SCANNER OVERLAY */}
-                            {activeScanner && (
-                                <CameraOverlay>
-                                    <Typography variant="h6" mb={2} color="#FF3366" fontWeight={800}>SCANNER DE SAÍDA ATIVO</Typography>
-                                    <Box id={SCANNER_ID} sx={{ width: 320, height: 320, borderRadius: 4, overflow: 'hidden', border: '2px solid #FF3366' }} />
-                                    <NeonButton onClick={() => setActiveScanner(false)} color="error" sx={{ mt: 3 }}>CANCELAR</NeonButton>
-                                </CameraOverlay>
-                            )}
-
-                            {/* PULSEIRA INPUT OVERLAY */}
-                            {showPulseiraInput && (
-                                <CameraOverlay>
-                                    <Typography variant="h6" mb={2} color="#FF3366" fontWeight={800}>LEITURA DE PULSEIRA / QR CODE (SAÍDA)</Typography>
-                                    <TextField 
-                                        inputRef={rfidInputRef}
-                                        placeholder="AGUARDANDO LEITURA..."
-                                        value={pulseiraValue}
-                                        onChange={(e) => setPulseiraValue(e.target.value)}
-                                        onKeyDown={handlePulseiraKeyDown}
-                                        sx={{ width: 400, '& .MuiOutlinedInput-root': { borderRadius: 4, height: 70, fontSize: '1.5rem', textAlign: 'center' } }}
-                                    />
-                                    <Stack direction="row" spacing={2} sx={{ mt: 4 }}>
-                                        <NeonButton onClick={() => { performCheckin('pulseira', pulseiraValue); setPulseiraValue(''); setShowPulseiraInput(false); }}>CONFIRMAR MANUAL</NeonButton>
-                                        <NeonButton onClick={() => setShowPulseiraInput(false)} color="error" sx={{ borderColor: '#FF3366', color: '#FF3366' }}>VOLTAR</NeonButton>
-                                    </Stack>
-                                </CameraOverlay>
-                            )}
-
-                            <Grid container spacing={4} sx={{ flex: 1 }}>
-                                <Grid item xs={12} sm={modoQuiosque ? 4 : 3} sx={{ textAlign: 'center' }}>
-                                    <Avatar 
-                                        src={selectedPessoa.foto_url} 
-                                        sx={{ 
-                                            width: 160, height: 160, mx: 'auto', mb: 2, 
-                                            bgcolor: '#FF3366', fontSize: '3rem',
-                                            border: '4px solid rgba(255, 51, 102, 0.2)',
-                                            boxShadow: '0 0 30px rgba(255, 51, 102, 0.2)'
-                                        }}
-                                    >
-                                        {selectedPessoa.nome?.[0]}
-                                    </Avatar>
-                                    <Chip 
-                                        label={selectedPessoa.status_acesso === 'checkin_feito' ? 'DENTRO' : 'FORA'} 
-                                        color={selectedPessoa.status_acesso === 'checkin_feito' ? 'success' : 'default'} 
-                                        variant="outlined" 
-                                        sx={{ fontWeight: 800 }}
-                                    />
-                                </Grid>
-                                
-                                <Grid item xs={12} sm={modoQuiosque ? 8 : 9}>
-                                    <Typography variant="h4" fontWeight={900} color="#fff">{selectedPessoa.nome}</Typography>
-                                    <Stack spacing={1} mt={2}>
-                                        <Typography variant="body1" sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.8 }}>
-                                            <BadgeIcon sx={{ color: '#FF3366' }} /> {selectedPessoa.cpf || 'Sem CPF'}
-                                        </Typography>
-                                        <Typography variant="body1" sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.8 }}>
-                                            <CompanyIcon sx={{ color: '#FF3366' }} /> {selectedPessoa.empresas?.nome || 'Pessoa Física'}
-                                        </Typography>
-                                        
-                                        {entradaAtiva ? (
-                                            <Typography variant="h6" color="#FF3366" sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2, fontWeight: 800 }}>
-                                                <TimeIcon /> ⏱ Tempo no local: {permanencia || <CircularProgress size={16} />}
-                                            </Typography>
-                                        ) : (
-                                            <Typography variant="body2" color="#FFA500" sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2, fontWeight: 800 }}>
-                                                <WarningIcon sx={{ fontSize: 16 }} /> Sem registro de entrada ativo
-                                            </Typography>
+                                        {pessoa.numero_pulseira && (
+                                            <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'rgba(0,0,0,0.3)', borderRadius: 2 }}>
+                                                <Typography variant="caption" sx={{ opacity: 0.6 }}>Pulseira</Typography>
+                                                <Typography variant="h6" fontWeight={900} color="#FF3366">{pessoa.numero_pulseira}</Typography>
+                                            </Box>
                                         )}
-                                    </Stack>
-
-                                    <AuthorizedAreasChips pessoa={selectedPessoa} accentColor="#FF3366" />
-
-                                    <Box sx={{ mt: 3, p: 2, bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 3 }}>
-                                        <Typography variant="caption" color="text.secondary">ÚLTIMA ATIVIDADE</Typography>
-                                        <Typography variant="body2" sx={{ opacity: 0.6 }}>
-                                            Status consolidado via Terminal NZT.
-                                        </Typography>
                                     </Box>
-                                </Grid>
-                            </Grid>
-
-                            {/* ACTIONS FOOTER */}
-                            <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                                <Grid container spacing={2}>
-                                    <Grid item xs={12} md={4}>
-                                        <ActionButton fullWidth onClick={() => performCheckin('manual')} disabled={manualSaving || loading}>
-                                            <CheckoutIcon sx={{ mr: 1, fontSize: 30 }} /> REALIZAR CHECKOUT
-                                            {manualSaving && <CircularProgress size={20} sx={{ ml: 2 }} />}
-                                        </ActionButton>
-                                    </Grid>
-                                    <Grid item xs={12} md={4}>
-                                        <ActionButton fullWidth variant="outlined" onClick={() => setActiveScanner(true)} disabled={manualSaving || loading}>
-                                            <ScannerIcon sx={{ mr: 1, fontSize: 30 }} /> QR CODE
-                                        </ActionButton>
-                                    </Grid>
-                                    <Grid item xs={12} md={4}>
-                                        <ActionButton fullWidth variant="outlined" onClick={() => setShowPulseiraInput(true)} disabled={manualSaving || loading}>
-                                            <BadgeIcon sx={{ mr: 1, fontSize: 30 }} /> PULSEIRA / BARCODE
-                                        </ActionButton>
-                                    </Grid>
-                                </Grid>
+                                </Fade>
+                            );
+                        })}
+                        {checkoutLogs.length === 0 && (
+                            <Box sx={{ textAlign: 'center', p: 5, opacity: 0.3 }}>
+                                <HistoryIcon sx={{ fontSize: 60, mb: 2 }} />
+                                <Typography>Nenhuma saída registrada recentemente.</Typography>
                             </Box>
-                        </GlassCard>
-                    </Fade>
-                ) : (
-                    <GlassCard sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Stack alignItems="center" spacing={2} sx={{ opacity: 0.1 }}>
-                            <LogoutIcon sx={{ fontSize: 180, color: '#FF3366' }} />
-                            <Typography variant="h5" fontWeight={700}>BUSQUE UM PARTICIPANTE PARA SAÍDA</Typography>
-                        </Stack>
-                    </GlassCard>
-                )}
-            </Box>
+                        )}
+                    </Stack>
+                </Box>
+            </GlassCard>
         </Grid>
       </Grid>
     </Box>

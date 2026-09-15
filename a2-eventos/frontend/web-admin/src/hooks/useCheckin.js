@@ -33,6 +33,7 @@ export const useCheckin = (defaultMode) => {
     const [realtimeStats, setRealtimeStats] = useState(null);
     const [areaId, setAreaId] = useState(localStorage.getItem('nzt_area_id') || null);
     const [eventAreas, setEventAreas] = useState([]);
+    const [pulseiraTypes, setPulseiraTypes] = useState([]);
 
     const rfidInputRef = useRef(null);
     const resetTimerRef = useRef(null);
@@ -45,16 +46,18 @@ export const useCheckin = (defaultMode) => {
     const loadInitialData = useCallback(async () => {
         if (!eventoId) return;
         try {
-            const [logRes, eventRes, statsRes, areasRes] = await Promise.all([
+            const [logRes, eventRes, statsRes, areasRes, pulseiraRes] = await Promise.all([
                 api.get(`/access/logs`, { params: { limit: 10, evento_id: eventoId } }),
                 api.get(`/eventos/${eventoId}`),
                 api.get('/access/stats/realtime', { params: { evento_id: eventoId } }),
-                api.get('/config/areas', { params: { evento_id: eventoId } }).catch(() => ({ data: { data: [] } }))
+                api.get('/config/areas', { params: { evento_id: eventoId } }).catch(() => ({ data: { data: [] } })),
+                api.get('/config/pulseiras', { params: { evento_id: eventoId } }).catch(() => ({ data: { data: [] } }))
             ]);
             setRecentLogs(logRes.data.data || []);
             setEventModules(eventRes.data.data?.event_modules || []);
             setRealtimeStats(statsRes.data.data || null);
             setEventAreas(areasRes.data.data || []);
+            setPulseiraTypes(pulseiraRes.data.data || []);
         } catch (error) {
             console.error('Erro ao carregar dados de check-in:', error);
         }
@@ -238,6 +241,46 @@ export const useCheckin = (defaultMode) => {
         }
     };
 
+    const handleLinkPulseiraAndCheckin = async (pessoaId, tipoPulseiraId, numeroPulseira) => {
+        try {
+            setManualSaving(true);
+            const res = await api.post('/pulseira/link-checkin', {
+                pessoa_id: pessoaId,
+                tipo_pulseira_id: tipoPulseiraId,
+                numero_pulseira: numeroPulseira,
+                dispositivoId: 'web-dashboard'
+            });
+
+            if (res.data.success) {
+                setCheckinResult('sucesso');
+                setResultMessage('Pulseira vinculada e Entrada autorizada!');
+            }
+
+            clearTimeout(resetTimerRef.current);
+            resetTimerRef.current = setTimeout(() => {
+                setSelectedPessoa(null);
+                setCheckinResult(null);
+                setResultMessage('');
+                setSearchResults([]);
+                setSearchQuery('');
+            }, 3000);
+
+            loadInitialData();
+            return true;
+        } catch (error) {
+            setCheckinResult('negado');
+            setResultMessage(error.response?.data?.error || 'Erro ao vincular pulseira');
+            clearTimeout(resetTimerRef.current);
+            resetTimerRef.current = setTimeout(() => {
+                setCheckinResult(null);
+                setResultMessage('');
+            }, 3000);
+            return false;
+        } finally {
+            setManualSaving(false);
+        }
+    };
+
     const toggleQuiosque = () => {
         if (!modoQuiosque) {
             document.documentElement.requestFullscreen().then(() => {
@@ -276,9 +319,10 @@ export const useCheckin = (defaultMode) => {
         searchResults, setSearchResults,
         eventModules, rfidInputRef,
         recentLogs, offlineCount, realtimeStats,
-        areaId, changeAreaId, eventAreas,
+        areaId, changeAreaId, eventAreas, pulseiraTypes,
         consultarPulseiraAPI,
         performCheckin,
+        handleLinkPulseiraAndCheckin,
         eventoId
     };
 };
