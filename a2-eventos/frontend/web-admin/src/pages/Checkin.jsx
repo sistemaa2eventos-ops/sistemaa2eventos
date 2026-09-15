@@ -392,12 +392,6 @@ const Checkin = () => {
                             </GlassCard>
                         </DialogContent>
                     </Dialog>
-                    <GlassCard sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Stack alignItems="center" spacing={2} sx={{ opacity: 0.1 }}>
-                            <BadgeIcon sx={{ fontSize: 180 }} />
-                            <Typography variant="h5" fontWeight={700}>BUSQUE UM PARTICIPANTE PARA INICIAR</Typography>
-                        </Stack>
-                    </GlassCard>
             </Box>
         </Grid>
       </Grid>
