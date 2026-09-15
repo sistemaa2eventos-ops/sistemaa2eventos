@@ -482,6 +482,8 @@ class MonitorController {
             logger.error('Erro ao remover da watchlist:', error);
             res.status(500).json({ error: 'Erro interno no servidor' });
         }
+    }
+
     /**
      * Reset Diário
      * Reinicia o status de acesso de todos os colaboradores do evento,
