@@ -34,7 +34,7 @@ const uniqueOrigins = [...new Set(allowedOrigins)];
  * Aceita apenas origens explicitamente whitelistadas.
  */
 function isOriginAllowed(origin) {
-    if (!origin) return false; // Rejeitar requests sem origin (CSRF protection)
+    if (!origin) return true; // Permitir requisições sem origin (same-origin GET do browser, mobile apps, ferramentas internas)
     if (uniqueOrigins.includes(origin)) return true;
     return false;
 }

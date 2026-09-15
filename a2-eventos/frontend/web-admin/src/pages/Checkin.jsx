@@ -53,8 +53,10 @@ const Checkin = () => {
     operationMode, changeOperationMode, modoQuiosque, toggleQuiosque,
     searchQuery, handleSearch, searchResults,
     rfidInputRef, recentLogs, realtimeStats, offlineCount,
-    areaId, changeAreaId, eventAreas,
-    performCheckin
+    areaId, changeAreaId, eventAreas, pulseiraTypes,
+    consultarPulseiraAPI,
+    performCheckin,
+    handleLinkPulseiraAndCheckin
   } = useCheckin();
 
   const [pulseiraValue, setPulseiraValue] = useState('');
@@ -63,6 +65,24 @@ const Checkin = () => {
   // States for Modal
   const [selectedTipoPulseira, setSelectedTipoPulseira] = useState('');
   const [numeroPulseiraModal, setNumeroPulseiraModal] = useState('');
+
+  // Auto-seleciona o primeiro tipo de pulseira disponível quando abrir o modal da pessoa
+  useEffect(() => {
+    if (selectedPessoa && pulseiraTypes?.length > 0 && !selectedTipoPulseira) {
+      setSelectedTipoPulseira(pulseiraTypes[0].id);
+    }
+  }, [selectedPessoa, pulseiraTypes, selectedTipoPulseira]);
+
+  const handleConfirmPulseiraModal = () => {
+    if (manualSaving || loading || !selectedPessoa) return;
+    const num = numeroPulseiraModal?.trim();
+    const tipo = selectedTipoPulseira || pulseiraTypes?.[0]?.id;
+    if (tipo && num) {
+      handleLinkPulseiraAndCheckin(selectedPessoa.id, tipo, num);
+    } else {
+      performCheckin('manual');
+    }
+  };
 
   // QR Scanner Lifecycle
   useEffect(() => {
@@ -341,9 +361,17 @@ const Checkin = () => {
                                             </FormControl>
                                             <TextField 
                                                 fullWidth
+                                                autoFocus
                                                 label="Número da Pulseira"
+                                                placeholder="Digite o número e tecle Enter ↵"
                                                 value={numeroPulseiraModal}
                                                 onChange={(e) => setNumeroPulseiraModal(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        handleConfirmPulseiraModal();
+                                                    }
+                                                }}
                                                 sx={{ 
                                                     '& .MuiOutlinedInput-root': { 
                                                         bgcolor: 'rgba(0,0,0,0.2)', 
@@ -364,16 +392,10 @@ const Checkin = () => {
                                         <Grid item xs={12} md={6}>
                                             <ActionButton 
                                                 fullWidth 
-                                                onClick={() => {
-                                                    if (selectedTipoPulseira && numeroPulseiraModal) {
-                                                        handleLinkPulseiraAndCheckin(selectedPessoa.id, selectedTipoPulseira, numeroPulseiraModal);
-                                                    } else {
-                                                        performCheckin('manual');
-                                                    }
-                                                }} 
+                                                onClick={handleConfirmPulseiraModal} 
                                                 disabled={manualSaving || loading}
                                             >
-                                                <LoginIcon sx={{ mr: 1, fontSize: 30 }} /> {(selectedTipoPulseira && numeroPulseiraModal) ? "VINCULAR & ENTRADA" : "CHECK-IN S/ PULSEIRA"}
+                                                <LoginIcon sx={{ mr: 1, fontSize: 30 }} /> {(selectedTipoPulseira && numeroPulseiraModal) ? "VINCULAR & ENTRADA (ENTER)" : "CHECK-IN S/ PULSEIRA"}
                                                 {manualSaving && <CircularProgress size={20} sx={{ ml: 2 }} />}
                                             </ActionButton>
                                         </Grid>

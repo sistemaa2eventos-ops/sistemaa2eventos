@@ -186,7 +186,7 @@ export const useMonitor = () => {
         });
 
         return () => socket.disconnect();
-    }, [eventoId, alertAudio, log]);
+    }, [eventoId, log]);
 
     const fetchConfig = useCallback(async () => {
         if (!eventoId) return;

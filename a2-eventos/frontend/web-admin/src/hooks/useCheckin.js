@@ -46,8 +46,12 @@ export const useCheckin = (defaultMode) => {
     const loadInitialData = useCallback(async () => {
         if (!eventoId) return;
         try {
+            const logParams = { limit: 50, evento_id: eventoId };
+            if (defaultMode === 'checkout') {
+                logParams.tipo = 'checkout';
+            }
             const [logRes, eventRes, statsRes, areasRes, pulseiraRes] = await Promise.all([
-                api.get(`/access/logs`, { params: { limit: 10, evento_id: eventoId } }),
+                api.get(`/access/logs`, { params: logParams }),
                 api.get(`/eventos/${eventoId}`),
                 api.get('/access/stats/realtime', { params: { evento_id: eventoId } }),
                 api.get('/config/areas', { params: { evento_id: eventoId } }).catch(() => ({ data: { data: [] } })),
@@ -61,7 +65,7 @@ export const useCheckin = (defaultMode) => {
         } catch (error) {
             console.error('Erro ao carregar dados de check-in:', error);
         }
-    }, [eventoId]);
+    }, [eventoId, defaultMode]);
 
     // WebSocket Listeners
     useEffect(() => {
@@ -81,14 +85,15 @@ export const useCheckin = (defaultMode) => {
 
         socket.on('new_access', (newLog) => {
             if (newLog.evento_id && newLog.evento_id !== eventoId) return;
+            if (defaultMode === 'checkout' && newLog.tipo && newLog.tipo !== 'checkout') return;
             setRecentLogs(prev => {
                 const updated = [newLog, ...prev.filter(l => l.id !== newLog.id)];
-                return updated.slice(0, 10);
+                return updated.slice(0, 50);
             });
         });
 
         return () => socket.disconnect();
-    }, [eventoId]);
+    }, [eventoId, defaultMode]);
 
     // Fullscreen Listener
     useEffect(() => {

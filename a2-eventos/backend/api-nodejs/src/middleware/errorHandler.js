@@ -77,15 +77,15 @@ function errorHandler(err, req, res, next) {
 
   // Diferentes níveis de log por status code
   if (statusCode >= 500) {
-    logger.error('❌ Server Error:', logData);
+    logger.error(logData, '❌ Server Error:');
     // Log stack trace apenas em desenvolvimento
     if (process.env.NODE_ENV === 'development') {
       logger.debug('Stack trace:', { stack: err.stack });
     }
   } else if (statusCode >= 400) {
-    logger.warn('⚠️ Client Error:', logData);
+    logger.warn(logData, '⚠️ Client Error:');
   } else {
-    logger.info('ℹ️ Other:', logData);
+    logger.info(logData, 'ℹ️ Other:');
   }
 
   // Nunca retornar stack trace em produção

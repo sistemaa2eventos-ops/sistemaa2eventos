@@ -153,20 +153,35 @@ const Checkout = () => {
     }
   };
 
-  const checkoutLogs = recentLogs.filter(l => l.tipo === 'checkout');
+  const [checkoutFilter, setCheckoutFilter] = useState('');
+
+  const checkoutLogs = (recentLogs || []).filter(l => {
+    const isCheckout = l.tipo === 'checkout' || l.metodo === 'checkout';
+    if (!isCheckout) return false;
+    if (!checkoutFilter) return true;
+    const term = checkoutFilter.toLowerCase();
+    const p = l.pessoas || {};
+    return (
+      (p.nome_completo || p.nome || '').toLowerCase().includes(term) ||
+      (p.cpf || '').includes(term) ||
+      (p.empresas?.nome || '').toLowerCase().includes(term) ||
+      (p.numero_pulseira || '').includes(term) ||
+      (l.numero_pulseira || '').includes(term)
+    );
+  });
 
   return (
     <Box sx={{ 
-        p: modoQuiosque ? 2 : 4, 
+        p: modoQuiosque ? 2 : 3, 
         minHeight: modoQuiosque ? '100vh' : 'auto',
         display: 'flex', flexDirection: 'column'
     }}>
       
       {/* HEADER SECTION */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <PageHeader
             title={modoQuiosque ? "" : "Checkout NZT"}
-            subtitle={modoQuiosque ? "" : "Operação de Baixa e Saída"}
+            subtitle={modoQuiosque ? "" : "Operação de Baixa e Monitoramento de Saídas"}
             icon={modoQuiosque ? null : <LogoutIcon sx={{ fontSize: 40, color: '#FF3366' }} />}
             sx={{ m: 0, p: 0 }}
         />
@@ -194,28 +209,29 @@ const Checkout = () => {
       </Box>
 
       <AreaSelector areas={eventAreas} value={areaId} onChange={changeAreaId} accentColor="#FF3366" />
-      <Grid container spacing={3} sx={{ flex: 1, minHeight: 600 }}>
+      
+      <Grid container spacing={3} sx={{ flex: 1, minHeight: 'calc(100vh - 200px)' }}>
         
-        {/* LADO ESQUERDO: Operação (Input Pulseira) */}
-        <Grid item xs={12} md={6}>
-            <GlassCard sx={{ p: 4, height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-                <Typography variant="h5" fontWeight={900} color="#FF3366" mb={1} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <LogoutIcon /> SAÍDA POR PULSEIRA
+        {/* LADO ESQUERDO (4 colunas): Operação de Baixa (Input Pulseira) */}
+        <Grid item xs={12} lg={4}>
+            <GlassCard sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+                <Typography variant="h6" fontWeight={900} color="#FF3366" mb={0.5} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <LogoutIcon /> BAIXA DE PULSEIRA
                 </Typography>
-                <Typography variant="body2" sx={{ opacity: 0.7, mb: 4 }}>
-                    Realize o checkout bipando ou digitando o número da pulseira.
+                <Typography variant="caption" sx={{ opacity: 0.7, mb: 3 }}>
+                    Bipe com o leitor RFID/Código de barras ou digite o número da pulseira e pressione Enter.
                 </Typography>
 
                 {/* FEEDBACK OVERLAY */}
                 {checkinResult && (
                     <FeedbackOverlay status={checkinResult}>
                         <Zoom in={!!checkinResult}>
-                            <Box sx={{ textAlign: 'center' }}>
-                                {checkinResult === 'sucesso' ? <CheckoutIcon sx={{ fontSize: 130, color: '#FF3366' }} /> : <WarningIcon sx={{ fontSize: 130, color: '#FFA500' }} />}
-                                <Typography variant="h3" fontWeight={900} mt={2}>
-                                    {checkinResult === 'sucesso' ? 'CHECKOUT REALIZADO' : 'ATENÇÃO'}
+                            <Box sx={{ textAlign: 'center', p: 2 }}>
+                                {checkinResult === 'sucesso' ? <CheckoutIcon sx={{ fontSize: 100, color: '#FF3366' }} /> : <WarningIcon sx={{ fontSize: 100, color: '#FFA500' }} />}
+                                <Typography variant="h4" fontWeight={900} mt={2}>
+                                    {checkinResult === 'sucesso' ? 'SAÍDA LIBERADA' : 'ATENÇÃO'}
                                 </Typography>
-                                <Typography variant="h6" sx={{ opacity: 0.8 }}>{resultMessage}</Typography>
+                                <Typography variant="body1" sx={{ opacity: 0.9, mt: 1 }}>{resultMessage}</Typography>
                             </Box>
                         </Zoom>
                     </FeedbackOverlay>
@@ -231,80 +247,176 @@ const Checkout = () => {
                         onChange={(e) => setPulseiraValue(e.target.value)}
                         onKeyDown={handlePulseiraKeyDown}
                         InputProps={{ 
-                            startAdornment: <BadgeIcon sx={{ color: '#FF3366', mr: 2, fontSize: 30 }} />,
-                            sx: { borderRadius: 4, height: 90, fontSize: '2rem', bgcolor: 'rgba(255,255,255,0.03)', textAlign: 'center' }
+                            startAdornment: <BadgeIcon sx={{ color: '#FF3366', mr: 2, fontSize: 28 }} />,
+                            sx: { borderRadius: 4, height: 80, fontSize: '1.8rem', bgcolor: 'rgba(255,255,255,0.03)', textAlign: 'center', fontWeight: 800 }
                         }}
                     />
-                    <Stack direction="row" spacing={2} sx={{ mt: 4 }}>
+                    <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
                         <ActionButton fullWidth onClick={() => { performCheckin('pulseira', pulseiraValue); setPulseiraValue(''); }}>
-                            BAIXAR PULSEIRA
+                            <LogoutIcon sx={{ mr: 1 }} /> CONFIRMAR SAÍDA
                         </ActionButton>
                     </Stack>
+
+                    {/* Resumo rápido de status */}
+                    <Box sx={{ mt: 4, p: 2.5, bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 3, border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1, display: 'block', mb: 1 }}>
+                            Status da Operação
+                        </Typography>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                            <Typography variant="body2" color="rgba(255,255,255,0.8)">Sincronização em Tempo Real:</Typography>
+                            <Chip label="ONLINE" size="small" sx={{ bgcolor: 'rgba(0, 255, 136, 0.15)', color: '#00FF88', fontWeight: 800, border: '1px solid #00FF88' }} />
+                        </Stack>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 1.5 }}>
+                            <Typography variant="body2" color="rgba(255,255,255,0.8)">Saídas computadas nesta sessão:</Typography>
+                            <Typography variant="subtitle2" fontWeight={800} color="#FF3366">{checkoutLogs.length}</Typography>
+                        </Stack>
+                    </Box>
                 </Box>
             </GlassCard>
         </Grid>
 
-        {/* LADO DIREITO: Monitoramento em Tempo Real */}
-        <Grid item xs={12} md={6}>
-            <GlassCard sx={{ p: 4, height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <Typography variant="h5" fontWeight={900} color="#fff" mb={1} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <HistoryIcon sx={{ color: '#FF3366' }} /> MONITORAMENTO DE SAÍDAS
-                </Typography>
-                <Typography variant="body2" sx={{ opacity: 0.7, mb: 3 }}>
-                    Acompanhamento em tempo real dos colaboradores descredenciados.
-                </Typography>
+        {/* LADO DIREITO (8 colunas): MONITORAMENTO EXPANDIDO EM TEMPO REAL */}
+        <Grid item xs={12} lg={8}>
+            <GlassCard sx={{ p: 3.5, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                
+                {/* CABEÇALHO DO MONITORAMENTO */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 2.5, pb: 2, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                    <Box>
+                        <Stack direction="row" alignItems="center" spacing={1.5}>
+                            <Typography variant="h5" fontWeight={900} color="#fff" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <HistoryIcon sx={{ color: '#FF3366', fontSize: 32 }} /> COLABORADORES DESCREDENCIADOS
+                            </Typography>
+                            <Chip 
+                                label="AO VIVO" 
+                                size="small" 
+                                sx={{ 
+                                    bgcolor: 'rgba(255, 51, 102, 0.2)', 
+                                    color: '#FF3366', 
+                                    fontWeight: 900, 
+                                    letterSpacing: 1.5,
+                                    border: '1px solid rgba(255, 51, 102, 0.5)',
+                                    animation: 'pulse 2s infinite'
+                                }} 
+                            />
+                        </Stack>
+                        <Typography variant="body2" sx={{ opacity: 0.7, mt: 0.5 }}>
+                            Últimas baixas e saídas registradas com foto, empresa e pulseira.
+                        </Typography>
+                    </Box>
 
+                    {/* Filtro rápido */}
+                    <Box sx={{ width: { xs: '100%', sm: 280 } }}>
+                        <TextField 
+                            fullWidth
+                            size="small"
+                            placeholder="Buscar descredenciado..."
+                            value={checkoutFilter}
+                            onChange={(e) => setCheckoutFilter(e.target.value)}
+                            InputProps={{
+                                startAdornment: <SearchIcon sx={{ color: 'rgba(255,255,255,0.4)', mr: 1, fontSize: 20 }} />,
+                                sx: { bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 2, color: '#fff' }
+                            }}
+                        />
+                    </Box>
+                </Box>
+
+                {/* LISTA EXPANDIDA DOS ÚLTIMOS DESCREDENCIADOS */}
                 <Box sx={{ flex: 1, overflowY: 'auto', pr: 1 }}>
                     <Stack spacing={2}>
-                        {checkoutLogs.map(log => {
+                        {checkoutLogs.map((log, index) => {
                             const pessoa = log.pessoas || {};
+                            const nome = pessoa.nome_completo || pessoa.nome || log.pessoa_nome || 'Colaborador';
+                            const empresa = pessoa.empresas?.nome || log.empresa_nome || 'Empresa não informada';
+                            const funcao = pessoa.funcao || log.funcao || 'Operacional';
+                            const pulseira = pessoa.numero_pulseira || log.numero_pulseira || log.extra?.numero_pulseira;
+                            const hora = new Date(log.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
                             return (
-                                <Fade in key={log.id}>
+                                <Fade in key={log.id || index} timeout={400}>
                                     <Box sx={{ 
-                                        p: 3, 
-                                        bgcolor: 'rgba(255, 51, 102, 0.05)', 
-                                        borderRadius: 3, 
-                                        border: '1px solid rgba(255, 51, 102, 0.2)',
+                                        p: 2.5, 
+                                        bgcolor: index === 0 ? 'rgba(255, 51, 102, 0.12)' : 'rgba(255, 255, 255, 0.02)', 
+                                        borderRadius: 3.5, 
+                                        border: index === 0 ? '2px solid rgba(255, 51, 102, 0.4)' : '1px solid rgba(255, 255, 255, 0.06)',
                                         display: 'flex',
-                                        gap: 3,
-                                        alignItems: 'center'
+                                        gap: 2.5,
+                                        alignItems: 'center',
+                                        transition: 'all 0.2s ease',
+                                        '&:hover': {
+                                            bgcolor: 'rgba(255, 51, 102, 0.08)',
+                                            borderColor: 'rgba(255, 51, 102, 0.3)',
+                                            transform: 'translateY(-2px)'
+                                        }
                                     }}>
+                                        {/* FOTO DO COLABORADOR */}
                                         <Avatar 
                                             src={pessoa.foto_url} 
-                                            sx={{ width: 60, height: 60, bgcolor: '#FF3366', border: '2px solid rgba(255,51,102,0.5)' }}
+                                            sx={{ 
+                                                width: 72, 
+                                                height: 72, 
+                                                bgcolor: '#FF3366', 
+                                                border: '3px solid rgba(255,51,102,0.6)',
+                                                fontSize: '1.8rem',
+                                                fontWeight: 800
+                                            }}
                                         >
-                                            {pessoa.nome?.[0]}
+                                            {nome[0]}
                                         </Avatar>
+
+                                        {/* INFORMAÇÕES DO COLABORADOR */}
                                         <Box sx={{ flex: 1 }}>
-                                            <Typography variant="h6" fontWeight={800} color="#fff">{pessoa.nome_completo || pessoa.nome}</Typography>
-                                            <Stack direction="row" spacing={3} mt={1} sx={{ opacity: 0.8 }}>
-                                                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                    <BadgeIcon fontSize="small" sx={{ color: '#FF3366' }} /> {pessoa.funcao || 'N/A'}
+                                            <Stack direction="row" alignItems="center" spacing={1.5}>
+                                                <Typography variant="h6" fontWeight={900} color="#fff" sx={{ letterSpacing: 0.5 }}>
+                                                    {nome}
                                                 </Typography>
-                                                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                    <CompanyIcon fontSize="small" sx={{ color: '#FF3366' }} /> {pessoa.empresas?.nome || 'N/A'}
-                                                </Typography>
+                                                {index === 0 && (
+                                                    <Chip label="ÚLTIMA SAÍDA" size="small" sx={{ bgcolor: '#FF3366', color: '#fff', fontWeight: 900, fontSize: '0.7rem', height: 22 }} />
+                                                )}
+                                                <Chip label="DESCREDENCIADO" size="small" variant="outlined" sx={{ borderColor: '#FF3366', color: '#FF3366', fontWeight: 800, fontSize: '0.7rem', height: 22 }} />
                                             </Stack>
-                                            <Stack direction="row" spacing={3} mt={1}>
-                                                <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                    <TimeIcon fontSize="small" /> Checkout: {new Date(log.created_at).toLocaleTimeString()}
+
+                                            <Stack direction="row" spacing={3} mt={1} sx={{ opacity: 0.85, flexWrap: 'wrap', gap: 1 }}>
+                                                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.8, color: '#fff' }}>
+                                                    <BadgeIcon fontSize="small" sx={{ color: '#FF3366' }} /> {funcao}
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.8, color: '#fff' }}>
+                                                    <CompanyIcon fontSize="small" sx={{ color: '#FF3366' }} /> {empresa}
                                                 </Typography>
                                             </Stack>
                                         </Box>
-                                        {pessoa.numero_pulseira && (
-                                            <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'rgba(0,0,0,0.3)', borderRadius: 2 }}>
-                                                <Typography variant="caption" sx={{ opacity: 0.6 }}>Pulseira</Typography>
-                                                <Typography variant="h6" fontWeight={900} color="#FF3366">{pessoa.numero_pulseira}</Typography>
+
+                                        {/* BLOCO DA PULSEIRA E HORÁRIO */}
+                                        <Stack direction="row" spacing={2} alignItems="center">
+                                            {pulseira && (
+                                                <Box sx={{ textAlign: 'center', px: 2, py: 1, bgcolor: 'rgba(0,0,0,0.35)', borderRadius: 2.5, border: '1px solid rgba(255,51,102,0.2)' }}>
+                                                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', display: 'block', fontSize: '0.65rem', textTransform: 'uppercase' }}>
+                                                        Pulseira
+                                                    </Typography>
+                                                    <Typography variant="subtitle1" fontWeight={900} color="#FF3366">
+                                                        #{pulseira}
+                                                    </Typography>
+                                                </Box>
+                                            )}
+
+                                            <Box sx={{ textAlign: 'right', minWidth: 90 }}>
+                                                <Typography variant="h6" fontWeight={800} color="#fff">
+                                                    {hora}
+                                                </Typography>
+                                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
+                                                    <TimeIcon sx={{ fontSize: 14 }} /> Horário
+                                                </Typography>
                                             </Box>
-                                        )}
+                                        </Stack>
                                     </Box>
                                 </Fade>
                             );
                         })}
+
                         {checkoutLogs.length === 0 && (
-                            <Box sx={{ textAlign: 'center', p: 5, opacity: 0.3 }}>
-                                <HistoryIcon sx={{ fontSize: 60, mb: 2 }} />
-                                <Typography>Nenhuma saída registrada recentemente.</Typography>
+                            <Box sx={{ textAlign: 'center', p: 8, opacity: 0.4 }}>
+                                <HistoryIcon sx={{ fontSize: 72, mb: 2, color: '#FF3366' }} />
+                                <Typography variant="h6" fontWeight={700}>Aguardando descredenciamentos...</Typography>
+                                <Typography variant="body2" sx={{ mt: 1 }}>Conectado em tempo real ao gateway. Assim que uma pulseira for dada baixa, o colaborador aparecerá aqui.</Typography>
                             </Box>
                         )}
                     </Stack>
