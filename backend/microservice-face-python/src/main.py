@@ -20,6 +20,14 @@ except ImportError:
     INSIGHTFACE_AVAILABLE = False
     logger.warning("InsightFace não está instalado. Simulação ativada se requisitado.")
 
+# Suporte UTF-8 no Windows (evita UnicodeEncodeError com emojis no console)
+if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 # Configurar logging
 logger.remove()
 logger.add(sys.stdout, format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan> - <level>{message}</level>")
