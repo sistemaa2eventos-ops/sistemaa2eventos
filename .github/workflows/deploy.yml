@@ -53,6 +53,8 @@ jobs:
             git fetch origin
             git reset --hard origin/master
             git clean -fd
+            # Ignora mudanças de permissão (chmod) para não sujar a working tree
+            git config core.fileMode false
             
             # Garante que o script tem permissão de execução
             chmod +x deploy.sh
