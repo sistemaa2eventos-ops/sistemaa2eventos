@@ -58,7 +58,7 @@ class GlobalErrorBoundary extends React.Component {
                             REINICIALIZAR INTERFACE
                         </Button>
 
-                        {process.env.NODE_ENV === 'development' && (
+                        {true && (
                             <Box sx={{ mt: 4, textAlign: 'left', p: 2, bgcolor: 'rgba(255,51,102,0.1)', borderRadius: 2 }}>
                                 <Typography variant="caption" sx={{ color: '#FF3366', fontFamily: 'monospace' }}>
                                     {this.state.error?.toString()}
