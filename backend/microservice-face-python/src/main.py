@@ -17,6 +17,7 @@ try:
     from insightface.app import FaceAnalysis
     INSIGHTFACE_AVAILABLE = True
 except ImportError:
+    FaceAnalysis = None
     INSIGHTFACE_AVAILABLE = False
     logger.warning("InsightFace não está instalado. Simulação ativada se requisitado.")
 
@@ -44,7 +45,7 @@ app.add_middleware(
 
 # Inicializar o Model ArcFace / RetianFace via InsightFace (Buffalo_L é o melhor C++)
 face_app = None
-if INSIGHTFACE_AVAILABLE:
+if INSIGHTFACE_AVAILABLE and FaceAnalysis is not None:
     logger.info("⏳ Inicializando modelo ONNX (ArcFace)...")
     face_app = FaceAnalysis(name='buffalo_l')
     face_app.prepare(ctx_id=0, det_size=(640, 640))
@@ -91,7 +92,7 @@ async def extract_face(req: ExtractRequest):
                  "is_live": False
              }
 
-        if not INSIGHTFACE_AVAILABLE:
+        if not INSIGHTFACE_AVAILABLE or face_app is None:
             # Mock de 512 posições se não conseguir buildar o C++ native
             return {"success": True, "embedding": [0.0] * 512, "mock": True}
 
