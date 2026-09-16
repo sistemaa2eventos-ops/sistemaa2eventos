@@ -59,7 +59,7 @@ jobs:
             # Garante que o script tem permissão de execução
             chmod +x deploy.sh
             
-            # Executa o deploy rápido
-            ./deploy.sh quick
+            # Executa o deploy rápido respondendo 's' caso haja mudanças locais detectadas pelo script
+            echo 's' | ./deploy.sh quick
             
             echo "Deploy disparado pelo GitHub Actions finalizado."
