@@ -49,6 +49,10 @@ jobs:
           script: |
             echo "Iniciando processo de deploy..."
             cd /root/Projeto_A2_Eventos
+            # Limpa qualquer modificação manual no servidor para não travar o script
+            git fetch origin
+            git reset --hard origin/master
+            git clean -fd
             
             # Garante que o script tem permissão de execução
             chmod +x deploy.sh
