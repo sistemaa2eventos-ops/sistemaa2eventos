@@ -161,7 +161,7 @@ build_docker() {
     log_info "Building Docker images (sem cache)..."
     log_warn "Isso pode levar 10-15 minutos..."
 
-    docker-compose build --no-cache
+    docker-compose build frontend api gateway api_intelbras
 
     log_success "Build concluído"
 }
@@ -171,6 +171,9 @@ build_docker() {
 # ============================================================================
 start_services() {
     log_info "Iniciando containers..."
+
+    log_info "Limpando containers antigos conflitantes..."
+    docker rm -f a2_eventos_pg_edge a2_eventos_redis a2_eventos_api a2_eventos_api_intelbras a2_eventos_gateway a2_eventos_admin_web a2_eventos_ai_worker 2>/dev/null || true
 
     docker-compose up -d
 
