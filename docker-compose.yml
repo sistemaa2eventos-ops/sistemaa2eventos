@@ -82,7 +82,7 @@ services:
     container_name: a2_eventos_api_intelbras
     restart: unless-stopped
     ports:
-      - "3002:3002"
+      - "3003:3002"
     command: npm run start:intelbras
     depends_on:
       redis:
