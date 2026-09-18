@@ -230,6 +230,14 @@ post_deploy_check() {
 
     # 6. Ver logs (últimas linhas)
     echo ""
+    log_info "Diagnóstico de Rede Externo (Error 522):"
+    echo "--- Netstat Porta 80 ---"
+    sudo netstat -tulnp | grep ":80 " || true
+    echo "--- UFW Status ---"
+    sudo ufw status verbose || true
+    echo "--- Docker IPTables ---"
+    sudo iptables -L DOCKER -n || true
+    
     log_info "Últimas linhas dos logs:"
     echo "─────────────────────────"
     docker-compose logs --tail=10
