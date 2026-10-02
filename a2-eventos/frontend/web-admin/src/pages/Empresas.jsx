@@ -16,6 +16,8 @@ import {
   StepLabel,
   Divider,
   Tooltip,
+  FormControlLabel,
+  Checkbox
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -33,6 +35,7 @@ import {
   WhatsApp as WhatsAppIcon,
   Telegram as TelegramIcon,
   Email as EmailIcon,
+  Check as CheckIcon
 } from '@mui/icons-material';
 import GlassCard from '../components/common/GlassCard';
 import PageHeader from '../components/common/PageHeader';
@@ -71,6 +74,7 @@ const Empresas = () => {
   const [openQuotaDialog, setOpenQuotaDialog] = useState(false);
   const [openInviteDialog, setOpenInviteDialog] = useState(false);
   const [inviteResult, setInviteResult] = useState({ link: '', empresa: null });
+  const [activePhaseTabEmpresa, setActivePhaseTabEmpresa] = useState('todas');
 
   useEffect(() => {
     if (eventoIdParam && eventoIdParam !== 'undefined' && eventoIdParam !== 'null') {
@@ -85,7 +89,8 @@ const Empresas = () => {
       activeEvent, dailyQuotas, setDailyQuotas,
       activeStep, setActiveStep, documentos,
       formData, setFormData, handleSave, handleDelete, handleSaveQuotas,
-      handleAuditDocument, loadDocumentos
+      handleAuditDocument, handleSelectAllDatesEmpresa, handleClearAllDatesEmpresa,
+      handleSelectAllPhaseEmpresa, handleClearPhaseEmpresa, loadDocumentos
   } = useEmpresas(eventoIdParam);
 
   const steps = ['Dados Cadastrais', 'Configurações Avançadas', 'Documentação (ECM)'];
@@ -262,6 +267,16 @@ const Empresas = () => {
     return `https://wa.me/${waPhone}?text=${body}`;
   };
 
+  const getAllEventDates = () => {
+    if (!activeEvent) return [];
+    const allDates = [
+      ...(activeEvent.datas_montagem || []),
+      ...(activeEvent.datas_evento || []),
+      ...(activeEvent.datas_desmontagem || [])
+    ];
+    return [...new Set(allDates)].sort();
+  };
+
   const handleOpenEdit = (empresa) => {
       setActiveStep(0);
       setSelectedEmpresa(empresa);
@@ -275,7 +290,10 @@ const Empresas = () => {
         responsavel: empresa.responsavel || empresa.responsavel_legal || '',
         observacao: empresa.observacao || '',
         registration_token: empresa.registration_token || '',
-        max_colaboradores: empresa.max_colaboradores || 50
+        max_colaboradores: empresa.max_colaboradores || 50,
+        datas_presenca: Array.isArray(empresa.datas_presenca) && empresa.datas_presenca.length > 0 
+          ? empresa.datas_presenca 
+          : getAllEventDates()
       });
       setOpenDialog(true);
       loadDocumentos(empresa.id);
@@ -294,19 +312,10 @@ const Empresas = () => {
         responsavel: '',
         observacao: '',
         registration_token: '',
-        max_colaboradores: 50
+        max_colaboradores: 50,
+        datas_presenca: getAllEventDates()
       });
       setOpenDialog(true);
-  };
-
-  const getAllEventDates = () => {
-    if (!activeEvent) return [];
-    const allDates = [
-      ...(activeEvent.datas_montagem || []),
-      ...(activeEvent.datas_evento || []),
-      ...(activeEvent.datas_desmontagem || [])
-    ];
-    return [...new Set(allDates)].sort();
   };
 
   return (
@@ -376,6 +385,7 @@ const Empresas = () => {
             borderRadius: 3,
             minHeight: { xs: '100%', md: '80vh' },
             maxHeight: { xs: '100%', md: '90vh' },
+            height: { xs: '100%', md: '88vh' },
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
@@ -396,19 +406,21 @@ const Empresas = () => {
           {selectedEmpresa ? 'MODIFICAR EMPRESA' : 'ANEXAR NOVA EMPRESA'}
         </DialogTitle>
         <DialogContent sx={{ 
-          p: { xs: 3, md: 5 }, 
-          pr: { xs: 3, md: 2 }, 
+          p: { xs: 2.5, md: 3.5 }, 
+          pr: { xs: 2, md: 2.5 }, 
           overflowY: 'auto', 
           display: 'flex', 
           flexDirection: 'column', 
           minHeight: 0, 
-          height: '100%', 
+          height: '100%',
+          maxHeight: '100%',
+          flex: '1 1 auto',
           '&::-webkit-scrollbar': { width: '6px' }, 
-          '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.3)', borderRadius: '10px' }, 
-          '&::-webkit-scrollbar-track': { background: 'transparent' } 
+          '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.4)', borderRadius: '10px' }, 
+          '&::-webkit-scrollbar-track': { background: 'rgba(255,255,255,0.02)' } 
         }}>
-          <Box sx={{ pr: { xs: 0, md: 2 }, pb: 4, flex: 1 }}>
-          <Stepper activeStep={activeStep} alternativeLabel sx={{ pt: 3, mb: 4 }}>
+          <Box sx={{ pr: { xs: 0, md: 0.5 }, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <Stepper activeStep={activeStep} alternativeLabel sx={{ pt: 1, mb: 2.5 }}>
             {steps.map((label) => (
               <Step key={label}>
                 <StepLabel>{label}</StepLabel>
@@ -441,7 +453,7 @@ const Empresas = () => {
           )}
 
           {activeStep === 1 && (
-            <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <Box sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 2.5, flex: 1, minHeight: 0 }}>
               <Grid container spacing={2}>
                 <Grid item xs={8}>
                   <TextField label="Token de Registro Seguro (Envio B2B)" fullWidth disabled value={formData.registration_token} />
@@ -453,61 +465,189 @@ const Empresas = () => {
               <TextField label="Notas de Operação e Logística" fullWidth multiline rows={2} value={formData.observacao} onChange={(e) => setFormData({ ...formData, observacao: e.target.value })} />
 
               {activeEvent && formData && (
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="subtitle2" sx={{ color: '#00D4FF', mb: 1, fontWeight: 700 }}>DIAS PERMITIDOS PARA ACESSO (TERCEIRIZADOS)</Typography>
-                  <Divider sx={{ mb: 2, borderColor: 'rgba(255,255,255,0.1)' }} />
+                <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, mt: 1 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+                    <Box>
+                      <Typography variant="subtitle2" sx={{ color: '#00D4FF', fontWeight: 800, letterSpacing: '0.5px' }}>
+                        DIAS PERMITIDOS PARA ACESSO (TERCEIRIZADOS)
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>
+                        Define as datas autorizadas para os colaboradores vinculados a esta empresa.
+                      </Typography>
+                    </Box>
+                    <Stack direction="row" spacing={1}>
+                      <Button 
+                        size="small" 
+                        variant="outlined" 
+                        onClick={handleSelectAllDatesEmpresa} 
+                        sx={{ fontSize: '0.68rem', fontWeight: 700, color: '#00FF88', borderColor: 'rgba(0,255,136,0.3)', py: 0.3, px: 1.5, '&:hover': { borderColor: '#00FF88', bgcolor: 'rgba(0,255,136,0.08)' } }}
+                      >
+                        MARCAR TODOS
+                      </Button>
+                      <Button 
+                        size="small" 
+                        variant="outlined" 
+                        onClick={handleClearAllDatesEmpresa} 
+                        sx={{ fontSize: '0.68rem', fontWeight: 700, color: '#FF3366', borderColor: 'rgba(255,51,102,0.3)', py: 0.3, px: 1.5, '&:hover': { borderColor: '#FF3366', bgcolor: 'rgba(255,51,102,0.08)' } }}
+                      >
+                        LIMPAR
+                      </Button>
+                    </Stack>
+                  </Box>
+
+                  {/* Botões de Navegação Direta de Fases para Empresas */}
+                  <Stack direction="row" spacing={1} sx={{ mb: 1.5, flexWrap: 'wrap', gap: 0.5 }}>
+                    {[
+                      { id: 'todas', label: 'TODAS AS FASES', color: '#00D4FF' },
+                      { id: 'montagem', label: 'MONTAGEM', color: '#00D4FF' },
+                      { id: 'evento', label: 'EVENTO', color: '#00FF88' },
+                      { id: 'desmontagem', label: 'DESMONTAGEM', color: '#FFB800' }
+                    ].map(tab => (
+                      <Button
+                        key={tab.id}
+                        size="small"
+                        variant={activePhaseTabEmpresa === tab.id ? 'contained' : 'outlined'}
+                        onClick={() => setActivePhaseTabEmpresa(tab.id)}
+                        sx={{
+                          fontSize: '0.68rem',
+                          fontWeight: 800,
+                          letterSpacing: '0.5px',
+                          color: activePhaseTabEmpresa === tab.id ? '#0a1628' : tab.color,
+                          bgcolor: activePhaseTabEmpresa === tab.id ? tab.color : 'transparent',
+                          borderColor: tab.color,
+                          py: 0.3,
+                          px: 1.3,
+                          boxShadow: activePhaseTabEmpresa === tab.id ? `0 0 10px ${tab.color}40` : 'none',
+                          '&:hover': {
+                            bgcolor: activePhaseTabEmpresa === tab.id ? tab.color : 'rgba(255,255,255,0.06)'
+                          }
+                        }}
+                      >
+                        {tab.label}
+                      </Button>
+                    ))}
+                  </Stack>
+                  
                   <Box 
                     sx={{ 
-                      maxHeight: 250, 
-                      overflowY: 'auto', 
-                      pr: 2, 
-                      border: '1px solid rgba(0, 212, 255, 0.1)',
+                      flex: 1,
+                      minHeight: 0,
+                      border: '1px solid rgba(0, 212, 255, 0.2)',
                       borderRadius: 2,
                       p: 2,
-                      bgcolor: 'rgba(0,0,0,0.1)',
+                      bgcolor: 'rgba(0,0,0,0.25)',
+                      overflowY: 'auto',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
                       '&::-webkit-scrollbar': { width: '6px' }, 
-                      '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.4)', borderRadius: '10px' },
-                      '&::-webkit-scrollbar-track': { background: 'rgba(255,255,255,0.05)' }
+                      '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.5)', borderRadius: '10px' }, 
+                      '&::-webkit-scrollbar-track': { background: 'rgba(255,255,255,0.02)' }
                     }}
                   >
-                    <Stack spacing={2.5}>
-                      {['montagem', 'evento', 'desmontagem'].map(phase => {
-                        const dates = (activeEvent && activeEvent[`datas_${phase}`]) || [];
+                    {[
+                      { id: 'montagem', label: 'MONTAGEM', color: '#00D4FF', bg: 'rgba(0,212,255,0.04)', border: 'rgba(0,212,255,0.2)' },
+                      { id: 'evento', label: 'EVENTO', color: '#00FF88', bg: 'rgba(0,255,136,0.04)', border: 'rgba(0,255,136,0.2)' },
+                      { id: 'desmontagem', label: 'DESMONTAGEM', color: '#FFB800', bg: 'rgba(255,184,0,0.05)', border: 'rgba(255,184,0,0.25)' }
+                    ]
+                      .filter(phase => activePhaseTabEmpresa === 'todas' || activePhaseTabEmpresa === phase.id)
+                      .map(phase => {
+                        const dates = (activeEvent && activeEvent[`datas_${phase.id}`]) || [];
                         if (!Array.isArray(dates) || dates.length === 0) return null;
+                        const totalDates = dates.length;
+                        const selectedCount = dates.filter(d => Array.isArray(formData?.datas_presenca) && formData.datas_presenca.includes(d)).length;
+
                         return (
-                          <Box key={phase}>
-                            <Typography variant="caption" sx={{ color: '#00FF88', textTransform: 'uppercase', fontWeight: 800, display: 'block', mb: 1 }}>{phase}</Typography>
-                            <Grid container spacing={1}>
+                          <Box 
+                            key={phase.id}
+                            sx={{
+                              p: 1.5,
+                              borderRadius: 2,
+                              bgcolor: phase.bg,
+                              border: `1px solid ${phase.border}`
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.2, flexWrap: 'wrap', gap: 1 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography variant="caption" sx={{ color: phase.color, fontWeight: 900, letterSpacing: '1px', textTransform: 'uppercase', fontSize: '0.78rem' }}>
+                                  {phase.label}
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.72rem' }}>
+                                  ({selectedCount}/{totalDates} dias selecionados)
+                                </Typography>
+                              </Box>
+                              <Stack direction="row" spacing={0.8}>
+                                <Button 
+                                  size="small" 
+                                  onClick={() => handleSelectAllPhaseEmpresa ? handleSelectAllPhaseEmpresa(phase.id) : null}
+                                  sx={{ fontSize: '0.65rem', fontWeight: 700, color: phase.color, py: 0.2, px: 1, minWidth: 'auto', border: `1px solid ${phase.border}`, '&:hover': { bgcolor: `${phase.border}` } }}
+                                >
+                                  TODOS
+                                </Button>
+                                <Button 
+                                  size="small" 
+                                  onClick={() => handleClearPhaseEmpresa ? handleClearPhaseEmpresa(phase.id) : null}
+                                  sx={{ fontSize: '0.65rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', py: 0.2, px: 1, minWidth: 'auto', border: '1px solid rgba(255,255,255,0.1)', '&:hover': { color: '#FF3366', borderColor: '#FF3366' } }}
+                                >
+                                  LIMPAR
+                                </Button>
+                              </Stack>
+                            </Box>
+
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                               {dates.map(date => {
                                 const isChecked = Array.isArray(formData?.datas_presenca) && formData.datas_presenca.includes(date);
                                 return (
-                                  <Grid item key={date}>
-                                    <FormControlLabel 
-                                      control={
-                                        <Checkbox 
-                                          size="small" 
-                                          checked={!!isChecked} 
-                                          onChange={() => {
-                                            const currentDates = formData.datas_presenca || [];
-                                            const newDates = currentDates.includes(date)
-                                              ? currentDates.filter(d => d !== date)
-                                              : [...currentDates, date];
-                                            setFormData({ ...formData, datas_presenca: newDates });
-                                          }}
-                                          sx={{ color: 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: '#00FF88' }, p: 0.5 }} 
-                                        />
-                                      } 
-                                      label={<Typography variant="caption" sx={{ color: isChecked ? '#fff' : 'rgba(255,255,255,0.6)' }}>{date ? format(new Date(date + 'T00:00:00'), "dd/MM") : '--/--'}</Typography>} 
-                                      sx={{ m: 0, mr: 1, border: '1px solid rgba(255,255,255,0.05)', borderRadius: 1, px: 1, py: 0.5, bgcolor: isChecked ? 'rgba(0,255,136,0.05)' : 'transparent' }}
-                                    />
-                                  </Grid>
+                                  <Box
+                                    key={date}
+                                    onClick={() => {
+                                      const currentDates = Array.isArray(formData?.datas_presenca) ? [...formData.datas_presenca] : [];
+                                      const newDates = currentDates.includes(date)
+                                        ? currentDates.filter(d => d !== date)
+                                        : [...currentDates, date];
+                                      setFormData({ ...formData, datas_presenca: newDates });
+                                    }}
+                                    sx={{
+                                      cursor: 'pointer',
+                                      userSelect: 'none',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 0.8,
+                                      px: 1.2,
+                                      py: 0.6,
+                                      borderRadius: 1.5,
+                                      border: `1px solid ${isChecked ? phase.color : 'rgba(255,255,255,0.1)'}`,
+                                      bgcolor: isChecked ? `${phase.color}18` : 'rgba(255,255,255,0.02)',
+                                      boxShadow: isChecked ? `0 0 10px ${phase.color}30` : 'none',
+                                      transition: 'all 0.15s ease',
+                                      '&:hover': {
+                                        borderColor: phase.color,
+                                        bgcolor: `${phase.color}10`
+                                      }
+                                    }}
+                                  >
+                                    <Box sx={{
+                                      width: 16,
+                                      height: 16,
+                                      borderRadius: 0.5,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      bgcolor: isChecked ? phase.color : 'transparent',
+                                      border: `1px solid ${isChecked ? phase.color : 'rgba(255,255,255,0.3)'}`
+                                    }}>
+                                      {isChecked && <CheckIcon sx={{ fontSize: 13, color: '#0a1628', fontWeight: 900 }} />}
+                                    </Box>
+                                    <Typography variant="caption" sx={{ color: isChecked ? '#fff' : 'rgba(255,255,255,0.7)', fontWeight: isChecked ? 700 : 500, fontSize: '0.78rem' }}>
+                                      {date ? format(new Date(date + 'T00:00:00'), "dd/MM") : '--/--'}
+                                    </Typography>
+                                  </Box>
                                 );
                               })}
-                            </Grid>
+                            </Box>
                           </Box>
                         );
                       })}
-                    </Stack>
                   </Box>
                 </Box>
               )}
@@ -601,7 +741,7 @@ const Empresas = () => {
                 <Box sx={{ maxHeight: 400, overflowY: 'auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
                   {getAllEventDates().map(date => (
                     <Box key={date} sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 2 }}>
-                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>{format(new Date(date + 'T00:00:00'), "dd/MM")}</Typography>
+                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>{date ? format(new Date(date + 'T00:00:00'), "dd/MM") : '--/--'}</Typography>
                       <TextField size="small" type="number" fullWidth value={dailyQuotas[date] || 0} onChange={(e) => setDailyQuotas({ ...dailyQuotas, [date]: parseInt(e.target.value) || 0 })} />
                     </Box>
                   ))}

@@ -96,7 +96,12 @@ export const usePessoas = () => {
     const loadInitialData = async () => {
       try {
         const [evRes, empRes] = await Promise.all([ api.get('/eventos'), api.get('/empresas') ]);
-        const event = evRes.data.data.find(e => e.id === eventoIdParam) || evRes.data.data.find(e => e.status === 'ativo') || evRes.data.data[0];
+        const storedEventoId = localStorage.getItem('active_evento_id');
+        const eventList = evRes.data.data || [];
+        const event = (eventoIdParam && eventList.find(e => e.id === eventoIdParam))
+          || (storedEventoId && eventList.find(e => e.id === storedEventoId))
+          || eventList.find(e => e.status === 'ativo')
+          || eventList[0];
         setActiveEvent(event);
         setEmpresas(empRes.data.data || []);
       } catch (error) {
@@ -272,14 +277,111 @@ export const usePessoas = () => {
       const current = Array.isArray(formData.dias_acesso) ? [...formData.dias_acesso] : [];
       const index = current.indexOf(date);
       if (index === -1) current.push(date); else current.splice(index, 1);
-      setFormData({ ...formData, dias_acesso: current });
+      
+      // Recalcular fases_acesso baseado nas datas marcadas
+      const newFases = [];
+      if (activeEvent) {
+        ['montagem', 'evento', 'desmontagem'].forEach(fase => {
+          const phaseDates = activeEvent[`datas_${fase}`] || [];
+          if (phaseDates.length > 0 && phaseDates.some(d => current.includes(d))) {
+            newFases.push(fase);
+          }
+        });
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        dias_acesso: current,
+        ...(activeEvent ? { fases_acesso: newFases } : {})
+      }));
     };
 
     const handleFaseToggle = (fase) => {
-      const current = Array.isArray(formData.fases_acesso) ? [...formData.fases_acesso] : [];
-      const index = current.indexOf(fase);
-      if (index === -1) current.push(fase); else current.splice(index, 1);
-      setFormData({ ...formData, fases_acesso: current });
+      const currentFases = Array.isArray(formData.fases_acesso) ? [...formData.fases_acesso] : [];
+      const faseIndex = currentFases.indexOf(fase);
+      const isChecking = faseIndex === -1;
+      
+      if (isChecking) {
+        currentFases.push(fase);
+      } else {
+        currentFases.splice(faseIndex, 1);
+      }
+
+      // Sincronizar dias_acesso com a fase selecionada
+      let currentDias = Array.isArray(formData.dias_acesso) ? [...formData.dias_acesso] : [];
+      const phaseDates = (activeEvent && activeEvent[`datas_${fase}`]) || [];
+
+      if (isChecking) {
+        // Marca todas as datas desta fase
+        phaseDates.forEach(d => {
+          if (!currentDias.includes(d)) currentDias.push(d);
+        });
+      } else {
+        // Desmarca as datas desta fase
+        currentDias = currentDias.filter(d => !phaseDates.includes(d));
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        fases_acesso: currentFases,
+        dias_acesso: currentDias
+      }));
+    };
+
+    const handleSelectAllPhase = (phase) => {
+      const phaseDates = (activeEvent && activeEvent[`datas_${phase}`]) || [];
+      if (phaseDates.length === 0) return;
+
+      const currentDias = Array.isArray(formData.dias_acesso) ? [...formData.dias_acesso] : [];
+      phaseDates.forEach(d => {
+        if (!currentDias.includes(d)) currentDias.push(d);
+      });
+
+      const currentFases = Array.isArray(formData.fases_acesso) ? [...formData.fases_acesso] : [];
+      if (!currentFases.includes(phase)) currentFases.push(phase);
+
+      setFormData(prev => ({
+        ...prev,
+        fases_acesso: currentFases,
+        dias_acesso: currentDias
+      }));
+    };
+
+    const handleClearPhase = (phase) => {
+      const phaseDates = (activeEvent && activeEvent[`datas_${phase}`]) || [];
+      const currentDias = (Array.isArray(formData.dias_acesso) ? formData.dias_acesso : []).filter(d => !phaseDates.includes(d));
+      const currentFases = (Array.isArray(formData.fases_acesso) ? formData.fases_acesso : []).filter(f => f !== phase);
+
+      setFormData(prev => ({
+        ...prev,
+        fases_acesso: currentFases,
+        dias_acesso: currentDias
+      }));
+    };
+
+    const handleSelectAllDates = () => {
+      if (!activeEvent) return;
+      const allDates = [
+        ...(activeEvent.datas_montagem || []),
+        ...(activeEvent.datas_evento || []),
+        ...(activeEvent.datas_desmontagem || [])
+      ];
+      const uniqueDates = [...new Set(allDates)].sort();
+      const allFases = ['montagem', 'evento', 'desmontagem'].filter(f => (activeEvent[`datas_${f}`] || []).length > 0);
+
+      setFormData(prev => ({
+        ...prev,
+        fases_acesso: allFases,
+        dias_acesso: uniqueDates
+      }));
+    };
+
+    const handleClearAllDates = () => {
+      setFormData(prev => ({
+        ...prev,
+        fases_acesso: [],
+        dias_acesso: []
+      }));
     };
 
     const handleDelete = (id) => { setPessoaToDelete(id); setOpenDeleteConfirm(true); };
@@ -449,6 +551,10 @@ export const usePessoas = () => {
         handleSave,
         handleDateToggle,
         handleFaseToggle,
+        handleSelectAllPhase,
+        handleClearPhase,
+        handleSelectAllDates,
+        handleClearAllDates,
         handleDelete,
         confirmDelete,
         handleOpenBlock,

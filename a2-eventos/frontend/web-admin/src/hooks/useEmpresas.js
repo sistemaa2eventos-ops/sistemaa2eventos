@@ -27,13 +27,19 @@ export const useEmpresas = (eventoIdParam) => {
         responsavel: '',
         observacao: '',
         registration_token: '',
-        max_colaboradores: 50
+        max_colaboradores: 50,
+        datas_presenca: []
     });
 
     const fetchActiveEvent = useCallback(async () => {
         try {
             const resp = await api.get('/eventos');
-            const active = resp.data.data.find(e => e.id === eventoIdParam) || resp.data.data.find(e => e.status === 'ativo');
+            const storedEventoId = localStorage.getItem('active_evento_id');
+            const eventList = resp.data.data || [];
+            const active = (eventoIdParam && eventList.find(e => e.id === eventoIdParam))
+                || (storedEventoId && eventList.find(e => e.id === storedEventoId))
+                || eventList.find(e => e.status === 'ativo')
+                || eventList[0];
             setActiveEvent(active);
         } catch (e) {
             enqueueSnackbar('Erro ao buscar evento ativo.', { variant: 'error' });
@@ -80,6 +86,7 @@ export const useEmpresas = (eventoIdParam) => {
             setSaving(true);
             const payload = {
                 ...formData,
+                datas_presenca: Array.isArray(formData.datas_presenca) ? formData.datas_presenca : [],
                 tipo_operacao: formData.servico,
                 responsavel_legal: formData.responsavel
             };
@@ -97,6 +104,35 @@ export const useEmpresas = (eventoIdParam) => {
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleSelectAllDatesEmpresa = () => {
+        if (!activeEvent) return;
+        const all = [
+            ...(activeEvent.datas_montagem || []),
+            ...(activeEvent.datas_evento || []),
+            ...(activeEvent.datas_desmontagem || [])
+        ];
+        setFormData(prev => ({ ...prev, datas_presenca: [...new Set(all)].sort() }));
+    };
+
+    const handleClearAllDatesEmpresa = () => {
+        setFormData(prev => ({ ...prev, datas_presenca: [] }));
+    };
+
+    const handleSelectAllPhaseEmpresa = (phase) => {
+        const phaseDates = (activeEvent && activeEvent[`datas_${phase}`]) || [];
+        const current = Array.isArray(formData.datas_presenca) ? [...formData.datas_presenca] : [];
+        phaseDates.forEach(d => {
+            if (!current.includes(d)) current.push(d);
+        });
+        setFormData(prev => ({ ...prev, datas_presenca: current }));
+    };
+
+    const handleClearPhaseEmpresa = (phase) => {
+        const phaseDates = (activeEvent && activeEvent[`datas_${phase}`]) || [];
+        const current = (Array.isArray(formData.datas_presenca) ? formData.datas_presenca : []).filter(d => !phaseDates.includes(d));
+        setFormData(prev => ({ ...prev, datas_presenca: current }));
     };
 
     const handleDelete = async (id) => {
@@ -161,6 +197,10 @@ export const useEmpresas = (eventoIdParam) => {
         handleDelete,
         handleSaveQuotas,
         handleAuditDocument,
+        handleSelectAllDatesEmpresa,
+        handleClearAllDatesEmpresa,
+        handleSelectAllPhaseEmpresa,
+        handleClearPhaseEmpresa,
         loadDocumentos,
         loadEmpresas
     };

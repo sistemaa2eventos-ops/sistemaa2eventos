@@ -22,10 +22,12 @@ except ImportError:
     logger.warning("InsightFace não está instalado. Simulação ativada se requisitado.")
 
 # Suporte UTF-8 no Windows (evita UnicodeEncodeError com emojis no console)
-if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
+if sys.platform == "win32":
     try:
-        sys.stdout.reconfigure(encoding="utf-8")
-        sys.stderr.reconfigure(encoding="utf-8")
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
     except Exception:
         pass
 

@@ -7,6 +7,7 @@ class DeviceController {
 
     constructor() {
         this.create = this.create.bind(this);
+        this.update = this.update.bind(this);
         this.configurePush = this.configurePush.bind(this);
     }
 
@@ -191,6 +192,78 @@ class DeviceController {
                 'Unexpected error creating device'
             );
             res.status(500).json({ error: 'Falha interna ao criar dispositivo. Detalhes registrados no log.' });
+        }
+    }
+
+    // Atualizar dispositivo existente
+    async update(req, res) {
+        try {
+            const { id } = req.params;
+            const evento_id = req.event?.id;
+            const {
+                nome,
+                marca,
+                tipo,
+                ip_address,
+                porta,
+                user_device,
+                password_device,
+                modo,
+                area_nome,
+                area_id,
+                offline_mode,
+                config
+            } = req.body;
+
+            // Verificar se dispositivo existe
+            const { data: existing, error: findError } = await supabase
+                .from('dispositivos_acesso')
+                .select('*')
+                .eq('id', id)
+                .single();
+
+            if (findError || !existing) {
+                return res.status(404).json({ error: 'Dispositivo não encontrado' });
+            }
+
+            const updateData = {};
+            if (nome !== undefined) updateData.nome = nome.trim();
+            if (marca !== undefined) updateData.marca = marca;
+            if (tipo !== undefined) updateData.tipo = tipo;
+            if (ip_address !== undefined) updateData.ip_address = ip_address.trim();
+            if (porta !== undefined) updateData.porta = parseInt(porta, 10) || 80;
+            if (user_device !== undefined) updateData.user_device = user_device.trim();
+            if (password_device !== undefined && password_device !== '') updateData.password_device = password_device;
+            if (modo !== undefined) updateData.modo = modo;
+            if (offline_mode !== undefined) updateData.offline_mode = offline_mode;
+            if (area_id !== undefined) updateData.area_id = area_id || null;
+            if (area_nome !== undefined) updateData.area_nome = area_nome || null;
+            if (config !== undefined) {
+                updateData.config = {
+                    ...(existing.config || {}),
+                    ...config
+                };
+            }
+
+            const { data, error } = await supabase
+                .from('dispositivos_acesso')
+                .update(updateData)
+                .eq('id', id)
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            logger.info('Device updated successfully', {
+                device_id: id,
+                event_id: evento_id,
+                updated_fields: Object.keys(updateData)
+            });
+
+            return res.json({ success: true, data });
+        } catch (error) {
+            logger.error({ err: error, device_id: req.params.id }, 'Error updating device');
+            return res.status(500).json({ error: error.message || 'Erro ao atualizar dispositivo' });
         }
     }
 

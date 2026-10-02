@@ -65,12 +65,72 @@ class ValidationService {
 
     async getRealtimeStatsInternal(evento_id) {
         const hoje = getHojeLocal();
+        const startOfDay = `${hoje}T00:00:00.000Z`;
+        const endOfDay = `${hoje}T23:59:59.999Z`;
+
+        // 1. Presentes gerais (pessoas com checkin_feito)
         const { count: countPresentes } = await supabase
             .from('pessoas')
             .select('id', { count: 'exact', head: true })
             .eq('evento_id', evento_id)
             .eq('status_acesso', 'checkin_feito');
 
+        // 2. Capacidade do evento
+        const { data: evento } = await supabase
+            .from('eventos')
+            .select('capacidade_total')
+            .eq('id', evento_id)
+            .single();
+
+        // 3. Contadores de Logs de Hoje (checkins, checkouts, negados, fiscalizacoes)
+        const [
+            { count: countCheckinsHoje },
+            { count: countCheckoutsHoje },
+            { count: countNegadosHoje },
+            { count: countFiscalizacoesHoje }
+        ] = await Promise.all([
+            supabase.from('logs_acesso').select('id', { count: 'exact', head: true }).eq('evento_id', evento_id).eq('tipo', 'checkin').gte('created_at', startOfDay).lte('created_at', endOfDay),
+            supabase.from('logs_acesso').select('id', { count: 'exact', head: true }).eq('evento_id', evento_id).eq('tipo', 'checkout').gte('created_at', startOfDay).lte('created_at', endOfDay),
+            supabase.from('logs_acesso').select('id', { count: 'exact', head: true }).eq('evento_id', evento_id).eq('tipo', 'negado').gte('created_at', startOfDay).lte('created_at', endOfDay),
+            supabase.from('logs_acesso').select('id', { count: 'exact', head: true }).eq('evento_id', evento_id).eq('tipo', 'fiscalizacao').gte('created_at', startOfDay).lte('created_at', endOfDay)
+        ]);
+
+        // 4. Áreas do Evento com totais de passagem hoje
+        const { data: areasData } = await supabase
+            .from('evento_areas')
+            .select('id, nome_area')
+            .eq('evento_id', evento_id);
+
+        let areasComStats = [];
+        if (areasData && areasData.length > 0) {
+            // Buscar logs de hoje agrupados por area_id
+            const { data: logsHojePorArea } = await supabase
+                .from('logs_acesso')
+                .select('area_id, tipo')
+                .eq('evento_id', evento_id)
+                .gte('created_at', startOfDay)
+                .lte('created_at', endOfDay)
+                .not('area_id', 'is', null);
+
+            const areaStatsMap = {};
+            (logsHojePorArea || []).forEach(l => {
+                if (!areaStatsMap[l.area_id]) {
+                    areaStatsMap[l.area_id] = { total: 0, negados: 0 };
+                }
+                areaStatsMap[l.area_id].total++;
+                if (l.tipo === 'negado') areaStatsMap[l.area_id].negados++;
+            });
+
+            areasComStats = areasData.map(a => ({
+                id: a.id,
+                nome: a.nome_area,
+                nome_area: a.nome_area,
+                total_acessos_hoje: areaStatsMap[a.id]?.total || 0,
+                total_negados_hoje: areaStatsMap[a.id]?.negados || 0
+            }));
+        }
+
+        // 5. Ocupação por empresa N:N
         const { data: presentesNtoN } = await supabase
             .from('pessoa_evento_empresa')
             .select('empresa_id, empresas(nome), pessoas!inner(status_acesso)')
@@ -84,9 +144,7 @@ class ValidationService {
             .eq('evento_id', evento_id)
             .eq('data', hoje);
 
-        const { data: evento } = await supabase.from('eventos').select('capacidade_total').eq('id', evento_id).single();
         const ocupacaoPorEmpresa = {};
-
         if (presentesNtoN) {
             presentesNtoN.forEach(vinculo => {
                 const eid = vinculo.empresa_id;
@@ -111,6 +169,11 @@ class ValidationService {
         return {
             presentes: countPresentes || 0,
             capacidade: evento?.capacidade_total || 0,
+            checkins_hoje: countCheckinsHoje || 0,
+            checkouts_hoje: countCheckoutsHoje || 0,
+            negados_hoje: countNegadosHoje || 0,
+            fiscalizacoes_hoje: countFiscalizacoesHoje || 0,
+            areas: areasComStats,
             empresas: Object.values(ocupacaoPorEmpresa)
         };
     }
@@ -209,18 +272,40 @@ class ValidationService {
         const blockDays = s.block_unauthorized_days ?? true;
         const allowOffhour = s.allow_offhour_checkin ?? false;
 
-        // 0. Validação de ÁREA específica (Zonamento)
+        // 0. Validação de ÁREA específica (Zonamento de Segurança)
         if (area_id && tipo === 'checkin') {
-            const { data: hasPermit } = await supabase
-                .from('pulseira_areas_permitidas')
+            // Se a pessoa estiver tentando acessar área restrita sem ter passado pelo credenciamento/portaria
+            if (pessoa.status_acesso === 'pendente') {
+                throw this._buildError('Credenciamento Pendente: Dirija-se à Portaria Principal');
+            }
+            if (pessoa.status_documentos === 'reprovado') {
+                throw this._buildError('Acesso Bloqueado: Documentação Reprovada');
+            }
+
+            // 1. Checar se a pessoa tem autorização individual atribuída para esta área
+            const { data: pessoaPermit } = await supabase
+                .from('pessoa_areas_acesso')
                 .select('id')
-                .eq('tipo_pulseira_id', pessoa.tipo_pulseira_id)
+                .eq('pessoa_id', pessoa.id)
                 .eq('area_id', area_id)
                 .limit(1)
-                .single();
+                .maybeSingle();
 
-            if (!hasPermit) {
-                throw this._buildError('Acesso Negado: Perfil não autorizado para esta área');
+            // 2. Se não tiver direta, checar se a pulseira dela confere permissão à área
+            let pulseiraPermit = null;
+            if (!pessoaPermit && pessoa.tipo_pulseira_id) {
+                const { data: pPermit } = await supabase
+                    .from('pulseira_areas_permitidas')
+                    .select('id')
+                    .eq('tipo_pulseira_id', pessoa.tipo_pulseira_id)
+                    .eq('area_id', area_id)
+                    .limit(1)
+                    .maybeSingle();
+                pulseiraPermit = pPermit;
+            }
+
+            if (!pessoaPermit && !pulseiraPermit) {
+                throw this._buildError('Acesso Negado: Área Restrita Não Autorizada');
             }
         }
 

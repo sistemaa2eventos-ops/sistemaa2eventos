@@ -16,10 +16,16 @@ class ImageProcessor {
         try {
             let buffer;
 
-            // 1. Converter Base64 para Buffer se necessário
+            // 1. Converter Base64 ou URL para Buffer se necessário
             if (typeof input === 'string') {
-                const base64Data = input.replace(/^data:image\/\w+;base64,/, '');
-                buffer = Buffer.from(base64Data, 'base64');
+                if (input.startsWith('http://') || input.startsWith('https://')) {
+                    const axios = require('axios');
+                    const resp = await axios.get(input, { responseType: 'arraybuffer', timeout: 7000 });
+                    buffer = Buffer.from(resp.data);
+                } else {
+                    const base64Data = input.replace(/^data:image\/\w+;base64,/, '');
+                    buffer = Buffer.from(base64Data, 'base64');
+                }
             } else {
                 buffer = input;
             }

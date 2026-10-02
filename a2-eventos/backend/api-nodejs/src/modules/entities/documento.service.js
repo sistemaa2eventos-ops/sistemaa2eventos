@@ -125,25 +125,73 @@ class DocumentoService {
     }
 
     /**
-     * Regra de negócio: Sincroniza o status global da pessoa baseado nos seus documentos
+     * Regra de negócio: Sincroniza o status documental e de acesso da pessoa baseado nos seus documentos
      */
     async sincronizarStatusPessoa(supabaseClient, pessoaId) {
-        const { data: docs, error } = await supabaseClient
-            .from('pessoa_documentos')
-            .select('status')
-            .eq('pessoa_id', pessoaId);
+        if (!pessoaId) return;
 
-        if (error || !docs) return;
+        try {
+            // 1. Obter status atual da pessoa
+            const { data: pessoaAtual } = await supabaseClient
+                .from('pessoas')
+                .select('id, status_acesso, status_documentos')
+                .eq('id', pessoaId)
+                .single();
 
-        let novoStatus = 'pendente';
-        const temRejeitado = docs.some(d => d.status === 'rejeitado');
-        const todosAprovados = docs.every(d => d.status === 'aprovado');
+            const { data: docs, error } = await supabaseClient
+                .from('pessoa_documentos')
+                .select('status')
+                .eq('pessoa_id', pessoaId);
 
-        if (temRejeitado) novoStatus = 'recusado';
-        else if (todosAprovados && docs.length > 0) novoStatus = 'autorizado';
+            if (error || !docs) return;
 
-        await supabaseClient.from('pessoas').update({ status_acesso: novoStatus }).eq('id', pessoaId);
-        logger.info(`🔄 Status da Pessoa [${pessoaId}] sincronizado para: ${novoStatus.toUpperCase()}`);
+            // 2. Determinar status documental
+            let novoStatusDocs = 'pendente';
+            const temReprovado = docs.some(d => d.status === 'rejeitado' || d.status === 'reprovado');
+            const temReenvio = docs.some(d => d.status === 'reenvio_solicitado');
+            const temPendente = docs.some(d => d.status === 'pendente' || d.status === 'em_analise');
+            const todosAprovados = docs.length > 0 && docs.every(d => d.status === 'aprovado');
+
+            if (temReprovado) {
+                novoStatusDocs = 'reprovado';
+            } else if (temReenvio) {
+                novoStatusDocs = 'reenvio_solicitado';
+            } else if (todosAprovados) {
+                novoStatusDocs = 'aprovado';
+            } else if (temPendente) {
+                novoStatusDocs = 'em_analise';
+            } else {
+                novoStatusDocs = 'pendente';
+            }
+
+            // 3. Determinar status de acesso (preservando quem já entrou no evento)
+            let novoStatusAcesso = pessoaAtual?.status_acesso || 'pendente';
+            if (pessoaAtual?.status_acesso !== 'checkin_feito') {
+                if (novoStatusDocs === 'aprovado') {
+                    novoStatusAcesso = 'autorizado';
+                } else if (novoStatusDocs === 'reprovado') {
+                    novoStatusAcesso = 'recusado';
+                } else if (novoStatusDocs === 'reenvio_solicitado' || novoStatusDocs === 'em_analise') {
+                    novoStatusAcesso = 'pendente';
+                }
+            }
+
+            const updatePayload = {
+                status_documentos: novoStatusDocs,
+                status_acesso: novoStatusAcesso,
+                updated_at: new Date().toISOString()
+            };
+
+            const { error: updateErr } = await supabaseClient.from('pessoas').update(updatePayload).eq('id', pessoaId);
+            if (updateErr) {
+                // Fallback gracioso se a coluna status_documentos ainda não tiver sido criada
+                await supabaseClient.from('pessoas').update({ status_acesso: novoStatusAcesso }).eq('id', pessoaId);
+            }
+
+            logger.info(`🔄 Pessoa [${pessoaId}] sincronizada: Docs=${novoStatusDocs.toUpperCase()} | Acesso=${novoStatusAcesso.toUpperCase()}`);
+        } catch (err) {
+            logger.warn(`⚠️ [DocumentoService] Falha ao sincronizar status da pessoa ${pessoaId}: ${err.message}`);
+        }
     }
 
     async listDocumentos(supabaseClient, entityType, entityId) {
@@ -192,6 +240,29 @@ class DocumentoService {
         };
     }
 
+    /**
+     * Estatísticas de auditoria documental para métricas do analista
+     */
+    async obterEstatisticas(supabaseClient, eventoId) {
+        try {
+            const [pRes, eRes] = await Promise.all([
+                supabaseClient.from('pessoa_documentos').select('status'),
+                supabaseClient.from('empresa_documentos').select('status')
+            ]);
+
+            const todosDocs = [...(pRes.data || []), ...(eRes.data || [])];
+
+            return {
+                total: todosDocs.length,
+                pendentes: todosDocs.filter(d => d.status === 'pendente' || d.status === 'em_analise').length,
+                aprovados: todosDocs.filter(d => d.status === 'aprovado').length,
+                reprovados: todosDocs.filter(d => d.status === 'rejeitado' || d.status === 'reprovado').length,
+                reenvio_solicitado: todosDocs.filter(d => d.status === 'reenvio_solicitado').length
+            };
+        } catch (err) {
+            return { total: 0, pendentes: 0, aprovados: 0, reprovados: 0, reenvio_solicitado: 0 };
+        }
+    }
 }
 
 module.exports = new DocumentoService();

@@ -7,10 +7,17 @@ const logger = require('../../services/logger');
 const { deviceValidators, handleValidationErrors } = require('../../middleware/validators');
 
 const deviceController = require('./device.controller');
+const sessaoOperadorController = require('./sessaoOperador.controller');
 
 // Todas as rotas de dispositivos requerem autenticação e contexto de evento
 router.use(authenticate);
 router.use(requireEvent);
+
+// --- Rotas de Sessão de Operador (Vínculo Leitor Facial ↔ Operador) ---
+router.get('/sessao/ativa', sessaoOperadorController.obterSessaoAtiva);
+router.get('/sessao/disponiveis', sessaoOperadorController.listarDispositivosParaVinculo);
+router.post('/sessao/vincular', sessaoOperadorController.vincularLeitor);
+router.post('/sessao/desvincular', sessaoOperadorController.desvincularLeitor);
 
 // Listar dispositivos
 router.get('/', deviceController.list);

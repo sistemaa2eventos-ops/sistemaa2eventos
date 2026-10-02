@@ -43,6 +43,13 @@ router.get(
     documentoController.listarPendentes
 );
 
+// Estatísticas da auditoria documental
+router.get(
+    '/estatisticas',
+    authorize('admin', 'supervisor', 'operador', 'op_analista'),
+    documentoController.obterEstatisticas
+);
+
 // Submissão de documentos (Roles de upload)
 router.post(
     '/:entityType/:entityId/upload',

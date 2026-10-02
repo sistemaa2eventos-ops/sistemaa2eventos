@@ -280,10 +280,22 @@ export default function DispositivosPage() {
 
             <Box sx={{ fontSize: '0.8rem', color: '#aaa', lineHeight: 1.8 }}>
               <Box>🌐 <code style={{ color: '#ccc' }}>{device.ip_address}:{device.porta || 80}</code></Box>
-              {device.area_nome && <Box>📍 {device.area_nome}</Box>}
-              {device.modo && <Box>⚙️ Registro: <b style={{ color: '#ccc' }}>{device.modo}</b>
-                {device.config?.fluxo && <> · Fluxo: <b style={{ color: CYAN }}>{device.config.fluxo}</b></>}
-              </Box>}
+              
+              <Box sx={{ my: 0.8, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {device.modo === 'credenciamento' ? (
+                  <Chip label="🏷️ BAIA DE CREDENCIAMENTO" size="small" sx={{ bgcolor: 'rgba(123,47,190,0.25)', color: '#C084FC', border: '1px solid rgba(123,47,190,0.5)', fontWeight: 800, fontSize: '0.68rem' }} />
+                ) : device.modo === 'area_restrita' ? (
+                  <Chip label={`🔒 ÁREA RESTRITA: ${device.area_nome || 'NÃO DEFINIDA'}`} size="small" sx={{ bgcolor: 'rgba(0,212,255,0.18)', color: '#00D4FF', border: '1px solid rgba(0,212,255,0.4)', fontWeight: 800, fontSize: '0.68rem' }} />
+                ) : device.modo === 'checkout' ? (
+                  <Chip label="🚪 PORTÃO DE SAÍDA" size="small" sx={{ bgcolor: 'rgba(255,119,0,0.2)', color: '#FFAA00', border: '1px solid rgba(255,119,0,0.4)', fontWeight: 800, fontSize: '0.68rem' }} />
+                ) : (
+                  <Chip label={device.area_nome ? `📍 ${device.area_nome}` : "🚪 PORTARIA GERAL"} size="small" sx={{ bgcolor: 'rgba(0,255,136,0.15)', color: '#00FF88', border: '1px solid rgba(0,255,136,0.4)', fontWeight: 800, fontSize: '0.68rem' }} />
+                )}
+
+                {device.config?.fluxo && (
+                  <Chip label={`Fluxo: ${device.config.fluxo.toUpperCase()}`} size="small" variant="outlined" sx={{ fontSize: '0.65rem', borderColor: 'rgba(255,255,255,0.2)', color: '#ccc' }} />
+                )}
+              </Box>
               {device.config?.controla_rele === false && (
                 <Box sx={{ fontSize: '0.7rem', color: '#FFB800' }}>🔌 Sem controle de relé (modo online)</Box>
               )}
@@ -660,12 +672,14 @@ export default function DispositivosPage() {
             <Grid container spacing={2}>
               <Grid item xs={6}>
                 <FormControl fullWidth size="small">
-                  <InputLabel id="modo-label" htmlFor="modo-select">Modo de Registro</InputLabel>
+                  <InputLabel id="modo-label" htmlFor="modo-select">Modo de Operação</InputLabel>
                   <Select labelId="modo-label" inputProps={{ id: 'modo-select', name: 'modo' }}
-                    value={formData.modo} onChange={handleFormChange} label="Modo de Registro">
-                    <MenuItem value="checkin">Checkin</MenuItem>
-                    <MenuItem value="checkout">Checkout</MenuItem>
-                    <MenuItem value="ambos">Ambos</MenuItem>
+                    value={formData.modo || 'acesso_geral'} onChange={handleFormChange} label="Modo de Operação">
+                    <MenuItem value="credenciamento">🏷️ Baia de Credenciamento (Operador)</MenuItem>
+                    <MenuItem value="acesso_geral">🚪 Portaria Geral (Catraca Principal)</MenuItem>
+                    <MenuItem value="area_restrita">🔒 Área Restrita (Exige Autorização)</MenuItem>
+                    <MenuItem value="checkout">🚪 Portão de Saída (Checkout)</MenuItem>
+                    <MenuItem value="ambos">🔄 Bidirecional (Entrada/Saída)</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>

@@ -75,16 +75,17 @@ const EventFormDialog = ({
             <DialogContent sx={{ 
                 p: { xs: 3, md: 5 }, 
                 pr: { xs: 3, md: 2 }, 
+                pb: 8,
                 overflowY: 'auto', 
                 display: 'flex', 
                 flexDirection: 'column', 
                 minHeight: 0, 
-                height: '100%', 
-                '&::-webkit-scrollbar': { width: '6px' }, 
-                '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.3)', borderRadius: '10px' }, 
-                '&::-webkit-scrollbar-track': { background: 'transparent' } 
+                flex: '1 1 auto', 
+                '&::-webkit-scrollbar': { width: '8px' }, 
+                '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.4)', borderRadius: '10px' }, 
+                '&::-webkit-scrollbar-track': { background: 'rgba(255,255,255,0.02)' } 
             }}>
-                <Box sx={{ pr: { xs: 0, md: 2 }, pb: 4, flex: 1 }}>
+                <Box sx={{ pr: { xs: 0, md: 1 }, pb: 6, flex: 1 }}>
                 <Tabs
                     value={tabValue}
                     onChange={(e, v) => setTabValue(v)}
@@ -338,53 +339,93 @@ const EventFormDialog = ({
                         {!formData.data_inicio || !formData.data_fim ? (
                             <Alert severity="info">Defina as datas de início e fim na aba Informações para configurar as fases.</Alert>
                         ) : (
-                            <Stack spacing={3}>
-                                {['montagem', 'evento', 'desmontagem'].map(phase => (
-                                    <Box key={phase}>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                                            <Typography variant="subtitle2" sx={{ color: '#00D4FF', textTransform: 'uppercase', fontWeight: 800 }}>
-                                                {phase}
-                                            </Typography>
-                                            <Stack direction="row" spacing={1}>
-                                                <Button size="small" onClick={() => handleSelectAll(phase)} sx={{ fontSize: '0.65rem' }}>TUDO</Button>
-                                                <Button size="small" onClick={() => handleClearAll(phase)} color="error" sx={{ fontSize: '0.65rem' }}>LIMPAR</Button>
-                                            </Stack>
-                                        </Box>
-                                        <FormGroup row sx={{ gap: 1 }}>
-                                            {generateDateRange().map(date => (
-                                                <FormControlLabel
-                                                    key={date}
-                                                    control={
-                                                        <Checkbox
-                                                            size="small"
-                                                            checked={formData[`datas_${phase}`]?.includes(date)}
-                                                            onChange={() => handleDateToggle(date, phase)}
-                                                            sx={{ color: 'rgba(255,255,255,0.2)', '&.Mui-checked': { color: '#00FF88' } }}
+                            <Stack spacing={4} sx={{ mb: 4 }}>
+                                {[
+                                    { id: 'montagem', label: 'MONTAGEM', color: '#00D4FF', bg: 'rgba(0,212,255,0.04)', border: 'rgba(0,212,255,0.15)' },
+                                    { id: 'evento', label: 'EVENTO', color: '#00FF88', bg: 'rgba(0,255,136,0.04)', border: 'rgba(0,255,136,0.15)' },
+                                    { id: 'desmontagem', label: 'DESMONTAGEM', color: '#FFB800', bg: 'rgba(255,184,0,0.05)', border: 'rgba(255,184,0,0.25)' }
+                                ].map(phase => {
+                                    const selectedCount = (formData[`datas_${phase.id}`] || []).length;
+                                    const allDates = generateDateRange();
+
+                                    return (
+                                        <Box 
+                                            key={phase.id} 
+                                            sx={{ 
+                                                p: 2.5, 
+                                                borderRadius: 2.5, 
+                                                bgcolor: phase.bg, 
+                                                border: `1px solid ${phase.border}` 
+                                            }}
+                                        >
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                    <Typography variant="subtitle2" sx={{ color: phase.color, textTransform: 'uppercase', fontWeight: 900, letterSpacing: '1px' }}>
+                                                        {phase.label}
+                                                    </Typography>
+                                                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem' }}>
+                                                        ({selectedCount}/{allDates.length} dias selecionados)
+                                                    </Typography>
+                                                </Box>
+                                                <Stack direction="row" spacing={1}>
+                                                    <Button 
+                                                        size="small" 
+                                                        onClick={() => handleSelectAll(phase.id)} 
+                                                        sx={{ fontSize: '0.65rem', color: phase.color, border: `1px solid ${phase.border}`, py: 0.2 }}
+                                                    >
+                                                        TUDO
+                                                    </Button>
+                                                    <Button 
+                                                        size="small" 
+                                                        onClick={() => handleClearAll(phase.id)} 
+                                                        color="error" 
+                                                        sx={{ fontSize: '0.65rem', py: 0.2 }}
+                                                    >
+                                                        LIMPAR
+                                                    </Button>
+                                                </Stack>
+                                            </Box>
+                                            <FormGroup row sx={{ gap: 1 }}>
+                                                {allDates.map(date => {
+                                                    const isChecked = formData[`datas_${phase.id}`]?.includes(date);
+                                                    return (
+                                                        <FormControlLabel
+                                                            key={date}
+                                                            control={
+                                                                <Checkbox
+                                                                    size="small"
+                                                                    checked={!!isChecked}
+                                                                    onChange={() => handleDateToggle(date, phase.id)}
+                                                                    sx={{ color: 'rgba(255,255,255,0.2)', '&.Mui-checked': { color: phase.color } }}
+                                                                />
+                                                            }
+                                                            label={
+                                                                <Box sx={{ lineHeight: 1 }}>
+                                                                    <Typography variant="caption" sx={{ fontWeight: isChecked ? 800 : 600, display: 'block', color: isChecked ? '#fff' : 'rgba(255,255,255,0.7)' }}>
+                                                                        {format(new Date(date + 'T00:00:00'), "dd/MM")}
+                                                                    </Typography>
+                                                                    <Typography variant="caption" sx={{ fontSize: '0.6rem', color: isChecked ? phase.color : 'text.secondary' }}>
+                                                                        {format(new Date(date + 'T00:00:00'), "EEE", { locale: ptBR })}
+                                                                    </Typography>
+                                                                </Box>
+                                                            }
+                                                            sx={{
+                                                                mr: 0,
+                                                                p: 0.8,
+                                                                px: 1.2,
+                                                                borderRadius: 2,
+                                                                border: `1px solid ${isChecked ? phase.color : 'rgba(255,255,255,0.06)'}`,
+                                                                bgcolor: isChecked ? phase.bg : 'rgba(255,255,255,0.02)',
+                                                                transition: 'all 0.15s ease',
+                                                                '&:hover': { background: 'rgba(255,255,255,0.05)' }
+                                                            }}
                                                         />
-                                                    }
-                                                    label={
-                                                        <Box sx={{ lineHeigh: 1 }}>
-                                                            <Typography variant="caption" sx={{ fontWeight: 700, display: 'block' }}>
-                                                                {format(new Date(date + 'T00:00:00'), "dd/MM")}
-                                                            </Typography>
-                                                            <Typography variant="caption" sx={{ fontSize: '0.6rem', color: 'text.secondary' }}>
-                                                                {format(new Date(date + 'T00:00:00'), "EEE", { locale: ptBR })}
-                                                            </Typography>
-                                                        </Box>
-                                                    }
-                                                    sx={{
-                                                        mr: 0,
-                                                        p: 1,
-                                                        borderRadius: 2,
-                                                        border: '1px solid rgba(255,255,255,0.05)',
-                                                        '&:hover': { background: 'rgba(255,255,255,0.02)' }
-                                                    }}
-                                                />
-                                            ))}
-                                        </FormGroup>
-                                        <Divider sx={{ mt: 2, borderColor: 'rgba(255,255,255,0.05)' }} />
-                                    </Box>
-                                ))}
+                                                    );
+                                                })}
+                                            </FormGroup>
+                                        </Box>
+                                    );
+                                })}
                             </Stack>
                         )}
                     </Box>

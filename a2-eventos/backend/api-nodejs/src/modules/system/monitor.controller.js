@@ -497,16 +497,16 @@ class MonitorController {
                 return res.status(400).json({ error: 'Falta vincular evento ativo para reset diário.' });
             }
 
-            // Atualiza status_acesso para 'ausente' onde status_acesso != 'checkin_feito'
-            const { data, error } = await supabase
-                .from('pessoas')
-                .update({ status_acesso: 'ausente' })
-                .eq('evento_id', evento_id)
-                .neq('status_acesso', 'checkin_feito');
-
-            if (error) throw error;
+            const cronController = require('../events/cron.controller');
+            await cronController.resetTurnos();
             
             logger.info(`🔄 Reset diário executado no evento ${evento_id} pelo usuário ${req.user?.id || 'Admin'}`);
+
+            const websocketService = require('../../services/websocketService');
+            websocketService.emit('reset_diario_executado', {
+                evento_id,
+                hora: new Date().toISOString()
+            }, evento_id);
 
             res.json({ success: true, message: 'Reset diário concluído com sucesso. Novo dia iniciado.' });
         } catch (error) {

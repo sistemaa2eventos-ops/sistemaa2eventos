@@ -39,9 +39,10 @@ router.post('/checkin/qrcode', sessionMiddleware, rateLimiter.access, accessCont
 router.post('/credenciar-pulseira', sessionMiddleware, rateLimiter.access, accessController.credenciarPulseira);
 
 // ============================================
-// CONSULTA DE PULSEIRA POR CÓDIGO (painel web)
+// CONSULTA E FISCALIZAÇÃO DE PULSEIRA / ÁREAS (painel web & app fiscal)
 // ============================================
 router.get('/consultar-pulseira/:codigo', sessionMiddleware, accessController.consultarPulseira);
+router.post('/fiscalizar', sessionMiddleware, rateLimiter.access, accessController.fiscalizarAcesso);
 
 // ============================================
 // GESTÃO DE TERMINAIS (apenas admin_master)

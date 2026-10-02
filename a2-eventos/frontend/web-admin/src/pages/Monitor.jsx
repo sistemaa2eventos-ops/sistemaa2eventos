@@ -18,7 +18,10 @@ import {
   Login as LoginIcon, Block as BlockIcon, CloudUpload as UploadIcon,
   FileDownload as DownloadIcon, Settings as SettingsIcon,
   Add as AddIcon, PowerSettingsNew as PowerIcon,
-  Schedule as ClockIcon, CorporateFare as CompanyIcon
+  Schedule as ClockIcon, CorporateFare as CompanyIcon,
+  Badge as BadgeIcon, Security as SecurityIcon,
+  Groups as GroupsIcon, Shield as ShieldIcon,
+  Place as AreaIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { format } from 'date-fns';
@@ -36,11 +39,13 @@ const LogItem = styled(Box, { shouldForwardProp: (p) => p !== 'tipo' })(({ tipo,
         monitorado ? '#FFB800' : 
         tipo === 'negado' ? '#FF3366' : 
         tipo === 'checkin' ? '#00FF88' : 
-        tipo === 'checkout' ? '#FF3366' : 
+        tipo === 'checkout' ? '#FF8800' : 
+        tipo === 'fiscalizacao' ? '#00D4FF' :
         'transparent'
     }`,
     background: tipo === 'negado' ? 'rgba(255, 51, 102, 0.05)' : 
-               monitorado ? 'rgba(255, 184, 0, 0.05)' : 'transparent',
+               monitorado ? 'rgba(255, 184, 0, 0.05)' : 
+               tipo === 'fiscalizacao' ? 'rgba(0, 212, 255, 0.03)' : 'transparent',
     transition: 'all 0.2s ease'
 }));
 
@@ -50,7 +55,9 @@ const Monitor = () => {
   const {
     logs, stats, loading, tick, areas, dispositivosLista, terminais,
     cameras, setCameras, fetchCameras, fetchWatchlist,
-    watchlist, newCpf, setNewCpf, isTracking, activeAlert, setActiveAlert,
+    watchlist, newCpf, setNewCpf, isTracking,
+    activeAlert, setActiveAlert,
+    activeAreaAlert, setActiveAreaAlert,
     sysStatus, sysLogs, sysPerf, sysError,
     addToWatchlist, removeFromWatchlist, fetchSystemHealth,
     filtros, setFiltros, eventoId
@@ -148,6 +155,146 @@ const Monitor = () => {
           </Fade>
       )}
 
+      {/* AREA RESTRICTED ALERT OVERLAY */}
+      {activeAreaAlert && (
+          <Fade in={!!activeAreaAlert}>
+             <Box sx={{ 
+                 position: 'fixed', top: activeAlert ? 240 : 40, right: 40, width: 450, zIndex: 9999,
+                 background: 'linear-gradient(135deg, rgba(255, 30, 86, 0.96) 0%, rgba(180, 0, 40, 0.98) 100%)',
+                 color: '#fff', borderRadius: 4,
+                 p: 3, boxShadow: '0 20px 50px rgba(255,0,80,0.4)', border: '2px solid #FF3366',
+                 backdropFilter: 'blur(10px)'
+             }}>
+                 <Stack direction="row" spacing={2} justifyContent="space-between" alignItems="center">
+                    <Stack direction="row" spacing={1} alignItems="center">
+                        <ShieldIcon sx={{ fontSize: 36, color: '#FFF' }} />
+                        <Typography variant="h6" fontWeight={900} letterSpacing={0.5}>ACESSO NÃO AUTORIZADO!</Typography>
+                    </Stack>
+                    <IconButton onClick={() => setActiveAreaAlert(null)} size="small" sx={{ color: '#fff' }}><CloseIcon /></IconButton>
+                 </Stack>
+
+                 <Stack direction="row" spacing={2.5} mt={2.5} alignItems="center">
+                    <Avatar src={activeAreaAlert?.pessoa_foto} sx={{ width: 80, height: 80, border: '3px solid #fff' }} />
+                    <Box>
+                        <Typography variant="h5" fontWeight={900}>{activeAreaAlert?.pessoa_nome || 'Indivíduo Não Autorizado'}</Typography>
+                        <Chip label="ÁREA RESTRITA" sx={{ mt: 0.5, bgcolor: '#fff', color: '#FF1E56', fontWeight: 900, height: 22 }} />
+                    </Box>
+                 </Stack>
+                 <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.25)' }} />
+                 <Typography variant="body2"><b>ÁREA TENTADA:</b> {activeAreaAlert?.area_nome || 'Restrita'}</Typography>
+                 <Typography variant="caption" sx={{ mt: 1, display: 'block', opacity: 0.8 }}>Horário: {format(new Date(activeAreaAlert?.timestamp || new Date()), 'HH:mm:ss')}</Typography>
+             </Box>
+          </Fade>
+      )}
+
+      {/* PAINEL DE MÉTRICAS EM TEMPO REAL */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid item xs={12} sm={6} md={2.4}>
+              <GlassCard sx={{ p: 2, borderLeft: '4px solid #00D4FF', background: 'rgba(0, 212, 255, 0.04)' }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography variant="caption" fontWeight={800} color="#00D4FF">PRESENTES AGORA</Typography>
+                      <GroupsIcon sx={{ color: '#00D4FF', fontSize: 22 }} />
+                  </Stack>
+                  <Typography variant="h4" fontWeight={900} sx={{ my: 0.5, color: '#fff' }}>
+                      {stats.presentes || 0}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                      {stats.capacidade ? `de ${stats.capacidade} (${Math.round(((stats.presentes || 0) / stats.capacidade) * 100)}% lotação)` : 'Capacidade livre'}
+                  </Typography>
+              </GlassCard>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={2.4}>
+              <GlassCard sx={{ p: 2, borderLeft: '4px solid #00FF88', background: 'rgba(0, 255, 136, 0.04)' }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography variant="caption" fontWeight={800} color="#00FF88">CHECK-INS HOJE</Typography>
+                      <LoginIcon sx={{ color: '#00FF88', fontSize: 22 }} />
+                  </Stack>
+                  <Typography variant="h4" fontWeight={900} sx={{ my: 0.5, color: '#fff' }}>
+                      {stats.checkins_hoje || 0}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">Entradas registradas</Typography>
+              </GlassCard>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={2.4}>
+              <GlassCard sx={{ p: 2, borderLeft: '4px solid #FF8800', background: 'rgba(255, 136, 0, 0.04)' }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography variant="caption" fontWeight={800} color="#FF8800">CHECK-OUTS HOJE</Typography>
+                      <CheckoutIcon sx={{ color: '#FF8800', fontSize: 22 }} />
+                  </Stack>
+                  <Typography variant="h4" fontWeight={900} sx={{ my: 0.5, color: '#fff' }}>
+                      {stats.checkouts_hoje || 0}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">Saídas registradas</Typography>
+              </GlassCard>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={2.4}>
+              <GlassCard sx={{ p: 2, borderLeft: '4px solid #FF3366', background: 'rgba(255, 51, 102, 0.04)' }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography variant="caption" fontWeight={800} color="#FF3366">BLOQUEIOS / NEGADOS</Typography>
+                      <BlockIcon sx={{ color: '#FF3366', fontSize: 22 }} />
+                  </Stack>
+                  <Typography variant="h4" fontWeight={900} sx={{ my: 0.5, color: '#FF3366' }}>
+                      {stats.negados_hoje || 0}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">Acessos barrados hoje</Typography>
+              </GlassCard>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={2.4}>
+              <GlassCard sx={{ p: 2, borderLeft: '4px solid #B026FF', background: 'rgba(176, 38, 255, 0.04)' }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography variant="caption" fontWeight={800} color="#B026FF">FISCALIZAÇÕES</Typography>
+                      <SecurityIcon sx={{ color: '#B026FF', fontSize: 22 }} />
+                  </Stack>
+                  <Typography variant="h4" fontWeight={900} sx={{ my: 0.5, color: '#fff' }}>
+                      {stats.fiscalizacoes_hoje || 0}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">Verificações de fiscais</Typography>
+              </GlassCard>
+          </Grid>
+      </Grid>
+
+      {/* CARROSSEL / SELETOR DE ÁREAS EM TEMPO REAL COM FILTRO DE 1 CLIQUE */}
+      {stats.areas && stats.areas.length > 0 && (
+          <Box sx={{ mb: 3 }}>
+              <Typography variant="caption" fontWeight={800} color="#888" sx={{ letterSpacing: 1, textTransform: 'uppercase', mb: 1, display: 'block' }}>
+                  Áreas Físicas do Evento (Clique para filtrar feed):
+              </Typography>
+              <Stack direction="row" spacing={1.5} sx={{ overflowX: 'auto', pb: 1 }}>
+                  <Chip
+                      clickable
+                      onClick={() => setFiltros(f => ({ ...f, area_id: '' }))}
+                      label="Todas as Áreas"
+                      variant={filtros.area_id === '' ? 'filled' : 'outlined'}
+                      color={filtros.area_id === '' ? 'primary' : 'default'}
+                      sx={{ fontWeight: 800, px: 1 }}
+                  />
+                  {stats.areas.map(area => {
+                      const isSelected = filtros.area_id === area.id;
+                      return (
+                          <Chip
+                              key={area.id}
+                              clickable
+                              onClick={() => setFiltros(f => ({ ...f, area_id: isSelected ? '' : area.id }))}
+                              icon={<AreaIcon sx={{ fontSize: 16 }} />}
+                              label={`${area.nome || area.nome_area} (${area.total_acessos_hoje || 0})${area.total_negados_hoje > 0 ? ` ⚠️ ${area.total_negados_hoje}` : ''}`}
+                              color={isSelected ? 'info' : area.total_negados_hoje > 0 ? 'error' : 'default'}
+                              variant={isSelected ? 'filled' : 'outlined'}
+                              sx={{
+                                  fontWeight: 800,
+                                  borderColor: isSelected ? '#00D4FF' : area.total_negados_hoje > 0 ? '#FF3366' : 'rgba(255,255,255,0.15)',
+                                  boxShadow: isSelected ? '0 0 10px rgba(0,212,255,0.4)' : 'none'
+                              }}
+                          />
+                      );
+                  })}
+              </Stack>
+          </Box>
+      )}
+
       {/* ABA 0: FEED AO VIVO */}
       {tabIndex === 0 && (
         <Grid container spacing={3}>
@@ -158,7 +305,7 @@ const Monitor = () => {
                         <InputLabel>ÁREA</InputLabel>
                         <Select label="ÁREA" value={filtros.area_id} onChange={(e) => setFiltros({...filtros, area_id: e.target.value})}>
                             <MenuItem value="">Todas as Áreas</MenuItem>
-                            {areas.map(a => <MenuItem key={a.id} value={a.id}>{a.nome}</MenuItem>)}
+                            {areas.map(a => <MenuItem key={a.id} value={a.id}>{a.nome || a.nome_area}</MenuItem>)}
                         </Select>
                     </FormControl>
                     <FormControl size="small" sx={{ minWidth: 200 }}>
@@ -174,6 +321,7 @@ const Monitor = () => {
                             <MenuItem value="todos">Todos</MenuItem>
                             <MenuItem value="checkin">Check-in</MenuItem>
                             <MenuItem value="checkout">Check-out</MenuItem>
+                            <MenuItem value="fiscalizacao">Fiscalização</MenuItem>
                             <MenuItem value="negado">Negado</MenuItem>
                         </Select>
                     </FormControl>
@@ -199,27 +347,37 @@ const Monitor = () => {
                         )}
                         {logs.map((log, idx) => {
                             const isNegado = log.tipo === 'negado' || log.resultado === 'negado';
+                            const isFiscalizacao = log.tipo === 'fiscalizacao';
                             const isWatchlist = watchlist.some(w => w.cpf === log.pessoas?.cpf);
                             return (
                                 <LogItem key={log.id || idx} tipo={isNegado ? 'negado' : log.tipo} monitorado={isWatchlist}>
                                     <Avatar src={log.pessoas?.foto_url} sx={{ width: 50, height: 50, border: '2px solid rgba(255,255,255,0.1)' }} />
                                     <Box sx={{ flex: 1 }}>
                                         <Typography variant="body1" fontWeight={800} color={isWatchlist ? '#FFB800' : '#fff'}>
-                                            {log.pessoas?.nome_completo || log.pessoas?.nome || 'Anônimo'}
+                                            {log.pessoas?.nome_completo || log.pessoas?.nome || log.pessoa_nome || 'Anônimo'}
                                             {isWatchlist && <Chip label="MONITORADO" size="small" sx={{ ml: 1, bgcolor: '#FFB800', color: '#000', fontWeight: 900, height: 20 }} />}
                                         </Typography>
                                         <Stack direction="row" spacing={2}>
                                             <Typography variant="caption" color="text.secondary">📍 {log.area_nome || 'Local Externo'}</Typography>
-                                            <Typography variant="caption" color="text.secondary">| Terminal: {log.dispositivos_acesso?.nome || log.dispositivo_nome || log.dispositivo_id}</Typography>
+                                            <Typography variant="caption" color="text.secondary">| Terminal: {log.dispositivos_acesso?.nome || log.dispositivo_nome || log.dispositivo_id || 'Fiscal Portátil'}</Typography>
                                         </Stack>
                                     </Box>
                                     <Box sx={{ textAlign: 'right', minWidth: 120 }}>
                                         <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center">
                                             {isNegado ? <BlockIcon sx={{ color: '#FF3366', fontSize: 18 }} /> : 
+                                             isFiscalizacao ? <SecurityIcon sx={{ color: '#00D4FF', fontSize: 18 }} /> :
                                              log.tipo === 'checkin' ? <LoginIcon sx={{ color: '#00FF88', fontSize: 18 }} /> : 
-                                             <CheckoutIcon sx={{ color: '#FF3366', fontSize: 18 }} />}
-                                            <Typography variant="subtitle2" fontWeight={900} color={isNegado ? '#FF3366' : log.tipo === 'checkin' ? '#00FF88' : '#FF3366'}>
-                                                {isNegado ? 'NEGADO' : log.tipo?.toUpperCase()}
+                                             <CheckoutIcon sx={{ color: '#FF8800', fontSize: 18 }} />}
+                                            <Typography
+                                                variant="subtitle2"
+                                                fontWeight={900}
+                                                color={
+                                                    isNegado ? '#FF3366' : 
+                                                    isFiscalizacao ? '#00D4FF' :
+                                                    log.tipo === 'checkin' ? '#00FF88' : '#FF8800'
+                                                }
+                                            >
+                                                {isNegado ? 'NEGADO' : isFiscalizacao ? 'FISCALIZADO' : log.tipo?.toUpperCase()}
                                             </Typography>
                                         </Stack>
                                         <Typography variant="caption" color="text.secondary">

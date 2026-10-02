@@ -91,6 +91,10 @@ const Pessoas = () => {
     handleSave,
     handleDateToggle,
     handleFaseToggle,
+    handleSelectAllPhase,
+    handleClearPhase,
+    handleSelectAllDates,
+    handleClearAllDates,
     handleDelete,
     confirmDelete,
     handleOpenBlock,
@@ -187,6 +191,10 @@ const Pessoas = () => {
         activeEvent={activeEvent}
         handleDateToggle={handleDateToggle}
         handleFaseToggle={handleFaseToggle}
+        handleSelectAllPhase={handleSelectAllPhase}
+        handleClearPhase={handleClearPhase}
+        handleSelectAllDates={handleSelectAllDates}
+        handleClearAllDates={handleClearAllDates}
         documentos={documentos}
         handleUploadECM={handleUploadECM}
         handleOpenWebcamECM={handleOpenWebcamECM}

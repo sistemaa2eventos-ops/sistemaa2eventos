@@ -45,7 +45,7 @@ const deviceValidators = {
 
     body('modo')
       .optional()
-      .isIn(['checkin', 'checkout', 'ambos']).withMessage('Modo inválido'),
+      .isIn(['checkin', 'checkout', 'ambos', 'credenciamento', 'acesso_geral', 'area_restrita']).withMessage('Modo inválido'),
 
     body('area_nome')
       .optional()

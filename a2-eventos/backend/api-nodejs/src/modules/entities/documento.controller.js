@@ -124,6 +124,22 @@ class DocumentoController {
             return ApiResponse.error(res, 'Erro ao buscar fila de auditoria documental.');
         }
     }
+
+    /**
+     * Obter estatísticas gerais da fila de auditoria (métricas para dashboard/cards)
+     */
+    async obterEstatisticas(req, res) {
+        try {
+            const supabaseClient = req.supabase || supabase;
+            const eventoId = req.headers['x-evento-id'] || req.query.evento_id;
+
+            const stats = await documentoService.obterEstatisticas(supabaseClient, eventoId);
+            return ApiResponse.success(res, stats);
+        } catch (error) {
+            logger.error('Erro ao obter estatísticas de documentos:', error.message);
+            return ApiResponse.error(res, 'Erro ao carregar estatísticas.');
+        }
+    }
 }
 
 module.exports = new DocumentoController();

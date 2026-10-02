@@ -10,7 +10,8 @@ import {
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
   FileUpload as UploadIcon,
-  CameraAlt as CameraIcon
+  CameraAlt as CameraIcon,
+  Check as CheckIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import PhotoCapture from '../common/PhotoCapture';
@@ -30,6 +31,10 @@ const PessoaFormDialog = ({
   activeEvent,
   handleDateToggle,
   handleFaseToggle,
+  handleSelectAllPhase,
+  handleClearPhase,
+  handleSelectAllDates,
+  handleClearAllDates,
   documentos,
   handleUploadECM,
   handleOpenWebcamECM,
@@ -38,6 +43,7 @@ const PessoaFormDialog = ({
   handleSave,
   isEmpresa = false
 }) => {
+  const [activePhaseTab, setActivePhaseTab] = React.useState('todas');
   return (
     <Dialog
       open={open}
@@ -53,6 +59,7 @@ const PessoaFormDialog = ({
           borderRadius: 3,
           minHeight: isMobile ? '100%' : '80vh',
           maxHeight: isMobile ? '100%' : '90vh',
+          height: isMobile ? '100%' : '88vh',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -74,44 +81,190 @@ const PessoaFormDialog = ({
 
       </DialogTitle>
       
-      <DialogContent sx={{ p: 0, flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
-        <Grid container sx={{ flex: 1, height: '100%' }}>
-          <Grid item xs={12} md={5} sx={{
+      <DialogContent sx={{ p: 0, flex: '1 1 auto', display: 'flex', minHeight: 0, overflow: 'hidden' }}>
+        <Grid container sx={{ flex: 1, height: '100%', minHeight: 0 }}>
+          <Grid item xs={12} md={activeStep === 1 ? 4 : 5} sx={{
             borderRight: isMobile ? 'none' : '1px solid rgba(255, 255, 255, 0.05)',
-            p: 4, display: 'flex', flexDirection: 'column', bgcolor: 'rgba(0,0,0,0.2)',
-            overflowY: 'auto', minHeight: 0, height: '100%'
+            p: activeStep === 1 ? 2.5 : 4, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            bgcolor: 'rgba(0,0,0,0.2)',
+            overflowY: 'auto', 
+            minHeight: 0, 
+            height: '100%',
+            '&::-webkit-scrollbar': { width: '6px' },
+            '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.3)', borderRadius: '10px' }
           }}>
-            {!isEmpresa && (
-              <>
-                <Box sx={{ mb: 3, textAlign: 'center' }}>
-                  <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: 2 }}>IDENTIFICAÇÃO BIOMÉTRICA</Typography>
-                </Box>
-                <PhotoCapture
-                  onPhotoCaptured={(url) => setFormData({ ...formData, foto_url: url })}
-                  initialPhoto={formData.foto_url}
-                />
-                <Box sx={{ mt: 'auto', pt: 3 }}>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center', display: 'block', fontStyle: 'italic' }}>
-                    A qualidade do enquadramento garante a velocidade de identificação nos terminais.
+            {activeStep === 0 && (
+              !isEmpresa ? (
+                <>
+                  <Box sx={{ mb: 3, textAlign: 'center' }}>
+                    <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: 2 }}>IDENTIFICAÇÃO BIOMÉTRICA</Typography>
+                  </Box>
+                  <PhotoCapture
+                    onPhotoCaptured={(url) => setFormData({ ...formData, foto_url: url })}
+                    initialPhoto={formData.foto_url}
+                  />
+                  <Box sx={{ mt: 'auto', pt: 3 }}>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center', display: 'block', fontStyle: 'italic' }}>
+                      A qualidade do enquadramento garante a velocidade de identificação nos terminais.
+                    </Typography>
+                  </Box>
+                </>
+              ) : (
+                <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
+                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>
+                    A coleta biométrica será realizada pelo próprio colaborador via link seguro de convite.
                   </Typography>
                 </Box>
-              </>
+              )
             )}
-            {isEmpresa && (
-              <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
-                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>
-                  A coleta biométrica será realizada pelo próprio colaborador via link seguro de convite.
+
+            {activeStep === 1 && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {/* Miniatura do Perfil */}
+                <Box sx={{ 
+                  p: 1.5, 
+                  borderRadius: 2, 
+                  bgcolor: 'rgba(0, 212, 255, 0.04)', 
+                  border: '1px solid rgba(0, 212, 255, 0.15)',
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 1.5 
+                }}>
+                  {formData.foto_url ? (
+                    <Box 
+                      component="img" 
+                      src={formData.foto_url} 
+                      alt="Foto" 
+                      sx={{ width: 56, height: 56, borderRadius: 1.5, objectFit: 'cover', border: '2px solid #00D4FF' }} 
+                    />
+                  ) : (
+                    <Box sx={{ width: 56, height: 56, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed rgba(255,255,255,0.2)' }}>
+                      <CameraIcon sx={{ color: 'rgba(255,255,255,0.3)', fontSize: 22 }} />
+                    </Box>
+                  )}
+                  <Box sx={{ overflow: 'hidden' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#fff', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                      {formData.nome_completo || 'Colaborador'}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#00D4FF', display: 'block', fontWeight: 600 }}>
+                      {formData.cpf || 'Sem CPF'}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.68rem', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                      {empresas.find(e => e.id === formData.empresa_id)?.nome || 'Empresa Âncora'}
+                    </Typography>
+                  </Box>
+                </Box>
+
+                <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 800, letterSpacing: '1px' }}>
+                  ESCOPO & CATEGORIA
+                </Typography>
+
+                <FormControl fullWidth size="small" required>
+                  <InputLabel>Categoria Operacional</InputLabel>
+                  <Select 
+                    value={formData.tipo_pessoa || ''} 
+                    label="Categoria Operacional" 
+                    onChange={(e) => setFormData({ ...formData, tipo_pessoa: e.target.value })} 
+                    MenuProps={{ PaperProps: { sx: { bgcolor: '#0a1628', color: '#fff', border: '1px solid #00D4FF' } } }}
+                  >
+                    <MenuItem value="colaborador">Colaborador (B2B) / Staff</MenuItem>
+                    <MenuItem value="visitante">Visitante (B2C)</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <TextField 
+                  label="Função Especificada" 
+                  fullWidth 
+                  size="small" 
+                  value={formData.funcao} 
+                  onChange={(e) => setFormData({ ...formData, funcao: e.target.value })} 
+                />
+
+                {formData.tipo_pessoa === 'visitante' && (
+                  <FormControlLabel 
+                    control={<Checkbox size="small" checked={formData.pagamento_validado} onChange={(e) => setFormData({ ...formData, pagamento_validado: e.target.checked })} sx={{ color: 'rgba(0, 255, 136, 0.5)', '&.Mui-checked': { color: '#00FF88' } }} />} 
+                    label={<Typography variant="caption">Pagamento Validado</Typography>} 
+                  />
+                )}
+
+                {(selectedPessoa?.status === 'PENDENTE' || selectedPessoa?.status_acesso === 'pendente' || !selectedPessoa) && (
+                  <FormControl fullWidth size="small" required>
+                    <InputLabel>Parecer Documental Inicial</InputLabel>
+                    <Select 
+                      value={formData.parecer_documentos || 'pendente'} 
+                      label="Parecer Documental Inicial" 
+                      onChange={(e) => setFormData({ ...formData, parecer_documentos: e.target.value })} 
+                      MenuProps={{ PaperProps: { sx: { bgcolor: '#0a1628', color: '#fff', border: '1px solid #00D4FF' } } }}
+                    >
+                      <MenuItem value="pendente">Documentos Pendentes</MenuItem>
+                      <MenuItem value="completo">Completo e Correto (Aprovar)</MenuItem>
+                      <MenuItem value="incorreto">Incorreto / Reprovado</MenuItem>
+                    </Select>
+                  </FormControl>
+                )}
+
+                <Box sx={{ mt: 1, p: 1.5, borderRadius: 2, bgcolor: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 800, textTransform: 'uppercase', display: 'block', mb: 0.5 }}>
+                    ACESSO POR FASE DO EVENTO
+                  </Typography>
+                  <FormGroup>
+                    {['montagem', 'evento', 'desmontagem'].map(fase => {
+                      const isChecked = Array.isArray(formData?.fases_acesso) && formData.fases_acesso.includes(fase);
+                      const phaseColor = fase === 'montagem' ? '#00D4FF' : (fase === 'evento' ? '#00FF88' : '#FFB800');
+                      return (
+                        <FormControlLabel 
+                          key={fase}
+                          control={
+                            <Checkbox 
+                              size="small"
+                              checked={!!isChecked} 
+                              onChange={() => handleFaseToggle(fase)}
+                              sx={{ color: 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: phaseColor }, p: 0.5 }}
+                            />
+                          }
+                          label={<Typography variant="caption" sx={{ textTransform: 'uppercase', fontWeight: 700, color: isChecked ? phaseColor : 'rgba(255,255,255,0.6)' }}>{fase}</Typography>}
+                        />
+                      );
+                    })}
+                  </FormGroup>
+                </Box>
+              </Box>
+            )}
+
+            {activeStep === 2 && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box sx={{ 
+                  p: 2, 
+                  borderRadius: 2, 
+                  bgcolor: 'rgba(0, 212, 255, 0.04)', 
+                  border: '1px solid rgba(0, 212, 255, 0.15)',
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 1.5 
+                }}>
+                  {formData.foto_url && (
+                    <Box component="img" src={formData.foto_url} alt="Foto" sx={{ width: 56, height: 56, borderRadius: 1.5, objectFit: 'cover', border: '2px solid #00D4FF' }} />
+                  )}
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{formData.nome_completo}</Typography>
+                    <Typography variant="caption" sx={{ color: '#00FF88', fontWeight: 700 }}>{formData.funcao || 'Colaborador'}</Typography>
+                  </Box>
+                </Box>
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontStyle: 'italic', mt: 2 }}>
+                  Verifique a conformidade de segurança e audite a documentação obrigatória anexada.
                 </Typography>
               </Box>
             )}
 
           </Grid>
 
-          <Grid item xs={12} md={7} sx={{ p: { xs: 3, md: 5 }, pr: { xs: 3, md: 2 }, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%', '&::-webkit-scrollbar': { width: '6px' }, '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.3)', borderRadius: '10px' }, '&::-webkit-scrollbar-track': { background: 'transparent' } }}>
-            <Box sx={{ pr: { xs: 0, md: 2 }, pb: 4, flex: 1 }}>
+          <Grid item xs={12} md={activeStep === 1 ? 8 : 7} sx={{ p: { xs: 2.5, md: 3 }, pr: { xs: 2, md: 2.5 }, height: '100%', maxHeight: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0, '&::-webkit-scrollbar': { width: '6px' }, '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.4)', borderRadius: '10px' }, '&::-webkit-scrollbar-track': { background: 'rgba(255,255,255,0.02)' } }}>
+            <Box sx={{ pr: { xs: 0, md: 0.5 }, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               {!isEmpresa && (
               <Stepper activeStep={activeStep} alternativeLabel sx={{
-                mb: 6,
+                mb: 2.5,
                 '& .MuiStepConnector-line': { borderColor: 'rgba(255,255,255,0.05)' },
                 '& .MuiStepIcon-root': {
                   color: 'rgba(255,255,255,0.05)',
@@ -190,113 +343,186 @@ const PessoaFormDialog = ({
 
 
               {activeStep === 1 && (
-                <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12}>
-                      <FormControl fullWidth required>
-                        <InputLabel>Categoria Operacional</InputLabel>
-                        <Select value={formData.tipo_pessoa || ''} label="Categoria Operacional" onChange={(e) => setFormData({ ...formData, tipo_pessoa: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: '#0a1628', color: '#fff', border: '1px solid #00D4FF' } } }}>
-                          <MenuItem value="colaborador">Colaborador (B2B) / Staff</MenuItem>
-                          <MenuItem value="visitante">Visitante (B2C)</MenuItem>
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <TextField label="Função Especificada" fullWidth value={formData.funcao} onChange={(e) => setFormData({ ...formData, funcao: e.target.value })} />
-                    </Grid>
-                    {formData.tipo_pessoa === 'visitante' && (
-                      <Grid item xs={6} sx={{ display: 'flex', alignItems: 'center' }}>
-                        <FormControlLabel control={<Checkbox checked={formData.pagamento_validado} onChange={(e) => setFormData({ ...formData, pagamento_validado: e.target.checked })} sx={{ color: 'rgba(0, 255, 136, 0.5)', '&.Mui-checked': { color: '#00FF88' } }} />} label="Pagamento Validado" />
-                      </Grid>
-                    )}
-                    {(selectedPessoa?.status === 'PENDENTE' || selectedPessoa?.status_acesso === 'pendente' || !selectedPessoa) && (
-                      <Grid item xs={12}>
-                        <FormControl fullWidth required>
-                          <InputLabel>Parecer Documental Inicial</InputLabel>
-                          <Select value={formData.parecer_documentos || 'pendente'} label="Parecer Documental Inicial" onChange={(e) => setFormData({ ...formData, parecer_documentos: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: '#0a1628', color: '#fff', border: '1px solid #00D4FF' } } }}>
-                            <MenuItem value="pendente">Documentos Pendentes (Faltam Envios)</MenuItem>
-                            <MenuItem value="completo">Completo e Correto (Aprovar Cadastro)</MenuItem>
-                            <MenuItem value="incorreto">Incorreto / Reprovado (Bloquear Cadastro)</MenuItem>
-                          </Select>
-                        </FormControl>
-                      </Grid>
-                    )}
-                  </Grid>
-
-                  {activeEvent && formData && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+                  {/* Cabeçalho da seção com ações */}
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
                     <Box>
-                      <Typography variant="subtitle2" sx={{ color: '#00D4FF', mb: 1, fontWeight: 700 }}>ACESSO POR FASE DO EVENTO</Typography>
-                      <Divider sx={{ mb: 2, borderColor: 'rgba(255,255,255,0.1)' }} />
-                      <FormGroup row sx={{ mb: 3 }}>
-                        {['montagem', 'evento', 'desmontagem'].map(fase => {
-                          const isChecked = Array.isArray(formData?.fases_acesso) && formData.fases_acesso.includes(fase);
-                          return (
-                            <FormControlLabel 
-                              key={fase}
-                              control={
-                                <Checkbox 
-                                  checked={!!isChecked} 
-                                  onChange={() => handleFaseToggle(fase)}
-                                  sx={{ color: 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: '#00D4FF' } }}
-                                />
-                              }
-                              label={<Typography variant="body2" sx={{ textTransform: 'uppercase' }}>{fase}</Typography>}
-                            />
-                          );
-                        })}
-                      </FormGroup>
-                      
-                      <Typography variant="subtitle2" sx={{ color: '#00D4FF', mb: 1, fontWeight: 700 }}>DIAS PERMITIDOS PARA ACESSO FÍSICO</Typography>
-                      <Divider sx={{ mb: 2, borderColor: 'rgba(255,255,255,0.1)' }} />
-                      <Box 
-                        sx={{ 
-                          maxHeight: 250, 
-                          overflowY: 'auto', 
-                          pr: 2, 
-                          border: '1px solid rgba(0, 212, 255, 0.1)',
-                          borderRadius: 2,
-                          p: 2,
-                          bgcolor: 'rgba(0,0,0,0.1)',
-                          '&::-webkit-scrollbar': { width: '6px' }, 
-                          '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.4)', borderRadius: '10px' },
-                          '&::-webkit-scrollbar-track': { background: 'rgba(255,255,255,0.05)' }
+                      <Typography variant="subtitle2" sx={{ color: '#00D4FF', fontWeight: 800, letterSpacing: '0.5px' }}>
+                        DIAS PERMITIDOS PARA ACESSO FÍSICO
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>
+                        Selecione as datas em que a credencial terá liberação de acesso nos terminais.
+                      </Typography>
+                    </Box>
+                    <Stack direction="row" spacing={1}>
+                      <Button 
+                        size="small" 
+                        variant="outlined" 
+                        onClick={handleSelectAllDates} 
+                        sx={{ fontSize: '0.68rem', fontWeight: 700, color: '#00FF88', borderColor: 'rgba(0,255,136,0.3)', py: 0.3, px: 1.5, '&:hover': { borderColor: '#00FF88', bgcolor: 'rgba(0,255,136,0.08)' } }}
+                      >
+                        MARCAR TODOS
+                      </Button>
+                      <Button 
+                        size="small" 
+                        variant="outlined" 
+                        onClick={handleClearAllDates} 
+                        sx={{ fontSize: '0.68rem', fontWeight: 700, color: '#FF3366', borderColor: 'rgba(255,51,102,0.3)', py: 0.3, px: 1.5, '&:hover': { borderColor: '#FF3366', bgcolor: 'rgba(255,51,102,0.08)' } }}
+                      >
+                        LIMPAR
+                      </Button>
+                    </Stack>
+                  </Box>
+
+                  {/* Abas Rápidas de Navegação / Filtro por Fase */}
+                  <Stack direction="row" spacing={1} sx={{ mb: 1.5, flexWrap: 'wrap', gap: 0.5 }}>
+                    {[
+                      { id: 'todas', label: 'TODAS AS FASES', color: '#00D4FF' },
+                      { id: 'montagem', label: 'MONTAGEM', color: '#00D4FF' },
+                      { id: 'evento', label: 'EVENTO', color: '#00FF88' },
+                      { id: 'desmontagem', label: 'DESMONTAGEM', color: '#FFB800' }
+                    ].map(tab => (
+                      <Button
+                        key={tab.id}
+                        size="small"
+                        variant={activePhaseTab === tab.id ? 'contained' : 'outlined'}
+                        onClick={() => setActivePhaseTab(tab.id)}
+                        sx={{
+                          fontSize: '0.68rem',
+                          fontWeight: 800,
+                          letterSpacing: '0.5px',
+                          color: activePhaseTab === tab.id ? '#0a1628' : tab.color,
+                          bgcolor: activePhaseTab === tab.id ? tab.color : 'transparent',
+                          borderColor: tab.color,
+                          py: 0.3,
+                          px: 1.3,
+                          boxShadow: activePhaseTab === tab.id ? `0 0 10px ${tab.color}40` : 'none',
+                          '&:hover': {
+                            bgcolor: activePhaseTab === tab.id ? tab.color : 'rgba(255,255,255,0.06)'
+                          }
                         }}
                       >
-                        <Stack spacing={2.5}>
-                          {['montagem', 'evento', 'desmontagem'].map(phase => {
-                            const dates = (activeEvent && activeEvent[`datas_${phase}`]) || [];
-                            if (!Array.isArray(dates) || dates.length === 0) return null;
-                            return (
-                              <Box key={phase}>
-                                <Typography variant="caption" sx={{ color: '#00FF88', textTransform: 'uppercase', fontWeight: 800, display: 'block', mb: 1 }}>{phase}</Typography>
-                                <Grid container spacing={1}>
-                                  {dates.map(date => {
-                                    const isChecked = Array.isArray(formData?.dias_acesso) && formData.dias_acesso.includes(date);
-                                    return (
-                                      <Grid item key={date}>
-                                        <FormControlLabel 
-                                          control={
-                                            <Checkbox 
-                                              size="small" 
-                                              checked={!!isChecked} 
-                                              onChange={() => handleDateToggle(date)} 
-                                              sx={{ color: 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: '#00FF88' }, p: 0.5 }} 
-                                            />
-                                          } 
-                                          label={<Typography variant="caption" sx={{ color: isChecked ? '#fff' : 'rgba(255,255,255,0.6)' }}>{date ? format(new Date(date + 'T00:00:00'), "dd/MM") : '--/--'}</Typography>} 
-                                          sx={{ m: 0, mr: 1, border: '1px solid rgba(255,255,255,0.05)', borderRadius: 1, px: 1, py: 0.5, bgcolor: isChecked ? 'rgba(0,255,136,0.05)' : 'transparent' }}
-                                        />
-                                      </Grid>
-                                    );
-                                  })}
-                                </Grid>
+                        {tab.label}
+                      </Button>
+                    ))}
+                  </Stack>
+
+                  {/* Container Visual com as Fases e Datas */}
+                  <Box 
+                    sx={{ 
+                      flex: 1,
+                      minHeight: 0,
+                      border: '1px solid rgba(0, 212, 255, 0.2)',
+                      borderRadius: 2,
+                      p: 2,
+                      bgcolor: 'rgba(0,0,0,0.25)',
+                      overflowY: 'auto',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                      '&::-webkit-scrollbar': { width: '6px' }, 
+                      '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.5)', borderRadius: '10px' }, 
+                      '&::-webkit-scrollbar-track': { background: 'rgba(255,255,255,0.02)' }
+                    }}
+                  >
+                    {[
+                      { id: 'montagem', label: 'MONTAGEM', color: '#00D4FF', bg: 'rgba(0,212,255,0.04)', border: 'rgba(0,212,255,0.2)' },
+                      { id: 'evento', label: 'EVENTO', color: '#00FF88', bg: 'rgba(0,255,136,0.04)', border: 'rgba(0,255,136,0.2)' },
+                      { id: 'desmontagem', label: 'DESMONTAGEM', color: '#FFB800', bg: 'rgba(255,184,0,0.05)', border: 'rgba(255,184,0,0.25)' }
+                    ]
+                      .filter(phase => activePhaseTab === 'todas' || activePhaseTab === phase.id)
+                      .map(phase => {
+                        const dates = (activeEvent && activeEvent[`datas_${phase.id}`]) || [];
+                        if (!Array.isArray(dates) || dates.length === 0) return null;
+                        const totalDates = dates.length;
+                        const selectedCount = dates.filter(d => Array.isArray(formData?.dias_acesso) && formData.dias_acesso.includes(d)).length;
+
+                        return (
+                          <Box 
+                            key={phase.id}
+                            sx={{
+                              p: 1.5,
+                              borderRadius: 2,
+                              bgcolor: phase.bg,
+                              border: `1px solid ${phase.border}`
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.2, flexWrap: 'wrap', gap: 1 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography variant="caption" sx={{ color: phase.color, fontWeight: 900, letterSpacing: '1px', textTransform: 'uppercase', fontSize: '0.78rem' }}>
+                                  {phase.label}
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.72rem' }}>
+                                  ({selectedCount}/{totalDates} dias selecionados)
+                                </Typography>
                               </Box>
-                            );
-                          })}
-                        </Stack>
-                      </Box>
-                    </Box>
-                  )}
+                              <Stack direction="row" spacing={0.8}>
+                                <Button 
+                                  size="small" 
+                                  onClick={() => handleSelectAllPhase ? handleSelectAllPhase(phase.id) : null}
+                                  sx={{ fontSize: '0.65rem', fontWeight: 700, color: phase.color, py: 0.2, px: 1, minWidth: 'auto', border: `1px solid ${phase.border}`, '&:hover': { bgcolor: `${phase.border}` } }}
+                                >
+                                  TODOS
+                                </Button>
+                                <Button 
+                                  size="small" 
+                                  onClick={() => handleClearPhase ? handleClearPhase(phase.id) : null}
+                                  sx={{ fontSize: '0.65rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', py: 0.2, px: 1, minWidth: 'auto', border: '1px solid rgba(255,255,255,0.1)', '&:hover': { color: '#FF3366', borderColor: '#FF3366' } }}
+                                >
+                                  LIMPAR
+                                </Button>
+                              </Stack>
+                            </Box>
+
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                              {dates.map(date => {
+                                const isChecked = Array.isArray(formData?.dias_acesso) && formData.dias_acesso.includes(date);
+                                return (
+                                  <Box
+                                    key={date}
+                                    onClick={() => handleDateToggle(date)}
+                                    sx={{
+                                      cursor: 'pointer',
+                                      userSelect: 'none',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 0.8,
+                                      px: 1.2,
+                                      py: 0.6,
+                                      borderRadius: 1.5,
+                                      border: `1px solid ${isChecked ? phase.color : 'rgba(255,255,255,0.1)'}`,
+                                      bgcolor: isChecked ? `${phase.color}18` : 'rgba(255,255,255,0.02)',
+                                      boxShadow: isChecked ? `0 0 10px ${phase.color}30` : 'none',
+                                      transition: 'all 0.15s ease',
+                                      '&:hover': {
+                                        borderColor: phase.color,
+                                        bgcolor: `${phase.color}10`
+                                      }
+                                    }}
+                                  >
+                                    <Box sx={{
+                                      width: 16,
+                                      height: 16,
+                                      borderRadius: 0.5,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      bgcolor: isChecked ? phase.color : 'transparent',
+                                      border: `1px solid ${isChecked ? phase.color : 'rgba(255,255,255,0.3)'}`
+                                    }}>
+                                      {isChecked && <CheckIcon sx={{ fontSize: 13, color: '#0a1628', fontWeight: 900 }} />}
+                                    </Box>
+                                    <Typography variant="caption" sx={{ color: isChecked ? '#fff' : 'rgba(255,255,255,0.7)', fontWeight: isChecked ? 700 : 500, fontSize: '0.78rem' }}>
+                                      {date ? format(new Date(date + 'T00:00:00'), "dd/MM") : '--/--'}
+                                    </Typography>
+                                  </Box>
+                                );
+                              })}
+                            </Box>
+                          </Box>
+                        );
+                      })}
+                  </Box>
                 </Box>
               )}
 

@@ -2,6 +2,7 @@ const accessController = require('../checkin/checkin.controller');
 const checkinService = require('../checkin/checkin.service');
 const logger = require('../../services/logger');
 const { supabase } = require('../../config/supabase');
+const websocketService = require('../../services/websocketService');
 
 class IntelbrasController {
     /**
@@ -107,6 +108,58 @@ class IntelbrasController {
                 if (!pessoa) {
                     logger.warn(`[Intelbras] Identidade desconhecida: ${UserID}`);
                     continue;
+                }
+
+                // 2.1 Verificar se o dispositivo está vinculado a um operador de credenciamento
+                const sessaoOperador = await this._buscarSessaoOperador(dispositivoId);
+                const isEstacaoExclusivaCredenciamento = dispositivoConfig?.modo === 'credenciamento' && !dispositivoConfig?.controla_rele;
+
+                if (sessaoOperador || dispositivoConfig?.modo === 'credenciamento') {
+                    logger.info(`🎯 [Intelbras Push] Pessoa identificada na estação de credenciamento: ${pessoa.nome_completo || pessoa.nome}`);
+
+                    const payloadCredenciamento = {
+                        dispositivo_id: dispositivoId,
+                        dispositivo_nome: dispositivoNome,
+                        estacao_nome: sessaoOperador?.estacao_nome || dispositivoNome,
+                        operador_id: sessaoOperador?.operador_id || null,
+                        confianca: Similarity || 100,
+                        timestamp: new Date().toISOString(),
+                        pessoa: {
+                            id: pessoa.id,
+                            nome_completo: pessoa.nome_completo || pessoa.nome,
+                            cpf: pessoa.cpf,
+                            foto_url: pessoa.foto_url,
+                            funcao: pessoa.funcao || pessoa.cargo,
+                            status_documentos: pessoa.status_documentos || 'pendente',
+                            status_acesso: pessoa.status_acesso,
+                            empresa_nome: pessoa.empresas?.nome || pessoa.empresa_nome || 'Empresa não informada',
+                            empresa_id: pessoa.empresa_id,
+                            numero_pulseira: pessoa.numero_pulseira || null,
+                            areas_autorizadas: pessoa.areas_autorizadas || []
+                        }
+                    };
+
+                    if (sessaoOperador?.operador_id) {
+                        websocketService.emitToOperador(sessaoOperador.operador_id, 'credenciamento_abrir', payloadCredenciamento);
+                    }
+                    if (dispositivoId) {
+                        websocketService.emitToDispositivo(dispositivoId, 'credenciamento_abrir', payloadCredenciamento);
+                    }
+                    if (eventoContexto) {
+                        websocketService.emit('credenciamento_abrir', payloadCredenciamento, eventoContexto);
+                    }
+
+                    if (isEstacaoExclusivaCredenciamento) {
+                        if (deviceAuth) {
+                            try {
+                                const IntelbrasService = require('./intelbras.service');
+                                const service = new IntelbrasService(deviceAuth);
+                                const primeiroNome = (pessoa.nome_completo || pessoa.nome || '').split(' ')[0] || 'COLABORADOR';
+                                await service.displayMessage(`AGUARDE ATENDIMENTO\n${primeiroNome}`);
+                            } catch (_) {}
+                        }
+                        continue;
+                    }
                 }
 
                 // 3. Registrar o acesso no controlador central (Smart Access Logic)
@@ -242,7 +295,7 @@ class IntelbrasController {
             // 3. Buscar pessoa por CPF (11 dígitos) ou UUID
             let pessoa = null;
             {
-                let q = supabase.from('pessoas').select('id, nome_completo, cpf, status_acesso, empresa_id');
+                let q = supabase.from('pessoas').select('id, nome_completo, cpf, foto_url, status_acesso, status_documentos, cargo, funcao, numero_pulseira, empresa_id, empresas(nome)');
                 if (eventoId) q = q.eq('evento_id', eventoId);
 
                 if (/^\d{11}$/.test(userID)) {
@@ -258,6 +311,50 @@ class IntelbrasController {
             }
 
             if (!pessoa) return deny(`Pessoa não encontrada: ${userID}`);
+
+            // 3.1 Verificar se o dispositivo está vinculado a uma estação/operador de credenciamento
+            const sessaoOperador = await this._buscarSessaoOperador(dispositivo.id);
+            const isEstacaoExclusivaCredenciamento = config.modo === 'credenciamento' && !config.controla_rele;
+
+            if (sessaoOperador || config.modo === 'credenciamento') {
+                logger.info(`🎯 [Intelbras Online] Pessoa identificada na estação de credenciamento: ${pessoa.nome_completo}`);
+
+                const payloadCredenciamento = {
+                    dispositivo_id: dispositivo.id,
+                    dispositivo_nome: dispositivo.nome,
+                    estacao_nome: sessaoOperador?.estacao_nome || dispositivo.nome,
+                    operador_id: sessaoOperador?.operador_id || null,
+                    confianca: body?.Similarity || 100,
+                    timestamp: new Date().toISOString(),
+                    pessoa: {
+                        id: pessoa.id,
+                        nome_completo: pessoa.nome_completo,
+                        cpf: pessoa.cpf,
+                        foto_url: pessoa.foto_url,
+                        funcao: pessoa.funcao || pessoa.cargo,
+                        status_documentos: pessoa.status_documentos || 'pendente',
+                        status_acesso: pessoa.status_acesso,
+                        empresa_nome: pessoa.empresas?.nome || 'Empresa não informada',
+                        empresa_id: pessoa.empresa_id,
+                        numero_pulseira: pessoa.numero_pulseira || null
+                    }
+                };
+
+                if (sessaoOperador?.operador_id) {
+                    websocketService.emitToOperador(sessaoOperador.operador_id, 'credenciamento_abrir', payloadCredenciamento);
+                }
+                if (dispositivo.id) {
+                    websocketService.emitToDispositivo(dispositivo.id, 'credenciamento_abrir', payloadCredenciamento);
+                }
+                if (eventoId) {
+                    websocketService.emit('credenciamento_abrir', payloadCredenciamento, eventoId);
+                }
+
+                if (isEstacaoExclusivaCredenciamento) {
+                    const primeiroNome = (pessoa.nome_completo || '').split(' ')[0] || 'COLABORADOR';
+                    return res.json({ message: `Aguarde Atendimento ${primeiroNome}`, code: 200, auth: 'false' });
+                }
+            }
 
             // 4. Validar políticas de acesso via ValidationService
             const validation = require('../checkin/services/validation.service');
@@ -293,8 +390,9 @@ class IntelbrasController {
             return res.json({ message: `BEM-VINDO ${nome.split(' ')[0]}`, code: 200, auth: 'true' });
 
         } catch (error) {
-            logger.error(`[Online] Erro crítico: ${error.message}`);
-            return res.json({ message: 'Erro interno', code: 500, auth: 'false' });
+            const motivo = error.message || 'Acesso Não Autorizado';
+            logger.warn(`[Online] 🛑 Acesso RECUSADO para ${pessoa?.nome_completo || userID}: ${motivo}`);
+            return res.json({ message: motivo.toUpperCase(), code: 200, auth: 'false' });
         }
     }
 
@@ -372,6 +470,28 @@ class IntelbrasController {
         }
 
         return null;
+    }
+
+    /**
+     * Busca sessão ativa de operador vinculada ao dispositivo
+     */
+    async _buscarSessaoOperador(dispositivoId) {
+        if (!dispositivoId) return null;
+        try {
+            const { data, error } = await supabase
+                .from('sessoes_operador')
+                .select('id, operador_id, dispositivo_id, evento_id, estacao_nome, ativo')
+                .eq('dispositivo_id', dispositivoId)
+                .eq('ativo', true)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (error || !data) return null;
+            return data;
+        } catch (_) {
+            return null;
+        }
     }
 }
 

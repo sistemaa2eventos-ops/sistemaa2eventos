@@ -5,6 +5,7 @@ const validationService = require('./services/validation.service');
 const ApiResponse = require('../../utils/apiResponse');
 const webhookDispatcher = require('../../services/webhookDispatcher');
 const websocketService = require('../../services/websocketService'); // FIX C-02: import ausente causava ReferenceError em runtime
+const databaseService = require('./services/database.service');
 
 class AccessController {
     constructor() {
@@ -17,6 +18,7 @@ class AccessController {
         this.bloquearPessoa = this.bloquearPessoa.bind(this);
         this.consultarAreasPulseira = this.consultarAreasPulseira.bind(this);
         this.consultarPulseira = this.consultarPulseira.bind(this);
+        this.fiscalizarAcesso = this.fiscalizarAcesso.bind(this);
         this.ultimoCheckin = this.ultimoCheckin.bind(this);
         this.acionarCatraca = this.acionarCatraca.bind(this);
         this.checkinManual = this.checkinManual.bind(this);
@@ -129,6 +131,21 @@ class AccessController {
                 logs.forEach(log => {
                     if (log.dispositivo_id && dispMap[log.dispositivo_id]) {
                         log.dispositivo_nome = dispMap[log.dispositivo_id];
+                    }
+                });
+            }
+
+            // Passo 5: Coletar e mapear Áreas para obter o NOME DA ÁREA
+            const areaIds = [...new Set(logs.map(l => l.area_id).filter(id => id))];
+            if (areaIds.length > 0) {
+                const { data: areasData } = await supabaseClient
+                    .from('evento_areas')
+                    .select('id, nome_area')
+                    .in('id', areaIds);
+                const areaMap = (areasData || []).reduce((acc, a) => { acc[a.id] = a.nome_area; return acc; }, {});
+                logs.forEach(log => {
+                    if (log.area_id && areaMap[log.area_id]) {
+                        log.area_nome = areaMap[log.area_id];
                     }
                 });
             }
@@ -893,6 +910,251 @@ class AccessController {
                 'Error in facial checkin'
             );
             return res.status(500).json({ error: 'Erro interno' });
+        }
+    }
+
+    /**
+     * Consultar informações completas da pulseira / colaborador
+     */
+    async consultarPulseira(req, res) {
+        try {
+            const { codigo } = req.params;
+            const eventoId = req.event?.id;
+            const supabaseClient = req.supabase || supabase;
+
+            const safeCodigo = (codigo || '').trim();
+            const { data: pessoas, error } = await supabaseClient
+                .from('pessoas')
+                .select('id, nome_completo, cpf, funcao, status_acesso, status_documentos, numero_pulseira, foto_url, tipo_pulseira_id, empresas(id, nome)')
+                .eq('evento_id', eventoId)
+                .or(`numero_pulseira.eq.${safeCodigo},cpf.eq.${safeCodigo},id.eq.${safeCodigo}`)
+                .limit(1);
+
+            if (error) throw error;
+            if (!pessoas || pessoas.length === 0) {
+                return ApiResponse.error(res, 'Pulseira / Colaborador não encontrado', 404);
+            }
+
+            return ApiResponse.success(res, pessoas[0]);
+        } catch (error) {
+            logger.error({ err: error, codigo: req.params?.codigo }, 'Erro ao consultar pulseira');
+            return ApiResponse.error(res, 'Erro ao consultar pulseira');
+        }
+    }
+
+    /**
+     * Fiscalização Rápida de Áreas (App/Tablet do Fiscal)
+     * Valida permissão do colaborador para a área física específica
+     */
+    async fiscalizarAcesso(req, res) {
+        try {
+            const { codigo, area_id, metodo = 'scanner' } = req.body;
+            const eventoId = req.event?.id;
+            const supabaseClient = req.supabase || supabase;
+
+            const safeCodigo = (codigo || '').trim();
+            if (!safeCodigo) {
+                return ApiResponse.error(res, 'Informe o código da pulseira ou CPF do colaborador.', 400);
+            }
+
+            // 1. Buscar a pessoa no evento atual
+            let query = supabaseClient
+                .from('pessoas')
+                .select('id, nome_completo, cpf, funcao, status_acesso, status_documentos, numero_pulseira, foto_url, tipo_pulseira_id, bloqueado, motivo_bloqueio, empresas(id, nome, ativo)')
+                .eq('evento_id', eventoId);
+
+            query = query.or(`numero_pulseira.eq.${safeCodigo},cpf.eq.${safeCodigo},id.eq.${safeCodigo}`);
+
+            const { data: pessoas, error: findErr } = await query.limit(1);
+            if (findErr) throw findErr;
+
+            const pessoa = pessoas?.[0];
+            if (!pessoa) {
+                return ApiResponse.success(res, {
+                    autorizado: false,
+                    status: 'nao_encontrado',
+                    mensagem: `Código '${safeCodigo}' não encontrado no evento.`,
+                    codigo_lido: safeCodigo
+                });
+            }
+
+            // 2. Buscar informações da área fiscalizada se informada
+            let areaFiscalizada = null;
+            if (area_id) {
+                const { data: areaData } = await supabaseClient
+                    .from('evento_areas')
+                    .select('id, nome_area')
+                    .eq('id', area_id)
+                    .single();
+                areaFiscalizada = areaData;
+            }
+
+            // 3. Buscar todas as áreas autorizadas da pessoa (diretas + por tipo de pulseira)
+            const [paaRes, papRes] = await Promise.all([
+                supabaseClient
+                    .from('pessoa_areas_acesso')
+                    .select('area_id, evento_areas(id, nome_area)')
+                    .eq('pessoa_id', pessoa.id),
+                pessoa.tipo_pulseira_id
+                    ? supabaseClient
+                        .from('pulseira_areas_permitidas')
+                        .select('area_id, evento_areas(id, nome_area)')
+                        .eq('tipo_pulseira_id', pessoa.tipo_pulseira_id)
+                    : Promise.resolve({ data: [] })
+            ]);
+
+            const areasMap = new Map();
+            (paaRes.data || []).forEach(item => {
+                if (item.area_id) {
+                    areasMap.set(item.area_id, item.evento_areas?.nome_area || 'Área');
+                }
+            });
+            (papRes.data || []).forEach(item => {
+                if (item.area_id) {
+                    areasMap.set(item.area_id, item.evento_areas?.nome_area || 'Área');
+                }
+            });
+
+            const areasAutorizadas = Array.from(areasMap.entries()).map(([id, nome]) => ({ id, nome_area: nome }));
+            const pessoaPayload = {
+                id: pessoa.id,
+                nome_completo: pessoa.nome_completo,
+                cpf: pessoa.cpf,
+                funcao: pessoa.funcao,
+                empresa_nome: pessoa.empresas?.nome || 'Pessoa Física',
+                foto_url: pessoa.foto_url,
+                numero_pulseira: pessoa.numero_pulseira,
+                status_acesso: pessoa.status_acesso,
+                status_documentos: pessoa.status_documentos,
+                areas_autorizadas: areasAutorizadas
+            };
+
+            // 4. Checar bloqueio
+            if (pessoa.bloqueado || pessoa.empresas?.ativo === false) {
+                const motivo = pessoa.bloqueado ? (pessoa.motivo_bloqueio || 'Bloqueio de segurança') : 'Empresa Inativa';
+                
+                await databaseService.logDeniedAccess(eventoId, pessoa.id, metodo, 'fiscalizacao', req.user?.id, `BLOQUEADO: ${motivo}`);
+                
+                return ApiResponse.success(res, {
+                    autorizado: false,
+                    status: 'bloqueado',
+                    mensagem: `BLOQUEADO: ${motivo}`,
+                    pessoa: pessoaPayload,
+                    area: areaFiscalizada
+                });
+            }
+
+            // 5. Checar status de credenciamento prévio
+            if (pessoa.status_acesso === 'pendente') {
+                return ApiResponse.success(res, {
+                    autorizado: false,
+                    status: 'pendente',
+                    mensagem: 'CREDENCIAMENTO PENDENTE (Dirija-se à Portaria)',
+                    pessoa: pessoaPayload,
+                    area: areaFiscalizada
+                });
+            }
+
+            // 6. Checar autorização da área específica se informada
+            if (area_id) {
+                const temPermissao = areasMap.has(area_id);
+                if (!temPermissao) {
+                    // Log de tentativa em área restrita
+                    await databaseService.logDeniedAccess(eventoId, pessoa.id, metodo, 'fiscalizacao', req.user?.id, `Área Não Autorizada: ${areaFiscalizada?.nome_area || area_id}`);
+
+                    // WebSocket para monitor de segurança
+                    websocketService.emit('area_alert', {
+                        tipo: 'tentativa_area_restrita',
+                        pessoa_id: pessoa.id,
+                        pessoa_nome: pessoa.nome_completo,
+                        pessoa_foto: pessoa.foto_url,
+                        area_id,
+                        area_nome: areaFiscalizada?.nome_area,
+                        hora: new Date().toISOString()
+                    }, eventoId);
+
+                    websocketService.emit('new_access', {
+                        id: require('uuid').v4(),
+                        tipo: 'negado',
+                        resultado: 'negado',
+                        pessoa_id: pessoa.id,
+                        pessoa_nome: pessoa.nome_completo,
+                        pessoas: {
+                            id: pessoa.id,
+                            nome_completo: pessoa.nome_completo,
+                            cpf: pessoa.cpf,
+                            foto_url: pessoa.foto_url
+                        },
+                        area_id,
+                        area_nome: areaFiscalizada?.nome_area,
+                        observacao: `Tentativa em Área Restrita: ${areaFiscalizada?.nome_area || area_id}`,
+                        created_at: new Date().toISOString()
+                    }, eventoId);
+
+                    return ApiResponse.success(res, {
+                        autorizado: false,
+                        status: 'area_negada',
+                        mensagem: `ACESSO NEGADO: Não autorizado para ${areaFiscalizada?.nome_area || 'esta área'}`,
+                        pessoa: pessoaPayload,
+                        area: areaFiscalizada
+                    });
+                }
+            }
+
+            // 7. SUCESSO: Autorizado!
+            // Registrar log de passagem
+            const logId = require('uuid').v4();
+            await supabaseClient.from('logs_acesso').insert({
+                id: logId,
+                evento_id: eventoId,
+                pessoa_id: pessoa.id,
+                tipo: 'fiscalizacao',
+                metodo,
+                area_id: area_id || null,
+                observacao: `Fiscalizado na área: ${areaFiscalizada?.nome_area || 'Geral'}`,
+                created_at: new Date().toISOString()
+            });
+
+            // WebSocket
+            websocketService.emit('fiscalizacao_passagem', {
+                pessoa_id: pessoa.id,
+                pessoa_nome: pessoa.nome_completo,
+                pessoa_foto: pessoa.foto_url,
+                area_id: area_id || null,
+                area_nome: areaFiscalizada?.nome_area || 'Geral',
+                autorizado: true,
+                hora: new Date().toISOString()
+            }, eventoId);
+
+            websocketService.emit('new_access', {
+                id: logId,
+                tipo: 'fiscalizacao',
+                resultado: 'sucesso',
+                pessoa_id: pessoa.id,
+                pessoa_nome: pessoa.nome_completo,
+                pessoas: {
+                    id: pessoa.id,
+                    nome_completo: pessoa.nome_completo,
+                    cpf: pessoa.cpf,
+                    foto_url: pessoa.foto_url
+                },
+                area_id: area_id || null,
+                area_nome: areaFiscalizada?.nome_area || 'Geral',
+                observacao: `Fiscalizado na área: ${areaFiscalizada?.nome_area || 'Geral'}`,
+                created_at: new Date().toISOString()
+            }, eventoId);
+
+            return ApiResponse.success(res, {
+                autorizado: true,
+                status: 'liberado',
+                mensagem: `ACESSO LIBERADO${areaFiscalizada ? ` — ${areaFiscalizada.nome_area.toUpperCase()}` : ''}`,
+                pessoa: pessoaPayload,
+                area: areaFiscalizada
+            });
+
+        } catch (error) {
+            logger.error({ err: error, event_id: req.event?.id }, 'Erro ao fiscalizar acesso');
+            return ApiResponse.error(res, error.message || 'Erro ao processar fiscalização');
         }
     }
 }

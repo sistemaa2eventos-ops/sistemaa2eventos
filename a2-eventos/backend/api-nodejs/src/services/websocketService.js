@@ -160,6 +160,24 @@ class WebSocketService {
                 logger.info(`🔌 Auto-join: ${socket.user.email} → sala evento_${socket.user.evento_id}`);
             }
 
+            // Auto-join na room do próprio operador (para notificações direcionadas à estação/baia)
+            if (socket.user?.id) {
+                socket.join(`operador_${socket.user.id}`);
+                logger.info(`🔌 Auto-join: ${socket.user.email} → sala operador_${socket.user.id}`);
+            }
+
+            socket.on('join_device', (dispositivoId) => {
+                if (!dispositivoId) return;
+                socket.join(`dispositivo_${dispositivoId}`);
+                logger.info(`🔌 ${socket.user?.email || socket.id} entrou na sala: dispositivo_${dispositivoId}`);
+            });
+
+            socket.on('leave_device', (dispositivoId) => {
+                if (!dispositivoId) return;
+                socket.leave(`dispositivo_${dispositivoId}`);
+                logger.info(`🔌 ${socket.user?.email || socket.id} saiu da sala: dispositivo_${dispositivoId}`);
+            });
+
             socket.on('join_event', (eventoId) => {
                 // 🔒 Aplicar rate limiting
                 if (!socketRateLimiter.checkLimit()) {
@@ -210,15 +228,26 @@ class WebSocketService {
             return;
         }
         if (room) {
-            const roomName = (room.startsWith('evento_') || room.startsWith('system_'))
-                ? room
-                : `evento_${room}`;
+            const roomName = (
+                room.startsWith('evento_') || 
+                room.startsWith('operador_') || 
+                room.startsWith('dispositivo_') || 
+                room.startsWith('system_')
+            ) ? room : `evento_${room}`;
             this.io.to(roomName).emit(event, data);
             logger.info(`📡 [WS] Emitido '${event}' para sala ${roomName}`);
         } else {
             this.io.emit(event, data);
             logger.info(`📡 [WS] Emitido '${event}' global`);
         }
+    }
+
+    emitToOperador(operadorId, event, data) {
+        this.emit(event, data, `operador_${operadorId}`);
+    }
+
+    emitToDispositivo(dispositivoId, event, data) {
+        this.emit(event, data, `dispositivo_${dispositivoId}`);
     }
 }
 

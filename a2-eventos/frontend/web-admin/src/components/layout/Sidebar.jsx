@@ -272,6 +272,16 @@ const Sidebar = ({ open, onClose }) => {
             roles: ['admin', 'supervisor', 'op_atendimento', 'op_analista']
         },
         {
+            text: 'Fiscalização de Áreas',
+            icon: <SecurityIcon />,
+            menuKey: 'checkin',
+            get path() {
+                const eid = localStorage.getItem('active_evento_id');
+                return eid ? `/fiscalizacao?evento_id=${eid}` : '/fiscalizacao';
+            },
+            roles: ['admin', 'supervisor', 'op_atendimento', 'op_monitoramento', 'op_analista']
+        },
+        {
             text: t('sidebar.monitor', { defaultValue: 'Monitor' }),
             icon: <MonitorIcon />,
             menuKey: 'monitoramento',

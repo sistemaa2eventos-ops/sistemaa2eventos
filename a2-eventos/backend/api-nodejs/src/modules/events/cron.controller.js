@@ -125,7 +125,7 @@ class CronController {
             // Supabase: Buscar pessoas onde o updated_at é MENOR (mais velho) que checkTimeLimit
             const { data: overstayed, error: fetchErr } = await supabase
                 .from('pessoas')
-                .select('id, nome, evento_id')
+                .select('id, nome_completo, evento_id')
                 .eq('status_acesso', 'checkin_feito')
                 .lt('updated_at', checkTimeLimit.toISOString());
 
@@ -150,7 +150,7 @@ class CronController {
             const pessoasIds = overstayed.map(p => p.id);
             const { error: updateErr } = await supabase
                 .from('pessoas')
-                .update({ status_acesso: 'pendente', updated_at: new Date().toISOString() })
+                .update({ status_acesso: 'autorizado', updated_at: new Date().toISOString() })
                 .in('id', pessoasIds);
 
             if (updateErr) throw updateErr;
@@ -169,20 +169,20 @@ class CronController {
             // Busca pessoas que estão com check-in pendente (não deram checkout)
             const { data: presas, error: fetchErr } = await supabase
                 .from('pessoas')
-                .select('id, nome, evento_id')
-                .eq('status_acesso', 'checkin_feito');
+                .select('id, nome_completo, evento_id, numero_pulseira')
+                .in('status_acesso', ['checkin_feito', 'checkout_feito']);
 
             if (fetchErr) throw fetchErr;
 
-            if (presas.length === 0) {
+            if (!presas || presas.length === 0) {
                 logger.info('✅ [CRON] Nenhum status pendente de checkout encontrado.');
                 return;
             }
 
-            logger.info(`🚨 [CRON] Encontradas ${presas.length} pessoas com checkin preso. Aplicando 'checkout_forcado'.`);
+            logger.info(`🚨 [CRON] Encontradas ${presas.length} pessoas no fechamento de turno. Aplicando reset diário.`);
 
-            // Transição para status pendente para entrar no dia seguinte normalmente.
-            const checkoutLogs = presas.map(p => ({
+            // Transição para status autorizado para quem tem pulseira ou pendente para entrar no dia seguinte normalmente.
+            const checkoutLogs = presas.filter(p => p.status_acesso === 'checkin_feito').map(p => ({
                 pessoa_id: p.id,
                 evento_id: p.evento_id,
                 tipo: 'checkout',
@@ -192,20 +192,25 @@ class CronController {
                 created_at: new Date().toISOString()
             }));
 
-            // 1. Inserir logs de checkout automático
-            const { error: logsErr } = await supabase
-                .from('logs_acesso')
-                .insert(checkoutLogs);
+            // 1. Inserir logs de checkout automático apenas para quem ainda estava dentro
+            if (checkoutLogs.length > 0) {
+                const { error: logsErr } = await supabase
+                    .from('logs_acesso')
+                    .insert(checkoutLogs);
 
-            if (logsErr) {
-                logger.error('[CRON] Erro ao salvar logs de checkout forçado:', logsErr);
+                if (logsErr) {
+                    logger.error('[CRON] Erro ao salvar logs de checkout forçado:', logsErr);
+                }
             }
 
-            // 2. Atualizar status na tabela pessoas
+            // 2. Atualizar status na tabela pessoas (volta para autorizado para o novo dia)
             const pessoasIds = presas.map(p => p.id);
             const { error: updateErr } = await supabase
                 .from('pessoas')
-                .update({ status_acesso: 'pendente' })
+                .update({ 
+                    status_acesso: 'autorizado',
+                    updated_at: new Date().toISOString()
+                })
                 .in('id', pessoasIds);
 
             if (updateErr) throw updateErr;

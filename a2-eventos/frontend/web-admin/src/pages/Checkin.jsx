@@ -22,6 +22,8 @@ import { styled } from '@mui/material/styles';
 import PageHeader from '../components/common/PageHeader';
 import GlassCard from '../components/common/GlassCard';
 import NeonButton from '../components/common/NeonButton';
+import EstacaoFacialSelector from '../components/common/EstacaoFacialSelector';
+import ModalCredenciamento from '../components/credenciamento/ModalCredenciamento';
 import { useCheckin } from '../hooks/useCheckin';
 
 const ActionButton = styled(NeonButton)(({ theme }) => ({
@@ -56,31 +58,28 @@ const Checkin = () => {
     areaId, changeAreaId, eventAreas, pulseiraTypes,
     consultarPulseiraAPI,
     performCheckin,
-    handleLinkPulseiraAndCheckin
+    handleLinkPulseiraAndCheckin,
+    // Vínculo Facial (Fase 1)
+    sessaoAtiva,
+    dispositivosDisponiveis,
+    loadingSessao,
+    vincularLeitor,
+    desvincularLeitor,
+    carregarDispositivosDisponiveis
   } = useCheckin();
 
   const [pulseiraValue, setPulseiraValue] = useState('');
   const [showPulseiraInput, setShowPulseiraInput] = useState(false);
-  
-  // States for Modal
-  const [selectedTipoPulseira, setSelectedTipoPulseira] = useState('');
-  const [numeroPulseiraModal, setNumeroPulseiraModal] = useState('');
 
-  // Auto-seleciona o primeiro tipo de pulseira disponível quando abrir o modal da pessoa
-  useEffect(() => {
-    if (selectedPessoa && pulseiraTypes?.length > 0 && !selectedTipoPulseira) {
-      setSelectedTipoPulseira(pulseiraTypes[0].id);
-    }
-  }, [selectedPessoa, pulseiraTypes, selectedTipoPulseira]);
-
-  const handleConfirmPulseiraModal = () => {
-    if (manualSaving || loading || !selectedPessoa) return;
-    const num = numeroPulseiraModal?.trim();
-    const tipo = selectedTipoPulseira || pulseiraTypes?.[0]?.id;
-    if (tipo && num) {
-      handleLinkPulseiraAndCheckin(selectedPessoa.id, tipo, num);
+  // Confirmação de credenciamento do modal (Fase 2)
+  const handleConfirmarCredenciamento = ({ pessoa_id, numero_pulseira, tipo_pulseira_id }) => {
+    if (manualSaving || loading || !pessoa_id) return;
+    if (tipo_pulseira_id && numero_pulseira) {
+      handleLinkPulseiraAndCheckin(pessoa_id, tipo_pulseira_id, numero_pulseira);
+    } else if (numero_pulseira) {
+      performCheckin('pulseira', numero_pulseira, pessoa_id);
     } else {
-      performCheckin('manual');
+      performCheckin('manual', null, pessoa_id);
     }
   };
 
@@ -162,6 +161,18 @@ const Checkin = () => {
         </NeonButton>
       </Box>
 
+      {/* 📡 Seletor e Status da Estação / Leitor Facial (Fase 1) */}
+      {!modoQuiosque && (
+          <EstacaoFacialSelector
+              sessaoAtiva={sessaoAtiva}
+              dispositivos={dispositivosDisponiveis}
+              loading={loadingSessao}
+              onVincular={vincularLeitor}
+              onDesvincular={desvincularLeitor}
+              onRecarregar={carregarDispositivosDisponiveis}
+          />
+      )}
+
       <AreaSelector areas={eventAreas} value={areaId} onChange={changeAreaId} accentColor="#00D4FF" />
 
       {/* MAIN CONTENT AREA */}
@@ -236,185 +247,38 @@ const Checkin = () => {
                         </Stack>
                     </GlassCard>
                 )}
-                {selectedPessoa && (
-                    <Dialog 
-                        open={!!selectedPessoa} 
-                        onClose={() => { setSelectedPessoa(null); setNumeroPulseiraModal(''); setSelectedTipoPulseira(''); }}
-                        maxWidth="md"
-                        fullWidth
-                        PaperProps={{
-                            sx: {
-                                bgcolor: 'transparent',
-                                boxShadow: 'none'
-                            }
-                        }}
-                    >
-                        <DialogContent sx={{ p: 0 }}>
-                            <GlassCard sx={{ p: modoQuiosque ? 5 : 4, height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-                            {/* FEEDBACK OVERLAY */}
-                            {checkinResult && (
-                                <FeedbackOverlay status={checkinResult}>
-                                    <Zoom in={!!checkinResult}>
-                                        <Box sx={{ textAlign: 'center' }}>
-                                            {checkinResult === 'sucesso' ? <SuccessIcon sx={{ fontSize: 130, color: '#00FF88' }} /> : <ErrorIcon sx={{ fontSize: 130, color: '#FF3366' }} />}
-                                            <Typography variant="h3" fontWeight={900} mt={2}>
-                                                {checkinResult === 'sucesso' ? 'LIBERADO' : 'NEGADO'}
-                                            </Typography>
-                                            <Typography variant="h6" sx={{ opacity: 0.8 }}>{resultMessage}</Typography>
-                                            {checkinResult === 'sucesso' && (
-                                                <Typography variant="h5" sx={{ mt: 2, opacity: 0.5 }}>
-                                                    {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                                                </Typography>
-                                            )}
-                                        </Box>
-                                    </Zoom>
-                                </FeedbackOverlay>
-                            )}
-
-                            {/* SCANNER OVERLAY */}
-                            {activeScanner && (
-                                <CameraOverlay>
-                                    <Typography variant="h6" mb={2}>Scanner Ativo</Typography>
-                                    <Box id="reader-quiosque" sx={{ width: 320, height: 320, borderRadius: 4, overflow: 'hidden', border: '2px solid #00D4FF' }} />
-                                    <NeonButton onClick={() => setActiveScanner(false)} color="error" sx={{ mt: 3 }}>CANCELAR</NeonButton>
-                                </CameraOverlay>
-                            )}
-
-                            {/* PULSEIRA INPUT OVERLAY */}
-                            {showPulseiraInput && (
-                                <CameraOverlay>
-                                    <Typography variant="h6" mb={2}>LEITURA DE PULSEIRA / QR</Typography>
-                                    <TextField 
-                                        inputRef={rfidInputRef}
-                                        placeholder="AGUARDANDO LEITURA..."
-                                        value={pulseiraValue}
-                                        onChange={(e) => setPulseiraValue(e.target.value)}
-                                        onKeyDown={handlePulseiraKeyDown}
-                                        sx={{ width: 400, '& .MuiOutlinedInput-root': { borderRadius: 4, height: 70, fontSize: '1.5rem', textAlign: 'center' } }}
-                                    />
-                                    <Stack direction="row" spacing={2} sx={{ mt: 4 }}>
-                                        <NeonButton onClick={() => { performCheckin('pulseira', pulseiraValue); setPulseiraValue(''); setShowPulseiraInput(false); }}>CONFIRMAR MANUAL</NeonButton>
-                                        <NeonButton onClick={() => setShowPulseiraInput(false)} color="error">VOLTAR</NeonButton>
-                                    </Stack>
-                                </CameraOverlay>
-                            )}
-
-                            <Grid container spacing={4} sx={{ flex: 1 }}>
-                                <Grid item xs={12} sm={modoQuiosque ? 4 : 3} sx={{ textAlign: 'center' }}>
-                                    <Avatar 
-                                        src={selectedPessoa.foto_url} 
-                                        sx={{ 
-                                            width: 160, height: 160, mx: 'auto', mb: 2, 
-                                            bgcolor: '#00D4FF', fontSize: '3rem',
-                                            border: '4px solid rgba(0,212,255,0.2)',
-                                            boxShadow: '0 0 30px rgba(0,212,255,0.2)'
-                                        }}
-                                    >
-                                        {selectedPessoa.nome?.[0]}
-                                    </Avatar>
-                                    <Chip 
-                                        label={selectedPessoa.status_acesso === 'checkin_feito' ? 'DENTRO' : 'FORA'} 
-                                        color={selectedPessoa.status_acesso === 'checkin_feito' ? 'success' : 'default'} 
-                                        variant="outlined" 
-                                        sx={{ fontWeight: 800 }}
-                                    />
-                                </Grid>
-                                
-                                <Grid item xs={12} sm={modoQuiosque ? 8 : 9}>
-                                    <Typography variant="h4" fontWeight={900} color="#fff">{selectedPessoa.nome}</Typography>
-                                    <Stack spacing={1} mt={2}>
-                                        <Typography variant="body1" sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.8 }}>
-                                            <BadgeIcon sx={{ color: '#00D4FF' }} /> {selectedPessoa.cpf || 'Sem CPF'}
-                                        </Typography>
-                                        <Typography variant="body1" sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.8 }}>
-                                            <CompanyIcon sx={{ color: '#00D4FF' }} /> {selectedPessoa.empresas?.nome || 'Pessoa Física'}
-                                        </Typography>
-                                        <Typography variant="body1" sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.8 }}>
-                                            <BadgeIcon sx={{ color: '#00D4FF' }} /> {selectedPessoa.funcao || 'Participante'}
-                                        </Typography>
-                                    </Stack>
-
-                                    <AuthorizedAreasChips pessoa={selectedPessoa} accentColor="#00D4FF" />
-                                    
-                                    <Box sx={{ mt: 3, p: 2, bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 3 }}>
-                                        <Typography variant="subtitle2" color="#00D4FF" mb={2}>ATRIBUIR PULSEIRA</Typography>
-                                        <Stack direction="row" spacing={2}>
-                                            <FormControl fullWidth>
-                                                <InputLabel id="tipo-pulseira-label" sx={{ color: 'rgba(255,255,255,0.7)' }}>Tipo (Lote)</InputLabel>
-                                                <Select
-                                                    labelId="tipo-pulseira-label"
-                                                    value={selectedTipoPulseira}
-                                                    label="Tipo (Lote)"
-                                                    onChange={(e) => setSelectedTipoPulseira(e.target.value)}
-                                                    sx={{ 
-                                                        bgcolor: 'rgba(0,0,0,0.2)', 
-                                                        color: '#fff',
-                                                        '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.1)' }
-                                                    }}
-                                                >
-                                                    {(pulseiraTypes || []).map(t => (
-                                                        <MenuItem key={t.id} value={t.id}>
-                                                            {t.nome_tipo} ({t.cor_hex})
-                                                        </MenuItem>
-                                                    ))}
-                                                </Select>
-                                            </FormControl>
-                                            <TextField 
-                                                fullWidth
-                                                autoFocus
-                                                label="Número da Pulseira"
-                                                placeholder="Digite o número e tecle Enter ↵"
-                                                value={numeroPulseiraModal}
-                                                onChange={(e) => setNumeroPulseiraModal(e.target.value)}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter') {
-                                                        e.preventDefault();
-                                                        handleConfirmPulseiraModal();
-                                                    }
-                                                }}
-                                                sx={{ 
-                                                    '& .MuiOutlinedInput-root': { 
-                                                        bgcolor: 'rgba(0,0,0,0.2)', 
-                                                        color: '#fff' 
-                                                    },
-                                                    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' }
-                                                }}
-                                            />
-                                        </Stack>
-                                    </Box>
-
-                                </Grid>
-                            </Grid>
-
-                                {/* ACTIONS FOOTER */}
-                                <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                                    <Grid container spacing={2}>
-                                        <Grid item xs={12} md={6}>
-                                            <ActionButton 
-                                                fullWidth 
-                                                onClick={handleConfirmPulseiraModal} 
-                                                disabled={manualSaving || loading}
-                                            >
-                                                <LoginIcon sx={{ mr: 1, fontSize: 30 }} /> {(selectedTipoPulseira && numeroPulseiraModal) ? "VINCULAR & ENTRADA (ENTER)" : "CHECK-IN S/ PULSEIRA"}
-                                                {manualSaving && <CircularProgress size={20} sx={{ ml: 2 }} />}
-                                            </ActionButton>
-                                        </Grid>
-                                        <Grid item xs={12} md={3}>
-                                            <ActionButton fullWidth variant="outlined" onClick={() => setActiveScanner(true)} disabled={manualSaving || loading}>
-                                                <ScannerIcon sx={{ mr: 1, fontSize: 30 }} /> QR
-                                            </ActionButton>
-                                        </Grid>
-                                        <Grid item xs={12} md={3}>
-                                            <ActionButton fullWidth variant="outlined" onClick={() => { setSelectedPessoa(null); setNumeroPulseiraModal(''); setSelectedTipoPulseira(''); }} disabled={manualSaving || loading}>
-                                                <CloseIcon sx={{ mr: 1, fontSize: 30 }} /> CANCELAR
-                                            </ActionButton>
-                                        </Grid>
-                                    </Grid>
-                                </Box>
-                            </GlassCard>
-                        </DialogContent>
-                    </Dialog>
+                {/* FEEDBACK OVERLAY GLOBAL */}
+                {checkinResult && (
+                    <FeedbackOverlay status={checkinResult}>
+                        <Zoom in={!!checkinResult}>
+                            <Box sx={{ textAlign: 'center' }}>
+                                {checkinResult === 'sucesso' ? <SuccessIcon sx={{ fontSize: 130, color: '#00FF88' }} /> : <ErrorIcon sx={{ fontSize: 130, color: '#FF3366' }} />}
+                                <Typography variant="h3" fontWeight={900} mt={2}>
+                                    {checkinResult === 'sucesso' ? 'LIBERADO' : 'NEGADO'}
+                                </Typography>
+                                <Typography variant="h6" sx={{ opacity: 0.8 }}>{resultMessage}</Typography>
+                                {checkinResult === 'sucesso' && (
+                                    <Typography variant="h5" sx={{ mt: 2, opacity: 0.5 }}>
+                                        {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                    </Typography>
+                                )}
+                            </Box>
+                        </Zoom>
+                    </FeedbackOverlay>
                 )}
+
+                {/* MODAL DE CREDENCIAMENTO E ACESSO RÁPIDO (Fase 2) */}
+                <ModalCredenciamento
+                    open={!!selectedPessoa}
+                    pessoa={selectedPessoa}
+                    onClose={() => setSelectedPessoa(null)}
+                    onConfirmar={handleConfirmarCredenciamento}
+                    pulseiraTypes={pulseiraTypes}
+                    eventAreas={eventAreas}
+                    loading={manualSaving || loading}
+                    onOpenQrScanner={() => setActiveScanner(true)}
+                />
+
             </Box>
         </Grid>
       </Grid>

@@ -35,13 +35,102 @@ export const useCheckin = (defaultMode) => {
     const [eventAreas, setEventAreas] = useState([]);
     const [pulseiraTypes, setPulseiraTypes] = useState([]);
 
+    // Estados de Vínculo com Leitor Facial (Fase 1)
+    const [sessaoAtiva, setSessaoAtiva] = useState(null);
+    const [dispositivosDisponiveis, setDispositivosDisponiveis] = useState([]);
+    const [loadingSessao, setLoadingSessao] = useState(false);
+
     const rfidInputRef = useRef(null);
     const resetTimerRef = useRef(null);
+
+    const tocarBipeNotificacao = useCallback(() => {
+        try {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) return;
+            const audioCtx = new AudioContextClass();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1320, audioCtx.currentTime + 0.12);
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.22);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.22);
+        } catch (_) {}
+    }, []);
 
     const updateOfflineCount = useCallback(async () => {
         const count = await localCheckinService.getPendenteCount();
         setOfflineCount(count);
     }, []);
+
+    const carregarSessaoAtiva = useCallback(async () => {
+        if (!eventoId) return;
+        try {
+            setLoadingSessao(true);
+            const res = await api.get('/devices/sessao/ativa');
+            if (res.data?.success) {
+                setSessaoAtiva(res.data.data);
+            }
+        } catch (err) {
+            console.warn('Erro ao carregar sessão de operador:', err.message);
+        } finally {
+            setLoadingSessao(false);
+        }
+    }, [eventoId]);
+
+    const carregarDispositivosDisponiveis = useCallback(async () => {
+        if (!eventoId) return;
+        try {
+            const res = await api.get('/devices/sessao/disponiveis', { params: { evento_id: eventoId } });
+            if (res.data?.success) {
+                setDispositivosDisponiveis(res.data.data || []);
+            }
+        } catch (err) {
+            console.warn('Erro ao carregar dispositivos para vínculo:', err.message);
+        }
+    }, [eventoId]);
+
+    const vincularLeitor = async (dispositivoId, estacaoNome) => {
+        try {
+            setLoadingSessao(true);
+            const res = await api.post('/devices/sessao/vincular', {
+                dispositivo_id: dispositivoId,
+                estacao_nome: estacaoNome,
+                evento_id: eventoId
+            });
+            if (res.data?.success) {
+                setSessaoAtiva(res.data.data);
+                await carregarDispositivosDisponiveis();
+                return { success: true, data: res.data.data };
+            }
+            return { success: false, error: res.data?.error || 'Erro ao vincular leitor' };
+        } catch (err) {
+            return { success: false, error: err.response?.data?.error || err.message };
+        } finally {
+            setLoadingSessao(false);
+        }
+    };
+
+    const desvincularLeitor = async () => {
+        try {
+            setLoadingSessao(true);
+            const res = await api.post('/devices/sessao/desvincular');
+            if (res.data?.success) {
+                setSessaoAtiva(null);
+                await carregarDispositivosDisponiveis();
+                return { success: true };
+            }
+            return { success: false, error: res.data?.error || 'Erro ao desvincular leitor' };
+        } catch (err) {
+            return { success: false, error: err.response?.data?.error || err.message };
+        } finally {
+            setLoadingSessao(false);
+        }
+    };
 
     const loadInitialData = useCallback(async () => {
         if (!eventoId) return;
@@ -62,10 +151,14 @@ export const useCheckin = (defaultMode) => {
             setRealtimeStats(statsRes.data.data || null);
             setEventAreas(areasRes.data.data || []);
             setPulseiraTypes(pulseiraRes.data.data || []);
+
+            // Carregar sessão de leitor do operador
+            carregarSessaoAtiva();
+            carregarDispositivosDisponiveis();
         } catch (error) {
             console.error('Erro ao carregar dados de check-in:', error);
         }
-    }, [eventoId, defaultMode]);
+    }, [eventoId, defaultMode, carregarSessaoAtiva, carregarDispositivosDisponiveis]);
 
     // WebSocket Listeners
     useEffect(() => {
@@ -92,8 +185,22 @@ export const useCheckin = (defaultMode) => {
             });
         });
 
+        // 🎯 ABERTURA AUTOMÁTICA VIA LEITOR FACIAL (Fase 1)
+        socket.on('credenciamento_abrir', (data) => {
+            console.log('📡 [WS] Credenciamento recebido do leitor facial:', data);
+            if (data?.pessoa) {
+                tocarBipeNotificacao();
+                handleSelectPessoa(data.pessoa);
+            }
+        });
+
+        // Atualização de status da sessão do operador
+        socket.on('sessao_operador_atualizada', (novaSessao) => {
+            setSessaoAtiva(novaSessao);
+        });
+
         return () => socket.disconnect();
-    }, [eventoId, defaultMode]);
+    }, [eventoId, defaultMode, tocarBipeNotificacao]);
 
     // Fullscreen Listener
     useEffect(() => {
@@ -328,6 +435,14 @@ export const useCheckin = (defaultMode) => {
         consultarPulseiraAPI,
         performCheckin,
         handleLinkPulseiraAndCheckin,
-        eventoId
+        eventoId,
+        // Sessão do Leitor Facial (Fase 1)
+        sessaoAtiva,
+        dispositivosDisponiveis,
+        loadingSessao,
+        carregarSessaoAtiva,
+        carregarDispositivosDisponiveis,
+        vincularLeitor,
+        desvincularLeitor
     };
 };

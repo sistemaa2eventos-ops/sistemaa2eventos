@@ -28,6 +28,7 @@ const Pessoas = lazy(() => import('./pages/Pessoas'));
 const AuditoriaDocumental = lazy(() => import('./pages/AuditoriaDocumental'));
 const Checkin = lazy(() => import('./pages/Checkin'));
 const Checkout = lazy(() => import('./pages/Checkout'));
+const Fiscalizacao = lazy(() => import('./pages/Fiscalizacao'));
 const Monitor = lazy(() => import('./pages/Monitor'));
 const Eventos = lazy(() => import('./pages/Eventos'));
 const Reports = lazy(() => import('./pages/Reports'));
@@ -130,6 +131,7 @@ const AppContent = () => {
           <Route path="/reports" element={<ProtectedRoute modulo="relatorios"><Reports /></ProtectedRoute>} />
           <Route path="/checkin" element={<ProtectedRoute modulo="checkin"><Checkin /></ProtectedRoute>} />
           <Route path="/checkout" element={<ProtectedRoute modulo="checkin"><Checkout /></ProtectedRoute>} />
+          <Route path="/fiscalizacao" element={<ProtectedRoute modulo="checkin"><Fiscalizacao /></ProtectedRoute>} />
           <Route path="/monitor" element={<ProtectedRoute modulo="monitoramento"><Monitor /></ProtectedRoute>} />
           <Route path="/usuarios" element={<ProtectedRoute role="admin_master"><Usuarios /></ProtectedRoute>} />
           <Route path="/audit-logs" element={<ProtectedRoute role="admin_master"><AuditLogs /></ProtectedRoute>} />

@@ -20,8 +20,34 @@ import { styled } from '@mui/material/styles';
 import PageHeader from '../components/common/PageHeader';
 import GlassCard from '../components/common/GlassCard';
 import NeonButton from '../components/common/NeonButton';
+import UniversalPulseiraInput from '../components/common/UniversalPulseiraInput';
 import { useCheckin } from '../hooks/useCheckin';
 import api from '../services/api';
+
+const playCheckoutSound = (type) => {
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        if (type === 'sucesso') {
+            osc.frequency.setValueAtTime(440, audioCtx.currentTime); // A4
+            osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); // E5
+            gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.3);
+        } else {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(160, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.35);
+        }
+    } catch (_) {}
+};
 
 const ActionButton = styled(NeonButton)(({ theme }) => ({
     height: 80,
@@ -69,6 +95,14 @@ const Checkout = () => {
   const [entradaAtiva, setEntradaAtiva] = useState(null);
 
   const SCANNER_ID = `checkout-scanner-nzt`;
+
+  useEffect(() => {
+    if (checkinResult === 'sucesso') {
+      playCheckoutSound('sucesso');
+    } else if (checkinResult === 'atencao' || checkinResult === 'erro') {
+      playCheckoutSound('erro');
+    }
+  }, [checkinResult]);
 
   // Busca o último check-in da pessoa para calcular tempo de permanência
   const fetchUltimoCheckin = useCallback(async (pessoaId) => {
@@ -237,25 +271,30 @@ const Checkout = () => {
                     </FeedbackOverlay>
                 )}
 
-                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                    <TextField 
-                        fullWidth
-                        autoFocus={!modoQuiosque}
-                        inputRef={rfidInputRef}
-                        placeholder="NÚMERO DA PULSEIRA"
+                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2 }}>
+                    <UniversalPulseiraInput 
                         value={pulseiraValue}
-                        onChange={(e) => setPulseiraValue(e.target.value)}
-                        onKeyDown={handlePulseiraKeyDown}
-                        InputProps={{ 
-                            startAdornment: <BadgeIcon sx={{ color: '#FF3366', mr: 2, fontSize: 28 }} />,
-                            sx: { borderRadius: 4, height: 80, fontSize: '1.8rem', bgcolor: 'rgba(255,255,255,0.03)', textAlign: 'center', fontWeight: 800 }
+                        onChange={setPulseiraValue}
+                        onConfirm={(val) => {
+                            const cod = (val || pulseiraValue || '').trim();
+                            if (cod) {
+                                performCheckin('pulseira', cod);
+                                setPulseiraValue('');
+                            }
                         }}
+                        loading={loading}
+                        autoFocus={!modoQuiosque}
                     />
-                    <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
-                        <ActionButton fullWidth onClick={() => { performCheckin('pulseira', pulseiraValue); setPulseiraValue(''); }}>
-                            <LogoutIcon sx={{ mr: 1 }} /> CONFIRMAR SAÍDA
-                        </ActionButton>
-                    </Stack>
+
+                    <ActionButton fullWidth onClick={() => { 
+                        const cod = (pulseiraValue || '').trim();
+                        if (cod) {
+                            performCheckin('pulseira', cod); 
+                            setPulseiraValue('');
+                        }
+                    }} disabled={loading}>
+                        <LogoutIcon sx={{ mr: 1 }} /> CONFIRMAR SAÍDA (ENTER)
+                    </ActionButton>
 
                     {/* Resumo rápido de status */}
                     <Box sx={{ mt: 4, p: 2.5, bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 3, border: '1px solid rgba(255,255,255,0.05)' }}>

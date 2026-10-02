@@ -28,7 +28,16 @@ export const useMonitor = () => {
 
     // States - Feed & Stats
     const [logs, setLogs] = useState([]);
-    const [stats, setStats] = useState({ presentes: 0, capacidade: 0, empresas: [] });
+    const [stats, setStats] = useState({
+        presentes: 0,
+        capacidade: 0,
+        checkins_hoje: 0,
+        checkouts_hoje: 0,
+        negados_hoje: 0,
+        fiscalizacoes_hoje: 0,
+        areas: [],
+        empresas: []
+    });
     const [loading, setLoading] = useState(true);
     const [tick, setTick] = useState(0);
 
@@ -47,6 +56,27 @@ export const useMonitor = () => {
     const [newCpf, setNewCpf] = useState('');
     const [isTracking, setIsTracking] = useState(false);
     const [activeAlert, setActiveAlert] = useState(null);
+    const [activeAreaAlert, setActiveAreaAlert] = useState(null);
+
+    // Audio de Alerta Sintetizado
+    const playAlarmSound = useCallback(() => {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(850, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(420, ctx.currentTime + 0.35);
+            gain.gain.setValueAtTime(0.18, ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.35);
+        } catch (e) {
+            // áudio desabilitado no navegador
+        }
+    }, []);
 
     // States - System Health
     const [sysStatus, setSysStatus] = useState(null);
@@ -64,7 +94,16 @@ export const useMonitor = () => {
                 api.get('/access/stats/realtime', { params: { evento_id: eventoId } })
             ]);
             setLogs(logsResp.data.data || []);
-            setStats(statsResp.data.data || { presentes: 0, capacidade: 0, empresas: [] });
+            setStats(statsResp.data.data || {
+                presentes: 0,
+                capacidade: 0,
+                checkins_hoje: 0,
+                checkouts_hoje: 0,
+                negados_hoje: 0,
+                fiscalizacoes_hoje: 0,
+                areas: [],
+                empresas: []
+            });
         } catch (error) {
             log('Erro no polling do monitor:', error);
         } finally {
@@ -162,16 +201,57 @@ export const useMonitor = () => {
 
         socket.on('new_access', (newLog) => {
             setLogs(prev => [newLog, ...prev.slice(0, 99)]);
-            if (newLog.tipo === 'checkin' || newLog.tipo === 'checkout') {
-                setStats(prev => ({
-                    ...prev,
-                    presentes: newLog.tipo === 'checkin' ? prev.presentes + 1 : Math.max(0, prev.presentes - 1)
-                }));
-            }
+            
+            // Atualizar contadores
+            setStats(prev => {
+                const updated = { ...prev };
+                if (newLog.tipo === 'checkin') {
+                    updated.presentes = (prev.presentes || 0) + 1;
+                    updated.checkins_hoje = (prev.checkins_hoje || 0) + 1;
+                } else if (newLog.tipo === 'checkout') {
+                    updated.presentes = Math.max(0, (prev.presentes || 0) - 1);
+                    updated.checkouts_hoje = (prev.checkouts_hoje || 0) + 1;
+                } else if (newLog.tipo === 'negado' || newLog.resultado === 'negado') {
+                    updated.negados_hoje = (prev.negados_hoje || 0) + 1;
+                } else if (newLog.tipo === 'fiscalizacao') {
+                    updated.fiscalizacoes_hoje = (prev.fiscalizacoes_hoje || 0) + 1;
+                }
+
+                // Se houver área vinculada, atualizar contagem da área
+                if (newLog.area_id && Array.isArray(updated.areas)) {
+                    updated.areas = updated.areas.map(a => {
+                        if (a.id === newLog.area_id) {
+                            return {
+                                ...a,
+                                total_acessos_hoje: (a.total_acessos_hoje || 0) + 1,
+                                total_negados_hoje: (newLog.tipo === 'negado' || newLog.resultado === 'negado')
+                                    ? (a.total_negados_hoje || 0) + 1
+                                    : (a.total_negados_hoje || 0)
+                            };
+                        }
+                        return a;
+                    });
+                }
+
+                return updated;
+            });
+        });
+
+        socket.on('area_alert', (alert) => {
+            playAlarmSound();
+            setActiveAreaAlert({
+                id: Math.random().toString(36),
+                pessoa_nome: alert.pessoa_nome || 'Indivíduo Não Autorizado',
+                pessoa_foto: alert.pessoa_foto,
+                area_nome: alert.area_nome || 'Área Restrita',
+                tipo: alert.tipo || 'tentativa_area_restrita',
+                timestamp: alert.hora || new Date().toISOString()
+            });
+            setTimeout(() => setActiveAreaAlert(null), 12000);
         });
 
         socket.on('watchlist_alert', (alert) => {
-            // Unifica com o evento que o monitor espera
+            playAlarmSound();
             const formattedAlert = {
                 id: Math.random().toString(36),
                 target_name: alert.pessoa.nome,
@@ -182,11 +262,11 @@ export const useMonitor = () => {
                 watchlist: alert.watchlist
             };
             setActiveAlert(formattedAlert);
-            setTimeout(() => setActiveAlert(null), 10000);
+            setTimeout(() => setActiveAlert(null), 12000);
         });
 
         return () => socket.disconnect();
-    }, [eventoId, log]);
+    }, [eventoId, log, playAlarmSound]);
 
     const fetchConfig = useCallback(async () => {
         if (!eventoId) return;
@@ -195,7 +275,13 @@ export const useMonitor = () => {
                 api.get('/config/areas', { params: { evento_id: eventoId } }),
                 api.get('/dispositivos', { params: { evento_id: eventoId } })
             ]);
-            setAreas(areasResp.data.data || []);
+            const rawAreas = areasResp.data.data || [];
+            // Normalizar nome da área
+            const normalizedAreas = rawAreas.map(a => ({
+                ...a,
+                nome: a.nome_area || a.nome || 'Sem Nome'
+            }));
+            setAreas(normalizedAreas);
             setDispositivosLista(dispResp.data.data || []);
         } catch (error) {
             log('Erro ao carregar configs do monitor:', error);
@@ -210,7 +296,7 @@ export const useMonitor = () => {
         fetchTerminais();
         fetchConfig();
 
-        const interval = setInterval(fetchData, 30000);
+        const interval = setInterval(fetchData, 20000);
         const terminalInterval = setInterval(fetchTerminais, 30000);
         const tickTimer = setInterval(() => setTick(t => t + 1), 5000);
 
@@ -240,7 +326,9 @@ export const useMonitor = () => {
         cameras, setCameras, fetchCameras, fetchWatchlist,
         terminais, areas, dispositivosLista,
         selectedCameras, setSelectedCameras,
-        watchlist, newCpf, setNewCpf, isTracking, activeAlert, setActiveAlert,
+        watchlist, newCpf, setNewCpf, isTracking,
+        activeAlert, setActiveAlert,
+        activeAreaAlert, setActiveAreaAlert,
         sysStatus, sysLogs, sysPerf, sysError,
         addToWatchlist, removeFromWatchlist, fetchSystemHealth,
         eventoId, filtros, setFiltros

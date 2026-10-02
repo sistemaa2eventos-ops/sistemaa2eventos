@@ -641,25 +641,29 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
      */
     async addToTerminalQueue(dispositivoId, tipo, payload) {
         try {
-            const connection = await getPgConnection();
+            const { data: dev } = await supabase
+                .from('dispositivos_acesso')
+                .select('evento_id')
+                .eq('id', dispositivoId)
+                .single();
 
-            // Buscar evento_id do dispositivo (necessário pois é NOT NULL na tabela)
-            const devResult = await connection.query(
-                'SELECT evento_id FROM dispositivos_acesso WHERE id = $1 LIMIT 1',
-                [dispositivoId]
-            );
-
-            const eventoId = devResult.rows[0]?.evento_id;
+            const eventoId = dev?.evento_id;
             if (!eventoId) {
                 logger.warn(`[SyncQueue] Dispositivo ${dispositivoId} não encontrado ou sem evento_id. Comando ${tipo} descartado.`);
                 return;
             }
 
-            await connection.query(`
-                INSERT INTO terminal_sync_queue (evento_id, dispositivo_id, tipo_comando, payload, status, created_at)
-                VALUES ($1, $2, $3, $4, 'pendente', NOW())
-            `, [eventoId, dispositivoId, tipo, JSON.stringify(payload)]);
+            const { error: insErr } = await supabase
+                .from('terminal_sync_queue')
+                .insert({
+                    evento_id: eventoId,
+                    dispositivo_id: dispositivoId,
+                    tipo_comando: tipo,
+                    payload: JSON.stringify(payload),
+                    status: 'pendente'
+                });
 
+            if (insErr) throw insErr;
             logger.info(`📝 [SyncQueue] Comando ${tipo} agendado para dispositivo ${dispositivoId}`);
         } catch (error) {
             logger.error(`❌ Erro ao enfileirar comando para terminal: ${error.message}`);
@@ -672,25 +676,21 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
      */
     async processTerminalQueue() {
         try {
-            const connection = await getPgConnection();
+            const { data: queue, error: qErr } = await supabase
+                .from('terminal_sync_queue')
+                .select(`
+                    id, dispositivo_id, tipo_comando, pessoa_id, payload,
+                    status, attempt_count, created_at,
+                    dispositivos_acesso (
+                        ip_address, user_device, password_device, marca, nome, config, status_online
+                    )
+                `)
+                .in('status', ['pendente', 'erro'])
+                .lt('attempt_count', 5)
+                .order('created_at', { ascending: true })
+                .limit(10);
 
-            // Buscar fila pendente de sync para terminais online
-            const result = await connection.query(`
-                SELECT
-                    q.id, q.dispositivo_id, q.tipo_comando, q.pessoa_id, q.payload,
-                    q.status, q.attempt_count, q.created_at,
-                    d.ip_address, d.user_device, d.password_device, d.marca, d.nome as device_name, d.config
-                FROM terminal_sync_queue q
-                JOIN dispositivos_acesso d ON q.dispositivo_id = d.id
-                WHERE q.status IN ('pendente', 'erro')
-                  AND q.attempt_count < 5
-                  AND d.status_online = 'online'
-                ORDER BY q.created_at ASC
-                LIMIT 10
-            `);
-
-            const queue = result.rows;
-
+            if (qErr) throw qErr;
             if (!queue || queue.length === 0) {
                 return { processed: 0 };
             }
@@ -701,47 +701,51 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
             let processed = 0;
 
             for (const item of queue) {
+                const d = item.dispositivos_acesso;
+                if (!d || d.status_online !== 'online') continue;
+
                 try {
                     const terminal = {
                         id: item.dispositivo_id,
-                        ip_address: item.ip_address,
-                        user_device: item.user_device,
-                        password_device: item.password_device,
-                        marca: item.marca,
-                        config: item.config
+                        ip_address: d.ip_address,
+                        user_device: d.user_device,
+                        password_device: d.password_device,
+                        marca: d.marca,
+                        config: d.config
                     };
 
                     const service = DeviceFactory.getDevice(terminal);
-                    const payload = JSON.parse(item.payload);
+                    const payload = typeof item.payload === 'string' ? JSON.parse(item.payload) : item.payload;
 
-                    logger.info(`🔄 [SyncQueue] Tentando ${item.tipo_comando} no terminal ${item.device_name}...`);
+                    logger.info(`🔄 [SyncQueue] Tentando ${item.tipo_comando} no terminal ${d.nome}...`);
 
                     if (item.tipo_comando === 'enroll_face') {
-                        // Otimizar imagem para o hardware antes do envio
-                        const optimizedPhoto = await imageProcessor.optimizeToBase64(payload.fotoBase64);
+                        const fotoInput = payload.fotoInput || payload.fotoBase64 || payload.pessoa?.foto_url;
+                        const optimizedPhoto = await imageProcessor.optimizeToBase64(fotoInput);
                         await service.enrollUser(payload.pessoa, optimizedPhoto);
                     } else if (item.tipo_comando === 'delete_face') {
                         await service.deleteUser(payload.hwUserId);
                     }
 
                     // Sucesso
-                    await connection.query(
-                        "UPDATE terminal_sync_queue SET status = 'sucesso', updated_at = NOW() WHERE id = $1",
-                        [item.id]
-                    );
+                    await supabase
+                        .from('terminal_sync_queue')
+                        .update({ status: 'sucesso', updated_at: new Date().toISOString() })
+                        .eq('id', item.id);
 
                     processed++;
-                    logger.info(`✅ [SyncQueue] ${item.tipo_comando} executado com sucesso em ${item.device_name}`);
+                    logger.info(`✅ [SyncQueue] ${item.tipo_comando} executado com sucesso em ${d.nome}`);
 
                 } catch (err) {
-                    await connection.query(`
-                        UPDATE terminal_sync_queue
-                        SET status = 'erro',
-                            attempt_count = attempt_count + 1,
-                            error_message = $2,
-                            last_attempt = NOW()
-                        WHERE id = $1
-                    `, [item.id, err.message]);
+                    await supabase
+                        .from('terminal_sync_queue')
+                        .update({
+                            status: 'erro',
+                            attempt_count: (item.attempt_count || 0) + 1,
+                            error_message: err.message,
+                            last_attempt: new Date().toISOString()
+                        })
+                        .eq('id', item.id);
                     logger.warn(`⚠️ [SyncQueue] Falha ao processar item ${item.id}: ${err.message}`);
                 }
             }
@@ -760,7 +764,7 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
      */
     async syncUserToAllDevices(pessoa) {
         try {
-            logger.info(`🔄 Auto-Sync: Processando ${pessoa.nome} para terminais...`);
+            logger.info(`🔄 Auto-Sync: Processando ${pessoa.nome || pessoa.nome_completo} para terminais...`);
 
             const { data: terminais } = await supabase
                 .from('dispositivos_acesso')
@@ -771,27 +775,32 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
             if (!terminais || terminais.length === 0) return;
 
             const DeviceFactory = require('./adapters/DeviceFactory');
+            const fotoInput = pessoa.foto_url || pessoa.foto_base64_cache || pessoa.foto_base64_internal;
+
+            if (!fotoInput) {
+                logger.warn(`⚠️ [Sync] Pessoa ${pessoa.nome || pessoa.nome_completo} não possui foto. Ignorando.`);
+                return;
+            }
 
             for (const terminal of terminais) {
                 // Se offline, direto pra fila
                 if (terminal.status_online !== 'online') {
-                    await this.addToTerminalQueue(terminal.id, 'enroll_face', { pessoa, fotoBase64: pessoa.foto_base64_cache || pessoa.foto_base64_internal });
+                    await this.addToTerminalQueue(terminal.id, 'enroll_face', { pessoa, fotoInput });
                     continue;
                 }
 
                 const service = DeviceFactory.getDevice(terminal);
-                let fotoBase64 = pessoa.foto_base64_cache || pessoa.foto_base64_internal;
 
                 // Tentar envio imediato
                 try {
                     // Otimizar imagem para o hardware antes do envio imediato
-                    const optimizedPhoto = await imageProcessor.optimizeToBase64(fotoBase64);
+                    const optimizedPhoto = await imageProcessor.optimizeToBase64(fotoInput);
                     await service.enrollUser(pessoa, optimizedPhoto);
-                    logger.info(`✅ Sync Imediato: ${pessoa.nome} -> ${terminal.nome}`);
+                    logger.info(`✅ Sync Imediato: ${pessoa.nome || pessoa.nome_completo} -> ${terminal.nome}`);
                 } catch (err) {
                     // Erro no envio imediato -> Enfileira
-                    logger.warn(`⚠️ Erro no sync imediato para ${terminal.nome}. Enfileirando...`);
-                    await this.addToTerminalQueue(terminal.id, 'enroll_face', { pessoa, fotoBase64 });
+                    logger.warn(`⚠️ Erro no sync imediato para ${terminal.nome}: ${err.message}. Enfileirando...`);
+                    await this.addToTerminalQueue(terminal.id, 'enroll_face', { pessoa, fotoInput });
                 }
             }
         } catch (error) {

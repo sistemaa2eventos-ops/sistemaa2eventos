@@ -6,13 +6,13 @@ const { TIMEOUT_CONFIG } = require('../../config/timeouts');
 class IntelbrasService extends AccessDevice {
     constructor(config) {
         super(config);
-        this.ip = config.ip_address;
-        this.port = config.porta || 80;
-        this.user = config.user_device || config.user || process.env.INTELBRAS_DEFAULT_USER || 'admin';
-        if (!config.password_device && !config.password && !process.env.INTELBRAS_DEFAULT_PASS) {
+        this.ip = config.ip_address || config.ip;
+        this.port = config.porta || config.port || 80;
+        this.user = config.user_device || config.user || config.usuario || process.env.INTELBRAS_DEFAULT_USER || 'admin';
+        this.pass = config.password_device || config.password || config.senha || process.env.INTELBRAS_DEFAULT_PASS;
+        if (!this.pass) {
             throw new Error(`Dispositivo Intelbras ${this.ip} requer password configurada`);
         }
-        this.pass = config.password_device || config.password || process.env.INTELBRAS_DEFAULT_PASS;
         this.baseUrl = `http://${this.ip}:${this.port}`;
         this.digestClient = null;
     }
@@ -161,23 +161,22 @@ class IntelbrasService extends AccessDevice {
 
             logger.info('Registering person on Intelbras (V2)', { person_name: safeName, hw_user_id: hwUserId, device_ip: this.ip });
 
-            // 1. Criar/Atualizar Usuário (payload mínimo compatível com SS 5541)
+            // 1. Criar/Atualizar Usuário com permissão de portas e horário
             const userData = {
                 UserList: [{
                     UserID: String(hwUserId),
                     UserName: safeName,
-                    UserType: 'Normal',
-                    AuthorizeTimePeriodList: [{ Index: 0, Enable: true }],
-                    Valid: {
-                        Enable: true,
-                        BeginTime: '2000-01-01 00:00:00',
-                        EndTime: '2037-12-31 23:59:59'
-                    }
+                    UserType: 0,
+                    Authority: 0, // 0 = Usuário comum (1 = Admin no firmware Intelbras)
+                    Doors: [0, 1], // Porta 1 e Porta 2 liberadas
+                    TimeSections: [255], // 255 = Período 24h irrestrito (Full Access no Dahua/Intelbras)
+                    ValidFrom: '2020-01-01 00:00:00',
+                    ValidTo: '2037-12-31 23:59:59'
                 }]
             };
 
             const addUserResponse = await this._postJson('/cgi-bin/AccessUser.cgi', { action: 'insertMulti' }, userData);
-            logger.info('User registered on device', { device_ip: this.ip });
+            logger.info('User registered on device with door permissions', { device_ip: this.ip, hw_user_id: hwUserId });
 
             // 2. Enviar Face via FaceInfoManager.cgi com upsert automático
             const base64Clean = fotoBase64.replace(/^data:image\/\w+;base64,/, '');
