@@ -75,13 +75,23 @@ __pycache__/
 *$py.class
 .Python
 venv/
+.venv/
+venv_311/
 env/
+
+# Arquivos temporários / logs de diagnóstico
+temp*.txt
+codigo_*.txt
+
+# Playwright (gerados pelos testes do a2-eventos)
+playwright-report/
+test-results/
 
 # ===== CLEANUP RULES (Phase 1 Audit 2026-04-23) =====
 
-# Root-level duplicates (canonical source is a2-eventos/)
-/gateway/
-/frontend/
+# 2026-10-01: árvore canônica agora é a RAIZ (backend/, frontend/, gateway/)
+# — as regras /frontend/ e /gateway/ foram removidas para permitir o merge
+# de a2-eventos/ → raiz (novos arquivos precisam ser trackeados).
 /appnzt/
 
 # Deploy scripts with credentials — NEVER commit
