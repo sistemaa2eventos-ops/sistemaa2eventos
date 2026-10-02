@@ -26,6 +26,7 @@ class AccessController {
         this.expulsar = this.expulsar.bind(this);
         this.isModuleEnabled = this.isModuleEnabled.bind(this);
         this.vincularPulseiraFacial = this.vincularPulseiraFacial.bind(this);
+        this.linkPulseiraAndCheckin = this.linkPulseiraAndCheckin.bind(this);
         this.bloquearPessoa = this.bloquearPessoa.bind(this);
         this.consultarAreasPulseira = this.consultarAreasPulseira.bind(this);
         this.acionarCatraca = this.acionarCatraca.bind(this);
@@ -273,13 +274,17 @@ class AccessController {
 
         cacheService.invalidatePessoa(pessoa_id);
 
+        // Expanded payload for checkout monitoring
         const logFinal = {
             id: logId, evento_id, pessoa_id, tipo, metodo, dispositivo_id, confianca,
             created_at: timestamp, observacao: null,
-            pessoas: { id: pessoa.id, nome: pessoa.nome, foto_url: pessoa.foto_url || null, empreasa_id: pessoa.empresa_id, empresas: pessoa.empresas },
+            pessoas: { id: pessoa.id, nome: pessoa.nome, nome_completo: pessoa.nome_completo, foto_url: pessoa.foto_url || null, empreasa_id: pessoa.empresa_id, empresas: pessoa.empresas, funcao: pessoa.funcao, numero_pulseira: pessoa.numero_pulseira, tipo_pulseira_id: pessoa.tipo_pulseira_id },
             ...rpcResult
         };
 
+        if (tipo === 'checkout') {
+            websocketService.emit('checkout_realizado', logFinal, evento_id);
+        }
         websocketService.emit('new_access', logFinal, evento_id);
 
         if (isAlert) {
@@ -394,6 +399,47 @@ class AccessController {
         } catch (error) {
             if (error.status === 403) return res.status(403).json({ error: error.message });
             res.status(500).json({ error: 'Erro interno no servidor' });
+        }
+    }
+
+    async linkPulseiraAndCheckin(req, res) {
+        try {
+            const { pessoa_id, tipo_pulseira_id, numero_pulseira, dispositivoId } = req.body;
+            const evento_id = req.event.id;
+
+            // 1. Validar se a pessoa existe
+            const { data: pessoa, error: pessoaError } = await supabase.from('pessoas').select('*').eq('id', pessoa_id).eq('evento_id', evento_id).single();
+            if (pessoaError || !pessoa) return res.status(404).json({ error: 'Pessoa não encontrada' });
+
+            if (pessoa.status_acesso === 'checkin_feito') return res.status(400).json({ error: 'Pessoa já realizou check-in' });
+
+            // 2. Vincular pulseira (a constraint UNIQUE no banco vai bloquear duplicidade no mesmo lote)
+            const { error: updateError } = await supabase.from('pessoas').update({
+                numero_pulseira: numero_pulseira,
+                tipo_pulseira_id: tipo_pulseira_id
+            }).eq('id', pessoa_id);
+
+            if (updateError) {
+                if (updateError.code === '23505' || updateError.message.includes('unique')) {
+                    return res.status(409).json({ error: 'Número de pulseira já em uso para este lote' });
+                }
+                throw updateError;
+            }
+
+            cacheService.invalidatePessoa(pessoa_id);
+
+            // 3. Registrar acesso
+            const result = await this.registrarAcesso({
+                pessoa_id, evento_id, tipo: 'checkin', metodo: 'manual', 
+                dispositivo_id: dispositivoId, created_by: req.user.id 
+            });
+
+            if (result.error) return res.status(400).json({ error: result.error });
+
+            res.json({ success: true, message: 'Pulseira vinculada e check-in realizado com sucesso', data: result });
+        } catch (error) {
+            if (error.status === 403) return res.status(403).json({ error: error.message });
+            res.status(500).json({ error: 'Erro interno no servidor ao vincular pulseira' });
         }
     }
 

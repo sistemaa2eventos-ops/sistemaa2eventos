@@ -11,12 +11,22 @@ router.post('/face/process', validateInternalApiKey, accessController.processFac
 // Middleware global para rotas de Dashboard/Operação
 const sessionMiddleware = [authenticate, requireEvent];
 
+const { body } = require('express-validator');
+const { handleValidationErrors } = require('../../middleware/validators');
+
 // Rotas para operadores (check-in/out)
 router.post('/validate/qrcode', sessionMiddleware, rateLimiter.access, accessController.validateQRCode);
 router.post('/checkin/qrcode', sessionMiddleware, rateLimiter.access, accessController.checkinQRCode);
 router.post('/checkin/barcode', sessionMiddleware, rateLimiter.access, accessController.checkinBarcode);
 router.post('/checkin/rfid', sessionMiddleware, rateLimiter.access, accessController.checkinRFID);
 router.post('/checkin/manual', sessionMiddleware, rateLimiter.access, accessController.checkinManual);
+
+router.post('/pulseira/link-checkin', sessionMiddleware, rateLimiter.access, [
+  body('pessoa_id').isUUID().withMessage('ID da pessoa inválido'),
+  body('tipo_pulseira_id').isUUID().withMessage('Tipo de pulseira inválido'),
+  body('numero_pulseira').notEmpty().withMessage('Número da pulseira obrigatório')
+], handleValidationErrors, accessController.linkPulseiraAndCheckin);
+
 router.post('/checkout', sessionMiddleware, rateLimiter.access, accessController.checkout);
 router.post('/checkout/qrcode', sessionMiddleware, rateLimiter.access, accessController.checkoutQRCode);
 router.post('/vincular-pulseira-facial', sessionMiddleware, rateLimiter.access, accessController.vincularPulseiraFacial);
