@@ -1,37 +1,45 @@
 // Maintenance: Force HMR refresh - System stable
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import theme from './styles/theme';
 import GlobalErrorBoundary from './components/common/GlobalErrorBoundary';
+import LoadingOverlay from './components/common/LoadingOverlay';
+import { ConfirmacaoProvider } from './contexts/ConfirmacaoContext';
 import { SnackbarProvider, useSnackbar } from 'notistack';
 import { setGlobalSnackbar } from './services/api';
 
 // Layout
-import Sidebar from './components/layout/Sidebar';
-import { Box, CircularProgress } from '@mui/material';
+import MainLayout from './components/layout/MainLayout';
+import ProtectedRoute from './components/common/ProtectedRoute'; // FIX I-09
 
 // Services
 import localCheckinService from './services/LocalCheckinService';
+import { useSystemAlerts } from './hooks/useSystemAlerts';
 
 // Pages (Lazy Loaded for Bundle Splitting)
 const Login = lazy(() => import('./pages/Login'));
+const PortalCadastro = lazy(() => import('./pages/PortalCadastro'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
+const CftvWall = lazy(() => import('./pages/CftvWall'));
 const Empresas = lazy(() => import('./pages/Empresas'));
 const Pessoas = lazy(() => import('./pages/Pessoas'));
 const AuditoriaDocumental = lazy(() => import('./pages/AuditoriaDocumental'));
 const Checkin = lazy(() => import('./pages/Checkin'));
 const Checkout = lazy(() => import('./pages/Checkout'));
+const Fiscalizacao = lazy(() => import('./pages/Fiscalizacao'));
 const Monitor = lazy(() => import('./pages/Monitor'));
 const Eventos = lazy(() => import('./pages/Eventos'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Veiculos = lazy(() => import('./pages/Veiculos'));
 const Usuarios = lazy(() => import('./pages/Usuarios'));
+const AuditLogs = lazy(() => import('./pages/AuditLogs'));
 const Configuracoes = lazy(() => import('./pages/Configuracoes'));
 const ConfigEtiquetas = lazy(() => import('./pages/config/ConfigEtiquetas'));
 const ConfigLeitorFacial = lazy(() => import('./pages/config/ConfigLeitorFacial'));
+
 const ConfigCameras = lazy(() => import('./pages/config/ConfigCameras'));
 const ConfigBancoDados = lazy(() => import('./pages/config/ConfigBancoDados'));
 const ConfigGeral = lazy(() => import('./pages/config/ConfigGeral'));
@@ -48,15 +56,21 @@ const ConfigWebhooks = lazy(() => import('./pages/config/ConfigWebhooks'));
 const ConfigGamificacao = lazy(() => import('./pages/config/ConfigGamificacao'));
 const ConfigAreas = lazy(() => import('./pages/config/ConfigAreas'));
 const ConfigPulseiras = lazy(() => import('./pages/config/ConfigPulseiras'));
+const ConfigTerminais = lazy(() => import('./pages/config/ConfigTerminais'));
 const PermissoesAcesso = lazy(() => import('./pages/config/PermissoesAcesso'));
 const ConfigCron = lazy(() => import('./pages/config/ConfigCron'));
+const DispositivosPage = lazy(() => import('./pages/config/DispositivosPage'));
+// const Financeiro = lazy(() => import('./pages/Financeiro'));
 
 const AppContent = () => {
   const { user, loading } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
+  const location = useLocation();
+  
+  // Ativar Alertas Proativos de Sistema
+  useSystemAlerts();
 
   React.useEffect(() => {
-    // Only register listener if user is logged in
     if (user && !loading) {
       localCheckinService.iniciarListenerConexao(
         (count) => {
@@ -69,76 +83,101 @@ const AppContent = () => {
 
       setGlobalSnackbar(enqueueSnackbar);
 
-      window.addEventListener('offline', () => {
+      // FIX I-12: handlers nomeados para permitir cleanup correto (evita memory leak)
+      const handleOffline = () => {
         enqueueSnackbar(`Sem conexão! Modo Offline ativado. Check-ins salvos localmente.`, { variant: 'warning' });
-      });
+      };
+      const handleOfflineSyncCompleted = () => {
+        window.dispatchEvent(new CustomEvent('refresh-global-data'));
+        enqueueSnackbar(`Dashboard atualizado com dados sincronizados.`, { variant: 'success' });
+      };
+
+      window.addEventListener('offline', handleOffline);
+      window.addEventListener('offline-sync-completed', handleOfflineSyncCompleted);
+
+      // Cleanup: remove listeners ao desmontar ou quando user/loading mudar
+      return () => {
+        window.removeEventListener('offline', handleOffline);
+        window.removeEventListener('offline-sync-completed', handleOfflineSyncCompleted);
+      };
     }
   }, [user, loading, enqueueSnackbar]);
 
+  // Regra 22: Durante a validação, apenas o LoadingOverlay
   if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', bgcolor: '#050B18' }}>
-        <CircularProgress color="secondary" />
-      </Box>
-    );
+    return <LoadingOverlay />;
   }
 
+  // Regra 21: A jaula de exclusão isolada de rotas
   if (!user) {
     return (
-      <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', bgcolor: '#050B18' }}><CircularProgress color="secondary" /></Box>}>
+      <Suspense fallback={<LoadingOverlay />}>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/portal" element={<PortalCadastro />} />
           <Route path="*" element={<Navigate to="/login" />} />
         </Routes>
       </Suspense>
     );
   }
 
+  // Janela Dedicada / Popout de CFTV Multi-Monitores (sem Layout/Sidebar)
+  if (location.pathname === '/cftv') {
+    return (
+      <Suspense fallback={<LoadingOverlay />}>
+        <ProtectedRoute modulo="monitoramento"><CftvWall /></ProtectedRoute>
+      </Suspense>
+    );
+  }
+
   return (
-    <Box sx={{ display: 'flex' }}>
-      <Sidebar />
-      <Box component="main" sx={{ flexGrow: 1, bgcolor: 'background.default', minHeight: '100vh' }}>
-        <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', bgcolor: '#050B18' }}><CircularProgress color="secondary" /></Box>}>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/eventos" element={<Eventos />} />
-            <Route path="/empresas" element={<Empresas />} />
-            <Route path="/pessoas" element={<Pessoas />} />
-            <Route path="/auditoria" element={<AuditoriaDocumental />} />
-            <Route path="/veiculos" element={<Veiculos />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/checkin" element={<Checkin />} />
-            <Route path="/checkout" element={<Checkout />} />
-            <Route path="/monitor" element={<Monitor />} />
-            <Route path="/usuarios" element={<Usuarios />} />
-            <Route path="/configuracoes" element={<Configuracoes />} />
-            <Route path="/config/geral" element={<ConfigGeral />} />
-            <Route path="/config/idiomas" element={<ConfigIdiomas />} />
-            <Route path="/config/notificacoes" element={<ConfigNotificacoes />} />
-            <Route path="/config/integracoes" element={<ConfigIntegracoes />} />
-            <Route path="/config/etiquetas" element={<ConfigEtiquetas />} />
-            <Route path="/config/leitor-facial" element={<ConfigLeitorFacial />} />
-            <Route path="/config/cameras" element={<ConfigCameras />} />
-            <Route path="/config/banco-dados" element={<ConfigBancoDados />} />
-            <Route path="/config/credenciamento" element={<ConfigCredenciamento />} />
-            <Route path="/config/areas" element={<ConfigAreas />} />
-            <Route path="/config/pulseiras" element={<ConfigPulseiras />} />
-            <Route path="/config/checkin" element={<ConfigCheckin />} />
-            <Route path="/config/veiculos" element={<ConfigVeiculos />} />
-            <Route path="/config/seguranca" element={<ConfigSeguranca />} />
-            <Route path="/config/logs" element={<ConfigLogs />} />
-            <Route path="/config/comunicacao" element={<ConfigComunicacao />} />
-            <Route path="/config/webhooks" element={<ConfigWebhooks />} />
-            <Route path="/config/gamificacao" element={<ConfigGamificacao />} />
-            <Route path="/config/permissoes" element={<PermissoesAcesso />} />
-            <Route path="/config/cron" element={<ConfigCron />} />
-            {/* Redirect authenticated users away from login or unknown routes */}
-            <Route path="/login" element={<Navigate to="/" />} />
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </Suspense>
-      </Box>
-    </Box>
+    <MainLayout>
+      <Suspense fallback={<LoadingOverlay />}>
+        <Routes>
+          <Route path="/" element={<ProtectedRoute modulo="dashboard"><Dashboard /></ProtectedRoute>} />
+          <Route path="/cftv" element={<ProtectedRoute modulo="monitoramento"><CftvWall /></ProtectedRoute>} />
+          <Route path="/eventos" element={<ProtectedRoute role="admin_master"><Eventos /></ProtectedRoute>} />
+          <Route path="/empresas" element={<ProtectedRoute modulo="empresas"><Empresas /></ProtectedRoute>} />
+          <Route path="/pessoas" element={<ProtectedRoute modulo="pessoas"><Pessoas /></ProtectedRoute>} />
+          <Route path="/auditoria" element={<ProtectedRoute modulo="auditoria_documentos"><AuditoriaDocumental /></ProtectedRoute>} />
+          <Route path="/veiculos" element={<ProtectedRoute modulo="veiculos"><Veiculos /></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute modulo="relatorios"><Reports /></ProtectedRoute>} />
+          <Route path="/checkin" element={<ProtectedRoute modulo="checkin"><Checkin /></ProtectedRoute>} />
+          <Route path="/checkout" element={<ProtectedRoute modulo="checkout"><Checkout /></ProtectedRoute>} />
+          <Route path="/fiscalizacao" element={<ProtectedRoute modulo="fiscalizacao"><Fiscalizacao /></ProtectedRoute>} />
+          <Route path="/monitor" element={<ProtectedRoute modulo="monitoramento"><Monitor /></ProtectedRoute>} />
+          <Route path="/usuarios" element={<ProtectedRoute role="admin_master"><Usuarios /></ProtectedRoute>} />
+          <Route path="/audit-logs" element={<ProtectedRoute role="admin_master"><AuditLogs /></ProtectedRoute>} />
+          <Route path="/configuracoes" element={<ProtectedRoute role="admin_master"><Configuracoes /></ProtectedRoute>} />
+          <Route path="/config/geral" element={<ProtectedRoute role="admin_master"><ConfigGeral /></ProtectedRoute>} />
+          <Route path="/config/leitor-facial" element={<ProtectedRoute role="admin_master"><ConfigLeitorFacial /></ProtectedRoute>} />
+          <Route path="/config/idiomas" element={<ProtectedRoute role="admin_master"><ConfigIdiomas /></ProtectedRoute>} />
+          <Route path="/config/notificacoes" element={<ProtectedRoute role="admin_master"><ConfigNotificacoes /></ProtectedRoute>} />
+          <Route path="/config/integracoes" element={<ProtectedRoute role="admin_master"><ConfigIntegracoes /></ProtectedRoute>} />
+          <Route path="/config/etiquetas" element={<ProtectedRoute role="admin_master"><ConfigEtiquetas /></ProtectedRoute>} />
+          <Route path="/config/dispositivos" element={<ProtectedRoute role="admin_master"><DispositivosPage /></ProtectedRoute>} />
+          <Route path="/config/cameras" element={<ProtectedRoute role="admin_master"><ConfigCameras /></ProtectedRoute>} />
+          <Route path="/config/banco-dados" element={<ProtectedRoute role="admin_master"><ConfigBancoDados /></ProtectedRoute>} />
+          <Route path="/config/credenciamento" element={<ProtectedRoute role="admin_master"><ConfigCredenciamento /></ProtectedRoute>} />
+          <Route path="/config/areas" element={<ProtectedRoute role="admin_master"><ConfigAreas /></ProtectedRoute>} />
+          <Route path="/config/pulseiras" element={<ProtectedRoute role="admin_master"><ConfigPulseiras /></ProtectedRoute>} />
+          <Route path="/config/terminais" element={<ProtectedRoute role="admin_master"><ConfigTerminais /></ProtectedRoute>} />
+          <Route path="/config/checkin" element={<ProtectedRoute role="admin_master"><ConfigCheckin /></ProtectedRoute>} />
+          <Route path="/config/veiculos" element={<ProtectedRoute role="admin_master"><ConfigVeiculos /></ProtectedRoute>} />
+          <Route path="/config/seguranca" element={<ProtectedRoute role="admin_master"><ConfigSeguranca /></ProtectedRoute>} />
+          <Route path="/config/logs" element={<ProtectedRoute role="admin_master"><ConfigLogs /></ProtectedRoute>} />
+          <Route path="/config/comunicacao" element={<ProtectedRoute role="admin_master"><ConfigComunicacao /></ProtectedRoute>} />
+          <Route path="/config/webhooks" element={<ProtectedRoute role="admin_master"><ConfigWebhooks /></ProtectedRoute>} />
+          <Route path="/config/gamificacao" element={<ProtectedRoute role="admin_master"><ConfigGamificacao /></ProtectedRoute>} />
+          <Route path="/config/permissoes" element={<ProtectedRoute role="admin_master"><PermissoesAcesso /></ProtectedRoute>} />
+          <Route path="/config/cron" element={<ProtectedRoute role="admin_master"><ConfigCron /></ProtectedRoute>} />
+          {/* <Route path="/financeiro" element={<Financeiro />} /> */}
+          <Route path="/portal" element={<PortalCadastro />} />
+          <Route path="/login" element={<Navigate to="/" />} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </Suspense>
+    </MainLayout>
   );
 };
 
@@ -150,7 +189,9 @@ function App() {
         <GlobalErrorBoundary>
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <AuthProvider>
-              <AppContent />
+              <ConfirmacaoProvider>
+                <AppContent />
+              </ConfirmacaoProvider>
             </AuthProvider>
           </BrowserRouter>
         </GlobalErrorBoundary>

@@ -14,7 +14,7 @@ import {
   Stepper,
   Step,
   StepLabel,
-  Divider,
+  Tooltip
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -25,66 +25,58 @@ import {
   Link as LinkIcon,
   ContentCopy as CopyIcon,
   Assessment as QuotaIcon,
-  CloudUpload as UploadIcon,
   InsertDriveFile as FileIcon,
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
+  WhatsApp as WhatsAppIcon,
+  Email as EmailIcon,
+  Check as CheckIcon
 } from '@mui/icons-material';
-import api from '../services/api';
 import GlassCard from '../components/common/GlassCard';
 import PageHeader from '../components/common/PageHeader';
 import NeonButton from '../components/common/NeonButton';
 import DataTable from '../components/common/DataTable';
 import ConfirmDialog from '../components/common/ConfirmDialog';
-import { styled } from '@mui/material/styles';
 import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-
-const SearchWrapper = styled(Box)(({ theme }) => ({
-  background: 'rgba(10, 22, 40, 0.6)',
-  border: '1px solid rgba(0, 212, 255, 0.1)',
-  borderRadius: 12,
-  padding: theme.spacing(1, 2),
-  display: 'flex',
-  alignItems: 'center',
-  gap: theme.spacing(1),
-  marginBottom: theme.spacing(3),
-  '&:focus-within': {
-    border: '1px solid rgba(0, 212, 255, 0.4)',
-    boxShadow: '0 0 10px rgba(0, 212, 255, 0.1)',
-  }
-}));
+import { useSnackbar } from 'notistack';
+import { useEmpresas } from '../hooks/useEmpresas';
+import api from '../services/api';
+import { useConfirmacao } from '../contexts/ConfirmacaoContext';
+import TituloModal from '../components/common/TituloModal';
+import { acaoTabela, acaoTabelaPerigo } from '../styles/tokens';
+import { formatarCnpj } from '../utils/formatadores';
 
 const Empresas = () => {
+    const confirmar = useConfirmacao();
+  const { enqueueSnackbar } = useSnackbar();
   const [searchParams] = useSearchParams();
   const eventoIdParam = searchParams.get('evento_id') || localStorage.getItem('active_evento_id');
-  const [empresas, setEmpresas] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [search, setSearch] = useState('');
-  const [openDialog, setOpenDialog] = useState(false);
   const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
   const [empresaToDelete, setEmpresaToDelete] = useState(null);
   const [openQuotaDialog, setOpenQuotaDialog] = useState(false);
-  const [selectedEmpresa, setSelectedEmpresa] = useState(null);
-  const [activeEvent, setActiveEvent] = useState(null);
-  const [dailyQuotas, setDailyQuotas] = useState({});
-  const [activeStep, setActiveStep] = useState(0);
-  const steps = ['Dados Cadastrais', 'Configurações Avançadas', 'Documentação (ECM)'];
-  const [documentos, setDocumentos] = useState([]);
-  const [formData, setFormData] = useState({
-    nome: '',
-    cnpj: '',
-    servico: '', // Agora refletindo tipo_operacao internamente
-    email: '',
-    email_convite: '',
-    responsavel: '', // Responsavel legal
-    observacao: '',
-    registration_token: '',
-    max_colaboradores: 50
-  });
+  const [openInviteDialog, setOpenInviteDialog] = useState(false);
+  const [inviteResult, setInviteResult] = useState({ link: '', empresa: null });
+  const [activePhaseTabEmpresa, setActivePhaseTabEmpresa] = useState('todas');
+
+  useEffect(() => {
+    if (eventoIdParam && eventoIdParam !== 'undefined' && eventoIdParam !== 'null') {
+      localStorage.setItem('active_evento_id', eventoIdParam);
+    }
+  }, [eventoIdParam]);
+
+  const {
+      empresas, loading, saving, search, setSearch,
+      page, setPage, rowsPerPage, setRowsPerPage, total,
+      openDialog, setOpenDialog, selectedEmpresa, setSelectedEmpresa,
+      activeEvent, dailyQuotas, setDailyQuotas,
+      activeStep, setActiveStep, documentos,
+      formData, setFormData, handleSave, handleDelete, handleSaveQuotas,
+      handleAuditDocument, handleSelectAllDatesEmpresa, handleClearAllDatesEmpresa,
+      handleSelectAllPhaseEmpresa, handleClearPhaseEmpresa, loadDocumentos
+  } = useEmpresas(eventoIdParam);
+
+  const steps = ['Dados cadastrais', 'Configurações', 'Documentos'];
 
   const columns = [
     {
@@ -98,7 +90,7 @@ const Empresas = () => {
         </Box>
       )
     },
-    { id: 'cnpj', label: 'ID/CNPJ', minWidth: 150 },
+    { id: 'cnpj', label: 'CNPJ', minWidth: 170, format: (value) => formatarCnpj(value) },
     { id: 'max_colaboradores', label: 'COTA BASE', minWidth: 100 },
     {
       id: 'acoes',
@@ -109,32 +101,46 @@ const Empresas = () => {
         <Stack direction="row" spacing={1} justifyContent="center">
           <IconButton
             size="small"
-            onClick={() => handleCopyLink(row.registration_token)}
-            sx={{ color: '#00FF88', background: 'rgba(0,255,136,0.05)' }}
-            title="Copiar Link de Cadastro"
+            onClick={() => handleCopyPhone(row)}
+            sx={acaoTabela}
+            title="Copiar telefone"
           >
-            <CopyIcon fontSize="small" />
+            <WhatsAppIcon fontSize="small" />
           </IconButton>
           <IconButton
             size="small"
-            onClick={() => handleOpenQuotaDialog(row)}
-            sx={{ color: '#FFB800', background: 'rgba(255,184,0,0.05)' }}
+            onClick={() => handleGerarConvite(row)}
+            sx={acaoTabela}
+            title="Gerar Convite de Cadastro"
+          >
+            <LinkIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            onClick={() => {
+                setSelectedEmpresa(row);
+                setOpenQuotaDialog(true);
+            }}
+            sx={acaoTabela}
             title="Gerenciar Cotas Diárias"
           >
             <QuotaIcon fontSize="small" />
           </IconButton>
           <IconButton
             size="small"
-            onClick={() => handleOpenDialog(row)}
-            sx={{ color: '#00D4FF', background: 'rgba(0,212,255,0.05)' }}
+            onClick={() => handleOpenEdit(row)}
+            sx={acaoTabela}
             title="Editar"
           >
             <EditIcon fontSize="small" />
           </IconButton>
           <IconButton
             size="small"
-            onClick={() => handleDelete(row.id)}
-            sx={{ color: '#FF3366', background: 'rgba(255,51,102,0.05)' }}
+            onClick={() => {
+                setEmpresaToDelete(row.id);
+                setOpenDeleteConfirm(true);
+            }}
+            sx={acaoTabelaPerigo}
             title="Excluir"
           >
             <DeleteIcon fontSize="small" />
@@ -144,22 +150,106 @@ const Empresas = () => {
     },
   ];
 
-  useEffect(() => {
-    loadEmpresas();
-    fetchActiveEvent();
-  }, [search]);
+  const handleCopyPhone = (row) => {
+    const telefone = row.telefone || row.responsavel_telefone || '';
+    if (!telefone) {
+      enqueueSnackbar('Telefone não cadastrado.', { variant: 'warning' });
+      return;
+    }
 
-  const fetchActiveEvent = async () => {
-    try {
-      const resp = await api.get('/eventos');
-      const active = resp.data.data.find(e => e.id === eventoIdParam) || resp.data.data.find(e => e.status === 'ativo');
-      setActiveEvent(active);
-    } catch (e) {
-      console.error('Erro ao buscar evento ativo');
+    const cleanPhone = telefone.replace(/\D/g, '');
+    let waPhone = cleanPhone;
+    if (waPhone && waPhone.length <= 11 && !waPhone.startsWith('55')) {
+      waPhone = `55${waPhone}`;
+    }
+
+    const eventoNome = localStorage.getItem('active_evento_nome') || 'Evento';
+    const publicUrl = 'https://cadastro.nzt.app.br'; // Fallback base
+    
+    // Se a empresa já tem um token, enviamos o link direto
+    if (row.registration_token) {
+      const link = `${publicUrl}/register/${row.registration_token}`;
+      const body = encodeURIComponent(
+        `Olá, *${row.responsavel || 'Responsável'}*!\n\n` +
+        `Segue o link para registro da equipe da *${row.nome}* no evento *${eventoNome}*:\n\n` +
+        `${link}`
+      );
+      window.open(`https://wa.me/${waPhone}?text=${body}`, '_blank');
+    } else {
+      // Caso contrário, apenas abre o chat
+      window.open(`https://wa.me/${waPhone}`, '_blank');
     }
   };
 
-  // Get all unique sorted dates from event phases
+  const handleGerarConvite = async (row, forceRefresh = false) => {
+    try {
+      // Se já tem token e não estamos forçando refresh, apenas mostra o que tem
+      if (row.registration_token && !forceRefresh) {
+        const publicUrl = 'https://cadastro.nzt.app.br';
+        const link = `${publicUrl}/register/${row.registration_token}`;
+        setInviteResult({ link, empresa: row });
+        setOpenInviteDialog(true);
+        return;
+      }
+
+      const { data } = await api.post(`/empresas/${row.id}/gerar-convite`, { refresh: forceRefresh });
+      setInviteResult({
+        link: data.link,
+        empresa: row
+      });
+      setOpenInviteDialog(true);
+      
+      if (data.isNew) {
+        await navigator.clipboard.writeText(data.link);
+        enqueueSnackbar('Novo link gerado e copiado!', { variant: 'success' });
+      }
+    } catch (err) {
+      enqueueSnackbar('Erro ao processar convite.', { variant: 'error' });
+    }
+  };
+
+  const buildMailto = () => {
+    if (!inviteResult.empresa) return '';
+    const eventoNome = localStorage.getItem('active_evento_nome') || 'Evento';
+    const empresaNome = inviteResult.empresa.nome;
+    const responsavel = inviteResult.empresa.responsavel || 'Responsável';
+    
+    const subject = encodeURIComponent(`Convite de Gerenciamento de Staff - ${eventoNome}`);
+    const body = encodeURIComponent(
+      `Olá, ${responsavel}!\n\n` +
+      `Temos o prazer de confirmar que a empresa ${empresaNome} foi cadastrada no evento ${eventoNome}.\n\n` +
+      `Para registrar sua equipe, por favor utilize o portal de inscrições através do link abaixo. Você pode preencher diretamente ou repassar o link para seus colaboradores:\n` +
+      `${inviteResult.link}\n\n` +
+      `Atenciosamente,\n` +
+      `Equipe de Credenciamento.`
+    );
+    
+    return `mailto:${inviteResult.empresa.email_convite || inviteResult.empresa.email || ''}?subject=${subject}&body=${body}`;
+  };
+
+  const buildWhatsappLink = () => {
+    if (!inviteResult.empresa) return '';
+    const eventoNome = localStorage.getItem('active_evento_nome') || 'Evento';
+    const empresaNome = inviteResult.empresa.nome;
+    const responsavel = inviteResult.empresa.responsavel || 'Responsável';
+    const telefone = inviteResult.empresa.telefone || inviteResult.empresa.responsavel_telefone || '';
+    const cleanPhone = telefone.replace(/\D/g, '');
+    let waPhone = cleanPhone;
+    if (waPhone && waPhone.length <= 11 && !waPhone.startsWith('55')) {
+      waPhone = `55${waPhone}`;
+    }
+    
+    // Garantir que usamos o link gerado, que agora vem no formato correto do backend
+    const body = encodeURIComponent(
+      `Olá, *${responsavel}*!\n\n` +
+      `Sua empresa *${empresaNome}* foi cadastrada para o evento *${eventoNome}*.\n` +
+      `Para registrar sua equipe acesse ou compartilhe o portal abaixo:\n\n` +
+      `${inviteResult.link}`
+    );
+    
+    return `https://wa.me/${waPhone}?text=${body}`;
+  };
+
   const getAllEventDates = () => {
     if (!activeEvent) return [];
     const allDates = [
@@ -167,204 +257,89 @@ const Empresas = () => {
       ...(activeEvent.datas_evento || []),
       ...(activeEvent.datas_desmontagem || [])
     ];
-    // Ensure dates are unique and sorted
     return [...new Set(allDates)].sort();
   };
 
-  const loadEmpresas = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get('/empresas', {
-        params: {
-          search: search || undefined,
-          evento_id: eventoIdParam || undefined
-        },
-      });
-      setEmpresas(response.data.data || []);
-    } catch (error) {
-      console.error('Erro ao carregar empresas:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCopyLink = (token) => {
-    if (!token) {
-      alert('Token de registro não gerado para esta empresa.');
-      return;
-    }
-    const url = `${window.location.protocol}//${window.location.hostname}:3000/register/${token}`;
-    navigator.clipboard.writeText(url);
-    alert('Link de cadastro copiado para o clipboard!');
-  };
-
-  const handleOpenQuotaDialog = async (empresa) => {
-    setSelectedEmpresa(empresa);
-    setDailyQuotas({});
-    if (activeEvent) {
-      try {
-        const resp = await api.get(`/eventos/${activeEvent.id}/quotas/${empresa.id}`);
-        const quotas = {};
-        resp.data.data.forEach(q => {
-          quotas[q.data] = q.cota;
-        });
-        setDailyQuotas(quotas);
-      } catch (e) {
-        console.log('Sem cotas prévias definidas');
-      }
-    }
-    setOpenQuotaDialog(true);
-  };
-
-  const handleSaveQuotas = async () => {
-    try {
-      await api.post(`/eventos/${activeEvent.id}/quotas/${selectedEmpresa.id}`, {
-        quotas: dailyQuotas
-      });
-      setOpenQuotaDialog(false);
-      alert('Cotas diárias sincronizadas com sucesso!');
-    } catch (e) {
-      alert('Falha ao salvar cotas');
-    }
-  };
-
-  const handleOpenDialog = (empresa = null) => {
-    setActiveStep(0);
-    if (empresa) {
+  const handleOpenEdit = (empresa) => {
+      setActiveStep(0);
       setSelectedEmpresa(empresa);
       setFormData({
         nome: empresa.nome || '',
         cnpj: empresa.cnpj || '',
         servico: empresa.servico || empresa.tipo_operacao || '',
         email: empresa.email || '',
+        telefone: empresa.telefone || '',
         email_convite: empresa.email_convite || '',
         responsavel: empresa.responsavel || empresa.responsavel_legal || '',
         observacao: empresa.observacao || '',
         registration_token: empresa.registration_token || '',
-        max_colaboradores: empresa.max_colaboradores || 50
+        max_colaboradores: empresa.max_colaboradores || 50,
+        datas_presenca: Array.isArray(empresa.datas_presenca) && empresa.datas_presenca.length > 0 
+          ? empresa.datas_presenca 
+          : getAllEventDates()
       });
-    } else {
+      setOpenDialog(true);
+      loadDocumentos(empresa.id);
+  };
+
+  const handleNew = () => {
+      setActiveStep(0);
       setSelectedEmpresa(null);
       setFormData({
         nome: '',
         cnpj: '',
         servico: '',
         email: '',
+        telefone: '',
         email_convite: '',
         responsavel: '',
         observacao: '',
-        registration_token: Math.random().toString(36).substring(2, 15),
-        max_colaboradores: 50
+        registration_token: '',
+        max_colaboradores: 50,
+        datas_presenca: getAllEventDates()
       });
-      setDocumentos([]);
-    }
-    setOpenDialog(true);
-  };
-
-  const loadDocumentos = async (empresaId) => {
-    try {
-      const resp = await api.get(`/documentos/empresa/${empresaId}`);
-      setDocumentos(resp.data.data || []);
-    } catch (e) {
-      console.error('Falha ao buscar docs', e);
-    }
-  };
-
-  useEffect(() => {
-    if (openDialog && selectedEmpresa) {
-      loadDocumentos(selectedEmpresa.id);
-    }
-  }, [openDialog, selectedEmpresa]);
-
-  const handleCloseDialog = () => {
-    setOpenDialog(false);
-    setSelectedEmpresa(null);
-  };
-
-  const handleSave = async () => {
-    try {
-      setSaving(true);
-      const payload = {
-        ...formData,
-        tipo_operacao: formData.servico,
-        responsavel_legal: formData.responsavel
-      };
-
-      if (selectedEmpresa) {
-        await api.put(`/empresas/${selectedEmpresa.id}`, payload);
-      } else {
-        await api.post('/empresas', payload);
-      }
-      handleCloseDialog();
-      loadEmpresas();
-    } catch (error) {
-      console.error('Erro ao salvar empresa:', error);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = (id) => {
-    setEmpresaToDelete(id);
-    setOpenDeleteConfirm(true);
-  };
-
-  const confirmDelete = async () => {
-    try {
-      setDeleteLoading(true);
-      await api.delete(`/empresas/${empresaToDelete}`);
-      setOpenDeleteConfirm(false);
-      setEmpresaToDelete(null);
-      loadEmpresas();
-    } catch (error) {
-      console.error('Erro ao excluir empresa:', error);
-      alert('Falha ao desativar empresa.');
-    } finally {
-      setDeleteLoading(false);
-    }
+      setOpenDialog(true);
   };
 
   return (
-    <Box sx={{ p: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
+    <Box sx={{ p: { xs: 2, md: 3 } }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'flex-start' }, mb: 3, gap: 2 }}>
         <PageHeader
-          title="PAINEL DE EMPRESAS"
+          title="Empresas"
           subtitle={eventoIdParam ? `Filtrando empresas do evento: ${localStorage.getItem('active_evento_nome')}` : "Gerencie as entidades terceirizadas do ecossistema."}
           breadcrumbs={[{ text: 'Dashboard' }, { text: 'Empresas' }]}
         />
         <NeonButton
           startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-          sx={{ mt: 2 }}
+          onClick={handleNew}
+          sx={{ mt: { xs: 0, md: 2 }, width: { xs: '100%', md: 'auto' } }}
         >
-          Anexar Empresa
+          Nova empresa
         </NeonButton>
       </Box>
 
       <GlassCard glowColor="#00D4FF" sx={{ p: 3, mb: 3 }}>
-        <SearchWrapper>
-          <SearchIcon sx={{ color: 'text.secondary' }} />
-          <input
-            type="text"
-            placeholder="Rastrear por nome, CNPJ ou serviço..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#fff',
-              width: '100%',
-              outline: 'none',
-              fontFamily: 'inherit',
-              fontSize: '0.9rem'
-            }}
-          />
-        </SearchWrapper>
+        <TextField
+          fullWidth
+          size="small"
+          placeholder="Buscar por nome, CNPJ ou serviço..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          InputProps={{
+            startAdornment: <SearchIcon sx={{ color: 'rgba(255,255,255,0.4)', mr: 1, fontSize: 20 }} />,
+            sx: { bgcolor: 'rgba(0,0,0,0.25)', borderRadius: 1.5, color: '#FFFFFF', fontSize: '0.875rem', mb: 2.5 }
+          }}
+        />
 
         <DataTable
           columns={columns}
           data={empresas}
           loading={loading}
+          totalCount={total}
+          page={page}
+          onPageChange={setPage}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={setRowsPerPage}
           sx={{
             '& .MuiTableHead-root': { background: 'rgba(0,212,255,0.05)' },
             border: '1px solid rgba(0,212,255,0.05)'
@@ -372,12 +347,50 @@ const Empresas = () => {
         />
       </GlassCard>
 
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth disableRestoreFocus>
-        <DialogTitle sx={{ fontFamily: '"Orbitron", sans-serif', fontWeight: 700, letterSpacing: '2px' }}>
-          {selectedEmpresa ? 'MODIFICAR EMPRESA' : 'ANEXAR NOVA EMPRESA'}
-        </DialogTitle>
-        <DialogContent>
-          <Stepper activeStep={activeStep} alternativeLabel sx={{ pt: 3, mb: 4 }}>
+      <Dialog 
+        open={openDialog} 
+        onClose={() => setOpenDialog(false)} 
+        maxWidth="md" 
+        fullWidth 
+        disableRestoreFocus
+        PaperProps={{
+          sx: {
+            bgcolor: 'rgba(10, 25, 41, 0.95)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(0, 212, 255, 0.15)',
+            borderRadius: 1.5,
+            minHeight: { xs: '100%', md: '80vh' },
+            maxHeight: { xs: '100%', md: '90vh' },
+            height: { xs: '100%', md: '88vh' },
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            backgroundImage: 'none',
+            boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 40px rgba(0,212,255,0.05)'
+          }
+        }}
+      >
+        <TituloModal
+          titulo={selectedEmpresa ? 'Editar empresa' : 'Nova empresa'}
+          onFechar={() => setOpenDialog(false)}
+          desabilitarFechar={saving}
+        />
+        <DialogContent sx={{ 
+          p: { xs: 2.5, md: 3.5 }, 
+          pr: { xs: 2, md: 2.5 }, 
+          overflowY: 'auto', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          minHeight: 0, 
+          height: '100%',
+          maxHeight: '100%',
+          flex: '1 1 auto',
+          '&::-webkit-scrollbar': { width: '6px' }, 
+          '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.4)', borderRadius: '10px' }, 
+          '&::-webkit-scrollbar-track': { background: 'rgba(255,255,255,0.02)' } 
+        }}>
+          <Box sx={{ pr: { xs: 0, md: 0.5 }, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <Stepper activeStep={activeStep} alternativeLabel sx={{ pt: 1, mb: 2.5 }}>
             {steps.map((label) => (
               <Step key={label}>
                 <StepLabel>{label}</StepLabel>
@@ -387,124 +400,262 @@ const Empresas = () => {
 
           {activeStep === 0 && (
             <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <TextField
-                label="Nome da Empresa (Razão Social)"
-                fullWidth
-                value={formData.nome}
-                onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-              />
+              <TextField label="Razão social" fullWidth value={formData.nome} onChange={(e) => setFormData({ ...formData, nome: e.target.value })} />
               <Grid container spacing={2}>
                 <Grid item xs={6}>
-                  <TextField
-                    label="CNPJ / ID Fiscal"
-                    fullWidth
-                    value={formData.cnpj}
-                    onChange={(e) => setFormData({ ...formData, cnpj: e.target.value })}
-                  />
+                  <TextField label="CNPJ" fullWidth value={formData.cnpj} onChange={(e) => setFormData({ ...formData, cnpj: e.target.value })} />
                 </Grid>
                 <Grid item xs={6}>
-                  <TextField
-                    label="Tipo de Operação / Serviço"
-                    fullWidth
-                    value={formData.servico}
-                    onChange={(e) => setFormData({ ...formData, servico: e.target.value })}
-                  />
+                  <TextField label="Serviço prestado" fullWidth value={formData.servico} onChange={(e) => setFormData({ ...formData, servico: e.target.value })} />
                 </Grid>
               </Grid>
-              <TextField
-                label="Responsável Legal"
-                fullWidth
-                value={formData.responsavel}
-                onChange={(e) => setFormData({ ...formData, responsavel: e.target.value })}
-              />
+              <TextField label="Responsável" fullWidth value={formData.responsavel} onChange={(e) => setFormData({ ...formData, responsavel: e.target.value })} />
               <Grid container spacing={2}>
                 <Grid item xs={6}>
-                  <TextField
-                    label="E-mail Corporativo Básicao"
-                    fullWidth
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  />
+                  <TextField label="E-mail" fullWidth value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
                 </Grid>
                 <Grid item xs={6}>
-                  <TextField
-                    label="E-mail Recebimento de Convite"
-                    fullWidth
-                    value={formData.email_convite}
-                    onChange={(e) => setFormData({ ...formData, email_convite: e.target.value })}
-                  />
+                  <TextField label="Telefone" fullWidth value={formData.telefone} onChange={(e) => setFormData({ ...formData, telefone: e.target.value })} />
                 </Grid>
               </Grid>
+              <TextField sx={{ mt: 2 }} label="E-mail para o convite de cadastro" fullWidth value={formData.email_convite} onChange={(e) => setFormData({ ...formData, email_convite: e.target.value })} />
             </Box>
           )}
 
           {activeStep === 1 && (
-            <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <Box sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 2.5, flex: 1, minHeight: 0 }}>
               <Grid container spacing={2}>
                 <Grid item xs={8}>
-                  <TextField
-                    label="Token de Registro Seguro (Envio B2B)"
-                    fullWidth
-                    disabled
-                    value={formData.registration_token}
-                    InputProps={{
-                      endAdornment: (
-                        <IconButton disabled>
-                          <LinkIcon />
-                        </IconButton>
-                      )
-                    }}
-                  />
+                  <TextField label="Link de cadastro da empresa" fullWidth disabled value={formData.registration_token} />
                 </Grid>
                 <Grid item xs={4}>
-                  <TextField
-                    label="Cota Total Max."
-                    type="number"
-                    fullWidth
-                    value={formData.max_colaboradores}
-                    onChange={(e) => setFormData({ ...formData, max_colaboradores: e.target.value })}
-                  />
+                  <TextField label="Cota máxima" type="number" fullWidth value={formData.max_colaboradores} onChange={(e) => setFormData({ ...formData, max_colaboradores: e.target.value })} />
                 </Grid>
               </Grid>
-              <TextField
-                label="Notas de Operação e Logística"
-                fullWidth
-                multiline
-                rows={4}
-                value={formData.observacao}
-                onChange={(e) => setFormData({ ...formData, observacao: e.target.value })}
-              />
+              <TextField label="Observações" fullWidth multiline rows={2} value={formData.observacao} onChange={(e) => setFormData({ ...formData, observacao: e.target.value })} />
+
+              {activeEvent && formData && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, mt: 1 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+                    <Box>
+                      <Typography variant="subtitle2" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: '0.5px' }}>
+                        Dias permitidos para acesso (terceirizados)
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>
+                        Define as datas autorizadas para os colaboradores vinculados a esta empresa.
+                      </Typography>
+                    </Box>
+                    <Stack direction="row" spacing={1}>
+                      <Button 
+                        size="small" 
+                        variant="outlined" 
+                        onClick={handleSelectAllDatesEmpresa} 
+                        sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#00FF88', borderColor: 'rgba(0,255,136,0.3)', py: 0.3, px: 1.5, '&:hover': { borderColor: '#00FF88', bgcolor: 'rgba(0,255,136,0.08)' } }}
+                      >
+                        Marcar todos
+                      </Button>
+                      <Button 
+                        size="small" 
+                        variant="outlined" 
+                        onClick={handleClearAllDatesEmpresa} 
+                        sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#FF3366', borderColor: 'rgba(255,51,102,0.3)', py: 0.3, px: 1.5, '&:hover': { borderColor: '#FF3366', bgcolor: 'rgba(255,51,102,0.08)' } }}
+                      >
+                        Limpar
+                      </Button>
+                    </Stack>
+                  </Box>
+
+                  {/* Botões de Navegação Direta de Fases para Empresas */}
+                  <Stack direction="row" spacing={1} sx={{ mb: 1.5, flexWrap: 'wrap', gap: 0.5 }}>
+                    {[
+                      { id: 'todas', label: 'TODAS AS FASES', color: '#00D4FF' },
+                      { id: 'montagem', label: 'MONTAGEM', color: '#00D4FF' },
+                      { id: 'evento', label: 'EVENTO', color: '#00FF88' },
+                      { id: 'desmontagem', label: 'DESMONTAGEM', color: '#FFB800' }
+                    ].map(tab => (
+                      <Button
+                        key={tab.id}
+                        size="small"
+                        variant={activePhaseTabEmpresa === tab.id ? 'contained' : 'outlined'}
+                        onClick={() => setActivePhaseTabEmpresa(tab.id)}
+                        sx={{
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          letterSpacing: '0.5px',
+                          color: activePhaseTabEmpresa === tab.id ? '#0a1628' : tab.color,
+                          bgcolor: activePhaseTabEmpresa === tab.id ? tab.color : 'transparent',
+                          borderColor: tab.color,
+                          py: 0.3,
+                          px: 1.3,
+                          boxShadow: activePhaseTabEmpresa === tab.id ? `0 0 10px ${tab.color}40` : 'none',
+                          '&:hover': {
+                            bgcolor: activePhaseTabEmpresa === tab.id ? tab.color : 'rgba(255,255,255,0.06)'
+                          }
+                        }}
+                      >
+                        {tab.label}
+                      </Button>
+                    ))}
+                  </Stack>
+                  
+                  <Box 
+                    sx={{ 
+                      flex: 1,
+                      minHeight: 0,
+                      border: '1px solid rgba(0, 212, 255, 0.2)',
+                      borderRadius: 1.5,
+                      p: 2,
+                      bgcolor: 'rgba(0,0,0,0.25)',
+                      overflowY: 'auto',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                      '&::-webkit-scrollbar': { width: '6px' }, 
+                      '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.5)', borderRadius: '10px' }, 
+                      '&::-webkit-scrollbar-track': { background: 'rgba(255,255,255,0.02)' }
+                    }}
+                  >
+                    {[
+                      { id: 'montagem', label: 'MONTAGEM', color: '#00D4FF', bg: 'rgba(0,212,255,0.04)', border: 'rgba(0,212,255,0.2)' },
+                      { id: 'evento', label: 'EVENTO', color: '#00FF88', bg: 'rgba(0,255,136,0.04)', border: 'rgba(0,255,136,0.2)' },
+                      { id: 'desmontagem', label: 'DESMONTAGEM', color: '#FFB800', bg: 'rgba(255,184,0,0.05)', border: 'rgba(255,184,0,0.25)' }
+                    ]
+                      .filter(phase => activePhaseTabEmpresa === 'todas' || activePhaseTabEmpresa === phase.id)
+                      .map(phase => {
+                        const dates = (activeEvent && activeEvent[`datas_${phase.id}`]) || [];
+                        if (!Array.isArray(dates) || dates.length === 0) return null;
+                        const totalDates = dates.length;
+                        const selectedCount = dates.filter(d => Array.isArray(formData?.datas_presenca) && formData.datas_presenca.includes(d)).length;
+
+                        return (
+                          <Box 
+                            key={phase.id}
+                            sx={{
+                              p: 1.5,
+                              borderRadius: 1.5,
+                              bgcolor: phase.bg,
+                              border: `1px solid ${phase.border}`
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.2, flexWrap: 'wrap', gap: 1 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography variant="caption" sx={{ color: phase.color, fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', fontSize: '0.75rem' }}>
+                                  {phase.label}
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem' }}>
+                                  ({selectedCount}/{totalDates} dias selecionados)
+                                </Typography>
+                              </Box>
+                              <Stack direction="row" spacing={0.8}>
+                                <Button 
+                                  size="small" 
+                                  onClick={() => handleSelectAllPhaseEmpresa ? handleSelectAllPhaseEmpresa(phase.id) : null}
+                                  sx={{ fontSize: '0.75rem', fontWeight: 700, color: phase.color, py: 0.2, px: 1, minWidth: 'auto', border: `1px solid ${phase.border}`, '&:hover': { bgcolor: `${phase.border}` } }}
+                                >
+                                  Todos
+                                </Button>
+                                <Button 
+                                  size="small" 
+                                  onClick={() => handleClearPhaseEmpresa ? handleClearPhaseEmpresa(phase.id) : null}
+                                  sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', py: 0.2, px: 1, minWidth: 'auto', border: '1px solid rgba(255,255,255,0.1)', '&:hover': { color: '#FF3366', borderColor: '#FF3366' } }}
+                                >
+                                  Limpar
+                                </Button>
+                              </Stack>
+                            </Box>
+
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                              {dates.map(date => {
+                                const isChecked = Array.isArray(formData?.datas_presenca) && formData.datas_presenca.includes(date);
+                                return (
+                                  <Box
+                                    key={date}
+                                    onClick={() => {
+                                      const currentDates = Array.isArray(formData?.datas_presenca) ? [...formData.datas_presenca] : [];
+                                      const newDates = currentDates.includes(date)
+                                        ? currentDates.filter(d => d !== date)
+                                        : [...currentDates, date];
+                                      setFormData({ ...formData, datas_presenca: newDates });
+                                    }}
+                                    sx={{
+                                      cursor: 'pointer',
+                                      userSelect: 'none',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 0.8,
+                                      px: 1.2,
+                                      py: 0.6,
+                                      borderRadius: 1.5,
+                                      border: `1px solid ${isChecked ? phase.color : 'rgba(255,255,255,0.1)'}`,
+                                      bgcolor: isChecked ? `${phase.color}18` : 'rgba(255,255,255,0.02)',
+                                      boxShadow: isChecked ? `0 0 10px ${phase.color}30` : 'none',
+                                      transition: 'all 0.15s ease',
+                                      '&:hover': {
+                                        borderColor: phase.color,
+                                        bgcolor: `${phase.color}10`
+                                      }
+                                    }}
+                                  >
+                                    <Box sx={{
+                                      width: 16,
+                                      height: 16,
+                                      borderRadius: 1,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      bgcolor: isChecked ? phase.color : 'transparent',
+                                      border: `1px solid ${isChecked ? phase.color : 'rgba(255,255,255,0.3)'}`
+                                    }}>
+                                      {isChecked && <CheckIcon sx={{ fontSize: 13, color: '#0a1628', fontWeight: 700 }} />}
+                                    </Box>
+                                    <Typography variant="caption" sx={{ color: isChecked ? '#FFFFFF' : 'rgba(255,255,255,0.7)', fontWeight: isChecked ? 700 : 500, fontSize: '0.75rem' }}>
+                                      {date ? format(new Date(date + 'T00:00:00'), "dd/MM") : '--/--'}
+                                    </Typography>
+                                  </Box>
+                                );
+                              })}
+                            </Box>
+                          </Box>
+                        );
+                      })}
+                  </Box>
+                </Box>
+              )}
             </Box>
           )}
 
           {activeStep === 2 && (
             <Box sx={{ pt: 2, textAlign: 'center' }}>
               {!selectedEmpresa ? (
-                <Typography color="text.secondary" sx={{ py: 4 }}>
-                  Por favor, salve a empresa primeiro antes de gerenciar documentos.
-                </Typography>
+                <Typography color="text.secondary" sx={{ py: 4 }}>Por favor, salve a empresa primeiro antes de gerenciar documentos.</Typography>
               ) : (
                 <Box>
                   <Stack spacing={2} sx={{ mb: 3 }}>
                     {documentos.length === 0 ? (
-                      <Typography variant="body2" color="text.secondary">
-                        Nenhum documento formal (Contratos/Alvarás) anexado à empresa ainda.
-                        Envie-os acessando o <b style={{ color: '#00D4FF' }}>Portal B2B das Empresas</b> através do link de registro seguro na aba anterior.
-                      </Typography>
+                      <Typography variant="body2" color="text.secondary">Nenhum documento formal anexado ainda.</Typography>
                     ) : (
                       documentos.map(doc => (
-                        <Box key={doc.id} sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 2, border: '1px solid rgba(0, 212, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Box key={doc.id} sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 1.5, border: '1px solid rgba(0, 212, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                             <FileIcon sx={{ color: '#00D4FF' }} />
                             <Box sx={{ textAlign: 'left' }}>
                               <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{doc.titulo}</Typography>
-                              <Typography variant="caption" color="text.secondary">{doc.tipo_doc} • Uploaded in {new Date(doc.data_inclusao).toLocaleDateString()}</Typography>
+                              <Typography variant="caption" color="text.secondary">{doc.tipo_doc} • {new Date(doc.data_inclusao).toLocaleDateString()}</Typography>
                             </Box>
                           </Box>
-                          <Box>
-                            {doc.status === 'aprovado' && <CheckCircleIcon sx={{ color: '#00FF88' }} titleAccess="Aprovado" />}
-                            {doc.status === 'rejeitado' && <CancelIcon sx={{ color: '#FF3366' }} titleAccess="Rejeitado" />}
-                            {doc.status === 'pendente' && <Typography variant="caption" sx={{ color: '#FFB800', border: '1px solid', px: 1, borderRadius: 1 }}>PENDENTE AUDITORIA</Typography>}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            {doc.status === 'pendente' ? (
+                              <Stack direction="row" spacing={1}>
+                                <Tooltip title="Aprovar"><IconButton size="small" onClick={() => handleAuditDocument(doc.id, 'aprovado')} sx={{ color: '#00FF88', border: '1px solid rgba(0,255,136,0.2)' }}><CheckCircleIcon fontSize="small" /></IconButton></Tooltip>
+                                <Tooltip title="Rejeitar"><IconButton size="small" onClick={() => handleAuditDocument(doc.id, 'rejeitado')} sx={{ color: '#FF3366', border: '1px solid rgba(255,51,102,0.2)' }}><CancelIcon fontSize="small" /></IconButton></Tooltip>
+                              </Stack>
+                            ) : (
+                              <>
+                                {doc.status === 'aprovado' && <CheckCircleIcon sx={{ color: '#00FF88' }} />}
+                                {doc.status === 'rejeitado' && <CancelIcon sx={{ color: '#FF3366' }} />}
+                              </>
+                            )}
+                            <IconButton size="small" onClick={() => window.open(doc.url_arquivo, '_blank')} sx={{ color: 'rgba(255,255,255,0.5)' }}><LinkIcon fontSize="small" /></IconButton>
                           </Box>
                         </Box>
                       ))
@@ -514,177 +665,129 @@ const Empresas = () => {
               )}
             </Box>
           )}
-
+          </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 3, justifyContent: 'space-between' }}>
-          <Button onClick={handleCloseDialog} disabled={saving} sx={{ color: 'text.secondary' }}>CANCELAR</Button>
-          <Box>
-            {activeStep > 0 && (
-              <Button onClick={() => setActiveStep(prev => prev - 1)} sx={{ mr: 1, color: '#fff' }}>Voltar</Button>
-            )}
+        <DialogActions sx={{ p: 3, px: 6, justifyContent: 'space-between', borderTop: '1px solid rgba(255, 255, 255, 0.05)', bgcolor: 'rgba(10, 25, 41, 0.5)' }}>
+          <Button onClick={() => setOpenDialog(false)} disabled={saving} sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, '&:hover': { color: '#FF3366' } }}>Cancelar</Button>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            {activeStep > 0 && <Button onClick={() => setActiveStep(prev => prev - 1)} sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, '&:hover': { color: '#FFFFFF' } }}>Voltar</Button>}
             {activeStep < steps.length - 1 ? (
-              <NeonButton onClick={() => setActiveStep(prev => prev + 1)}>PRÓXIMA ETAPA</NeonButton>
+              <NeonButton onClick={() => setActiveStep(prev => prev + 1)}>Próxima etapa</NeonButton>
             ) : (
-              <NeonButton onClick={handleSave} loading={saving}>FINALIZAR & SALVAR</NeonButton>
+              <NeonButton onClick={handleSave} loading={saving}>Finalizar & salvar</NeonButton>
             )}
           </Box>
         </DialogActions>
       </Dialog>
-      {/* Dialog de Cotas Diárias */}
-      <Dialog
-        open={openQuotaDialog}
-        onClose={() => setOpenQuotaDialog(false)}
-        maxWidth="sm"
-        fullWidth
-        disableRestoreFocus
-        PaperProps={{
-          sx: {
-            bgcolor: 'rgba(10, 25, 41, 0.98)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(0, 212, 255, 0.1)',
-            borderRadius: 3,
-            maxHeight: '90vh',
-            backgroundImage: 'none'
-          }
+
+      <ConfirmDialog
+        open={openDeleteConfirm}
+        title="Remover Empresa?"
+        description="Esta ação desvinculará a empresa do ecossistema. Colaboradores vinculados serão mantidos, mas podem perder acesso a certas áreas."
+        onConfirm={async () => {
+            await handleDelete(empresaToDelete);
+            setOpenDeleteConfirm(false);
         }}
-      >
-        <DialogTitle sx={{
-          fontFamily: '"Orbitron", sans-serif',
-          fontWeight: 700,
-          color: '#fff',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-          py: 2.5,
-          px: 4
-        }}>
-          GERENCIAMENTO DE COTAS: {selectedEmpresa?.nome}
-        </DialogTitle>
-        <DialogContent sx={{ p: 0 }}>
-          <Box sx={{ p: 4 }}>
+        onClose={() => setOpenDeleteConfirm(false)}
+      />
+
+      <Dialog open={openQuotaDialog} onClose={() => setOpenQuotaDialog(false)} maxWidth="sm" fullWidth disableRestoreFocus>
+        <TituloModal
+          titulo="Cotas diárias"
+          subtitulo={selectedEmpresa?.nome}
+          onFechar={() => setOpenQuotaDialog(false)}
+        />
+        <DialogContent sx={{ p: 4 }}>
             {!activeEvent ? (
-              <Box sx={{ textAlign: 'center', py: 4 }}>
-                <Typography color="error" variant="subtitle2" sx={{ fontWeight: 700 }}>Nenhum evento ativo detectado.</Typography>
-                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)' }}>Selecione um evento no menu superior para gerenciar cotas.</Typography>
-              </Box>
+              <Typography color="error" variant="subtitle2">Nenhum evento ativo detectado.</Typography>
             ) : (
               <Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                  <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 800, m: 0, display: 'block', letterSpacing: 2 }}>
-                    PLANEJAMENTO DIÁRIO DE ACESSOS
-                  </Typography>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={() => {
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+                  <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700 }}>PLANEJAMENTO DIÁRIO</Typography>
+                  <Button size="small" variant="outlined" onClick={() => {
                       const newQuotas = {};
-                      getAllEventDates().forEach(date => {
-                        newQuotas[date] = selectedEmpresa?.max_colaboradores ?? 50;
-                      });
+                      getAllEventDates().forEach(d => newQuotas[d] = selectedEmpresa?.max_colaboradores ?? 50);
                       setDailyQuotas(newQuotas);
-                    }}
-                    sx={{
-                      borderColor: 'rgba(0, 212, 255, 0.3)',
-                      color: '#00D4FF',
-                      fontSize: '0.65rem',
-                      '&:hover': { borderColor: '#00D4FF', bgcolor: 'rgba(0, 212, 255, 0.05)' }
-                    }}
-                  >
-                    APLICAR COTA PADRÃO EM TUDO
-                  </Button>
+                  }}>Cota padrão</Button>
                 </Box>
-
-                <Box sx={{
-                  maxHeight: 450,
-                  overflowY: 'auto',
-                  pr: 1,
-                  display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-                  gap: 1.5,
-                  // Estilização da scrollbar para o tema dark
-                  '&::-webkit-scrollbar': { width: '6px' },
-                  '&::-webkit-scrollbar-track': { background: 'rgba(0,0,0,0.1)' },
-                  '&::-webkit-scrollbar-thumb': { background: 'rgba(0, 212, 255, 0.2)', borderRadius: '10px' }
-                }}>
+                <Box sx={{ maxHeight: 400, overflowY: 'auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
                   {getAllEventDates().map(date => (
-                    <Box key={date} sx={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      p: 2,
-                      bgcolor: 'rgba(0,0,0,0.2)',
-                      borderRadius: 2,
-                      border: '1px solid rgba(255,255,255,0.03)',
-                      transition: 'all 0.2s ease',
-                      '&:hover': {
-                        border: '1px solid rgba(0, 212, 255, 0.2)',
-                        bgcolor: 'rgba(0, 212, 255, 0.02)'
-                      }
-                    }}>
-                      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1.5 }}>
-                        <Box sx={{
-                          width: 35,
-                          height: 35,
-                          bgcolor: 'rgba(0, 212, 255, 0.1)',
-                          borderRadius: 1.5,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          border: '1px solid rgba(0, 212, 255, 0.2)'
-                        }}>
-                          <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 900, fontSize: '0.7rem' }}>
-                            {format(new Date(date + 'T00:00:00'), "dd/MM")}
-                          </Typography>
-                        </Box>
-                        <Box>
-                          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block', mb: -0.5 }}>
-                            {format(new Date(date + 'T00:00:00'), "EEEE", { locale: ptBR })}
-                          </Typography>
-                          <Typography variant="body2" sx={{ color: '#fff', fontWeight: 700 }}>
-                            {format(new Date(date + 'T00:00:00'), "dd/MM/yyyy")}
-                          </Typography>
-                        </Box>
-                      </Stack>
-                      <TextField
-                        size="small"
-                        type="number"
-                        placeholder="Qtd."
-                        fullWidth
-                        sx={{
-                          '& .MuiOutlinedInput-root': {
-                            bgcolor: 'rgba(0,0,0,0.3)',
-                            fontWeight: 700,
-                            color: '#00FF88',
-                            height: 40
-                          }
-                        }}
-                        value={dailyQuotas[date] || (selectedEmpresa?.max_colaboradores ?? 50)}
-                        onChange={(e) => setDailyQuotas({ ...dailyQuotas, [date]: parseInt(e.target.value) || 0 })}
-                      />
+                    <Box key={date} sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 1.5 }}>
+                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>{date ? format(new Date(date + 'T00:00:00'), "dd/MM") : '--/--'}</Typography>
+                      <TextField size="small" type="number" fullWidth value={dailyQuotas[date] || 0} onChange={(e) => setDailyQuotas({ ...dailyQuotas, [date]: parseInt(e.target.value) || 0 })} />
                     </Box>
                   ))}
                 </Box>
-
-                <Box sx={{ mt: 3, p: 2, bgcolor: 'rgba(0, 212, 255, 0.05)', borderRadius: 2, border: '1px solid rgba(0, 212, 255, 0.1)' }}>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block', lineHeight: 1.4 }}>
-                    <strong>Nota:</strong> Estas cotas limitam quantos participantes desta empresa podem ser cadastrados ou ter acesso simultâneo no dia específico.
-                  </Typography>
-                </Box>
               </Box>
             )}
-          </Box>
         </DialogContent>
-        <DialogActions sx={{
-          p: 3,
-          px: 4,
-          borderTop: '1px solid rgba(255, 255, 255, 0.05)',
-          bgcolor: 'rgba(0,0,0,0.1)'
-        }}>
-          <Button onClick={() => setOpenQuotaDialog(false)} sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700 }}>ABORTAR</Button>
-          <NeonButton
-            onClick={handleSaveQuotas}
-            disabled={!activeEvent}
-            startIcon={<CheckCircleIcon />}
-          >
-            SINCRONIZAR COTAS
-          </NeonButton>
+        <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
+          <Button onClick={() => setOpenQuotaDialog(false)}>Cancelar</Button>
+          <NeonButton onClick={async () => {
+              if (await handleSaveQuotas()) setOpenQuotaDialog(false);
+          }}>Salvar cotas</NeonButton>
+        </DialogActions>
+      </Dialog>
+      <Dialog open={openInviteDialog} onClose={() => setOpenInviteDialog(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700, textAlign: 'center' }}>Convite gerado</DialogTitle>
+        <DialogContent sx={{ textAlign: 'center', py: 3 }}>
+          <Typography variant="body2" sx={{ mb: 3, color: 'text.secondary' }}>
+            O link de acesso seguro para a empresa <strong>{inviteResult.empresa?.nome}</strong> foi gerado com sucesso.
+          </Typography>
+          
+          <Box sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 1.5, mb: 3, wordBreak: 'break-all' }}>
+            <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700 }}>{inviteResult.link}</Typography>
+          </Box>
+
+          <Stack direction="row" spacing={2} justifyContent="center">
+            <Button 
+                variant="outlined" 
+                startIcon={<CopyIcon />}
+                onClick={() => {
+                    navigator.clipboard.writeText(inviteResult.link);
+                    enqueueSnackbar('Link copiado!', { variant: 'success' });
+                }}
+            >
+                Copiar
+            </Button>
+            <Button 
+                variant="outlined" 
+                startIcon={<WhatsAppIcon />}
+                component="a"
+                href={buildWhatsappLink()}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setOpenInviteDialog(false)}
+                sx={{ borderColor: '#25D366', color: '#25D366', '&:hover': { bgcolor: 'rgba(37, 211, 102, 0.1)', borderColor: '#25D366' } }}
+            >
+                WhatsApp
+            </Button>
+            
+            <Button 
+                variant="contained" 
+                color="primary"
+                startIcon={<EmailIcon />}
+                component="a"
+                href={buildMailto()}
+                onClick={() => setOpenInviteDialog(false)}
+                sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700 }}
+            >
+                Enviar e-mail
+            </Button>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+            <Button onClick={() => setOpenInviteDialog(false)}>Fechar</Button>
+            <Button 
+                size="small"
+                onClick={async () => {
+                    const ok = await confirmar({ titulo: 'Gerar novo link', mensagem: 'O link atual deixa de funcionar. Gerar um novo?', textoConfirmar: 'Gerar novo link', perigo: false });
+                    if (ok) handleGerarConvite(inviteResult.empresa, true);
+                }}
+                sx={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem' }}
+            >
+                Reciclar link
+            </Button>
         </DialogActions>
       </Dialog>
     </Box>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, Stack, IconButton, Avatar, Chip, Tooltip } from '@mui/material';
+import { Box, Typography, Stack, IconButton, Chip, Tooltip } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import {
   Edit as EditIcon,
@@ -11,12 +11,15 @@ import {
   ExitToApp as ExpulsarIcon,
 } from '@mui/icons-material';
 import DataTable from '../common/DataTable';
+import PessoaFoto from '../common/PessoaFoto';
+import { acaoTabela, acaoTabelaPerigo } from '../../styles/tokens';
+import { formatarCpf } from '../../utils/formatadores';
 
-const StatusChip = styled(Chip)(({ theme, status }) => {
+const StatusChip = styled(Chip)(({ status }) => {
   const colors = {
     'ativo': { bg: 'rgba(0, 255, 136, 0.1)', text: '#00FF88', border: 'rgba(0, 255, 136, 0.2)' },
     'autorizado': { bg: 'rgba(0, 255, 136, 0.1)', text: '#00FF88', border: 'rgba(0, 255, 136, 0.2)' },
-    'pendente': { bg: 'rgba(255, 170, 0, 0.1)', text: '#FFAA00', border: 'rgba(255, 170, 0, 0.2)' },
+    'pendente': { bg: 'rgba(255, 170, 0, 0.1)', text: '#FFB800', border: 'rgba(255, 170, 0, 0.2)' },
     'verificacao': { bg: 'rgba(0, 212, 255, 0.1)', text: '#00D4FF', border: 'rgba(0, 212, 255, 0.2)' },
     'bloqueado': { bg: 'rgba(255, 51, 102, 0.1)', text: '#FF3366', border: 'rgba(255, 51, 102, 0.2)' }
   };
@@ -25,7 +28,7 @@ const StatusChip = styled(Chip)(({ theme, status }) => {
 
   return {
     fontWeight: 700,
-    fontSize: '0.65rem',
+    fontSize: '0.75rem',
     height: 24,
     background: current.bg,
     color: current.text,
@@ -43,8 +46,14 @@ const PessoasTable = ({
   onBlock,
   onExpulsar,
   onOpenDocs,
+  onViewQR,
   isAdmin,
-  expulsionLoading
+  expulsionLoading,
+  totalCount,
+  page,
+  rowsPerPage,
+  onPageChange,
+  onRowsPerPageChange
 }) => {
 
   const columns = [
@@ -52,17 +61,13 @@ const PessoasTable = ({
       id: 'foto_url',
       label: 'FOTO',
       minWidth: 80,
-      format: (val) => (
-        <Avatar
+      format: (val, row) => (
+        <PessoaFoto
           src={val}
-          variant="rounded"
-          sx={{
-            width: 40,
-            height: 53,
-            borderRadius: '6px',
-            border: '1px solid rgba(0,212,255,0.5)',
-            boxShadow: '0 0 8px rgba(0,212,255,0.3)'
-          }}
+          nome={row?.nome}
+          width={42}
+          borderRadius="8px"
+          accentColor="#00D4FF"
         />
       )
     },
@@ -73,17 +78,17 @@ const PessoasTable = ({
       format: (val, row) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Box>
-            <Typography variant="body2" sx={{ fontWeight: 700, color: '#fff' }}>{val}</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF' }}>{val}</Typography>
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
               <Typography variant="caption" sx={{ color: 'text.secondary' }}>{row.funcao || 'Participante'}</Typography>
               <Chip
-                label={row.tipo_pessoa || 'colaborador'}
+                label={row.tipo_pessoa === 'colaborador' ? 'COLABORADOR' : (row.tipo_pessoa === 'visitante' ? 'VISITANTE' : (row.tipo_pessoa === 'participante' ? 'PARTICIPANTE' : row.tipo_pessoa?.toUpperCase() || 'COLABORADOR'))}
                 size="small"
                 sx={{
                   height: 16,
-                  fontSize: '0.6rem',
-                  bgcolor: row.tipo_pessoa === 'visitante' ? 'rgba(0, 212, 255, 0.1)' : 'rgba(123, 47, 190, 0.1)',
-                  color: row.tipo_pessoa === 'visitante' ? '#00D4FF' : '#7B2FBE',
+                  fontSize: '0.75rem',
+                  bgcolor: row.tipo_pessoa === 'visitante' ? 'rgba(0, 212, 255, 0.1)' : (row.tipo_pessoa === 'participante' ? 'rgba(0, 255, 136, 0.1)' : 'rgba(123, 47, 190, 0.1)'),
+                  color: row.tipo_pessoa === 'visitante' ? '#00D4FF' : (row.tipo_pessoa === 'participante' ? '#00FF88' : '#7B2FBE'),
                   border: 'none'
                 }}
               />
@@ -92,20 +97,32 @@ const PessoasTable = ({
         </Box>
       )
     },
-    { id: 'cpf', label: 'ID/CPF', minWidth: 150 },
+    { id: 'cpf', label: 'CPF', minWidth: 150, format: (value) => formatarCpf(value) },
     {
       id: 'empresas',
       label: 'EMPRESA',
       minWidth: 150,
-      format: (val) => val?.nome || 'N/A'
+      format: (val, row) => row.empresa_nome || row.empresas?.nome || '—'
     },
     {
       id: 'status_acesso',
       label: 'ESTADO',
       minWidth: 150,
-      format: (val) => (
-        <StatusChip status={val || 'autorizado'} label={val || 'AUTORIZADO'} />
-      )
+      format: (val) => {
+        const STATUS_LABELS = {
+          checkin_feito:   'Check-in Realizado',
+          checkout_feito:  'Check-out Realizado',
+          pendente:        'Pendente',
+          ativo:           'Ativo',
+          bloqueado:       'Bloqueado',
+          rejeitado:       'Rejeitado',
+          autorizado:      'Autorizado',
+          ausente:         'Ausente'
+        };
+        const statusVal = val || 'autorizado';
+        const labelText = STATUS_LABELS[statusVal.toLowerCase()] || statusVal;
+        return <StatusChip status={statusVal} label={labelText} />;
+      }
     },
     {
       id: 'acoes',
@@ -115,29 +132,40 @@ const PessoasTable = ({
       format: (value, row) => (
         <Stack direction="row" spacing={1} justifyContent="center">
           <Tooltip title="Documentos ECM">
-            <IconButton size="small" onClick={() => onOpenDocs(row)} sx={{ color: '#00D4FF', background: 'rgba(0,212,255,0.05)' }}>
+            <IconButton size="small" onClick={() => onOpenDocs(row)} sx={acaoTabela}>
               <FileIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Tooltip title={row.qr_code ? "QR Code" : "Sem QR Code"}>
-            <IconButton size="small" disabled={!row.qr_code} sx={{ color: row.qr_code ? '#00FF88' : 'rgba(255,255,255,0.2)', background: row.qr_code ? 'rgba(0,255,136,0.05)' : 'transparent' }}>
+          <Tooltip title={row.qr_code ? "QR Code" : "Gerar QR Code"}>
+            <IconButton size="small" onClick={() => onViewQR(row)} sx={acaoTabela}>
               <QrCodeIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Tooltip title={row.bloqueado ? "Desbloquear" : "Bloquear"}>
-            <IconButton size="small" onClick={() => onBlock(row)} sx={{ color: row.bloqueado ? '#00FF88' : '#FF3366', background: row.bloqueado ? 'rgba(0,255,136,0.05)' : 'rgba(255,51,102,0.05)' }}>
-              {row.bloqueado ? <LockOpenIcon fontSize="small" /> : <BlockIcon fontSize="small" />}
-            </IconButton>
-          </Tooltip>
-          <IconButton size="small" onClick={() => onEdit(row)} sx={{ color: '#e0e0e0', background: 'rgba(255,255,255,0.05)' }}>
+          {(() => {
+            const isBlocked = Boolean(row.bloqueado || row.status_acesso === 'bloqueado');
+            return (
+              <Tooltip title={isBlocked ? "Desbloquear Participante" : "Bloquear Participante"}>
+                <IconButton 
+                  size="small" 
+                  onClick={() => onBlock(row)} 
+                  sx={isBlocked ? acaoTabela : acaoTabelaPerigo}
+                >
+                  {isBlocked ? <LockOpenIcon fontSize="small" /> : <BlockIcon fontSize="small" />}
+                </IconButton>
+              </Tooltip>
+            );
+          })()}
+          <IconButton size="small" onClick={() => onEdit(row)} sx={acaoTabela}>
             <EditIcon fontSize="small" />
           </IconButton>
-          <IconButton size="small" onClick={() => onDelete(row.id)} sx={{ color: '#FF3366', background: 'rgba(255,51,102,0.05)' }}>
-            <DeleteIcon fontSize="small" />
-          </IconButton>
+          {isAdmin && (
+            <IconButton size="small" onClick={() => onDelete(row.id)} sx={acaoTabelaPerigo}>
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          )}
           {row.status_acesso === 'checkin_feito' && isAdmin && (
             <Tooltip title="Expulsar do Evento">
-              <IconButton size="small" onClick={() => onExpulsar(row)} disabled={expulsionLoading} sx={{ color: '#FF6600', background: 'rgba(255,102,0,0.05)' }}>
+              <IconButton size="small" onClick={() => onExpulsar(row)} disabled={expulsionLoading} sx={acaoTabelaPerigo}>
                 <ExpulsarIcon fontSize="small" />
               </IconButton>
             </Tooltip>
@@ -154,6 +182,11 @@ const PessoasTable = ({
       loading={loading}
       onRowDoubleClick={onEdit}
       sx={{ '& .MuiTableHead-root': { background: 'rgba(0,136,255,0.05)' } }}
+      totalCount={totalCount}
+      page={page}
+      rowsPerPage={rowsPerPage}
+      onPageChange={onPageChange}
+      onRowsPerPageChange={onRowsPerPageChange}
     />
   );
 };

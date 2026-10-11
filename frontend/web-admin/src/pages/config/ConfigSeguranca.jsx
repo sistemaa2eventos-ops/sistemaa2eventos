@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Typography, Grid, TextField, Switch, FormControlLabel, List, ListItem, ListItemText, CircularProgress } from '@mui/material';
 import { Security as SecurityIcon, Lock as LockIcon, Save as SaveIcon } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
@@ -16,11 +16,7 @@ const ConfigSeguranca = () => {
     const [force2FA, setForce2FA] = useState(true);
     const [ddosShield, setDdosShield] = useState(false);
 
-    useEffect(() => {
-        loadSettings();
-    }, []);
-
-    const loadSettings = async () => {
+    const loadSettings = useCallback(async () => {
         try {
             const { data } = await api.get('/settings');
             if (data?.success && data?.data) {
@@ -34,7 +30,11 @@ const ConfigSeguranca = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [enqueueSnackbar]);
+
+    useEffect(() => {
+        loadSettings();
+    }, [loadSettings]);
 
     const handleSave = async () => {
         setSaving(true);
@@ -72,7 +72,7 @@ const ConfigSeguranca = () => {
                     <GlassCard sx={{ p: 3, mb: 4, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                             <LockIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
-                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff' }}>
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
                                 JWT & SESSÕES
                             </Typography>
                         </Box>
@@ -93,18 +93,18 @@ const ConfigSeguranca = () => {
 
                         <FormControlLabel
                             control={<Switch checked={force2FA} onChange={(e) => setForce2FA(e.target.checked)} color="primary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#fff' }}>Forçar Autenticação em 2 Fatores (Admin)</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Forçar Autenticação em 2 Fatores (Admin)</Typography>}
                             sx={{ mb: 2 }}
                         />
                         <FormControlLabel
                             control={<Switch checked={ddosShield} onChange={(e) => setDdosShield(e.target.checked)} color="primary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#fff' }}>Habilitar Bloqueio de IP (DDoS Shield)</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Habilitar Bloqueio de IP (DDoS Shield)</Typography>}
                             sx={{ mb: 4 }}
                         />
 
                         <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                             <NeonButton onClick={handleSave} disabled={saving} startIcon={<SaveIcon />}>
-                                {saving ? "SALVANDO..." : "SALVAR REGRAS"}
+                                {saving ? "Salvando..." : "Salvar regras"}
                             </NeonButton>
                         </Box>
                     </GlassCard>
@@ -114,8 +114,8 @@ const ConfigSeguranca = () => {
                     <GlassCard sx={{ p: 3, mb: 4, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                             <SecurityIcon sx={{ color: '#7B2FBE', fontSize: 28 }} />
-                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff' }}>
-                                PERFIS DE ACESSO (RBAC)
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                                Perfis de acesso (rbac)
                             </Typography>
                         </Box>
 
@@ -123,7 +123,7 @@ const ConfigSeguranca = () => {
                             Estes níveis de acesso determinam a visibilidade de botões e APIs nos painéis Frontend.
                         </Typography>
 
-                        <List sx={{ bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 2 }}>
+                        <List sx={{ bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 1.5 }}>
                             <ListItem sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                                 <ListItemText
                                     primary="[ADMIN] High-Level Operations"
@@ -142,7 +142,7 @@ const ConfigSeguranca = () => {
                                 <ListItemText
                                     primary="[OPERADOR] Reception & Control"
                                     secondary="Restrito ao PDV/Credenciamento final. Não possui acesso a relatórios gerenciais ou configurações."
-                                    primaryTypographyProps={{ color: '#fff', fontWeight: 600 }}
+                                    primaryTypographyProps={{ color: '#FFFFFF', fontWeight: 600 }}
                                 />
                             </ListItem>
                         </List>

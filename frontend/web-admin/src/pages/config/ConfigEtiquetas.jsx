@@ -26,7 +26,7 @@ const ConfigEtiquetas = () => {
     ]);
 
     const [selectedId, setSelectedId] = useState(null);
-    const [loading, setLoading] = useState(false);
+    const [_loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const { enqueueSnackbar } = useSnackbar();
 
@@ -41,14 +41,13 @@ const ConfigEtiquetas = () => {
                     setElements(response.data.data.elementos);
                 }
             } catch (error) {
-                console.error('Erro ao buscar layout da etiqueta:', error);
                 enqueueSnackbar('Falha ao carregar layout de etiqueta.', { variant: 'error' });
             } finally {
                 setLoading(false);
             }
         };
         fetchLayout();
-    }, [eventoId]);
+    }, [eventoId, enqueueSnackbar]);
 
     const handleChangeConfig = (field, value) => {
         setConfig(prev => ({ ...prev, [field]: value }));
@@ -98,7 +97,6 @@ const ConfigEtiquetas = () => {
             await api.post('/config/etiquetas', payload);
             enqueueSnackbar(`Layout salvo com sucesso para ${localStorage.getItem('active_evento_nome') || 'o evento'}!`, { variant: 'success' });
         } catch (error) {
-            console.error('Erro ao salvar:', error);
             enqueueSnackbar('Falha ao salvar o layout da etiqueta. ' + (error.response?.data?.details || ''), { variant: 'error' });
         } finally {
             setSaving(false);
@@ -110,7 +108,7 @@ const ConfigEtiquetas = () => {
             <PageHeader
                 title="Impressão & Etiquetas"
                 subtitle="Configure os drivers de impressão térmica e layout de credenciais."
-                breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Impressão' }]}
+                breadcrumbs={[{ text: 'Configurações' }, { text: 'Impressão & Etiquetas' }]}
             />
             <Grid container spacing={4} sx={{ mt: 1 }}>
                 {/* COLUNA ESQUERDA: CONFIGURAÇÕES GERAIS E MENU DE ELEMENTOS */}
@@ -119,7 +117,7 @@ const ConfigEtiquetas = () => {
                         <GlassCard sx={{ p: 3 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                                 <StyleIcon sx={{ color: '#00D4FF' }} />
-                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff' }}>PARÂMETROS DE PAPEL</Typography>
+                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>Parâmetros de papel</Typography>
                             </Box>
 
                             <Grid container spacing={2}>
@@ -154,17 +152,17 @@ const ConfigEtiquetas = () => {
                         </GlassCard>
 
                         <GlassCard sx={{ p: 3 }}>
-                            <Typography variant="subtitle2" sx={{ color: '#00D4FF', fontWeight: 800, mb: 2 }}>ADICIONAR ELEMENTOS</Typography>
+                            <Typography variant="subtitle2" sx={{ color: '#00D4FF', fontWeight: 700, mb: 2 }}>ADICIONAR ELEMENTOS</Typography>
                             <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
-                                <NeonButton size="small" variant="outlined" startIcon={<AddIcon />} onClick={() => addElement('text')}>TEXTO / VARIÁVEL</NeonButton>
-                                <NeonButton size="small" variant="outlined" startIcon={<AddIcon />} color="secondary" onClick={() => addElement('qrcode')}>QR CODE</NeonButton>
+                                <NeonButton size="small" variant="outlined" startIcon={<AddIcon />} onClick={() => addElement('text')}>Texto / variável</NeonButton>
+                                <NeonButton size="small" variant="outlined" startIcon={<AddIcon />} color="secondary" onClick={() => addElement('qrcode')}>QR code</NeonButton>
                             </Stack>
 
                             {/* PAINEL DO ELEMENTO SELECIONADO */}
-                            <Typography variant="subtitle2" sx={{ color: 'text.secondary', fontWeight: 700, mb: 1 }}>PROPRIEDADES DA SELEÇÃO</Typography>
+                            <Typography variant="subtitle2" sx={{ color: 'text.secondary', fontWeight: 700, mb: 1 }}>Propriedades da seleção</Typography>
 
                             {selectedId ? (
-                                <Box sx={{ p: 2, background: 'rgba(255,255,255,0.05)', borderRadius: 2 }}>
+                                <Box sx={{ p: 2, background: 'rgba(255,255,255,0.05)', borderRadius: 1.5 }}>
                                     {elements.filter(el => el.id === selectedId).map(el => (
                                         <Grid container spacing={2} key={el.id}>
                                             <Grid item xs={12}>
@@ -209,7 +207,7 @@ const ConfigEtiquetas = () => {
 
                             <Box sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
                                 <NeonButton startIcon={<SaveIcon />} fullWidth onClick={handleSave} loading={saving}>
-                                    SALVAR LAYOUT DO EVENTO
+                                    Salvar layout do evento
                                 </NeonButton>
                             </Box>
                         </GlassCard>
@@ -218,12 +216,12 @@ const ConfigEtiquetas = () => {
 
                 {/* COLUNA DIREITA: CANVAS EDITOR */}
                 <Grid item xs={12} md={8}>
-                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '600px', p: 4, background: 'rgba(0,0,0,0.5)', borderRadius: 4, border: '1px dashed rgba(255,255,255,0.2)', overflow: 'auto' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '600px', p: 4, background: 'rgba(0,0,0,0.5)', borderRadius: 1.5, border: '1px dashed rgba(255,255,255,0.2)', overflow: 'auto' }}>
 
                         <Paper elevation={10} sx={{
                             width: config.width * scaleFactor,
                             height: config.height * scaleFactor,
-                            backgroundColor: '#fff',
+                            backgroundColor: '#FFFFFF',
                             position: 'relative',
                             overflow: 'hidden'
                         }}>
@@ -249,7 +247,7 @@ const ConfigEtiquetas = () => {
                                         justifyContent: 'center',
                                         overflow: 'hidden',
                                         backgroundColor: el.type === 'qrcode' ? 'rgba(0,0,0,0.1)' : 'transparent',
-                                        color: '#000',
+                                        color: '#000000',
                                         cursor: 'move',
                                         fontWeight: el.fontWeight || 'normal',
                                         fontSize: el.fontSize || 14

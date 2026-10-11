@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Box, Typography, Grid, TextField, Switch, FormControlLabel,
     CircularProgress, Stack, Avatar
@@ -26,11 +26,7 @@ const ConfigGamificacao = () => {
     const [pointsCheckin, setPointsCheckin] = useState(10);
     const [ranking, setRanking] = useState([]);
 
-    useEffect(() => {
-        loadSettings();
-    }, [enqueueSnackbar]);
-
-    const loadSettings = async () => {
+    const loadSettings = useCallback(async () => {
         try {
             const [settingsRes, rankingRes] = await Promise.all([
                 api.get('/settings'),
@@ -54,7 +50,11 @@ const ConfigGamificacao = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [enqueueSnackbar]);
+
+    useEffect(() => {
+        loadSettings();
+    }, [loadSettings]);
 
     const handleSave = async () => {
         setSaving(true);
@@ -94,15 +94,15 @@ const ConfigGamificacao = () => {
                 <Grid item xs={12} md={6}>
                     <GlassCard sx={{ p: 3, mb: 4, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
-                            <TrophyIcon sx={{ color: '#FFC107', fontSize: 28 }} />
-                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff' }}>
-                                MOTORES DE RECOMPENSA (PONTOS)
+                            <TrophyIcon sx={{ color: '#FFB800', fontSize: 28 }} />
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                                Motores de recompensa (pontos)
                             </Typography>
                         </Box>
 
                         <FormControlLabel
                             control={<Switch checked={gamificationEnabled} onChange={(e) => setGamificationEnabled(e.target.checked)} color="primary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#fff' }}>Computar Pontuação por Ações Isoladas</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Computar Pontuação por Ações Isoladas</Typography>}
                             sx={{ mb: 4 }}
                         />
 
@@ -119,8 +119,8 @@ const ConfigGamificacao = () => {
                         </Grid>
 
                         <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
-                            <NeonButton onClick={handleSave} disabled={saving} startIcon={<SaveIcon />} sx={{ bgcolor: 'rgba(255, 193, 7, 0.2)', color: '#FFC107', '&:hover': { bgcolor: 'rgba(255, 193, 7, 0.4)' } }}>
-                                {saving ? "SALVANDO..." : "DEPLOY ENGINE SCORE"}
+                            <NeonButton onClick={handleSave} disabled={saving} startIcon={<SaveIcon />} sx={{ bgcolor: 'rgba(255, 193, 7, 0.2)', color: '#FFB800', '&:hover': { bgcolor: 'rgba(255, 193, 7, 0.4)' } }}>
+                                {saving ? "Salvando..." : "Deploy engine score"}
                             </NeonButton>
                         </Box>
                     </GlassCard>
@@ -130,8 +130,8 @@ const ConfigGamificacao = () => {
                     <GlassCard sx={{ p: 3, mb: 4, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                             <TimelineIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
-                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff' }}>
-                                LÍDERES DE ENGAJAMENTO (TOP 5)
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                                Líderes de engajamento (top 5)
                             </Typography>
                         </Box>
 
@@ -143,20 +143,20 @@ const ConfigGamificacao = () => {
                                         alignItems: 'center',
                                         gap: 2,
                                         p: 1.5,
-                                        borderRadius: 2,
+                                        borderRadius: 1.5,
                                         bgcolor: 'rgba(255,255,255,0.03)',
                                         border: index === 0 ? '1px solid rgba(0, 212, 255, 0.3)' : '1px solid transparent'
                                     }}>
-                                        <Typography variant="h6" sx={{ color: index === 0 ? '#00D4FF' : 'text.secondary', width: 25, fontWeight: 900 }}>
+                                        <Typography variant="h6" sx={{ color: index === 0 ? '#00D4FF' : 'text.secondary', width: 25, fontWeight: 700 }}>
                                             {index + 1}
                                         </Typography>
                                         <Avatar src={user.foto} sx={{ border: '2px solid rgba(255,255,255,0.1)' }} />
                                         <Box sx={{ flex: 1 }}>
-                                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#fff' }}>{user.nome?.toUpperCase()}</Typography>
+                                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF' }}>{user.nome?.toUpperCase()}</Typography>
                                             <Typography variant="caption" sx={{ color: 'text.secondary' }}>{user.empresa}</Typography>
                                         </Box>
                                         <Box sx={{ textAlign: 'right' }}>
-                                            <Typography variant="body2" sx={{ fontWeight: 900, color: '#00FF88' }}>{user.score} pts</Typography>
+                                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#00FF88' }}>{user.score} pts</Typography>
                                             <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>{user.atividades} ações</Typography>
                                         </Box>
                                     </Box>

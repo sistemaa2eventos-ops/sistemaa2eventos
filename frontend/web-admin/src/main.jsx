@@ -1,3 +1,20 @@
+// Intercept browser extension errors to prevent console noise (harmless to application)
+window.addEventListener('error', (event) => {
+    const message = event.message || '';
+    if (message.includes('Extension context invalidated') || message.includes('message channel closed')) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+}, true);
+
+window.addEventListener('unhandledrejection', (event) => {
+    const reason = event.reason?.message || String(event.reason || '');
+    if (reason.includes('Extension context invalidated') || reason.includes('message channel closed')) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+}, true);
+
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
@@ -8,7 +25,7 @@ import './config/i18n' // Global i18next initialization
 import * as Sentry from "@sentry/react";
 
 Sentry.init({
-  dsn: import.meta.env.VITE_SENTRY_DSN_FRONTEND || "https://97ea5ad4a21e1883aa7ac725cf18e0a3@o4511978719346688.ingest.us.sentry.io/4511978767777792",
+  dsn: import.meta.env.VITE_SENTRY_DSN_FRONTEND || "https://97ea5ad4a21e1883aa7ac725cf18e0a3@o4511978719346688.ingest.sentry.io/4511978767777792",
   integrations: [
     Sentry.browserTracingIntegration(),
     Sentry.replayIntegration(),

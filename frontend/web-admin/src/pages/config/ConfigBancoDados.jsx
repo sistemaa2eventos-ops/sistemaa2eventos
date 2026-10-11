@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Box, Typography, Grid, TextField, Button, LinearProgress, Alert,
     CircularProgress, Dialog, DialogTitle, DialogContent, Table,
@@ -24,20 +24,20 @@ const ConfigBancoDados = () => {
     const [historyOpen, setHistoryOpen] = useState(false);
     const [syncHistory, setSyncHistory] = useState([]);
 
-    useEffect(() => {
-        fetchMetrics();
-    }, []);
-
-    const fetchMetrics = async () => {
+    const fetchMetrics = useCallback(async () => {
         try {
             const res = await api.get('/settings/metrics');
             setMetrics(res.data.data);
         } catch (error) {
-            console.error("Erro ao buscar métricas:", error);
+            enqueueSnackbar('Erro ao buscar métricas.', { variant: 'error' });
         } finally {
             setLoading(false);
         }
-    };
+    }, [enqueueSnackbar]);
+
+    useEffect(() => {
+        fetchMetrics();
+    }, [fetchMetrics]);
 
     const handleTestConnection = async () => {
         setTesting(true);
@@ -89,7 +89,7 @@ const ConfigBancoDados = () => {
                     <GlassCard sx={{ p: 3, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                             <DatabaseIcon sx={{ color: '#00D4FF' }} />
-                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff' }}>
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
                                 CONEXÃO DATAWAREHOUSE
                             </Typography>
                         </Box>
@@ -127,10 +127,10 @@ const ConfigBancoDados = () => {
                                 disabled={testing}
                                 sx={{ color: 'text.secondary' }}
                             >
-                                {testing ? "TESTANDO..." : "TESTAR CONEXÃO"}
+                                {testing ? "Testando..." : "Testar conexão"}
                             </Button>
                             <NeonButton startIcon={<SaveIcon />} sx={{ ml: 2 }}>
-                                SALVAR
+                                Salvar
                             </NeonButton>
                         </Box>
                     </GlassCard>
@@ -140,7 +140,7 @@ const ConfigBancoDados = () => {
                     <GlassCard sx={{ p: 3, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                             <SyncIcon sx={{ color: '#7B2FBE' }} />
-                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff' }}>
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
                                 SINCRONIZAÇÃO & BACKUP
                             </Typography>
                         </Box>
@@ -148,10 +148,10 @@ const ConfigBancoDados = () => {
                         <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 1 }}>Status da Sincronização SQL Server</Typography>
                         <Box sx={{ mb: 4 }}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                <Typography variant="caption" sx={{ color: '#fff' }}>Sincronizando registros offline locais...</Typography>
+                                <Typography variant="caption" sx={{ color: '#FFFFFF' }}>Sincronizando registros offline locais...</Typography>
                                 <Typography variant="caption" sx={{ color: '#00D4FF' }}>{metrics?.syncProgress || 100}%</Typography>
                             </Box>
-                            <LinearProgress variant="determinate" value={metrics?.syncProgress || 100} sx={{ height: 6, borderRadius: 3, bgcolor: 'rgba(255,255,255,0.1)', '& .MuiLinearProgress-bar': { bgcolor: '#00D4FF' } }} />
+                            <LinearProgress variant="determinate" value={metrics?.syncProgress || 100} sx={{ height: 6, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.1)', '& .MuiLinearProgress-bar': { bgcolor: '#00D4FF' } }} />
                             <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5, display: 'block' }}>Ultima verificação: {metrics?.lastCheck || 'Ao carregar a página.'}</Typography>
                         </Box>
 
@@ -162,7 +162,7 @@ const ConfigBancoDados = () => {
                             onClick={handleSync}
                             disabled={syncing}
                         >
-                            {syncing ? 'SINCRONIZANDO...' : 'FORÇAR SYNC COM NUVEM'}
+                            {syncing ? 'Sincronizando...' : 'Forçar sync com nuvem'}
                         </NeonButton>
                         <Button
                             fullWidth
@@ -171,7 +171,7 @@ const ConfigBancoDados = () => {
                             onClick={handleViewLogs}
                             sx={{ mt: 2, borderColor: 'rgba(255,255,255,0.2)', color: 'text.secondary' }}
                         >
-                            VER LOGS DE EXECUÇÃO
+                            Ver logs de execução
                         </Button>
                     </GlassCard>
                 </Grid>
@@ -185,9 +185,9 @@ const ConfigBancoDados = () => {
                 fullWidth
                 PaperProps={{
                     sx: {
-                        bgcolor: '#1A1A2E',
+                        bgcolor: '#0F1E37',
                         backgroundImage: 'none',
-                        color: '#fff',
+                        color: '#FFFFFF',
                         border: '1px solid rgba(255,255,255,0.1)'
                     }
                 }}
@@ -213,8 +213,8 @@ const ConfigBancoDados = () => {
                             <TableBody>
                                 {syncHistory.map((log, index) => (
                                     <TableRow key={index} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
-                                        <TableCell sx={{ color: '#fff' }}>{new Date(log.timestamp).toLocaleString()}</TableCell>
-                                        <TableCell sx={{ color: '#fff' }}>{log.duration}s</TableCell>
+                                        <TableCell sx={{ color: '#FFFFFF' }}>{new Date(log.timestamp).toLocaleString()}</TableCell>
+                                        <TableCell sx={{ color: '#FFFFFF' }}>{log.duration}s</TableCell>
                                         <TableCell sx={{ color: '#00FF88' }}>{log.synced}</TableCell>
                                         <TableCell sx={{ color: '#FF3366' }}>{log.failed}</TableCell>
                                         <TableCell>
@@ -224,7 +224,7 @@ const ConfigBancoDados = () => {
                                                 </Tooltip>
                                             ) : (
                                                 <Tooltip title="Possui falhas residuais">
-                                                    <ErrorIcon sx={{ color: '#FFC107', fontSize: 18 }} />
+                                                    <ErrorIcon sx={{ color: '#FFB800', fontSize: 18 }} />
                                                 </Tooltip>
                                             )}
                                         </TableCell>

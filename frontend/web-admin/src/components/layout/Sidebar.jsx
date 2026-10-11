@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import NotificationBell from './NotificationBell';
 import {
     Drawer,
     List,
@@ -8,7 +9,6 @@ import {
     Avatar,
     Typography,
     Box,
-    IconButton,
     Menu,
     MenuItem,
     ListItemButton,
@@ -22,16 +22,38 @@ import {
     Business as EmpresaIcon,
     People as PessoaIcon,
     Settings as SettingsIcon,
-    ExitToApp as LogoutIcon,
     Assessment as AssessmentIcon,
+
     Monitor as MonitorIcon,
     Event as EventIcon,
     Badge as UserIcon,
-    Help as SupportIcon,
     DirectionsCar as CarIcon,
     AssignmentTurnedIn as AssignmentTurnedInIcon,
     ExpandLess,
     ExpandMore,
+    History as HistoryIcon,
+    Tune as TuneIcon,
+    Security as SecurityIcon,
+    Extension as ExtensionIcon,
+    Storage as StorageIcon,
+    Palette as PaletteIcon,
+
+    NotificationsActive as NotifIcon,
+    CameraAlt as CameraIcon,
+    Label as LabelIcon,
+    VerifiedUser as VerifiedIcon,
+    Webhook as WebhookIcon,
+    Schedule as CronIcon,
+
+    ViewModule as CredIcon,
+    FactCheck as CheckConfigIcon,
+    Description as LogsIcon,
+    Chat as ChatIcon,
+    Place as AreaIcon,
+    QrCode2 as PulseiraIcon,
+    Face as FaceIcon,
+    EmojiEvents as TrophyIcon,
+    SwapHoriz as SwapHorizIcon
 } from '@mui/icons-material';
 import { Collapse } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
@@ -39,8 +61,10 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { styled } from '@mui/material/styles';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@mui/material/styles';
+import api from '../../services/api';
+import OperatorSection from './OperatorSection';
 
-const StyledDrawer = styled(Drawer)(({ theme }) => ({
+const StyledDrawer = styled(Drawer)(() => ({
     width: 280,
     flexShrink: 0,
     '& .MuiDrawer-paper': {
@@ -69,17 +93,6 @@ const LogoContainer = styled(Box)(({ theme }) => ({
         height: '1px',
         background: 'linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.4), transparent)',
     }
-}));
-
-const LogoAvatar = styled(Avatar)(({ theme }) => ({
-    width: 48,
-    height: 48,
-    background: 'linear-gradient(135deg, #00D4FF 0%, #7B2FBE 100%)',
-    boxShadow: '0 0 15px rgba(0, 212, 255, 0.5)',
-    animation: 'neonPulse 2s infinite',
-    fontWeight: 'bold',
-    fontSize: '1.2rem',
-    color: '#000',
 }));
 
 const NavItem = styled(ListItemButton, {
@@ -119,35 +132,14 @@ const NavItem = styled(ListItemButton, {
     }
 }));
 
-const UserSection = styled(Box)(({ theme }) => ({
-    padding: theme.spacing(3, 2),
-    background: 'rgba(255, 255, 255, 0.03)',
-    borderTop: '1px solid rgba(255, 255, 255, 0.05)',
-    marginTop: 'auto',
-}));
-
-const UserCard = styled(Box)(({ theme }) => ({
-    display: 'flex',
-    alignItems: 'center',
-    gap: theme.spacing(2),
-    padding: theme.spacing(1.5),
-    borderRadius: 12,
-    background: 'rgba(10, 22, 40, 0.6)',
-    border: '1px solid rgba(0, 212, 255, 0.1)',
-    transition: 'all 0.3s ease',
-    '&:hover': {
-        borderColor: 'rgba(0, 212, 255, 0.3)',
-        boxShadow: '0 0 15px rgba(0, 212, 255, 0.1)',
-    }
-}));
-
 const Sidebar = ({ open, onClose }) => {
-    const { user, logout } = useAuth();
+    const { user, hasMenuAccess, changeActiveEvento } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const { t } = useTranslation();
     const [openSubMenus, setOpenSubMenus] = useState({});
-    const [anchorEl, setAnchorEl] = useState(null);
+    const [eventAnchorEl, setEventAnchorEl] = useState(null);
+    const [availableEvents, setAvailableEvents] = useState([]);
     const [, forceUpdate] = useState({});
 
     const theme = useTheme();
@@ -159,8 +151,33 @@ const Sidebar = ({ open, onClose }) => {
         return () => window.removeEventListener('storage', handleStorageChange);
     }, []);
 
-    const handleMenuOpen = (event) => setAnchorEl(event.currentTarget);
-    const handleMenuClose = () => setAnchorEl(null);
+    React.useEffect(() => {
+        let isSubscribed = true;
+        const fetchEvents = async () => {
+            try {
+                const res = await api.get('/eventos');
+                const list = res.data?.data || res.data || [];
+                if (isSubscribed) {
+                    setAvailableEvents(list);
+                    const currentActiveId = localStorage.getItem('active_evento_id');
+                    if (!currentActiveId && list.length > 0) {
+                        const first = list[0];
+                        if (changeActiveEvento) {
+                            changeActiveEvento(first.id, first.nome);
+                        } else {
+                            localStorage.setItem('active_evento_id', first.id);
+                            localStorage.setItem('active_evento_nome', first.nome);
+                            window.dispatchEvent(new Event('storage'));
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn('Erro ao carregar eventos no sidebar:', err);
+            }
+        };
+        fetchEvents();
+        return () => { isSubscribed = false; };
+    }, [user, changeActiveEvento]);
 
     const handleSubMenuToggle = (text, e) => {
         e.stopPropagation();
@@ -176,7 +193,7 @@ const Sidebar = ({ open, onClose }) => {
                 const eid = localStorage.getItem('active_evento_id');
                 return eid ? `/?evento_id=${eid}` : '/';
             },
-            roles: ['admin', 'supervisor', 'op_atendimento', 'op_monitoramento', 'op_analista']
+            roles: ['admin_master', 'operador']
         },
         {
             text: 'Empresas',
@@ -186,27 +203,29 @@ const Sidebar = ({ open, onClose }) => {
                 const eid = localStorage.getItem('active_evento_id');
                 return eid ? `/empresas?evento_id=${eid}` : '/empresas';
             },
-            roles: ['admin', 'supervisor', 'op_atendimento', 'op_analista']
+            roles: ['admin_master', 'operador']
         },
         {
             text: t('sidebar.people', { defaultValue: 'Participantes' }),
             icon: <PessoaIcon />,
-            menuKey: 'participantes',
+            menuKey: 'pessoas',
+            legacyMenuKey: 'participantes',
             get path() {
                 const eid = localStorage.getItem('active_evento_id');
                 return eid ? `/pessoas?evento_id=${eid}` : '/pessoas';
             },
-            roles: ['admin', 'supervisor', 'op_atendimento', 'op_analista']
+            roles: ['admin_master', 'operador']
         },
         {
             text: 'Auditoria Documental',
             icon: <AssignmentTurnedInIcon />,
-            menuKey: 'auditoria',
+            menuKey: 'auditoria_documentos',
+            legacyMenuKey: 'auditoria',
             get path() {
                 const eid = localStorage.getItem('active_evento_id');
                 return eid ? `/auditoria?evento_id=${eid}` : '/auditoria';
             },
-            roles: ['admin', 'supervisor', 'op_analista']
+            roles: ['admin_master', 'operador']
         },
         {
             text: t('sidebar.reports', { defaultValue: 'Relatórios' }),
@@ -216,17 +235,18 @@ const Sidebar = ({ open, onClose }) => {
                 const eid = localStorage.getItem('active_evento_id');
                 return eid ? `/reports?evento_id=${eid}` : '/reports';
             },
-            roles: ['admin', 'supervisor', 'op_monitoramento']
+            roles: ['admin_master', 'operador']
         },
         {
-            text: 'Frota LPR',
+            text: 'Veículos',
             icon: <CarIcon />,
-            menuKey: 'frota_lpr',
+            menuKey: 'veiculos',
+            legacyMenuKey: 'frota_lpr',
             get path() {
                 const eid = localStorage.getItem('active_evento_id');
                 return eid ? `/veiculos?evento_id=${eid}` : '/veiculos';
             },
-            roles: ['admin', 'supervisor', 'op_atendimento', 'op_monitoramento', 'op_analista']
+            roles: ['admin_master', 'operador']
         },
         { divider: true },
         {
@@ -237,7 +257,7 @@ const Sidebar = ({ open, onClose }) => {
                 const eid = localStorage.getItem('active_evento_id');
                 return eid ? `/checkin?evento_id=${eid}` : '/checkin';
             },
-            roles: ['admin', 'supervisor', 'op_atendimento', 'op_analista']
+            roles: ['admin_master', 'operador']
         },
         {
             text: 'Check-out',
@@ -247,86 +267,107 @@ const Sidebar = ({ open, onClose }) => {
                 const eid = localStorage.getItem('active_evento_id');
                 return eid ? `/checkout?evento_id=${eid}` : '/checkout';
             },
-            roles: ['admin', 'supervisor', 'op_atendimento', 'op_analista']
+            roles: ['admin_master', 'operador']
+        },
+        {
+            text: 'Fiscalização de Áreas',
+            icon: <SecurityIcon />,
+            menuKey: 'fiscalizacao',
+            get path() {
+                const eid = localStorage.getItem('active_evento_id');
+                return eid ? `/fiscalizacao?evento_id=${eid}` : '/fiscalizacao';
+            },
+            roles: ['admin_master', 'operador']
         },
         {
             text: t('sidebar.monitor', { defaultValue: 'Monitor' }),
             icon: <MonitorIcon />,
-            menuKey: 'monitor',
+            menuKey: 'monitoramento',
+            legacyMenuKey: 'monitor',
             get path() {
                 const eid = localStorage.getItem('active_evento_id');
                 return eid ? `/monitor?evento_id=${eid}` : '/monitor';
             },
-            roles: ['admin', 'supervisor', 'op_monitoramento']
+            roles: ['admin_master', 'operador']
         },
 
         { divider: true },
-        { text: 'Usuários', icon: <UserIcon />, menuKey: 'usuarios', path: '/usuarios', roles: ['admin', 'master'] },
+        { 
+            text: 'Logs de Auditoria', 
+            icon: <HistoryIcon />, 
+            menuKey: 'auditoria_sistema', 
+            path: '/audit-logs', 
+            roles: ['admin_master'] 
+        },
+        { text: 'Usuários', icon: <UserIcon />, menuKey: 'usuarios', path: '/usuarios', roles: ['admin_master'] },
         {
             text: t('sidebar.settings', { defaultValue: 'Configurações' }),
             icon: <SettingsIcon />,
             menuKey: 'configuracoes',
             path: '/configuracoes',
-            roles: ['admin', 'master'],
+            roles: ['admin_master'],
             children: [
-                { text: 'Automação (CRON)', path: '/config/cron' },
-                { text: 'Eventos', path: '/eventos' },
-                { text: 'Geral', path: '/config/geral' },
-                { text: 'Idiomas', path: '/config/idiomas' },
-                { text: 'Notificações', path: '/config/notificacoes' },
-                { text: 'Integrações', path: '/config/integracoes' },
-                { text: 'Etiquetas', path: '/config/etiquetas' },
+                // --- GRUPO 1: CONFIGURAÇÕES DO EVENTO ---
+                { text: 'Geral', path: '/config/geral', icon: <TuneIcon sx={{ fontSize: 16 }} /> },
                 {
                     text: 'Leitor Facial',
+                    icon: <FaceIcon sx={{ fontSize: 16 }} />,
                     get path() {
                         const eventoId = localStorage.getItem('active_evento_id');
                         return eventoId ? `/config/leitor-facial?evento_id=${eventoId}` : '/config/leitor-facial';
                     }
                 },
-                {
-                    text: 'Equipamentos Edge',
-                    get path() {
-                        const eid = localStorage.getItem('active_evento_id');
-                        return eid ? `/config/cameras?evento_id=${eid}` : '/config/cameras';
-                    }
-                },
-                { text: 'Zonas (Áreas)', path: '/config/areas' },
-                { text: 'Pulseiras & Lotes', path: '/config/pulseiras' },
-                { text: 'Datawarehouse', path: '/config/banco-dados' },
-                { text: 'Credenciamento', path: '/config/credenciamento' },
-                { text: 'Check-in Acesso', path: '/config/checkin' },
-                { text: 'Estacionamento', path: '/config/veiculos' },
-                { text: 'Segurança & RBAC', path: '/config/seguranca' },
-                { text: 'Syslogs', path: '/config/logs' },
-                { text: 'E-mail & Mídia', path: '/config/comunicacao' },
-                { text: 'APIs & Webhooks', path: '/config/webhooks' },
-                { text: 'Gamificação', path: '/config/gamificacao' },
-                { text: 'Perfis de Acesso', path: '/config/permissoes' },
+                { text: 'Eventos', path: '/eventos', icon: <EventIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Credenciamento', path: '/config/credenciamento', icon: <CredIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Regras de Acesso', path: '/config/checkin', icon: <CheckConfigIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Áreas', path: '/config/areas', icon: <AreaIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Pulseiras', path: '/config/pulseiras', icon: <PulseiraIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Leitores e dispositivos', path: '/config/dispositivos', icon: <FaceIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Etiquetas e crachás', path: '/config/etiquetas', icon: <LabelIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Veículos', path: '/config/veiculos', icon: <CarIcon sx={{ fontSize: 16 }} /> },
+                { divider: true },
+                // --- GRUPO 2: SEGURANÇA & USUÁRIOS ---
+                { text: 'Perfis de Acesso', path: '/config/permissoes', icon: <VerifiedIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Segurança', path: '/config/seguranca', icon: <SecurityIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Comunicação', path: '/config/comunicacao', icon: <ChatIcon sx={{ fontSize: 16 }} /> },
+                { divider: true },
+                // --- GRUPO 3: INTEGRAÇÕES & AUTOMAÇÃO ---
+                { text: 'Integrações', path: '/config/integracoes', icon: <ExtensionIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Webhooks e chaves de API', path: '/config/webhooks', icon: <WebhookIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Câmeras', path: '/config/cameras', icon: <CameraIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Rotinas automáticas', path: '/config/cron', icon: <CronIcon sx={{ fontSize: 16 }} /> },
+                { divider: true },
+                // --- GRUPO 4: SISTEMA ---
+                { text: 'Notificações', path: '/config/notificacoes', icon: <NotifIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Idiomas', path: '/config/idiomas', icon: <PaletteIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Banco de dados', path: '/config/banco-dados', icon: <StorageIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Gamificação', path: '/config/gamificacao', icon: <TrophyIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Logs do Sistema', path: '/config/logs', icon: <LogsIcon sx={{ fontSize: 16 }} /> },
+
             ]
         },
     ];
 
-    const { hasMenuAccess } = useAuth();
+    const isSuper = user?.nivel_acesso === 'admin_master';
 
-    // Verificar se o role do usuário tem permissões granulares configuradas
-    const hasGranularPerms = !!(user?.menu_permissions?.web_admin?.length > 0);
+    const filteredMenu = menuItems
+        .filter(item => {
+            if (item.divider) return true;
+            if (isSuper) return true;
 
-    const filteredMenu = menuItems.filter(item => {
-        if (item.divider) return true;
-
-        if (hasGranularPerms && item.menuKey) {
-            // Sistema granular configurado → usa APENAS hasMenuAccess (ignora roles[] hardcoded)
-            if (!hasMenuAccess(item.menuKey, 'web_admin')) return false;
-        } else if (!hasGranularPerms) {
-            // Sem permissões granulares → fallback para roles[] hardcoded
-            if (item.roles && !item.roles.includes(user?.nivel_acesso || 'operador')) return false;
-        }
-
-        // Se o usuário está preso a um evento (Nexus Fixo) e NÃO for admin, ele não deve ver a Central de Eventos
-        if (user?.evento_id && item.text === 'Eventos' && user?.nivel_acesso !== 'admin') return false;
-
-        return true;
-    });
+            // Para operadores, só exibe itens expressamente autorizados
+            if (item.menuKey) {
+                return hasMenuAccess(item.menuKey);
+            }
+            return false;
+        })
+        .filter((item, idx, arr) => {
+            if (item.divider) {
+                if (idx === 0 || idx === arr.length - 1) return false;
+                if (arr[idx - 1]?.divider) return false;
+            }
+            return true;
+        });
 
     const renderMenuItem = (item) => {
         const isActive = location.pathname === item.path;
@@ -344,43 +385,73 @@ const Sidebar = ({ open, onClose }) => {
 
         return (
             <React.Fragment key={item.text}>
-                <NavItem
-                    active={isActive ? 1 : 0}
-                    onClick={(e) => hasChildren ? handleSubMenuToggle(item.text, e) : navigate(item.path)}
-                >
+                <Tooltip title={item.disabled ? "Em breve" : ""} placement="right">
+                    <Box component="div">
+                        <NavItem
+                            active={isActive ? 1 : 0}
+                            disabled={item.disabled}
+                            onClick={(e) => {
+                                if (item.disabled) return;
+                                if (hasChildren) {
+                                    handleSubMenuToggle(item.text, e);
+                                } else {
+                                    navigate(item.path);
+                                    if (isMobile && onClose) onClose();
+                                }
+                            }}
+                            sx={{
+                                opacity: item.disabled ? 0.3 : 1,
+                                cursor: item.disabled ? 'not-allowed' : 'pointer'
+                            }}
+                        >
                     <ListItemIcon sx={{ minWidth: 40, color: 'text.secondary' }}>
                         {item.icon}
                     </ListItemIcon>
                     <ListItemText
                         primary={item.text}
                         primaryTypographyProps={{
-                            fontSize: '0.85rem',
+                            fontSize: '0.875rem',
                             fontWeight: 600,
                             letterSpacing: '0.5px'
                         }}
                     />
                     {hasChildren && (isOpen ? <ExpandLess sx={{ color: '#00D4FF' }} /> : <ExpandMore sx={{ color: 'text.secondary' }} />)}
-                </NavItem>
+                        </NavItem>
+                    </Box>
+                </Tooltip>
                 {hasChildren && (
                     <Collapse in={isOpen} timeout="auto" unmountOnExit>
                         <List component="div" disablePadding>
-                            {item.children.map((child) => (
-                                <NavItem
-                                    key={child.text}
-                                    active={location.pathname === child.path ? 1 : 0}
-                                    onClick={() => navigate(child.path)}
-                                    sx={{ pl: 4, mb: 0.5 }}
-                                >
-                                    <ListItemText
-                                        primary={child.text}
-                                        primaryTypographyProps={{
-                                            fontSize: '0.75rem',
-                                            color: location.pathname === child.path ? '#00D4FF' : 'text.secondary',
-                                            fontWeight: location.pathname === child.path ? 700 : 400
+                            {item.children.map((child, idx) => {
+                                if (child.divider) {
+                                    return <Divider key={`sub-div-${idx}`} sx={{ my: 0.5, mx: 5, borderColor: 'rgba(0, 212, 255, 0.08)' }} />;
+                                }
+                                return (
+                                    <NavItem
+                                        key={child.text}
+                                        active={location.pathname === child.path ? 1 : 0}
+                                        onClick={() => {
+                                            navigate(child.path);
+                                            if (isMobile && onClose) onClose();
                                         }}
-                                    />
-                                </NavItem>
-                            ))}
+                                        sx={{ pl: child.icon ? 3.5 : 4, mb: 0.3, py: 0.5 }}
+                                    >
+                                        {child.icon && (
+                                            <ListItemIcon sx={{ minWidth: 28, color: location.pathname === child.path ? '#00D4FF' : 'text.secondary' }}>
+                                                {child.icon}
+                                            </ListItemIcon>
+                                        )}
+                                        <ListItemText
+                                            primary={child.text}
+                                            primaryTypographyProps={{
+                                                fontSize: '0.75rem',
+                                                color: location.pathname === child.path ? '#00D4FF' : 'text.secondary',
+                                                fontWeight: location.pathname === child.path ? 700 : 400
+                                            }}
+                                        />
+                                    </NavItem>
+                                );
+                            })}
                         </List>
                     </Collapse>
                 )}
@@ -405,211 +476,149 @@ const Sidebar = ({ open, onClose }) => {
                 >
                     NZT
                 </Avatar>
-                <Box>
+                <Box sx={{ minWidth: 0, flex: 1 }}>
                     <Typography
                         variant="h6"
                         sx={{
-                            fontFamily: '"Orbitron", sans-serif',
+                            fontFamily: '"Space Grotesk", sans-serif',
                             color: '#00D4FF',
-                            fontWeight: 900,
+                            fontWeight: 700,
                             letterSpacing: '2px',
                             textShadow: '0 0 10px rgba(0, 212, 255, 0.3)'
                         }}
                     >
                         NZT
                     </Typography>
-                    <Typography
+                        <Typography
                         variant="caption"
                         sx={{
+                            display: 'block',
                             color: 'text.secondary',
-                            letterSpacing: '1px',
-                            textTransform: 'uppercase',
-                            fontSize: '0.55rem',
-                            fontWeight: 700
+                            fontSize: '0.75rem',
+                            fontWeight: 500,
+                            lineHeight: 1.3,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
                         }}
                     >
-                        Intelligent access systems
+                        Intelligent Control System
                     </Typography>
                 </Box>
             </LogoContainer>
 
-            {/* Evento Ativo Context */}
-            {localStorage.getItem('active_evento_id') && (
+{/* Evento Ativo Context com Seletor Interativo */}
+            {(localStorage.getItem('active_evento_id') || availableEvents.length > 0) && (
                 <Box sx={{ px: 3, pt: 2, pb: 1 }}>
-                    <Typography variant="caption" sx={{ color: 'text.secondary', letterSpacing: '1px', fontWeight: 800 }}>
-                        EVENTO EM FOCO:
-                    </Typography>
+                    {/* Notificações são do evento: o sino fica junto do evento em foco */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                            Evento em foco
+                        </Typography>
+                        <NotificationBell />
+                    </Box>
                     <Box
                         sx={{
                             mt: 1,
-                            p: 2,
-                            borderRadius: 3,
+                            p: 1.5,
+                            borderRadius: 1.5,
                             background: 'rgba(0, 212, 255, 0.05)',
                             border: '1px solid rgba(0, 212, 255, 0.2)',
                             boxShadow: 'inset 0 0 20px rgba(0, 212, 255, 0.05)',
-                            cursor: (user?.nivel_acesso === 'admin' || user?.nivel_acesso === 'master') ? 'pointer' : 'default',
-                            '&:hover': (user?.nivel_acesso === 'admin' || user?.nivel_acesso === 'master')
-                                ? { background: 'rgba(0, 212, 255, 0.1)' }
+                            cursor: (isSuper || availableEvents.length > 1) ? 'pointer' : 'default',
+                            transition: 'all 0.2s ease',
+                            '&:hover': (isSuper || availableEvents.length > 1)
+                                ? { background: 'rgba(0, 212, 255, 0.12)', borderColor: 'rgba(0, 212, 255, 0.4)' }
                                 : {}
                         }}
-                        onClick={() => {
-                            if (user?.nivel_acesso === 'admin' || user?.nivel_acesso === 'master') {
+                        onClick={(e) => {
+                            if (availableEvents.length > 1) {
+                                setEventAnchorEl(e.currentTarget);
+                            } else if (isSuper) {
                                 navigate('/eventos');
                             }
                         }}
                     >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            <EventIcon sx={{ color: '#00D4FF', fontSize: 20 }} />
-                            <Box sx={{ minWidth: 0 }}>
-                                <Typography variant="body2" noWrap sx={{ fontWeight: 800, color: '#fff', fontSize: '0.8rem' }}>
-                                    {localStorage.getItem('active_evento_nome')?.toUpperCase()}
-                                </Typography>
-                                <Typography variant="caption" sx={{
-                                    color: (user?.nivel_acesso === 'admin' || user?.nivel_acesso === 'master') ? '#00FF88' : '#FFB800',
-                                    fontWeight: 700, fontSize: '0.6rem'
-                                }}>
-                                    {(user?.nivel_acesso === 'admin' || user?.nivel_acesso === 'master') ? 'NEXUS ATIVO' : '🔒 NEXUS FIXO'}
-                                </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, minWidth: 0 }}>
+                                <EventIcon sx={{ color: '#00D4FF', fontSize: 20, flexShrink: 0 }} />
+                                <Box sx={{ minWidth: 0 }}>
+                                    <Typography variant="subtitle2" noWrap sx={{ fontWeight: 700, color: 'white', letterSpacing: '-0.02em', fontSize: '0.875rem' }}>
+                                        {localStorage.getItem('active_evento_nome') || availableEvents.find(e => e.id === localStorage.getItem('active_evento_id'))?.nome || 'A2 Eventos'}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{
+                                        color: availableEvents.length > 1 ? '#00D4FF' : (isSuper ? '#00FF88' : '#FFB800'),
+                                        fontWeight: 700, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 0.5
+                                    }}>
+                                        {availableEvents.length > 1 ? 'Clique para alterar' : (isSuper ? 'Gerenciar eventos' : 'Evento fixo')}
+                                    </Typography>
+                                </Box>
                             </Box>
+                            {availableEvents.length > 1 && (
+                                <SwapHorizIcon sx={{ color: '#00D4FF', fontSize: 18, opacity: 0.8 }} />
+                            )}
                         </Box>
                     </Box>
+
+                    {/* Menu seletor de eventos disponíveis */}
+                    <Menu
+                        anchorEl={eventAnchorEl}
+                        open={Boolean(eventAnchorEl)}
+                        onClose={() => setEventAnchorEl(null)}
+                        PaperProps={{
+                            sx: {
+                                background: '#0A1628',
+                                border: '1px solid rgba(0, 212, 255, 0.25)',
+                                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.7)',
+                                maxHeight: 300,
+                                minWidth: 220
+                            }
+                        }}
+                    >
+                        <Box sx={{ px: 2, py: 1, borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                            <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, textTransform: 'uppercase' }}>
+                                Selecionar evento ativo
+                            </Typography>
+                        </Box>
+                        {availableEvents.map(ev => {
+                            const isSelected = ev.id === localStorage.getItem('active_evento_id');
+                            return (
+                                <MenuItem
+                                    key={ev.id}
+                                    selected={isSelected}
+                                    onClick={() => {
+                                        if (changeActiveEvento) {
+                                            changeActiveEvento(ev.id, ev.nome);
+                                        } else {
+                                            localStorage.setItem('active_evento_id', ev.id);
+                                            localStorage.setItem('active_evento_nome', ev.nome);
+                                            window.dispatchEvent(new Event('storage'));
+                                        }
+                                        setEventAnchorEl(null);
+                                    }}
+                                    sx={{
+                                        fontSize: '0.875rem',
+                                        fontWeight: isSelected ? 700 : 400,
+                                        color: isSelected ? '#00D4FF' : '#FFFFFF',
+                                        '&.Mui-selected': { background: 'rgba(0, 212, 255, 0.15)' }
+                                    }}
+                                >
+                                    <EventIcon sx={{ fontSize: 16, mr: 1, color: isSelected ? '#00D4FF' : 'text.secondary' }} />
+                                    {ev.nome}
+                                </MenuItem>
+                            );
+                        })}
+                    </Menu>
                 </Box>
             )}
 
-            <List sx={{ flex: 1, pt: 2, px: 0 }}>
-                {filteredMenu.map((item) => renderMenuItem(item))}
-            </List>
+                <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', pb: 2 }}>
+                <List sx={{ pt: 2, px: 0 }}>
+                    {filteredMenu.map((item) => renderMenuItem(item))}
+                </List>
+            </Box>
 
-            <UserSection>
-                <Typography variant="caption" sx={{ color: 'text.secondary', px: 1, mb: 1, display: 'block', fontWeight: 800, letterSpacing: '2px' }}>
-                    OPERADOR LOGADO
-                </Typography>
-                <UserCard onClick={handleMenuOpen} sx={{ cursor: 'pointer' }}>
-                    <Box sx={{ position: 'relative' }}>
-                        <Avatar
-                            src={user?.foto_url}
-                            sx={{
-                                width: 52,
-                                height: 52,
-                                border: '2px solid',
-                                borderColor: '#00D4FF',
-                                boxShadow: '0 0 15px rgba(0, 212, 255, 0.4)',
-                                background: '#050B18'
-                            }}
-                        >
-                            {user?.nome_completo?.charAt(0) || 'U'}
-                        </Avatar>
-                        <Box sx={{
-                            position: 'absolute',
-                            bottom: 2,
-                            right: 2,
-                            width: 12,
-                            height: 12,
-                            bgcolor: '#00FF88',
-                            borderRadius: '50%',
-                            border: '2px solid #0A1628',
-                            boxShadow: '0 0 5px #00FF88'
-                        }} />
-                    </Box>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography
-                            variant="subtitle2"
-                            noWrap
-                            sx={{
-                                fontWeight: 900,
-                                fontSize: '0.8rem',
-                                color: '#fff',
-                                fontFamily: '"Orbitron", sans-serif',
-                                letterSpacing: '0.5px'
-                            }}
-                        >
-                            {user?.nome_completo?.split(' ')[0] || 'OPERADOR'}
-                        </Typography>
-                        <Typography
-                            variant="caption"
-                            sx={{
-                                color: '#00D4FF',
-                                fontWeight: 700,
-                                fontSize: '0.65rem',
-                                display: 'block',
-                                opacity: 0.8
-                            }}
-                        >
-                            {user?.nivel_acesso?.toUpperCase() || 'ACESSO'}
-                        </Typography>
-                        <Typography
-                            variant="caption"
-                            sx={{ color: '#00FF88', fontWeight: 800, fontSize: '0.55rem', letterSpacing: '1px' }}
-                        >
-                            ONLINE • NEXUS
-                        </Typography>
-                    </Box>
-                    <IconButton
-                        size="small"
-                        sx={{
-                            color: 'text.secondary',
-                            '&:hover': { color: '#00D4FF' }
-                        }}
-                    >
-                        <SettingsIcon fontSize="inherit" sx={{ fontSize: '1rem' }} />
-                    </IconButton>
-                </UserCard>
-
-                <Menu
-                    anchorEl={anchorEl}
-                    open={Boolean(anchorEl)}
-                    onClose={handleMenuClose}
-                    anchorOrigin={{
-                        vertical: 'top',
-                        horizontal: 'right',
-                    }}
-                    transformOrigin={{
-                        vertical: 'bottom',
-                        horizontal: 'left',
-                    }}
-                    PaperProps={{
-                        sx: {
-                            background: '#0A1628',
-                            border: '1px solid rgba(0, 212, 255, 0.2)',
-                            boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
-                            minWidth: 180,
-                            borderRadius: 3,
-                            mt: -1
-                        },
-                    }}
-                >
-                    <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.05)', mb: 1 }}>
-                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>EMAIL</Typography>
-                        <Typography variant="body2" sx={{ color: '#fff', fontWeight: 600, fontSize: '0.75rem' }} noWrap>
-                            {user?.email}
-                        </Typography>
-                    </Box>
-                    <MenuItem
-                        onClick={logout}
-                        sx={{
-                            gap: 2,
-                            mx: 1,
-                            borderRadius: 1.5,
-                            '&:hover': { background: 'rgba(255, 51, 102, 0.1)', color: '#FF3366' }
-                        }}
-                    >
-                        <LogoutIcon fontSize="small" />
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>Logoff do Nexus</Typography>
-                    </MenuItem>
-                    <MenuItem
-                        onClick={handleMenuClose}
-                        sx={{
-                            gap: 2,
-                            mx: 1,
-                            borderRadius: 1.5,
-                            '&:hover': { background: 'rgba(0, 212, 255, 0.1)' }
-                        }}
-                    >
-                        <SupportIcon fontSize="small" />
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>Suporte A2</Typography>
-                    </MenuItem>
-                </Menu>
-            </UserSection>
+            <OperatorSection />
         </StyledDrawer>
     );
 };

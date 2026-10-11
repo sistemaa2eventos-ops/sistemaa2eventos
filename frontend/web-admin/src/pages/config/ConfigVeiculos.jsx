@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Typography, Grid, TextField, Switch, FormControlLabel, CircularProgress } from '@mui/material';
 import { DirectionsCar as CarIcon, LocalParking as ParkingIcon, Save as SaveIcon } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
@@ -17,11 +17,7 @@ const ConfigVeiculos = () => {
     const [anprConfidence, setAnprConfidence] = useState(90);
     const [anprLogRetention, setAnprLogRetention] = useState(30);
 
-    useEffect(() => {
-        loadSettings();
-    }, []);
-
-    const loadSettings = async () => {
+    const loadSettings = useCallback(async () => {
         try {
             const { data } = await api.get('/settings');
             if (data?.success && data?.data) {
@@ -36,7 +32,11 @@ const ConfigVeiculos = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [enqueueSnackbar]);
+
+    useEffect(() => {
+        loadSettings();
+    }, [loadSettings]);
 
     const handleSave = async () => {
         setSaving(true);
@@ -63,26 +63,26 @@ const ConfigVeiculos = () => {
         );
     }
     return (
-        <Box sx={{ p: { xs: 2, md: 4 } }}>
+        <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 }, maxWidth: '100%', overflowX: 'hidden' }}>
             <PageHeader
                 title="Veículos & Estacionamento"
                 subtitle="Integre câmeras LPR (Leitura de Placas) e Cancelas."
-                breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Veículos' }]}
+                breadcrumbs={[{ text: 'Configurações' }, { text: 'Veículos & Estacionamento' }]}
             />
 
-            <Grid container spacing={4} sx={{ mt: 1 }}>
+            <Grid container spacing={3} sx={{ mt: 1 }}>
                 <Grid item xs={12} md={6}>
-                    <GlassCard sx={{ p: 3, mb: 4 }}>
+                    <GlassCard sx={{ p: { xs: 2, sm: 3 }, mb: 4 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                             <CarIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
-                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff' }}>
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
                                 MOTOR ANPR / LPR (Leitura de Placas)
                             </Typography>
                         </Box>
 
                         <FormControlLabel
                             control={<Switch checked={anprEnabled} onChange={(e) => setAnprEnabled(e.target.checked)} color="primary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#fff' }}>Habilitar Módulo de Estacionamento</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Habilitar Módulo de Estacionamento</Typography>}
                             sx={{ mb: 3 }}
                         />
 
@@ -119,8 +119,8 @@ const ConfigVeiculos = () => {
                         </Grid>
 
                         <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-                            <NeonButton onClick={handleSave} disabled={saving} startIcon={<SaveIcon />}>
-                                {saving ? "SALVANDO..." : "SALVAR IA LPR"}
+                            <NeonButton onClick={handleSave} disabled={saving} startIcon={<SaveIcon />} sx={{ height: 38, minHeight: 38, borderRadius: '8px' }}>
+                                {saving ? "Salvando..." : "Salvar IA LPR"}
                             </NeonButton>
                         </Box>
                     </GlassCard>
@@ -131,7 +131,7 @@ const ConfigVeiculos = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                             <ParkingIcon sx={{ color: 'text.secondary', fontSize: 28 }} />
                             <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.secondary' }}>
-                                CANCELAS E ESTACIONAMENTOS
+                                Cancelas e estacionamentos
                             </Typography>
                         </Box>
                         <Box sx={{ textAlign: 'center', py: 6 }}>

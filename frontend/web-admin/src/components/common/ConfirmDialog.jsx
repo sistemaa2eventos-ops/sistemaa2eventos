@@ -1,65 +1,47 @@
 import React from 'react';
-import {
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    Typography,
-    Button,
-    Box
-} from '@mui/material';
-import { Warning as WarningIcon } from '@mui/icons-material';
-import NeonButton from './NeonButton';
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from '@mui/material';
+import { WarningAmberRounded as AlertaIcon, HelpOutlineRounded as PerguntaIcon } from '@mui/icons-material';
+import { cores, tom } from '../../styles/tokens';
 
-const ConfirmDialog = ({ open, title, message, onConfirm, onCancel, loading }) => {
+/**
+ * Confirmação padrão do painel (substitui o window.confirm do navegador).
+ * `perigo` (padrão: true) pinta a ação de vermelho — use false para confirmações neutras.
+ */
+const ConfirmDialog = ({
+    open, title, message, description, onConfirm, onCancel, onClose, loading,
+    confirmText = 'Confirmar', cancelText = 'Cancelar', perigo = true
+}) => {
+    const cor = perigo ? cores.erro : cores.primaria;
+    // Aceita também description/onClose (nomes usados em telas antigas — antes eram ignorados
+    // e o botão Cancelar não fazia nada)
+    const cancelar = onCancel || onClose;
+    const mensagem = message || description;
     return (
-        <Dialog
-            open={open}
-            onClose={onCancel}
-            PaperProps={{
-                sx: {
-                    background: '#0A1628',
-                    border: '1px solid rgba(255, 51, 102, 0.2)',
-                    boxShadow: '0 0 40px rgba(255, 51, 102, 0.1)',
-                    borderRadius: 4
-                }
-            }}
-        >
-            <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 2, pb: 1 }}>
-                <WarningIcon sx={{ color: '#FF3366' }} />
-                <Typography variant="h6" component="span" sx={{ fontFamily: '"Orbitron", sans-serif', fontWeight: 900, fontSize: '1rem' }}>
-                    {title || 'CONFIRMAR EXCLUSÃO'}
-                </Typography>
+        <Dialog open={open} onClose={loading ? undefined : cancelar} maxWidth="xs" fullWidth>
+            <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Box sx={{ width: 36, height: 36, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: tom(cor, 0.14), color: cor, flexShrink: 0 }}>
+                    {perigo ? <AlertaIcon fontSize="small" /> : <PerguntaIcon fontSize="small" />}
+                </Box>
+                {title || (perigo ? 'Confirmar exclusão' : 'Confirmar')}
             </DialogTitle>
             <DialogContent>
-                <Typography sx={{ color: 'text.secondary' }}>
-                    {message || 'Esta ação é irreversível e afetará os dados sincronizados. Deseja prosseguir?'}
+                <Typography variant="body2" sx={{ color: cores.textoSuave, whiteSpace: 'pre-line' }}>
+                    {mensagem || 'Esta ação não pode ser desfeita. Deseja continuar?'}
                 </Typography>
             </DialogContent>
-            <DialogActions sx={{ p: 3, pt: 0 }}>
-                <Button
-                    onClick={onCancel}
-                    sx={{ color: 'text.secondary', fontWeight: 700 }}
-                    disabled={loading}
-                >
-                    ABORTAR
+            <DialogActions>
+                <Button onClick={cancelar} disabled={loading} sx={{ color: cores.textoSecundario }}>
+                    {cancelText}
                 </Button>
-                <NeonButton
+                <Button
+                    variant="contained"
                     onClick={onConfirm}
-                    color="error"
-                    loading={loading}
-                    sx={{
-                        background: 'rgba(255, 51, 102, 0.1)',
-                        border: '1px solid #FF3366',
-                        color: '#FF3366',
-                        '&:hover': {
-                            background: '#FF3366',
-                            color: '#fff'
-                        }
-                    }}
+                    disabled={loading}
+                    color={perigo ? 'error' : 'primary'}
+                    autoFocus
                 >
-                    CONFIRMAR
-                </NeonButton>
+                    {loading ? 'Aguarde...' : confirmText}
+                </Button>
             </DialogActions>
         </Dialog>
     );

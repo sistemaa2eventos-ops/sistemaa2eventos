@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Box, Typography, List, ListItem, ListItemIcon, ListItemText,
-    ListItemSecondaryAction, MenuItem, Select, CircularProgress,
-    Snackbar, Alert
+    ListItemSecondaryAction, MenuItem, Select, CircularProgress
 } from '@mui/material';
 import { useSnackbar } from 'notistack';
 import { Language as LangIcon } from '@mui/icons-material';
@@ -66,7 +65,7 @@ const ConfigIdiomas = () => {
             <GlassCard sx={{ p: { xs: 2, md: 4 }, mt: 4, minHeight: '500px' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 4, pb: 2, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <LangIcon sx={{ color: '#00D4FF', fontSize: 32 }} />
-                    <Typography variant="h5" sx={{ fontWeight: 800, color: '#fff' }}>
+                    <Typography variant="h5" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
                         Idiomas & Regiões
                     </Typography>
                 </Box>
@@ -83,7 +82,7 @@ const ConfigIdiomas = () => {
                         <ListItemText
                             primary="Idioma Padrão do Sistema"
                             secondary="O idioma fallback se detectores automáticos falharem."
-                            primaryTypographyProps={{ fontWeight: 600, color: '#fff' }}
+                            primaryTypographyProps={{ fontWeight: 600, color: '#FFFFFF' }}
                             secondaryTypographyProps={{ fontSize: '0.75rem', color: 'text.secondary' }}
                         />
                         <ListItemSecondaryAction>

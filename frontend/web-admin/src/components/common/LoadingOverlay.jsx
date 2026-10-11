@@ -1,11 +1,11 @@
 import React from 'react';
-import { Backdrop, CircularProgress, Typography, Box } from '@mui/material';
+import { Backdrop, CircularProgress, Typography } from '@mui/material';
 
-const LoadingOverlay = ({ open, message = 'Carregando...' }) => {
+const LoadingOverlay = ({ open = true, message = 'Carregando...' }) => {
     return (
         <Backdrop
             sx={{
-                color: '#fff',
+                color: '#FFFFFF',
                 zIndex: (theme) => theme.zIndex.drawer + 1,
                 flexDirection: 'column',
                 gap: 2,

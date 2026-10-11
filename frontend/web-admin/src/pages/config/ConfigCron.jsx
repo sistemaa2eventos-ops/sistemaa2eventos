@@ -1,142 +1,303 @@
 import React, { useState } from 'react';
-import { Box, Typography, Grid, Chip, CircularProgress, IconButton } from '@mui/material';
-import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import SettingsSuggestIcon from '@mui/icons-material/SettingsSuggest';
+import {
+    Box, Typography, Grid, TextField, MenuItem,
+    Select, FormControl, InputLabel, CircularProgress,
+    Stack, Alert, Chip, LinearProgress, Tooltip
+} from '@mui/material';
+import {
+    Schedule as CronIcon,
+    Assessment as ReportIcon,
+    Sync as SyncIcon,
+    DeleteSweep as CleanupIcon,
+    GetApp as DownloadIcon,
+    PlayArrow as PlayIcon,
+    Timer as FixedIcon,
+    RotateRight as TriggerIcon
+} from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
-import api from '../../services/api';
-
-import PageHeader from '../../components/common/PageHeader';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
 import GlassCard from '../../components/common/GlassCard';
 import NeonButton from '../../components/common/NeonButton';
+import PageHeader from '../../components/common/PageHeader';
+import api from '../../services/api';
+import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
+
+// Todas as horas do dia em intervalos de 30 min
+const HORAS = Array.from({ length: 48 }, (_, i) => {
+    const h = String(Math.floor(i / 2)).padStart(2, '0');
+    const m = i % 2 === 0 ? '00' : '30';
+    return `${h}:${m}`;
+});
+
+// Jobs com schedule fixo (não configuráveis pelo usuário)
+const JOBS_FIXOS = [
+    { label: 'Auto-checkout de Trava',   schedule: 'A cada 5 min',  desc: 'Detecta pessoas presas em check-in e força checkout.' },
+    { label: 'Saúde dos Dispositivos',   schedule: 'A cada 5 min',  desc: 'Ping em terminais biométricos e atualiza status online/offline.' },
+    { label: 'Fila de Sincronização',    schedule: 'A cada 1 min',  desc: 'Processa comandos enfileirados para terminais offline.' },
+    { label: 'Saúde do Sistema',         schedule: 'A cada 30 seg', desc: 'Verifica memória, conexões e integridade geral do servidor.' },
+    { label: 'Sync Noturno Inteligente', schedule: 'Diário às 01:00', desc: 'Sincroniza acessos e limpa cache de faces desatualizadas.' },
+    { label: 'Revogação de Documentos',  schedule: 'Diário às 04:00', desc: 'Invalida NRs e ASOs vencidos no ECM.' },
+];
 
 const ConfigCron = () => {
+    const confirmar = useConfirmacao();
+    const { settings, setSettings, loading, saving, handleSave, downloadDailyReport } = useSystemSettings();
     const { enqueueSnackbar } = useSnackbar();
-    const [isRunningFechamento, setIsRunningFechamento] = useState(false);
+    const [runningReset,  setRunningReset]  = useState(false);
+    const [runningSync,   setRunningSync]   = useState(false);
+    const [downloading,   setDownloading]   = useState(false);
 
-    const handleDispararFechamento = async () => {
-        if (!window.confirm("Atenção! Esta ação forçará o Checkout de TODOS os participantes que ainda constam como 'Dentro do Evento' / 'Checkin Feito'. Isso conclui o turno de hoje. Deseja prosseguir?")) {
+    const retencao = parseInt(settings.log_retention_days) || 90;
+    const retencaoInvalida = retencao < 7 || retencao > 365;
+
+    const handleDownload = async () => {
+        const eid = localStorage.getItem('active_evento_id');
+        if (!eid) {
+            enqueueSnackbar('Selecione um evento ativo no Dashboard antes de gerar o relatório.', { variant: 'warning' });
             return;
         }
-
-        setIsRunningFechamento(true);
         try {
-            const { data } = await api.post('/eventos/reset/manual');
-            enqueueSnackbar(data.message || 'Turno fechado com sucesso.', { variant: 'success' });
-        } catch (error) {
-            console.error("Erro ao disparar fechamento manual", error);
-            enqueueSnackbar(error.response?.data?.error || 'Erro interno ao processar CRON.', { variant: 'error' });
+            setDownloading(true);
+            await downloadDailyReport(eid);
+            enqueueSnackbar('Relatório gerado e download iniciado!', { variant: 'success' });
+        } catch {
+            enqueueSnackbar('Erro ao gerar relatório.', { variant: 'error' });
         } finally {
-            setIsRunningFechamento(false);
+            setDownloading(false);
         }
     };
+
+    const handleManualReset = async () => {
+        if (!(await confirmar({ titulo: 'Fechar turno agora', mensagem: 'Quem estiver com entrada registrada recebe saída automática. Continuar?', textoConfirmar: 'Fechar turno' }))) return;
+        try {
+            setRunningReset(true);
+            await api.post('/eventos/reset/manual');
+            enqueueSnackbar('Reset de turnos executado com sucesso!', { variant: 'success' });
+        } catch (err) {
+            enqueueSnackbar(err.response?.data?.error || 'Erro ao executar reset.', { variant: 'error' });
+        } finally {
+            setRunningReset(false);
+        }
+    };
+
+    const handleManualSync = async () => {
+        try {
+            setRunningSync(true);
+            await api.post('/sync/run');
+            enqueueSnackbar('Sincronização manual executada!', { variant: 'success' });
+        } catch (err) {
+            enqueueSnackbar(err.response?.data?.error || 'Erro ao executar sync.', { variant: 'error' });
+        } finally {
+            setRunningSync(false);
+        }
+    };
+
+    const handleSalvar = async () => {
+        if (retencaoInvalida) {
+            enqueueSnackbar('Retenção de logs deve ser entre 7 e 365 dias.', { variant: 'warning' });
+            return;
+        }
+        if (settings.cron_relatorio_hora <= settings.cron_reset_hora) {
+            enqueueSnackbar('O Relatório deve ser agendado APÓS o Reset de Turno.', { variant: 'warning' });
+            return;
+        }
+        await handleSave();
+    };
+
+    if (loading) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
 
     return (
         <Box sx={{ p: { xs: 2, md: 4 } }}>
             <PageHeader
-                title="Sistema & Automação (CRON)"
-                subtitle="Painel de visualização e manipulação manual dos Jobs em segundo plano que regem as políticas temporais do evento."
-                breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Automação' }]}
+                title="Automação & Jobs em Background"
+                subtitle="Configure horários de execução dos jobs e dispare ações manuais de manutenção."
+                breadcrumbs={[{ text: 'Configurações' }, { text: 'Automação' }]}
             />
 
-            <Grid container spacing={4} sx={{ mt: 1 }}>
+            {/* Aviso: mudanças de horário são aplicadas em tempo real */}
+            <Alert severity="info" sx={{ mb: 3, bgcolor: 'rgba(0,212,255,0.05)', color: '#E8F4FD', border: '1px solid rgba(0,212,255,0.2)' }}>
+                Alterações nos horários configuráveis são aplicadas <b>imediatamente</b> sem reiniciar o servidor.
+                Os jobs com horário fixo abaixo não são configuráveis pela interface.
+            </Alert>
 
-                {/* Fechamento Diário */}
-                <Grid item xs={12} lg={6}>
-                    <GlassCard sx={{ p: 4, height: '100%', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
-                        <Box sx={{ position: 'absolute', top: 10, right: 10, opacity: 0.05 }}>
-                            <AccessTimeIcon sx={{ fontSize: 140, color: '#fff' }} />
-                        </Box>
+            <Grid container spacing={3}>
 
-                        <Box sx={{ mb: 3, position: 'relative', zIndex: 1 }}>
-                            <Typography variant="h6" sx={{ fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: 1 }}>
-                                Fechamento de Turno Diário
-                            </Typography>
-                            <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                                <Chip label="0 3 * * *" size="small" sx={{ bgcolor: 'rgba(0,212,255,0.1)', color: '#00D4FF', fontFamily: 'monospace', fontWeight: 'bold' }} />
-                                <Chip label="Diário às 03:00am" size="small" sx={{ bgcolor: 'rgba(0,255,100,0.1)', color: '#00FF66', fontWeight: 'bold' }} />
-                            </Box>
-                        </Box>
-
-                        <Typography variant="body2" sx={{ color: 'text.secondary', mb: 4, flexGrow: 1, position: 'relative', zIndex: 1, lineHeight: 1.7 }}>
-                            Esta rotina varre o banco de dados em busca de participantes que efetuaram Check-in mas não realizaram o Check-out no mesmo dia. Ela força a transição do status para evitar catracas travadas por "Dupla Entrada" no dia seguinte.
-                        </Typography>
-
-                        <Box sx={{ position: 'relative', zIndex: 1 }}>
-                            <NeonButton
-                                onClick={handleDispararFechamento}
-                                disabled={isRunningFechamento}
-                                startIcon={isRunningFechamento ? <CircularProgress size={20} color="inherit" /> : <PlayCircleOutlineIcon />}
-                                fullWidth
-                            >
-                                {isRunningFechamento ? 'PROCESSANDO (AGUARDE)...' : 'FORÇAR FECHAMENTO AGORA'}
-                            </NeonButton>
-                        </Box>
-                    </GlassCard>
-                </Grid>
-
-                {/* Auto Check-out Global */}
-                <Grid item xs={12} lg={6}>
-                    <GlassCard sx={{ p: 4, height: '100%', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
-                        <Box sx={{ position: 'absolute', top: 10, right: 10, opacity: 0.05 }}>
-                            <SettingsSuggestIcon sx={{ fontSize: 140, color: '#fff' }} />
-                        </Box>
-
-                        <Box sx={{ mb: 3, position: 'relative', zIndex: 1 }}>
-                            <Typography variant="h6" sx={{ fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: 1 }}>
-                                Analisador de Auto Check-out
-                            </Typography>
-                            <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                                <Chip label="*/5 * * * *" size="small" sx={{ bgcolor: 'rgba(0,212,255,0.1)', color: '#00D4FF', fontFamily: 'monospace', fontWeight: 'bold' }} />
-                                <Chip label="A cada 5 minutos" size="small" sx={{ bgcolor: 'rgba(255,180,0,0.1)', color: '#FFB400', fontWeight: 'bold' }} />
-                            </Box>
-                        </Box>
-
-                        <Typography variant="body2" sx={{ color: 'text.secondary', mb: 4, flexGrow: 1, position: 'relative', zIndex: 1, lineHeight: 1.7 }}>
-                            Processo em loop constante pelo Node.js. Ele verifica se a trava global de "Timeout de Área" está configurada no banco SQL Server. Se ativada, derruba credenciais (Auto Checkout) de pessoas cujo tempo de permanência ultrapassou a cota horária limite.
-                        </Typography>
-
-                        <Box sx={{ p: 2, bgcolor: 'rgba(255,180,0,0.05)', border: '1px solid rgba(255,180,0,0.2)', borderRadius: 2, display: 'flex', alignItems: 'center', gap: 1, position: 'relative', zIndex: 1 }}>
-                            <AccessTimeIcon sx={{ color: '#FFB400', fontSize: 20 }} />
-                            <Typography variant="caption" sx={{ color: '#FFB400', fontWeight: 700 }}>
-                                STATUS: OPERANDO SILENCIOSAMENTE NO BACKEND
-                            </Typography>
-                        </Box>
-                    </GlassCard>
-                </Grid>
-
-                {/* Revogação de Documentos ECM */}
+                {/* ── JOBS CONFIGURÁVEIS ── */}
                 <Grid item xs={12}>
-                    <GlassCard sx={{ p: 4, position: 'relative', overflow: 'hidden' }}>
-                        <Box sx={{ position: 'absolute', top: -30, right: 20, opacity: 0.03 }}>
-                            <WarningAmberIcon sx={{ fontSize: 250, color: '#fff' }} />
-                        </Box>
+                    <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CronIcon sx={{ color: '#00D4FF' }} fontSize="small" /> Jobs Configuráveis
+                    </Typography>
+                </Grid>
 
-                        <Box sx={{ mb: 3, position: 'relative', zIndex: 1 }}>
-                            <Typography variant="h6" sx={{ fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: 1 }}>
-                                Auditoria ECM (Arquivamento Vencido)
+                {/* Reset Diário */}
+                <Grid item xs={12} md={6} lg={4}>
+                    <GlassCard glowColor="rgba(0,212,255,0.3)" sx={{ p: 3, height: '100%' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                            <CronIcon sx={{ color: '#00D4FF' }} fontSize="small" />
+                            <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700 }}>
+                                Reset de Turno Diário
                             </Typography>
-                            <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                                <Chip label="0 4 * * *" size="small" sx={{ bgcolor: 'rgba(0,212,255,0.1)', color: '#00D4FF', fontFamily: 'monospace', fontWeight: 'bold' }} />
-                                <Chip label="Diário às 04:00am" size="small" sx={{ bgcolor: 'rgba(0,255,100,0.1)', color: '#00FF66', fontWeight: 'bold' }} />
-                            </Box>
                         </Box>
-
-                        <Typography variant="body2" sx={{ color: 'text.secondary', mb: 4, maxWidth: '80%', position: 'relative', zIndex: 1, lineHeight: 1.7 }}>
-                            Este CRON noturno varre a base de dados de documentos (`pessoa_documentos`) avaliando NRs e ASOs. Qualquer documento que atingir a data estipulada em `data_validade` terá seu status revogado (`vencido`). Consequentemente, as catracas irão bloquear o indivíduo que tiver documentação vital de segurança pendente.
+                        <FormControl fullWidth size="small">
+                            <InputLabel>Horário de Execução</InputLabel>
+                            <Select
+                                value={settings.cron_reset_hora || '03:00'}
+                                label="Horário de Execução"
+                                onChange={(e) => setSettings(prev => ({ ...prev, cron_reset_hora: e.target.value }))}
+                            >
+                                {HORAS.map(h => <MenuItem key={h} value={h}>{h}</MenuItem>)}
+                            </Select>
+                        </FormControl>
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1.5, display: 'block' }}>
+                            Força checkout em todas as pessoas ainda em check-in e gera relatório noturno.
                         </Typography>
-
-                        <Box sx={{ display: 'inline-flex', p: 1.5, px: 2, bgcolor: 'rgba(0,212,255,0.05)', border: '1px solid rgba(0,212,255,0.2)', borderRadius: 2, alignItems: 'center', gap: 1, position: 'relative', zIndex: 1 }}>
-                            <CheckCircleOutlineIcon sx={{ color: '#00D4FF', fontSize: 20 }} />
-                            <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700 }}>
-                                FUNÇÃO GERENCIADA VIA PROCEDURE NATIVA (POSTGRESQL) E AGENDADA PELO NODE.
-                            </Typography>
-                        </Box>
                     </GlassCard>
                 </Grid>
 
+                {/* Relatório Diário */}
+                <Grid item xs={12} md={6} lg={4}>
+                    <GlassCard glowColor="rgba(0,255,136,0.3)" sx={{ p: 3, height: '100%' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                            <ReportIcon sx={{ color: '#00FF88' }} fontSize="small" />
+                            <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700 }}>
+                                Relatório Diário
+                            </Typography>
+                        </Box>
+                        <FormControl fullWidth size="small">
+                            <InputLabel>Horário de Execução</InputLabel>
+                            <Select
+                                value={settings.cron_relatorio_hora || '03:30'}
+                                label="Horário de Execução"
+                                onChange={(e) => setSettings(prev => ({ ...prev, cron_relatorio_hora: e.target.value }))}
+                            >
+                                {HORAS.map(h => <MenuItem key={h} value={h}>{h}</MenuItem>)}
+                            </Select>
+                        </FormControl>
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1.5, display: 'block' }}>
+                            Envia relatório consolidado (Excel/PDF) para os emails cadastrados. Deve ser agendado após o Reset.
+                        </Typography>
+                    </GlassCard>
+                </Grid>
+
+                {/* Retenção de Logs */}
+                <Grid item xs={12} md={6} lg={4}>
+                    <GlassCard glowColor="rgba(255,51,102,0.3)" sx={{ p: 3, height: '100%' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                            <CleanupIcon sx={{ color: '#FF3366' }} fontSize="small" />
+                            <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700 }}>
+                                Retenção de Logs
+                            </Typography>
+                        </Box>
+                        <TextField
+                            label="Dias de Retenção"
+                            type="number"
+                            fullWidth
+                            size="small"
+                            value={retencao}
+                            onChange={(e) => setSettings(prev => ({ ...prev, log_retention_days: parseInt(e.target.value, 10) }))}
+                            inputProps={{ min: 7, max: 365 }}
+                            error={retencaoInvalida}
+                            helperText={retencaoInvalida ? 'Entre 7 e 365 dias.' : 'Logs com mais de X dias são removidos automaticamente.'}
+                        />
+                        {retencao < 30 && !retencaoInvalida && (
+                            <Alert severity="warning" sx={{ mt: 1.5, py: 0.5, fontSize: '0.75rem' }}>
+                                Retenção abaixo de 30 dias pode apagar logs recentes em uso.
+                            </Alert>
+                        )}
+                    </GlassCard>
+                </Grid>
+
+                {/* ── JOBS FIXOS (informativos) ── */}
+                <Grid item xs={12} sx={{ mt: 1 }}>
+                    <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <FixedIcon sx={{ color: '#FFB800' }} fontSize="small" /> Jobs de Sistema (Fixos, não configuráveis)
+                    </Typography>
+                </Grid>
+
+                <Grid item xs={12}>
+                    <GlassCard sx={{ p: 3 }}>
+                        <Grid container spacing={2}>
+                            {JOBS_FIXOS.map((job, i) => (
+                                <Grid item xs={12} sm={6} md={4} key={i}>
+                                    <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 1.5, border: '1px solid rgba(255,255,255,0.06)', height: '100%' }}>
+                                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                                            <SyncIcon sx={{ fontSize: 14, color: '#FFB800' }} />
+                                            <Typography variant="body2" fontWeight={700} color="#FFFFFF" sx={{ fontSize: '0.8125rem' }}>
+                                                {job.label}
+                                            </Typography>
+                                        </Stack>
+                                        <Chip label={job.schedule} size="small" sx={{ mb: 0.75, fontSize: '0.75rem', fontWeight: 700, bgcolor: 'rgba(255,170,0,0.1)', color: '#FFB800' }} />
+                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: '0.75rem' }}>
+                                            {job.desc}
+                                        </Typography>
+                                    </Box>
+                                </Grid>
+                            ))}
+                        </Grid>
+                    </GlassCard>
+                </Grid>
+
+                {/* ── AÇÕES MANUAIS ── */}
+                <Grid item xs={12}>
+                    <GlassCard sx={{ p: 3, border: '1px solid rgba(0,212,255,0.1)' }}>
+                        <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <TriggerIcon sx={{ color: '#00D4FF' }} fontSize="small" /> Ações Manuais
+                        </Typography>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                            <Tooltip title="Gera e faz download do relatório Excel do evento ativo">
+                                <span>
+                                    <NeonButton
+                                        startIcon={downloading ? <CircularProgress size={16} /> : <DownloadIcon />}
+                                        disabled={downloading}
+                                        onClick={handleDownload}
+                                    >
+                                        {downloading ? 'Gerando...' : 'Baixar Relatório Excel'}
+                                    </NeonButton>
+                                </span>
+                            </Tooltip>
+                            <Tooltip title="Força checkout de pessoas presas e limpa turnos do dia">
+                                <span>
+                                    <NeonButton
+                                        neonColor="#FFB800"
+                                        startIcon={runningReset ? <CircularProgress size={16} /> : <PlayIcon />}
+                                        disabled={runningReset}
+                                        onClick={handleManualReset}
+                                    >
+                                        {runningReset ? 'Executando...' : 'Reset de Turno Agora'}
+                                    </NeonButton>
+                                </span>
+                            </Tooltip>
+                            <Tooltip title="Executa sincronização de dispositivos imediatamente">
+                                <span>
+                                    <NeonButton
+                                        neonColor="#00FF88"
+                                        startIcon={runningSync ? <CircularProgress size={16} /> : <SyncIcon />}
+                                        disabled={runningSync}
+                                        onClick={handleManualSync}
+                                    >
+                                        {runningSync ? 'Sincronizando...' : 'Sync Manual de Dispositivos'}
+                                    </NeonButton>
+                                </span>
+                            </Tooltip>
+                        </Stack>
+                    </GlassCard>
+                </Grid>
+
+                {/* ── SALVAR ── */}
+                <Grid item xs={12}>
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        {saving && <LinearProgress sx={{ width: 200, mr: 2, alignSelf: 'center' }} />}
+                        <NeonButton onClick={handleSalvar} disabled={saving || retencaoInvalida}>
+                            {saving ? 'Salvando...' : 'Salvar Alterações'}
+                        </NeonButton>
+                    </Box>
+                </Grid>
             </Grid>
         </Box>
     );

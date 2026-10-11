@@ -31,14 +31,14 @@ class GlobalErrorBoundary extends React.Component {
                         justifyContent: 'center',
                         minHeight: '100vh',
                         bgcolor: '#050B18',
-                        color: '#fff',
+                        color: '#FFFFFF',
                         textAlign: 'center',
                         p: 3
                     }}
                 >
                     <Container maxWidth="sm">
                         <ErrorIcon sx={{ fontSize: 80, color: '#FF3366', mb: 2 }} />
-                        <Typography variant="h4" sx={{ fontWeight: 800, mb: 2, fontFamily: '"Orbitron", sans-serif' }}>
+                        <Typography variant="h4" sx={{ fontWeight: 700, mb: 2, fontFamily: '"Space Grotesk", sans-serif' }}>
                             SISTEMA INTERCEPTADO
                         </Typography>
                         <Typography variant="body1" sx={{ color: 'text.secondary', mb: 4 }}>
@@ -50,17 +50,17 @@ class GlobalErrorBoundary extends React.Component {
                             onClick={this.handleReload}
                             sx={{
                                 bgcolor: '#00D4FF',
-                                color: '#000',
+                                color: '#000000',
                                 fontWeight: 700,
                                 '&:hover': { bgcolor: '#00FF88' }
                             }}
                         >
-                            REINICIALIZAR INTERFACE
+                            Reinicializar interface
                         </Button>
 
                         {true && (
-                            <Box sx={{ mt: 4, textAlign: 'left', p: 2, bgcolor: 'rgba(255,51,102,0.1)', borderRadius: 2 }}>
-                                <Typography variant="caption" sx={{ color: '#FF3366', fontFamily: 'monospace' }}>
+                            <Box sx={{ mt: 4, textAlign: 'left', p: 2, bgcolor: 'rgba(255,51,102,0.1)', borderRadius: 1.5 }}>
+                                <Typography variant="caption" sx={{ color: '#FF3366', fontFamily: '"Inter", sans-serif' }}>
                                     {this.state.error?.toString()}
                                 </Typography>
                             </Box>

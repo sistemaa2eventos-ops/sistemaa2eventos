@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Typography, Grid, TextField, Switch, FormControlLabel, Button, CircularProgress } from '@mui/material';
 import { Email as MailIcon, Message as SmsIcon, Save as SaveIcon } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
@@ -27,11 +27,39 @@ const ConfigComunicacao = () => {
     const [wppToken, setWppToken] = useState('');
     const [wppPhoneId, setWppPhoneId] = useState('');
 
-    useEffect(() => {
-        loadSettings();
+    // Templates Configs
+    const [templates, setTemplates] = useState([]);
+    const [selectedTemplate, setSelectedTemplate] = useState(null);
+    const [tempContent, setTempContent] = useState('');
+    const [tempTitle, setTempTitle] = useState('');
+    const [savingTemplate, setSavingTemplate] = useState(false);
+
+    const getEventoId = () => sessionStorage.getItem('active_evento_id') || localStorage.getItem('active_evento_id');
+
+    const handleSelectTemplate = useCallback((t) => {
+        setSelectedTemplate(t);
+        setTempContent(t.conteudo);
+        setTempTitle(t.titulo || '');
     }, []);
 
-    const loadSettings = async () => {
+    const loadTemplates = useCallback(async () => {
+        try {
+            const eventoId = getEventoId();
+            if (!eventoId) return;
+
+            const { data } = await api.get('/messages/templates', {
+                params: { evento_id: eventoId }
+            });
+            if (data.success && Array.isArray(data.data)) {
+                setTemplates(data.data);
+                if (data.data.length > 0) handleSelectTemplate(data.data[0]);
+            }
+        } catch (error) {
+            enqueueSnackbar('Erro ao carregar templates de mensagem', { variant: 'error' });
+        }
+    }, [enqueueSnackbar, handleSelectTemplate]);
+
+    const loadSettings = useCallback(async () => {
         try {
             const { data } = await api.get('/settings');
             if (data?.success && data?.data) {
@@ -55,7 +83,12 @@ const ConfigComunicacao = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [enqueueSnackbar]);
+
+    useEffect(() => {
+        loadSettings();
+        loadTemplates();
+    }, [loadSettings, loadTemplates]);
 
     const handleTestSmtp = async () => {
         try {
@@ -122,11 +155,32 @@ const ConfigComunicacao = () => {
                 wpp_token: wppToken,
                 wpp_phone_id: wppPhoneId
             });
-            enqueueSnackbar('Configurações de WhatsApp/SMS salvas!', { variant: 'success' });
+            enqueueSnackbar('Configurações de Mensageria salvas!', { variant: 'success' });
         } catch (error) {
-            enqueueSnackbar('Erro ao salvar gateways de mensagens', { variant: 'error' });
+            enqueueSnackbar('Erro ao salvar configurações de Mensageria', { variant: 'error' });
         } finally {
             setSavingWpp(false);
+        }
+    };
+
+    const handleSaveTemplate = async () => {
+        if (!selectedTemplate) return;
+        setSavingTemplate(true);
+        try {
+            const eventoId = getEventoId();
+            await api.post('/messages/templates', {
+                slug: selectedTemplate.slug,
+                canal: selectedTemplate.canal,
+                titulo: tempTitle,
+                conteudo: tempContent,
+                evento_id: eventoId
+            });
+            enqueueSnackbar('Template personalizado com sucesso!', { variant: 'success' });
+            loadTemplates();
+        } catch (error) {
+            enqueueSnackbar('Falha ao salvar personalização', { variant: 'error' });
+        } finally {
+            setSavingTemplate(false);
         }
     };
 
@@ -142,7 +196,7 @@ const ConfigComunicacao = () => {
             <PageHeader
                 title="Módulo de Comunicação (SMTP/SMS)"
                 subtitle="Integre gateways nativos para disparar aprovações e links de credenciamento web e whatsapp."
-                breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'E-mail & SMS' }]}
+                breadcrumbs={[{ text: 'Configurações' }, { text: 'Módulo de Comunicação' }]}
             />
 
             <Grid container spacing={4} sx={{ mt: 1 }}>
@@ -151,14 +205,14 @@ const ConfigComunicacao = () => {
                         <GlassCard sx={{ p: 3, mb: 4, height: '100%' }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                                 <MailIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
-                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff' }}>
-                                    SERVIDOR DE E-MAIL (SMTP)
+                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                                    Servidor de e-mail (SMTP)
                                 </Typography>
                             </Box>
 
                             <FormControlLabel
                                 control={<Switch checked={smtpEnabled} onChange={(e) => setSmtpEnabled(e.target.checked)} color="primary" />}
-                                label={<Typography sx={{ fontWeight: 600, color: '#fff' }}>Habilitar Envio de E-mails</Typography>}
+                                label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Habilitar Envio de E-mails</Typography>}
                                 sx={{ mb: 3 }}
                             />
 
@@ -176,7 +230,15 @@ const ConfigComunicacao = () => {
                                     <TextField fullWidth label="Usuário Autenticação" value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} size="small" />
                                 </Grid>
                                 <Grid item xs={12} md={6}>
-                                    <TextField fullWidth label="Senha (App Password)" value={smtpPass} onChange={(e) => setSmtpPass(e.target.value)} type="password" size="small" />
+                                    <TextField 
+                                        fullWidth 
+                                        label="Senha (App Password)" 
+                                        value={smtpPass} 
+                                        onChange={(e) => setSmtpPass(e.target.value)} 
+                                        type="password" 
+                                        size="small" 
+                                        autoComplete="current-password"
+                                    />
                                 </Grid>
                             </Grid>
 
@@ -186,10 +248,10 @@ const ConfigComunicacao = () => {
                                     sx={{ color: '#00D4FF' }}
                                     onClick={handleTestSmtp}
                                 >
-                                    TESTAR DISPARO
+                                    Testar disparo
                                 </Button>
                                 <NeonButton type="submit" disabled={savingSmtp} startIcon={<SaveIcon />}>
-                                    {savingSmtp ? "SALVANDO..." : "SALVAR SMTP"}
+                                    {savingSmtp ? "Salvando..." : "Salvar SMTP"}
                                 </NeonButton>
                             </Box>
                         </GlassCard>
@@ -201,14 +263,14 @@ const ConfigComunicacao = () => {
                         <GlassCard sx={{ p: 3, mb: 4, height: '100%' }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                                 <SmsIcon sx={{ color: '#00FF88', fontSize: 28 }} />
-                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff' }}>
-                                    WHATSAPP / SMS (API)
+                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                                    WhatsApp / sms (API)
                                 </Typography>
                             </Box>
 
                             <FormControlLabel
                                 control={<Switch checked={wppEnabled} onChange={(e) => setWppEnabled(e.target.checked)} color="primary" />}
-                                label={<Typography sx={{ fontWeight: 600, color: '#fff' }}>Habilitar Disparos Oficiais WhatsApp (Meta)</Typography>}
+                                label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Habilitar Disparos Oficiais WhatsApp (Meta)</Typography>}
                                 sx={{ mb: 3 }}
                             />
 
@@ -222,14 +284,22 @@ const ConfigComunicacao = () => {
                                     </TextField>
                                 </Grid>
                                 <Grid item xs={12}>
-                                    <TextField fullWidth label="Authorization Token (Bearer / Secret)" value={wppToken} onChange={(e) => setWppToken(e.target.value)} type="password" size="small" />
+                                    <TextField 
+                                        fullWidth 
+                                        label="Authorization Token (Bearer / Secret)" 
+                                        value={wppToken} 
+                                        onChange={(e) => setWppToken(e.target.value)} 
+                                        type="password" 
+                                        size="small" 
+                                        autoComplete="current-password"
+                                    />
                                 </Grid>
                                 <Grid item xs={12}>
                                     <TextField fullWidth label="ID do Telefone Remetente" value={wppPhoneId} onChange={(e) => setWppPhoneId(e.target.value)} placeholder="+55 11 99999-9999" size="small" />
                                 </Grid>
                             </Grid>
 
-                            <Box sx={{ p: 2, mt: 3, bgcolor: 'rgba(0, 255, 136, 0.05)', border: '1px dashed rgba(0, 255, 136, 0.2)', borderRadius: 2 }}>
+                            <Box sx={{ p: 2, mt: 3, bgcolor: 'rgba(0, 255, 136, 0.05)', border: '1px dashed rgba(0, 255, 136, 0.2)', borderRadius: 1.5 }}>
                                 <Typography variant="caption" sx={{ color: '#00FF88' }}>
                                     Lembre-se: O Gateway de disparo de mensageria requer modelos (templates) aprovados na operadora caso o disparo seja proativo.
                                 </Typography>
@@ -241,14 +311,113 @@ const ConfigComunicacao = () => {
                                     sx={{ color: '#00FF88' }}
                                     onClick={handleTestWpp}
                                 >
-                                    TESTAR API
+                                    Testar API
                                 </Button>
                                 <NeonButton type="submit" color="success" disabled={savingWpp} startIcon={<SaveIcon />}>
-                                    {savingWpp ? "SALVANDO..." : "SALVAR MENSAGERIA"}
+                                    {savingWpp ? "Salvando..." : "Salvar mensageria"}
                                 </NeonButton>
                             </Box>
                         </GlassCard>
                     </form>
+                </Grid>
+            </Grid>
+
+            {/* Editor de Templates */}
+            <Typography variant="h5" sx={{ mt: 6, mb: 3, fontWeight: 700, color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: 1 }}>
+                Editor de Mensagens Dinâmicas
+            </Typography>
+            
+            <Grid container spacing={4}>
+                <Grid item xs={12} md={4}>
+                    <GlassCard sx={{ p: 2, height: '100%' }}>
+                        <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 700, color: '#00D4FF' }}>
+                            Lista de templates
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            {templates.map(t => (
+                                <Button
+                                    key={`${t.slug}-${t.canal}`}
+                                    variant={selectedTemplate?.id === t.id ? 'contained' : 'outlined'}
+                                    onClick={() => handleSelectTemplate(t)}
+                                    sx={{ justifyContent: 'flex-start', textAlign: 'left', py: 1.5, color: '#FFFFFF' }}
+                                    startIcon={t.canal === 'email' ? <MailIcon /> : <SmsIcon />}
+                                >
+                                    <Box>
+                                        <Typography variant="body2" sx={{ fontWeight: 700, textTransform: 'uppercase' }}>
+                                            {t.slug.replace(/_/g, ' ')}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ opacity: 0.7 }}>
+                                            Canal: {t.canal} {t.evento_id ? '(Personalizado)' : '(Padrão)'}
+                                        </Typography>
+                                    </Box>
+                                </Button>
+                            ))}
+                        </Box>
+                    </GlassCard>
+                </Grid>
+
+                <Grid item xs={12} md={8}>
+                    <GlassCard sx={{ p: 3, height: '100%' }}>
+                        {selectedTemplate ? (
+                            <Box>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                                        Editando: {selectedTemplate.slug.toUpperCase()} ({selectedTemplate.canal})
+                                    </Typography>
+                                    <NeonButton onClick={handleSaveTemplate} disabled={savingTemplate} startIcon={<SaveIcon />}>
+                                        {savingTemplate ? "Salvando..." : "Salvar alterações"}
+                                    </NeonButton>
+                                </Box>
+
+                                {selectedTemplate.canal === 'email' && (
+                                    <TextField
+                                        fullWidth
+                                        label="Assunto do E-mail"
+                                        value={tempTitle}
+                                        onChange={(e) => setTempTitle(e.target.value)}
+                                        sx={{ mb: 3 }}
+                                        size="small"
+                                    />
+                                )}
+
+                                <TextField
+                                    fullWidth
+                                    multiline
+                                    rows={8}
+                                    label="Conteúdo da Mensagem"
+                                    value={tempContent}
+                                    onChange={(e) => setTempContent(e.target.value)}
+                                    helperText="Use {{variavel}} para campos dinâmicos."
+                                    sx={{ 
+                                        '& .MuiInputBase-root': { fontFamily: '"Inter", sans-serif', fontSize: '0.875rem', color: '#FFFFFF' } 
+                                    }}
+                                />
+
+                                <Box sx={{ mt: 3, p: 2, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 1.5 }}>
+                                    <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block', mb: 1 }}>
+                                        VARIÁVEIS DISPONÍVEIS:
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                        {['nome_empresa', 'responsavel', 'link_onboarding', 'evento_nome', 'data_expiracao', 'link_qrcode'].map(v => (
+                                            <Box 
+                                                key={v} 
+                                                sx={{ px: 1, py: 0.5, bgcolor: 'rgba(0,212,255,0.1)', border: '1px solid rgba(0,212,255,0.3)', borderRadius: 1, cursor: 'pointer' }}
+                                                onClick={() => setTempContent(prev => prev + ` {{${v}}}`)}
+                                            >
+                                                <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700 }}>
+                                                    {`{{${v}}}`}
+                                                </Typography>
+                                            </Box>
+                                        ))}
+                                    </Box>
+                                </Box>
+                            </Box>
+                        ) : (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                                <Typography sx={{ color: '#94A3B8' }}>Selecione um template para editar</Typography>
+                            </Box>
+                        )}
+                    </GlassCard>
                 </Grid>
             </Grid>
         </Box>

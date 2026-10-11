@@ -1,217 +1,222 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Box, Typography, Switch, List, ListItem, ListItemIcon,
-    ListItemText, ListItemSecondaryAction, Divider, TextField,
-    Button, Grid, Stack, FormControlLabel, CircularProgress,
-    Snackbar, Alert
+    Box, Typography, Button, Grid, 
+    CircularProgress, Chip, Stack, 
+    Divider, TextField
 } from '@mui/material';
-import { useSnackbar } from 'notistack';
-import {
-    CloudQueue as CloudIcon,
-    SettingsInputComponent as ApiIcon,
-    DirectionsCar as CarIcon,
-    WhatsApp as WppIcon,
-    Save as SaveIcon
+import { 
+    CloudDone as CloudIcon,
+    Storage as StorageIcon,
+    Mail as MailIcon,
+    Telegram as TelegramIcon,
+    CheckCircle as SuccessIcon,
+    Error as ErrorIcon
 } from '@mui/icons-material';
-import PageHeader from '../../components/common/PageHeader';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
 import GlassCard from '../../components/common/GlassCard';
+import PageHeader from '../../components/common/PageHeader';
 import api from '../../services/api';
 
 const ConfigIntegracoes = () => {
-    const [settings, setSettings] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const { enqueueSnackbar } = useSnackbar();
+    const { settings, setSettings, loading, saving, handleSave, testEmail } = useSystemSettings();
+    
+    const [status, setStatus] = useState({
+        database: 'loading',
+        storage: 'loading',
+        smtp: 'loading',
+        whatsapp: 'loading'
+    });
+
+    const checkStatus = useCallback(async () => {
+        try {
+            const smtpParams = {
+                smtp_host: settings.smtp_host,
+                smtp_port: settings.smtp_port,
+                smtp_user: settings.smtp_user,
+                smtp_pass: settings.smtp_pass
+            };
+            const smtpConfigured = Boolean(
+                smtpParams.smtp_host && smtpParams.smtp_port && smtpParams.smtp_user && smtpParams.smtp_pass
+            );
+
+            const [db, smtp] = await Promise.all([
+                api.get('/settings/test-connection', { timeout: 5000 }).catch(error => {
+                    console.error('Falha teste Supabase:', error);
+                    return { data: { success: false, message: error.message } };
+                }),
+                smtpConfigured
+                    ? api.post('/settings/verify-smtp', smtpParams).catch(() => ({ data: { success: false } }))
+                    : Promise.resolve({ data: { success: false } })
+            ]);
+
+            setStatus({
+                database: db.data.success ? 'online' : 'error',
+                storage: db.data.success ? 'online' : 'error', // Geralmente atrelado ao DB no nexus
+                smtp: !smtpConfigured ? 'offline' : (smtp.data.success ? 'online' : 'error'),
+                whatsapp: settings.whatsapp_api_url ? 'configured' : 'offline'
+            });
+        } catch (error) {
+            console.error(error);
+        }
+    }, [settings]);
 
     useEffect(() => {
-        const fetchSettings = async () => {
-            try {
-                const response = await api.get('/settings');
-                setSettings(response.data.data);
-            } catch (error) {
-                console.error('Erro ao buscar configurações:', error);
-                enqueueSnackbar('Falha ao carregar configurações.', { variant: 'error' });
-            } finally {
-                setLoading(false);
-            }
+        if (!loading) checkStatus();
+    }, [loading, checkStatus]);
+
+    const StatusChip = ({ type }) => {
+        const config = {
+            loading: { label: 'Verificando...', color: 'default', icon: <CircularProgress size={12} color="inherit" /> },
+            online: { label: 'Conectado', color: 'success', icon: <SuccessIcon sx={{ fontSize: 14 }} /> },
+            error: { label: 'Falha na Conexão', color: 'error', icon: <ErrorIcon sx={{ fontSize: 14 }} /> },
+            configured: { label: 'Configurado', color: 'info', icon: <SuccessIcon sx={{ fontSize: 14 }} /> },
+            offline: { label: 'Não Configurado', color: 'default', icon: <ErrorIcon sx={{ fontSize: 14 }} /> },
         };
-        fetchSettings();
-    }, [enqueueSnackbar]);
-
-    const handleToggle = async (key) => {
-        if (!settings) return;
-        const newValue = !settings[key];
-        const oldSettings = { ...settings };
-        setSettings(prev => ({ ...prev, [key]: newValue }));
-
-        try {
-            setSaving(true);
-            await api.put('/settings', { [key]: newValue });
-            enqueueSnackbar('Configuração atualizada com sucesso.', { variant: 'success' });
-        } catch (error) {
-            console.error('Erro ao salvar:', error);
-            setSettings(oldSettings);
-            enqueueSnackbar('Falha ao salvar configuração.', { variant: 'error' });
-        } finally {
-            setSaving(false);
-        }
+        const current = config[type] || config.loading;
+        return <Chip icon={current.icon} label={current.label} color={current.color} size="small" variant="outlined" sx={{ fontWeight: 700, fontSize: '0.75rem' }} />;
     };
-
-    const handleSaveIntegrations = async (e) => {
-        if (e && e.preventDefault) e.preventDefault();
-        try {
-            setSaving(true);
-            await api.put('/settings', {
-                anpr_enabled: settings.anpr_enabled,
-                anpr_endpoint: settings.anpr_endpoint,
-                anpr_confidence_min: parseInt(settings.anpr_confidence_min, 10),
-                wpp_enabled: settings.wpp_enabled,
-                wpp_provider: settings.wpp_provider,
-                wpp_token: settings.wpp_token,
-                wpp_phone_id: settings.wpp_phone_id
-            });
-            enqueueSnackbar('Parâmetros de integração salvos com sucesso!', { variant: 'success' });
-        } catch (error) {
-            console.error('Erro ao salvar integrações:', error);
-            enqueueSnackbar('Erro ao salvar integrações externas.', { variant: 'error' });
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const handleInputChange = (key, value) => {
-        setSettings(prev => ({ ...prev, [key]: value }));
-    };
-
-    if (loading) return (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-            <CircularProgress color="secondary" />
-        </Box>
-    );
 
     return (
         <Box sx={{ p: { xs: 2, md: 4 } }}>
             <PageHeader
-                title="Integrações & Edge"
-                subtitle="Gerencie como o A2 Eventos se conecta com a nuvem e outros ecossistemas."
-                breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Integrações' }]}
+                title="Integrações & Gateways Externos"
+                subtitle="Monitore o status dos serviços conectados e configure integrações com plataformas externas."
+                breadcrumbs={[{ text: 'Configurações' }, { text: 'Integrações' }]}
             />
 
-            <GlassCard sx={{ p: { xs: 2, md: 4 }, mt: 4, minHeight: '500px' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 4, pb: 2, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <CloudIcon sx={{ color: '#00D4FF', fontSize: 32 }} />
-                    <Typography variant="h5" sx={{ fontWeight: 800, color: '#fff' }}>
-                        Nuvem & Apis
-                    </Typography>
-                </Box>
+            <Grid container spacing={3}>
+                {/* STATUS DOS SERVIÇOS CORE */}
+                <Grid item xs={12}>
+                    <GlassCard sx={{ p: 3 }}>
+                        <Typography variant="subtitle2" sx={{ color: '#FFFFFF', fontWeight: 700, mb: 3 }}>Status do Ecossistema</Typography>
+                        <Stack direction={{ xs: 'column', md: 'row' }} spacing={4} divider={<Divider orientation="vertical" flexItem sx={{ borderColor: 'rgba(255,255,255,0.05)' }} />}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                <StorageIcon color="primary" />
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>SUPABASE DB</Typography>
+                                    <StatusChip type={status.database} />
+                                </Box>
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                <CloudIcon sx={{ color: '#00D4FF' }} />
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>STORAGE BUCKET</Typography>
+                                    <StatusChip type={status.storage} />
+                                </Box>
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                <MailIcon sx={{ color: '#00FF88' }} />
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>SMTP SERVER</Typography>
+                                    <StatusChip type={status.smtp} />
+                                </Box>
+                            </Box>
+                        </Stack>
 
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-                    Estas chaves governam a persistência e direcionamento global dos pacotes da aplicação. Apenas administradores devem manusear.
-                </Typography>
-
-                <List disablePadding>
-                    <ListItem sx={{ px: 0, py: 2, '&:hover': { background: 'rgba(0, 212, 255, 0.03)' }, borderRadius: 2 }}>
-                        <ListItemIcon sx={{ color: '#00D4FF', minWidth: 48 }}>
-                            <CloudIcon />
-                        </ListItemIcon>
-                        <ListItemText
-                            primary="Sincronização Cloud (Backup Local)"
-                            secondary="Se este nó for Offline (Edge), ative para espelhar dados continuamente para o servidor mestre quando houver internet."
-                            primaryTypographyProps={{ fontWeight: 600, color: '#fff' }}
-                            secondaryTypographyProps={{ fontSize: '0.75rem', color: 'text.secondary' }}
+                        <TextField
+                            fullWidth
+                            disabled
+                            size="small"
+                            label="Endereço da API Backend (nó controlador)"
+                            value={import.meta.env.VITE_API_URL || 'URL Não Encontrada'}
+                            sx={{ mt: 3 }}
+                            InputProps={{
+                                sx: {
+                                    color: '#00D4FF',
+                                    '-webkit-text-fill-color': '#00D4FF !important',
+                                    fontFamily: '"Inter", sans-serif'
+                                }
+                            }}
+                            helperText="URL raiz (HOST) lida pelo frontend via Vite ENV. Não é possível alterar aqui por questões de CORS compilado na build."
                         />
-                        <ListItemSecondaryAction>
-                            <Switch
-                                checked={!!settings?.cloud_sync_enabled}
-                                onChange={() => handleToggle('cloud_sync_enabled')}
-                                disabled={saving}
-                                color="primary"
-                            />
-                        </ListItemSecondaryAction>
-                    </ListItem>
-                    <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)' }} />
-                </List>
+                    </GlassCard>
+                </Grid>
 
-                <Box sx={{ mt: 6, pt: 4, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                    <form onSubmit={handleSaveIntegrations}>
-                        <Grid container spacing={4}>
-                            <Grid item xs={12} md={6}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-                                    <CarIcon sx={{ color: '#FFAC33', fontSize: 24 }} />
-                                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff' }}>
-                                        LPR / ANPR (Placas)
-                                    </Typography>
-                                </Box>
-                                <Stack spacing={3}>
-                                    <FormControlLabel
-                                        control={<Switch checked={!!settings?.anpr_enabled} onChange={(e) => handleInputChange('anpr_enabled', e.target.checked)} color="warning" />}
-                                        label={<Typography sx={{ color: '#fff' }}>Habilitar Reconhecimento de Placas</Typography>}
-                                    />
-                                    <TextField fullWidth label="Endpoint da Câmera LPR" value={settings?.anpr_endpoint || ''} onChange={(e) => handleInputChange('anpr_endpoint', e.target.value)} size="small" placeholder="http://192.168.1.50/lpr" />
-                                    <TextField fullWidth label="Confiança Mínima (%)" value={settings?.anpr_confidence_min || ''} onChange={(e) => handleInputChange('anpr_confidence_min', e.target.value)} size="small" type="number" />
-                                </Stack>
-                            </Grid>
-
-                            <Grid item xs={12} md={6}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-                                    <WppIcon sx={{ color: '#25D366', fontSize: 24 }} />
-                                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff' }}>
-                                        WhatsApp Business API
-                                    </Typography>
-                                </Box>
-                                <Stack spacing={3}>
-                                    <FormControlLabel
-                                        control={<Switch checked={!!settings?.wpp_enabled} onChange={(e) => handleInputChange('wpp_enabled', e.target.checked)} color="success" />}
-                                        label={<Typography sx={{ color: '#fff' }}>Ativar Envio de Ingressos/QR</Typography>}
-                                    />
-                                    <TextField fullWidth label="WPP Token (Bearer)" type="password" value={settings?.wpp_token || ''} onChange={(e) => handleInputChange('wpp_token', e.target.value)} size="small" autoComplete="off" />
-                                    <TextField fullWidth label="Phone ID (Facebook)" value={settings?.wpp_phone_id || ''} onChange={(e) => handleInputChange('wpp_phone_id', e.target.value)} size="small" />
-                                </Stack>
-                            </Grid>
-
-                            <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-                                <Button
-                                    type="submit"
-                                    variant="contained"
-                                    startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-                                    disabled={saving}
-                                    sx={{ background: 'linear-gradient(45deg, #FFAC33 30%, #FF8800 90%)', color: '#fff', fontWeight: 700 }}
-                                >
-                                    {saving ? 'SALVANDO...' : 'SALVAR INTEGRAÇÕES EDGE'}
-                                </Button>
-                            </Grid>
-                        </Grid>
-                    </form>
-                </Box>
-                <List disablePadding>
-                    <ListItem sx={{ px: 0, py: 2, alignItems: 'flex-start' }}>
-                        <ListItemIcon sx={{ color: 'text.secondary', minWidth: 48, mt: 1 }}>
-                            <ApiIcon />
-                        </ListItemIcon>
-                        <Box sx={{ flexGrow: 1, pr: 2 }}>
-                            <ListItemText
-                                primary="Endereço da API Backend (Nó Controlador)"
-                                secondary="A URL raiz (HOST) lida pelo frontend via Vite ENV. Não é possível alterar aqui por questões de CORS compilado na build."
-                                primaryTypographyProps={{ fontWeight: 600, color: '#fff' }}
-                                secondaryTypographyProps={{ fontSize: '0.75rem', color: 'text.secondary', mb: 1 }}
-                            />
-                            <TextField
-                                fullWidth
-                                disabled
+                {/* CONFIGURAÇÃO: EMAIL (SMTP) */}
+                <Grid item xs={12} md={6}>
+                    <GlassCard sx={{ p: 3, height: '100%' }}>
+                        <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700, mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <MailIcon fontSize="small" color="primary" /> Remetente de E-mail
+                        </Typography>
+                        
+                        <Stack spacing={2}>
+                            <TextField 
+                                label="E-mail do Remetente" 
+                                fullWidth 
                                 size="small"
-                                value={import.meta.env.VITE_API_URL || 'URL Não Encontrada'}
-                                InputProps={{
-                                    sx: {
-                                        color: '#00D4FF',
-                                        '-webkit-text-fill-color': '#00D4FF !important',
-                                        fontFamily: 'monospace'
-                                    }
-                                }}
+                                value={settings.email_from || ''}
+                                onChange={(e) => setSettings(prev => ({ ...prev, email_from: e.target.value }))}
                             />
-                        </Box>
-                    </ListItem>
-                </List>
-            </GlassCard>
+                            <TextField 
+                                label="Nome de Exibição" 
+                                fullWidth 
+                                size="small"
+                                value={settings.email_from_name || ''}
+                                onChange={(e) => setSettings(prev => ({ ...prev, email_from_name: e.target.value }))}
+                            />
+                            <Button 
+                                variant="outlined" 
+                                color="primary" 
+                                fullWidth
+                                onClick={testEmail}
+                                sx={{ textTransform: 'none', fontWeight: 700 }}
+                            >
+                                Enviar E-mail de Teste
+                            </Button>
+                        </Stack>
+                    </GlassCard>
+                </Grid>
+
+                {/* CONFIGURAÇÃO: MENSAGERIA */}
+                <Grid item xs={12} md={6}>
+                    <GlassCard sx={{ p: 3, height: '100%' }}>
+                        <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700, mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <TelegramIcon fontSize="small" sx={{ color: '#00D4FF' }} /> Telegram & WhatsApp
+                        </Typography>
+                        
+                        <Stack spacing={2}>
+                            <TextField 
+                                label="Bot Token (Telegram)" 
+                                type="password"
+                                fullWidth 
+                                size="small"
+                                value={settings.telegram_bot_token || ''}
+                                onChange={(e) => setSettings(prev => ({ ...prev, telegram_bot_token: e.target.value }))}
+                            />
+                            <TextField 
+                                label="API URL (WhatsApp)" 
+                                fullWidth 
+                                size="small"
+                                placeholder="Ex: https://api.wa.nzt.io/v1/..."
+                                value={settings.whatsapp_api_url || ''}
+                                onChange={(e) => setSettings(prev => ({ ...prev, whatsapp_api_url: e.target.value }))}
+                            />
+                            <TextField 
+                                label="API Key (WhatsApp)" 
+                                type="password"
+                                fullWidth 
+                                size="small"
+                                value={settings.whatsapp_api_key || ''}
+                                onChange={(e) => setSettings(prev => ({ ...prev, whatsapp_api_key: e.target.value }))}
+                            />
+                        </Stack>
+                    </GlassCard>
+                </Grid>
+
+                <Grid item xs={12}>
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={() => handleSave()}
+                            disabled={saving}
+                            sx={{ fontWeight: 700, px: 4, borderRadius: 1.5 }}
+                        >
+                            {saving ? 'Salvando...' : 'Salvar Alterações'}
+                        </Button>
+                    </Box>
+                </Grid>
+            </Grid>
         </Box>
     );
 };

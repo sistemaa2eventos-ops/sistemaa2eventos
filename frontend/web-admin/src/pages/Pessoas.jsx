@@ -1,303 +1,217 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   Box, Typography, Stack, IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
-  Avatar, Chip, Grid, Button, Tooltip, useTheme, useMediaQuery, CircularProgress
+  Chip, Button, useTheme, useMediaQuery, CircularProgress, Tabs, Tab, TextField
 } from '@mui/material';
 import {
   Add as AddIcon, Search as SearchIcon, FileUpload as UploadIcon, FileDownload as DownloadIcon,
   InsertDriveFile as FileIcon, Cancel as CancelIcon, CameraAlt as CameraIcon
 } from '@mui/icons-material';
-import api from '../services/api';
 import PhotoCapture from '../components/common/PhotoCapture';
 import GlassCard from '../components/common/GlassCard';
 import PageHeader from '../components/common/PageHeader';
 import NeonButton from '../components/common/NeonButton';
 import { styled } from '@mui/material/styles';
-import { useSearchParams } from 'react-router-dom';
-import { format } from 'date-fns';
-import { useAuth } from '../contexts/AuthContext';
-import { useSnackbar } from 'notistack';
+import { usePessoas } from '../hooks/usePessoas';
 
 // MICRO-COMPONENTS
 import PessoasTable from '../components/pessoa/PessoasTable';
 import PessoaFormDialog from '../components/pessoa/PessoaFormDialog';
+import ConfirmDialog from '../components/common/ConfirmDialog';
+import api from '../services/api';
+import { useSnackbar } from 'notistack';
+import { botaoSecundario } from '../styles/tokens';
 
-const SearchWrapper = styled(Box)(({ theme }) => ({
-  background: 'rgba(10, 22, 40, 0.6)',
-  border: '1px solid rgba(0, 212, 255, 0.1)',
-  borderRadius: 12, padding: theme.spacing(1, 2),
-  display: 'flex', alignItems: 'center', gap: theme.spacing(1), marginBottom: theme.spacing(3),
-  '&:focus-within': { border: '1px solid rgba(0, 212, 255, 0.4)', boxShadow: '0 0 10px rgba(0, 212, 255, 0.1)' }
-}));
-
-const StatusChip = styled(Chip)(({ theme, status }) => {
+const StatusChip = styled(Chip)(({ theme: _theme, status }) => {
   const colors = {
     'ativo': { bg: 'rgba(0, 255, 136, 0.1)', text: '#00FF88', border: 'rgba(0, 255, 136, 0.2)' },
     'autorizado': { bg: 'rgba(0, 255, 136, 0.1)', text: '#00FF88', border: 'rgba(0, 255, 136, 0.2)' },
-    'pendente': { bg: 'rgba(255, 170, 0, 0.1)', text: '#FFAA00', border: 'rgba(255, 170, 0, 0.2)' },
+    'pendente': { bg: 'rgba(255, 170, 0, 0.1)', text: '#FFB800', border: 'rgba(255, 170, 0, 0.2)' },
     'verificacao': { bg: 'rgba(0, 212, 255, 0.1)', text: '#00D4FF', border: 'rgba(0, 212, 255, 0.2)' },
     'bloqueado': { bg: 'rgba(255, 51, 102, 0.1)', text: '#FF3366', border: 'rgba(255, 51, 102, 0.2)' }
   };
   const current = colors[status] || colors['ativo'];
-  return { fontWeight: 700, fontSize: '0.65rem', height: 24, background: current.bg, color: current.text, border: `1px solid ${current.border}`, textTransform: 'uppercase', letterSpacing: '1px' }
+  return { fontWeight: 700, fontSize: '0.75rem', height: 24, background: current.bg, color: current.text, border: `1px solid ${current.border}`, textTransform: 'uppercase', letterSpacing: '1px' }
 });
 
 const Pessoas = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const [searchParams] = useSearchParams();
-  const eventoIdParam = searchParams.get('evento_id') || localStorage.getItem('active_evento_id');
-  
-  const [pessoas, setPessoas] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [search, setSearch] = useState('');
-  
-  const [openDialog, setOpenDialog] = useState(false);
-  const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
-  const [pessoaToDelete, setPessoaToDelete] = useState(null);
-  const [selectedPessoa, setSelectedPessoa] = useState(null);
-  
-  const [empresas, setEmpresas] = useState([]);
-  const [activeEvent, setActiveEvent] = useState(null);
-  const [openImport, setOpenImport] = useState(false);
-  const [importLoading, setImportLoading] = useState(false);
-  
-  const [activeStep, setActiveStep] = useState(0);
-  const steps = ['Dados Biométricos & Pessoais', 'Escopo de Atuação', 'Gestão de Risco & ECM'];
-  const [documentos, setDocumentos] = useState([]);
-  const [openDocsDialog, setOpenDocsDialog] = useState(false);
-  const [selectedPessoaDocs, setSelectedPessoaDocs] = useState(null);
-  
-  const { user } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
-  
-  const [openBlockDialog, setOpenBlockDialog] = useState(false);
-  const [blockJustification, setBlockJustification] = useState('');
-  const [pessoaToBlock, setPessoaToBlock] = useState(null);
-  const [isBlocking, setIsBlocking] = useState(true);
-  const [blockLoading, setBlockLoading] = useState(false);
-  const [expulsionLoading, setExpulsionLoading] = useState(false);
 
-  const isAdmin = user?.nivel_acesso === 'admin' || user?.nivel_acesso === 'master' || user?.nivel_acesso === 'supervisor';
-  
-  const [formData, setFormData] = useState({
-    nome: '', nome_credencial: '', cpf: '', passaporte: '', telefone: '', nome_mae: '', data_nascimento: '',
-    funcao: '', empresa_id: '', tipo_pessoa: 'colaborador', foto_url: '', dias_trabalho: [], trabalho_area_tecnica: false,
-    trabalho_altura: false, pagamento_validado: false
-  });
+  const [openQR, setOpenQR] = React.useState(false);
+  const [qrImage, setQrImage] = React.useState('');
+  const [qrPessoa, setQrPessoa] = React.useState(null);
+  const [qrLoading, setQrLoading] = React.useState(false);
+  const {
+    // States/Params
+    search, setSearch,
+    page, setPage,
+    limit, setLimit,
+    statusFilter, setStatusFilter,
+    totalCount,
+    pessoas, loading,
+    openDialog,
+    selectedPessoa,
+    formData, setFormData,
+    activeStep, setActiveStep,
+    steps,
+    empresas,
+    activeEvent,
+    documentos,
+    saving,
+    openDocsDialog, setOpenDocsDialog,
+    selectedPessoaDocs,
+    openWebcamECM, setOpenWebcamECM,
+    openImport, setOpenImport,
+    importLoading,
+    openBlockDialog, setOpenBlockDialog,
+    isBlocking,
+    pessoaToBlock,
+    blockJustification, setBlockJustification,
+    blockLoading,
+    openDeleteConfirm, setOpenDeleteConfirm,
+    deleteLoading,
+    expulsionLoading,
+    eventoIdParam,
+    isAdmin,
+    isEmpresa,
 
-  const handleOpenBlock = (pessoa) => {
-    setPessoaToBlock(pessoa);
-    setIsBlocking(!pessoa.bloqueado);
-    setBlockJustification('');
-    setOpenBlockDialog(true);
-  };
+    // Handlers
+    handleOpenDialog,
+    handleCloseDialog,
+    handleSave,
+    handleDateToggle,
+    handleFaseToggle,
+    handleSelectAllPhase,
+    handleClearPhase,
+    handleSelectAllDates,
+    handleClearAllDates,
+    handleDelete,
+    confirmDelete,
+    handleOpenBlock,
+    handleConfirmBlock,
+    handleExpulsar,
+    handleOpenDocs,
+    handleNextStep,
+    handleOpenWebcamECM,
+    handleUploadWebcamECM,
+    handleUploadECM,
+    handleImport,
+    handleExport,
+    handleDownloadTemplate
+  } = usePessoas();
 
-  const handleConfirmBlock = async () => {
-    if (!blockJustification) { enqueueSnackbar('Justificativa é obrigatória.', { variant: 'warning' }); return; }
+  const handleViewQR = async (pessoa) => {
     try {
-      setBlockLoading(true);
-      await api.post(`/pessoas/${pessoaToBlock.id}/bloqueio`, { acao: isBlocking ? 'bloquear' : 'desbloquear', justificativa: blockJustification });
-      enqueueSnackbar(`Participante ${isBlocking ? 'bloqueado' : 'desbloqueado'} com sucesso.`, { variant: 'success' });
-      setOpenBlockDialog(false);
-      loadPessoas();
-    } catch (error) { enqueueSnackbar('Erro ao processar solicitação de bloqueio.', { variant: 'error' }); } finally { setBlockLoading(false); }
-  };
-
-  const handleExpulsar = async (pessoa) => {
-    const motivo = window.prompt(`Motivo da expulsão de ${pessoa.nome}:`);
-    if (!motivo) return;
-    try {
-      setExpulsionLoading(true);
-      await api.post(`/access/expulsar/${pessoa.id}`, { motivo, dispositivo_id: 'web-dashboard' });
-      enqueueSnackbar(`${pessoa.nome} foi expulso(a) do evento.`, { variant: 'warning' });
-      loadPessoas();
-    } catch (error) { enqueueSnackbar(error.response?.data?.error || 'Erro.', { variant: 'error' }); } finally { setExpulsionLoading(false); }
-  };
-
-  useEffect(() => { loadInitialData(); }, []);
-  useEffect(() => { loadPessoas(); }, [search]);
-
-  const loadInitialData = async () => {
-    try {
-      const [evRes, empRes] = await Promise.all([ api.get('/eventos'), api.get('/empresas') ]);
-      const event = evRes.data.data.find(e => e.id === eventoIdParam) || evRes.data.data.find(e => e.status === 'ativo') || evRes.data.data[0];
-      setActiveEvent(event);
-      setEmpresas(empRes.data.data || []);
-    } catch (error) {}
-  };
-
-  const loadPessoas = async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams();
-      if (eventoIdParam) params.append('evento_id', eventoIdParam);
-      if (search) params.append('search', search);
-
-      const response = await api.get(`/pessoas?${params.toString()}`);
-      setPessoas(response.data.data || []);
-    } catch (error) {} finally { setLoading(false); }
-  };
-
-  const handleOpenDocs = (pessoa) => {
-    setSelectedPessoaDocs(pessoa);
-    setOpenDocsDialog(true);
-  };
-
-  const loadDocumentos = async (pessoaId) => {
-    try {
-      const resp = await api.get(`/documentos/pessoa/${pessoaId}`);
-      setDocumentos(resp.data.data || []);
-    } catch (e) {}
-  };
-
-  useEffect(() => { if (openDialog && selectedPessoa) { loadDocumentos(selectedPessoa.id); } }, [openDialog, selectedPessoa]);
-
-  const handleOpenDialog = (pessoa = null) => {
-    setActiveStep(0);
-    if (pessoa) {
-      setSelectedPessoa(pessoa);
-      setFormData({
-        ...pessoa,
-        data_nascimento: pessoa.data_nascimento ? format(new Date(pessoa.data_nascimento), "yyyy-MM-dd") : '',
-      });
-    } else {
-      setSelectedPessoa(null);
-      setFormData({
-        nome: '', nome_credencial: '', cpf: '', passaporte: '', telefone: '', nome_mae: '', data_nascimento: '', funcao: '', tipo_pessoa: 'colaborador',
-        empresa_id: '', foto_url: '', dias_trabalho: [], trabalho_area_tecnica: false, trabalho_altura: false, pagamento_validado: false, parecer_documentos: 'pendente'
-      });
-      setDocumentos([]);
+      setQrPessoa(pessoa);
+      setQrLoading(true);
+      setOpenQR(true);
+      const resp = await api.get(`/pessoas/${pessoa.id}/qrcode`);
+      setQrImage(resp.data.data.image);
+    } catch (e) {
+      const errorMsg = e.response?.data?.error || e.response?.data?.message || 'Erro ao gerar imagem QR';
+      enqueueSnackbar(errorMsg, { variant: 'error' });
+      setOpenQR(false);
+    } finally {
+      setQrLoading(false);
     }
-    setOpenDialog(true);
   };
 
-  const handleCloseDialog = () => { setOpenDialog(false); setSelectedPessoa(null); };
-
-  const handleSave = async () => {
-    if (!formData.nome || !formData.empresa_id) { enqueueSnackbar('Nome e Empresa são obrigatórios.', {variant: 'error'}); return; }
-    try {
-      setSaving(true);
-      let payload = { ...formData };
-      if (payload.foto_url && payload.foto_url.startsWith('data:image') && payload.cpf) {
-        try {
-          const { data: urlData } = await api.post('/pessoas/generate-upload-url', { cpf: payload.cpf });
-          if (urlData.success && urlData.uploadUrl) {
-            const base64Data = payload.foto_url.split(',')[1];
-            const arr = new Uint8Array(atob(base64Data).split('').map(c => c.charCodeAt(0)));
-            const blob = new Blob([arr], { type: 'image/jpeg' });
-            const uploadRes = await fetch(urlData.uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
-            if (uploadRes.ok) payload.foto_url = urlData.publicUrl || urlData.path;
-          }
-        } catch (e) {}
-      }
-      if (selectedPessoa) await api.put(`/pessoas/${selectedPessoa.id}`, payload);
-      else await api.post('/pessoas', payload);
-      handleCloseDialog();
-      loadPessoas();
-    } catch (error) {} finally { setSaving(false); }
-  };
-
-  const handleDateToggle = (date) => {
-    const current = [...formData.dias_trabalho];
-    const index = current.indexOf(date);
-    if (index === -1) current.push(date); else current.splice(index, 1);
-    setFormData({ ...formData, dias_trabalho: current });
-  };
-
-  const handleDelete = (id) => { setPessoaToDelete(id); setOpenDeleteConfirm(true); };
-
-  const confirmDelete = async () => {
-    try {
-      setDeleteLoading(true);
-      await api.delete(`/pessoas/${pessoaToDelete}`);
-      setOpenDeleteConfirm(false); setPessoaToDelete(null); loadPessoas();
-    } catch (error) { enqueueSnackbar('Falha ao desativar registro.', { variant: 'error' }); } finally { setDeleteLoading(false); }
-  };
-
-  const handleNextStep = async () => {
-    if (activeStep === 1 && !selectedPessoa) {
-      if (!formData.nome || !formData.empresa_id) { enqueueSnackbar('Preencha Nome e Empresa.', { variant: 'warning' }); return; }
-      try {
-        setSaving(true);
-        const response = await api.post('/pessoas', { ...formData, status_acesso: 'pendente' });
-        if (response.data.success) {
-          setSelectedPessoa(response.data.data);
-          enqueueSnackbar('Registro inicial salvo.', { variant: 'info' });
-          setActiveStep(2);
-        }
-      } catch (error) {} finally { setSaving(false); }
-    } else { setActiveStep(prev => prev + 1); }
-  };
-
-  const [openWebcamECM, setOpenWebcamECM] = useState(false);
-  const [currentECMEntityId, setCurrentECMEntityId] = useState(null);
-
-  const handleOpenWebcamECM = (entityId) => { setCurrentECMEntityId(entityId); setOpenWebcamECM(true); };
-
-  const handleUploadWebcamECM = async (base64) => {
-    try {
-      const blob = await (await fetch(base64)).blob();
-      const file = new File([blob], `documento_webcam_${Date.now()}.jpg`, { type: 'image/jpeg' });
-      await handleUploadECM(currentECMEntityId, file);
-      setOpenWebcamECM(false);
-    } catch (e) {}
-  };
-
-  const handleUploadECM = async (entityId, file) => {
-    if (!file) return;
-    const titulo = window.prompt("Título do Documento:", "Documento");
-    if (!titulo) return;
-    const formDataUpload = new FormData();
-    formDataUpload.append('arquivo', file);
-    formDataUpload.append('titulo', titulo);
-    formDataUpload.append('tipo_doc', 'ECM');
-    try {
-      setSaving(true);
-      await api.post(`/documentos/pessoa/${entityId}/upload`, formDataUpload, { headers: { 'Content-Type': 'multipart/form-data' } });
-      enqueueSnackbar('Documento enviado com sucesso!', { variant: 'success' });
-      loadDocumentos(entityId);
-    } catch (error) { enqueueSnackbar('Erro ao enviar documento.', { variant: 'error' }); } finally { setSaving(false); }
-  };
-
-  const handleImport = async (event) => {
-    const file = event.target.files[0];
-    if (!file || !activeEvent) return;
-    const formData = new FormData(); formData.append('file', file); formData.append('eventoId', activeEvent.id);
-    try {
-      setImportLoading(true);
-      const response = await api.post('/excel/import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-      alert(response.data.message); setOpenImport(false); loadPessoas();
-    } catch (error) { alert('Erro na importação.'); } finally { setImportLoading(false); }
-  };
-
-  const handleExport = async () => {
-    try {
-      const response = await api.get('/excel/export', { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a'); link.href = url; link.setAttribute('download', `export_participantes_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`);
-      document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    } catch (error) { alert('Falha ao exportar.'); }
-  };
 
   return (
-    <Box sx={{ p: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
-        <PageHeader title="PAINEL DE PESSOAS" subtitle={eventoIdParam ? `Filtrando pessoas do evento.` : "Visualize e modifique as permissões de acesso biográfico."} breadcrumbs={[{ text: 'Dashboard' }, { text: 'Participantes' }]} />
-        <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
-          <Button variant="outlined" startIcon={<UploadIcon />} onClick={() => setOpenImport(true)} sx={{ borderColor: 'rgba(0,255,136,0.3)', color: '#00FF88' }}>Importar Lote</Button>
-          <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExport} sx={{ borderColor: 'rgba(123,47,190,0.5)', color: '#7B2FBE' }}>Exportar Lote</Button>
-          <NeonButton startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>Novo Registro</NeonButton>
-        </Stack>
+    <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 }, maxWidth: '100%', overflowX: 'hidden' }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, mb: { xs: 2, sm: 2.5, md: 3 }, gap: 2 }}>
+        <PageHeader 
+          title="Participantes" 
+          subtitle={eventoIdParam ? `Filtrando pessoas do evento.` : "Visualize e modifique as permissões de acesso biográfico."} 
+          breadcrumbs={[{ text: 'Dashboard' }, { text: 'Participantes' }]} 
+          sx={{ mb: 0 }}
+        />
+        <Box sx={{ 
+          display: 'grid', 
+          gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, auto)' }, 
+          gap: 1.5, 
+          width: { xs: '100%', md: 'auto' } 
+        }}>
+          <Button 
+            variant="outlined" 
+            size="small"
+            startIcon={<DownloadIcon sx={{ fontSize: 18 }} />} 
+            onClick={handleDownloadTemplate} 
+            sx={botaoSecundario}
+          >
+            Baixar modelo
+          </Button>
+          <Button 
+            variant="outlined" 
+            size="small"
+            startIcon={<UploadIcon sx={{ fontSize: 18 }} />} 
+            onClick={() => setOpenImport(true)} 
+            sx={botaoSecundario}
+          >
+            Importar planilha
+          </Button>
+          <Button 
+            variant="outlined" 
+            size="small"
+            startIcon={<DownloadIcon sx={{ fontSize: 18 }} />} 
+            onClick={handleExport} 
+            disabled={saving} 
+            sx={botaoSecundario}
+          >
+            {saving ? 'Exportando...' : 'Exportar planilha'}
+          </Button>
+          <NeonButton 
+            startIcon={<AddIcon sx={{ fontSize: 18 }} />} 
+            loading={saving} 
+            onClick={() => handleOpenDialog()}
+            sx={{ whiteSpace: 'nowrap' }}
+          >
+            {isEmpresa ? 'Novo vínculo' : 'Novo participante'}
+          </NeonButton>
+        </Box>
       </Box>
 
-      <GlassCard glowColor="#7B2FBE" sx={{ p: 3, mb: 3 }}>
-        <SearchWrapper>
-          <SearchIcon sx={{ color: 'text.secondary' }} />
-          <input type="text" placeholder="Interceptar sinal por nome, CPF ou cargo..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ background: 'transparent', border: 'none', color: '#fff', width: '100%', outline: 'none', fontFamily: 'inherit', fontSize: '0.9rem' }} />
-        </SearchWrapper>
+      <GlassCard glowColor="#7B2FBE" sx={{ p: { xs: 2, sm: 2.5, md: 3 }, mb: 3 }}>
+        <Tabs
+          value={statusFilter}
+          onChange={(e, val) => setStatusFilter(val)}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+          sx={{ 
+            mb: 2.5, 
+            minHeight: 40,
+            '& .MuiTab-root': { color: 'rgba(255,255,255,0.5)', fontWeight: 700, minHeight: 40, py: 0.5, fontSize: '0.8125rem' }, 
+            '& .Mui-selected': { color: '#00D4FF !important' }, 
+            '& .MuiTabs-indicator': { backgroundColor: '#00D4FF' } 
+          }}
+        >
+          <Tab value="TODOS" label="Todos" />
+          <Tab value="ativos" label="Ativos" />
+          <Tab value="pendentes" label="Pendentes" />
+          <Tab value="bloqueados" label="Bloqueados" sx={{ '&.Mui-selected': { color: '#FF3366 !important' }, '&:not(.Mui-selected):hover': { color: 'rgba(255,51,102,0.6)' } }} />
+        </Tabs>
+
+        <TextField
+          fullWidth
+          size="small"
+          placeholder="Buscar participante por nome, CPF ou cargo..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          InputProps={{
+            startAdornment: <SearchIcon sx={{ color: 'rgba(255,255,255,0.4)', mr: 1, fontSize: 20 }} />,
+            sx: { 
+              height: 38,
+              bgcolor: 'rgba(0,0,0,0.25)', 
+              borderRadius: 1.5, 
+              color: '#FFFFFF', 
+              fontSize: '0.875rem' 
+            }
+          }}
+          sx={{ mb: 2.5 }}
+        />
 
         <PessoasTable
           pessoas={pessoas}
@@ -307,8 +221,15 @@ const Pessoas = () => {
           onBlock={handleOpenBlock}
           onExpulsar={handleExpulsar}
           onOpenDocs={handleOpenDocs}
+          onViewQR={handleViewQR}
           isAdmin={isAdmin}
           expulsionLoading={expulsionLoading}
+          // Pagination
+          totalCount={totalCount}
+          page={page}
+          rowsPerPage={limit}
+          onPageChange={setPage}
+          onRowsPerPageChange={setLimit}
         />
       </GlassCard>
 
@@ -325,28 +246,42 @@ const Pessoas = () => {
         empresas={empresas}
         activeEvent={activeEvent}
         handleDateToggle={handleDateToggle}
+        handleFaseToggle={handleFaseToggle}
+        handleSelectAllPhase={handleSelectAllPhase}
+        handleClearPhase={handleClearPhase}
+        handleSelectAllDates={handleSelectAllDates}
+        handleClearAllDates={handleClearAllDates}
         documentos={documentos}
         handleUploadECM={handleUploadECM}
         handleOpenWebcamECM={handleOpenWebcamECM}
         saving={saving}
         handleNextStep={handleNextStep}
         handleSave={handleSave}
+        isEmpresa={isEmpresa}
       />
 
-      <Dialog open={openDocsDialog} onClose={() => setOpenDocsDialog(false)} maxWidth="md" fullWidth>
+      <Dialog 
+        open={openDocsDialog} 
+        onClose={() => setOpenDocsDialog(false)} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{
+          sx: { bgcolor: '#0A1628', border: '1px solid rgba(0, 212, 255, 0.3)', borderRadius: 1.5, maxHeight: '90vh' }
+        }}
+      >
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6" sx={{ fontWeight: 800 }}>DOCUMENTOS ECM: {selectedPessoaDocs?.nome}</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>DOCUMENTOS ECM: {selectedPessoaDocs?.nome}</Typography>
           <IconButton onClick={() => setOpenDocsDialog(false)}><CancelIcon /></IconButton>
         </DialogTitle>
-        <DialogContent dividers>
+        <DialogContent dividers sx={{ overflowY: 'auto' }}>
           <Box sx={{ mb: 3 }}>
             <Typography variant="subtitle2" sx={{ color: '#00D4FF', mb: 2 }}>DOCUMENTOS ANEXADOS</Typography>
             <Stack spacing={1}>
-              {documentos.length === 0 ? (
+              {(!Array.isArray(documentos) || documentos.length === 0) ? (
                 <Typography variant="body2" color="text.secondary">Nenhum documento encontrado.</Typography>
               ) : (
                 documentos.map(doc => (
-                  <Box key={doc.id} sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box key={doc.id} sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                       <FileIcon color="primary" />
                       <Box>
@@ -363,38 +298,136 @@ const Pessoas = () => {
               )}
             </Stack>
           </Box>
-          <Box sx={{ p: 3, border: '2px dashed rgba(0,212,255,0.2)', borderRadius: 4, textAlign: 'center' }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 2 }}>ENVIAR NOVO DOCUMENTO</Typography>
+          <Box sx={{ p: 3, border: '2px dashed rgba(0,212,255,0.2)', borderRadius: 1.5, textAlign: 'center' }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>Enviar novo documento</Typography>
             <Stack direction="row" spacing={2} justifyContent="center">
-              <Button variant="contained" startIcon={<UploadIcon />} onClick={() => { const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*,application/pdf'; input.onchange = (e) => handleUploadECM(selectedPessoaDocs.id, e.target.files[0]); input.click(); }} sx={{ bgcolor: '#00D4FF', color: '#000', fontWeight: 700 }}>ARQUIVO / SCANNER</Button>
-              <Button variant="contained" startIcon={<CameraIcon />} onClick={() => handleOpenWebcamECM(selectedPessoaDocs.id)} sx={{ bgcolor: '#7B2FBE', color: '#fff', fontWeight: 700 }}>FOTO WEBCAM</Button>
+              <Button variant="contained" startIcon={<UploadIcon />} onClick={() => { const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*,application/pdf'; input.onchange = (e) => handleUploadECM(selectedPessoaDocs.id, e.target.files[0]); input.click(); }} sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700, height: 38 }}>Arquivo / scanner</Button>
+              <Button variant="contained" startIcon={<CameraIcon />} onClick={() => handleOpenWebcamECM(selectedPessoaDocs.id)} sx={{ bgcolor: '#7B2FBE', color: '#FFFFFF', fontWeight: 700, height: 38 }}>Foto webcam</Button>
             </Stack>
           </Box>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={openWebcamECM} onClose={() => setOpenWebcamECM(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>CAPTURAR FOTO DO DOCUMENTO</DialogTitle>
-        <DialogContent>
+      <Dialog 
+        open={openWebcamECM} 
+        onClose={() => setOpenWebcamECM(false)} 
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{
+          sx: { bgcolor: '#0A1628', border: '1px solid rgba(0, 212, 255, 0.3)', borderRadius: 1.5, maxHeight: '90vh' }
+        }}
+      >
+        <DialogTitle>Capturar foto do documento</DialogTitle>
+        <DialogContent sx={{ overflowY: 'auto' }}>
           <Box sx={{ py: 2 }}>
             <PhotoCapture onPhotoCaptured={(base64) => { if (base64) handleUploadWebcamECM(base64); }} />
           </Box>
         </DialogContent>
-        <DialogActions><Button onClick={() => setOpenWebcamECM(false)}>FECHAR</Button></DialogActions>
+        <DialogActions><Button onClick={() => setOpenWebcamECM(false)} sx={{ height: 38 }}>Fechar</Button></DialogActions>
       </Dialog>
 
-      <Dialog open={openImport} onClose={() => !importLoading && setOpenImport(false)} maxWidth="xs" fullWidth fullScreen={isMobile}>
-        <DialogTitle sx={{ fontFamily: '"Orbitron", sans-serif', fontWeight: 700 }}>IMPORTAÇÃO EM LOTE</DialogTitle>
-        <DialogContent>
+      <Dialog 
+        open={openImport} 
+        onClose={() => !importLoading && setOpenImport(false)} 
+        maxWidth="xs" 
+        fullWidth 
+        fullScreen={isMobile}
+        PaperProps={{
+          sx: { bgcolor: '#0A1628', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: 1.5, maxHeight: '90vh' }
+        }}
+      >
+        <DialogTitle sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 }}>Importação em lote</DialogTitle>
+        <DialogContent sx={{ overflowY: 'auto' }}>
           <Box sx={{ py: 2, textAlign: 'center' }}>
             <Typography variant="body2" sx={{ mb: 3, color: 'text.secondary' }}>Selecione o arquivo Excel preenchido com os dados das empresas e colaboradores.</Typography>
             <input type="file" accept=".xlsx, .xls" id="excel-upload" style={{ display: 'none' }} onChange={handleImport} disabled={importLoading} />
             <label htmlFor="excel-upload">
-              <Button component="span" variant="contained" disabled={importLoading} startIcon={importLoading ? null : <UploadIcon />} sx={{ background: 'linear-gradient(45deg, #00FF88 30%, #00D4FF 90%)', color: '#000', fontWeight: 700, px: 4 }}>{importLoading ? 'PROCESSANDO...' : 'SELECIONAR ARQUIVO'}</Button>
+              <Button component="span" variant="contained" disabled={importLoading} startIcon={importLoading ? null : <UploadIcon />} sx={{ background: 'linear-gradient(45deg, #00FF88 30%, #00D4FF 90%)', color: '#000000', fontWeight: 700, px: 4, height: 38 }}>{importLoading ? 'Processando...' : 'Selecionar arquivo'}</Button>
             </label>
           </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}><Button onClick={() => setOpenImport(false)} disabled={importLoading} sx={{ color: 'text.secondary' }}>FECHAR</Button></DialogActions>
+        <DialogActions sx={{ p: 2 }}><Button onClick={() => setOpenImport(false)} disabled={importLoading} sx={{ color: 'text.secondary', height: 38 }}>Fechar</Button></DialogActions>
+      </Dialog>
+
+      {/* FIX ERR-PF05: Dialog de Bloqueio/Desbloqueio que faltava */}
+      <Dialog 
+        open={openBlockDialog} 
+        onClose={() => setOpenBlockDialog(false)} 
+        maxWidth="xs" 
+        fullWidth
+        PaperProps={{
+          sx: { 
+            bgcolor: '#0A1628', 
+            border: `1px solid ${isBlocking ? 'rgba(255,51,102,0.4)' : 'rgba(0,255,136,0.4)'}`, 
+            borderRadius: 1.5, 
+            maxHeight: '90vh' 
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, color: isBlocking ? '#FF3366' : '#00FF88' }}>
+          {isBlocking ? 'BLOQUEAR PARTICIPANTE' : 'DESBLOQUEAR PARTICIPANTE'}
+        </DialogTitle>
+        <DialogContent sx={{ overflowY: 'auto' }}>
+          <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
+            {isBlocking
+              ? `Você está prestes a BLOQUEAR ${pessoaToBlock?.nome}. O acesso será imediatamente revogado.`
+              : `Você está prestes a DESBLOQUEAR ${pessoaToBlock?.nome}. O acesso será restaurado para verificação.`}
+          </Typography>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Justificativa obrigatória..."
+            value={blockJustification}
+            onChange={(e) => setBlockJustification(e.target.value)}
+            InputProps={{
+              sx: { height: 38, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 1.5, color: '#FFFFFF', fontSize: '0.875rem' }
+            }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenBlockDialog(false)} sx={{ color: 'text.secondary', height: 38 }}>Cancelar</Button>
+          <NeonButton
+            onClick={handleConfirmBlock}
+            loading={blockLoading}
+            sx={{ height: 38, minHeight: 38, bgcolor: isBlocking ? '#FF3366' : '#00FF88' }}
+          >
+            CONFIRMAR {isBlocking ? 'Bloqueio' : 'Desbloqueio'}
+          </NeonButton>
+        </DialogActions>
+      </Dialog>
+
+      {/* FIX ERR-GLOBAL04: ConfirmDialog component verificado e utilizado */}
+      <ConfirmDialog
+        open={openDeleteConfirm}
+        title="CONFIRMAR EXCLUSÃO"
+        message="Deseja realmente excluir este participante? Esta ação é irreversível."
+        onCancel={() => setOpenDeleteConfirm(false)}
+        onConfirm={confirmDelete}
+        loading={deleteLoading}
+      />
+
+      <Dialog 
+        open={openQR} 
+        onClose={() => setOpenQR(false)} 
+        maxWidth="xs" 
+        fullWidth
+        PaperProps={{
+          sx: { bgcolor: '#0A1628', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: 1.5, maxHeight: '90vh' }
+        }}
+      >
+        <DialogTitle sx={{ textAlign: 'center', fontWeight: 700 }}>ACRESCITAR CREDENCIAL: {qrPessoa?.nome}</DialogTitle>
+        <DialogContent sx={{ textAlign: 'center', py: 4, overflowY: 'auto' }}>
+          {qrLoading ? <CircularProgress sx={{ color: '#00FF88' }} /> : (
+            <Box>
+              <img src={qrImage} alt="QR Code" style={{ maxWidth: '100%', maxHeight: '45vh', width: '250px', border: '8px solid #FFFFFF', borderRadius: '8px', objectFit: 'contain' }} />
+              <Typography variant="caption" sx={{ display: 'block', mt: 2, color: 'text.secondary' }}>TOKEN SEGURO: {qrPessoa?.qr_code || 'Gerado via sistema'}</Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenQR(false)} sx={{ height: 38 }}>Fechar</Button>
+          {!qrLoading && <Button variant="contained" onClick={() => { const link = document.createElement('a'); link.href = qrImage; link.download = `QR_${qrPessoa?.nome}.png`; link.click(); }} sx={{ bgcolor: '#00FF88', color: '#000000', fontWeight: 700, height: 38 }}>Baixar png</Button>}
+        </DialogActions>
       </Dialog>
     </Box>
   );

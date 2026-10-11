@@ -127,32 +127,32 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
             fullWidth
             PaperProps={{
                 sx: {
-                    bgcolor: '#050a14',
+                    bgcolor: '#050B18',
                     backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(0,212,255,0.05) 1px, transparent 0)',
                     backgroundSize: '24px 24px',
                     border: '1px solid rgba(0, 212, 255, 0.1)',
-                    borderRadius: 4,
+                    borderRadius: 1.5,
                     boxShadow: '0 0 50px rgba(0,0,0,0.8)',
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    mx: { xs: 1, sm: 2 }
                 }
             }}
             disableEnforceFocus
         >
             <DialogTitle sx={{ textAlign: 'center', pt: 6, pb: 2 }} component="div">
                 <Typography variant="h4" sx={{
-                    color: '#fff',
-                    fontFamily: '"Orbitron", sans-serif',
-                    fontWeight: 900,
-                    letterSpacing: 4,
-                    textTransform: 'uppercase'
+                    color: '#FFFFFF',
+                    fontFamily: '"Space Grotesk", sans-serif',
+                    fontWeight: 700,
+                    letterSpacing: { xs: 2, sm: 4 },
+                    fontSize: { xs: '1.25rem', sm: '2rem' }
                 }}>
-                    ENQUADRAMENTO BIOMÉTRICO
+                    Enquadramento biométrico
                 </Typography>
                 <Typography variant="body2" sx={{
                     color: 'rgba(255,255,255,0.4)',
                     mt: 1,
-                    fontWeight: 500,
-                    letterSpacing: 0.5
+                    fontWeight: 500
                 }}>
                     Sincronize o rosto com o retículo tecnológico para obter máxima performance facial
                 </Typography>
@@ -169,10 +169,11 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
                     ref={containerRef}
                     sx={{
                         position: 'relative',
-                        width: 720,
-                        height: 480,
-                        bgcolor: '#000',
-                        borderRadius: 3,
+                        width: '100%',
+                        maxWidth: 720,
+                        aspectRatio: '3 / 2',
+                        bgcolor: '#000000',
+                        borderRadius: 1.5,
                         border: '1px solid rgba(0, 212, 255, 0.2)',
                         overflow: 'hidden',
                         cursor: dragging ? 'grabbing' : 'grab',
@@ -183,6 +184,18 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
                         justifyContent: 'center'
                     }}
                     onMouseDown={handleMouseDown}
+                    onTouchStart={(e) => {
+                        setDragging(true);
+                        setLastPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+                    }}
+                    onTouchMove={(e) => {
+                        if (!dragging) return;
+                        const dx = e.touches[0].clientX - lastPos.x;
+                        const dy = e.touches[0].clientY - lastPos.y;
+                        setPosition(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+                        setLastPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+                    }}
+                    onTouchEnd={() => setDragging(false)}
                 >
                     {/* Imagem com Transformação de Hardware */}
                     <img
@@ -207,19 +220,16 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
                         bottom: 0,
                         pointerEvents: 'none',
                         zIndex: 5,
-                        // Criar o buraco central via radial-gradient ou múltiplos boxes
                         backgroundColor: 'rgba(5, 10, 20, 0.75)',
-                        maskImage: `radial-gradient(rect, transparent ${MASK_WIDTH}px ${MASK_HEIGHT}px, black ${MASK_WIDTH}px ${MASK_HEIGHT}px)`,
-                        // Infelizmente mask-image com rect não é padrão em todos os browsers facilmente.
-                        // Usaremos clip-path para o buraco
+                        // Dinâmico baseado na largura do contêiner
                         clipPath: `polygon(
                             0% 0%, 0% 100%, 
-                            ${(720 - MASK_WIDTH) / 2}px 100%, 
-                            ${(720 - MASK_WIDTH) / 2}px ${(480 - MASK_HEIGHT) / 2}px, 
-                            ${(720 + MASK_WIDTH) / 2}px ${(480 - MASK_HEIGHT) / 2}px, 
-                            ${(720 + MASK_WIDTH) / 2}px ${(480 + MASK_HEIGHT) / 2}px, 
-                            ${(720 - MASK_WIDTH) / 2}px ${(480 + MASK_HEIGHT) / 2}px, 
-                            ${(720 - MASK_WIDTH) / 2}px 100%, 
+                            calc(50% - ${MASK_WIDTH/2}px) 100%, 
+                            calc(50% - ${MASK_WIDTH/2}px) calc(50% - ${MASK_HEIGHT/2}px), 
+                            calc(50% + ${MASK_WIDTH/2}px) calc(50% - ${MASK_HEIGHT/2}px), 
+                            calc(50% + ${MASK_WIDTH/2}px) calc(50% + ${MASK_HEIGHT/2}px), 
+                            calc(50% - ${MASK_WIDTH/2}px) calc(50% + ${MASK_HEIGHT/2}px), 
+                            calc(50% - ${MASK_WIDTH/2}px) 100%, 
                             100% 100%, 100% 0%
                         )`
                     }} />
@@ -268,7 +278,7 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
                             fontWeight: 700,
                             fontFamily: 'Inter',
                             textTransform: 'none',
-                            fontSize: '0.9rem',
+                            fontSize: '0.875rem',
                             '&:hover': { bgcolor: 'rgba(0,212,255,0.1)' }
                         }}
                     >
@@ -277,38 +287,40 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
                 </Stack>
             </DialogContent>
 
-            <DialogActions sx={{ p: 6, pt: 2, justifyContent: 'center', gap: 3 }}>
+            <DialogActions sx={{ p: { xs: 3, sm: 6 }, pt: 2, justifyContent: 'center', gap: { xs: 1, sm: 3 }, flexDirection: { xs: 'column', sm: 'row' } }}>
                 <Button
                     variant="contained"
                     onClick={handleConfirm}
+                    fullWidth
                     sx={{
                         bgcolor: '#00D4FF',
-                        color: '#000',
-                        fontWeight: 900,
-                        px: 10,
+                        color: '#000000',
+                        fontWeight: 700,
+                        maxWidth: { xs: '100%', sm: 300 },
                         py: 2,
-                        borderRadius: 2,
+                        borderRadius: 1.5,
                         fontFamily: '"Inter", sans-serif',
-                        fontSize: '1.1rem',
+                        fontSize: '1.25rem',
                         letterSpacing: 1,
                         boxShadow: '0 4px 15px rgba(0, 212, 255, 0.4)',
-                        '&:hover': { bgcolor: '#00b4d8' }
+                        '&:hover': { bgcolor: '#00D4FF' }
                     }}
                 >
-                    SALVAR
+                    Salvar
                 </Button>
                 <Button
                     variant="outlined"
                     onClick={onClose}
+                    fullWidth
                     sx={{
-                        color: '#fff',
+                        color: '#FFFFFF',
                         borderColor: '#00D4FF',
-                        px: 6,
+                        maxWidth: { xs: '100%', sm: 300 },
                         py: 2,
-                        borderRadius: 2,
-                        fontWeight: 900,
+                        borderRadius: 1.5,
+                        fontWeight: 700,
                         fontFamily: '"Inter", sans-serif',
-                        fontSize: '1.1rem',
+                        fontSize: '1.25rem',
                         letterSpacing: 1,
                         borderWidth: '2px',
                         '&:hover': {
@@ -318,7 +330,7 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
                         }
                     }}
                 >
-                    TENTAR NOVAMENTE
+                    Tentar novamente
                 </Button>
             </DialogActions>
         </Dialog>

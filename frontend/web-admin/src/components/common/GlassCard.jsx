@@ -1,47 +1,50 @@
 import React from 'react';
-import { Card, CardContent, Box } from '@mui/material';
+import { Card, CardContent } from '@mui/material';
 import { styled } from '@mui/material/styles';
+import { cores, raios, sombras } from '../../styles/tokens';
 
+/**
+ * Cartão padrão do painel.
+ * Borda sempre discreta: cor de moldura sem significado (roxa, laranja...) deixava cada tela
+ * com um visual diferente. Só cartões clicáveis reagem ao mouse.
+ * `glowColor` continua aceito por compatibilidade, mas só tinge a borda no hover de cartões clicáveis.
+ */
 const StyledCard = styled(Card, {
-    shouldForwardProp: (prop) => !['glowcolor', 'active', 'result'].includes(prop)
-})(({ theme, glowcolor }) => ({
-    background: 'linear-gradient(135deg, rgba(10,22,40,0.8) 0%, rgba(15,30,55,0.8) 100%)',
-    backdropFilter: 'blur(20px)',
-    border: `1px solid ${glowcolor || 'rgba(0, 212, 255, 0.15)'}`,
-    borderRadius: 16,
-    boxShadow: `0 8px 32px rgba(0,0,0,0.4), 0 0 15px ${glowcolor ? `${glowcolor}20` : 'rgba(0,212,255,0.05)'}`,
-    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    shouldForwardProp: (prop) => !['glowcolor', 'clicavel', 'active', 'result', 'monitorado'].includes(prop)
+})(({ glowcolor, clicavel }) => ({
+    backgroundColor: cores.superficie,
+    backgroundImage: 'none',
+    border: `1px solid ${cores.borda}`,
+    borderRadius: raios.cartao,
+    boxShadow: sombras.cartao,
     overflow: 'hidden',
     position: 'relative',
-    '&:hover': {
-        border: `1px solid ${glowcolor || 'rgba(0, 212, 255, 0.3)'}`,
-        boxShadow: `0 12px 40px rgba(0,0,0,0.6), 0 0 30px ${glowcolor ? `${glowcolor}40` : 'rgba(0,212,255,0.15)'}`,
-        transform: 'translateY(-4px)',
+    transition: 'border-color 0.15s ease, background-color 0.15s ease',
+    ...(clicavel && {
+        cursor: 'pointer',
+        '&:hover': {
+            borderColor: glowcolor || cores.bordaDestaque,
+            backgroundColor: cores.superficieElevada,
+        },
+    }),
+    '&:focus-visible': {
+        outline: `2px solid ${cores.primaria}`,
+        outlineOffset: 2,
     },
-    '&::before': {
-        content: '""',
-        position: 'absolute',
-        top: 0,
-        left: '-100%',
-        width: '100%',
-        height: '100%',
-        background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent)',
-        transition: '0.5s',
-    },
-    '&:hover::before': {
-        left: '100%',
-    }
 }));
 
 const GlassCard = ({ children, glowColor, sx, onClick, ...props }) => {
     return (
         <StyledCard
-            glowcolor={glowColor} // Lowercase to avoid React warning
+            glowcolor={glowColor}
+            clicavel={onClick ? 1 : 0}
             sx={sx}
             onClick={onClick}
             {...props}
         >
-            <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
+            {/* display: contents — os filhos participam direto do layout do cartão; assim
+                flex/grid/gap passados em `sx` funcionam (antes ficavam presos nesta camada) */}
+            <CardContent sx={{ p: 0, display: 'contents', '&:last-child': { pb: 0 } }}>
                 {children}
             </CardContent>
         </StyledCard>

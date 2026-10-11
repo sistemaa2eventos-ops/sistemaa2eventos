@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Typography, Grid, TextField, Button, List, ListItem, ListItemText, IconButton, CircularProgress, MenuItem } from '@mui/material';
 import { Code as CodeIcon, Delete as DeleteIcon, ContentCopy as CopyIcon, Add as AddIcon, Webhook as WebhookIcon } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import api from '../../services/api';
 import PageHeader from '../../components/common/PageHeader';
 import GlassCard from '../../components/common/GlassCard';
+import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
 
 const ConfigWebhooks = () => {
+    const confirmar = useConfirmacao();
     const { enqueueSnackbar } = useSnackbar();
     const [loading, setLoading] = useState(true);
     const [apiKeys, setApiKeys] = useState([]);
@@ -15,11 +17,7 @@ const ConfigWebhooks = () => {
     const [newWebhookUrl, setNewWebhookUrl] = useState('');
     const [newWebhookEvent, setNewWebhookEvent] = useState('NOVO_CADASTRO');
 
-    useEffect(() => {
-        loadData();
-    }, []);
-
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         try {
             const [keysRes, webhooksRes] = await Promise.all([
                 api.get('/settings/apikeys'),
@@ -32,7 +30,11 @@ const ConfigWebhooks = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [enqueueSnackbar]);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
 
     const handleCreateApiKey = async () => {
         const name = prompt("Nome da Nova Integração API (Ex: Zapier, PowerBI):");
@@ -47,7 +49,7 @@ const ConfigWebhooks = () => {
     };
 
     const handleDeleteApiKey = async (id) => {
-        if (!window.confirm("Revogar este Token? Aplicações perderão acesso.")) return;
+        if (!(await confirmar({ titulo: 'Revogar chave de API', mensagem: 'As aplicações que usam esta chave perdem o acesso.', textoConfirmar: 'Revogar' }))) return;
         try {
             await api.delete(`/settings/apikeys/${id}`);
             enqueueSnackbar('API Key revogada!', { variant: 'warning' });
@@ -118,12 +120,12 @@ const ConfigWebhooks = () => {
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                 <CodeIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
-                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff' }}>
-                                    API KEYS GERADAS (TOKENS)
+                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                                    API keys geradas (tokens)
                                 </Typography>
                             </Box>
                             <Button onClick={handleCreateApiKey} startIcon={<AddIcon />} variant="outlined" sx={{ color: '#00D4FF', borderColor: 'rgba(0,212,255,0.3)' }} size="small">
-                                GERAR NOVO
+                                Gerar novo
                             </Button>
                         </Box>
 
@@ -131,7 +133,7 @@ const ConfigWebhooks = () => {
                             Gerencie os Bearer Tokens de acesso longo usados para extrair dados programaticamente.
                         </Typography>
 
-                        <List sx={{ bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 2 }}>
+                        <List sx={{ bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 1.5 }}>
                             {apiKeys.length === 0 ? (
                                 <ListItem sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                                     <ListItemText primary="Nenhum token gerado" secondary="Crie uma API Key para começar" primaryTypographyProps={{ color: 'text.secondary' }} />
@@ -141,7 +143,7 @@ const ConfigWebhooks = () => {
                                     <ListItemText
                                         primary={key.name}
                                         secondary={`Gerado em: ${formatDate(key.created_at)}`}
-                                        primaryTypographyProps={{ color: '#fff', fontWeight: 600, fontSize: '0.95rem' }}
+                                        primaryTypographyProps={{ color: '#FFFFFF', fontWeight: 600, fontSize: '1rem' }}
                                         secondaryTypographyProps={{ color: 'text.secondary', fontSize: '0.75rem' }}
                                     />
                                     <Box sx={{ display: 'flex', gap: 1 }}>
@@ -158,8 +160,8 @@ const ConfigWebhooks = () => {
                     <GlassCard sx={{ p: 3, mb: 4, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                             <WebhookIcon sx={{ color: '#7B2FBE', fontSize: 28 }} />
-                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff' }}>
-                                AÇÕES REATIVAS / WEBHOOKS
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                                Ações reativas / webhooks
                             </Typography>
                         </Box>
 
@@ -167,7 +169,7 @@ const ConfigWebhooks = () => {
                             Assine eventos para receber chamadas HTTP POST (`application/json`) com as payloads do sistema.
                         </Typography>
 
-                        <List sx={{ bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 2, mb: 4 }}>
+                        <List sx={{ bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 1.5, mb: 4 }}>
                             {webhooks.length === 0 ? (
                                 <ListItem sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                                     <ListItemText primary="Nenhum webhook ativo" secondary="Adicione uma URL abaixo" primaryTypographyProps={{ color: 'text.secondary' }} />
@@ -180,7 +182,7 @@ const ConfigWebhooks = () => {
                                         </Typography>
                                         <IconButton onClick={() => handleDeleteWebhook(wh.id)} size="small" sx={{ color: '#FF3366' }}><DeleteIcon fontSize="small" /></IconButton>
                                     </Box>
-                                    <Typography variant="body2" sx={{ color: '#fff', wordBreak: 'break-all' }}>
+                                    <Typography variant="body2" sx={{ color: '#FFFFFF', wordBreak: 'break-all' }}>
                                         {wh.target_url}
                                     </Typography>
                                 </ListItem>
@@ -188,7 +190,7 @@ const ConfigWebhooks = () => {
                         </List>
 
                         <Typography variant="h6" sx={{ color: '#7B2FBE', fontWeight: 700, mb: 2, fontSize: '1rem' }}>+ ADICIONAR NOVO WEBHOOK</Typography>
-                        <Box sx={{ p: 2, border: '1px solid rgba(123, 47, 190, 0.3)', borderRadius: 2, bgcolor: 'rgba(123,47,190,0.05)' }}>
+                        <Box sx={{ p: 2, border: '1px solid rgba(123, 47, 190, 0.3)', borderRadius: 1.5, bgcolor: 'rgba(123,47,190,0.05)' }}>
                             <TextField
                                 select
                                 fullWidth
@@ -211,8 +213,8 @@ const ConfigWebhooks = () => {
                                 size="small"
                                 sx={{ mb: 2 }}
                             />
-                            <Button variant="contained" onClick={handleCreateWebhook} fullWidth sx={{ bgcolor: '#7B2FBE', color: '#fff', '&:hover': { bgcolor: '#5E1B99' } }}>
-                                INSCREVER ENDPOINT
+                            <Button variant="contained" onClick={handleCreateWebhook} fullWidth sx={{ bgcolor: '#7B2FBE', color: '#FFFFFF', '&:hover': { bgcolor: '#7B2FBE' } }}>
+                                Inscrever endpoint
                             </Button>
                         </Box>
 

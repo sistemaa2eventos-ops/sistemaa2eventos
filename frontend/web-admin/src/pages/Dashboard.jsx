@@ -1,374 +1,231 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React from 'react';
 import {
-    Grid,
-    Typography,
-    Box,
-    CircularProgress,
-    Stack,
-    IconButton,
-    Chip,
-    Avatar,
+    Grid, Typography, Box, CircularProgress, Stack, IconButton, Chip
 } from '@mui/material';
 import {
-    Business as BusinessIcon,
-    People as PeopleIcon,
-    Login as LoginIcon,
-    Logout as LogoutIcon,
-    Refresh as RefreshIcon,
-    TrendingUp as TrendingUpIcon,
-    TrendingDown as TrendingDownIcon,
-    CheckCircle as CheckIcon,
-    Event as EventIcon,
+    Business as BusinessIcon, People as PeopleIcon, Login as LoginIcon,
+    Logout as LogoutIcon, Refresh as RefreshIcon,
+    Event as EventIcon, Autorenew as AutorenewIcon,
+    Devices as DevicesIcon, Groups as GroupsIcon, Block as BlockIcon,
+    Security as SecurityIcon
 } from '@mui/icons-material';
-import {
-    LineChart,
-    Line,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip as ReTooltip,
-    ResponsiveContainer,
-    Area,
-    AreaChart,
-} from 'recharts';
-import { format, parseISO } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import api from '../services/api';
-import GlassCard from '../components/common/GlassCard';
-import PageHeader from '../components/common/PageHeader';
-import RecentCheckins from '../components/dashboard/RecentCheckins';
-import RecentAdditions from '../components/dashboard/RecentAdditions';
-import NeonButton from '../components/common/NeonButton';
-import { styled } from '@mui/material/styles';
-import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 
-const MotionGrid = motion(Grid);
-const MotionBox = motion(Box);
+import GlassCard from '../components/common/GlassCard';
+import KpiCard from '../components/common/KpiCard';
+import { cores } from '../styles/tokens';
+import PageHeader from '../components/common/PageHeader';
+import RecentAdditions from '../components/dashboard/RecentAdditions';
+import EmpresasMetricasCard from '../components/dashboard/EmpresasMetricasCard';
+import TerminaisListaCard from '../components/dashboard/TerminaisListaCard';
+import NeonButton from '../components/common/NeonButton';
+import { useDashboard } from '../hooks/useDashboard';
+import { useConfirmacao } from '../contexts/ConfirmacaoContext';
 
-const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-        opacity: 1,
-        transition: {
-            staggerChildren: 0.15
-        }
-    }
-};
-
-const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: {
-        y: 0,
-        opacity: 1,
-        transition: { type: 'spring', stiffness: 100 }
-    }
-};
-
-const StatValue = styled(Typography)(({ theme, color }) => ({
-    fontSize: '2.5rem',
-    fontWeight: 900,
-    fontFamily: '"Orbitron", sans-serif',
-    color: '#fff',
-    textShadow: `0 0 20px ${color || '#00D4FF'}40`,
-}));
-
-const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-        return (
-            <Box sx={{
-                background: 'rgba(10,14,35,0.95)',
-                border: '1px solid rgba(0,212,255,0.3)',
-                borderRadius: 2,
-                p: 1.5,
-            }}>
-                <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700 }}>{label}h</Typography>
-                <Typography variant="body2" sx={{ color: '#fff' }}>
-                    Checkins: <strong>{payload[0]?.value || 0}</strong>
-                </Typography>
-                {payload[1] && (
-                    <Typography variant="body2" sx={{ color: '#FF6B6B' }}>
-                        Checkouts: <strong>{payload[1]?.value || 0}</strong>
-                    </Typography>
-                )}
-            </Box>
-        );
-    }
-    return null;
-};
-
+/**
+ * Dashboard: Painel Central de Controle Operacional & Telemetria A2 Eventos.
+ * Estrutura Harmônica:
+ * 1. Topo: Header Limpo com Leitores Online e Ações Rápidas Padronizadas.
+ * 2. Telemetria Operacional em Tempo Real: 5 mini-cards compactos responsivos.
+ * 3. Base Estrutural: 2 Cards integrados de Empresas e Participantes cadastrados.
+ * 4. Bloco Central: Empresas & Fluxo ao lado de Terminais e Equipamentos.
+ * 5. Base: Últimos participantes cadastrados.
+ */
 const Dashboard = () => {
-    const { t } = useTranslation();
+    const confirmar = useConfirmacao();
     const navigate = useNavigate();
-    const [loading, setLoading] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
-    const [stats, setStats] = useState({
-        total_empresas: 0,
-        total_pessoas: 0,
-        checkins_hoje: 0,
-        checkouts_hoje: 0,
-        presentes: 0,
-        dispositivos_online: 0,
-    });
-    const [fluxData, setFluxData] = useState([]);
-    const [recentCheckins, setRecentCheckins] = useState([]);
-    const [recentPessoas, setRecentPessoas] = useState([]);
+    const {
+        stats, empresasMetricas, terminaisLista, recentPessoas,
+        loading, refreshing, resetting, eventoId, refresh, handleDailyReset
+    } = useDashboard();
 
-    const [searchParams] = useSearchParams();
-    const eventoId = searchParams.get('evento_id') || localStorage.getItem('active_evento_id');
-
-    useEffect(() => {
-        loadDashboardData();
-    }, [eventoId]);
-
-    const loadDashboardData = async () => {
-        try {
-            if (!loading) setRefreshing(true);
-
-            if (!eventoId) {
-                console.log('Dashboard - Nenhum evento_id definido, abortando carregamento.');
-                setLoading(false);
-                return;
-            }
-
-            const response = await api.get('/monitor/dashboard', {
-                params: { evento_id: eventoId }
-            });
-            const data = response.data.data;
-
-            setStats({
-                total_empresas: data.cards?.total_empresas || 0,
-                total_pessoas: data.cards?.total_pessoas || 0,
-                checkins_hoje: data.cards?.total_checkins_hoje || 0,
-                checkouts_hoje: data.cards?.total_checkouts_hoje || 0,
-                presentes: data.cards?.checkin || 0,
-                dispositivos_online: data.cards?.dispositivos_online || 0,
-            });
-
-            setRecentCheckins(data.ultimos_checkins || []);
-            setRecentPessoas(data.ultimos_adicionados || []);
-
-            // Processar fluxo 24h: gera dados hora a hora se a API retornar dados
-            if (data.fluxo_24h && data.fluxo_24h.length > 0) {
-                setFluxData(data.fluxo_24h);
-            } else {
-                // Gerar placeholder com zeros para as últimas 12 horas
-                const now = new Date();
-                const placeholderData = Array.from({ length: 13 }, (_, i) => {
-                    const h = (now.getHours() - 12 + i + 24) % 24;
-                    return { hora: h, checkins: 0, checkouts: 0 };
-                });
-                setFluxData(placeholderData);
-            }
-
-        } catch (error) {
-            console.error('Erro ao carregar dashboard:', error);
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
+    const confirmDailyReset = async () => {
+        const ok = await confirmar({
+            titulo: 'Reset diário',
+            mensagem: 'Quem não estiver no evento passa a "ausente" e começa um novo dia de operação. Continuar?',
+            textoConfirmar: 'Fazer reset'
+        });
+        if (ok) handleDailyReset();
     };
 
     if (!eventoId) {
         return (
-            <Box sx={{ p: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', textAlign: 'center' }}>
-                <EventIcon sx={{ fontSize: 60, color: 'rgba(0, 212, 255, 0.2)', mb: 2 }} />
-                <Typography variant="h5" sx={{ color: '#fff', mb: 1, fontWeight: 700 }}>Nenhum Evento Selecionado</Typography>
-                <Typography variant="body1" sx={{ color: 'text.secondary', mb: 3 }}>
-                    Selecione um Nexus (Evento) no menu para visualizar as estatísticas em tempo real.
-                </Typography>
-                <NeonButton onClick={() => navigate('/eventos')}>
-                    IR PARA CENTRAL DE EVENTOS
-                </NeonButton>
+            <Box sx={{ p: { xs: 2, md: 3 }, textAlign: 'center', mt: 10 }}>
+                <EventIcon sx={{ fontSize: 60, opacity: 0.2, mb: 2 }} />
+                <Typography variant="h5" fontWeight={700}>Nenhum evento ativo selecionado</Typography>
+                <Typography variant="body2" sx={{ mb: 3 }} color="text.secondary">Selecione um Evento no menu lateral para visualizar a telemetria.</Typography>
+                <NeonButton onClick={() => navigate('/eventos')}>Ir para eventos</NeonButton>
             </Box>
         );
     }
 
     if (loading) {
         return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-                <CircularProgress color="primary" />
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+                <CircularProgress sx={{ color: '#00D4FF' }} />
             </Box>
         );
     }
 
-    const cards = [
-        {
-            title: t('dashboard.active_devices', { defaultValue: 'EMPRESAS ATIVAS' }),
-            value: stats.total_empresas,
-            icon: <BusinessIcon />,
-            color: '#00D4FF',
-            trend: `${stats.total_empresas} credenciada(s)`
-        },
-        {
-            title: t('dashboard.total_people', { defaultValue: 'PARTICIPANTES' }),
-            value: stats.total_pessoas,
-            icon: <PeopleIcon />,
-            color: '#7B2FBE',
-            trend: `${stats.presentes} presentes hoje`
-        },
-        {
-            title: t('dashboard.recent_activity', { defaultValue: 'CHECK-INS HOJE' }),
-            value: stats.checkins_hoje,
-            icon: <LoginIcon />,
-            color: '#00FF88',
-            trend: `Entradas registradas`
-        },
-        {
-            title: t('dashboard.recent_activity', { defaultValue: 'SAÍDAS HOJE' }),
-            value: stats.checkouts_hoje,
-            icon: <LogoutIcon />,
-            color: '#FFB800',
-            trend: `Saídas registradas`
-        },
-    ];
-
     return (
-        <Box sx={{ p: 4 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <PageHeader
-                    title={t('dashboard.title', { defaultValue: 'Visão Geral' })}
-                    subtitle="Visão geral em tempo real do ecossistema de acesso."
-                    breadcrumbs={[{ text: 'A2 Eventos' }, { text: t('sidebar.dashboard', { defaultValue: 'Dashboard' }) }]}
+        <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 }, maxWidth: '100%', overflowX: 'hidden' }}>
+            {/* Header da Página com Ações Rápidas Padronizadas */}
+            <Box sx={{
+                display: 'flex',
+                flexDirection: { xs: 'column', md: 'row' },
+                gap: { xs: 1.5, md: 2 },
+                justifyContent: 'space-between',
+                alignItems: { xs: 'flex-start', md: 'center' },
+                mb: { xs: 2, sm: 2.5, md: 3 }
+            }}>
+                <PageHeader 
+                    title="Painel operacional" 
+                    subtitle="Monitoramento em tempo real de ocupação, participantes, empresas e equipamentos do evento." 
+                    sx={{ mb: 0 }}
                 />
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 2 }}>
-                    {stats.dispositivos_online > 0 && (
-                        <Chip
-                            icon={<CheckIcon sx={{ fontSize: 14 }} />}
-                            label={`${stats.dispositivos_online} Leitor(es) Online`}
-                            color="success"
-                            size="small"
-                            variant="outlined"
-                            sx={{ fontWeight: 700 }}
-                        />
-                    )}
-                    <IconButton
-                        onClick={loadDashboardData}
-                        disabled={refreshing}
+
+                <Stack 
+                    direction="row" 
+                    spacing={1.2} 
+                    alignItems="center" 
+                    flexWrap="wrap" 
+                    sx={{ 
+                        width: { xs: '100%', sm: 'auto' },
+                        justifyContent: { xs: 'flex-start', sm: 'flex-end' }
+                    }}
+                >
+                    {/* Leitores Online */}
+                    <Chip 
+                        icon={<DevicesIcon sx={{ fontSize: 16, color: '#00FF88 !important' }} />}
+                        label={`${stats.dispositivos_online || 0} Leitores Online`} 
                         sx={{
-                            border: '1px solid rgba(0, 212, 255, 0.2)',
-                            background: 'rgba(0, 212, 255, 0.05)',
-                            animation: refreshing ? 'spin 2s linear infinite' : 'none'
+                            fontFamily: '"Inter", sans-serif',
+                            fontWeight: 700,
+                            height: 38,
+                            borderRadius: '10px',
+                            bgcolor: 'rgba(0, 255, 136, 0.1)',
+                            color: '#00FF88',
+                            border: '1px solid rgba(0, 255, 136, 0.3)',
+                            fontSize: '0.75rem'
+                        }} 
+                    />
+
+                    {/* Reset Diário */}
+                    <NeonButton 
+                        startIcon={<AutorenewIcon sx={{ fontSize: 17 }} />} 
+                        onClick={confirmDailyReset} 
+                        disabled={resetting}
+                        color="warning"
+                        sx={{ 
+                            height: 38, 
+                            minHeight: 38,
+                            fontSize: '0.75rem', 
+                            fontWeight: 700,
+                            borderRadius: '10px',
+                            px: 1.8
                         }}
                     >
-                        {refreshing ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
+                        {resetting ? 'Resetando...' : 'Reset Diário'}
+                    </NeonButton>
+
+                    {/* Refresh */}
+                    <IconButton
+                        onClick={refresh}
+                        title="Atualizar Dados"
+                        sx={{
+                            color: '#00D4FF',
+                            bgcolor: 'rgba(0, 212, 255, 0.08)',
+                            border: '1px solid rgba(0, 212, 255, 0.25)',
+                            borderRadius: '10px',
+                            height: 38,
+                            width: 38,
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                                bgcolor: 'rgba(0, 212, 255, 0.18)',
+                                borderColor: '#00D4FF'
+                            },
+                            animation: refreshing ? 'spin 1.5s linear infinite' : 'none',
+                            '@keyframes spin': {
+                                '0%': { transform: 'rotate(0deg)' },
+                                '100%': { transform: 'rotate(360deg)' }
+                            }
+                        }}
+                    >
+                        <RefreshIcon fontSize="small" />
                     </IconButton>
                 </Stack>
             </Box>
 
-            <MotionGrid container spacing={3} variants={containerVariants} initial="hidden" animate="visible">
-                {/* Stats Cards */}
-                {cards.map((card, index) => (
-                    <MotionGrid item xs={12} sm={6} md={3} key={index} variants={itemVariants}>
-                        <GlassCard glowColor={card.color} sx={{ p: 3 }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                                <Box
-                                    sx={{
-                                        p: 1.5,
-                                        borderRadius: 3,
-                                        background: `${card.color}15`,
-                                        color: card.color,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        boxShadow: `inset 0 0 10px ${card.color}20`
-                                    }}
-                                >
-                                    {card.icon}
-                                </Box>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: '#00FF88' }}>
-                                    <TrendingUpIcon sx={{ fontSize: 16 }} />
-                                    <Typography variant="caption" sx={{ fontWeight: 700 }}>{card.trend}</Typography>
-                                </Box>
+            {/* 1. INDICADORES DO DIA + BASE CADASTRAL */}
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={6} sm={4} md={2.4}>
+                    <KpiCard
+                        titulo="Presentes agora"
+                        valor={stats.presentes || 0}
+                        icone={<GroupsIcon />}
+                        cor={cores.primaria}
+                        progresso={stats.capacidade ? ((stats.presentes || 0) / stats.capacidade) * 100 : undefined}
+                        rodape={stats.capacidade ? `${Math.round(((stats.presentes || 0) / stats.capacidade) * 100)}% de ${stats.capacidade}` : 'Capacidade não definida'}
+                    />
+                </Grid>
+                <Grid item xs={6} sm={4} md={2.4}>
+                    <KpiCard titulo="Entradas hoje" valor={stats.checkins_hoje || 0} icone={<LoginIcon />} cor={cores.sucesso} />
+                </Grid>
+                <Grid item xs={6} sm={4} md={2.4}>
+                    <KpiCard titulo="Saídas hoje" valor={stats.checkouts_hoje || 0} icone={<LogoutIcon />} cor={cores.saida} />
+                </Grid>
+                <Grid item xs={6} sm={6} md={2.4}>
+                    <KpiCard titulo="Negados hoje" valor={stats.negados_hoje || 0} icone={<BlockIcon />} cor={cores.erro} />
+                </Grid>
+                <Grid item xs={12} sm={6} md={2.4}>
+                    <KpiCard titulo="Fiscalizações hoje" valor={stats.fiscalizacoes_hoje || 0} icone={<SecurityIcon />} cor={cores.secundariaClara} />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                    <KpiCard
+                        titulo="Empresas credenciadas"
+                        valor={stats.total_empresas || 0}
+                        icone={<BusinessIcon />}
+                        rodape={`${empresasMetricas.length} ativas no evento`}
+                    />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                    <KpiCard titulo="Participantes cadastrados" valor={stats.total_pessoas || 0} icone={<PeopleIcon />} />
+                </Grid>
+            </Grid>
+
+            {/* 3. BLOCO CENTRAL: EMPRESAS & TERMINAIS */}
+            <Grid container spacing={{ xs: 2, md: 3 }} sx={{ mb: { xs: 2, md: 3 } }}>
+                <Grid item xs={12} lg={7.5}>
+                    <EmpresasMetricasCard empresas={empresasMetricas} />
+                </Grid>
+
+                <Grid item xs={12} lg={4.5}>
+                    <TerminaisListaCard terminais={terminaisLista} />
+                </Grid>
+            </Grid>
+
+            {/* 4. BLOCO INFERIOR: ÚLTIMOS PARTICIPANTES CADASTRADOS */}
+            <Grid container spacing={3}>
+                <Grid item xs={12}>
+                    <GlassCard sx={{ p: { xs: 2, sm: 3 } }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                            <Box>
+                                <Typography variant="h6" sx={{
+                                    fontWeight: 700,
+                                    color: '#FFFFFF',
+                                    fontFamily: '"Space Grotesk", sans-serif'
+                                }}>
+                                    Últimos Participantes Cadastrados no Evento
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                                    Conferência imediata dos colaboradores recém-adicionados com foto e empresa
+                                </Typography>
                             </Box>
-                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, letterSpacing: '1px' }}>
-                                {card.title}
-                            </Typography>
-                            <StatValue color={card.color}>
-                                {String(card.value).padStart(2, '0')}
-                            </StatValue>
-                        </GlassCard>
-                    </MotionGrid>
-                ))}
-
-                {/* Chart - Fluxo de Acessos 24h */}
-                <MotionGrid item xs={12} md={7} variants={itemVariants}>
-                    <GlassCard sx={{ p: 3, height: '400px' }}>
-                        <Typography variant="h6" sx={{ color: '#00D4FF', mb: 3, fontWeight: 700 }}>
-                            FLUXO DE ACESSOS (24H)
-                        </Typography>
-                        <ResponsiveContainer width="100%" height={300}>
-                            <AreaChart data={fluxData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                                <defs>
-                                    <linearGradient id="colorCheckins" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#00D4FF" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#00D4FF" stopOpacity={0} />
-                                    </linearGradient>
-                                    <linearGradient id="colorCheckouts" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#FF6B6B" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#FF6B6B" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                                <XAxis
-                                    dataKey="hora"
-                                    stroke="rgba(255,255,255,0.2)"
-                                    tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11 }}
-                                    tickFormatter={(v) => `${v}h`}
-                                />
-                                <YAxis
-                                    stroke="rgba(255,255,255,0.2)"
-                                    tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11 }}
-                                    allowDecimals={false}
-                                />
-                                <ReTooltip content={<CustomTooltip />} />
-                                <Area
-                                    type="monotone"
-                                    dataKey="checkins"
-                                    stroke="#00D4FF"
-                                    strokeWidth={2}
-                                    fill="url(#colorCheckins)"
-                                    name="Checkins"
-                                />
-                                <Area
-                                    type="monotone"
-                                    dataKey="checkouts"
-                                    stroke="#FF6B6B"
-                                    strokeWidth={2}
-                                    fill="url(#colorCheckouts)"
-                                    name="Checkouts"
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </GlassCard>
-                </MotionGrid>
-
-                {/* Recent Activity */}
-                <MotionGrid item xs={12} md={5} variants={itemVariants}>
-                    <GlassCard sx={{ p: 0, height: '400px', overflow: 'hidden' }}>
-                        <Box sx={{ p: 3, borderBottom: '1px solid rgba(0, 212, 255, 0.1)' }}>
-                            <Typography variant="h6" sx={{ color: '#7B2FBE', fontWeight: 700 }}>
-                                RECENTE ATIVIDADE
-                            </Typography>
                         </Box>
-                        <Box sx={{ p: 2, overflowY: 'auto', maxHeight: 330 }}>
-                            <RecentCheckins logs={recentCheckins} />
-                        </Box>
-                    </GlassCard>
-                </MotionGrid>
-
-                {/* Recent registrations */}
-                <MotionGrid item xs={12} variants={itemVariants}>
-                    <GlassCard sx={{ p: 3 }}>
-                        <Typography variant="h6" sx={{ color: '#00FF88', mb: 3, fontWeight: 700 }}>
-                            ÚLTIMOS CADASTROS
-                        </Typography>
                         <RecentAdditions pessoas={recentPessoas} />
                     </GlassCard>
-                </MotionGrid>
-            </MotionGrid>
+                </Grid>
+            </Grid>
         </Box>
     );
 };

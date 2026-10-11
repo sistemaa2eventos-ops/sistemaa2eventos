@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Box, Typography, Grid, List, ListItem, ListItemIcon, ListItemText,
-    Switch, Button, IconButton, CircularProgress, Tabs, Tab, TextField, Divider, Stack
+    Switch, CircularProgress, Tabs, Tab, TextField, Divider, Stack
 } from '@mui/material';
 import {
-    AssignmentInd as CredIcon, Edit as EditIcon,
+    AssignmentInd as CredIcon,
     DragIndicator as DragIcon, Save as SaveIcon,
     Security as SecurityIcon,
     AutoGraph as AutoIcon
@@ -32,11 +32,7 @@ const ConfigCredenciamento = () => {
         lgpd_text: ''
     });
 
-    useEffect(() => {
-        loadSettings();
-    }, []);
-
-    const loadSettings = async () => {
+    const loadSettings = useCallback(async () => {
         try {
             setLoading(true);
             const { data } = await api.get('/config/registration-settings');
@@ -49,7 +45,11 @@ const ConfigCredenciamento = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [enqueueSnackbar]);
+
+    useEffect(() => {
+        loadSettings();
+    }, [loadSettings]);
 
     const handleSave = async () => {
         setSaving(true);
@@ -92,21 +92,21 @@ const ConfigCredenciamento = () => {
     const currentFields = registration.fields[activeTab] || [];
 
     return (
-        <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1200, margin: '0 auto' }}>
+        <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 }, maxWidth: '100%', overflowX: 'hidden' }}>
             <PageHeader
                 title="Configuração de Credenciamento"
                 subtitle="Personalize os campos de cadastro, regras de aprovação e termos LGPD."
                 breadcrumbs={[{ text: 'Configurações' }, { text: 'Credenciamento' }]}
             />
 
-            <Grid container spacing={4} sx={{ mt: 1 }}>
+            <Grid container spacing={{ xs: 2, sm: 2.5, md: 3 }} sx={{ mt: 0.5 }}>
                 <Grid item xs={12} md={8}>
                     <GlassCard sx={{ p: 0, overflow: 'hidden' }}>
                         <Box sx={{ p: 3, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                                 <CredIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
-                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff' }}>
-                                    MATRIZ DE CAMPOS POR TIPO
+                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                                    Matriz de campos por tipo
                                 </Typography>
                             </Box>
                             <Tabs
@@ -116,14 +116,14 @@ const ConfigCredenciamento = () => {
                                 indicatorColor="primary"
                                 sx={{ '& .MuiTab-root': { color: 'rgba(255,255,255,0.5)', fontWeight: 700 } }}
                             >
-                                <Tab label="PARTICIPANTE" value="Participante" />
-                                <Tab label="EXPOSITOR" value="Expositor" />
-                                <Tab label="STAFF / EQUIPE" value="Staff" />
+                                <Tab label="Participante" value="Participante" />
+                                <Tab label="Expositor" value="Expositor" />
+                                <Tab label="Staff / equipe" value="Staff" />
                             </Tabs>
                         </Box>
 
                         <Box sx={{ p: 3 }}>
-                            <List sx={{ bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 2 }}>
+                            <List sx={{ bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 1.5 }}>
                                 {currentFields.map((field) => (
                                     <ListItem
                                         key={field.id}
@@ -139,8 +139,8 @@ const ConfigCredenciamento = () => {
                                         <ListItemText
                                             primary={field.label}
                                             secondary={field.id.toUpperCase()}
-                                            primaryTypographyProps={{ color: '#fff', fontWeight: 600 }}
-                                            secondaryTypographyProps={{ fontSize: '0.65rem' }}
+                                            primaryTypographyProps={{ color: '#FFFFFF', fontWeight: 600 }}
+                                            secondaryTypographyProps={{ fontSize: '0.75rem' }}
                                         />
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -173,7 +173,7 @@ const ConfigCredenciamento = () => {
 
                             <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
                                 <NeonButton onClick={handleSave} loading={saving} startIcon={<SaveIcon />}>
-                                    SALVAR MATRIZ DE CAMPOS
+                                    Salvar matriz de campos
                                 </NeonButton>
                             </Box>
                         </Box>
@@ -185,7 +185,7 @@ const ConfigCredenciamento = () => {
                         <GlassCard sx={{ p: 3 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
                                 <AutoIcon sx={{ color: '#00D4FF' }} />
-                                <Typography variant="subtitle1" sx={{ color: '#fff', fontWeight: 800 }}>
+                                <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700 }}>
                                     AUTO-APROVAÇÃO
                                 </Typography>
                             </Box>
@@ -200,21 +200,21 @@ const ConfigCredenciamento = () => {
                             </Box>
                             <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 1 }}>
                                 * Ativado: O participante recebe o QR Code logo após o cadastro.<br />
-                                * Desativado: O cadastro fica "Pendente" para moderação manual.
+                                * Desativado: O cadastro fica &quot;Pendente&quot; para moderação manual.
                             </Typography>
                         </GlassCard>
 
                         <GlassCard sx={{ p: 3 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
                                 <SecurityIcon sx={{ color: '#7B2FBE' }} />
-                                <Typography variant="subtitle1" sx={{ color: '#fff', fontWeight: 800 }}>
-                                    LGPD & DOUBLE OPT-IN
+                                <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700 }}>
+                                    LGPD & double opt-in
                                 </Typography>
                             </Box>
 
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                                 <Box>
-                                    <Typography variant="body2" sx={{ color: '#fff', fontWeight: 600 }}>Verificação de E-mail</Typography>
+                                    <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600 }}>Verificação de E-mail</Typography>
                                     <Typography variant="caption" color="text.secondary">Exigir clique antes de liberar o acesso.</Typography>
                                 </Box>
                                 <Switch

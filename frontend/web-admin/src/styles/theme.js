@@ -1,229 +1,221 @@
 import { createTheme } from '@mui/material/styles';
+import { ptBR } from '@mui/material/locale';
+import { cores, fontes, raios, sombras, tamanhos } from './tokens';
 
+/**
+ * Tema do NZT Intelligent Control System.
+ * Valores vêm de ./tokens.js — as telas devem usar o tema/tokens, não cores e tamanhos à mão.
+ */
 const theme = createTheme({
     palette: {
         mode: 'dark',
-        primary: {
-            main: '#00D4FF',
-            light: '#66E5FF',
-            dark: '#0099BB',
-            contrastText: '#000000',
-        },
-        secondary: {
-            main: '#7B2FBE',
-            light: '#A855F7',
-            dark: '#5B1F8E',
-            contrastText: '#FFFFFF',
-        },
-        success: {
-            main: '#00FF88',
-            light: '#66FFB2',
-            dark: '#00BB66',
-        },
-        warning: {
-            main: '#FFB800',
-            light: '#FFD166',
-            dark: '#CC9200',
-        },
-        error: {
-            main: '#FF3366',
-            light: '#FF6699',
-            dark: '#CC0044',
-        },
-        info: {
-            main: '#00D4FF',
-        },
-        background: {
-            default: '#050B18',
-            paper: '#0A1628',
-        },
-        text: {
-            primary: '#E8F4FD',
-            secondary: '#7BA7C4',
-        },
+        primary: { main: cores.primaria, light: cores.primariaHover, dark: cores.primariaEscura, contrastText: cores.textoSobrePrimaria },
+        secondary: { main: cores.secundaria, light: cores.secundariaClara, dark: '#5B1F8E', contrastText: '#FFFFFF' },
+        success: { main: cores.sucesso, contrastText: '#000000' },
+        warning: { main: cores.alerta, contrastText: '#000000' },
+        error: { main: cores.erro, contrastText: '#FFFFFF' },
+        info: { main: cores.primaria, contrastText: '#000000' },
+        background: { default: cores.fundo, paper: cores.superficie },
+        text: { primary: cores.texto, secondary: cores.textoSecundario, disabled: cores.textoFraco },
+        divider: cores.borda,
     },
     typography: {
-        fontFamily: '"Space Grotesk", "Inter", "Roboto", sans-serif',
-        h1: { fontSize: '2.5rem', fontWeight: 700, letterSpacing: '-0.02em' },
-        h2: { fontSize: '2rem', fontWeight: 700, letterSpacing: '-0.01em' },
-        h3: { fontSize: '1.75rem', fontWeight: 600 },
-        h4: { fontSize: '1.5rem', fontWeight: 600 },
-        h5: { fontSize: '1.25rem', fontWeight: 600 },
-        h6: { fontSize: '1rem', fontWeight: 600 },
-        button: { textTransform: 'none', fontWeight: 600, letterSpacing: '0.02em' },
-        caption: { letterSpacing: '0.08em' },
+        fontFamily: fontes.texto,
+        h1: { fontFamily: fontes.titulo, fontSize: '2.25rem', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.2 },
+        h2: { fontFamily: fontes.titulo, fontSize: '2rem', fontWeight: 700, letterSpacing: '-0.015em', lineHeight: 1.25 },
+        h3: { fontFamily: fontes.titulo, fontSize: '1.75rem', fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.3 },
+        h4: { fontFamily: fontes.titulo, fontSize: '1.5rem', fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.3 },
+        h5: { fontFamily: fontes.titulo, fontSize: tamanhos.xl, fontWeight: 700, lineHeight: 1.35 },
+        h6: { fontFamily: fontes.titulo, fontSize: '1.0625rem', fontWeight: 700, lineHeight: 1.4 },
+        subtitle1: { fontSize: tamanhos.lg, fontWeight: 600, lineHeight: 1.5 },
+        subtitle2: { fontSize: tamanhos.md, fontWeight: 600, lineHeight: 1.5 },
+        body1: { fontSize: tamanhos.md, lineHeight: 1.6 },
+        body2: { fontSize: tamanhos.sm, lineHeight: 1.55 },
+        button: { textTransform: 'none', fontWeight: 600, letterSpacing: '0.01em' },
+        caption: { fontSize: tamanhos.xs, letterSpacing: '0.01em', lineHeight: 1.45 },
+        overline: { fontSize: tamanhos.xs, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1.6 },
     },
     shape: {
-        borderRadius: 12,
+        borderRadius: 8,
     },
     components: {
         MuiCssBaseline: {
             styleOverrides: {
                 body: {
-                    background: 'linear-gradient(135deg, #050B18 0%, #0A1628 50%, #050B18 100%)',
+                    background: cores.fundo,
                     minHeight: '100vh',
                 },
-                '::-webkit-scrollbar': { width: '6px', height: '6px' },
-                '::-webkit-scrollbar-track': { background: '#0A1628' },
-                '::-webkit-scrollbar-thumb': {
-                    background: 'linear-gradient(180deg, #00D4FF, #7B2FBE)',
-                    borderRadius: '3px',
-                },
+                '::-webkit-scrollbar': { width: '8px', height: '8px' },
+                '::-webkit-scrollbar-track': { background: 'transparent' },
+                '::-webkit-scrollbar-thumb': { background: 'rgba(148, 163, 184, 0.25)', borderRadius: '8px' },
+                '::-webkit-scrollbar-thumb:hover': { background: 'rgba(0, 212, 255, 0.45)' },
             },
         },
         MuiDrawer: {
             styleOverrides: {
                 paper: {
-                    background: 'linear-gradient(180deg, #050B18 0%, #0A1628 100%)',
-                    borderRight: '1px solid rgba(0, 212, 255, 0.15)',
-                    backdropFilter: 'blur(20px)',
-                },
-            },
-        },
-        MuiCard: {
-            styleOverrides: {
-                root: {
-                    background: 'linear-gradient(135deg, rgba(10,22,40,0.9) 0%, rgba(15,30,55,0.9) 100%)',
-                    backdropFilter: 'blur(20px)',
-                    border: '1px solid rgba(0, 212, 255, 0.12)',
-                    borderRadius: 16,
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                        border: '1px solid rgba(0, 212, 255, 0.3)',
-                        boxShadow: '0 12px 40px rgba(0,212,255,0.1), inset 0 1px 0 rgba(255,255,255,0.08)',
-                        transform: 'translateY(-2px)',
-                    },
+                    background: cores.fundo,
+                    borderRight: `1px solid ${cores.borda}`,
                 },
             },
         },
         MuiPaper: {
             styleOverrides: {
                 root: {
-                    background: 'linear-gradient(135deg, rgba(10,22,40,0.95) 0%, rgba(15,30,55,0.95) 100%)',
-                    backdropFilter: 'blur(20px)',
-                    border: '1px solid rgba(0, 212, 255, 0.1)',
-                    borderRadius: 16,
+                    backgroundImage: 'none',
+                    backgroundColor: cores.superficie,
+                    border: `1px solid ${cores.borda}`,
+                    borderRadius: raios.cartao,
+                },
+            },
+        },
+        MuiCard: {
+            styleOverrides: {
+                root: {
+                    backgroundImage: 'none',
+                    backgroundColor: cores.superficie,
+                    border: `1px solid ${cores.borda}`,
+                    borderRadius: raios.cartao,
+                    boxShadow: sombras.cartao,
                 },
             },
         },
         MuiButton: {
+            defaultProps: { disableElevation: true },
             styleOverrides: {
                 root: {
-                    borderRadius: 10,
-                    padding: '10px 24px',
+                    borderRadius: raios.controle,
+                    padding: '8px 18px',
                     fontWeight: 600,
-                    transition: 'all 0.3s ease',
+                    transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
                 },
+                sizeSmall: { padding: '4px 12px', fontSize: tamanhos.sm },
+                sizeLarge: { padding: '11px 24px', fontSize: tamanhos.lg },
                 containedPrimary: {
-                    background: 'linear-gradient(135deg, #00D4FF 0%, #0099BB 100%)',
-                    boxShadow: '0 4px 20px rgba(0, 212, 255, 0.3)',
-                    color: '#000',
-                    '&:hover': {
-                        background: 'linear-gradient(135deg, #33DDFF 0%, #00AACC 100%)',
-                        boxShadow: '0 6px 28px rgba(0, 212, 255, 0.5)',
-                        transform: 'translateY(-1px)',
-                    },
+                    background: cores.primaria,
+                    color: cores.textoSobrePrimaria,
+                    '&:hover': { background: cores.primariaHover },
                 },
                 containedSecondary: {
-                    background: 'linear-gradient(135deg, #7B2FBE 0%, #5B1F8E 100%)',
-                    boxShadow: '0 4px 20px rgba(123, 47, 190, 0.3)',
-                    '&:hover': {
-                        background: 'linear-gradient(135deg, #9B4FDE 0%, #7B2FBE 100%)',
-                        boxShadow: '0 6px 28px rgba(123, 47, 190, 0.5)',
-                        transform: 'translateY(-1px)',
-                    },
+                    background: cores.secundaria,
+                    '&:hover': { background: cores.secundariaClara },
                 },
                 outlined: {
-                    borderColor: 'rgba(0, 212, 255, 0.4)',
-                    color: '#00D4FF',
-                    '&:hover': {
-                        borderColor: '#00D4FF',
-                        background: 'rgba(0, 212, 255, 0.08)',
-                        boxShadow: '0 0 20px rgba(0, 212, 255, 0.2)',
-                    },
+                    borderColor: cores.bordaDestaque,
+                    '&:hover': { borderColor: cores.primaria, background: 'rgba(0, 212, 255, 0.06)' },
                 },
             },
         },
-        MuiTextField: {
+        MuiIconButton: {
+            styleOverrides: { root: { borderRadius: raios.controle } },
+        },
+        MuiOutlinedInput: {
             styleOverrides: {
                 root: {
-                    '& .MuiOutlinedInput-root': {
-                        background: 'rgba(0, 212, 255, 0.03)',
-                        borderRadius: 10,
-                        '& fieldset': {
-                            borderColor: 'rgba(0, 212, 255, 0.2)',
-                        },
-                        '&:hover fieldset': {
-                            borderColor: 'rgba(0, 212, 255, 0.4)',
-                        },
-                        '&.Mui-focused fieldset': {
-                            borderColor: '#00D4FF',
-                            boxShadow: '0 0 0 3px rgba(0, 212, 255, 0.1)',
-                        },
-                    },
-                    '& .MuiInputLabel-root.Mui-focused': {
-                        color: '#00D4FF',
-                    },
+                    background: 'rgba(0, 0, 0, 0.22)',
+                    borderRadius: raios.controle,
+                    '& fieldset': { borderColor: cores.borda },
+                    '&:hover fieldset': { borderColor: 'rgba(0, 212, 255, 0.4)' },
+                    '&.Mui-focused fieldset': { borderColor: cores.primaria, boxShadow: sombras.focoPrimaria },
                 },
+            },
+        },
+        MuiInputLabel: {
+            styleOverrides: {
+                root: { fontSize: tamanhos.md, color: cores.textoSecundario, '&.Mui-focused': { color: cores.primaria } },
             },
         },
         MuiTableCell: {
             styleOverrides: {
                 head: {
-                    background: 'rgba(0, 212, 255, 0.05)',
-                    color: '#00D4FF',
-                    fontWeight: 700,
-                    letterSpacing: '0.08em',
-                    fontSize: '0.75rem',
+                    backgroundColor: cores.superficie,
+                    color: cores.textoSecundario,
+                    fontWeight: 600,
+                    letterSpacing: '0.06em',
+                    fontSize: tamanhos.xs,
                     textTransform: 'uppercase',
-                    borderBottom: '1px solid rgba(0, 212, 255, 0.2)',
+                    whiteSpace: 'nowrap',
+                    borderBottom: `1px solid ${cores.borda}`,
                 },
                 body: {
-                    color: '#E8F4FD',
-                    borderBottom: '1px solid rgba(0, 212, 255, 0.05)',
+                    color: cores.texto,
+                    fontSize: tamanhos.sm,
+                    // Algarismos de largura fixa: números, horários e CPFs alinham nas colunas
+                    fontVariantNumeric: 'tabular-nums',
+                    borderBottom: '1px solid rgba(148, 163, 184, 0.08)',
                 },
+            },
+        },
+        MuiTablePagination: {
+            styleOverrides: {
+                root: { color: cores.textoSecundario },
+                selectLabel: { fontSize: tamanhos.sm },
+                displayedRows: { fontSize: tamanhos.sm },
             },
         },
         MuiChip: {
             styleOverrides: {
-                root: {
-                    borderRadius: 8,
-                    fontWeight: 600,
-                    fontSize: '0.75rem',
-                },
+                root: { borderRadius: '6px', fontWeight: 600, fontSize: tamanhos.xs },
             },
         },
         MuiDialog: {
             styleOverrides: {
                 paper: {
-                    background: 'linear-gradient(135deg, #0A1628 0%, #0F1E37 100%)',
-                    border: '1px solid rgba(0, 212, 255, 0.2)',
-                    boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 60px rgba(0,212,255,0.1)',
+                    backgroundColor: cores.superficie,
+                    border: `1px solid ${cores.borda}`,
+                    borderRadius: raios.cartao,
+                    boxShadow: sombras.modal,
                 },
             },
+        },
+        MuiDialogTitle: {
+            styleOverrides: {
+                root: { fontFamily: fontes.titulo, fontSize: tamanhos.xl, fontWeight: 700, padding: '20px 24px 12px' },
+            },
+        },
+        MuiDialogContent: {
+            styleOverrides: { root: { padding: '12px 24px' } },
+        },
+        MuiDialogActions: {
+            styleOverrides: { root: { padding: '12px 24px 20px', gap: 8 } },
+        },
+        MuiTooltip: {
+            styleOverrides: {
+                tooltip: {
+                    backgroundColor: cores.superficieElevada,
+                    border: `1px solid ${cores.borda}`,
+                    fontSize: tamanhos.xs,
+                    fontWeight: 500,
+                },
+            },
+        },
+        MuiTab: {
+            styleOverrides: {
+                root: { textTransform: 'none', fontWeight: 600, fontSize: tamanhos.md, minHeight: 44 },
+            },
+        },
+        MuiTabs: {
+            styleOverrides: { indicator: { backgroundColor: cores.primaria, height: 2 } },
+        },
+        MuiAlert: {
+            styleOverrides: { root: { borderRadius: raios.controle } },
         },
         MuiListItemButton: {
             styleOverrides: {
                 root: {
-                    borderRadius: 10,
-                    marginBottom: 4,
-                    transition: 'all 0.2s ease',
-                    '&:hover': {
-                        background: 'rgba(0, 212, 255, 0.08)',
-                        boxShadow: 'inset 3px 0 0 #00D4FF',
-                    },
+                    borderRadius: raios.controle,
+                    marginBottom: 2,
+                    transition: 'background-color 0.15s ease',
+                    '&:hover': { background: 'rgba(0, 212, 255, 0.06)' },
                     '&.Mui-selected': {
-                        background: 'linear-gradient(90deg, rgba(0,212,255,0.15) 0%, rgba(0,212,255,0.05) 100%)',
-                        boxShadow: 'inset 3px 0 0 #00D4FF',
-                        '&:hover': {
-                            background: 'linear-gradient(90deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.08) 100%)',
-                        },
+                        background: 'rgba(0, 212, 255, 0.12)',
+                        boxShadow: `inset 3px 0 0 ${cores.primaria}`,
+                        '&:hover': { background: 'rgba(0, 212, 255, 0.16)' },
                     },
                 },
             },
         },
     },
-});
+}, ptBR); // textos padrão do MUI em português (paginação "1–10 de 50", etc.)
 
 export default theme;

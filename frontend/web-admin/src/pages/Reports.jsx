@@ -1,413 +1,1031 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Box,
-    Grid,
-    Typography,
-    Stack,
-    Avatar,
-    Divider,
-    TextField,
+    Box, Typography, Stack, TextField, Select, MenuItem,
+    FormControl, Tab, Tabs, Button, IconButton,
+    Chip, Avatar, Dialog, DialogTitle,
+    DialogContent, DialogActions, Grid, Paper, InputAdornment,
+    ToggleButton, ToggleButtonGroup
 } from '@mui/material';
 import {
-    Assessment as ReportsIcon,
-    TrendingUp as TrendingIcon,
-    Business as BusinessIcon,
-    People as PeopleIcon,
-    QrCode as ScanIcon,
+    FileDownload as ExportIcon,
+    Refresh as RefreshIcon, PictureAsPdf as PdfIcon,
+    TableChart as TableIcon, AccessTime as TimeIcon,
+    Business as BusinessIcon, Devices as DeviceIcon,
+    Work as JobIcon, History as HistoryIcon,
+    Assignment as DailyIcon,
+    Badge as BadgeIcon,
+    EditNote as NoteIcon,
+    InfoOutlined as InfoIcon,
+    Search as SearchIcon
 } from '@mui/icons-material';
-import api from '../services/api';
-import GlassCard from '../components/common/GlassCard';
-import PageHeader from '../components/common/PageHeader';
-import NeonButton from '../components/common/NeonButton';
-import { styled } from '@mui/material/styles';
-import {
-    AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-    PieChart, Pie, Cell, Legend
-} from 'recharts';
-import { format, startOfDay, endOfDay, eachHourOfInterval, isWithinInterval } from 'date-fns';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-const StatValue = styled(Typography)(({ color }) => ({
-    fontFamily: '"Orbitron", sans-serif',
-    fontWeight: 900,
-    fontSize: '2rem',
-    color: color || '#00D4FF',
-    textShadow: `0 0 15px ${color}44`,
-}));
+import GlassCard from '../components/common/GlassCard';
+import KpiCard from '../components/common/KpiCard';
+import { cores, botaoSecundario } from '../styles/tokens';
+import { Groups as KpiCadastradosIcon, HowToReg as KpiPresentesIcon, Logout as KpiSaidasIcon, PersonOff as KpiAusentesIcon, Timer as KpiTempoIcon } from '@mui/icons-material';
+import PageHeader from '../components/common/PageHeader';
+import DataTable from '../components/common/DataTable';
+import { useReports } from '../hooks/useReports';
+import { useEmpresas } from '../hooks/useEmpresas';
+import api from '../services/api';
 
-const ActivityItem = styled(Box)(({ theme }) => ({
-    padding: theme.spacing(2),
-    borderRadius: 12,
-    background: 'rgba(255, 255, 255, 0.02)',
-    border: '1px solid rgba(255, 255, 255, 0.05)',
-    display: 'flex',
-    alignItems: 'center',
-    gap: theme.spacing(2),
-    transition: 'all 0.3s ease',
-    '&:hover': {
-        background: 'rgba(0, 212, 255, 0.05)',
-        borderColor: 'rgba(0, 212, 255, 0.2)',
-        transform: 'translateX(8px)',
-    }
-}));
-
+/**
+ * NZT Relatórios: Central operacional e executiva de relatórios do sistema.
+ * Apresenta o Relatório Diário de Acessos consolidado (Empresa, Colaborador, CPF, Função,
+ * Pulseira, Check-in, Check-out, Tempo de Permanência), relatórios setoriais e auditoria.
+ */
 const Reports = () => {
-    const [summary, setSummary] = useState({});
-    const [dailyLogs, setDailyLogs] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [chartData, setChartData] = useState([]);
+    const {
+        loading, empresaId, setEmpresaId,
+        dateStart, setDateStart, dateEnd, setDateEnd,
 
-    // Filtros de Data
-    const [dateStart, setDateStart] = useState(format(startOfDay(new Date()), "yyyy-MM-dd'T'HH:mm"));
-    const [dateEnd, setDateEnd] = useState(format(endOfDay(new Date()), "yyyy-MM-dd'T'HH:mm"));
+        // Relatório Diário Consolidado
+        dailyConsolidado, totaisDiarios,
+        dataReferenciaDiario, setDataReferenciaDiario,
+        statusFiltroDiario, setStatusFiltroDiario,
+        searchDiario, setSearchDiario,
+        fechamentosList, selectedFechamentoId, setSelectedFechamentoId,
+        loadDiarioConsolidado, loadFechamentos,
+        handleExportDiarioXLSX, handleExportDiarioPDF,
 
-    const [searchParams] = useSearchParams();
-    const eventoId = searchParams.get('evento_id') || localStorage.getItem('active_evento_id');
+        // Abas agregadas e logs
+        dailyLogs, totalLogs, page, setPage,
+        reportArea, reportEmpresa, reportLeitor, reportFuncao, reportStatus,
+        loadLogs, loadTab, handleExport, handleExportAbaPDF
+    } = useReports();
 
-    useEffect(() => {
-        loadData();
-    }, [eventoId, dateStart, dateEnd]);
+    const { empresas } = useEmpresas();
+    const [tab, setTab] = useState('diario');
 
-    const loadData = async () => {
+    // Estado para Sessões de Operador
+    const [sessoesList, setSessoesList] = useState([]);
+    const [loadingSessoes, setLoadingSessoes] = useState(false);
+    const [selectedSessao, setSelectedSessao] = useState(null);
+    const [modalDetalhesOpen, setModalDetalhesOpen] = useState(false);
+    const [modalNotasOpen, setModalNotasOpen] = useState(false);
+    const [notasOperador, setNotasOperador] = useState('');
+    const [notasOperadorNome, setNotasOperadorNome] = useState('');
+
+    // Carregar sessões dos operadores
+    const loadSessoes = useCallback(async () => {
         try {
-            setLoading(true);
-            const [summaryRes, logsRes] = await Promise.all([
-                api.get('/reports/company-summary', { params: { evento_id: eventoId } }),
-                api.get('/reports/daily', {
-                    params: {
-                        evento_id: eventoId,
-                        data_inicio: dateStart,
-                        data_fim: dateEnd
-                    }
-                })
-            ]);
-            setSummary(summaryRes.data.summary || {});
-            const logs = logsRes.data.data || [];
-            setDailyLogs(logs);
-            processChartData(logs);
+            setLoadingSessoes(true);
+            const eventoId = localStorage.getItem('active_evento_id');
+            const { data } = await api.get('/audit/sessoes-operadores', {
+                params: {
+                    evento_id: eventoId,
+                    data_inicio: dateStart,
+                    data_fim: dateEnd,
+                    limit: 100
+                }
+            });
+            setSessoesList(data?.data || []);
         } catch (error) {
-            console.error('Erro ao carregar relatórios:', error);
+            console.error('Erro ao carregar sessões de operador:', error);
         } finally {
-            setLoading(false);
+            setLoadingSessoes(false);
         }
-    };
+    }, [dateStart, dateEnd]);
 
-    const processChartData = (logs) => {
-        const start = new Date(dateStart);
-        const end = new Date(dateEnd);
-        const hours = eachHourOfInterval({ start, end });
-
-        const data = hours.map(hour => {
-            const hourStr = format(hour, 'HH:00');
-            const hourLogs = logs.filter(log => {
-                const logDate = new Date(log.horario);
-                return logDate.getHours() === hour.getHours() &&
-                    logDate.getDate() === hour.getDate();
-            });
-
-            return {
-                hora: hourStr,
-                checkin: hourLogs.filter(l => l.tipo === 'checkin').length,
-                checkout: hourLogs.filter(l => l.tipo === 'checkout').length
-            };
-        });
-
-        setChartData(data);
-    };
-
-    const handleExportExcel = async () => {
-        try {
-            const response = await api.get('/excel/export', {
-                params: { eventoId },
-                responseType: 'blob'
-            });
-
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `Relatorio_Nexus_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-        } catch (error) {
-            console.error('Erro ao exportar Excel:', error);
+    // Carregar dados conforme aba ativa
+    useEffect(() => {
+        if (tab === 'diario') {
+            loadDiarioConsolidado();
+            loadFechamentos();
+        } else if (tab === 'logs') {
+            loadLogs(1);
+        } else if (tab === 'sessoes') {
+            loadSessoes();
+        } else {
+            loadTab(tab);
         }
+    }, [tab, loadDiarioConsolidado, loadFechamentos, loadLogs, loadTab, loadSessoes]);
+
+    const handleTabChange = (_event, newValue) => {
+        setTab(newValue);
     };
 
-    const totalCheckins = dailyLogs.filter(l => l.tipo === 'checkin').length;
-    const totalCheckouts = dailyLogs.filter(l => l.tipo === 'checkout').length;
+    // Exportar Sessões para CSV
+    const exportarSessoesCSV = () => {
+        if (!sessoesList || sessoesList.length === 0) return;
+        const headers = ['Operador', 'Email', 'Nivel', 'Login', 'Logout', 'Tempo Online', 'Pessoas Criadas', 'Empresas Criadas', 'Itens Apagados', 'Checkins', 'Notas'];
+        const rows = sessoesList.map(s => [
+            `"${s.operador_nome || ''}"`,
+            `"${s.operador_email || ''}"`,
+            `"${s.nivel_acesso || ''}"`,
+            `"${s.login_at ? format(new Date(s.login_at), 'dd/MM/yyyy HH:mm:ss', { locale: ptBR }) : ''}"`,
+            `"${s.logout_at ? format(new Date(s.logout_at), 'dd/MM/yyyy HH:mm:ss', { locale: ptBR }) : ''}"`,
+            `"${s.tempo_online_formatado || ''}"`,
+            s.pessoas_criadas || 0,
+            s.empresas_criadas || 0,
+            s.itens_apagados || 0,
+            s.checkins_realizados || 0,
+            `"${(s.notas || '').replace(/"/g, '""')}"`
+        ]);
+
+        const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', `NZT_Relatorio_Sessoes_Operadores_${format(new Date(), 'yyyy-MM-dd_HHmm')}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    // =========================================================================
+    // DEFINIÇÕES DE COLUNAS DAS TABELAS
+    // =========================================================================
+
+    // 1. Aba Principal: RELATÓRIO DIÁRIO (8 Colunas Exigidas)
+    const diarioColumns = [
+        {
+            id: 'empresa_nome',
+            label: 'Nome da Empresa',
+            width: 220,
+            format: (val) => (
+                <Typography variant="body2" sx={{ fontWeight: 700, color: '#00D4FF' }} noWrap>
+                    {val || 'Sem Empresa'}
+                </Typography>
+            )
+        },
+        {
+            id: 'colaborador_nome',
+            label: 'Nome do Colaborador',
+            width: 240,
+            format: (val) => (
+                <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF' }} noWrap>
+                    {val || '—'}
+                </Typography>
+            )
+        },
+        {
+            id: 'cpf',
+            label: 'CPF',
+            width: 150,
+            format: (val) => (
+                <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.875rem', color: '#94A3B8' }}>
+                    {val || '—'}
+                </Typography>
+            )
+        },
+        {
+            id: 'funcao',
+            label: 'Função',
+            width: 170,
+            format: (val) => (
+                <Typography variant="body2" sx={{ color: '#CBD5E1', fontSize: '0.875rem' }} noWrap>
+                    {val || '—'}
+                </Typography>
+            )
+        },
+        {
+            id: 'numero_pulseira',
+            label: 'Nº Pulseira',
+            width: 130,
+            align: 'center',
+            format: (val) => val && val !== '—' ? (
+                <Chip
+                    label={val}
+                    size="small"
+                    sx={{
+                        bgcolor: 'rgba(0, 212, 255, 0.12)',
+                        color: '#00D4FF',
+                        fontFamily: '"Inter", sans-serif',
+                        fontWeight: 700,
+                        border: '1px solid rgba(0, 212, 255, 0.3)'
+                    }}
+                />
+            ) : (
+                <Typography variant="caption" sx={{ color: '#64748B' }}>—</Typography>
+            )
+        },
+        {
+            id: 'checkin_at',
+            label: 'Check-in (Entrada)',
+            width: 175,
+            format: (val) => val && val !== '—' ? (
+                <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem', color: '#00FF88', fontWeight: 700 }}>
+                    {val}
+                </Typography>
+            ) : (
+                <Typography variant="caption" sx={{ color: '#64748B' }}>—</Typography>
+            )
+        },
+        {
+            id: 'checkout_at',
+            label: 'Check-out (Saída)',
+            width: 175,
+            format: (val) => {
+                if (val === 'No evento') {
+                    return (
+                        <Chip
+                            label="NO EVENTO"
+                            size="small"
+                            sx={{
+                                bgcolor: 'rgba(255, 184, 0, 0.15)',
+                                color: '#FFB800',
+                                fontWeight: 700,
+                                fontSize: '0.75rem',
+                                border: '1px solid rgba(255, 184, 0, 0.3)'
+                            }}
+                        />
+                    );
+                }
+                if (val && val !== '—') {
+                    return (
+                        <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem', color: '#00D4FF', fontWeight: 700 }}>
+                            {val}
+                        </Typography>
+                    );
+                }
+                return <Typography variant="caption" sx={{ color: '#64748B' }}>—</Typography>;
+            }
+        },
+        {
+            id: 'tempo_permanencia',
+            label: 'Tempo de Permanência',
+            width: 200,
+            format: (val, _row) => {
+                if (!val || val === '—') {
+                    return <Typography variant="caption" sx={{ color: '#64748B' }}>00h 00m</Typography>;
+                }
+                const isAndamento = val.includes('Em andamento');
+                return (
+                    <Chip
+                        icon={<TimeIcon sx={{ fontSize: '13px !important', color: (isAndamento ? '#FFB800' : '#00FF88') + ' !important' }} />}
+                        label={val}
+                        size="small"
+                        sx={{
+                            bgcolor: isAndamento ? 'rgba(255, 184, 0, 0.12)' : 'rgba(0, 255, 136, 0.12)',
+                            color: isAndamento ? '#FFB800' : '#00FF88',
+                            fontFamily: '"Inter", sans-serif',
+                            fontWeight: 700,
+                            fontSize: '0.75rem',
+                            border: `1px solid ${isAndamento ? 'rgba(255, 184, 0, 0.3)' : 'rgba(0, 255, 136, 0.3)'}`
+                        }}
+                    />
+                );
+            }
+        }
+    ];
+
+    // 2. Colunas dos Logs Diários Brutos
+    const logColumns = [
+        { id: 'pessoa', label: 'Participante', width: 230 },
+        { id: 'empresa', label: 'Empresa', width: 200 },
+        { 
+            id: 'tipo', 
+            label: 'Tipo', 
+            width: 120,
+            format: (value) => (
+                <Chip
+                    label={value?.toUpperCase()}
+                    size="small"
+                    sx={{
+                        bgcolor: (value === 'checkin' || value === 'entrada') ? 'rgba(0, 255, 136, 0.15)' : 'rgba(255, 51, 102, 0.15)',
+                        color: (value === 'checkin' || value === 'entrada') ? '#00FF88' : '#FF3366',
+                        fontWeight: 700,
+                        fontSize: '0.75rem'
+                    }}
+                />
+            )
+        },
+        { 
+            id: 'horario', 
+            label: 'Horário', 
+            width: 170,
+            format: (value) => value && (
+                <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem', color: '#00D4FF' }}>
+                    {format(new Date(value), "dd/MM HH:mm:ss", { locale: ptBR })}
+                </Typography>
+            )
+        },
+        { id: 'metodo', label: 'Método', width: 140 },
+        { id: 'dispositivo_id', label: 'Equipamento', width: 140 }
+    ];
+
+    // 3. Colunas: Por Área
+    const areaColumns = [
+        { id: 'area', label: 'Área / Localização', width: 260 },
+        { id: 'entradas', label: 'Entradas', width: 130, align: 'center', type: 'number' },
+        { id: 'saidas', label: 'Saídas', width: 130, align: 'center', type: 'number' },
+        {
+            id: 'pico',
+            label: 'Pico de Fluxo',
+            width: 150,
+            align: 'center',
+            format: (val) => (
+                <Chip
+                    label={val || '—'}
+                    size="small"
+                    sx={{ bgcolor: 'rgba(0, 212, 255, 0.12)', color: '#00D4FF', fontFamily: '"Inter", sans-serif', fontWeight: 700 }}
+                />
+            )
+        }
+    ];
+
+    // 4. Colunas: Por Empresa
+    const empresaColumns = [
+        { id: 'empresa', label: 'Nome da Empresa', width: 250 },
+        { id: 'pessoas', label: 'Colaboradores', width: 130, align: 'center', type: 'number' },
+        { id: 'entradas', label: 'Entradas', width: 120, align: 'center', type: 'number' },
+        { id: 'saidas', label: 'Saídas', width: 120, align: 'center', type: 'number' },
+        { id: 'bloqueados', label: 'Bloqueados', width: 120, align: 'center', type: 'number' },
+        { id: 'expulsos', label: 'Expulsos', width: 120, align: 'center', type: 'number' }
+    ];
+
+    // 5. Colunas: Por Leitor
+    const leitorColumns = [
+        { id: 'terminal', label: 'Terminal / Equipamento', width: 220 },
+        { id: 'localizacao', label: 'Localização', width: 200 },
+        { id: 'total', label: 'Total Leituras', width: 130, align: 'center', type: 'number' },
+        { id: 'entradas', label: 'Entradas', width: 110, align: 'center', type: 'number' },
+        { id: 'saidas', label: 'Saídas', width: 110, align: 'center', type: 'number' },
+        { id: 'erros', label: 'Erros / Negados', width: 130, align: 'center', type: 'number' }
+    ];
+
+    // 6. Colunas: Por Função
+    const funcaoColumns = [
+        { id: 'funcao', label: 'Função / Cargo', width: 250 },
+        { id: 'total', label: 'Total Cadastrado', width: 150, align: 'center', type: 'number' },
+        { id: 'presentes', label: 'Presentes Hoje', width: 140, align: 'center', type: 'number' },
+        { id: 'entradas_periodo', label: 'Entradas no Período', width: 160, align: 'center', type: 'number' },
+        { id: 'saidas_periodo', label: 'Saídas no Período', width: 160, align: 'center', type: 'number' }
+    ];
+
+    // 7. Colunas: Por Status
+    const statusColumns = [
+        { 
+            id: 'status', 
+            label: 'Status Documental / Acesso', 
+            width: 250,
+            format: (val) => (
+                <Chip
+                    label={String(val || 'PENDENTE').toUpperCase()}
+                    size="small"
+                    sx={{
+                        bgcolor: val === 'autorizado' || val === 'ativo' ? 'rgba(0, 255, 136, 0.15)' : 'rgba(255, 184, 0, 0.15)',
+                        color: val === 'autorizado' || val === 'ativo' ? '#00FF88' : '#FFB800',
+                        fontWeight: 700
+                    }}
+                />
+            )
+        },
+        { id: 'quantidade', label: 'Quantidade de Pessoas', width: 200, align: 'center', type: 'number' }
+    ];
+
+    // 8. Colunas: Sessões de Operador
+    const sessoesColumns = [
+        {
+            id: 'operador_nome',
+            label: 'Operador',
+            width: 230,
+            format: (val, row) => (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Avatar sx={{ width: 32, height: 32, bgcolor: '#0A1628', border: '1px solid #00D4FF', color: '#00D4FF', fontSize: '0.8125rem', fontWeight: 700 }}>
+                        {val?.charAt(0) || 'O'}
+                    </Avatar>
+                    <Box sx={{ minWidth: 0 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF', fontSize: '0.875rem' }} noWrap>
+                            {val || 'Operador'}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.75rem' }} noWrap>
+                            {row.operador_email || row.nivel_acesso?.toUpperCase()}
+                        </Typography>
+                    </Box>
+                </Box>
+            )
+        },
+        {
+            id: 'login_at',
+            label: 'Entrada (Login)',
+            width: 170,
+            format: (val) => val && (
+                <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem', color: '#00D4FF' }}>
+                    {format(new Date(val), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
+                </Typography>
+            )
+        },
+        {
+            id: 'logout_at',
+            label: 'Saída (Logout)',
+            width: 170,
+            format: (val) => val ? (
+                <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem', color: '#FFB800' }}>
+                    {format(new Date(val), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
+                </Typography>
+            ) : (
+                <Chip label="ONLINE AGORA" size="small" sx={{ bgcolor: 'rgba(0,255,136,0.15)', color: '#00FF88', fontWeight: 700, fontSize: '0.75rem' }} />
+            )
+        },
+        {
+            id: 'tempo_online_formatado',
+            label: 'Duração Online',
+            width: 150,
+            format: (val) => (
+                <Chip
+                    icon={<TimeIcon sx={{ fontSize: '14px !important', color: '#00FF88 !important' }} />}
+                    label={val || '00h 00m 00s'}
+                    size="small"
+                    sx={{
+                        bgcolor: 'rgba(0, 255, 136, 0.1)',
+                        color: '#00FF88',
+                        fontFamily: '"Inter", sans-serif',
+                        fontWeight: 700,
+                        border: '1px solid rgba(0, 255, 136, 0.3)'
+                    }}
+                />
+            )
+        },
+        {
+            id: 'pessoas_criadas',
+            label: 'Pessoas Criadas',
+            width: 130,
+            align: 'center',
+            format: (val) => (
+                <Chip
+                    label={`+${val || 0}`}
+                    size="small"
+                    sx={{ bgcolor: 'rgba(0, 212, 255, 0.15)', color: '#00D4FF', fontWeight: 700, minWidth: 45 }}
+                />
+            )
+        },
+        {
+            id: 'empresas_criadas',
+            label: 'Empresas Criadas',
+            width: 140,
+            align: 'center',
+            format: (val) => (
+                <Chip
+                    label={`+${val || 0}`}
+                    size="small"
+                    sx={{ bgcolor: 'rgba(123, 47, 190, 0.15)', color: '#A855F7', fontWeight: 700, minWidth: 45 }}
+                />
+            )
+        },
+        {
+            id: 'itens_apagados',
+            label: 'Itens Apagados',
+            width: 130,
+            align: 'center',
+            format: (val) => (
+                <Chip
+                    label={val || 0}
+                    size="small"
+                    sx={{ bgcolor: val > 0 ? 'rgba(255, 51, 102, 0.15)' : 'rgba(255,255,255,0.05)', color: val > 0 ? '#FF3366' : 'text.secondary', fontWeight: 700, minWidth: 45 }}
+                />
+            )
+        },
+        {
+            id: 'checkins_realizados',
+            label: 'Check-ins',
+            width: 110,
+            align: 'center',
+            format: (val) => (
+                <Chip
+                    label={val || 0}
+                    size="small"
+                    sx={{ bgcolor: 'rgba(0, 255, 136, 0.15)', color: '#00FF88', fontWeight: 700, minWidth: 45 }}
+                />
+            )
+        },
+        {
+            id: 'notas',
+            label: 'Notas de Turno',
+            width: 140,
+            align: 'center',
+            format: (val, row) => val ? (
+                <IconButton
+                    size="small"
+                    onClick={() => {
+                        setNotasOperador(val);
+                        setNotasOperadorNome(row.operador_nome || 'Operador');
+                        setModalNotasOpen(true);
+                    }}
+                    sx={{ color: '#00D4FF', '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.15)' } }}
+                    title="Ver anotações do operador"
+                >
+                    <NoteIcon fontSize="small" />
+                </IconButton>
+            ) : (
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>—</Typography>
+            )
+        },
+        {
+            id: 'actions',
+            label: 'Resumo',
+            width: 90,
+            align: 'center',
+            format: (_, row) => (
+                <IconButton
+                    size="small"
+                    onClick={() => {
+                        setSelectedSessao(row);
+                        setModalDetalhesOpen(true);
+                    }}
+                    sx={{ color: '#00D4FF', '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.15)' } }}
+                    title="Ver Resumo Consolidado"
+                >
+                    <InfoIcon fontSize="small" />
+                </IconButton>
+            )
+        }
+    ];
 
     return (
-        <Box sx={{ p: 4 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+        <Box sx={{ p: { xs: 2, md: 3 } }}>
+            {/* CABEÇALHO DA PÁGINA (NZT Relatórios) */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, mb: 3, flexWrap: 'wrap', gap: 2 }}>
                 <PageHeader
-                    title="Sistemas de Relatórios"
-                    subtitle="Análise consolidada de fluxo e ocupação do evento."
+                    title="Relatórios"
+                    subtitle="Fluxo de acesso, fechamento diário e histórico da operação."
                     breadcrumbs={[{ text: 'Dashboard' }, { text: 'Relatórios' }]}
+                    sx={{ mb: 0 }}
                 />
-                <NeonButton
-                    startIcon={<ReportsIcon />}
-                    onClick={handleExportExcel}
-                    sx={{ mt: 2 }}
-                >
-                    EXPORTAR EXCEL COMPLETO
-                </NeonButton>
+
+                {/* BOTÕES DE EXPORTAÇÃO PADRONIZADOS */}
+                <Stack direction="row" spacing={1.5} flexWrap="wrap">
+                    {tab === 'diario' ? (
+                        <>
+                            <Button variant="outlined"
+                                startIcon={<ExportIcon />}
+                                onClick={handleExportDiarioXLSX}
+                                sx={botaoSecundario}
+                            >
+                                Exportar Excel
+                            </Button>
+                            <Button variant="outlined"
+                                startIcon={<PdfIcon />}
+                                onClick={handleExportDiarioPDF}
+                                sx={botaoSecundario}
+                            >
+                                Exportar PDF
+                            </Button>
+                        </>
+                    ) : tab === 'sessoes' ? (
+                        <Button variant="outlined"
+                            startIcon={<ExportIcon />}
+                            onClick={exportarSessoesCSV}
+                            sx={botaoSecundario}
+                        >
+                            Exportar sessões (CSV)
+                        </Button>
+                    ) : (
+                        <>
+                            <Button variant="outlined" 
+                                startIcon={<ExportIcon />} 
+                                onClick={() => handleExport(tab, 'excel')}
+                                sx={botaoSecundario}
+                            >
+                                Exportar Excel
+                            </Button>
+                            <Button variant="outlined" 
+                                startIcon={<PdfIcon />} 
+                                onClick={() => handleExportAbaPDF(tab)} 
+                                sx={botaoSecundario}
+                            >
+                                Exportar PDF
+                            </Button>
+                        </>
+                    )}
+                </Stack>
             </Box>
 
-            {/* Filtros de Data */}
-            <GlassCard sx={{ p: 2, mb: 3 }}>
-                <Stack direction="row" spacing={3} alignItems="center">
-                    <Box>
-                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, display: 'block', mb: 0.5 }}>INÍCIO</Typography>
-                        <TextField
-                            type="datetime-local"
-                            size="small"
-                            value={dateStart}
-                            onChange={(e) => setDateStart(e.target.value)}
-                            sx={{
-                                input: { color: '#fff' },
-                                '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0,212,255,0.2)' }
-                            }}
+            {/* SEÇÃO DA ABA: RELATÓRIO DIÁRIO */}
+            {tab === 'diario' && (
+                <>
+                    {/* RESUMO DO DIA */}
+                    <Grid container spacing={2} sx={{ mb: 3 }}>
+                        <Grid item xs={6} sm={4} md={2.4}>
+                            <KpiCard titulo="Cadastrados" valor={totaisDiarios.total_colaboradores || dailyConsolidado.length} icone={<KpiCadastradosIcon />} />
+                        </Grid>
+                        <Grid item xs={6} sm={4} md={2.4}>
+                            <KpiCard titulo="Presentes no evento" valor={totaisDiarios.total_presentes || 0} icone={<KpiPresentesIcon />} cor={cores.sucesso} />
+                        </Grid>
+                        <Grid item xs={6} sm={4} md={2.4}>
+                            <KpiCard titulo="Saídas registradas" valor={totaisDiarios.total_finalizados || 0} icone={<KpiSaidasIcon />} cor={cores.saida} />
+                        </Grid>
+                        <Grid item xs={6} sm={4} md={2.4}>
+                            <KpiCard titulo="Não compareceram" valor={totaisDiarios.total_ausentes || 0} icone={<KpiAusentesIcon />} cor={cores.textoSecundario} />
+                        </Grid>
+                        <Grid item xs={12} sm={4} md={2.4}>
+                            <KpiCard titulo="Tempo médio no evento" valor={totaisDiarios.tempo_medio_formatado || '00h 00m'} icone={<KpiTempoIcon />} cor={cores.secundariaClara} valorCompacto />
+                        </Grid>
+                    </Grid>
+
+                    {/* FILTROS DO RELATÓRIO DIÁRIO */}
+                    <GlassCard sx={{ p: 2.5, mb: 3 }}>
+                        <Grid container spacing={2} alignItems="center">
+                            {/* Data de Referência */}
+                            <Grid item xs={12} sm={6} md={2.5}>
+                                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, display: 'block', mb: 0.5 }}>Data de referência</Typography>
+                                <TextField
+                                    type="date"
+                                    fullWidth
+                                    size="small"
+                                    value={dataReferenciaDiario}
+                                    onChange={(e) => {
+                                        setDataReferenciaDiario(e.target.value);
+                                        setSelectedFechamentoId('');
+                                    }}
+                                />
+                            </Grid>
+
+                            {/* Seletor de Snapshot de Fechamento Diário (Resets Gravados) */}
+                            <Grid item xs={12} sm={6} md={3}>
+                                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, display: 'block', mb: 0.5 }}>Arquivo / reset diário</Typography>
+                                <FormControl fullWidth size="small">
+                                    <Select
+                                        value={selectedFechamentoId}
+                                        onChange={(e) => setSelectedFechamentoId(e.target.value)}
+                                        displayEmpty
+                                    >
+                                        <MenuItem value="">TEMPO REAL (AO VIVO)</MenuItem>
+                                        {fechamentosList.map(f => (
+                                            <MenuItem key={f.id} value={f.id}>
+                                                Reset {f.tipo_reset?.toUpperCase()} • {f.hora_fechamento ? format(new Date(f.hora_fechamento), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : f.data_referencia}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+
+                            {/* Filtrar por Empresa */}
+                            <Grid item xs={12} sm={6} md={3}>
+                                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, display: 'block', mb: 0.5 }}>Filtrar por empresa</Typography>
+                                <FormControl fullWidth size="small">
+                                    <Select
+                                        value={empresaId}
+                                        onChange={(e) => setEmpresaId(e.target.value)}
+                                        displayEmpty
+                                    >
+                                        <MenuItem value="">TODAS AS EMPRESAS</MenuItem>
+                                        {empresas.map(e => (
+                                            <MenuItem key={e.id} value={e.id}>{e.nome}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+
+                            {/* Campo de Busca Rápida */}
+                            <Grid item xs={12} sm={6} md={2.5}>
+                                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, display: 'block', mb: 0.5 }}>PESQUISAR</Typography>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    placeholder="Nome, CPF, Pulseira..."
+                                    value={searchDiario}
+                                    onChange={(e) => setSearchDiario(e.target.value)}
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <SearchIcon sx={{ color: '#00D4FF', fontSize: 18 }} />
+                                            </InputAdornment>
+                                        )
+                                    }}
+                                />
+                            </Grid>
+
+                            {/* Botão de Atualização */}
+                            <Grid item xs={12} sm={12} md={1}>
+                                <Typography variant="caption" sx={{ opacity: 0, display: 'block', mb: 0.5 }}>AÇÃO</Typography>
+                                <Button
+                                    variant="contained"
+                                    fullWidth
+                                    onClick={loadDiarioConsolidado}
+                                    sx={{ height: 40, minWidth: 40, p: 0, bgcolor: '#00D4FF', color: '#000000', '&:hover': { bgcolor: '#00FF88' } }}
+                                    title="Atualizar dados"
+                                >
+                                    <RefreshIcon />
+                                </Button>
+                            </Grid>
+                        </Grid>
+
+                        {/* Filtros Rápidos de Status */}
+                        <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, mr: 1 }}>STATUS:</Typography>
+                            <ToggleButtonGroup
+                                size="small"
+                                value={statusFiltroDiario}
+                                exclusive
+                                onChange={(e, val) => val && setStatusFiltroDiario(val)}
+                                sx={{
+                                    '& .MuiToggleButton-root': {
+                                        color: '#94A3B8',
+                                        borderColor: 'rgba(255,255,255,0.1)',
+                                        py: 0.4,
+                                        px: 1.5,
+                                        fontSize: '0.75rem',
+                                        fontWeight: 700,
+                                        '&.Mui-selected': {
+                                            bgcolor: 'rgba(0, 212, 255, 0.15)',
+                                            color: '#00D4FF',
+                                            borderColor: 'rgba(0, 212, 255, 0.4)'
+                                        }
+                                    }
+                                }}
+                            >
+                                <ToggleButton value="todos">TODOS ({dailyConsolidado.length})</ToggleButton>
+                                <ToggleButton value="presente">PRESENTES</ToggleButton>
+                                <ToggleButton value="finalizado">FINALIZADOS</ToggleButton>
+                                <ToggleButton value="ausente">NÃO COMPARECERAM</ToggleButton>
+                            </ToggleButtonGroup>
+                        </Box>
+                    </GlassCard>
+                </>
+            )}
+
+            {/* SEÇÃO DE FILTROS GERAIS PARA AS DEMAIS ABAS */}
+            {tab !== 'diario' && (
+                <GlassCard sx={{ p: 2, mb: 3 }}>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
+                        <Box sx={{ flex: '1 1 250px' }}>
+                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, display: 'block', mb: 0.5 }}>PERÍODO INICIAL</Typography>
+                            <TextField 
+                                type="datetime-local" 
+                                fullWidth 
+                                size="small" 
+                                value={dateStart} 
+                                onChange={(e) => setDateStart(e.target.value)} 
+                            />
+                        </Box>
+                        <Box sx={{ flex: '1 1 250px' }}>
+                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, display: 'block', mb: 0.5 }}>PERÍODO FINAL</Typography>
+                            <TextField 
+                                type="datetime-local" 
+                                fullWidth 
+                                size="small" 
+                                value={dateEnd} 
+                                onChange={(e) => setDateEnd(e.target.value)} 
+                            />
+                        </Box>
+                        {tab !== 'sessoes' && (
+                            <Box sx={{ flex: '1 1 250px' }}>
+                                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, display: 'block', mb: 0.5 }}>Filtrar por empresa</Typography>
+                                <FormControl fullWidth size="small">
+                                    <Select
+                                        value={empresaId}
+                                        onChange={(e) => setEmpresaId(e.target.value)}
+                                        displayEmpty
+                                    >
+                                        <MenuItem value="">TODAS AS EMPRESAS</MenuItem>
+                                        {empresas.map(e => (
+                                            <MenuItem key={e.id} value={e.id}>{e.nome}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Box>
+                        )}
+                        <Box sx={{ flex: '0 0 auto', display: 'flex', alignItems: 'flex-end', pt: '10px' }}>
+                            <Button 
+                                variant="contained" 
+                                fullWidth 
+                                startIcon={<RefreshIcon />} 
+                                onClick={() => {
+                                    if (tab === 'logs') loadLogs(1);
+                                    else if (tab === 'sessoes') loadSessoes();
+                                    else loadTab(tab);
+                                }}
+                                sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700 }}
+                            >
+                                Atualizar
+                            </Button>
+                        </Box>
+                    </Box>
+                </GlassCard>
+            )}
+
+            {/* ABAS DO MENU DE RELATÓRIOS */}
+            <GlassCard sx={{ mb: 3 }}>
+                <Tabs 
+                    value={tab} 
+                    onChange={handleTabChange} 
+                    variant="scrollable" 
+                    scrollButtons="auto" 
+                    sx={{ borderBottom: 1, borderColor: 'divider' }}
+                >
+                    <Tab icon={<DailyIcon />} label="RELATÓRIO DIÁRIO" value="diario" />
+                    <Tab icon={<HistoryIcon />} label="LOGS DE ACESSO" value="logs" />
+                    <Tab icon={<BadgeIcon />} label="SESSÕES DE OPERADOR" value="sessoes" />
+                    <Tab icon={<TableIcon />} label="POR ÁREA" value="area" />
+                    <Tab icon={<BusinessIcon />} label="POR EMPRESA" value="empresa" />
+                    <Tab icon={<DeviceIcon />} label="POR LEITOR" value="leitor" />
+                    <Tab icon={<JobIcon />} label="POR FUNÇÃO" value="funcao" />
+                    <Tab icon={<TimeIcon />} label="POR STATUS" value="status" />
+                </Tabs>
+
+                <Box sx={{ p: 2 }}>
+                    {/* 1. RELATÓRIO DIÁRIO (8 COLUNAS EXIGIDAS) */}
+                    {tab === 'diario' && (
+                        <DataTable
+                            data={dailyConsolidado}
+                            columns={diarioColumns}
+                            loading={loading}
+                            rowsPerPage={25}
                         />
-                    </Box>
-                    <Box>
-                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, display: 'block', mb: 0.5 }}>TÉRMINO</Typography>
-                        <TextField
-                            type="datetime-local"
-                            size="small"
-                            value={dateEnd}
-                            onChange={(e) => setDateEnd(e.target.value)}
-                            sx={{
-                                input: { color: '#fff' },
-                                '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0,212,255,0.2)' }
-                            }}
+                    )}
+
+                    {/* 2. LOGS DE ACESSO */}
+                    {tab === 'logs' && (
+                        <DataTable
+                            data={dailyLogs}
+                            columns={logColumns}
+                            loading={loading}
+                            totalCount={totalLogs}
+                            page={page - 1}
+                            rowsPerPage={25}
+                            onPageChange={(event, newPage) => setPage(newPage + 1)}
                         />
-                    </Box>
-                    <Box sx={{ ml: 'auto', textAlign: 'right' }}>
-                        <Typography variant="h6" sx={{ color: '#00D4FF', fontWeight: 800 }}>{dailyLogs.length}</Typography>
-                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>Registros no período</Typography>
-                    </Box>
-                </Stack>
+                    )}
+
+                    {/* 3. SESSÕES DE OPERADOR */}
+                    {tab === 'sessoes' && (
+                        <DataTable
+                            data={sessoesList}
+                            columns={sessoesColumns}
+                            loading={loadingSessoes}
+                            rowsPerPage={25}
+                        />
+                    )}
+
+                    {/* 4. POR ÁREA */}
+                    {tab === 'area' && (
+                        <DataTable
+                            data={reportArea}
+                            columns={areaColumns}
+                            loading={loading}
+                            rowsPerPage={25}
+                        />
+                    )}
+
+                    {/* 5. POR EMPRESA */}
+                    {tab === 'empresa' && (
+                        <DataTable
+                            data={reportEmpresa}
+                            columns={empresaColumns}
+                            loading={loading}
+                            rowsPerPage={25}
+                        />
+                    )}
+
+                    {/* 6. POR LEITOR */}
+                    {tab === 'leitor' && (
+                        <DataTable
+                            data={reportLeitor}
+                            columns={leitorColumns}
+                            loading={loading}
+                            rowsPerPage={25}
+                        />
+                    )}
+
+                    {/* 7. POR FUNÇÃO */}
+                    {tab === 'funcao' && (
+                        <DataTable
+                            data={reportFuncao}
+                            columns={funcaoColumns}
+                            loading={loading}
+                            rowsPerPage={25}
+                        />
+                    )}
+
+                    {/* 8. POR STATUS */}
+                    {tab === 'status' && (
+                        <DataTable
+                            data={reportStatus}
+                            columns={statusColumns}
+                            loading={loading}
+                            rowsPerPage={25}
+                        />
+                    )}
+                </Box>
             </GlassCard>
 
-            <Grid container spacing={3}>
-                {/* Stats Cards Integration */}
-                <Grid item xs={12} md={4}>
-                    <GlassCard glowColor="#00D4FF">
-                        <Box sx={{ p: 3 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                                <Avatar sx={{ bgcolor: 'rgba(0, 212, 255, 0.1)', color: '#00D4FF' }}>
-                                    <ScanIcon />
-                                </Avatar>
-                                <Typography variant="subtitle2" sx={{ color: 'text.secondary', fontWeight: 700 }}>CHECK-INS NO PERÍODO</Typography>
-                            </Box>
-                            <StatValue>{totalCheckins}</StatValue>
-                            <Typography variant="caption" sx={{ color: '#00FF88', fontWeight: 600 }}>DADOS ATUALIZADOS</Typography>
-                        </Box>
-                    </GlassCard>
-                </Grid>
+            {/* MODAL: NOTAS DE TURNO DO OPERADOR */}
+            <Dialog
+                open={modalNotasOpen}
+                onClose={() => setModalNotasOpen(false)}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        background: '#050B18',
+                        border: '1px solid rgba(0, 212, 255, 0.3)',
+                        borderRadius: 3
+                    }
+                }}
+            >
+                <DialogTitle sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <NoteIcon sx={{ color: '#00D4FF' }} />
+                        <Typography variant="h6" sx={{ color: '#00D4FF', fontWeight: 700 }}>
+                            Notas do Turno • {notasOperadorNome}
+                        </Typography>
+                    </Box>
+                </DialogTitle>
+                <DialogContent sx={{ pt: 2.5 }}>
+                    <Paper sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 1.5, border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', color: '#FFFFFF', lineHeight: 1.6 }}>
+                            {notasOperador || 'Nenhum lembrete registrado durante este turno.'}
+                        </Typography>
+                    </Paper>
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={() => setModalNotasOpen(false)} variant="contained" sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700 }}>
+                        Fechar
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
-                <Grid item xs={12} md={4}>
-                    <GlassCard glowColor="#7B2FBE">
-                        <Box sx={{ p: 3 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                                <Avatar sx={{ bgcolor: 'rgba(123, 47, 190, 0.1)', color: '#7B2FBE' }}>
-                                    <BusinessIcon />
-                                </Avatar>
-                                <Typography variant="subtitle2" sx={{ color: 'text.secondary', fontWeight: 700 }}>EMPRESAS NO RADAR</Typography>
-                            </Box>
-                            <StatValue color="#7B2FBE">{Object.keys(summary).length}</StatValue>
-                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>EM OPERAÇÃO</Typography>
-                        </Box>
-                    </GlassCard>
-                </Grid>
-
-                <Grid item xs={12} md={4}>
-                    <GlassCard glowColor="#FF3366">
-                        <Box sx={{ p: 3 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                                <Avatar sx={{ bgcolor: 'rgba(255, 51, 102, 0.1)', color: '#FF3366' }}>
-                                    <TrendingIcon />
-                                </Avatar>
-                                <Typography variant="subtitle2" sx={{ color: 'text.secondary', fontWeight: 700 }}>SAÍDAS PROCESSADAS</Typography>
-                            </Box>
-                            <StatValue color="#FF3366">{totalCheckouts}</StatValue>
-                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>FLUXO DE DISPERSÃO</Typography>
-                        </Box>
-                    </GlassCard>
-                </Grid>
-
-                {/* Gráfico de Fluxo Temporal */}
-                <Grid item xs={12} lg={8}>
-                    <GlassCard glowColor="#00D4FF" sx={{ p: 3, height: '450px', display: 'flex', flexDirection: 'column' }}>
-                        <Typography variant="h6" sx={{ fontWeight: 800, mb: 3, letterSpacing: 1 }}>FLUXO DE ACESSOS (POR HORA)</Typography>
-                        <Box sx={{ flexGrow: 1, width: '100%', minHeight: 300 }}>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={chartData}>
-                                    <defs>
-                                        <linearGradient id="colorIn" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#00FF88" stopOpacity={0.3} />
-                                            <stop offset="95%" stopColor="#00FF88" stopOpacity={0} />
-                                        </linearGradient>
-                                        <linearGradient id="colorOut" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#FF3366" stopOpacity={0.3} />
-                                            <stop offset="95%" stopColor="#FF3366" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                                    <XAxis
-                                        dataKey="hora"
-                                        stroke="rgba(255,255,255,0.5)"
-                                        fontSize={12}
-                                        tickLine={false}
-                                        axisLine={false}
-                                    />
-                                    <YAxis
-                                        stroke="rgba(255,255,255,0.5)"
-                                        fontSize={12}
-                                        tickLine={false}
-                                        axisLine={false}
-                                    />
-                                    <Tooltip
-                                        contentStyle={{
-                                            background: 'rgba(10, 25, 41, 0.95)',
-                                            borderRadius: 12,
-                                            border: '1px solid rgba(0,212,255,0.2)',
-                                            boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
-                                        }}
-                                        itemStyle={{ fontSize: 13, fontWeight: 700 }}
-                                    />
-                                    <Legend verticalAlign="top" height={36} />
-                                    <Area
-                                        name="Entradas"
-                                        type="monotone"
-                                        dataKey="checkin"
-                                        stroke="#00FF88"
-                                        strokeWidth={3}
-                                        fillOpacity={1}
-                                        fill="url(#colorIn)"
-                                    />
-                                    <Area
-                                        name="Saídas"
-                                        type="monotone"
-                                        dataKey="checkout"
-                                        stroke="#FF3366"
-                                        strokeWidth={3}
-                                        fillOpacity={1}
-                                        fill="url(#colorOut)"
-                                    />
-                                </AreaChart>
-                            </ResponsiveContainer>
-                        </Box>
-                    </GlassCard>
-                </Grid>
-
-                {/* Distribuição por Empresa */}
-                <Grid item xs={12} lg={4}>
-                    <GlassCard glowColor="#7B2FBE" sx={{ p: 3, height: '450px', display: 'flex', flexDirection: 'column' }}>
-                        <Typography variant="h6" sx={{ fontWeight: 800, mb: 1, letterSpacing: 1 }}>OCUPAÇÃO POR EMPRESA</Typography>
-                        <Box sx={{ flexGrow: 1, position: 'relative' }}>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie
-                                        data={Object.entries(summary).map(([name, stats]) => ({ name, value: stats.presentes }))}
-                                        cx="50%"
-                                        cy="50%"
-                                        innerRadius={60}
-                                        outerRadius={80}
-                                        paddingAngle={5}
-                                        dataKey="value"
-                                    >
-                                        {Object.entries(summary).map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={['#00D4FF', '#7B2FBE', '#00FF88', '#FFB800', '#FF3366'][index % 5]} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip
-                                        contentStyle={{
-                                            background: 'rgba(10, 25, 41, 0.95)',
-                                            borderRadius: 12,
-                                            border: '1px solid rgba(123, 47, 190, 0.2)'
-                                        }}
-                                    />
-                                    <Legend layout="horizontal" align="center" verticalAlign="bottom" />
-                                </PieChart>
-                            </ResponsiveContainer>
-                            <Box sx={{ position: 'absolute', top: '45%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' }}>
-                                <Typography variant="h4" sx={{ fontWeight: 900, color: '#fff' }}>
-                                    {Object.values(summary).reduce((a, b) => a + (b.presentes || 0), 0)}
-                                </Typography>
-                                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>TOTAL PRESENTES</Typography>
-                            </Box>
-                        </Box>
-                    </GlassCard>
-                </Grid>
-
-                {/* Activity Feed */}
-                <Grid item xs={12}>
-                    <GlassCard sx={{ p: 4 }}>
-                        <Typography variant="h6" sx={{ color: '#fff', mb: 3, fontWeight: 800 }}>REGISTROS DE CAMPO (DETALHADO)</Typography>
-                        <Stack spacing={2}>
-                            {dailyLogs.slice(0, 20).map((log) => (
-                                <ActivityItem key={log.id} sx={{
-                                    borderLeft: log.tipo === 'negado' ? '4px solid #FF3366' : 'none',
-                                    background: log.tipo === 'negado' ? 'rgba(255, 51, 102, 0.05)' : 'rgba(255, 255, 255, 0.02)'
-                                }}>
-                                    <Avatar sx={{
-                                        bgcolor: log.tipo === 'checkin' ? 'rgba(0, 255, 136, 0.1)' :
-                                            log.tipo === 'negado' ? 'rgba(255, 51, 102, 0.1)' : 'rgba(255, 184, 0, 0.1)',
-                                        color: log.tipo === 'checkin' ? '#00FF88' :
-                                            log.tipo === 'negado' ? '#FF3366' : '#FFB800'
-                                    }}>
-                                        {log.tipo === 'checkin' ? <ScanIcon /> :
-                                            log.tipo === 'negado' ? <PeopleIcon /> : <TrendingIcon />}
-                                    </Avatar>
-                                    <Box sx={{ flexGrow: 1 }}>
-                                        <Stack direction="row" alignItems="center" spacing={1}>
-                                            <Typography variant="body2" sx={{ color: '#fff', fontWeight: 700 }}>
-                                                {log.pessoa || 'SISTEMA'}
-                                            </Typography>
-                                            {log.cpf && (
-                                                <Typography variant="caption" sx={{ color: 'text.secondary', bgcolor: 'rgba(255,255,255,0.05)', px: 0.5, borderRadius: 0.5 }}>
-                                                    {log.cpf}
-                                                </Typography>
-                                            )}
-                                        </Stack>
-                                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-                                            {log.empresa || 'Sem Empresa'} • {log.metodo?.toUpperCase()} {log.dispositivo_id ? `(${log.dispositivo_id})` : ''}
+            {/* MODAL: DETALHES CONSOLIDADOS DA SESSÃO */}
+            <Dialog
+                open={modalDetalhesOpen}
+                onClose={() => setModalDetalhesOpen(false)}
+                maxWidth="md"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        background: '#050B18',
+                        border: '1px solid rgba(0, 212, 255, 0.3)',
+                        borderRadius: 3
+                    }
+                }}
+            >
+                <DialogTitle sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <Typography variant="h6" sx={{ color: '#00D4FF', fontWeight: 700 }}>
+                        Relatório Consolidado de Turno
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        Operador: <strong style={{ color: '#FFFFFF' }}>{selectedSessao?.operador_nome}</strong> ({selectedSessao?.nivel_acesso?.toUpperCase()})
+                    </Typography>
+                </DialogTitle>
+                <DialogContent sx={{ pt: 2.5 }}>
+                    {selectedSessao && (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                            {/* Cards de Métricas do Turno */}
+                            <Grid container spacing={2}>
+                                <Grid item xs={6} sm={3}>
+                                    <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'rgba(0, 255, 136, 0.08)', border: '1px solid rgba(0, 255, 136, 0.2)', borderRadius: 1.5 }}>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>TEMPO ONLINE</Typography>
+                                        <Typography variant="h6" sx={{ color: '#00FF88', fontWeight: 700, fontFamily: '"Inter", sans-serif' }}>
+                                            {selectedSessao.tempo_online_formatado}
                                         </Typography>
-                                        {log.tipo === 'negado' && log.observacao && (
-                                            <Typography variant="caption" sx={{ color: '#FF3366', fontWeight: 600, mt: 0.5, display: 'block' }}>
-                                                MOTIVO: {log.observacao.toUpperCase()}
-                                            </Typography>
-                                        )}
-                                    </Box>
-                                    <Box sx={{ textAlign: 'right' }}>
-                                        <Typography variant="caption" sx={{
-                                            color: log.tipo === 'checkin' ? '#00FF88' :
-                                                log.tipo === 'negado' ? '#FF3366' : '#FFB800',
-                                            fontWeight: 900,
-                                            letterSpacing: 1
-                                        }}>
-                                            {log.tipo.toUpperCase()}
+                                    </Paper>
+                                </Grid>
+                                <Grid item xs={6} sm={3}>
+                                    <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'rgba(0, 212, 255, 0.08)', border: '1px solid rgba(0, 212, 255, 0.2)', borderRadius: 1.5 }}>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>PESSOAS CRIADAS</Typography>
+                                        <Typography variant="h6" sx={{ color: '#00D4FF', fontWeight: 700 }}>
+                                            {selectedSessao.pessoas_criadas || 0}
                                         </Typography>
-                                        <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>
-                                            {(log.horario && !isNaN(new Date(log.horario).getTime())) ? format(new Date(log.horario), "HH:mm:ss 'em' dd/MM", { locale: ptBR }) : 'S/ horário'}
+                                    </Paper>
+                                </Grid>
+                                <Grid item xs={6} sm={3}>
+                                    <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'rgba(168, 85, 247, 0.08)', border: '1px solid rgba(168, 85, 247, 0.2)', borderRadius: 1.5 }}>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>EMPRESAS CRIADAS</Typography>
+                                        <Typography variant="h6" sx={{ color: '#A855F7', fontWeight: 700 }}>
+                                            {selectedSessao.empresas_criadas || 0}
                                         </Typography>
-                                    </Box>
-                                </ActivityItem>
-                            ))}
-                            {dailyLogs.length === 0 && (
-                                <Box sx={{ textAlign: 'center', py: 8 }}>
-                                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                        NENHUM REGISTRO ENCONTRADO PARA O PERÍODO SELECIONADO.
-                                    </Typography>
-                                </Box>
-                            )}
-                        </Stack>
-                    </GlassCard>
-                </Grid>
-            </Grid>
+                                    </Paper>
+                                </Grid>
+                                <Grid item xs={6} sm={3}>
+                                    <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'rgba(255, 51, 102, 0.08)', border: '1px solid rgba(255, 51, 102, 0.2)', borderRadius: 1.5 }}>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>ITENS APAGADOS</Typography>
+                                        <Typography variant="h6" sx={{ color: '#FF3366', fontWeight: 700 }}>
+                                            {selectedSessao.itens_apagados || 0}
+                                        </Typography>
+                                    </Paper>
+                                </Grid>
+                            </Grid>
+
+                            {/* Informações de Login e Logout */}
+                            <Paper sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 1.5, border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <Grid container spacing={2}>
+                                    <Grid item xs={12} sm={6}>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>Horário de Início (Login):</Typography>
+                                        <Typography variant="body1" sx={{ color: '#00D4FF', fontWeight: 700, fontFamily: '"Inter", sans-serif' }}>
+                                            {selectedSessao.login_at ? format(new Date(selectedSessao.login_at), "dd/MM/yyyy HH:mm:ss", { locale: ptBR }) : '--'}
+                                        </Typography>
+                                    </Grid>
+                                    <Grid item xs={12} sm={6}>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>Horário de Encerramento (Logout):</Typography>
+                                        <Typography variant="body1" sx={{ color: '#FFB800', fontWeight: 700, fontFamily: '"Inter", sans-serif' }}>
+                                            {selectedSessao.logout_at ? format(new Date(selectedSessao.logout_at), "dd/MM/yyyy HH:mm:ss", { locale: ptBR }) : '--'}
+                                        </Typography>
+                                    </Grid>
+                                </Grid>
+                            </Paper>
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={() => setModalDetalhesOpen(false)} variant="contained" sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700 }}>
+                        Fechar
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

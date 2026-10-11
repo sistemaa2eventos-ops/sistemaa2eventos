@@ -1,170 +1,219 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
-    Box, Typography, Switch, List, ListItem, ListItemIcon,
-    ListItemText, ListItemSecondaryAction, Divider, CircularProgress
+    Box, Typography, Switch, TextField, Button, Avatar, 
+    Slider, Divider, CircularProgress, Grid, IconButton
 } from '@mui/material';
-import { useSnackbar } from 'notistack';
-import {
+import { 
+    CloudUpload as UploadIcon,
     Palette as PaletteIcon,
-    Fingerprint as BiometricIcon,
-    CloudDone as CloudIcon,
-    NotificationsActive as NotificationIcon
+    NotificationsActive as NotificationIcon,
+    Business as BusinessIcon
 } from '@mui/icons-material';
-import PageHeader from '../../components/common/PageHeader';
+import { useSnackbar } from 'notistack';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
 import GlassCard from '../../components/common/GlassCard';
-import api from '../../services/api';
+import { supabase } from '../../config/supabase';
 
 const ConfigGeral = () => {
+    const { settings, setSettings, loading, saving, handleSave } = useSystemSettings();
     const { enqueueSnackbar } = useSnackbar();
-    const [settings, setSettings] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
+    const [uploading, setUploading] = useState(false);
 
-    useEffect(() => {
-        const fetchSettings = async () => {
-            try {
-                const response = await api.get('/settings');
-                setSettings(response.data.data);
-            } catch (error) {
-                console.error('Erro ao buscar configurações:', error);
-                enqueueSnackbar('Falha ao carregar configurações.', { variant: 'error' });
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchSettings();
-    }, [enqueueSnackbar]);
-
-    const handleToggle = async (key) => {
-        if (!settings) return;
-        const newValue = !settings[key];
-        const oldSettings = { ...settings };
-        setSettings(prev => ({ ...prev, [key]: newValue }));
-
+    const handleLogoUpload = async (event) => {
         try {
-            setSaving(true);
-            await api.put('/settings', { [key]: newValue });
-            enqueueSnackbar('Configuração atualizada com sucesso.', { variant: 'success' });
+            const file = event.target.files[0];
+            if (!file) return;
+
+            setUploading(true);
+            const fileExt = file.name.split('.').pop();
+            const fileName = `logo-${Math.random()}.${fileExt}`;
+            const filePath = `logo/${fileName}`;
+
+            // Upload para bucket 'system-assets'
+            const { error: uploadError } = await supabase.storage
+                .from('system-assets')
+                .upload(filePath, file, { upsert: true });
+
+            if (uploadError) throw uploadError;
+
+            // Pegar URL pública
+            const { data: { publicUrl } } = supabase.storage
+                .from('system-assets')
+                .getPublicUrl(filePath);
+
+            setSettings(prev => ({ ...prev, logo_url: publicUrl }));
+            enqueueSnackbar('Logo carregada com sucesso!', { variant: 'success' });
         } catch (error) {
-            console.error('Erro ao salvar:', error);
-            setSettings(oldSettings); // Rollback
-            enqueueSnackbar('Falha ao salvar configuração.', { variant: 'error' });
+            enqueueSnackbar('Erro ao carregar logo: ' + error.message, { variant: 'error' });
         } finally {
-            setSaving(false);
+            setUploading(false);
         }
     };
 
     if (loading) return (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-            <CircularProgress color="secondary" />
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+            <CircularProgress />
         </Box>
     );
 
     return (
-        <Box sx={{ p: { xs: 2, md: 4 } }}>
-            <PageHeader
-                title="Configurações Gerais"
-                subtitle="Ajuste parâmetros visuais e identidade da aplicação NZT."
-                breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações Globais' }, { text: 'Geral' }]}
-            />
+        <Box>
+            <Typography variant="h6" sx={{ color: 'primary.main', mb: 3, fontWeight: 700 }}>
+                Configurações Gerais
+            </Typography>
 
-            <GlassCard sx={{ p: { xs: 2, md: 4 }, mt: 4, minHeight: '500px' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 4, pb: 2, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <PaletteIcon sx={{ color: '#00D4FF', fontSize: 32 }} />
-                    <Typography variant="h5" sx={{ fontWeight: 800, color: '#fff' }}>
-                        Geral & Interface
-                    </Typography>
-                </Box>
-
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-                    Ajuste os parâmetros visuais globais e a identidade da aplicação NZT (A2 Eventos).
-                </Typography>
-
-                <List disablePadding>
-                    <ListItem sx={{ px: 0, py: 2, '&:hover': { background: 'rgba(0, 212, 255, 0.03)' }, borderRadius: 2 }}>
-                        <ListItemIcon sx={{ color: 'primary.main', minWidth: 48 }}>
-                            <PaletteIcon />
-                        </ListItemIcon>
-                        <ListItemText
-                            primary="Modo Neon Dinâmico"
-                            secondary="Aplica um tema escuro profundo (Dark Solid) combinado com luzes neon nos cartões principais."
-                            primaryTypographyProps={{ fontWeight: 600, color: '#fff' }}
-                            secondaryTypographyProps={{ fontSize: '0.75rem', color: 'text.secondary' }}
-                        />
-                        <ListItemSecondaryAction>
-                            <Switch
-                                checked={!!settings?.theme_neon_enabled}
-                                onChange={() => handleToggle('theme_neon_enabled')}
-                                disabled={saving}
-                                color="primary"
+            <Grid container spacing={3}>
+                {/* SEÇÃO: Identidade do Sistema */}
+                <Grid item xs={12}>
+                    <GlassCard sx={{ p: 3 }}>
+                        <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700, mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <BusinessIcon fontSize="small" color="primary" /> Identidade do Sistema
+                        </Typography>
+                        
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 4, mb: 4 }}>
+                            <Box sx={{ position: 'relative' }}>
+                                <Avatar 
+                                    src={settings.logo_url} 
+                                    sx={{ 
+                                        width: 100, 
+                                        height: 100, 
+                                        border: '2px solid', 
+                                        borderColor: 'primary.main',
+                                        boxShadow: '0 0 15px rgba(0, 212, 255, 0.3)' 
+                                    }} 
+                                >
+                                    NZT
+                                </Avatar>
+                                <input
+                                    accept="image/*"
+                                    style={{ display: 'none' }}
+                                    id="logo-upload"
+                                    type="file"
+                                    onChange={handleLogoUpload}
+                                    disabled={uploading}
+                                />
+                                <label htmlFor="logo-upload">
+                                    <IconButton 
+                                        component="span" 
+                                        sx={{ 
+                                            position: 'absolute', 
+                                            bottom: -5, 
+                                            right: -5, 
+                                            bgcolor: 'primary.main',
+                                            '&:hover': { bgcolor: 'primary.dark' }
+                                        }}
+                                        size="small"
+                                    >
+                                        <UploadIcon sx={{ color: '#000000', fontSize: 18 }} />
+                                    </IconButton>
+                                </label>
+                            </Box>
+                            
+                            <TextField
+                                label="Nome do Sistema"
+                                variant="outlined"
+                                fullWidth
+                                value={settings.system_name}
+                                onChange={(e) => setSettings(prev => ({ ...prev, system_name: e.target.value }))}
+                                sx={{ maxWidth: 400 }}
                             />
-                        </ListItemSecondaryAction>
-                    </ListItem>
-                    <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)' }} />
+                        </Box>
+                    </GlassCard>
+                </Grid>
 
-                    <ListItem sx={{ px: 0, py: 2, '&:hover': { background: 'rgba(0, 212, 255, 0.03)' }, borderRadius: 2 }}>
-                        <ListItemIcon sx={{ color: '#00D4FF', minWidth: 48 }}>
-                            <BiometricIcon />
-                        </ListItemIcon>
-                        <ListItemText
-                            primary="Login Biométrico"
-                            secondary="Permite que usuários façam login usando biometria do dispositivo (apenas mobile/apenas HTTPS)."
-                            primaryTypographyProps={{ fontWeight: 600, color: '#fff' }}
-                            secondaryTypographyProps={{ fontSize: '0.75rem', color: 'text.secondary' }}
-                        />
-                        <ListItemSecondaryAction>
-                            <Switch
-                                checked={!!settings?.biometric_login_enabled}
-                                onChange={() => handleToggle('biometric_login_enabled')}
-                                disabled={saving}
-                                color="primary"
-                            />
-                        </ListItemSecondaryAction>
-                    </ListItem>
-                    <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)' }} />
+                {/* SEÇÃO: Comportamento */}
+                <Grid item xs={12} md={6}>
+                    <GlassCard sx={{ p: 3, height: '100%' }}>
+                        <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700, mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <PaletteIcon fontSize="small" color="primary" /> Comportamento & Interface
+                        </Typography>
+                        
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Box>
+                                    <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600 }}>Login Biométrico</Typography>
+                                    <Typography variant="caption" color="text.secondary">Habilita uso de digital/facial no login</Typography>
+                                </Box>
+                                <Switch 
+                                    checked={settings.biometric_login_enabled}
+                                    onChange={(e) => setSettings(prev => ({ ...prev, biometric_login_enabled: e.target.checked }))}
+                                />
+                            </Box>
+                            <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)' }} />
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Box>
+                                    <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600 }}>Cloud Sync Real-time</Typography>
+                                    <Typography variant="caption" color="text.secondary">Sincronização instantânea com a nuvem</Typography>
+                                </Box>
+                                <Switch 
+                                    checked={settings.cloud_sync_enabled}
+                                    onChange={(e) => setSettings(prev => ({ ...prev, cloud_sync_enabled: e.target.checked }))}
+                                />
+                            </Box>
+                            <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)' }} />
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Box>
+                                    <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600 }}>Modo Neon Dinâmico</Typography>
+                                    <Typography variant="caption" color="text.secondary">Tema escuro profundo com luzes neon nos cartões principais</Typography>
+                                </Box>
+                                <Switch 
+                                    checked={!!settings.theme_neon_enabled}
+                                    onChange={(e) => setSettings(prev => ({ ...prev, theme_neon_enabled: e.target.checked }))}
+                                />
+                            </Box>
+                        </Box>
+                    </GlassCard>
+                </Grid>
 
-                    <ListItem sx={{ px: 0, py: 2, '&:hover': { background: 'rgba(0, 212, 255, 0.03)' }, borderRadius: 2 }}>
-                        <ListItemIcon sx={{ color: '#00FF88', minWidth: 48 }}>
-                            <CloudIcon />
-                        </ListItemIcon>
-                        <ListItemText
-                            primary="Sincronização em Nuvem em Tempo Real"
-                            secondary="Envia eventos de acesso instantaneamente para o servidor central enquanto houver internet."
-                            primaryTypographyProps={{ fontWeight: 600, color: '#fff' }}
-                            secondaryTypographyProps={{ fontSize: '0.75rem', color: 'text.secondary' }}
-                        />
-                        <ListItemSecondaryAction>
-                            <Switch
-                                checked={!!settings?.cloud_sync_enabled}
-                                onChange={() => handleToggle('cloud_sync_enabled')}
-                                disabled={saving}
-                                color="primary"
+                {/* SEÇÃO: Alertas de Lotação */}
+                <Grid item xs={12} md={6}>
+                    <GlassCard sx={{ p: 3, height: '100%' }}>
+                        <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700, mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <NotificationIcon fontSize="small" color="primary" /> Limites de Lotação
+                        </Typography>
+                        
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                            <Box>
+                                <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600 }}>Alertas de Lotação</Typography>
+                                <Typography variant="caption" color="text.secondary">Notificar quando atingir o limite</Typography>
+                            </Box>
+                            <Switch 
+                                checked={settings.alert_event_peak}
+                                onChange={(e) => setSettings(prev => ({ ...prev, alert_event_peak: e.target.checked }))}
                             />
-                        </ListItemSecondaryAction>
-                    </ListItem>
-                    <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)' }} />
+                        </Box>
+                        
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                            Threshold de Alerta: {settings.alert_peak_threshold}%
+                        </Typography>
+                        <Slider
+                            value={settings.alert_peak_threshold || 90}
+                            min={50}
+                            max={100}
+                            step={5}
+                            marks
+                            onChange={(e, val) => setSettings(prev => ({ ...prev, alert_peak_threshold: val }))}
+                            valueLabelDisplay="auto"
+                            sx={{ color: 'primary.main' }}
+                        />
+                    </GlassCard>
+                </Grid>
 
-                    <ListItem sx={{ px: 0, py: 2, '&:hover': { background: 'rgba(0, 212, 255, 0.03)' }, borderRadius: 2 }}>
-                        <ListItemIcon sx={{ color: '#FFAC33', minWidth: 48 }}>
-                            <NotificationIcon />
-                        </ListItemIcon>
-                        <ListItemText
-                            primary="Alertas de Pico de Lotação"
-                            secondary="Notifica administradores quando o evento atinge 90% da capacidade configurada."
-                            primaryTypographyProps={{ fontWeight: 600, color: '#fff' }}
-                            secondaryTypographyProps={{ fontSize: '0.75rem', color: 'text.secondary' }}
-                        />
-                        <ListItemSecondaryAction>
-                            <Switch
-                                checked={!!settings?.alert_event_peak}
-                                onChange={() => handleToggle('alert_event_peak')}
-                                disabled={saving}
-                                color="primary"
-                            />
-                        </ListItemSecondaryAction>
-                    </ListItem>
-                </List>
-            </GlassCard>
+                <Grid item xs={12}>
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={() => handleSave()}
+                            disabled={saving}
+                            startIcon={saving ? <CircularProgress size={20} color="inherit" /> : null}
+                            sx={{ fontWeight: 700, px: 4, borderRadius: 1.5 }}
+                        >
+                            {saving ? 'Salvando...' : 'Salvar Alterações'}
+                        </Button>
+                    </Box>
+                </Grid>
+            </Grid>
         </Box>
     );
 };
