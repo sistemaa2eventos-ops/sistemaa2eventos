@@ -13,7 +13,8 @@ const CYAN = '#00D4FF';
 
 /**
  * Agentes locais: programa instalado num computador da rede do evento que liga
- * os leitores faciais ao servidor na nuvem (cadastro de faces, configuração, snapshot).
+ * os leitores faciais ao servidor na nuvem (cadastro de faces, configuração, snapshot) e repassa
+ * as chamadas das câmeras ao motor de IA facial local.
  * @param {{ agentes: Array, onChange: () => void }} props
  */
 const AgentesLocais = ({ agentes = [], onChange }) => {
@@ -63,7 +64,7 @@ const AgentesLocais = ({ agentes = [], onChange }) => {
                     <Box>
                         <Typography sx={{ color: '#FFFFFF', fontWeight: 700 }}>Agentes locais</Typography>
                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.55)' }}>
-                            Necessário quando o servidor está na nuvem: liga os leitores da rede do evento ao sistema.
+                            Necessário quando o servidor está na nuvem: liga os leitores, as câmeras e a IA facial da rede do evento ao sistema.
                         </Typography>
                     </Box>
                 </Stack>
@@ -108,7 +109,8 @@ const AgentesLocais = ({ agentes = [], onChange }) => {
                             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.75)' }}>
                                 No computador da rede do evento (com Node.js 18+): copie a pasta <code>backend/agent-local</code>,
                                 salve o texto acima no arquivo <code>.env</code>, rode <code>npm install</code> e depois <code>npm start</code>.
-                                Em seguida, edite cada leitor e escolha este agente em <b>Conexão</b>.
+                                Em seguida, edite cada leitor e escolha este agente em <b>Conexão</b>. As câmeras do evento usam
+                                este agente automaticamente; no servidor com a IA facial, basta abrir <code>ligar-ia-facial.bat</code>.
                             </Typography>
                         </Stack>
                     )}

@@ -65,9 +65,10 @@ class DeviceHealthCheckService {
             return { online: true, timestamp: ultimoContato, via: 'keepalive' };
         }
 
-        if (dispositivo.agent_id) {
+        const agentService = require('../../services/agentService');
+        // Mesma regra do IntelbrasService._request: no servidor local o teste direto funciona
+        if (dispositivo.agent_id && (agentService.agents.has(dispositivo.agent_id) || !process.env.PYTHON_MICROSERVICE_URL)) {
             try {
-                const agentService = require('../../services/agentService');
                 await agentService.sendCommand(dispositivo.agent_id, 'ping', {
                     deviceId: dispositivo.id,
                     config: { ip: dispositivo.ip_address, port: dispositivo.porta || 80, user: dispositivo.user_device, password: dispositivo.password_device }

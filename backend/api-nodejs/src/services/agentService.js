@@ -83,7 +83,7 @@ class AgentService {
      * Envia um comando para o agente responsável pelo dispositivo
      * e aguarda a resposta com timeout.
      */
-    async sendCommand(agentId, command, payload) {
+    async sendCommand(agentId, command, payload, timeoutMs = this.REQUEST_TIMEOUT) {
         const socket = this.agents.get(agentId);
         if (!socket) throw new Error(`Agente ${agentId} não está conectado`);
 
@@ -93,7 +93,7 @@ class AgentService {
             const timer = setTimeout(() => {
                 this.pending.delete(requestId);
                 reject(new Error(`Timeout aguardando resposta do agente para ${command}`));
-            }, this.REQUEST_TIMEOUT);
+            }, timeoutMs);
 
             this.pending.set(requestId, { resolve, reject, timer });
             socket.emit('agent:command', { requestId, command, payload });
@@ -114,6 +114,15 @@ class AgentService {
 
         const socket = this.agents.get(data.agent_id);
         return socket ? data.agent_id : null;
+    }
+
+    /** Agente conectado do evento (câmeras e IA facial ficam na rede do evento), ou null */
+    findAgentForEvent(eventoId) {
+        if (!eventoId) return null;
+        for (const [agentId, socket] of this.agents) {
+            if (socket.agentInfo?.evento_id === eventoId) return agentId;
+        }
+        return null;
     }
 
     /** Encerra a conexão de um agente (ex.: token desativado) */

@@ -8,7 +8,10 @@
  * (cadastro de faces, configuração, relógio, abertura de porta, snapshot) e o
  * agente as executa na rede local, devolvendo a resposta.
  *
- * Variáveis (.env): VPS_URL, AGENT_TOKEN, AGENT_NAME
+ * Também repassa ao motor de IA facial local (microservice-face-python) as chamadas
+ * das câmeras (rastreamento, snapshot, teste) e busca imagens de câmeras HTTP da rede.
+ *
+ * Variáveis (.env): VPS_URL, AGENT_TOKEN, AGENT_NAME, IA_URL (padrão http://127.0.0.1:8000)
  */
 require('dotenv').config();
 const { io } = require('socket.io-client');
@@ -16,7 +19,8 @@ const { io } = require('socket.io-client');
 const VPS_URL = (process.env.VPS_URL || '').replace(/\/+$/, '');
 const AGENT_TOKEN = process.env.AGENT_TOKEN;
 const AGENT_NAME = process.env.AGENT_NAME || 'Agente Local';
-const VERSAO = '2.0.0';
+const IA_URL = (process.env.IA_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
+const VERSAO = '2.1.0';
 
 const log = (nivel, msg) => console.log(`[${new Date().toISOString()}] ${nivel.toUpperCase()} ${msg}`);
 
@@ -77,6 +81,46 @@ const handlers = {
     /** Chamada CGI genérica (usada por todo o serviço Intelbras do servidor) */
     async cgi(payload) {
         return executarCgi(payload);
+    },
+
+    /** Chamada ao motor de IA facial local: GET {IA_URL}{path}?{params} */
+    async ia({ path, params = {}, binary = false, timeoutMs = 8000 }) {
+        if (typeof path !== 'string' || !path.startsWith('/api/')) throw new Error('Caminho inválido para a IA');
+        const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== null).map(([k, v]) => [k, String(v)]));
+        let res;
+        try {
+            res = await fetch(`${IA_URL}${path}?${query}`, { signal: AbortSignal.timeout(timeoutMs) });
+        } catch (err) {
+            throw new Error(err.name === 'TimeoutError' ? 'Motor de IA local não respondeu (timeout)' : 'Motor de IA local não está ligado');
+        }
+        if (binary) {
+            const buffer = Buffer.from(await res.arrayBuffer());
+            return { status: res.status, ok: res.ok, contentType: res.headers.get('content-type'), base64: buffer.toString('base64') };
+        }
+        return { status: res.status, ok: res.ok, json: await res.json().catch(() => null) };
+    },
+
+    /** Imagem de câmera HTTP da rede local (snapshot CGI), com autenticação Digest ou Basic */
+    async http({ url, user, password, timeoutMs = 5000 }) {
+        const alvo = new URL(url);
+        if (!['http:', 'https:'].includes(alvo.protocol)) throw new Error('URL inválida');
+        const opcoes = () => ({ signal: AbortSignal.timeout(timeoutMs) });
+        try {
+            let res;
+            if (user) {
+                const client = await clienteDigest({ ip: alvo.hostname, port: alvo.port || 80, user, password });
+                res = await client.fetch(url, opcoes());
+                if (res.status === 401 && /^basic/i.test(res.headers.get('www-authenticate') || '')) {
+                    res = await fetch(url, { ...opcoes(), headers: { Authorization: 'Basic ' + Buffer.from(`${user}:${password || ''}`).toString('base64') } });
+                }
+            } else {
+                res = await fetch(url, opcoes());
+            }
+            const buffer = Buffer.from(await res.arrayBuffer());
+            return { status: res.status, ok: res.ok, contentType: res.headers.get('content-type'), base64: buffer.toString('base64') };
+        } catch (err) {
+            throw new Error(`Câmera ${alvo.host} inacessível: ${err.name === 'TimeoutError' ? 'timeout' : err.message}`);
+        }
     }
 };
 
@@ -107,10 +151,11 @@ socket.on('agent:command', async ({ requestId, command, payload }) => {
     try {
         const data = await handler(payload || {});
         socket.emit('agent:response', { requestId, success: true, data });
-        log('info', `${command} ${payload?.method || ''} ${payload?.config?.ip || ''}${(payload?.path || '').split('?')[0]} → ok (${Date.now() - inicio} ms)`);
+        // IA e imagens de câmera chegam várias vezes por segundo: só os erros vão para o log
+        if (command !== 'ia' && command !== 'http') log('info',`${command} ${payload?.method || ''} ${payload?.config?.ip || ''}${(payload?.path || '').split('?')[0]} → ok (${Date.now() - inicio} ms)`);
     } catch (err) {
         socket.emit('agent:response', { requestId, success: false, error: err.message });
-        log('error', `${command} ${payload?.config?.ip || ''} → ${err.message}`);
+        log('error', `${command} ${payload?.config?.ip || payload?.path || ''} → ${err.message}`);
     }
 });
 

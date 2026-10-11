@@ -18,6 +18,8 @@ class WebSocketService {
 
         // FIX C-08: CORS agora usa a mesma allowlist do Express (era "*")
         this.io = socketIo(httpServer, {
+            // Respostas do agente local trazem quadros de câmera em base64 (padrão do Socket.IO: 1 MB)
+            maxHttpBufferSize: 8e6,
             cors: {
                 origin: (origin, callback) => {
                     // Permite origens sem header (mobile apps, Postman interno)

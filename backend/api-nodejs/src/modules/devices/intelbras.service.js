@@ -39,15 +39,19 @@ class IntelbrasService extends AccessDevice {
      * Transporte único para o CGI do terminal.
      * - Terminal com agent_id: a chamada vai pelo agente local (servidor na nuvem,
      *   leitor na rede privada do evento).
-     * - Sem agente: conexão direta com Digest Auth (servidor na mesma rede).
+     * - Sem agente, ou com o agente conectado a outro servidor (ex.: API local do evento enquanto
+     *   o agente atende a nuvem): conexão direta com Digest Auth (servidor na mesma rede).
      * @returns {Promise<{ status: number, ok: boolean, text: string, buffer: Buffer|null }>}
      */
     async _request(method, path, params = {}, body = null, contentType = null, { binary = false, timeoutMs = TIMEOUT_CONFIG.DEVICE_CONNECTION } = {}) {
         const queryString = new URLSearchParams(params).toString();
         const fullPath = `${path}${queryString ? '?' + queryString : ''}`;
+        // Na nuvem o leitor só é alcançável pelo agente. No servidor local do evento (PYTHON_MICROSERVICE_URL
+        // definida, ver camera.controller) a conexão direta funciona mesmo com o agente atendendo a nuvem.
+        const agentService = this.config?.agent_id ? require('../../services/agentService') : null;
+        const viaAgente = agentService && (agentService.agents.has(this.config.agent_id) || !process.env.PYTHON_MICROSERVICE_URL);
 
-        if (this.config?.agent_id) {
-            const agentService = require('../../services/agentService');
+        if (viaAgente) {
             const r = await agentService.sendCommand(this.config.agent_id, 'cgi', {
                 deviceId: this.config.id,
                 config: { ip: this.ip, port: this.port, user: this.user, password: this.pass },
