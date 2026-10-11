@@ -12,6 +12,10 @@ const {
     getDefaultPermissions
 } = require('../../utils/validators');
 
+// Tela do painel onde o link do e-mail (convite ou "esqueci a senha") cria a senha.
+// FRONTEND_URL vazia na VPS gerava links "undefined/reset-password".
+const URL_DEFINIR_SENHA = `${(process.env.FRONTEND_URL || 'https://painel.nzt.app.br').replace(/\/+$/, '')}/reset-password`;
+
 class AuthController {
     /**
      * Login do usuário
@@ -33,6 +37,12 @@ class AuthController {
 
             if (error) {
                 logger.warn(`Falha no login: ${email} - ${error.message}`);
+                // E-mail não confirmado não é senha errada: dizer o que fazer (antes aparecia "Credenciais inválidas")
+                if (error.code === 'email_not_confirmed' || /email not confirmed/i.test(error.message || '')) {
+                    return res.status(401).json({
+                        error: 'Conta ainda não ativada. Use o link do convite ou "Esqueci a senha", ou peça ao administrador para redefinir sua senha.'
+                    });
+                }
                 return res.status(401).json({
                     error: 'Credenciais inválidas'
                 });
@@ -272,7 +282,7 @@ class AuthController {
                 type: 'invite',
                 email: normalizedEmail,
                 options: {
-                    redirectTo: `${process.env.FRONTEND_URL || 'https://painel.nzt.app.br'}/reset-password`
+                    redirectTo: URL_DEFINIR_SENHA
                 }
             });
 
@@ -518,7 +528,7 @@ class AuthController {
             }
 
             const { error } = await supabasePublic.auth.resetPasswordForEmail(email, {
-                redirectTo: `${process.env.FRONTEND_URL}/reset-password`
+                redirectTo: URL_DEFINIR_SENHA
             });
 
             if (error) throw error;
@@ -533,6 +543,37 @@ class AuthController {
         } catch (error) {
             logger.error('Erro na recuperação de senha:', error);
             res.status(500).json({ error: 'Erro interno no servidor' });
+        }
+    }
+
+    /**
+     * Definir senha pelo link do e-mail (convite ou "esqueci a senha").
+     * A tela /reset-password envia o access_token que o Supabase põe no link (Authorization: Bearer).
+     */
+    async definirSenha(req, res) {
+        try {
+            const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+            const { nova_senha, confirmar_senha } = req.body || {};
+
+            if (!token) return res.status(400).json({ error: 'Link inválido. Peça um novo e-mail de redefinição.' });
+            if (!nova_senha || nova_senha.length < 6) return res.status(400).json({ error: 'A senha deve ter pelo menos 6 caracteres.' });
+            if (nova_senha !== confirmar_senha) return res.status(400).json({ error: 'As senhas não coincidem.' });
+
+            const { data: { user } = {}, error: tokenError } = await supabase.auth.getUser(token);
+            if (tokenError || !user) {
+                return res.status(400).json({ error: 'Link expirado ou já usado. Peça um novo em "Esqueci a senha".' });
+            }
+
+            const { error } = await supabase.auth.admin.updateUserById(user.id, { password: nova_senha, email_confirm: true });
+            if (error) throw error;
+
+            // O token do link vira inútil: encerra a sessão aberta por ele
+            await supabase.auth.admin.signOut(token, 'local').catch(() => {});
+            logger.info(`🔑 Senha definida pelo link do e-mail: ${user.email}`);
+            res.json({ success: true, email: user.email, message: 'Senha definida. Entre com a nova senha.' });
+        } catch (error) {
+            logger.error('Erro ao definir senha pelo link:', error);
+            res.status(500).json({ error: 'Erro ao definir a senha.' });
         }
     }
 
@@ -845,7 +886,9 @@ class AuthController {
                 });
             }
 
-            const { error } = await supabase.auth.updateUser({
+            // O cliente do servidor não tem sessão de usuário: auth.updateUser() falhava sempre.
+            // Troca pelo id do usuário autenticado (vem do token validado no middleware).
+            const { error } = await supabase.auth.admin.updateUserById(req.user.id, {
                 password: nova_senha
             });
 
@@ -989,9 +1032,11 @@ class AuthController {
                 });
             }
 
-            // Atualizar senha via Supabase Admin
+            // Atualizar senha via Supabase Admin. email_confirm: o admin responde pela conta — sem isso,
+            // operador convidado que nunca abriu o link continuava barrado ("Email not confirmed").
             const { error } = await supabase.auth.admin.updateUserById(userId, {
-                password: nova_senha
+                password: nova_senha,
+                email_confirm: true
             });
 
             if (error) throw error;

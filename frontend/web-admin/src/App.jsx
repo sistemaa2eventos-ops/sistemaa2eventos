@@ -22,6 +22,7 @@ import { useSystemAlerts } from './hooks/useSystemAlerts';
 // Pages (Lazy Loaded for Bundle Splitting)
 const Login = lazy(() => import('./pages/Login'));
 const PortalCadastro = lazy(() => import('./pages/PortalCadastro'));
+const DefinirSenha = lazy(() => import('./pages/DefinirSenha'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const CftvWall = lazy(() => import('./pages/CftvWall'));
 const JanelaRegistros = lazy(() => import('./pages/JanelaRegistros'));
@@ -109,12 +110,20 @@ const AppContent = () => {
     return <LoadingOverlay />;
   }
 
+  // Link do e-mail (convite / esqueci a senha) que caiu em outro endereço — ex.: o Supabase devolve para
+  // a página inicial se /reset-password não estiver na lista de redirecionamentos: leva o token para a tela certa
+  const hashLink = window.location.hash;
+  if (/access_token=/.test(hashLink) && /type=(recovery|invite|signup|magiclink)/.test(hashLink) && window.location.pathname !== '/reset-password') {
+    return <Navigate to={{ pathname: '/reset-password', hash: hashLink }} replace />;
+  }
+
   // Regra 21: A jaula de exclusão isolada de rotas
   if (!user) {
     return (
       <Suspense fallback={<LoadingOverlay />}>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/reset-password" element={<DefinirSenha />} />
           <Route path="/portal" element={<PortalCadastro />} />
           <Route path="*" element={<Navigate to="/login" />} />
         </Routes>
@@ -184,6 +193,7 @@ const AppContent = () => {
           <Route path="/config/cron" element={<ProtectedRoute role="admin_master"><ConfigCron /></ProtectedRoute>} />
           {/* <Route path="/financeiro" element={<Financeiro />} /> */}
           <Route path="/portal" element={<PortalCadastro />} />
+          <Route path="/reset-password" element={<DefinirSenha />} />
           <Route path="/login" element={<Navigate to="/" />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

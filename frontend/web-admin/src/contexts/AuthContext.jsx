@@ -258,7 +258,9 @@ export const AuthProvider = ({ children }) => {
       if (!err.response) {
         errorMsg = 'Sem conexão com o servidor.';
       } else if (err.response.status === 401) {
-        errorMsg = 'Email ou senha incorretos';
+        // Mensagem específica do servidor (ex.: conta ainda não ativada) vale mais que a genérica
+        const doServidor = err.response.data?.error;
+        errorMsg = doServidor && doServidor !== 'Credenciais inválidas' ? doServidor : 'Email ou senha incorretos';
       } else if (err.response.status === 403) {
         const errorData = err.response.data?.error || '';
         if (errorData.includes('pendente')) {
