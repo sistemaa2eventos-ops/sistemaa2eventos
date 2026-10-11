@@ -17,19 +17,22 @@ export const metadata: Metadata = {
   description: "Plataforma Inteligente de Gestão de Bordo, Controle de Acesso e Credenciamento Biométrico.",
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: "/logo.jpg",
-    apple: "/logo.jpg",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
+    ],
+    apple: "/apple-touch-icon.png",
   },
   openGraph: {
     title: "NZT - Intelligent Control System",
     description: "Credenciamento Biométrico Inteligente",
-    images: ["/logo.jpg"],
+    images: ["/pwa-512x512.png"],
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "NZT - Intelligent Control System",
-    images: ["/logo.jpg"],
+    images: ["/pwa-512x512.png"],
   },
   appleWebApp: {
     capable: true,
