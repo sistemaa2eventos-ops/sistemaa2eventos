@@ -224,58 +224,72 @@ class CronController {
      * Força o checkout de pessoas que ficaram presas com 'checkin_feito' no final do dia
      * para evitar bloqueio de "Double Entry" no dia seguinte.
      */
-    async resetTurnos(eventoId = null) {
+    /**
+     * Quem ainda está dentro do evento: status de entrada OU último registro de entrada/saída
+     * (últimos 7 dias) é uma entrada — a mesma regra do painel e do relatório diário.
+     * Antes só o status contava: quem entrou pelo leitor e teve o status alterado depois
+     * ficava "presente" para sempre no relatório.
+     */
+    async _pessoasDentro(eventoId) {
+        const { buscarTodos } = require('../../utils/buscarTodos');
+        const desde = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const [{ data: porStatus, error: e1 }, { data: logs, error: e2 }] = await Promise.all([
+            supabase.from('pessoas').select('id, status_acesso')
+                .eq('evento_id', eventoId).in('status_acesso', ['checkin_feito', 'checkout_feito']),
+            buscarTodos(supabase.from('logs_acesso').select('pessoa_id, tipo, created_at')
+                .eq('evento_id', eventoId).in('tipo', ['checkin', 'checkout'])
+                .gte('created_at', desde).order('created_at', { ascending: false }))
+        ]);
+        if (e1) throw e1;
+        if (e2) throw e2;
+
+        const ultimo = new Map(); // pessoa_id → tipo do registro mais recente
+        for (const l of logs || []) if (l.pessoa_id && !ultimo.has(l.pessoa_id)) ultimo.set(l.pessoa_id, l.tipo);
+
+        const dentro = new Set([...ultimo].filter(([, tipo]) => tipo === 'checkin').map(([id]) => id));
+        for (const p of porStatus || []) if (p.status_acesso === 'checkin_feito' && ultimo.get(p.id) !== 'checkout') dentro.add(p.id);
+        return { dentro: [...dentro], statusParaZerar: (porStatus || []).map(p => p.id) };
+    }
+
+    /**
+     * Fechamento de turno de um evento: saída forçada para quem ficou dentro, status volta para o
+     * próximo turno e o relatório do dia é arquivado (sempre, mesmo sem ninguém dentro).
+     * Sem evento: roda para todos os eventos ativos.
+     * @param {{ arquivar?: boolean, dataFechamento?: string }} opcoes
+     */
+    async resetTurnos(eventoId = null, { arquivar = true, dataFechamento = null } = {}) {
+        if (!eventoId) {
+            const { data: eventos } = await supabase.from('eventos').select('id').eq('status', 'ativo');
+            for (const ev of eventos || []) await this.resetTurnos(ev.id, { arquivar, dataFechamento });
+            return;
+        }
         try {
-            // Busca pessoas que estão com check-in pendente (não deram checkout)
-            let query = supabase
-                .from('pessoas')
-                .select('id, nome_completo, evento_id, numero_pulseira, status_acesso')
-                .in('status_acesso', ['checkin_feito', 'checkout_feito']);
-            if (eventoId) query = query.eq('evento_id', eventoId);
-            const { data: presas, error: fetchErr } = await query;
+            const { dentro, statusParaZerar } = await this._pessoasDentro(eventoId);
+            logger.info(`🔄 [CRON] Fechamento de turno do evento ${eventoId}: ${dentro.length} pessoa(s) ainda dentro.`);
 
-            if (fetchErr) throw fetchErr;
-
-            if (!presas || presas.length === 0) {
-                logger.info('✅ [CRON] Nenhum status pendente de checkout encontrado.');
-                return;
+            // 1. Saída forçada para quem ainda estava dentro (erro aqui interrompe: sem saída, o relatório mentiria)
+            if (dentro.length > 0) {
+                const agora = new Date().toISOString();
+                const { error: logsErr } = await supabase.from('logs_acesso').insert(dentro.map(pessoa_id => ({
+                    pessoa_id,
+                    evento_id: eventoId,
+                    tipo: 'checkout',
+                    metodo: 'manual',
+                    observacao: 'CHECKOUT_FORCADO_CRON',
+                    created_at: agora
+                })));
+                if (logsErr) throw logsErr;
             }
 
-            logger.info(`🚨 [CRON] Encontradas ${presas.length} pessoas no fechamento de turno. Aplicando reset diário.`);
-
-            // Transição para status autorizado para quem tem pulseira ou pendente para entrar no dia seguinte normalmente.
-            const checkoutLogs = presas.filter(p => p.status_acesso === 'checkin_feito').map(p => ({
-                pessoa_id: p.id,
-                evento_id: p.evento_id,
-                tipo: 'checkout',
-                metodo: 'manual',
-                observacao: 'CHECKOUT_FORCADO_CRON',
-                confianca: null,
-                created_at: new Date().toISOString()
-            }));
-
-            // 1. Inserir logs de checkout automático apenas para quem ainda estava dentro
-            if (checkoutLogs.length > 0) {
-                const { error: logsErr } = await supabase
-                    .from('logs_acesso')
-                    .insert(checkoutLogs);
-
-                if (logsErr) {
-                    logger.error('[CRON] Erro ao salvar logs de checkout forçado:', logsErr);
-                }
+            // 2. Status de entrada/saída volta a "autorizado" para o novo dia
+            const pessoasIds = [...new Set([...statusParaZerar, ...dentro])];
+            if (statusParaZerar.length > 0) {
+                const { error: updateErr } = await supabase
+                    .from('pessoas')
+                    .update({ status_acesso: 'autorizado', updated_at: new Date().toISOString() })
+                    .in('id', statusParaZerar);
+                if (updateErr) throw updateErr;
             }
-
-            // 2. Atualizar status na tabela pessoas (volta para autorizado para o novo dia)
-            const pessoasIds = presas.map(p => p.id);
-            const { error: updateErr } = await supabase
-                .from('pessoas')
-                .update({ 
-                    status_acesso: 'autorizado',
-                    updated_at: new Date().toISOString()
-                })
-                .in('id', pessoasIds);
-
-            if (updateErr) throw updateErr;
 
             // 2.1 Fim do turno: encerra liberações manuais e reavalia a documentação
             //     (quem tem pendência volta a "pendente" para o próximo turno)
@@ -286,22 +300,15 @@ class CronController {
                 await documentoService.sincronizarStatusPessoa(null, id);
             }
 
-            // 3. Arquivar o fechamento diário de cada evento afetado.
-            // O e-mail com a planilha sai uma única vez por dia, no horário do relatório (enviarRelatoriosGlobais).
-            const eventosAtingidos = [...new Set(presas.map(p => p.evento_id))];
-            const dataFmt = this._ontemLocal();
-            for (const evId of eventosAtingidos) {
-                try {
-                    await reportController.salvarFechamentoDiario(evId, dataFmt, null, 'automatico');
-                } catch (evErr) {
-                    logger.error(`❌ [CRON] Falha ao arquivar o fechamento do evento ${evId}:`, evErr);
-                }
+            // 3. Arquivar o fechamento do dia (o e-mail com a planilha sai no horário do relatório)
+            if (arquivar) {
+                await reportController.salvarFechamentoDiario(eventoId, dataFechamento || this._ontemLocal(), null, 'automatico');
             }
 
-            logger.info('✅ [CRON] Fechamento de turno concluído.');
-
+            logger.info(`✅ [CRON] Fechamento de turno do evento ${eventoId} concluído.`);
         } catch (error) {
-            logger.error('❌ [CRON] Falha na execução do Reset de Turnos:', error);
+            logger.error(`❌ [CRON] Falha no fechamento de turno do evento ${eventoId}:`, error);
+            throw error;
         }
     }
 
@@ -328,7 +335,7 @@ class CronController {
      */
     manualTrigger = async (req, res) => {
         try {
-            await this.resetTurnos();
+            await this.resetTurnos(req.event?.id || null);
             res.json({ success: true, message: 'Reset de turnos disparado com sucesso' });
         } catch (error) {
             res.status(500).json({ error: error.message });

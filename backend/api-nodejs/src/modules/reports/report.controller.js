@@ -2,7 +2,7 @@ const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const pdfService = require('../../services/pdf.service');
 const ExcelJS = require('exceljs');
-const { getHojeLocal, getLimitesDiaLocalUTC } = require('../../utils/dateUtils');
+const { getHojeLocal, getLimitesDiaLocalUTC, TIMEZONE } = require('../../utils/dateUtils');
 // PostgREST limita a 1000 linhas: relatórios que somam em memória buscam todas as páginas
 const { buscarTodos, buscarPorIdsEmLotes } = require('../../utils/buscarTodos');
 
@@ -710,11 +710,14 @@ class ReportController {
      * Formata Timestamp para dd/MM/yyyy HH:mm:ss
      */
     _formatarDataHora(dateStr) {
-        if (!dateStr) return '—';
+        if (!dateStr && dateStr !== 0) return '—';
         try {
-            const d = new Date(dateStr);
+            // Horário sem fuso vindo do banco (logs_acesso) é UTC; exibe sempre no fuso do evento
+            const naive = typeof dateStr === 'string' && !/[zZ]|[+-]\d\d:?\d\d$/.test(dateStr);
+            const d = new Date(naive ? `${dateStr}Z` : dateStr);
             if (isNaN(d.getTime())) return '—';
             return d.toLocaleString('pt-BR', {
+                timeZone: TIMEZONE,
                 day: '2-digit', month: '2-digit', year: 'numeric',
                 hour: '2-digit', minute: '2-digit', second: '2-digit'
             });
@@ -767,10 +770,17 @@ class ReportController {
             dAmanha.setDate(dAmanha.getDate() + 1);
             const amanhaStr = dAmanha.toISOString().split('T')[0];
 
-            const inicioOntem = `${ontemStr}T00:00:00-03:00`;
-            const inicioDia = `${dataRef}T00:00:00-03:00`;
-            const fimDia = `${dataRef}T23:59:59.999-03:00`;
-            const fimAmanha = `${amanhaStr}T23:59:59.999-03:00`;
+            // logs_acesso.created_at é UTC sem fuso ("2026-10-11T21:59:40"): comparar como instante, nunca como
+            // texto (antes uma entrada às 22h do dia 9 caía no dia 10). Limites do dia local já em UTC.
+            const inicioOntem = getLimitesDiaLocalUTC(ontemStr).start;
+            const inicioDia = getLimitesDiaLocalUTC(dataRef).start;
+            const fimDia = getLimitesDiaLocalUTC(dataRef).end;
+            const fimAmanha = getLimitesDiaLocalUTC(amanhaStr).end;
+            const msInicioOntem = Date.parse(inicioOntem);
+            const msInicioDia = Date.parse(inicioDia);
+            const msFimDia = Date.parse(fimDia);
+            const msFimAmanha = Date.parse(fimAmanha);
+            const msLog = (ts) => Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(ts) ? ts : `${ts}Z`);
 
             if (!evento_id) {
                 return {
@@ -829,7 +839,7 @@ class ReportController {
             (logs || []).forEach(log => {
                 if (!log.pessoa_id) return;
                 if (!logsPorPessoa[log.pessoa_id]) logsPorPessoa[log.pessoa_id] = [];
-                logsPorPessoa[log.pessoa_id].push(log);
+                logsPorPessoa[log.pessoa_id].push({ ...log, ms: msLog(log.created_at) });
             });
 
             const hojeStr = getHojeLocal();
@@ -846,10 +856,12 @@ class ReportController {
                 const pLogs = logsPorPessoa[p.id] || [];
 
                 // Entradas e saídas categorizadas por janela temporal
-                const entradasHoje = pLogs.filter(l => (l.tipo === 'checkin' || l.tipo === 'entrada') && l.created_at >= inicioDia && l.created_at <= fimDia);
-                const entradasOntem = pLogs.filter(l => (l.tipo === 'checkin' || l.tipo === 'entrada') && l.created_at >= inicioOntem && l.created_at < inicioDia);
-                const saidasHoje = pLogs.filter(l => (l.tipo === 'checkout' || l.tipo === 'saida') && l.created_at >= inicioDia && l.created_at <= fimDia);
-                const saidasAmanha = pLogs.filter(l => (l.tipo === 'checkout' || l.tipo === 'saida') && l.created_at > fimDia && l.created_at <= fimAmanha);
+                const ehEntrada = (l) => l.tipo === 'checkin' || l.tipo === 'entrada';
+                const ehSaida = (l) => l.tipo === 'checkout' || l.tipo === 'saida';
+                const entradasHoje = pLogs.filter(l => ehEntrada(l) && l.ms >= msInicioDia && l.ms <= msFimDia);
+                const entradasOntem = pLogs.filter(l => ehEntrada(l) && l.ms >= msInicioOntem && l.ms < msInicioDia);
+                const saidasHoje = pLogs.filter(l => ehSaida(l) && l.ms >= msInicioDia && l.ms <= msFimDia);
+                const saidasAmanha = pLogs.filter(l => ehSaida(l) && l.ms > msFimDia && l.ms <= msFimAmanha);
 
                 let checkinAt = '—';
                 let checkoutAt = '—';
@@ -864,24 +876,24 @@ class ReportController {
                     let checkinLog = entradasHoje[0];
                     if (entradasHoje.length > 1) {
                         const ultimaEntrada = entradasHoje[entradasHoje.length - 1];
-                        const saidasAposUltima = saidasHoje.filter(s => new Date(s.created_at) > new Date(ultimaEntrada.created_at));
+                        const saidasAposUltima = saidasHoje.filter(s => s.ms > ultimaEntrada.ms);
                         if (saidasAposUltima.length === 0) {
                             checkinLog = ultimaEntrada;
                         }
                     }
 
-                    const checkinDate = new Date(checkinLog.created_at);
-                    checkinAt = this._formatarDataHora(checkinLog.created_at);
+                    const checkinDate = new Date(checkinLog.ms);
+                    checkinAt = this._formatarDataHora(checkinLog.ms);
                     
                     // A pulseira deve ser estritamente a do check-in realizado
                     pulseiraDoTurno = checkinLog.numero_pulseira || (isHoje ? p.numero_pulseira : null) || '—';
 
                     // Procurar checkout no mesmo dia
-                    const saidasMesmoDia = saidasHoje.filter(s => new Date(s.created_at) > checkinDate);
+                    const saidasMesmoDia = saidasHoje.filter(s => new Date(s.ms) > checkinDate);
                     if (saidasMesmoDia.length > 0) {
                         const checkoutLog = saidasMesmoDia[saidasMesmoDia.length - 1];
-                        const checkoutDate = new Date(checkoutLog.created_at);
-                        checkoutAt = this._formatarDataHora(checkoutLog.created_at);
+                        const checkoutDate = new Date(checkoutLog.ms);
+                        checkoutAt = this._formatarDataHora(checkoutLog.ms);
                         const ms = checkoutDate.getTime() - checkinDate.getTime();
                         tempoPermanencia = this._formatarDuracaoMs(ms);
                         tempoMinutos = Math.max(0, Math.round(ms / 60000));
@@ -891,11 +903,11 @@ class ReportController {
                         contagemComTempo++;
                     } else {
                         // Não saiu no mesmo dia: verificar se saiu no dia seguinte (Turno estendido / pernoite)
-                        const saidasDiaSeguinte = saidasAmanha.filter(s => new Date(s.created_at) > checkinDate);
+                        const saidasDiaSeguinte = saidasAmanha.filter(s => new Date(s.ms) > checkinDate);
                         if (saidasDiaSeguinte.length > 0) {
                             const checkoutLog = saidasDiaSeguinte[0];
-                            const checkoutDate = new Date(checkoutLog.created_at);
-                            checkoutAt = this._formatarDataHora(checkoutLog.created_at);
+                            const checkoutDate = new Date(checkoutLog.ms);
+                            checkoutAt = this._formatarDataHora(checkoutLog.ms);
                             const ms = checkoutDate.getTime() - checkinDate.getTime();
                             tempoPermanencia = this._formatarDuracaoMs(ms);
                             tempoMinutos = Math.max(0, Math.round(ms / 60000));
@@ -906,7 +918,7 @@ class ReportController {
                         } else {
                             // Ainda presente no evento (em andamento)
                             checkoutAt = 'No evento';
-                            const refTime = isHoje ? now : new Date(fimDia);
+                            const refTime = isHoje ? now : new Date(msFimDia);
                             const ms = Math.max(0, refTime.getTime() - checkinDate.getTime());
                             tempoPermanencia = `Em andamento (${this._formatarDuracaoMs(ms)})`;
                             tempoMinutos = Math.max(0, Math.round(ms / 60000));
@@ -916,25 +928,25 @@ class ReportController {
                             contagemComTempo++;
                         }
                     }
-                } else if (entradasOntem.length > 0 || (saidasHoje.length > 0 && pLogs.some(l => (l.tipo === 'checkin' || l.tipo === 'entrada') && l.created_at < inicioDia))) {
+                } else if (entradasOntem.length > 0 || (saidasHoje.length > 0 && pLogs.some(l => (l.tipo === 'checkin' || l.tipo === 'entrada') && l.ms < msInicioDia))) {
                     // CENÁRIO 2: Entrou no dia anterior e permaneceu no evento (turno estendido com saída hoje ou ainda dentro)
                     const checkinOntem = entradasOntem.length > 0 
                         ? entradasOntem[entradasOntem.length - 1]
-                        : pLogs.filter(l => (l.tipo === 'checkin' || l.tipo === 'entrada') && l.created_at < inicioDia).pop();
+                        : pLogs.filter(l => (l.tipo === 'checkin' || l.tipo === 'entrada') && l.ms < msInicioDia).pop();
                         
-                    const checkinDate = new Date(checkinOntem.created_at);
-                    const saidasOntem = pLogs.filter(l => (l.tipo === 'checkout' || l.tipo === 'saida') && new Date(l.created_at) > checkinDate && l.created_at < inicioDia);
+                    const checkinDate = new Date(checkinOntem.ms);
+                    const saidasOntem = pLogs.filter(l => (l.tipo === 'checkout' || l.tipo === 'saida') && new Date(l.ms) > checkinDate && l.ms < msInicioDia);
 
                     // Só considera permanência se não saiu ontem OU se possui registro explícito de saída hoje
                     if (saidasOntem.length === 0 || saidasHoje.length > 0) {
                         pulseiraDoTurno = checkinOntem.numero_pulseira || (isHoje ? p.numero_pulseira : null) || '—';
-                        checkinAt = this._formatarDataHora(checkinOntem.created_at);
+                        checkinAt = this._formatarDataHora(checkinOntem.ms);
 
                         if (saidasHoje.length > 0) {
                             // Deu checkout no dia de referência vindo do turno anterior
                             const checkoutLog = saidasHoje[0];
-                            const checkoutDate = new Date(checkoutLog.created_at);
-                            checkoutAt = this._formatarDataHora(checkoutLog.created_at);
+                            const checkoutDate = new Date(checkoutLog.ms);
+                            checkoutAt = this._formatarDataHora(checkoutLog.ms);
                             const ms = checkoutDate.getTime() - checkinDate.getTime();
                             tempoPermanencia = this._formatarDuracaoMs(ms);
                             tempoMinutos = Math.max(0, Math.round(ms / 60000));
@@ -945,7 +957,7 @@ class ReportController {
                         } else if (isHoje || p.status_acesso === 'checkin_feito' || p.status_acesso === 'entrada') {
                             // Permanece dentro
                             checkoutAt = 'No evento';
-                            const refTime = isHoje ? now : new Date(fimDia);
+                            const refTime = isHoje ? now : new Date(msFimDia);
                             const ms = Math.max(0, refTime.getTime() - checkinDate.getTime());
                             tempoPermanencia = `Em andamento (${this._formatarDuracaoMs(ms)})`;
                             tempoMinutos = Math.max(0, Math.round(ms / 60000));
@@ -1053,12 +1065,19 @@ class ReportController {
 
                     if (fechamento) {
                         registros = fechamento.dados_relatorio || [];
+                        // Totais saem da própria lista arquivada (antes "presentes" vinha fixo em 0
+                        // enquanto a lista mostrava gente "No evento")
+                        const contar = (st) => registros.filter(r => r.status === st).length;
+                        const comTempo = registros.filter(r => r.status !== 'ausente' && r.tempo_minutos > 0);
+                        const mediaMin = comTempo.length ? Math.round(comTempo.reduce((a, r) => a + r.tempo_minutos, 0) / comTempo.length) : 0;
                         totais = {
-                            total_colaboradores: fechamento.total_colaboradores || registros.length,
-                            total_presentes: 0,
-                            total_finalizados: fechamento.total_checkouts || 0,
-                            total_ausentes: (fechamento.total_colaboradores || 0) - (fechamento.total_checkins || 0),
-                            total_checkins: fechamento.total_checkins || 0
+                            total_colaboradores: registros.length || fechamento.total_colaboradores || 0,
+                            total_presentes: contar('presente'),
+                            total_finalizados: contar('finalizado'),
+                            total_ausentes: contar('ausente'),
+                            total_checkins: contar('presente') + contar('finalizado'),
+                            tempo_medio_minutos: mediaMin,
+                            tempo_medio_formatado: this._formatarDuracaoMs(mediaMin * 60000)
                         };
                         fechamentoInfo = {
                             id: fechamento.id,
@@ -1071,7 +1090,7 @@ class ReportController {
                 }
             }
 
-            if (registros.length === 0) {
+            if (!fechamentoInfo) {
                 const dados = await this.gerarDadosRelatorioDiarioConsolidado(evento_id, dataRef, empresa_id);
                 registros = dados.registros;
                 totais = dados.totais;

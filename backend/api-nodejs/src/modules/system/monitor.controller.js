@@ -9,7 +9,7 @@ const os = require('os');
 const fsSync = require('fs');
 const fs = fsSync.promises;
 const path = require('path');
-const { getLimitesDiaLocalUTC } = require('../../utils/dateUtils');
+const { getLimitesDiaLocalUTC, getHojeLocal } = require('../../utils/dateUtils');
 
 // Início do dia LOCAL em UTC (logs_acesso.created_at é gravado em UTC)
 const getInicioHojeLocal = () => getLimitesDiaLocalUTC().start;
@@ -734,14 +734,16 @@ class MonitorController {
                 return res.status(400).json({ error: 'Falta vincular evento ativo para reset diário.' });
             }
 
+            // Só o evento ativo (antes zerava todos os eventos do sistema). O arquivamento é o de
+            // hoje, logo abaixo — não o de ontem, que o fechamento automático já cuida.
             const cronController = require('../events/cron.controller');
-            await cronController.resetTurnos();
-            
+            await cronController.resetTurnos(evento_id, { arquivar: false });
+
             // Gerar e salvar snapshot do relatório diário imediatamente ao clicar no reset diário
             let fechamentoResultado = null;
             try {
                 const reportController = require('../reports/report.controller');
-                const hojeLocal = new Date().toISOString().split('T')[0];
+                const hojeLocal = getHojeLocal(); // fuso do evento (toISOString já virava o dia às 21h)
                 fechamentoResultado = await reportController.salvarFechamentoDiario(evento_id, hojeLocal, req.user?.id, 'manual');
             } catch (repErr) {
                 logger.error('[Reset Diário] Erro ao consolidar relatório diário no reset manual:', repErr);
