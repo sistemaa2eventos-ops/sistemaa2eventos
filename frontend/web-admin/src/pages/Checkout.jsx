@@ -1,25 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { Html5Qrcode } from "html5-qrcode";
 import {
-  Box, Typography, Grid, Stack,
-  Chip, Zoom, Divider
+  Box, Typography, Grid, Stack, Button, Zoom, Tooltip
 } from '@mui/material';
-import AreaSelector from '../components/common/AreaSelector';
 import {
   Logout as LogoutIcon, ExitToApp as CheckoutIcon,
-  Fullscreen as KioskIcon, FullscreenExit as ExitKioskIcon,
-  Badge as BadgeIcon, Warning as WarningIcon,
-  Schedule as ClockIcon, Public as GlobeIcon
+  Warning as WarningIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 
-import PageHeader from '../components/common/PageHeader';
 import GlassCard from '../components/common/GlassCard';
-import NeonButton from '../components/common/NeonButton';
 import UniversalPulseiraInput from '../components/common/UniversalPulseiraInput';
-import EstacaoFacialSelector from '../components/common/EstacaoFacialSelector';
 import PessoaCardDialog from '../components/credenciamento/PessoaCardDialog';
 import RecentAccessList from '../components/credenciamento/RecentAccessList';
+import CabecalhoOperacao, { BotaoJanelaRegistros } from '../components/credenciamento/CabecalhoOperacao';
 import { useCheckin } from '../hooks/useCheckin';
 import { useSyncedClock } from '../hooks/useSyncedClock';
 
@@ -50,19 +44,29 @@ const playCheckoutSound = (type) => {
     }
 };
 
-const ActionButton = styled(NeonButton)(() => ({
-    height: 64,
+const BotaoSaida = styled(Button)(() => ({
+    height: 52,
     fontSize: '1rem',
     fontWeight: 700,
-    borderRadius: 12,
-    borderColor: '#FF3366',
-    color: '#FF3366',
-    '&:hover': {
-        boxShadow: '0 0 20px rgba(255, 51, 102, 0.3)',
-        borderColor: '#FF3366',
-        color: '#FF3366'
-    }
+    textTransform: 'none',
+    borderRadius: 10,
+    background: '#FF3366',
+    color: '#FFFFFF',
+    boxShadow: 'none',
+    '&:hover': { background: '#FF3366', filter: 'brightness(1.1)', boxShadow: 'none' },
+    '&:focus-visible': { outline: '2px solid #FF3366', outlineOffset: 2 },
+    '&.Mui-disabled': { background: 'rgba(255,51,102,0.35)', color: 'rgba(255,255,255,0.7)' }
 }));
+
+const LinhaResumo = ({ rotulo, valor, cor = 'rgba(255,255,255,0.9)', dica }) => {
+    const linha = (
+        <Stack direction="row" justifyContent="space-between" alignItems="baseline">
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>{rotulo}</Typography>
+            <Typography variant="subtitle1" fontWeight={700} sx={{ color: cor, fontVariantNumeric: 'tabular-nums' }}>{valor}</Typography>
+        </Stack>
+    );
+    return dica ? <Tooltip title={dica} placement="left">{linha}</Tooltip> : linha;
+};
 
 const FeedbackOverlay = styled(Box, { shouldForwardProp: (p) => p !== 'status' })(({ status }) => ({
     position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
@@ -135,160 +139,90 @@ const Checkout = () => {
     return l.tipo === 'checkout' || l.metodo === 'checkout';
   });
 
+  const registrarSaida = (valor) => {
+    const cod = (valor || pulseiraValue || '').trim();
+    if (cod) {
+      executarLeituraRapida(cod, 'checkout', 'barcode');
+      setPulseiraValue('');
+    }
+  };
+
   return (
-    <Box sx={{ 
-        p: modoQuiosque ? 2 : 3, 
+    <Box sx={{
+        p: modoQuiosque ? 2 : { xs: 1.5, sm: 2, md: 2.5 },
+        maxWidth: '100%',
+        overflowX: 'hidden',
+        // No desktop a tela cabe na janela: só a lista rola
+        height: { lg: '100vh' },
         minHeight: modoQuiosque ? '100vh' : 'auto',
-        display: 'flex', flexDirection: 'column'
+        display: 'flex', flexDirection: 'column',
+        position: 'relative'
     }}>
-      
-      {/* HEADER SECTION */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <PageHeader
-            title={modoQuiosque ? "" : "Check-out"}
-            subtitle={modoQuiosque ? "" : `Operação de Baixa e Monitoramento • ${currentDate} ${currentTime} (${timezoneLabel})`}
-            icon={modoQuiosque ? null : <LogoutIcon sx={{ fontSize: 40, color: '#FF3366' }} />}
-            sx={{ m: 0, p: 0 }}
-        />
-        
-        {modoQuiosque && (
-            <Box sx={{ position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)', opacity: 0.8, textAlign: 'center' }}>
-                <Typography variant="h4" fontWeight={700} color="#FF3366" letterSpacing={4}>
-                    NZT <BadgeIcon /> ACCESS
-                </Typography>
-                <Typography variant="caption" color="rgba(255,255,255,0.6)" sx={{ fontFamily: '"Inter", sans-serif' }}>
-                    {currentTime} • {timezoneLabel}
-                </Typography>
-            </Box>
-        )}
+      <CabecalhoOperacao
+          titulo="Check-out"
+          icone={<LogoutIcon />}
+          cor="#FF3366"
+          dataHora={`${currentDate} ${currentTime} (${timezoneLabel})`}
+          estacao={{
+              sessaoAtiva,
+              dispositivos: dispositivosDisponiveis,
+              loading: loadingSessao,
+              onVincular: vincularLeitor,
+              onDesvincular: desvincularLeitor,
+              onRecarregar: carregarDispositivosDisponiveis
+          }}
+          areas={eventAreas}
+          areaId={areaId}
+          onAreaChange={changeAreaId}
+          modoQuiosque={modoQuiosque}
+          onToggleQuiosque={toggleQuiosque}
+      />
 
-        <NeonButton 
-            onClick={toggleQuiosque} 
-            color={modoQuiosque ? "error" : "primary"}
-            sx={{ 
-                px: 3, py: 1.5, borderRadius: 1.5,
-                borderColor: modoQuiosque ? '#FF3366' : 'primary.main',
-                color: modoQuiosque ? '#FF3366' : 'primary.main',
-            }}
-        >
-            {modoQuiosque ? <ExitKioskIcon sx={{ mr: 1 }} /> : <KioskIcon sx={{ mr: 1 }} />}
-            {modoQuiosque ? "Sair do quiosque" : "Modo quiosque"}
-        </NeonButton>
-      </Box>
+      <Grid container spacing={2} sx={{ flex: 1, minHeight: 0 }}>
 
-      {/* 📡 Seletor e Status da Estação / Leitor Facial para Checkout */}
-      {!modoQuiosque && (
-          <EstacaoFacialSelector
-              sessaoAtiva={sessaoAtiva}
-              dispositivos={dispositivosDisponiveis}
-              loading={loadingSessao}
-              onVincular={vincularLeitor}
-              onDesvincular={desvincularLeitor}
-              onRecarregar={carregarDispositivosDisponiveis}
-          />
-      )}
-
-      <AreaSelector areas={eventAreas} value={areaId} onChange={changeAreaId} accentColor="#FF3366" />
-      
-      {/* MAIN CONTENT AREA */}
-      <Grid container spacing={3} sx={{ flex: 1, minHeight: 'calc(100vh - 200px)' }}>
-        
-        {/* LADO ESQUERDO (4 colunas): Operação de Baixa com Espaçamento Limpo */}
+        {/* BAIXA: leitor, confirmação e resumo juntos no topo */}
         <Grid item xs={12} lg={4}>
-            <GlassCard sx={{ p: 3.5, height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-                {/* Título e Instruções com espaçamento harmonioso */}
-                <Box sx={{ mb: 3 }}>
-                    <Typography variant="h6" fontWeight={700} color="#FF3366" sx={{ display: 'flex', alignItems: 'center', gap: 1, letterSpacing: 0.5 }}>
-                        <LogoutIcon /> Baixa de acesso / saída
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.65)', mt: 0.8, fontSize: '0.875rem' }}>
-                        Bipe com a pistola de código de barras, CPF, pulseira ou utilize o leitor facial vinculado.
-                    </Typography>
-                </Box>
+            <GlassCard sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <UniversalPulseiraInput
+                    value={pulseiraValue}
+                    onChange={setPulseiraValue}
+                    accentColor="#FF3366"
+                    label="Leitor, CPF ou pulseira"
+                    placeholder="Bipe a pulseira ou digite o código"
+                    helperText="Enter registra a saída na hora"
+                    onConfirm={(val) => registrarSaida(val)}
+                    loading={loading}
+                    autoFocus={!modoQuiosque}
+                />
 
-                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3 }}>
-                    {/* Campo de Leitura com rótulo separado e livre de sobreposições */}
-                    <UniversalPulseiraInput 
-                        value={pulseiraValue}
-                        onChange={setPulseiraValue}
-                        accentColor="#FF3366"
-                        label="LEITOR DE CÓDIGO DE BARRAS / CPF / PULSEIRA"
-                        placeholder="Bipe a pulseira ou digite o código"
-                        helperText="Pressione Enter ↵ para registrar a baixa imediatamente"
-                        onConfirm={(val) => {
-                            const cod = (val || pulseiraValue || '').trim();
-                            if (cod) {
-                                executarLeituraRapida(cod, 'checkout', 'barcode');
-                                setPulseiraValue('');
-                            }
-                        }}
-                        loading={loading}
-                        autoFocus={!modoQuiosque}
+                <BotaoSaida fullWidth startIcon={<LogoutIcon />} onClick={() => registrarSaida()} disabled={loading || !pulseiraValue.trim()}>
+                    Registrar saída
+                </BotaoSaida>
+
+                <Stack spacing={0.75} sx={{ pt: 1.5, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                    <LinhaResumo rotulo="Saídas nesta tela" valor={checkoutLogs.length} cor="#FF3366" />
+                    <LinhaResumo
+                        rotulo="Horário oficial"
+                        valor={`${currentTime} ${timezoneLabel}`}
+                        cor={isSynced ? '#00FF88' : 'rgba(255,255,255,0.9)'}
+                        dica={isSynced ? 'Relógio sincronizado com o servidor' : 'Relógio do computador (sem sincronizar com o servidor)'}
                     />
-
-                    <ActionButton fullWidth onClick={() => { 
-                        const cod = (pulseiraValue || '').trim();
-                        if (cod) {
-                            executarLeituraRapida(cod, 'checkout', 'barcode'); 
-                            setPulseiraValue('');
-                        }
-                    }} disabled={loading}>
-                        <LogoutIcon sx={{ mr: 1 }} /> CONFIRMAR SAÍDA (ENTER)
-                    </ActionButton>
-
-                    {/* Resumo de status com relógio atômico sincronizado por geolocalização */}
-                    <Box sx={{ mt: 1, p: 2.2, bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 1.5, border: '1px solid rgba(255,255,255,0.06)' }}>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.2}>
-                            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1 }}>
-                                Sincronização do Sistema
-                            </Typography>
-                            <Chip 
-                                icon={<GlobeIcon sx={{ fontSize: '13px !important', color: '#00FF88 !important' }} />}
-                                label={isSynced ? "SINCRONIZADO" : "ONLINE"} 
-                                size="small" 
-                                sx={{ bgcolor: 'rgba(0, 255, 136, 0.15)', color: '#00FF88', fontWeight: 700, fontSize: '0.75rem', height: 20, border: '1px solid #00FF88' }} 
-                            />
-                        </Stack>
-
-                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 1 }}>
-                            <Typography variant="body2" color="rgba(255,255,255,0.75)" sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                                <ClockIcon sx={{ fontSize: 16, color: '#00D4FF' }} /> Horário Oficial:
-                            </Typography>
-                            <Typography variant="subtitle2" fontWeight={700} color="#00D4FF" sx={{ fontFamily: '"Inter", sans-serif', letterSpacing: 1.5, fontSize: '1rem' }}>
-                                {currentTime}
-                            </Typography>
-                        </Stack>
-
-                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 0.8 }}>
-                            <Typography variant="caption" color="rgba(255,255,255,0.5)">Fuso do Operador:</Typography>
-                            <Typography variant="caption" fontWeight={700} color="rgba(255,255,255,0.8)">
-                                {timezoneLabel}
-                            </Typography>
-                        </Stack>
-
-                        <Divider sx={{ my: 1.2, borderColor: 'rgba(255,255,255,0.06)' }} />
-
-                        <Stack direction="row" justifyContent="space-between" alignItems="center">
-                            <Typography variant="body2" color="rgba(255,255,255,0.75)">Saídas nesta sessão:</Typography>
-                            <Typography variant="subtitle2" fontWeight={700} color="#FF3366">{checkoutLogs.length}</Typography>
-                        </Stack>
-                    </Box>
-                </Box>
+                </Stack>
             </GlassCard>
         </Grid>
 
-        {/* LADO DIREITO (8 colunas): MONITORAMENTO EXPANDIDO EM TEMPO REAL */}
-        <Grid item xs={12} lg={8}>
-            <GlassCard sx={{ p: 3.5, height: '100%', display: 'flex', flexDirection: 'column' }}>
+        {/* SAÍDAS EM TEMPO REAL */}
+        <Grid item xs={12} lg={8} sx={{ height: { xs: '75vh', lg: '100%' } }}>
+            <GlassCard sx={{ p: 2.5, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                 <RecentAccessList
                     logs={checkoutLogs}
-                    title="Saídas registradas"
-                    subtitle="Últimas baixas e saídas registradas com foto, empresa e pulseira."
+                    title="Saídas"
                     accentColor="#FF3366"
-                    badgeLabel="DESCREDENCIADO"
-                    firstLabel="ÚLTIMA SAÍDA"
-                    emptyTitle="Aguardando descredenciamentos..."
-                    emptySubtitle="Conectado em tempo real ao gateway. Assim que uma pulseira for dada baixa, o colaborador aparecerá aqui."
+                    badgeLabel="Saída"
+                    firstLabel="Última saída"
+                    emptyTitle="Nenhuma saída registrada ainda"
+                    emptySubtitle="Cada saída aparece aqui na hora, com foto, empresa e pulseira."
+                    acoes={<BotaoJanelaRegistros tipo="checkout" cor="#FF3366" />}
                     onSelect={(log) => setCardLog(log)}
                 />
             </GlassCard>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
     Box, Typography, Dialog, DialogTitle, DialogContent,
     DialogActions, List, ListItem, ListItemButton, ListItemText,
-    Chip, TextField, IconButton, Tooltip, Stack
+    Chip, TextField, IconButton, Tooltip, Stack, ButtonBase, Menu, MenuItem
 } from '@mui/material';
 import {
     Face as FaceIcon,
@@ -11,7 +11,8 @@ import {
     Close as CloseIcon,
     CheckCircle as CheckCircleIcon,
     RadioButtonUnchecked as UncheckedIcon,
-    Refresh as RefreshIcon
+    Refresh as RefreshIcon,
+    ExpandMore as ExpandMoreIcon
 } from '@mui/icons-material';
 import NeonButton from './NeonButton';
 import GlassCard from './GlassCard';
@@ -22,9 +23,11 @@ export const EstacaoFacialSelector = ({
     loading = false,
     onVincular,
     onDesvincular,
-    onRecarregar
+    onRecarregar,
+    compacto = false
 }) => {
     const [openModal, setOpenModal] = useState(false);
+    const [menuAnchor, setMenuAnchor] = useState(null);
     const [selectedDispositivoId, setSelectedDispositivoId] = useState('');
     const [estacaoNome, setEstacaoNome] = useState('Baia 01');
     const [saving, setSaving] = useState(false);
@@ -79,10 +82,50 @@ export const EstacaoFacialSelector = ({
     };
 
     const dispositivoAtivo = sessaoAtiva?.dispositivos_acesso;
+    const corStatus = sessaoAtiva ? '#00FF88' : 'rgba(255, 255, 255, 0.45)';
+
+    // Versão de cabeçalho: um chip com o status; trocar/desconectar ficam no menu
+    const chipCompacto = (
+        <>
+            <Tooltip title={sessaoAtiva && dispositivoAtivo
+                ? `Leitor ${dispositivoAtivo.nome || 'facial'} (${dispositivoAtivo.ip_address || 'rede'}): o cadastro abre ao reconhecer o rosto`
+                : 'Conecte um leitor facial a esta estação'}>
+                <ButtonBase
+                    onClick={(e) => (sessaoAtiva ? setMenuAnchor(e.currentTarget) : handleOpen())}
+                    disabled={loading}
+                    sx={{
+                        display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.75,
+                        borderRadius: 1.5,
+                        border: `1px solid ${sessaoAtiva ? 'rgba(0, 255, 136, 0.4)' : 'rgba(255, 255, 255, 0.15)'}`,
+                        bgcolor: sessaoAtiva ? 'rgba(0, 255, 136, 0.08)' : 'rgba(255, 255, 255, 0.03)',
+                        '&:focus-visible': { outline: '2px solid #00D4FF', outlineOffset: 2 }
+                    }}
+                >
+                    {sessaoAtiva
+                        ? <SensorsIcon sx={{ color: corStatus, fontSize: 18 }} />
+                        : <SensorsOffIcon sx={{ color: corStatus, fontSize: 18 }} />}
+                    <Typography variant="body2" fontWeight={600} sx={{ color: '#FFFFFF', whiteSpace: 'nowrap' }}>
+                        {sessaoAtiva ? (sessaoAtiva.estacao_nome || 'Estação') : 'Sem leitor facial'}
+                    </Typography>
+                    {sessaoAtiva && <ExpandMoreIcon sx={{ fontSize: 18, color: 'rgba(255,255,255,0.6)' }} />}
+                </ButtonBase>
+            </Tooltip>
+            <Menu anchorEl={menuAnchor} open={!!menuAnchor} onClose={() => setMenuAnchor(null)}>
+                <MenuItem onClick={() => { setMenuAnchor(null); handleOpen(); }}>Trocar leitor</MenuItem>
+                <MenuItem
+                    onClick={() => { setMenuAnchor(null); handleConfirmarDesvinculo(); }}
+                    disabled={saving}
+                    sx={{ color: '#FF3366' }}
+                >
+                    Desconectar
+                </MenuItem>
+            </Menu>
+        </>
+    );
 
     return (
         <>
-            {/* Status Bar / Widget no Topo */}
+            {compacto ? chipCompacto : (
             <GlassCard
                 sx={{
                     p: 1.5,
@@ -173,12 +216,13 @@ export const EstacaoFacialSelector = ({
                     )}
                 </Stack>
             </GlassCard>
+            )}
 
             {/* Modal de Seleção de Leitor */}
             <Dialog
                 open={openModal}
                 onClose={handleClose}
-                maxWidth="sm"
+                maxWidth="xs"
                 fullWidth
                 PaperProps={{
                     sx: {
@@ -192,15 +236,10 @@ export const EstacaoFacialSelector = ({
             >
                 <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
                     <Stack direction="row" spacing={1.5} alignItems="center">
-                        <FaceIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
-                        <Box>
-                            <Typography variant="h6" fontWeight={700} color="#FFFFFF">
-                                Vincular Leitor Facial à Baia
-                            </Typography>
-                            <Typography variant="caption" color="rgba(255, 255, 255, 0.6)">
-                                O colaborador olha para a câmera e o cadastro abre na sua tela em tempo real
-                            </Typography>
-                        </Box>
+                        <FaceIcon sx={{ color: '#00D4FF', fontSize: 24 }} />
+                        <Typography variant="subtitle1" fontWeight={700} color="#FFFFFF">
+                            Leitor facial desta estação
+                        </Typography>
                     </Stack>
                     <IconButton onClick={handleClose} sx={{ color: 'rgba(255, 255, 255, 0.5)' }}>
                         <CloseIcon />
@@ -208,15 +247,14 @@ export const EstacaoFacialSelector = ({
                 </DialogTitle>
 
                 <DialogContent dividers sx={{ borderColor: 'rgba(255, 255, 255, 0.1)', py: 2 }}>
-                    <Stack spacing={2.5}>
+                    <Stack spacing={2}>
                         <TextField
-                            label="Identificação da Baia / Estação"
+                            label="Nome da estação"
                             fullWidth
                             size="small"
                             value={estacaoNome}
                             onChange={(e) => setEstacaoNome(e.target.value)}
                             placeholder="Ex: Baia 01, Guichê A, Recepção 2"
-                            helperText="Nome que identifica seu posto de atendimento"
                             sx={{
                                 '& .MuiOutlinedInput-root': {
                                     color: '#FFFFFF',
@@ -234,7 +272,7 @@ export const EstacaoFacialSelector = ({
                         <Box>
                             <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
                                 <Typography variant="subtitle2" fontWeight={700} color="#FFFFFF">
-                                    Selecione o Leitor Facial Desta Baia:
+                                    Leitor facial
                                 </Typography>
                                 <Tooltip title="Atualizar lista de leitores">
                                     <IconButton size="small" onClick={onRecarregar} sx={{ color: '#00D4FF' }}>
@@ -253,7 +291,7 @@ export const EstacaoFacialSelector = ({
                                     </Typography>
                                 </Box>
                             ) : (
-                                <List sx={{ maxHeight: 260, overflowY: 'auto', p: 0 }}>
+                                <List sx={{ maxHeight: 220, overflowY: 'auto', p: 0 }}>
                                     {dispositivos.map((dev) => {
                                         const isSelected = selectedDispositivoId === dev.id;
                                         const isOcupado = dev.ocupado;
@@ -297,7 +335,7 @@ export const EstacaoFacialSelector = ({
                                                                 </Typography>
                                                                 {dev.status_online === 'online' && (
                                                                     <Chip
-                                                                        label="ONLINE"
+                                                                        label="Online"
                                                                         size="small"
                                                                         sx={{
                                                                             height: 18,
@@ -309,7 +347,7 @@ export const EstacaoFacialSelector = ({
                                                                 )}
                                                                 {isOcupado && (
                                                                     <Chip
-                                                                        label="EM USO POR OUTRO OPERADOR"
+                                                                        label="Em uso por outro operador"
                                                                         size="small"
                                                                         sx={{
                                                                             height: 18,
@@ -343,7 +381,7 @@ export const EstacaoFacialSelector = ({
                     </Stack>
                 </DialogContent>
 
-                <DialogActions sx={{ p: 2.5, borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+                <DialogActions sx={{ px: 2.5, py: 1.5, borderColor: 'rgba(255, 255, 255, 0.1)' }}>
                     <NeonButton
                         neonColor="rgba(255, 255, 255, 0.4)"
                         onClick={handleClose}
@@ -360,7 +398,7 @@ export const EstacaoFacialSelector = ({
                         loading={saving}
                         sx={{ minHeight: 38 }}
                     >
-                        Vincular a Esta Baia
+                        Conectar leitor
                     </NeonButton>
                 </DialogActions>
             </Dialog>

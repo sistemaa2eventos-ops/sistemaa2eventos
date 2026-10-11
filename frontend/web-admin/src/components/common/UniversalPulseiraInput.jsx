@@ -27,7 +27,7 @@ export const UniversalPulseiraInput = ({
     loading = false,
     autoFocus = true,
     placeholder = 'Aproxime o leitor ou digite o código...',
-    label = 'CÓDIGO / NÚMERO DA PULSEIRA',
+    label = 'Código ou número da pulseira',
     disabled = false,
     helperText,
     accentColor = '#00D4FF'
@@ -117,9 +117,7 @@ export const UniversalPulseiraInput = ({
                     sx={{
                         color: accentColor,
                         fontWeight: 700,
-                        letterSpacing: '1px',
-                        fontSize: '0.75rem',
-                        textTransform: 'uppercase',
+                        fontSize: '0.875rem',
                         display: 'flex',
                         alignItems: 'center',
                         gap: 0.8
@@ -133,7 +131,7 @@ export const UniversalPulseiraInput = ({
                     <Fade in>
                         <Chip
                             icon={<FlashIcon sx={{ fontSize: '13px !important', color: '#00FF88 !important' }} />}
-                            label="SCANNER IDENTIFICADO"
+                            label="Leitor detectado"
                             size="small"
                             sx={{
                                 bgcolor: 'rgba(0, 255, 136, 0.15)',

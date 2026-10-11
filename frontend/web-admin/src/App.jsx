@@ -24,6 +24,7 @@ const Login = lazy(() => import('./pages/Login'));
 const PortalCadastro = lazy(() => import('./pages/PortalCadastro'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const CftvWall = lazy(() => import('./pages/CftvWall'));
+const JanelaRegistros = lazy(() => import('./pages/JanelaRegistros'));
 const Empresas = lazy(() => import('./pages/Empresas'));
 const Pessoas = lazy(() => import('./pages/Pessoas'));
 const AuditoriaDocumental = lazy(() => import('./pages/AuditoriaDocumental'));
@@ -117,6 +118,16 @@ const AppContent = () => {
           <Route path="/portal" element={<PortalCadastro />} />
           <Route path="*" element={<Navigate to="/login" />} />
         </Routes>
+      </Suspense>
+    );
+  }
+
+  // Janela avulsa de registros do check-in/checkout (sem menu), para outro monitor
+  if (location.pathname === '/janela/registros') {
+    const modulo = new URLSearchParams(location.search).get('tipo') === 'checkout' ? 'checkout' : 'checkin';
+    return (
+      <Suspense fallback={<LoadingOverlay />}>
+        <ProtectedRoute modulo={modulo}><JanelaRegistros /></ProtectedRoute>
       </Suspense>
     );
   }
