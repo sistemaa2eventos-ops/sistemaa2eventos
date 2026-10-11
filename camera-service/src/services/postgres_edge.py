@@ -52,7 +52,7 @@ class PostgresEdgeClient:
             cursor = conn.cursor()
             
             # Converter embedding para string pgvector
-            embedding_str = f'[{",".join(str(x) for x in embedding)]'
+            embedding_str = f'[{",".join(str(x) for x in embedding)}]'
             
             # Query usando operador <=> do pgvector
             cursor.execute("""
