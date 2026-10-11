@@ -409,10 +409,12 @@ async def test_camera_connection(stream_url: str = DEFAULT_RTSP_URL):
     }
 
 @app.get("/api/camera/snapshot")
-async def get_camera_snapshot(stream_url: str = DEFAULT_RTSP_URL, annotate: bool = False):
-    """Retorna um snapshot JPEG direto do stream RTSP"""
+async def get_camera_snapshot(stream_url: str = DEFAULT_RTSP_URL, annotate: bool = False,
+                              max_width: int = 0, quality: int = 85):
+    """Retorna um snapshot JPEG do stream RTSP. annotate usa o último quadro já analisado pelo
+    worker de IA do stream; max_width/quality reduzem o tamanho (vídeo repassado pelo agente local)."""
     reader = get_or_create_stream(stream_url)
-    frame = reader.get_frame()
+    frame = reader.get_annotated_frame() if annotate else reader.get_frame()
 
     if frame is None:
         # Se frame não estiver disponível, gera imagem de placeholder elegante
@@ -422,10 +424,11 @@ async def get_camera_snapshot(stream_url: str = DEFAULT_RTSP_URL, annotate: bool
         _, jpeg = cv2.imencode('.jpg', blank)
         return Response(content=jpeg.tobytes(), media_type="image/jpeg")
 
-    if annotate and face_app is not None:
-        frame, _ = process_and_annotate_frame(frame)
+    if max_width and frame.shape[1] > max_width:
+        escala = max_width / frame.shape[1]
+        frame = cv2.resize(frame, (max_width, int(frame.shape[0] * escala)), interpolation=cv2.INTER_AREA)
 
-    _, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    _, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, max(30, min(quality, 95))])
     return Response(content=jpeg.tobytes(), media_type="image/jpeg")
 
 def process_and_annotate_frame(frame: np.ndarray, threshold: float = 0.50):

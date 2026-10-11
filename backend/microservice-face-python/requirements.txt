@@ -2,6 +2,7 @@ opencv-python
 numpy
 Pillow
 insightface
+faiss-cpu
 onnxruntime
 fastapi
 uvicorn[standard]
