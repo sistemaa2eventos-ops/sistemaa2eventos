@@ -184,6 +184,21 @@ export const useCheckin = (defaultMode, options = {}) => {
         }
     }, [eventoId, defaultMode, logsTipo, carregarSessaoAtiva, carregarDispositivosDisponiveis]);
 
+    // Depois de cada acesso só mudam os registros e as estatísticas: não recarrega evento,
+    // áreas, tipos de pulseira nem sessão (eram 7 requisições por pessoa credenciada).
+    const atualizarAposAcesso = useCallback(async () => {
+        if (!eventoId) return;
+        try {
+            const [, statsRes] = await Promise.all([
+                refreshLogs(),
+                api.get('/access/stats/realtime', { params: { evento_id: eventoId } })
+            ]);
+            setRealtimeStats(statsRes.data.data || null);
+        } catch (error) {
+            console.error('Erro ao atualizar após acesso:', error);
+        }
+    }, [eventoId, refreshLogs]);
+
     // WebSocket Listeners
     useEffect(() => {
         if (!eventoId) return;
@@ -331,7 +346,7 @@ export const useCheckin = (defaultMode, options = {}) => {
                     ? `SAÍDA LIBERADA: ${data.pessoa?.nome || 'COLABORADOR'}`
                     : `ENTRADA LIBERADA: ${data.pessoa?.nome || 'COLABORADOR'}`);
 
-                loadInitialData();
+                atualizarAposAcesso();
 
                 clearTimeout(resetTimerRef.current);
                 resetTimerRef.current = setTimeout(() => {
@@ -448,7 +463,7 @@ export const useCheckin = (defaultMode, options = {}) => {
                 setSearchQuery('');
             }, 3000);
 
-            loadInitialData();
+            atualizarAposAcesso();
         } catch (error) {
             setCheckinResult('negado');
             setResultMessage(error.response?.data?.error || 'Falha na comunicação com o servidor.');
@@ -487,7 +502,7 @@ export const useCheckin = (defaultMode, options = {}) => {
                 setSearchQuery('');
             }, 3000);
 
-            loadInitialData();
+            atualizarAposAcesso();
             return true;
         } catch (error) {
             setCheckinResult('negado');

@@ -5,6 +5,9 @@ const cacheService = require('../../services/cacheService');
 const ValidationService = require('./services/validation.service');
 const DatabaseService = require('./services/database.service');
 
+const STATS_TTL_MS = 3000;
+const statsCache = new Map(); // evento_id -> { em, promessa }
+
 class CheckinService {
     /**
      * Verifica se um módulo específico está habilitado para o evento
@@ -193,8 +196,20 @@ class CheckinService {
         }
     }
 
+    /**
+     * Estatísticas do evento compartilhadas por alguns segundos: cada estação pede após cada
+     * acesso, e o cálculo faz ~13 consultas. Pedidos simultâneos aproveitam o mesmo cálculo.
+     */
     async getStats(supabaseClient, eventoId) {
-        return ValidationService.getRealtimeStatsInternal(eventoId);
+        const agora = Date.now();
+        const atual = statsCache.get(eventoId);
+        if (atual && agora - atual.em < STATS_TTL_MS) return atual.promessa;
+
+        const promessa = ValidationService.getRealtimeStatsInternal(eventoId);
+        statsCache.set(eventoId, { em: agora, promessa });
+        promessa.catch(() => statsCache.delete(eventoId));
+        if (statsCache.size > 200) statsCache.delete(statsCache.keys().next().value);
+        return promessa;
     }
 
     /**
