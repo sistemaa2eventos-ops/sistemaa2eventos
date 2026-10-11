@@ -1363,7 +1363,7 @@ const Monitor = () => {
           <Grid container spacing={3}>
               <Grid item xs={12} md={8}>
                   <GlassCard sx={{ p: 3 }}>
-                      <Stack direction={{ xs: 'column', md: 'row' }} gap={2} justifyContent="space-between" mb={3}>
+                      <Stack direction="column" gap={2} mb={3}>
                         <Box>
                             <Typography variant="h6" fontWeight={700}>Alvos em monitoramento (watchlist)</Typography>
                             <Typography variant="caption" color="text.secondary">
@@ -1394,11 +1394,11 @@ const Monitor = () => {
                           <Table size="small" sx={{ minWidth: 560 }}>
                               <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.3)' }}>
                                   <TableRow>
-                                      <TableCell sx={{ color: '#FFB800', fontWeight: 700 }}>CPF</TableCell>
-                                      <TableCell sx={{ color: '#FFB800', fontWeight: 700 }}>Nome</TableCell>
-                                      <TableCell sx={{ color: '#FFB800', fontWeight: 700 }}>Motivo do bloqueio</TableCell>
-                                      <TableCell sx={{ color: '#FFB800', fontWeight: 700 }}>Nível</TableCell>
-                                      <TableCell sx={{ color: '#FFB800', fontWeight: 700, textAlign: 'center' }}>Ações de segurança</TableCell>
+                                      <TableCell>CPF</TableCell>
+                                      <TableCell>Nome</TableCell>
+                                      <TableCell>Motivo do bloqueio</TableCell>
+                                      <TableCell>Nível</TableCell>
+                                      <TableCell sx={{ textAlign: 'center' }}>Ações de segurança</TableCell>
                                   </TableRow>
                               </TableHead>
                               <TableBody>
@@ -1469,7 +1469,7 @@ const Monitor = () => {
                   <GlassCard sx={{ p: 3 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                           <Box>
-                              <Typography variant="h6" fontWeight={700} color="#00D4FF">Notificações externas</Typography>
+                              <Typography variant="h6" fontWeight={700}>Notificações externas</Typography>
                               <Typography variant="caption" sx={{ display: 'block', opacity: 0.7 }}>
                                   Alertas instantâneos via Telegram e WhatsApp
                               </Typography>
