@@ -28,7 +28,7 @@ class HikvisionController {
             
             let query = supabase.from('dispositivos_acesso').select('*');
             if (pushToken) query = query.eq('control_token', pushToken);
-            else query = query.ilike('ip_address', `%${devIp}%`);
+            else query = query.eq('ip_address', devIp);
 
             const { data: dispositivo } = await query.limit(1).single();
 

@@ -27,9 +27,10 @@ const intelbrasRoutes = require('./modules/devices/intelbras.routes');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
+// Atrás do nginx: req.ip passa a ser o IP real do leitor (X-Forwarded-For)
+app.set('trust proxy', 1);
 
-app.use(Sentry.Handlers.requestHandler());
-app.use(Sentry.Handlers.tracingHandler());
+// Sentry v8+: instrumentação automática (Sentry.Handlers não existe mais)
 
 const httpServer = createServer(app);
 
@@ -60,7 +61,7 @@ app.get('/api/intelbras/ping', (req, res) => {
     });
 });
 
-app.use(Sentry.Handlers.errorHandler());
+Sentry.setupExpressErrorHandler(app);
 app.use(errorHandler);
 
 // A porta do Worker será passada pelo docker-compose (ex: 3002)
@@ -69,6 +70,15 @@ const PORT = process.env.PORT || 3002;
 httpServer.listen(PORT, async () => {
     logger.info(`🤖 [INTELBRAS-WORKER] Servidor Dedicado rodando na porta ${PORT}`);
     
-    // Testa apenas o banco, sem carregar cronjobs ou websockets desnecessários
+    // Testa apenas o banco, sem carregar cronjobs
     await testConnection();
+
+    // WebSocket com adaptador Redis: os eventos emitidos aqui (credenciamento_abrir,
+    // new_access) chegam aos painéis conectados na API principal. Sem isso, em produção
+    // (nginx envia /api/intelbras para este worker) o modal do credenciamento não abre.
+    const websocketService = require('./services/websocketService');
+    await websocketService.init(httpServer);
+    if (!websocketService.redisEnabled) {
+        logger.warn('⚠️ [INTELBRAS-WORKER] WebSocket sem Redis: eventos em tempo real NÃO chegarão ao painel. Defina USE_REDIS=true e REDIS_HOST.');
+    }
 });

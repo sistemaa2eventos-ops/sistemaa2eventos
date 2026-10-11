@@ -1,5 +1,6 @@
 const logger = require('../../services/logger');
 const AccessDevice = require('./adapters/AccessDevice');
+const { TIMEOUT_CONFIG } = require('../../config/timeouts');
 
 class HikvisionService extends AccessDevice {
     constructor(config) {
@@ -43,14 +44,14 @@ class HikvisionService extends AccessDevice {
             const arrayBuffer = await res.arrayBuffer();
             return Buffer.from(arrayBuffer);
         } catch (error) {
-            logger.error(`❌ [Hikvision] Snapshot error on ${this.ip}: ${error.message}`);
+            logger.error({ err: error, device_ip: this.ip }, 'Error capturing snapshot');
             throw error;
         }
     }
 
     async _request(path, method, body = null, contentType = 'application/json') {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000);
+        const timeout = setTimeout(() => controller.abort(), TIMEOUT_CONFIG.HARDWARE_CALLBACK);
 
         try {
             const url = `${this.baseUrl}${path}`;
@@ -73,7 +74,7 @@ class HikvisionService extends AccessDevice {
             }
             return text;
         } catch (error) {
-            logger.error(`❌ [Hikvision ISAPI] Erro: ${error.message}`);
+            logger.error({ err: error, device_ip: this.ip }, 'ISAPI request failed');
             throw error;
         } finally {
             clearTimeout(timeout);
@@ -86,7 +87,7 @@ class HikvisionService extends AccessDevice {
     async enrollUser(pessoa, fotoBase64) {
         try {
             const hwUserId = pessoa.cpf ? pessoa.cpf.replace(/\D/g, '') : pessoa.id.split('-')[0];
-            logger.info(`📸 [Hikvision] Cadastrando: ${pessoa.nome} (ID: ${hwUserId}) no IP: ${this.ip}`);
+            logger.info('Registering person on Hikvision', { person_name: pessoa.nome, hw_user_id: hwUserId, device_ip: this.ip });
 
             // 1. Criar UserInfo via ISAPI
             const userInfo = {
@@ -118,10 +119,10 @@ class HikvisionService extends AccessDevice {
             };
 
             // Envio simplificado: Firmware moderno aceita payload json base64, firmware legado exige multipart.
-            logger.info(`✅ [Hikvision] Sincronização concluída: ${pessoa.nome}`);
+            logger.info('Person successfully registered on device', { person_name: pessoa.nome, device_ip: this.ip });
             return true;
         } catch (error) {
-            logger.error(`❌ [Hikvision] Falha no Enroll de ${pessoa.nome}`);
+            logger.error({ err: error, person_name: pessoa?.nome, device_ip: this.ip }, 'Failed to register person');
             throw error;
         }
     }
@@ -139,11 +140,74 @@ class HikvisionService extends AccessDevice {
         } catch (error) { return false; }
     }
 
+    // Abrir porta (Pulso)
     async openDoor() {
         try {
             await this._request('/ISAPI/AccessControl/RemoteControl/door/1', 'PUT', '<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>', 'application/xml');
             return true;
         } catch (e) { return false; }
+    }
+
+    // Acesso Livre (Manter aberta)
+    async unlockDoor() {
+        try {
+            await this._request('/ISAPI/AccessControl/RemoteControl/door/1', 'PUT', '<RemoteControlDoor><cmd>remainOpen</cmd></RemoteControlDoor>', 'application/xml');
+            logger.info('Door unlocked', { device_ip: this.ip, action: 'unlock' });
+            return true;
+        } catch (e) { return false; }
+    }
+
+    // Bloqueio Total (Manter fechada)
+    async lockDoor() {
+        try {
+            await this._request('/ISAPI/AccessControl/RemoteControl/door/1', 'PUT', '<RemoteControlDoor><cmd>remainClosed</cmd></RemoteControlDoor>', 'application/xml');
+            logger.info('Door locked', { device_ip: this.ip, action: 'lock' });
+            return true;
+        } catch (e) { return false; }
+    }
+
+    // Retornar ao estado Normal
+    async closeDoor() {
+        try {
+            await this._request('/ISAPI/AccessControl/RemoteControl/door/1', 'PUT', '<RemoteControlDoor><cmd>normal</cmd></RemoteControlDoor>', 'application/xml');
+            logger.info('Door closed to normal state', { device_ip: this.ip, action: 'close' });
+            return true;
+        } catch (e) { return false; }
+    }
+
+    /**
+     * Configurar Push de Eventos (ISAPI HTTP Host)
+     * @param {String} serverIp IP do Gateway A2
+     * @param {Number} serverPort Porta do servidor (default 3001)
+     */
+    async configureEventPush(serverIp, serverPort = 3001) {
+        try {
+            const token = this.config.control_token || '';
+            const pushUrl = token ? `/api/hikvision/events?token=${token}` : '/api/hikvision/events';
+
+            const xmlBody = `
+            <HttpHostNotificationList>
+                <HttpHostNotification>
+                    <id>1</id>
+                    <url>${pushUrl}</url>
+                    <addressingFormatType>ipaddress</addressingFormatType>
+                    <ipv4Address>${serverIp}</ipv4Address>
+                    <portNo>${serverPort}</portNo>
+                    <protocolType>HTTP</protocolType>
+                    <parameterFormatType>json</parameterFormatType>
+                    <httpAuthenticationMethod>none</httpAuthenticationMethod>
+                </HttpHostNotification>
+            </HttpHostNotificationList>`.trim();
+
+            logger.info('Configuring event push', { device_ip: this.ip, server_ip: serverIp, server_port: serverPort });
+
+            await this._request('/ISAPI/Event/notification/httpHosts/1', 'PUT', xmlBody, 'application/xml');
+
+            return true;
+        } catch (error) {
+            logger.error({ err: error, device_ip: this.ip }, 'Failed to configure event push');
+            throw error;
+        }
     }
 }
 

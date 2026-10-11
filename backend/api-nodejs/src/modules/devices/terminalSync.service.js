@@ -43,56 +43,98 @@ class TerminalSyncService {
     }
 
     /**
-     * Sincroniza todos os funcionários de um evento para um terminal específico
+     * Sincroniza as pessoas do evento com um terminal específico.
+     * Só envia quem pode ficar no terminal (status ativo e área compatível)
+     * e remove quem não pode. Com { reset: true }, apaga tudo do terminal antes.
      */
-    async syncTerminal(terminalId) {
+    async syncTerminal(terminalId, { reset = false } = {}) {
+        let terminal = null;
         try {
-            const { data: terminal, error: tError } = await supabase
+            const { data, error: tError } = await supabase
                 .from('dispositivos_acesso')
                 .select('*')
                 .eq('id', terminalId)
                 .single();
 
-            if (tError || !terminal) throw new Error('Terminal não encontrado');
+            if (tError || !data) throw new Error('Terminal não encontrado');
+            terminal = data;
 
-            // Buscar pessoas ativas do evento com foto
+            const syncService = require('./sync.service');
+            const { getHwUserIdCandidates } = require('./hwUserId');
+
+            await supabase.from('dispositivos_acesso').update({ sync_status: 'sincronizando' }).eq('id', terminalId);
+
+            // Direto ou via agente local (transporte escolhido pelo serviço do terminal)
+            const directService = DeviceFactory.getDevice(terminal);
+            if (reset && directService?.clearAllFaces) {
+                await directService.clearAllFaces();
+                logger.info(`🧹 Terminal ${terminal.nome} limpo antes da sincronização`);
+            }
+
             const { data: pessoas, error: fError } = await supabase
                 .from('pessoas')
                 .select('*')
-                .eq('evento_id', terminal.evento_id)
-                .eq('ativo', true)
-                .not('foto_url', 'is', null);
+                .eq('evento_id', terminal.evento_id);
 
             if (fError) throw fError;
 
-            logger.info(`🔄 Iniciando sincronização em massa para terminal ${terminal.nome} (${pessoas.length} pessoas)`);
+            const enviar = [];
+            const remover = [];
+            for (const pessoa of pessoas) {
+                if (syncService._statusRemoveDosTerminais(pessoa)) { remover.push(pessoa); continue; }
+                const areaIds = await syncService._getPessoaAreaIds(pessoa);
+                if (!syncService._terminalAceitaPessoa(terminal, areaIds)) { remover.push(pessoa); continue; }
+                if (pessoa.foto_url) enviar.push(pessoa);
+            }
+
+            logger.info(`🔄 Sincronização do terminal ${terminal.nome}: ${enviar.length} para enviar, ${remover.length} para remover`);
 
             let successCount = 0;
-            for (const pessoa of pessoas) {
+            for (const pessoa of enviar) {
                 const ok = await this.pushToTerminal(pessoa, terminal);
                 if (ok) successCount++;
             }
 
-            return { success: true, count: successCount, total: pessoas.length };
+            if (directService && !reset) {
+                for (const pessoa of remover) {
+                    for (const id of getHwUserIdCandidates(pessoa)) await directService.deleteUser(id);
+                }
+            }
+
+            let totalNoTerminal = null;
+            if (directService?.countUsers) {
+                try { totalNoTerminal = await directService.countUsers(); } catch (_) { /* informativo */ }
+            }
+
+            await supabase.from('dispositivos_acesso').update({
+                sync_status: successCount === enviar.length ? 'sucesso' : 'erro',
+                ultima_sincronizacao: new Date().toISOString(),
+                faces_cadastradas: totalNoTerminal ?? successCount
+            }).eq('id', terminalId);
+
+            return { success: true, count: successCount, total: enviar.length, removidos: remover.length, usuarios_no_terminal: totalNoTerminal };
         } catch (error) {
-            logger.error(`❌ Erro na sincronização do terminal ${terminalId}:`, error.message);
+            logger.error(`❌ Erro na sincronização do terminal ${terminalId}: ${error.message}`);
+            if (terminal) {
+                await supabase.from('dispositivos_acesso').update({ sync_status: 'erro' }).eq('id', terminalId);
+            }
             return { success: false, error: error.message };
         }
     }
 
     /**
-     * Lógica de envio conforme a marca do terminal
+     * Lógica de envio conforme a marca do terminal.
+     * Se o terminal tiver agent_id, roteia via agente local.
+     * Se não, tenta conexão direta (legado / rede local acessível).
      */
     async pushToTerminal(pessoa, terminal) {
         try {
-            // Se a foto_url for apenas o caminho relativo no Supabase, precisamos da base64
             const fotoBase64 = await this.getFotoBase64(pessoa.foto_url);
             if (!fotoBase64) return false;
 
+            // O serviço do terminal usa o agente local automaticamente quando terminal.agent_id existe
             const service = DeviceFactory.getDevice(terminal);
             return await service.enrollUser(pessoa, fotoBase64);
-
-            return false;
         } catch (error) {
             logger.error(`Erro push terminal ${terminal.nome}:`, error.message);
             return false;

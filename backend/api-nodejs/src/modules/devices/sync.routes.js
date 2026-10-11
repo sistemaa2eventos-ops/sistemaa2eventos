@@ -3,6 +3,7 @@ const router = express.Router();
 const syncService = require('./sync.service');
 const syncScheduler = require('./syncScheduler.service');
 const logger = require('../../services/logger');
+const { supabase } = require('../../config/supabase');
 const { authenticate, authorize, validateInternalApiKey } = require('../../middleware/auth');
 
 /**
@@ -81,34 +82,42 @@ router.get('/status', authenticate, authorize('admin', 'supervisor'), async (req
  */
 router.get('/pending', authenticate, authorize('admin', 'supervisor'), async (req, res) => {
     try {
-        const { getConnection } = require('../../config/database');
-        const connection = await getConnection();
+        const { getPgConnection } = require('../../config/pgEdge');
+        const pool = await getPgConnection();
 
-        const result = await connection.request()
-            .query(`
-                SELECT 
-                    COUNT(*) as total,
-                    MIN(created_at) as mais_antigo,
-                    MAX(created_at) as mais_recente,
-                    COUNT(DISTINCT evento_id) as eventos,
-                    COUNT(DISTINCT pessoa_id) as pessoas
-                FROM logs_acesso 
-                WHERE sincronizado = 0
-            `);
+        const result = await pool.query(`
+            SELECT 
+                COUNT(*) as total,
+                MIN(created_at) as mais_antigo,
+                MAX(created_at) as mais_recente,
+                COUNT(DISTINCT evento_id) as eventos,
+                COUNT(DISTINCT pessoa_id) as pessoas
+            FROM logs_acesso 
+            WHERE sincronizado = false
+        `);
 
-        const queueResult = await connection.request()
-            .query('SELECT COUNT(*) as total FROM sync_retry_queue');
+        // Fila de retentativas/terminais vive no Supabase (nuvem), não na borda
+        let retryQueue = 0;
+        try {
+            const { count } = await supabase
+                .from('terminal_sync_queue')
+                .select('*', { count: 'exact', head: true })
+                .in('status', ['pendente', 'erro']);
+            retryQueue = count || 0;
+        } catch (queueError) {
+            logger.warn('Erro ao consultar fila de sync:', queueError.message);
+        }
 
         res.json({
             success: true,
             pending: {
-                logs: result.recordset[0].total,
-                mais_antigo: result.recordset[0].mais_antigo,
-                mais_recente: result.recordset[0].mais_recente,
-                eventos: result.recordset[0].eventos,
-                pessoas: result.recordset[0].pessoas
+                logs: result.rows[0].total,
+                mais_antigo: result.rows[0].mais_antigo,
+                mais_recente: result.rows[0].mais_recente,
+                eventos: result.rows[0].eventos,
+                pessoas: result.rows[0].pessoas
             },
-            retryQueue: queueResult.recordset[0].total
+            retryQueue
         });
 
     } catch (error) {
@@ -136,8 +145,8 @@ router.post('/logs/batch', validateInternalApiKey, async (req, res) => {
 
         logger.info(`📥 Recebendo ${logs.length} logs do microsserviço facial`);
 
-        const { getConnection, sql } = require('../../config/database');
-        const connection = await getConnection();
+        const { getPgConnection } = require('../../config/pgEdge');
+        const pool = await getPgConnection();
 
         let saved = 0;
         const errors = [];
@@ -150,33 +159,33 @@ router.post('/logs/batch', validateInternalApiKey, async (req, res) => {
                     continue;
                 }
 
-                await connection.request()
-                    .input('id', sql.UniqueIdentifier, log.id || sql.newid())
-                    .input('evento_id', sql.UniqueIdentifier, log.evento_id)
-                    .input('pessoa_id', sql.UniqueIdentifier, log.pessoa_id)
-                    .input('tipo', sql.VarChar, log.tipo || 'checkin')
-                    .input('metodo', sql.VarChar, log.metodo || 'face')
-                    .input('dispositivo_id', sql.VarChar, log.dispositivo_id || 'facial-camera')
-                    .input('confianca', sql.Decimal(5, 2), log.confianca || null)
-                    .input('foto_capturada', sql.Text, log.foto_capturada || null)
-                    .query(`
-                        INSERT INTO logs_acesso 
-                        (id, evento_id, pessoa_id, tipo, metodo, 
-                         dispositivo_id, confianca, foto_capturada, created_at, sincronizado)
-                        VALUES 
-                        (@id, @evento_id, @pessoa_id, @tipo, @metodo,
-                         @dispositivo_id, @confianca, @foto_capturada, GETDATE(), 0)
-                    `);
+                await pool.query(`
+                    INSERT INTO logs_acesso 
+                    (id, evento_id, pessoa_id, tipo, metodo, 
+                     dispositivo_id, confianca, foto_capturada, created_at, sincronizado)
+                    VALUES 
+                    ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), false)
+                    ON CONFLICT (id) DO NOTHING
+                `, [
+                    log.id || require('uuid').v4(),
+                    log.evento_id,
+                    log.pessoa_id,
+                    log.tipo || 'checkin',
+                    log.metodo || 'face',
+                    log.dispositivo_id || 'facial-camera',
+                    log.confianca || null,
+                    log.foto_capturada || null
+                ]);
 
                 saved++;
 
             } catch (error) {
-                logger.error(`Erro ao salvar log: ${error.message}`);
+                logger.error(`Erro ao salvar log no PG Edge: ${error.message}`);
                 errors.push({ log_id: log.id, error: error.message });
             }
         }
 
-        logger.info(`✅ ${saved}/${logs.length} logs salvos no SQL Server`);
+        logger.info(`✅ ${saved}/${logs.length} logs salvos no Postgres Edge`);
 
         res.json({
             success: true,

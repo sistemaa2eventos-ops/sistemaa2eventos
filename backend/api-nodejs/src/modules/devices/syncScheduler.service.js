@@ -42,7 +42,7 @@ class SyncScheduler {
             async () => {
                 const { supabase } = require('../../config/supabase');
                 const start = Date.now();
-                const { error } = await supabase.from('eventos').select('count').limit(1);
+                const { error } = await supabase.from('eventos').select('*', { count: 'exact', head: true });
                 const latency = Date.now() - start;
                 return { online: !error, latency };
             },
@@ -93,13 +93,15 @@ class SyncScheduler {
             checks.online = internet.online;
             checks.latency = internet.latency;
 
-            // 2. Verificar SQL Server
-            const { testConnection } = require('../../config/database');
-            checks.sqlServer = await testConnection();
+            // 2. Verificar PostgreSQL Edge
+            const { testPgConnection } = require('../../config/pgEdge');
+            const edge = await testPgConnection(); // null = Edge desativado
+            checks.sqlServer = edge !== false;
+            checks.edge = edge === null ? 'desativado' : (edge ? 'online' : 'offline');
 
             // 3. Verificar Supabase
             const { supabase } = require('../../config/supabase');
-            const { error } = await supabase.from('eventos').select('count').limit(1);
+            const { error } = await supabase.from('eventos').select('*', { count: 'exact', head: true });
             checks.supabase = !error;
 
             // 4. Memória
@@ -147,30 +149,44 @@ class SyncScheduler {
             }
         });
 
-        // Health check a cada 30 segundos
-        cron.schedule('*/30 * * * * *', async () => {
-            if (!this.isRunning) {
-                const health = await this.checkSystemHealth();
-                // Log silencioso - só mostra se estiver degradado
-                if (!health.online || !health.supabase || !health.sqlServer) {
-                    logger.warn('🏥 Health check: Sistema DEGRADADO', {
-                        online: health.online,
-                        sql: health.sqlServer,
-                        supabase: health.supabase
-                    });
-                }
+        // Health check de dispositivos a cada 2 minutos (única fonte do status online/offline)
+        cron.schedule('*/2 * * * *', async () => {
+            // Roda mesmo durante a sincronização manual: o status dos leitores não pode congelar
+            try {
+                const deviceHealthCheck = require('./deviceHealthCheck.service');
+                await deviceHealthCheck.checkAllDevices();
+            } catch (error) {
+                logger.error('[Scheduler] Erro no health check de dispositivos:', error);
             }
         });
 
-        // Executar primeira sincronização após 10 segundos
+        // Verificação imediata de dispositivos na inicialização (após 5s)
         setTimeout(async () => {
-            logger.info('🚀 Executando primeira sincronização...');
             try {
-                await this.runManualSync();
+                const deviceHealthCheck = require('./deviceHealthCheck.service');
+                await deviceHealthCheck.checkAllDevices();
             } catch (error) {
-                logger.error('❌ Falha na primeira sincronização:', error);
+                logger.error('[Scheduler] Erro no health check inicial de dispositivos:', error);
             }
-        }, 10000);
+        }, 5000);
+
+        // Processar fila de sync dos terminais a cada 60 segundos
+        cron.schedule('* * * * *', async () => {
+            // Roda mesmo durante a sincronização manual (cadastro nos leitores é idempotente)
+            try {
+                await syncService.processTerminalQueue();
+            } catch (error) {
+                logger.error('[Scheduler] Erro no processamento da fila de terminais:', error);
+            }
+        });
+
+        // (O health check de sistema a cada 30 s foi removido: duplicava o health.service,
+        //  que já verifica a nuvem a cada minuto e avisa o painel.)
+
+        // Sem sincronização completa na inicialização: os leitores guardam as faces e cada
+        // cadastro/alteração já vai para a fila na hora. Reenviar todas as fotos a cada
+        // reinício levava horas e pausava a fila de faces e o health check dos leitores.
+        // A limpeza diária continua no Nightly Sync (01:00) e há a sincronização manual.
     }
 
     /**
@@ -187,7 +203,9 @@ class SyncScheduler {
         try {
             logger.info('👤 SINCRONIZAÇÃO MANUAL INICIADA');
 
-            const result = await syncService.syncAll();
+            const { edgeAtivo } = require('../../config/pgEdge');
+            // syncAll só sincroniza com o banco local (Edge); desativado, não há o que fazer
+            const result = edgeAtivo() ? await syncService.syncAll() : { edge: 'desativado' };
             
             // Força a validação de Bordas (Edge Sync) para o comando de Teste Imediato 
             await syncService.runDailyAccessSync();

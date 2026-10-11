@@ -1,6 +1,5 @@
 const net = require('net');
 const { supabase } = require('../../config/supabase');
-const { getPgConnection } = require('../../config/pgEdge');
 const logger = require('../../services/logger');
 
 class DeviceHealthCheckService {
@@ -54,13 +53,42 @@ class DeviceHealthCheckService {
     }
 
     /**
+     * Situação de um leitor, funcionando com o servidor na rede local ou na nuvem:
+     * 1. keepalive/push recente do próprio leitor (last_push_at) → online;
+     * 2. leitor atendido por agente local → ping pelo agente;
+     * 3. teste TCP direto (só alcança leitores da mesma rede).
+     */
+    async avaliarDispositivo(dispositivo) {
+        const JANELA_KEEPALIVE_MS = 3 * 60 * 1000;
+        const ultimoContato = dispositivo.last_push_at ? new Date(dispositivo.last_push_at) : null;
+        if (ultimoContato && Date.now() - ultimoContato.getTime() < JANELA_KEEPALIVE_MS) {
+            return { online: true, timestamp: ultimoContato, via: 'keepalive' };
+        }
+
+        if (dispositivo.agent_id) {
+            try {
+                const agentService = require('../../services/agentService');
+                await agentService.sendCommand(dispositivo.agent_id, 'ping', {
+                    deviceId: dispositivo.id,
+                    config: { ip: dispositivo.ip_address, port: dispositivo.porta || 80, user: dispositivo.user_device, password: dispositivo.password_device }
+                });
+                return { online: true, timestamp: new Date(), via: 'agente' };
+            } catch (err) {
+                return { online: false, timestamp: new Date(), via: 'agente', error: err.message };
+            }
+        }
+
+        return this.pingDevice(dispositivo.ip_address, dispositivo.porta || 80);
+    }
+
+    /**
      * Verificar status de todos os dispositivos do evento
      * Atualiza status_online e ultimo_ping no Supabase
      * Se dispositivo voltou online, enfileira processamento
      */
     async checkAllDevices(eventoId = null) {
         try {
-            logger.info(`🏥 [HealthCheck] Iniciando verificação de dispositivos${eventoId ? ` para evento ${eventoId}` : ''}...`);
+            logger.debug(`🏥 [HealthCheck] Iniciando verificação de dispositivos${eventoId ? ` para evento ${eventoId}` : ''}...`);
 
             const startTime = Date.now();
             let query = supabase.from('dispositivos_acesso').select('*');
@@ -77,11 +105,11 @@ class DeviceHealthCheckService {
             }
 
             if (!dispositivos || dispositivos.length === 0) {
-                logger.info('[HealthCheck] Nenhum terminal facial encontrado');
+                logger.debug('[HealthCheck] Nenhum terminal facial encontrado');
                 return { checked: 0, online: 0, offline: 0 };
             }
 
-            logger.info(`[HealthCheck] Verificando ${dispositivos.length} dispositivos...`);
+            logger.debug(`[HealthCheck] Verificando ${dispositivos.length} dispositivos...`);
 
             let onlineCount = 0;
             let offlineCount = 0;
@@ -95,7 +123,7 @@ class DeviceHealthCheckService {
 
                 const results = await Promise.all(
                     batch.map(async (dispositivo) => {
-                        const status = await this.pingDevice(dispositivo.ip_address, dispositivo.porta || 80);
+                        const status = await this.avaliarDispositivo(dispositivo);
 
                         const wasOffline = dispositivo.status_online !== 'online';
                         const nowOnline = status.online;
@@ -123,14 +151,20 @@ class DeviceHealthCheckService {
                         offlineCount++;
                         if (!wasOffline) {
                             logger.warn(`🔴 [HealthCheck] ${dispositivo.nome} foi para OFFLINE`);
+                            require('../../services/websocketService').emit('system:alert', {
+                                type: 'DEVICE_OFFLINE',
+                                severity: 'critical',
+                                message: `Leitor desconectado ou sem sinal: ${dispositivo.nome}`,
+                                details: { device_id: dispositivo.id }
+                            }, 'system_admin');
                         }
                     }
 
-                    // Preparar update para Supabase
+                    // Preparar update para Supabase (último contato só muda quando houve contato)
                     updates.push({
                         id: dispositivo.id,
                         status_online: nowOnline ? 'online' : 'offline',
-                        ultimo_ping: status.timestamp.toISOString()
+                        ultimo_ping: nowOnline ? status.timestamp.toISOString() : dispositivo.ultimo_ping
                     });
 
                     // Manter registro em memória
@@ -163,7 +197,7 @@ class DeviceHealthCheckService {
                 }
                 
                 if (successUpdates > 0) {
-                    logger.info(`✅ [HealthCheck] ${successUpdates}/${updates.length} dispositivos atualizados no banco`);
+                    logger.debug(`✅ [HealthCheck] ${successUpdates}/${updates.length} dispositivos atualizados no banco`);
                 }
             }
 
@@ -178,7 +212,7 @@ class DeviceHealthCheckService {
             const duration = ((Date.now() - startTime) / 1000).toFixed(2);
             this.lastCheckTime = new Date();
 
-            logger.info(`🏥 [HealthCheck] Concluído em ${duration}s: ${onlineCount} online, ${offlineCount} offline`);
+            logger.debug(`🏥 [HealthCheck] Concluído em ${duration}s: ${onlineCount} online, ${offlineCount} offline`);
 
             return {
                 checked: dispositivos.length,
@@ -199,20 +233,22 @@ class DeviceHealthCheckService {
      */
     async processOfflineQueue(dispositivoId) {
         try {
-            const connection = await getPgConnection();
+            // Contar itens pendentes via Supabase (onde terminal_sync_queue reside)
+            const { count, error } = await supabase
+                .from('terminal_sync_queue')
+                .select('*', { count: 'exact', head: true })
+                .eq('dispositivo_id', dispositivoId)
+                .eq('status', 'pendente');
 
-            // Contar itens pendentes
-            const result = await connection.query(
-                `SELECT COUNT(*) as total FROM terminal_sync_queue
-                 WHERE dispositivo_id = $1 AND status = 'pendente'`,
-                [dispositivoId]
-            );
+            if (error) throw error;
 
-            const pendingCount = result.rows[0]?.total || 0;
+            const pendingCount = count || 0;
 
             if (pendingCount > 0) {
                 logger.info(`⚡ [ProcessQueue] Dispositivo ${dispositivoId} tem ${pendingCount} itens pendentes`);
-                // A fila será processada no próximo ciclo de processamento scheduled
+                // Processar fila imediatamente
+                const syncService = require('./sync.service');
+                await syncService.processTerminalQueue();
             }
 
         } catch (error) {
@@ -235,25 +271,17 @@ class DeviceHealthCheckService {
                 return { error: 'Dispositivo não encontrado' };
             }
 
-            const connection = await getPgConnection();
+            // Contar itens na fila via Supabase
+            const { data: queueItems } = await supabase
+                .from('terminal_sync_queue')
+                .select('status')
+                .eq('dispositivo_id', dispositivoId);
 
-            // Contar itens na fila
-            const queueResult = await connection.query(
-                `SELECT
-                    COUNT(*) as total,
-                    SUM(CASE WHEN status = 'pendente' THEN 1 ELSE 0 END) as pendente,
-                    SUM(CASE WHEN status = 'erro' THEN 1 ELSE 0 END) as erro,
-                    SUM(CASE WHEN status = 'sucesso' THEN 1 ELSE 0 END) as sucesso
-                FROM terminal_sync_queue
-                WHERE dispositivo_id = $1`,
-                [dispositivoId]
-            );
-
-            const queue = queueResult.rows[0] || {
-                total: 0,
-                pendente: 0,
-                erro: 0,
-                sucesso: 0
+            const queue = {
+                total: queueItems?.length || 0,
+                pendente: queueItems?.filter(q => q.status === 'pendente').length || 0,
+                erro: queueItems?.filter(q => q.status === 'erro').length || 0,
+                sucesso: queueItems?.filter(q => q.status === 'sucesso').length || 0
             };
 
             // Pegar status em cache

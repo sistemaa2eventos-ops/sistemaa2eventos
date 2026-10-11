@@ -2,19 +2,76 @@ const express = require('express');
 const router = express.Router();
 const intelbrasController = require('./intelbras.controller');
 const { validateInternalApiKey } = require('../../middleware/auth');
+const logger = require('../../services/logger');
 const multer = require('multer');
 
 // Usar storage em memória temporário para fotos de passagem rápida
 const upload = multer({ storage: multer.memoryStorage() });
 
+const parseMultipartMixed = express.text({
+    type: (req) => (req.headers['content-type'] || '').toLowerCase().includes('multipart/mixed'),
+    limit: '15mb'
+});
+
+const parseIntelbrasBody = (req, res, next) => {
+    const contentType = (req.headers['content-type'] || '').toLowerCase();
+
+    if (contentType.includes('multipart/form-data')) {
+        return upload.any()(req, res, next);
+    }
+
+    if (contentType.includes('multipart/mixed')) {
+        return parseMultipartMixed(req, res, next);
+    }
+
+    return next();
+};
+
+/**
+ * Middleware para garantir que um token está presente.
+ * A validação por dispositivo (control_token) é feita no controller.
+ * Isso evita rejeitar dispositivos com tokens individuais válidos.
+ */
+const validatePushToken = (req, res, next) => {
+    const token = req.query.token || req.headers['x-push-token'];
+    if (!token) {
+        // Dispositivos legados ainda não possuem control_token cadastrado:
+        // o controller resolve o dispositivo pelo IP e valida o token quando presente.
+        logger.warn('[Intelbras] Push sem token — identificando dispositivo por IP.', {
+            ip: req.ip,
+            path: req.path
+        });
+    }
+    next();
+};
+
 /**
  * @route   POST /api/intelbras/events
- * @desc    Recebe eventos em tempo real dos dispositivos Intelbras
- * @access  Public (Opcionalmente com API Key ou validação de IP)
+ * @desc    Recebe eventos em tempo real (Modo Push/Evento)
+ * @access  Protected by Push Token
  */
-router.post('/events', upload.any(), intelbrasController.handleEventPush.bind(intelbrasController));
+router.post('/events', validatePushToken, parseIntelbrasBody, intelbrasController.handleEventPush.bind(intelbrasController));
 
-// Rota de diagnóstico: confirma que o servidor está recebendo requests do dispositivo
+/**
+ * @route   POST /api/intelbras/online
+ * @desc    Modo Online — dispositivo pergunta se pode liberar acesso
+ *          Responde: {"message":"...","code":200,"auth":"true|false"}
+ *          Configurar no dispositivo:
+ *            PictureHttpUpload.UploadServerList[0].Uploadpath=/api/intelbras/online
+ *            Intelbras_ModeCfg.DeviceMode=1
+ * @access  Protected by Push Token
+ */
+router.post(['/online', '/verify-access'], validatePushToken, parseIntelbrasBody, intelbrasController.handleOnlineMode.bind(intelbrasController));
+router.get(['/online', '/verify-access'], validatePushToken, intelbrasController.handleOnlineMode.bind(intelbrasController));
+
+/**
+ * @route   GET /api/intelbras/keepalive
+ * @desc    Heartbeat do dispositivo — atualiza status_online
+ *          Configurar: Intelbras_ModeCfg.KeepAlive.Path=/api/intelbras/keepalive
+ */
+router.get('/keepalive', intelbrasController.handleKeepalive.bind(intelbrasController));
+
+// Diagnóstico
 router.get('/ping', (req, res) => {
     res.json({
         success: true,
@@ -22,7 +79,11 @@ router.get('/ping', (req, res) => {
         server_ip: req.hostname,
         device_ip: req.ip,
         timestamp: new Date().toISOString(),
-        endpoint_push: `http://${req.hostname}:3001/api/intelbras/events`
+        endpoints: {
+            online: `/api/intelbras/online?token=SEU_TOKEN`,
+            keepalive: `/api/intelbras/keepalive?token=SEU_TOKEN`,
+            push: `/api/intelbras/events?token=SEU_TOKEN`
+        }
     });
 });
 

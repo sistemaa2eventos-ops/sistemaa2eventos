@@ -44,7 +44,7 @@ import PageHeader from '../../components/common/PageHeader';
 // ============================================
 const ParametrosBiometricos = ({ sensitivity, setSensitivity, liveness, setLiveness, handleSaveGlobal, loading }) => (
     <GlassCard sx={{ p: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff', mb: 3 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF', mb: 3 }}>
             PARÂMETROS BIOMÉTRICOS
         </Typography>
 
@@ -80,7 +80,7 @@ const ParametrosBiometricos = ({ sensitivity, setSensitivity, liveness, setLiven
         </Box>
 
         <NeonButton startIcon={<SaveIcon />} fullWidth onClick={handleSaveGlobal} disabled={loading}>
-            {loading ? 'SALVANDO...' : 'SALVAR CONFIGURAÇÕES GLOBAIS'}
+            {loading ? 'Salvando...' : 'Salvar configurações globais'}
         </NeonButton>
     </GlassCard>
 );
@@ -92,8 +92,8 @@ const LeitorFacialForm = ({ open, onClose, formData, setFormData, onSave }) => (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
         <form onSubmit={onSave}>
             <DialogTitle>
-                <Typography variant="h6" component="span" sx={{ fontWeight: 800 }}>
-                    {formData.id ? 'EDITAR TERMINAL' : 'NOVO TERMINAL FACIAL'}
+                <Typography variant="h6" component="span" sx={{ fontWeight: 700 }}>
+                    {formData.id ? 'EDITAR TERMINAL' : 'Novo terminal facial'}
                 </Typography>
             </DialogTitle>
             <DialogContent>
@@ -158,7 +158,7 @@ const LeitorFacialForm = ({ open, onClose, formData, setFormData, onSave }) => (
                                 }
                                 label={
                                     <Box>
-                                        <Typography variant="subtitle2" sx={{ color: '#FFC107', fontWeight: 800 }}>Modo Identidade (Recepção)</Typography>
+                                        <Typography variant="subtitle2" sx={{ color: '#FFB800', fontWeight: 700 }}>Modo Identidade (Recepção)</Typography>
                                         <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
                                             Neste modo, o terminal NÃO realiza validação ou acesso. Ele apenas captura a digital/face e envia o perfil para a tela do Terminal Web do operador vinculado validar e emitir pulseira.
                                         </Typography>
@@ -188,8 +188,8 @@ const LeitorFacialForm = ({ open, onClose, formData, setFormData, onSave }) => (
                 </Grid>
             </DialogContent>
             <DialogActions sx={{ p: 3 }}>
-                <Button onClick={onClose} sx={{ color: 'text.secondary' }}>CANCELAR</Button>
-                <NeonButton type="submit">SALVAR TERMINAL</NeonButton>
+                <Button onClick={onClose} sx={{ color: 'text.secondary' }}>Cancelar</Button>
+                <NeonButton type="submit">Salvar terminal</NeonButton>
             </DialogActions>
         </form>
     </Dialog>
@@ -240,7 +240,7 @@ const ConfigLeitorFacial = () => {
                             <Typography variant="body2" sx={{ fontWeight: 700 }}>{val}</Typography>
                             {row.config?.modo_identificacao && (
                                 <Tooltip title="Modo Identificação (Não libera catraca, apenas identifica)">
-                                    <VpnKeyIcon sx={{ fontSize: 14, color: '#FFC107' }} />
+                                    <VpnKeyIcon sx={{ fontSize: 14, color: '#FFB800' }} />
                                 </Tooltip>
                             )}
                         </Stack>
@@ -298,7 +298,7 @@ const ConfigLeitorFacial = () => {
                         <IconButton
                             size="small"
                             onClick={() => handleOpenDialog(row)}
-                            sx={{ color: '#fff', background: 'rgba(255,255,255,0.05)' }}
+                            sx={{ color: '#FFFFFF', background: 'rgba(255,255,255,0.05)' }}
                         >
                             <SettingsIcon fontSize="small" />
                         </IconButton>
@@ -328,10 +328,10 @@ const ConfigLeitorFacial = () => {
             {!eventoId && (
                 <GlassCard sx={{ p: 3, mb: 3, border: '1px solid rgba(255, 193, 7, 0.4)', background: 'rgba(255, 193, 7, 0.05)' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <WifiOffIcon sx={{ color: '#FFC107', fontSize: 28 }} />
+                        <WifiOffIcon sx={{ color: '#FFB800', fontSize: 28 }} />
                         <Box>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#FFC107' }}>
-                                NENHUM EVENTO SELECIONADO
+                            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#FFB800' }}>
+                                Nenhum evento selecionado
                             </Typography>
                             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                                 Selecione um evento ativo na tela de Eventos e depois volte aqui.
@@ -347,7 +347,7 @@ const ConfigLeitorFacial = () => {
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                         <WifiOffIcon sx={{ color: '#FF3366', fontSize: 28 }} />
                         <Box>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#FF3366' }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#FF3366' }}>
                                 SESSÃO EXPIRADA
                             </Typography>
                             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
@@ -368,12 +368,12 @@ const ConfigLeitorFacial = () => {
                                     onClick={fetchReaders}
                                     className={loading ? 'ani-spin' : ''}
                                 />
-                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff' }}>
+                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
                                     TERMINAIS FACIAIS
                                 </Typography>
                             </Box>
                             <NeonButton startIcon={<AddIcon />} size="small" onClick={() => handleOpenDialog()}>
-                                NOVO TERMINAL
+                                Novo terminal
                             </NeonButton>
                         </Box>
                         <DataTable
