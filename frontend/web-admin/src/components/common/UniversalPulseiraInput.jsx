@@ -200,7 +200,7 @@ export const UniversalPulseiraInput = ({
                                 <Tooltip title="Número não coincide com nenhuma faixa de lote pré-cadastrada">
                                     <Chip
                                         icon={<WarningIcon sx={{ fontSize: '14px !important' }} />}
-                                        label="Faixa Avulsa"
+                                        label="Faixa avulsa"
                                         size="small"
                                         sx={{
                                             fontSize: '0.75rem',

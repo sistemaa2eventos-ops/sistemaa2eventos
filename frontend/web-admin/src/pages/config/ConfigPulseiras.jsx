@@ -288,14 +288,14 @@ const ConfigPulseiras = ({ embedded = false }) => {
                     <PageHeader
                         title="Pulseiras"
                         subtitle="Lotes de pulseiras, suas cores e as áreas que cada uma libera."
-                        breadcrumbs={[{ text: 'Configurações' }, { text: 'Matriz de Pulseiras' }]}
+                        breadcrumbs={[{ text: 'Configurações' }, { text: 'Matriz de pulseiras' }]}
                     />
                     <NeonButton
                         startIcon={<AddIcon />}
                         onClick={handleOpenDialog}
                         sx={{ mt: 2 }}
                     >
-                        Provisionar Lote
+                        Provisionar lote
                     </NeonButton>
                 </Box>
             )}
@@ -307,7 +307,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
                         onClick={handleOpenDialog}
                         size="small"
                     >
-                        Provisionar Novo Lote
+                        Provisionar novo lote
                     </NeonButton>
                 </Box>
             )}
@@ -353,7 +353,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
                         <Grid container spacing={2}>
                             <Grid item xs={6}>
                                 <TextField
-                                    label="Corda Numérica Inicial"
+                                    label="Corda numérica inicial"
                                     type="number"
                                     fullWidth
                                     value={formData.numero_inicial}
@@ -362,7 +362,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
                             </Grid>
                             <Grid item xs={6}>
                                 <TextField
-                                    label="Corda Numérica Final"
+                                    label="Corda numérica final"
                                     type="number"
                                     fullWidth
                                     value={formData.numero_final}
@@ -372,7 +372,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
                         </Grid>
 
                         <TextField
-                            label="Prefixo do Código (opcional)"
+                            label="Prefixo do código (opcional)"
                             fullWidth
                             placeholder="Ex: A2"
                             value={formData.prefixo_codigo}
@@ -380,14 +380,14 @@ const ConfigPulseiras = ({ embedded = false }) => {
                         />
 
                         <FormControl fullWidth size="small">
-                            <InputLabel>Método de Leitura Principal</InputLabel>
+                            <InputLabel>Método de leitura principal</InputLabel>
                             <Select
                                 value={formData.tipo_leitura}
                                 onChange={(e) => setFormData({ ...formData, tipo_leitura: e.target.value })}
-                                input={<OutlinedInput label="Método de Leitura Principal" />}
+                                input={<OutlinedInput label="Método de leitura principal" />}
                                 MenuProps={MenuProps}
                             >
-                                <MenuItem value="number_only">Somente Número</MenuItem>
+                                <MenuItem value="number_only">Somente número</MenuItem>
                                 <MenuItem value="qr_code">QR Code</MenuItem>
                                 <MenuItem value="barcode_ean13">EAN-13</MenuItem>
                                 <MenuItem value="barcode_128">CODE 128</MenuItem>
@@ -396,13 +396,13 @@ const ConfigPulseiras = ({ embedded = false }) => {
                         </FormControl>
 
                         <FormControl fullWidth size="small">
-                            <InputLabel id="areas-label">Zonas de Acesso Permitidas</InputLabel>
+                            <InputLabel id="areas-label">Zonas de acesso permitidas</InputLabel>
                             <Select
                                 labelId="areas-label"
                                 multiple
                                 value={formData.areas_permitidas}
                                 onChange={handleAreaChange}
-                                input={<OutlinedInput label="Zonas de Acesso Permitidas" />}
+                                input={<OutlinedInput label="Zonas de acesso permitidas" />}
                                 renderValue={(selected) => (
                                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                                         {selected.map((value) => {
@@ -424,7 +424,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
                         <Grid container spacing={2}>
                             <Grid item xs={6}>
                                 <TextField
-                                    label="Tempo Confirmação Checkout (seg)"
+                                    label="Tempo confirmação checkout (seg)"
                                     type="number"
                                     fullWidth
                                     value={formData.tempo_confirmacao_checkout}
@@ -440,7 +440,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
                                             onChange={(e) => setFormData({ ...formData, alerta_duplicidade: e.target.checked })}
                                         />
                                     }
-                                    label="Alerta de Duplicidade"
+                                    label="Alerta de duplicidade"
                                 />
                             </Grid>
                         </Grid>
@@ -456,13 +456,13 @@ const ConfigPulseiras = ({ embedded = false }) => {
 
             {/* Confirm Delete Dialog */}
             <Dialog open={openDeleteConfirm} onClose={() => setOpenDeleteConfirm(false)}>
-                <DialogTitle>Confirmar Exclusão</DialogTitle>
+                <DialogTitle>Confirmar exclusão</DialogTitle>
                 <DialogContent>
                     <Typography>Tem certeza que deseja destruir este lote de pulseiras? Esta ação é irreversível.</Typography>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setOpenDeleteConfirm(false)}>Não, Manter</Button>
-                    <Button onClick={confirmDelete} color="error" variant="contained">Sim, Destruir</Button>
+                    <Button onClick={() => setOpenDeleteConfirm(false)}>Não, manter</Button>
+                    <Button onClick={confirmDelete} color="error" variant="contained">Sim, destruir</Button>
                 </DialogActions>
             </Dialog>
         </Box>

@@ -238,7 +238,7 @@ export default function Financeiro() {
                                                 </TableCell>
                                                 <TableCell align="center">
                                                     {tx.status === 'pendente' && (
-                                                        <Tooltip title="Reconciliar Manualmente">
+                                                        <Tooltip title="Reconciliar manualmente">
                                                             <IconButton size="small" onClick={() => handleReconcile(tx.id)} sx={{ color: '#00D4FF' }}>
                                                                 <ReconcileIcon fontSize="small" />
                                                             </IconButton>

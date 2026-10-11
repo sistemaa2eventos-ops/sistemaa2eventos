@@ -93,7 +93,7 @@ const AgentesLocais = ({ agentes = [], onChange }) => {
                 <DialogTitle sx={{ color: CYAN, fontWeight: 700 }}>Novo agente local</DialogTitle>
                 <DialogContent>
                     {!criado ? (
-                        <TextField autoFocus fullWidth size="small" label="Nome (ex.: Notebook Portaria)" value={nome}
+                        <TextField autoFocus fullWidth size="small" label="Nome (ex.: notebook portaria)" value={nome}
                             onChange={(e) => setNome(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && criar()} sx={{ mt: 1 }} />
                     ) : (
                         <Stack spacing={2} sx={{ mt: 1 }}>

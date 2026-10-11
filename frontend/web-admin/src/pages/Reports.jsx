@@ -144,7 +144,7 @@ const Reports = () => {
     const diarioColumns = [
         {
             id: 'empresa_nome',
-            label: 'Nome da Empresa',
+            label: 'Nome da empresa',
             width: 220,
             format: (val) => (
                 <Typography variant="body2" sx={{ fontWeight: 700, color: '#00D4FF' }} noWrap>
@@ -154,7 +154,7 @@ const Reports = () => {
         },
         {
             id: 'colaborador_nome',
-            label: 'Nome do Colaborador',
+            label: 'Nome do colaborador',
             width: 240,
             format: (val) => (
                 <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF' }} noWrap>
@@ -205,7 +205,7 @@ const Reports = () => {
         },
         {
             id: 'checkin_at',
-            label: 'Check-in (Entrada)',
+            label: 'Check-in (entrada)',
             width: 175,
             format: (val) => val && val !== '—' ? (
                 <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem', color: '#00FF88', fontWeight: 700 }}>
@@ -217,7 +217,7 @@ const Reports = () => {
         },
         {
             id: 'checkout_at',
-            label: 'Check-out (Saída)',
+            label: 'Check-out (saída)',
             width: 175,
             format: (val) => {
                 if (val === 'No evento') {
@@ -247,7 +247,7 @@ const Reports = () => {
         },
         {
             id: 'tempo_permanencia',
-            label: 'Tempo de Permanência',
+            label: 'Tempo de permanência',
             width: 200,
             format: (val, _row) => {
                 if (!val || val === '—') {
@@ -310,12 +310,12 @@ const Reports = () => {
 
     // 3. Colunas: Por Área
     const areaColumns = [
-        { id: 'area', label: 'Área / Localização', width: 260 },
+        { id: 'area', label: 'Área / localização', width: 260 },
         { id: 'entradas', label: 'Entradas', width: 130, align: 'center', type: 'number' },
         { id: 'saidas', label: 'Saídas', width: 130, align: 'center', type: 'number' },
         {
             id: 'pico',
-            label: 'Pico de Fluxo',
+            label: 'Pico de fluxo',
             width: 150,
             align: 'center',
             format: (val) => (
@@ -330,7 +330,7 @@ const Reports = () => {
 
     // 4. Colunas: Por Empresa
     const empresaColumns = [
-        { id: 'empresa', label: 'Nome da Empresa', width: 250 },
+        { id: 'empresa', label: 'Nome da empresa', width: 250 },
         { id: 'pessoas', label: 'Colaboradores', width: 130, align: 'center', type: 'number' },
         { id: 'entradas', label: 'Entradas', width: 120, align: 'center', type: 'number' },
         { id: 'saidas', label: 'Saídas', width: 120, align: 'center', type: 'number' },
@@ -340,28 +340,28 @@ const Reports = () => {
 
     // 5. Colunas: Por Leitor
     const leitorColumns = [
-        { id: 'terminal', label: 'Terminal / Equipamento', width: 220 },
+        { id: 'terminal', label: 'Terminal / equipamento', width: 220 },
         { id: 'localizacao', label: 'Localização', width: 200 },
-        { id: 'total', label: 'Total Leituras', width: 130, align: 'center', type: 'number' },
+        { id: 'total', label: 'Total leituras', width: 130, align: 'center', type: 'number' },
         { id: 'entradas', label: 'Entradas', width: 110, align: 'center', type: 'number' },
         { id: 'saidas', label: 'Saídas', width: 110, align: 'center', type: 'number' },
-        { id: 'erros', label: 'Erros / Negados', width: 130, align: 'center', type: 'number' }
+        { id: 'erros', label: 'Erros / negados', width: 130, align: 'center', type: 'number' }
     ];
 
     // 6. Colunas: Por Função
     const funcaoColumns = [
-        { id: 'funcao', label: 'Função / Cargo', width: 250 },
-        { id: 'total', label: 'Total Cadastrado', width: 150, align: 'center', type: 'number' },
-        { id: 'presentes', label: 'Presentes Hoje', width: 140, align: 'center', type: 'number' },
-        { id: 'entradas_periodo', label: 'Entradas no Período', width: 160, align: 'center', type: 'number' },
-        { id: 'saidas_periodo', label: 'Saídas no Período', width: 160, align: 'center', type: 'number' }
+        { id: 'funcao', label: 'Função / cargo', width: 250 },
+        { id: 'total', label: 'Total cadastrado', width: 150, align: 'center', type: 'number' },
+        { id: 'presentes', label: 'Presentes hoje', width: 140, align: 'center', type: 'number' },
+        { id: 'entradas_periodo', label: 'Entradas no período', width: 160, align: 'center', type: 'number' },
+        { id: 'saidas_periodo', label: 'Saídas no período', width: 160, align: 'center', type: 'number' }
     ];
 
     // 7. Colunas: Por Status
     const statusColumns = [
         { 
             id: 'status', 
-            label: 'Status Documental / Acesso', 
+            label: 'Status documental / acesso', 
             width: 250,
             format: (val) => (
                 <Chip
@@ -375,7 +375,7 @@ const Reports = () => {
                 />
             )
         },
-        { id: 'quantidade', label: 'Quantidade de Pessoas', width: 200, align: 'center', type: 'number' }
+        { id: 'quantidade', label: 'Quantidade de pessoas', width: 200, align: 'center', type: 'number' }
     ];
 
     // 8. Colunas: Sessões de Operador
@@ -402,7 +402,7 @@ const Reports = () => {
         },
         {
             id: 'login_at',
-            label: 'Entrada (Login)',
+            label: 'Entrada (login)',
             width: 170,
             format: (val) => val && (
                 <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem', color: '#00D4FF' }}>
@@ -412,7 +412,7 @@ const Reports = () => {
         },
         {
             id: 'logout_at',
-            label: 'Saída (Logout)',
+            label: 'Saída (logout)',
             width: 170,
             format: (val) => val ? (
                 <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem', color: '#FFB800' }}>
@@ -424,7 +424,7 @@ const Reports = () => {
         },
         {
             id: 'tempo_online_formatado',
-            label: 'Duração Online',
+            label: 'Duração online',
             width: 150,
             format: (val) => (
                 <Chip
@@ -443,7 +443,7 @@ const Reports = () => {
         },
         {
             id: 'pessoas_criadas',
-            label: 'Pessoas Criadas',
+            label: 'Pessoas criadas',
             width: 130,
             align: 'center',
             format: (val) => (
@@ -456,7 +456,7 @@ const Reports = () => {
         },
         {
             id: 'empresas_criadas',
-            label: 'Empresas Criadas',
+            label: 'Empresas criadas',
             width: 140,
             align: 'center',
             format: (val) => (
@@ -469,7 +469,7 @@ const Reports = () => {
         },
         {
             id: 'itens_apagados',
-            label: 'Itens Apagados',
+            label: 'Itens apagados',
             width: 130,
             align: 'center',
             format: (val) => (
@@ -495,7 +495,7 @@ const Reports = () => {
         },
         {
             id: 'notas',
-            label: 'Notas de Turno',
+            label: 'Notas de turno',
             width: 140,
             align: 'center',
             format: (val, row) => val ? (
@@ -528,7 +528,7 @@ const Reports = () => {
                         setModalDetalhesOpen(true);
                     }}
                     sx={{ color: '#00D4FF', '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.15)' } }}
-                    title="Ver Resumo Consolidado"
+                    title="Ver resumo consolidado"
                 >
                     <InfoIcon fontSize="small" />
                 </IconButton>
@@ -677,7 +677,7 @@ const Reports = () => {
                                 <TextField
                                     fullWidth
                                     size="small"
-                                    placeholder="Nome, CPF, Pulseira..."
+                                    placeholder="Nome, CPF, pulseira..."
                                     value={searchDiario}
                                     onChange={(e) => setSearchDiario(e.target.value)}
                                     InputProps={{
@@ -729,7 +729,7 @@ const Reports = () => {
                                     }
                                 }}
                             >
-                                <ToggleButton value="todos">TODOS ({dailyConsolidado.length})</ToggleButton>
+                                <ToggleButton value="todos">Todos ({dailyConsolidado.length})</ToggleButton>
                                 <ToggleButton value="presente">Presentes</ToggleButton>
                                 <ToggleButton value="finalizado">Finalizados</ToggleButton>
                                 <ToggleButton value="ausente">Não compareceram</ToggleButton>
@@ -956,7 +956,7 @@ const Reports = () => {
             >
                 <DialogTitle sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <Typography variant="h6" sx={{ color: '#00D4FF', fontWeight: 700 }}>
-                        Relatório Consolidado de Turno
+                        Relatório consolidado de turno
                     </Typography>
                     <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                         Operador: <strong style={{ color: '#FFFFFF' }}>{selectedSessao?.operador_nome}</strong> ({selectedSessao?.nivel_acesso?.toUpperCase()})
@@ -1005,13 +1005,13 @@ const Reports = () => {
                             <Paper sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 1.5, border: '1px solid rgba(255,255,255,0.05)' }}>
                                 <Grid container spacing={2}>
                                     <Grid item xs={12} sm={6}>
-                                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>Horário de Início (Login):</Typography>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>Horário de início (login):</Typography>
                                         <Typography variant="body1" sx={{ color: '#00D4FF', fontWeight: 700, fontFamily: '"Inter", sans-serif' }}>
                                             {selectedSessao.login_at ? format(new Date(selectedSessao.login_at), "dd/MM/yyyy HH:mm:ss", { locale: ptBR }) : '--'}
                                         </Typography>
                                     </Grid>
                                     <Grid item xs={12} sm={6}>
-                                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>Horário de Encerramento (Logout):</Typography>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>Horário de encerramento (logout):</Typography>
                                         <Typography variant="body1" sx={{ color: '#FFB800', fontWeight: 700, fontFamily: '"Inter", sans-serif' }}>
                                             {selectedSessao.logout_at ? format(new Date(selectedSessao.logout_at), "dd/MM/yyyy HH:mm:ss", { locale: ptBR }) : '--'}
                                         </Typography>

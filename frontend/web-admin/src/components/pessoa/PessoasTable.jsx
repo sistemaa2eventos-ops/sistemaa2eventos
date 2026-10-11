@@ -164,7 +164,7 @@ const PessoasTable = ({
             </IconButton>
           )}
           {row.status_acesso === 'checkin_feito' && isAdmin && (
-            <Tooltip title="Expulsar do Evento">
+            <Tooltip title="Expulsar do evento">
               <IconButton size="small" onClick={() => onExpulsar(row)} disabled={expulsionLoading} sx={acaoTabelaPerigo}>
                 <ExpulsarIcon fontSize="small" />
               </IconButton>

@@ -98,7 +98,7 @@ const EventFormDialog = ({
                 {tabValue === 0 ? (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                         <TextField
-                            label="Nome do Evento"
+                            label="Nome do evento"
                             fullWidth
                             value={formData.nome}
                             onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
@@ -112,7 +112,7 @@ const EventFormDialog = ({
                         <Grid container spacing={2}>
                             <Grid item xs={6}>
                                 <TextField
-                                    label="Data Início"
+                                    label="Data início"
                                     type="date"
                                     fullWidth
                                     InputLabelProps={{ shrink: true }}
@@ -122,7 +122,7 @@ const EventFormDialog = ({
                             </Grid>
                             <Grid item xs={6}>
                                 <TextField
-                                    label="Data Fim"
+                                    label="Data fim"
                                     type="date"
                                     fullWidth
                                     InputLabelProps={{ shrink: true }}
@@ -132,7 +132,7 @@ const EventFormDialog = ({
                             </Grid>
                             <Grid item xs={6}>
                                 <TextField
-                                    label="Horário Reset Diário"
+                                    label="Horário reset diário"
                                     type="time"
                                     fullWidth
                                     InputLabelProps={{ shrink: true }}
@@ -167,7 +167,7 @@ const EventFormDialog = ({
                                         color="primary"
                                     />
                                 }
-                                label={<Typography variant="body2">Habilitar Impressão de Etiquetas</Typography>}
+                                label={<Typography variant="body2">Habilitar impressão de etiquetas</Typography>}
                             />
                             <Typography variant="caption" display="block" sx={{ color: 'text.secondary', mb: 2, ml: 1 }}>
                                 Ditará se o check-in dispara comando de impressão térmica.
@@ -178,8 +178,8 @@ const EventFormDialog = ({
                             </Typography>
                             <FormGroup row sx={{ ml: 1, mb: 2 }}>
                                 {[
-                                    { id: 'facial', label: 'Reconhecimento Facial' },
-                                    { id: 'pulseira', label: 'Pulseira/Barcode' }
+                                    { id: 'facial', label: 'Reconhecimento facial' },
+                                    { id: 'pulseira', label: 'Pulseira/barcode' }
                                 ].map(method => (
                                     <FormControlLabel
                                         key={method.id}
@@ -209,8 +209,8 @@ const EventFormDialog = ({
                             </Typography>
                             <FormGroup row sx={{ ml: 1 }}>
                                 {[
-                                    { id: 'facial', label: 'Reconhecimento Facial' },
-                                    { id: 'pulseira', label: 'Pulseira/Barcode' }
+                                    { id: 'facial', label: 'Reconhecimento facial' },
+                                    { id: 'pulseira', label: 'Pulseira/barcode' }
                                 ].map(method => (
                                     <FormControlLabel
                                         key={method.id}
@@ -246,7 +246,7 @@ const EventFormDialog = ({
                             <Grid container spacing={2}>
                                 <Grid item xs={6}>
                                     <TextField
-                                        label="Cor Primária"
+                                        label="Cor primária"
                                         type="color"
                                         fullWidth
                                         value={formData.cor_primaria || '#00D4FF'}
@@ -257,7 +257,7 @@ const EventFormDialog = ({
                                 </Grid>
                                 <Grid item xs={6}>
                                     <TextField
-                                        label="Cor Secundária"
+                                        label="Cor secundária"
                                         type="color"
                                         fullWidth
                                         value={formData.cor_secundaria || '#7B2FBE'}
@@ -302,11 +302,11 @@ const EventFormDialog = ({
                             <FormGroup row sx={{ gap: 2 }}>
                                 {[
                                     { id: 'email', label: 'E-mail' },
-                                    { id: 'data_nascimento', label: 'Data de Nascimento' },
-                                    { id: 'nome_mae', label: 'Nome da Mãe' },
-                                    { id: 'funcao', label: 'Função/Cargo' },
-                                    { id: 'foto', label: 'Foto (Selfie)' },
-                                    { id: 'dias_trabalho', label: 'Dias de Trabalho' }
+                                    { id: 'data_nascimento', label: 'Data de nascimento' },
+                                    { id: 'nome_mae', label: 'Nome da mãe' },
+                                    { id: 'funcao', label: 'Função/cargo' },
+                                    { id: 'foto', label: 'Foto (selfie)' },
+                                    { id: 'dias_trabalho', label: 'Dias de trabalho' }
                                 ].map(field => (
                                     <FormControlLabel
                                         key={field.id}

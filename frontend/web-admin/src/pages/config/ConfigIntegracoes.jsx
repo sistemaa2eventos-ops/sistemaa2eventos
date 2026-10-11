@@ -17,6 +17,7 @@ import GlassCard from '../../components/common/GlassCard';
 import PageHeader from '../../components/common/PageHeader';
 import api from '../../services/api';
 
+import { botaoSecundario } from '../../styles/tokens';
 const ConfigIntegracoes = () => {
     const { settings, setSettings, loading, saving, handleSave, testEmail } = useSystemSettings();
     
@@ -68,9 +69,9 @@ const ConfigIntegracoes = () => {
         const config = {
             loading: { label: 'Verificando...', color: 'default', icon: <CircularProgress size={12} color="inherit" /> },
             online: { label: 'Conectado', color: 'success', icon: <SuccessIcon sx={{ fontSize: 14 }} /> },
-            error: { label: 'Falha na Conexão', color: 'error', icon: <ErrorIcon sx={{ fontSize: 14 }} /> },
+            error: { label: 'Falha na conexão', color: 'error', icon: <ErrorIcon sx={{ fontSize: 14 }} /> },
             configured: { label: 'Configurado', color: 'info', icon: <SuccessIcon sx={{ fontSize: 14 }} /> },
-            offline: { label: 'Não Configurado', color: 'default', icon: <ErrorIcon sx={{ fontSize: 14 }} /> },
+            offline: { label: 'Não configurado', color: 'default', icon: <ErrorIcon sx={{ fontSize: 14 }} /> },
         };
         const current = config[type] || config.loading;
         return <Chip icon={current.icon} label={current.label} color={current.color} size="small" variant="outlined" sx={{ fontWeight: 700, fontSize: '0.75rem' }} />;
@@ -88,7 +89,7 @@ const ConfigIntegracoes = () => {
                 {/* STATUS DOS SERVIÇOS CORE */}
                 <Grid item xs={12}>
                     <GlassCard sx={{ p: 3 }}>
-                        <Typography variant="subtitle2" sx={{ color: '#FFFFFF', fontWeight: 700, mb: 3 }}>Status do Ecossistema</Typography>
+                        <Typography variant="subtitle2" sx={{ color: '#FFFFFF', fontWeight: 700, mb: 3 }}>Status do ecossistema</Typography>
                         <Stack direction={{ xs: 'column', md: 'row' }} spacing={4} divider={<Divider orientation="vertical" flexItem sx={{ borderColor: 'rgba(255,255,255,0.05)' }} />}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                 <StorageIcon color="primary" />
@@ -141,27 +142,25 @@ const ConfigIntegracoes = () => {
                         
                         <Stack spacing={2}>
                             <TextField 
-                                label="E-mail do Remetente" 
+                                label="E-mail do remetente" 
                                 fullWidth 
                                 size="small"
                                 value={settings.email_from || ''}
                                 onChange={(e) => setSettings(prev => ({ ...prev, email_from: e.target.value }))}
                             />
                             <TextField 
-                                label="Nome de Exibição" 
+                                label="Nome de exibição" 
                                 fullWidth 
                                 size="small"
                                 value={settings.email_from_name || ''}
                                 onChange={(e) => setSettings(prev => ({ ...prev, email_from_name: e.target.value }))}
                             />
-                            <Button 
-                                variant="outlined" 
-                                color="primary" 
+                            <Button variant="outlined" 
+                                
+                                
                                 fullWidth
-                                onClick={testEmail}
-                                sx={{ textTransform: 'none', fontWeight: 700 }}
-                            >
-                                Enviar E-mail de Teste
+                                onClick={testEmail} sx={botaoSecundario}>
+                                Enviar e-mail de teste
                             </Button>
                         </Stack>
                     </GlassCard>
@@ -176,7 +175,7 @@ const ConfigIntegracoes = () => {
                         
                         <Stack spacing={2}>
                             <TextField 
-                                label="Bot Token (Telegram)" 
+                                label="Bot token (Telegram)" 
                                 type="password"
                                 fullWidth 
                                 size="small"

@@ -265,7 +265,7 @@ export const ModalCredenciamento = ({
                                             }
                                         }}
                                     >
-                                        Ver Documentos
+                                        Ver documentos
                                     </Button>
                                 </Tooltip>
                             </Stack>
@@ -318,7 +318,7 @@ export const ModalCredenciamento = ({
                                                 <Select
                                                     labelId="tipo-pulseira-select"
                                                     value={selectedTipoPulseira}
-                                                    label="Lote / Tipo"
+                                                    label="Lote / tipo"
                                                     onChange={(e) => setSelectedTipoPulseira(e.target.value)}
                                                     sx={{
                                                         bgcolor: 'rgba(0,0,0,0.3)',

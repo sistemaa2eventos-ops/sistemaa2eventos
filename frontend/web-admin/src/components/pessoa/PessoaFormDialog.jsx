@@ -156,17 +156,17 @@ const PessoaFormDialog = ({
                 </Typography>
 
                 <FormControl fullWidth size="small" required>
-                  <InputLabel>Categoria Operacional</InputLabel>
+                  <InputLabel>Categoria operacional</InputLabel>
                   <Select 
                     value={formData.tipo_pessoa || ''} 
                     label="Categoria" 
                     onChange={(e) => setFormData({ ...formData, tipo_pessoa: e.target.value })} 
                     MenuProps={{ PaperProps: { sx: { bgcolor: '#0a1628', color: '#FFFFFF', border: '1px solid #00D4FF' } } }}
                   >
-                    <MenuItem value="colaborador">Colaborador (B2B) / Staff</MenuItem>
+                    <MenuItem value="colaborador">Colaborador (B2B) / staff</MenuItem>
                     <MenuItem value="visitante">Visitante (B2C)</MenuItem>
-                    <MenuItem value="staff">Staff Interno / Diretoria</MenuItem>
-                    <MenuItem value="fornecedor">Fornecedor de Suprimento</MenuItem>
+                    <MenuItem value="staff">Staff interno / diretoria</MenuItem>
+                    <MenuItem value="fornecedor">Fornecedor de suprimento</MenuItem>
                   </Select>
                 </FormControl>
 
@@ -181,22 +181,22 @@ const PessoaFormDialog = ({
                 {formData.tipo_pessoa === 'visitante' && (
                   <FormControlLabel 
                     control={<Checkbox size="small" checked={formData.pagamento_validado} onChange={(e) => setFormData({ ...formData, pagamento_validado: e.target.checked })} sx={{ color: 'rgba(0, 255, 136, 0.5)', '&.Mui-checked': { color: '#00FF88' } }} />} 
-                    label={<Typography variant="caption">Pagamento Validado</Typography>} 
+                    label={<Typography variant="caption">Pagamento validado</Typography>} 
                   />
                 )}
 
                 {(selectedPessoa?.status === 'PENDENTE' || selectedPessoa?.status_acesso === 'pendente' || !selectedPessoa) && (
                   <FormControl fullWidth size="small" required>
-                    <InputLabel>Parecer Documental Inicial</InputLabel>
+                    <InputLabel>Parecer documental inicial</InputLabel>
                     <Select 
                       value={formData.parecer_documentos || 'pendente'} 
                       label="Situação dos documentos" 
                       onChange={(e) => setFormData({ ...formData, parecer_documentos: e.target.value })} 
                       MenuProps={{ PaperProps: { sx: { bgcolor: '#0a1628', color: '#FFFFFF', border: '1px solid #00D4FF' } } }}
                     >
-                      <MenuItem value="pendente">Documentos Pendentes</MenuItem>
-                      <MenuItem value="completo">Completo e Correto (Aprovar)</MenuItem>
-                      <MenuItem value="incorreto">Incorreto / Reprovado</MenuItem>
+                      <MenuItem value="pendente">Documentos pendentes</MenuItem>
+                      <MenuItem value="completo">Completo e correto (aprovar)</MenuItem>
+                      <MenuItem value="incorreto">Incorreto / reprovado</MenuItem>
                     </Select>
                   </FormControl>
                 )}
@@ -528,13 +528,13 @@ const PessoaFormDialog = ({
                     <Typography variant="subtitle2" sx={{ color: '#FF3366', mb: 1, fontWeight: 700 }}>Verificação de risco operacional</Typography>
                     <Divider sx={{ mb: 2, borderColor: 'rgba(255,51,102,0.2)' }} />
                     <FormGroup row>
-                      <FormControlLabel control={<Checkbox checked={formData.trabalho_area_tecnica} onChange={(e) => setFormData({ ...formData, trabalho_area_tecnica: e.target.checked })} sx={{ color: 'rgba(255,51,102,0.3)', '&.Mui-checked': { color: '#FF3366' } }} />} label={<Typography variant="body2">Trabalhará em Área Técnica Confinada</Typography>} />
-                      <FormControlLabel control={<Checkbox checked={formData.trabalho_altura} onChange={(e) => setFormData({ ...formData, trabalho_altura: e.target.checked })} sx={{ color: 'rgba(255,184,0,0.3)', '&.Mui-checked': { color: '#FFB800' } }} />} label={<Typography variant="body2">Executará Trabalho em Altura</Typography>} />
+                      <FormControlLabel control={<Checkbox checked={formData.trabalho_area_tecnica} onChange={(e) => setFormData({ ...formData, trabalho_area_tecnica: e.target.checked })} sx={{ color: 'rgba(255,51,102,0.3)', '&.Mui-checked': { color: '#FF3366' } }} />} label={<Typography variant="body2">Trabalhará em área técnica confinada</Typography>} />
+                      <FormControlLabel control={<Checkbox checked={formData.trabalho_altura} onChange={(e) => setFormData({ ...formData, trabalho_altura: e.target.checked })} sx={{ color: 'rgba(255,184,0,0.3)', '&.Mui-checked': { color: '#FFB800' } }} />} label={<Typography variant="body2">Executará trabalho em altura</Typography>} />
                     </FormGroup>
                   </Box>
 
                   <Box sx={{ mt: 2 }}>
-                    <Typography variant="subtitle2" sx={{ color: '#00D4FF', mb: 1, fontWeight: 700 }}>DOCUMENTAÇÃO PESSOAL ECM (NRs, ASO, Seguros)</Typography>
+                    <Typography variant="subtitle2" sx={{ color: '#00D4FF', mb: 1, fontWeight: 700 }}>DOCUMENTAÇÃO PESSOAL ECM (NRs, ASO, seguros)</Typography>
                     <Divider sx={{ mb: 2, borderColor: 'rgba(0,212,255,0.2)' }} />
                     {!selectedPessoa ? (
                       <Box sx={{ textAlign: 'center', py: 4 }}>

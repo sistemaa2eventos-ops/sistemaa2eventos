@@ -158,7 +158,7 @@ const VerificationDialog = ({ image, result, onSave, onRetry }) => (
             pb: 1,
             borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}>
-            Verificação de Qualidade Biométrica
+            Verificação de qualidade biométrica
         </DialogTitle>
 
         <DialogContent sx={{ pt: 3 }}>
@@ -194,7 +194,7 @@ const VerificationDialog = ({ image, result, onSave, onRetry }) => (
                         display: 'block',
                         mb: 2,
                     }}>
-                        Critérios de Qualidade
+                        Critérios de qualidade
                     </Typography>
 
                     <ChecklistItem label="Rosto detectado" passed={result?.checklist?.faceDetected} />

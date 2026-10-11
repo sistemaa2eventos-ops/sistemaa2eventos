@@ -135,7 +135,7 @@ const ConfigLogs = () => {
             <PageHeader
                 title="Logs do sistema"
                 subtitle="Atividades e erros registrados pelo sistema."
-                breadcrumbs={[{ text: 'Configurações' }, { text: 'Logs do Sistema' }]}
+                breadcrumbs={[{ text: 'Configurações' }, { text: 'Logs do sistema' }]}
             />
 
             {/* FILTROS */}
@@ -158,7 +158,7 @@ const ConfigLogs = () => {
                     <TextField
                         size="small"
                         type="date"
-                        label="Data Início"
+                        label="Data início"
                         InputLabelProps={{ shrink: true }}
                         value={filtros.dataInicio}
                         onChange={(e) => handleFilterChange('dataInicio', e.target.value)}
@@ -166,7 +166,7 @@ const ConfigLogs = () => {
                     <TextField
                         size="small"
                         type="date"
-                        label="Data Fim"
+                        label="Data fim"
                         InputLabelProps={{ shrink: true }}
                         value={filtros.dataFim}
                         onChange={(e) => handleFilterChange('dataFim', e.target.value)}
@@ -247,7 +247,7 @@ const ConfigLogs = () => {
                         />
                         <TextField
                             fullWidth
-                            label="Retenção Admin (dias)"
+                            label="Retenção admin (dias)"
                             type="number"
                             value={retentionAdmin}
                             onChange={(e) => setRetentionAdmin(e.target.value)}

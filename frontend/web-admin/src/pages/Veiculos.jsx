@@ -163,7 +163,7 @@ const Veiculos = () => {
             format: (val) => {
                 const nome = val?.nome_completo || val?.nome;
                 if (!nome) {
-                    return <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>— Não Vinculado —</Typography>;
+                    return <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>— Não vinculado —</Typography>;
                 }
                 return (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -200,7 +200,7 @@ const Veiculos = () => {
             align: 'center',
             format: (value, row) => (
                 <Stack direction="row" spacing={1} justifyContent="center">
-                    <Tooltip title="Registrar Passagem">
+                    <Tooltip title="Registrar passagem">
                         <IconButton
                             size="small"
                             onClick={() => handleOpenPassagem(row)}
@@ -705,7 +705,7 @@ const Veiculos = () => {
                 <PageHeader
                     title="Veículos"
                     subtitle="Veículos autorizados e leitura de placas."
-                    breadcrumbs={[{ text: 'Dashboard' }, { text: 'Gestão de Frotas' }]}
+                    breadcrumbs={[{ text: 'Dashboard' }, { text: 'Gestão de frotas' }]}
                     sx={{ mb: 0 }}
                 />
                 <NeonButton
@@ -726,7 +726,7 @@ const Veiculos = () => {
                 >
                     <TextField 
                         size="small"
-                        placeholder="Consultar Placa (EX: ABC1D23)"
+                        placeholder="Consultar placa (EX: ABC1D23)"
                         value={consultaPlaca}
                         onChange={(e) => setConsultaPlaca(e.target.value.toUpperCase())}
                         onKeyPress={(e) => e.key === 'Enter' && handleConsultarPlaca()}
@@ -848,7 +848,7 @@ const Veiculos = () => {
                                 {/* Dados do Motorista */}
                                 <Grid item xs={12} sm={3.5}>
                                     <Typography variant="caption" sx={{ color: 'rgba(0, 212, 255, 0.8)', fontWeight: 700, letterSpacing: '1px', display: 'block', mb: 0.5 }}>
-                                        Motorista Vinculado
+                                        Motorista vinculado
                                     </Typography>
                                     {resultadoConsulta.veiculo.pessoas ? (
                                         <Box>
@@ -877,7 +877,7 @@ const Veiculos = () => {
                                                 onClick={() => handleOpenDialog(resultadoConsulta.veiculo)} 
                                                 sx={{ mt: 0.5, p: 0, minHeight: 0, color: '#00D4FF', textTransform: 'none', fontSize: '0.75rem' }}
                                             >
-                                                + Vincular Motorista Agora
+                                                + Vincular motorista agora
                                             </Button>
                                         </Box>
                                     )}
@@ -886,7 +886,7 @@ const Veiculos = () => {
                                 {/* Dados do Veículo & Placa ANPR */}
                                 <Grid item xs={12} sm={3}>
                                     <Typography variant="caption" sx={{ color: 'rgba(0, 212, 255, 0.8)', fontWeight: 700, letterSpacing: '1px', display: 'block', mb: 0.5 }}>
-                                        Dados do Veículo
+                                        Dados do veículo
                                     </Typography>
                                     
                                     {/* Mini Placa Mercosul Estilizada */}
@@ -930,7 +930,7 @@ const Veiculos = () => {
                                 {/* Operações do Veículo Consultados (Botões Compactos e Harmônicos) */}
                                 <Grid item xs={12} sm={3.5}>
                                     <Typography variant="caption" sx={{ color: 'rgba(0, 212, 255, 0.8)', fontWeight: 700, letterSpacing: '1px', display: 'block', mb: 0.8 }}>
-                                        Ações Rápidas
+                                        Ações rápidas
                                     </Typography>
                                     <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 0.8 }}>
                                         {/* 1. Passagem */}
@@ -1192,7 +1192,7 @@ const Veiculos = () => {
                 <DialogContent sx={{ overflowY: 'auto' }}>
                     <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                         <TextField
-                            label="Placa de Trânsito *"
+                            label="Placa de trânsito *"
                             fullWidth
                             value={formData.placa}
                             onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
@@ -1217,11 +1217,11 @@ const Veiculos = () => {
                         </Stack>
 
                         <FormControl fullWidth>
-                            <InputLabel id="empresa-select-label">Empresa / Delegação *</InputLabel>
+                            <InputLabel id="empresa-select-label">Empresa / delegação *</InputLabel>
                             <Select
                                 labelId="empresa-select-label"
                                 value={formData.empresa_id}
-                                label="Empresa / Delegação *"
+                                label="Empresa / delegação *"
                                 onChange={(e) => setFormData({ ...formData, empresa_id: e.target.value })}
                             >
                                 {empresas.map((emp) => (
@@ -1264,7 +1264,7 @@ const Veiculos = () => {
                             renderInput={(params) => (
                                 <TextField 
                                     {...params} 
-                                    label="Motorista Vinculado" 
+                                    label="Motorista vinculado" 
                                     placeholder="Busque por nome ou CPF..." 
                                     helperText={formData.empresa_id ? 'Colaboradores da empresa selecionada são priorizados' : 'Selecione uma pessoa para ser o motorista oficial'}
                                 />
@@ -1300,10 +1300,10 @@ const Veiculos = () => {
                     <Stack spacing={2.5} sx={{ pt: 1.5 }}>
                         <Typography variant="body2">Registrando movimento para: <b>{selectedVeiculo?.placa}</b></Typography>
                         <FormControl fullWidth>
-                            <InputLabel>Tipo de Movimento</InputLabel>
+                            <InputLabel>Tipo de movimento</InputLabel>
                             <Select
                                 value={passagemData.tipo}
-                                label="Tipo de Movimento"
+                                label="Tipo de movimento"
                                 onChange={(e) => setPassagemData({ ...passagemData, tipo: e.target.value })}
                             >
                                 <MenuItem value="entrada">Entrada</MenuItem>
@@ -1476,7 +1476,7 @@ const Veiculos = () => {
                         fullWidth
                         multiline
                         rows={3}
-                        label="Justificativa do Bloqueio *"
+                        label="Justificativa do bloqueio *"
                         placeholder="Ex: Mandado judicial, documentação irregular, determinação da coordenação..."
                         value={justificativaBloqueio}
                         onChange={(e) => setJustificativaBloqueio(e.target.value)}

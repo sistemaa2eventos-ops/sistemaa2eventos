@@ -571,7 +571,7 @@ const Monitor = () => {
                 </Box>
                 <Box>
                   <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#FFB800', lineHeight: 1.15 }}>
-                    Notificação Sigilosa de Segurança
+                    Notificação sigilosa de segurança
                   </Typography>
                   <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.75rem' }}>
                     Alvo da Watchlist detectado por câmera
@@ -663,7 +663,7 @@ const Monitor = () => {
                   Central de inteligência • ocorrência sigilosa
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.65)' }}>
-                  Alvo da Watchlist Reconhecido por Câmera de Vigilância Facial
+                  Alvo da watchlist reconhecido por câmera de vigilância facial
                 </Typography>
               </Box>
             </Stack>
@@ -801,7 +801,7 @@ const Monitor = () => {
                   </Box>
                 </Box>
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', mt: 0.8, textAlign: 'center', fontSize: '0.75rem', fontWeight: 600 }}>
-                  Foto Oficial de Perfil (Sem Cortes)
+                  Foto oficial de perfil (sem cortes)
                 </Typography>
               </Box>
 
@@ -899,7 +899,7 @@ const Monitor = () => {
                         {snapshotFitMode === 'cover' ? 'Preenchimento 100%' : 'Lente original'}
                       </Button>
                     </Tooltip>
-                    <Tooltip title="Inspecionar Captura em Tela Cheia">
+                    <Tooltip title="Inspecionar captura em tela cheia">
                       <IconButton
                         size="small"
                         onClick={() => setZoomSnapshotModal(true)}
@@ -944,7 +944,7 @@ const Monitor = () => {
                   </Box>
                 </Box>
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', mt: 0.8, textAlign: 'center', fontSize: '0.75rem', fontWeight: 600 }}>
-                  Captura Completa da Câmera no Momento da Detecção (16:9)
+                  Captura completa da câmera no momento da detecção (16:9)
                 </Typography>
               </Box>
             </Box>
@@ -1424,7 +1424,7 @@ const Monitor = () => {
                                           </TableCell>
                                           <TableCell sx={{ textAlign: 'center' }}>
                                               <Stack direction="row" spacing={1} justifyContent="center">
-                                                  <Tooltip title="Alvo Localizado! Deixar de Monitorar e Encerrar Rastreamento">
+                                                  <Tooltip title="Alvo localizado! Deixar de monitorar e encerrar rastreamento">
                                                       <Button
                                                           variant="outlined"
                                                           size="small"
@@ -1443,7 +1443,7 @@ const Monitor = () => {
                                                           Localizado
                                                       </Button>
                                                   </Tooltip>
-                                                  <Tooltip title="Desbloquear Indivíduo (Libera Acesso Geral em Todos os Eventos)">
+                                                  <Tooltip title="Desbloquear indivíduo (libera acesso geral em todos os eventos)">
                                                       <Button
                                                           variant="contained"
                                                           color="success"
@@ -1521,7 +1521,7 @@ const Monitor = () => {
                               <Box sx={{ p: 2, textAlign: 'center', bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 1.5 }}>
                                   <Typography variant="caption" color="text.secondary">
                                       Nenhum contato externo configurado.<br />
-                                      Os alertas serão despachados aos Administradores Master.
+                                      Os alertas serão despachados aos administradores master.
                                   </Typography>
                               </Box>
                           )}
@@ -1728,7 +1728,7 @@ const Monitor = () => {
                     </Button>
 
                     {/* ATUALIZAR GRID */}
-                    <Tooltip title="Atualizar Câmeras">
+                    <Tooltip title="Atualizar câmeras">
                         <IconButton
                             size="small"
                             onClick={fetchCameras}
@@ -1982,7 +1982,7 @@ const Monitor = () => {
             <Stack direction="row" spacing={1.5} alignItems="center">
                 {/* CONTROLES DE ZOOM DA IMAGEM */}
                 <ButtonGroup size="small" variant="outlined" sx={{ borderColor: 'rgba(255,255,255,0.1)' }}>
-                    <Tooltip title="Diminuir Zoom">
+                    <Tooltip title="Diminuir zoom">
                         <IconButton
                             size="small"
                             onClick={() => setStreamZoom(z => Math.max(80, z - 15))}
@@ -1998,7 +1998,7 @@ const Monitor = () => {
                     >
                         {streamZoom}%
                     </Button>
-                    <Tooltip title="Aumentar Zoom">
+                    <Tooltip title="Aumentar zoom">
                         <IconButton
                             size="small"
                             onClick={() => setStreamZoom(z => Math.min(220, z + 15))}
@@ -2302,27 +2302,27 @@ const Monitor = () => {
                       helperText="CPF numérico ou formatado da pessoa procurada."
                   />
                   <TextField
-                      label="Nome Completo (opcional)" fullWidth
+                      label="Nome completo (opcional)" fullWidth
                       placeholder="Nome do indivíduo"
                       value={newTarget.nome}
                       onChange={(e) => setNewTarget({ ...newTarget, nome: e.target.value })}
                   />
                   <TextField
-                      label="Motivo / Descrição" fullWidth
+                      label="Motivo / descrição" fullWidth
                       placeholder="Ex: Mandado de prisão, Bloqueio judicial, VIP Blacklist"
                       value={newTarget.motivo}
                       onChange={(e) => setNewTarget({ ...newTarget, motivo: e.target.value })}
                   />
                   <FormControl fullWidth>
-                      <InputLabel>Nível de Risco</InputLabel>
+                      <InputLabel>Nível de risco</InputLabel>
                       <Select
-                          label="Nível de Risco"
+                          label="Nível de risco"
                           value={newTarget.nivel_alerta}
                           onChange={(e) => setNewTarget({ ...newTarget, nivel_alerta: e.target.value })}
                       >
-                          <MenuItem value="critico">CRÍTICO (Perigo Imediato)</MenuItem>
-                          <MenuItem value="alto">ALTO (Risco Elevado)</MenuItem>
-                          <MenuItem value="medio">MÉDIO (Atenção / Monitoramento)</MenuItem>
+                          <MenuItem value="critico">CRÍTICO (perigo imediato)</MenuItem>
+                          <MenuItem value="alto">ALTO (risco elevado)</MenuItem>
+                          <MenuItem value="medio">MÉDIO (atenção / monitoramento)</MenuItem>
                       </Select>
                   </FormControl>
               </Stack>
@@ -2363,21 +2363,21 @@ const Monitor = () => {
           <DialogContent sx={{ overflowY: 'auto' }}>
               <Stack spacing={2} pt={1}>
                   <TextField
-                      label="Nome do Contato ou Central" fullWidth required
+                      label="Nome do contato ou central" fullWidth required
                       placeholder="Ex: Cel. Roberto, Central de Comando, Wanderley"
                       value={newContact.nome}
                       onChange={(e) => setNewContact({ ...newContact, nome: e.target.value })}
                   />
                   <FormControl fullWidth required>
-                      <InputLabel>Canal de Notificação</InputLabel>
+                      <InputLabel>Canal de notificação</InputLabel>
                       <Select
-                          label="Canal de Notificação"
+                          label="Canal de notificação"
                           value={newContact.canal}
                           onChange={(e) => setNewContact({ ...newContact, canal: e.target.value })}
                       >
-                          <MenuItem value="telegram">TELEGRAM (Chat / Grupo)</MenuItem>
-                          <MenuItem value="whatsapp">WHATSAPP (Mensagem Direta)</MenuItem>
-                          <MenuItem value="email">E-MAIL (Relatório Imediato)</MenuItem>
+                          <MenuItem value="telegram">TELEGRAM (chat / grupo)</MenuItem>
+                          <MenuItem value="whatsapp">WHATSAPP (mensagem direta)</MenuItem>
+                          <MenuItem value="email">E-MAIL (relatório imediato)</MenuItem>
                       </Select>
                   </FormControl>
                   <TextField
@@ -2396,7 +2396,7 @@ const Monitor = () => {
                   />
                   {newContact.canal === 'telegram' && (
                       <TextField
-                          label="Token do Bot (opcional)" fullWidth
+                          label="Token do bot (opcional)" fullWidth
                           placeholder="Deixe vazio para usar o bot padrão do sistema"
                           value={newContact.bot_token}
                           onChange={(e) => setNewContact({ ...newContact, bot_token: e.target.value })}
@@ -2465,7 +2465,7 @@ const Monitor = () => {
               )}
 
               <TextField
-                  label="Motivo / Justificativa do Desbloqueio (Obrigatório)"
+                  label="Motivo / justificativa do desbloqueio (obrigatório)"
                   fullWidth
                   multiline
                   rows={3}
@@ -2534,7 +2534,7 @@ const Monitor = () => {
               )}
 
               <TextField
-                  label="Observação da Abordagem / Encerramento"
+                  label="Observação da abordagem / encerramento"
                   fullWidth
                   multiline
                   rows={2}

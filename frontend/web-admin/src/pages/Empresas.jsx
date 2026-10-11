@@ -111,7 +111,7 @@ const Empresas = () => {
             size="small"
             onClick={() => handleGerarConvite(row)}
             sx={acaoTabela}
-            title="Gerar Convite de Cadastro"
+            title="Gerar convite de cadastro"
           >
             <LinkIcon fontSize="small" />
           </IconButton>
@@ -122,7 +122,7 @@ const Empresas = () => {
                 setOpenQuotaDialog(true);
             }}
             sx={acaoTabela}
-            title="Gerenciar Cotas Diárias"
+            title="Gerenciar cotas diárias"
           >
             <QuotaIcon fontSize="small" />
           </IconButton>
@@ -682,7 +682,7 @@ const Empresas = () => {
 
       <ConfirmDialog
         open={openDeleteConfirm}
-        title="Remover Empresa?"
+        title="Remover empresa?"
         description="Esta ação desvinculará a empresa do ecossistema. Colaboradores vinculados serão mantidos, mas podem perder acesso a certas áreas."
         onConfirm={async () => {
             await handleDelete(empresaToDelete);

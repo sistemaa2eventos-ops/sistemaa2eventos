@@ -25,7 +25,7 @@ const ConfigNotificacoes = () => {
             <PageHeader
                 title="Notificações"
                 subtitle="Quando e por onde o sistema avisa sobre situações importantes."
-                breadcrumbs={[{ text: 'Configurações' }, { text: 'Alertas & Notificações' }]}
+                breadcrumbs={[{ text: 'Configurações' }, { text: 'Alertas & notificações' }]}
             />
 
             <Grid container spacing={3}>
@@ -41,7 +41,7 @@ const ConfigNotificacoes = () => {
                                     <WarningIcon />
                                 </ListItemIcon>
                                 <ListItemText
-                                    primary="Alerta: Pico de Evento (Lotação Crítica)"
+                                    primary="Alerta: pico de evento (lotação crítica)"
                                     secondary="Notifica quando a ocupação atinge o limite configurado."
                                     primaryTypographyProps={{ fontWeight: 600, color: '#FFFFFF' }}
                                     secondaryTypographyProps={{ fontSize: '0.75rem', color: 'text.secondary' }}
@@ -60,7 +60,7 @@ const ConfigNotificacoes = () => {
                                     <EmailIcon />
                                 </ListItemIcon>
                                 <ListItemText
-                                    primary="Relatório Diário por E-mail"
+                                    primary="Relatório diário por e-mail"
                                     secondary="Envia o resumo após o reset noturno."
                                     primaryTypographyProps={{ fontWeight: 600, color: '#FFFFFF' }}
                                     secondaryTypographyProps={{ fontSize: '0.75rem', color: 'text.secondary' }}
@@ -79,7 +79,7 @@ const ConfigNotificacoes = () => {
                                     <EmailIcon />
                                 </ListItemIcon>
                                 <ListItemText
-                                    primary="Alerta: Shadow Login (Operador)"
+                                    primary="Alerta: shadow login (operador)"
                                     secondary="Dispara e-mail para masters quando um novo operador se autentica em horários atípicos (22:00 às 06:00)."
                                     primaryTypographyProps={{ fontWeight: 600, color: '#FFFFFF' }}
                                     secondaryTypographyProps={{ fontSize: '0.75rem', color: 'text.secondary' }}

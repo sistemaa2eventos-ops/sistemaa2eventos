@@ -388,7 +388,7 @@ const CftvWall = () => {
                 {/* Lado Direito: Controles do Mosaico */}
                 <Stack direction="row" spacing={1} alignItems="center">
                     {/* Botões de Layout */}
-                    <Tooltip title="Layout 1x1 (Foco Único)">
+                    <Tooltip title="Layout 1x1 (foco único)">
                         <IconButton
                             size="small"
                             onClick={() => { setFocusedCamId(null); handleLayoutChange('1x1'); }}
@@ -398,7 +398,7 @@ const CftvWall = () => {
                         </IconButton>
                     </Tooltip>
 
-                    <Tooltip title="Layout 2x2 (4 Câmeras)">
+                    <Tooltip title="Layout 2x2 (4 câmeras)">
                         <IconButton
                             size="small"
                             onClick={() => { setFocusedCamId(null); handleLayoutChange('2x2'); }}
@@ -408,7 +408,7 @@ const CftvWall = () => {
                         </IconButton>
                     </Tooltip>
 
-                    <Tooltip title="Layout 3x3 (9 Câmeras)">
+                    <Tooltip title="Layout 3x3 (9 câmeras)">
                         <IconButton
                             size="small"
                             onClick={() => { setFocusedCamId(null); handleLayoutChange('3x3'); }}
@@ -418,7 +418,7 @@ const CftvWall = () => {
                         </IconButton>
                     </Tooltip>
 
-                    <Tooltip title="Layout 4x4 (16 Câmeras)">
+                    <Tooltip title="Layout 4x4 (16 câmeras)">
                         <IconButton
                             size="small"
                             onClick={() => { setFocusedCamId(null); handleLayoutChange('4x4'); }}
@@ -472,7 +472,7 @@ const CftvWall = () => {
                     }}>
                         <CameraIcon sx={{ fontSize: 72, color: 'rgba(255,255,255,0.15)', mb: 2 }} />
                         <Typography variant="h6" fontWeight={700} color="text.secondary">
-                            Nenhuma Câmera Selecionada no Mosaico
+                            Nenhuma câmera selecionada no mosaico
                         </Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                             Abra o seletor para escolher quais câmeras exibir neste monitor.
@@ -604,7 +604,7 @@ const CftvWall = () => {
                                                     <Grid1x1Icon />
                                                 </IconButton>
                                             </Tooltip>
-                                            <Tooltip title="Capturar Snapshot">
+                                            <Tooltip title="Capturar snapshot">
                                                 <IconButton
                                                     size="small"
                                                     onClick={() => window.open(urlMidiaCamera(cam.id, 'snapshot'), '_blank')}

@@ -370,13 +370,13 @@ const FiscalizacaoPessoaModal = ({
                             {fezCheckin ? (
                                 <Grid container spacing={2} alignItems="center">
                                     <Grid item xs={6}>
-                                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Data & Hora de Entrada</Typography>
+                                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Data & hora de entrada</Typography>
                                         <Typography variant="body1" sx={{ color: '#00FF88', fontWeight: 700, fontFamily: '"Inter", sans-serif' }}>
                                             {formatarDataHora(horarioCheckin) || 'Check-in Realizado'}
                                         </Typography>
                                     </Grid>
                                     <Grid item xs={6}>
-                                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Local de Acesso</Typography>
+                                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Local de acesso</Typography>
                                         <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 700 }}>
                                             {areaCheckin} ({metodoCheckin})
                                         </Typography>
@@ -411,7 +411,7 @@ const FiscalizacaoPessoaModal = ({
 
                             {areasAutorizadas.length === 0 ? (
                                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
-                                    Nenhuma área específica cadastrada (Acesso Geral Básico).
+                                    Nenhuma área específica cadastrada (acesso geral básico).
                                 </Typography>
                             ) : (
                                 <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 1 }}>
@@ -459,7 +459,7 @@ const FiscalizacaoPessoaModal = ({
                             '&:hover': { bgcolor: 'rgba(255,255,255,0.08)', borderColor: '#FFFFFF' }
                         }}
                     >
-                        Fechar Ficha
+                        Fechar ficha
                     </Button>
                 </Box>
             </DialogContent>

@@ -163,7 +163,7 @@ const ConfigDocumentos = () => {
                                     {linhasFuncao.map(f => (
                                         <TableRow key={f} hover>
                                             <TableCell sx={{ fontWeight: f === PADRAO ? 800 : 600, color: f === PADRAO ? 'primary.main' : 'inherit', whiteSpace: 'nowrap' }}>
-                                                {f === PADRAO ? 'TODOS (padrão)' : f}
+                                                {f === PADRAO ? 'Todos (padrão)' : f}
                                             </TableCell>
                                             {tiposAtivos.map(t => (
                                                 <TableCell key={chaveTipo(t)} align="center" padding="checkbox">
@@ -181,7 +181,7 @@ const ConfigDocumentos = () => {
                             <Button onClick={adicionarFuncao} startIcon={<AddIcon />}>Função</Button>
                         </Stack>
                         <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', mt: 1 }}>
-                            A linha TODOS (padrão) vale para todo colaborador; a linha da função soma documentos extras.
+                            A linha Todos (padrão) vale para todo colaborador; a linha da função soma documentos extras.
                             A função é comparada sem diferenciar maiúsculas/minúsculas.
                         </Typography>
                     </GlassCard>

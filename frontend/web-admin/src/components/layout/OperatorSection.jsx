@@ -802,7 +802,7 @@ export const OperatorSection = () => {
                             }}
                             sx={{ color: '#FF3366', fontSize: '0.75rem' }}
                         >
-                            Limpar Notas
+                            Limpar notas
                         </Button>
                     </Box>
                 </DialogContent>
@@ -821,7 +821,7 @@ export const OperatorSection = () => {
                             px: 3
                         }}
                     >
-                        Salvar Anotação
+                        Salvar anotação
                     </Button>
                 </DialogActions>
             </Dialog>

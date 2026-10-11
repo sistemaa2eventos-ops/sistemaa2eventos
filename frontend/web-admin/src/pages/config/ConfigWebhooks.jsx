@@ -112,7 +112,7 @@ const ConfigWebhooks = () => {
             <PageHeader
                 title="Webhooks e chaves de API"
                 subtitle="Conecte o NZT a outros sistemas, como ERP, PowerBI ou Zapier."
-                breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Integrações Externas' }]}
+                breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Integrações externas' }]}
             />
 
             <Grid container spacing={4} sx={{ mt: 1 }}>
@@ -137,7 +137,7 @@ const ConfigWebhooks = () => {
                         <List sx={{ bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 1.5 }}>
                             {apiKeys.length === 0 ? (
                                 <ListItem sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                    <ListItemText primary="Nenhum token gerado" secondary="Crie uma API Key para começar" primaryTypographyProps={{ color: 'text.secondary' }} />
+                                    <ListItemText primary="Nenhum token gerado" secondary="Crie uma API key para começar" primaryTypographyProps={{ color: 'text.secondary' }} />
                                 </ListItem>
                             ) : apiKeys.map((key) => (
                                 <ListItem key={key.id} sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: 2 }}>
@@ -195,15 +195,15 @@ const ConfigWebhooks = () => {
                             <TextField
                                 select
                                 fullWidth
-                                label="Gatilho de Evento"
+                                label="Gatilho de evento"
                                 value={newWebhookEvent}
                                 onChange={(e) => setNewWebhookEvent(e.target.value)}
                                 size="small"
                                 sx={{ mb: 2 }}
                             >
-                                <MenuItem value="NOVO_CADASTRO">Novo Cadastro Realizado</MenuItem>
-                                <MenuItem value="ACESSO_PERMITIDO">Acesso Permitido Catraca/Check-in</MenuItem>
-                                <MenuItem value="ALERTA_SEGURANCA">Alerta de Segurança (LPR / Passback)</MenuItem>
+                                <MenuItem value="NOVO_CADASTRO">Novo cadastro realizado</MenuItem>
+                                <MenuItem value="ACESSO_PERMITIDO">Acesso permitido catraca/check-in</MenuItem>
+                                <MenuItem value="ALERTA_SEGURANCA">Alerta de segurança (LPR / passback)</MenuItem>
                             </TextField>
                             <TextField
                                 fullWidth

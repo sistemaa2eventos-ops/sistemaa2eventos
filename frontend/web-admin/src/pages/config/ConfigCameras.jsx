@@ -243,8 +243,8 @@ const ConfigCameras = () => {
                             '& .MuiTabs-indicator': { bgcolor: '#00D4FF', height: 3 }
                         }}
                     >
-                        <Tab icon={<CameraIcon sx={{ mr: 1 }} />} iconPosition="start" label={`CÂMERAS IP DE CFTV (${cameras.length})`} />
-                        <Tab icon={<DoorIcon sx={{ mr: 1 }} />} iconPosition="start" label={`CATRACAS & CONTROLADORAS (${dispositivos.length})`} />
+                        <Tab icon={<CameraIcon sx={{ mr: 1 }} />} iconPosition="start" label={`Câmeras IP (${cameras.length})`} />
+                        <Tab icon={<DoorIcon sx={{ mr: 1 }} />} iconPosition="start" label={`Catracas e controladoras (${dispositivos.length})`} />
                     </Tabs>
 
                     <Stack direction="row" spacing={1.5}>
@@ -281,7 +281,7 @@ const ConfigCameras = () => {
                         <GlassCard sx={{ p: 6, textAlign: 'center' }}>
                             <CameraIcon sx={{ fontSize: 64, color: 'rgba(255,255,255,0.2)', mb: 2 }} />
                             <Typography variant="h6" fontWeight={700}>
-                                Nenhuma Câmera IP Cadastrada para este Evento
+                                Nenhuma câmera IP cadastrada para este evento
                             </Typography>
                             <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 500, mx: 'auto', mt: 1, mb: 3 }}>
                                 Cadastre aqui as câmeras de segurança, câmeras RTSP, webcams ou streams de vídeo.
@@ -407,7 +407,7 @@ const ConfigCameras = () => {
                         <GlassCard sx={{ p: 3 }}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                                 <Typography variant="h6" fontWeight={700}>
-                                    Catracas e Controladoras de Acesso
+                                    Catracas e controladoras de acesso
                                 </Typography>
                                 <Button
                                     variant="outlined"
@@ -416,7 +416,7 @@ const ConfigCameras = () => {
                                     onClick={() => setDispositivos([...dispositivos, {
                                         id: Date.now().toString(),
                                         isNew: true,
-                                        nome: 'Nova Catraca',
+                                        nome: 'Nova catraca',
                                         tipo: 'catraca',
                                         marca: 'intelbras',
                                         ip: '192.168.1.150',
@@ -498,7 +498,7 @@ const ConfigCameras = () => {
                     <Grid item xs={12} md={4}>
                         <GlassCard sx={{ p: 3, borderLeft: '3px solid #00D4FF' }}>
                             <Typography variant="subtitle1" fontWeight={700} color="#00D4FF" gutterBottom>
-                                Sincronização em Tempo Real
+                                Sincronização em tempo real
                             </Typography>
                             <Typography variant="body2" color="text.secondary" paragraph>
                                 As câmeras IP configuradas nesta tela tornam-se imediatamente elegíveis para serem ativadas no mosaico do Monitor e no Video Wall.
@@ -524,7 +524,7 @@ const ConfigCameras = () => {
                 <DialogContent sx={{ pt: 2.5 }}>
                     <Stack spacing={2.5}>
                         <TextField
-                            label="Nome de Identificação da Câmera"
+                            label="Nome de identificação da câmera"
                             fullWidth
                             required
                             placeholder="Ex: Câmera Portão 1 - Entrada Principal, VIP Lounge"
@@ -535,9 +535,9 @@ const ConfigCameras = () => {
                         <Grid container spacing={2}>
                             <Grid item xs={12} sm={6}>
                                 <FormControl fullWidth required>
-                                    <InputLabel>Fabricante / Tipo</InputLabel>
+                                    <InputLabel>Fabricante / tipo</InputLabel>
                                     <Select
-                                        label="Fabricante / Tipo"
+                                        label="Fabricante / tipo"
                                         value={editingCamera?.fabricante || 'RTSP / OBS / Webcam'}
                                         onChange={(e) => {
                                             const fab = e.target.value;
@@ -560,13 +560,13 @@ const ConfigCameras = () => {
 
                             <Grid item xs={12} sm={6}>
                                 <FormControl fullWidth>
-                                    <InputLabel>Área / Setor do Evento</InputLabel>
+                                    <InputLabel>Área / setor do evento</InputLabel>
                                     <Select
-                                        label="Área / Setor do Evento"
+                                        label="Área / setor do evento"
                                         value={editingCamera?.area_id || ''}
                                         onChange={(e) => setEditingCamera({ ...editingCamera, area_id: e.target.value })}
                                     >
-                                        <MenuItem value=""><em>Nenhuma / Geral</em></MenuItem>
+                                        <MenuItem value=""><em>Nenhuma / geral</em></MenuItem>
                                         {areas.map(a => (
                                             <MenuItem key={a.id} value={a.id}>
                                                 {a.nome_area || a.nome}
@@ -580,7 +580,7 @@ const ConfigCameras = () => {
                         <Grid container spacing={2}>
                             <Grid item xs={12} sm={8}>
                                 <TextField
-                                    label="Endereço IP na Rede"
+                                    label="Endereço IP na rede"
                                     fullWidth
                                     required
                                     placeholder="Ex: 192.168.1.108 ou 127.0.0.1"
@@ -602,7 +602,7 @@ const ConfigCameras = () => {
                         <Grid container spacing={2}>
                             <Grid item xs={12} sm={6}>
                                 <TextField
-                                    label="Usuário da Câmera"
+                                    label="Usuário da câmera"
                                     fullWidth
                                     placeholder="Ex: admin"
                                     value={editingCamera?.usuario || ''}
@@ -611,7 +611,7 @@ const ConfigCameras = () => {
                             </Grid>
                             <Grid item xs={12} sm={6}>
                                 <TextField
-                                    label="Senha da Câmera"
+                                    label="Senha da câmera"
                                     type="password"
                                     fullWidth
                                     placeholder="Senha de acesso"
@@ -622,7 +622,7 @@ const ConfigCameras = () => {
                         </Grid>
 
                         <TextField
-                            label="URL de Stream RTSP (Opcional / Gerada automaticamente)"
+                            label="URL de stream RTSP (opcional / gerada automaticamente)"
                             fullWidth
                             placeholder="rtsp://usuario:senha@ip:porta/live"
                             value={editingCamera?.stream_url || ''}

@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom';
 
 import GlassCard from '../components/common/GlassCard';
 import KpiCard from '../components/common/KpiCard';
-import { cores } from '../styles/tokens';
+import { cores, funcao } from '../styles/tokens';
 import PageHeader from '../components/common/PageHeader';
 import RecentAdditions from '../components/dashboard/RecentAdditions';
 import EmpresasMetricasCard from '../components/dashboard/EmpresasMetricasCard';
@@ -97,7 +97,7 @@ const Dashboard = () => {
                     {/* Leitores Online */}
                     <Chip 
                         icon={<DevicesIcon sx={{ fontSize: 16, color: '#00FF88 !important' }} />}
-                        label={`${stats.dispositivos_online || 0} Leitores Online`} 
+                        label={`${stats.dispositivos_online || 0} ${(stats.dispositivos_online || 0) === 1 ? 'leitor online' : 'leitores online'}`} 
                         sx={{
                             fontFamily: '"Inter", sans-serif',
                             fontWeight: 700,
@@ -115,23 +115,15 @@ const Dashboard = () => {
                         startIcon={<AutorenewIcon sx={{ fontSize: 17 }} />} 
                         onClick={confirmDailyReset} 
                         disabled={resetting}
-                        color="warning"
-                        sx={{ 
-                            height: 38, 
-                            minHeight: 38,
-                            fontSize: '0.75rem', 
-                            fontWeight: 700,
-                            borderRadius: '10px',
-                            px: 1.8
-                        }}
+                        neonColor={funcao.alerta}
                     >
-                        {resetting ? 'Resetando...' : 'Reset Diário'}
+                        {resetting ? 'Zerando o dia...' : 'Reset diário'}
                     </NeonButton>
 
                     {/* Refresh */}
                     <IconButton
                         onClick={refresh}
-                        title="Atualizar Dados"
+                        title="Atualizar dados"
                         sx={{
                             color: '#00D4FF',
                             bgcolor: 'rgba(0, 212, 255, 0.08)',

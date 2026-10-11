@@ -15,6 +15,7 @@ import GlassCard from '../../components/common/GlassCard';
 import NeonButton from '../../components/common/NeonButton';
 import PageHeader from '../../components/common/PageHeader';
 
+import { botaoSecundario } from '../../styles/tokens';
 const ConfigBancoDados = () => {
     const { enqueueSnackbar } = useSnackbar();
     const [syncing, setSyncing] = useState(false);
@@ -95,14 +96,14 @@ const ConfigBancoDados = () => {
                         </Box>
 
                         <TextField
-                            label="Host / Endpoint"
+                            label="Host / endpoint"
                             fullWidth
                             disabled
                             value={import.meta.env.VITE_API_URL || "Local / Nuvem"}
                             sx={{ mb: 2 }}
                         />
                         <TextField
-                            label="Ambiente (Node Version)"
+                            label="Ambiente (Node version)"
                             fullWidth
                             disabled
                             value={metrics?.nodeVersion || 'Desconhecido'}
@@ -123,9 +124,10 @@ const ConfigBancoDados = () => {
 
                         <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
                             <Button
+                                variant="outlined"
                                 onClick={handleTestConnection}
                                 disabled={testing}
-                                sx={{ color: 'text.secondary' }}
+                                sx={{ ...botaoSecundario, mr: 1 }}
                             >
                                 {testing ? "Testando..." : "Testar conexão"}
                             </Button>
@@ -145,7 +147,7 @@ const ConfigBancoDados = () => {
                             </Typography>
                         </Box>
 
-                        <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 1 }}>Status da Sincronização SQL Server</Typography>
+                        <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 1 }}>Status da sincronização SQL Server</Typography>
                         <Box sx={{ mb: 4 }}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                                 <Typography variant="caption" sx={{ color: '#FFFFFF' }}>Sincronizando registros offline locais...</Typography>
@@ -155,7 +157,7 @@ const ConfigBancoDados = () => {
                             <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5, display: 'block' }}>Ultima verificação: {metrics?.lastCheck || 'Ao carregar a página.'}</Typography>
                         </Box>
 
-                        <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 2 }}>Ações Manuais</Typography>
+                        <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 2 }}>Ações manuais</Typography>
                         <NeonButton
                             fullWidth
                             startIcon={<SyncIcon />}
@@ -193,7 +195,7 @@ const ConfigBancoDados = () => {
                 }}
             >
                 <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    Histórico de Sincronização
+                    Histórico de sincronização
                     <IconButton onClick={() => setHistoryOpen(false)} sx={{ color: 'text.secondary' }}>
                         <CloseIcon />
                     </IconButton>
@@ -203,7 +205,7 @@ const ConfigBancoDados = () => {
                         <Table size="small">
                             <TableHead>
                                 <TableRow>
-                                    <TableCell sx={{ color: 'text.secondary', fontWeight: 700 }}>Data/Hora</TableCell>
+                                    <TableCell sx={{ color: 'text.secondary', fontWeight: 700 }}>Data/hora</TableCell>
                                     <TableCell sx={{ color: 'text.secondary', fontWeight: 700 }}>Duração</TableCell>
                                     <TableCell sx={{ color: 'text.secondary', fontWeight: 700 }}>Sincronizados</TableCell>
                                     <TableCell sx={{ color: 'text.secondary', fontWeight: 700 }}>Falhas</TableCell>
@@ -219,7 +221,7 @@ const ConfigBancoDados = () => {
                                         <TableCell sx={{ color: '#FF3366' }}>{log.failed}</TableCell>
                                         <TableCell>
                                             {log.failed === 0 ? (
-                                                <Tooltip title="Sucesso Total">
+                                                <Tooltip title="Sucesso total">
                                                     <SuccessIcon sx={{ color: '#00FF88', fontSize: 18 }} />
                                                 </Tooltip>
                                             ) : (

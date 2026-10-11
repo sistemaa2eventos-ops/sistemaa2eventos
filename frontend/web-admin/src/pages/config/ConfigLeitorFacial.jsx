@@ -63,7 +63,7 @@ const ParametrosBiometricos = ({ sensitivity, setSensitivity, liveness, setLiven
         </Box>
 
         <Box sx={{ mb: 4 }}>
-            <Typography gutterBottom sx={{ color: 'text.secondary' }}>Anti-Fake (Liveness)</Typography>
+            <Typography gutterBottom sx={{ color: 'text.secondary' }}>Anti-Fake (liveness)</Typography>
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                 <Chip
                     label="Ativado"
@@ -101,7 +101,7 @@ const LeitorFacialForm = ({ open, onClose, formData, setFormData, onSave }) => (
                 <Grid container spacing={2} sx={{ mt: 1 }}>
                     <Grid item xs={12} md={8}>
                         <TextField
-                            fullWidth label="Nome do Dispositivo"
+                            fullWidth label="Nome do dispositivo"
                             value={formData.nome}
                             required
                             onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
@@ -114,7 +114,7 @@ const LeitorFacialForm = ({ open, onClose, formData, setFormData, onSave }) => (
                             required
                             onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
                         >
-                            <MenuItem value="intelbras">Intelbras (Bio-T/Face)</MenuItem>
+                            <MenuItem value="intelbras">Intelbras (Bio-T/face)</MenuItem>
                             <MenuItem value="hikvision">Hikvision (MinMoe)</MenuItem>
                         </TextField>
                     </Grid>
@@ -159,7 +159,7 @@ const LeitorFacialForm = ({ open, onClose, formData, setFormData, onSave }) => (
                                 }
                                 label={
                                     <Box>
-                                        <Typography variant="subtitle2" sx={{ color: '#FFB800', fontWeight: 700 }}>Modo Identidade (Recepção)</Typography>
+                                        <Typography variant="subtitle2" sx={{ color: '#FFB800', fontWeight: 700 }}>Modo identidade (recepção)</Typography>
                                         <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
                                             Neste modo, o terminal NÃO realiza validação ou acesso. Ele apenas captura a digital/face e envia o perfil para a tela do Terminal Web do operador vinculado validar e emitir pulseira.
                                         </Typography>
@@ -170,7 +170,7 @@ const LeitorFacialForm = ({ open, onClose, formData, setFormData, onSave }) => (
                     </Grid>
                     <Grid item xs={12} md={6}>
                         <TextField
-                            fullWidth label="Usuário Dispositivo"
+                            fullWidth label="Usuário dispositivo"
                             value={formData.user}
                             required
                             onChange={(e) => setFormData({ ...formData, user: e.target.value })}
@@ -178,7 +178,7 @@ const LeitorFacialForm = ({ open, onClose, formData, setFormData, onSave }) => (
                     </Grid>
                     <Grid item xs={12} md={6}>
                         <TextField
-                            fullWidth label="Senha Dispositivo"
+                            fullWidth label="Senha dispositivo"
                             type="password"
                             value={formData.password}
                             required
@@ -275,7 +275,7 @@ const ConfigLeitorFacial = () => {
             align: 'center',
             format: (_, row) => (
                 <Stack direction="row" spacing={1} justifyContent="center">
-                    <Tooltip title="Testar Conexão">
+                    <Tooltip title="Testar conexão">
                         <IconButton
                             size="small"
                             onClick={() => handleTestDevice(row)}
@@ -285,7 +285,7 @@ const ConfigLeitorFacial = () => {
                             {testingId === row.id ? <CircularProgress size={20} color="inherit" /> : <PowerIcon fontSize="small" />}
                         </IconButton>
                     </Tooltip>
-                    <Tooltip title="Sincronizar Faces">
+                    <Tooltip title="Sincronizar faces">
                         <IconButton
                             size="small"
                             onClick={() => handleSync(row.id)}
@@ -408,7 +408,7 @@ const ConfigLeitorFacial = () => {
 
             <ConfirmDialog
                 open={openDeleteConfirm}
-                title="Remover Terminal"
+                title="Remover terminal"
                 message={`Deseja realmente remover o dispositivo "${deviceToDelete?.nome}"? Isso não afetará os dados no leitor físico.`}
                 onConfirm={handleDelete}
                 onCancel={() => setOpenDeleteConfirm(false)}

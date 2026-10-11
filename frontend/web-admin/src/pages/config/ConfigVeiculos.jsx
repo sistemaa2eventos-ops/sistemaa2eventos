@@ -67,7 +67,7 @@ const ConfigVeiculos = () => {
             <PageHeader
                 title="Veículos e estacionamento"
                 subtitle="Leitura de placas (LPR) e cancelas."
-                breadcrumbs={[{ text: 'Configurações' }, { text: 'Veículos & Estacionamento' }]}
+                breadcrumbs={[{ text: 'Configurações' }, { text: 'Veículos & estacionamento' }]}
             />
 
             <Grid container spacing={3} sx={{ mt: 1 }}>
@@ -82,7 +82,7 @@ const ConfigVeiculos = () => {
 
                         <FormControlLabel
                             control={<Switch checked={anprEnabled} onChange={(e) => setAnprEnabled(e.target.checked)} color="primary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Habilitar Módulo de Estacionamento</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Habilitar módulo de estacionamento</Typography>}
                             sx={{ mb: 3 }}
                         />
 
@@ -90,7 +90,7 @@ const ConfigVeiculos = () => {
                             <Grid item xs={12}>
                                 <TextField
                                     fullWidth
-                                    label="Endpoint Motor LPR IA"
+                                    label="Endpoint motor LPR IA"
                                     value={anprEndpoint}
                                     onChange={(e) => setAnprEndpoint(e.target.value)}
                                     size="small"
@@ -99,7 +99,7 @@ const ConfigVeiculos = () => {
                             <Grid item xs={12} md={6}>
                                 <TextField
                                     fullWidth
-                                    label="Confiança Minima (%)"
+                                    label="Confiança minima (%)"
                                     value={anprConfidence}
                                     onChange={(e) => setAnprConfidence(e.target.value)}
                                     type="number"
@@ -109,7 +109,7 @@ const ConfigVeiculos = () => {
                             <Grid item xs={12} md={6}>
                                 <TextField
                                     fullWidth
-                                    label="Tempo Retenção Log (Dias)"
+                                    label="Tempo retenção log (dias)"
                                     value={anprLogRetention}
                                     onChange={(e) => setAnprLogRetention(e.target.value)}
                                     type="number"
@@ -136,7 +136,7 @@ const ConfigVeiculos = () => {
                         </Box>
                         <Box sx={{ textAlign: 'center', py: 6 }}>
                             <Typography variant="body1" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                                Nenhuma Cancela ou Controladora Veicular detectada na rede.
+                                Nenhuma cancela ou controladora veicular detectada na rede.
                             </Typography>
                             <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1 }}>
                                 Instale um nó Edge compatível (ZKTeco ou Intelbras Veicular) para mapear áreas de estacionamento.

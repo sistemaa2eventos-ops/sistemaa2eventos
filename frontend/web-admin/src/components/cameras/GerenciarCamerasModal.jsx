@@ -168,7 +168,7 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
                                 <TextField
                                     fullWidth
                                     size="small"
-                                    label="Nome / Identificação da Câmera"
+                                    label="Nome / identificação da câmera"
                                     value={editingCamera?.nome || ''}
                                     onChange={(e) => setEditingCamera({ ...editingCamera, nome: e.target.value })}
                                     placeholder="Ex: Câmera Portão VIP 01"
@@ -179,10 +179,10 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
 
                             <Grid item xs={12} sm={4}>
                                 <FormControl fullWidth size="small">
-                                    <InputLabel sx={{ color: '#94A3B8' }}>Fabricante / Protocolo</InputLabel>
+                                    <InputLabel sx={{ color: '#94A3B8' }}>Fabricante / protocolo</InputLabel>
                                     <Select
                                         value={editingCamera?.fabricante || 'RTSP / OBS / Webcam'}
-                                        label="Fabricante / Protocolo"
+                                        label="Fabricante / protocolo"
                                         onChange={(e) => setEditingCamera({ ...editingCamera, fabricante: e.target.value })}
                                         sx={{ bgcolor: 'rgba(0,0,0,0.3)', color: '#FFFFFF' }}
                                     >
@@ -197,7 +197,7 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
                                 <TextField
                                     fullWidth
                                     size="small"
-                                    label="Endereço IP ou Host"
+                                    label="Endereço IP ou host"
                                     value={editingCamera?.ip_address || ''}
                                     onChange={(e) => setEditingCamera({ ...editingCamera, ip_address: e.target.value })}
                                     placeholder="192.168.1.100 ou cam.dominio.com"
@@ -222,7 +222,7 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
                                 <TextField
                                     fullWidth
                                     size="small"
-                                    label="Usuário (Autenticação)"
+                                    label="Usuário (autenticação)"
                                     value={editingCamera?.usuario || ''}
                                     onChange={(e) => setEditingCamera({ ...editingCamera, usuario: e.target.value })}
                                     sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'rgba(0,0,0,0.3)', color: '#FFFFFF' } }}
@@ -234,7 +234,7 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
                                     fullWidth
                                     size="small"
                                     type="password"
-                                    label="Senha (Autenticação)"
+                                    label="Senha (autenticação)"
                                     value={editingCamera?.senha || ''}
                                     onChange={(e) => setEditingCamera({ ...editingCamera, senha: e.target.value })}
                                     sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'rgba(0,0,0,0.3)', color: '#FFFFFF' } }}
@@ -245,7 +245,7 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
                                 <TextField
                                     fullWidth
                                     size="small"
-                                    label="URL Stream Completa (RTSP / HLS / MJPEG)"
+                                    label="URL stream completa (RTSP / HLS / MJPEG)"
                                     value={editingCamera?.stream_url || ''}
                                     onChange={(e) => setEditingCamera({ ...editingCamera, stream_url: e.target.value })}
                                     placeholder="rtsp://usuario:senha@192.168.1.100:554/cam/realmonitor?channel=1&subtype=0"
@@ -256,14 +256,14 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
 
                             <Grid item xs={12}>
                                 <FormControl fullWidth size="small">
-                                    <InputLabel sx={{ color: '#94A3B8' }}>Área do Evento Vinculada</InputLabel>
+                                    <InputLabel sx={{ color: '#94A3B8' }}>Área do evento vinculada</InputLabel>
                                     <Select
                                         value={editingCamera?.area_id || ''}
-                                        label="Área do Evento Vinculada"
+                                        label="Área do evento vinculada"
                                         onChange={(e) => setEditingCamera({ ...editingCamera, area_id: e.target.value })}
                                         sx={{ bgcolor: 'rgba(0,0,0,0.3)', color: '#FFFFFF' }}
                                     >
-                                        <MenuItem value=""><em>Nenhuma (Monitoramento Geral)</em></MenuItem>
+                                        <MenuItem value=""><em>Nenhuma (monitoramento geral)</em></MenuItem>
                                         {areas.map(a => (
                                             <MenuItem key={a.id} value={a.id}>{a.nome_area}</MenuItem>
                                         ))}
@@ -290,7 +290,7 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
                                     '&:hover': { bgcolor: '#0099BB' }
                                 }}
                             >
-                                Adicionar Câmera
+                                Adicionar câmera
                             </Button>
                         </Box>
 

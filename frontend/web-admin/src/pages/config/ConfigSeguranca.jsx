@@ -81,7 +81,7 @@ const ConfigSeguranca = () => {
                         <Box sx={{ mb: 3 }}>
                             <TextField
                                 fullWidth
-                                label="Token Expiration (Horas)"
+                                label="Token expiration (horas)"
                                 value={jwtExpiration}
                                 onChange={(e) => setJwtExpiration(e.target.value)}
                                 type="number"
@@ -94,12 +94,12 @@ const ConfigSeguranca = () => {
 
                         <FormControlLabel
                             control={<Switch checked={force2FA} onChange={(e) => setForce2FA(e.target.checked)} color="primary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Forçar Autenticação em 2 Fatores (Admin)</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Forçar autenticação em 2 fatores (admin)</Typography>}
                             sx={{ mb: 2 }}
                         />
                         <FormControlLabel
                             control={<Switch checked={ddosShield} onChange={(e) => setDdosShield(e.target.checked)} color="primary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Habilitar Bloqueio de IP (DDoS Shield)</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Habilitar bloqueio de IP (DDoS shield)</Typography>}
                             sx={{ mb: 4 }}
                         />
 

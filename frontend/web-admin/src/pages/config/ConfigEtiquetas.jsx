@@ -108,7 +108,7 @@ const ConfigEtiquetas = () => {
             <PageHeader
                 title="Etiquetas e crachás"
                 subtitle="Impressora térmica e layout do crachá."
-                breadcrumbs={[{ text: 'Configurações' }, { text: 'Impressão & Etiquetas' }]}
+                breadcrumbs={[{ text: 'Configurações' }, { text: 'Impressão & etiquetas' }]}
             />
             <Grid container spacing={4} sx={{ mt: 1 }}>
                 {/* COLUNA ESQUERDA: CONFIGURAÇÕES GERAIS E MENU DE ELEMENTOS */}
@@ -129,7 +129,7 @@ const ConfigEtiquetas = () => {
                                         onChange={(e) => handleChangeConfig('layout', e.target.value)}
                                         select SelectProps={{ native: true }}
                                     >
-                                        <option value="custom">Tamanho Customizado</option>
+                                        <option value="custom">Tamanho customizado</option>
                                         <option value="zebra_tlp2844">Zebra TLP (100x150mm)</option>
                                         <option value="argox_cracha">Argox Crachá (54x86mm)</option>
                                     </TextField>
@@ -175,7 +175,7 @@ const ConfigEtiquetas = () => {
                                             {el.type === 'text' && (
                                                 <Grid item xs={6}>
                                                     <TextField
-                                                        label="Tamanho Fonte" type="number"
+                                                        label="Tamanho fonte" type="number"
                                                         fullWidth size="small" value={el.fontSize}
                                                         onChange={e => updateElement(el.id, { fontSize: Number(e.target.value) })}
                                                     />
@@ -184,7 +184,7 @@ const ConfigEtiquetas = () => {
                                             {el.type === 'text' && (
                                                 <Grid item xs={6}>
                                                     <TextField
-                                                        label="Peso Fonte" select SelectProps={{ native: true }}
+                                                        label="Peso fonte" select SelectProps={{ native: true }}
                                                         fullWidth size="small" value={el.fontWeight}
                                                         onChange={e => updateElement(el.id, { fontWeight: e.target.value })}
                                                     >

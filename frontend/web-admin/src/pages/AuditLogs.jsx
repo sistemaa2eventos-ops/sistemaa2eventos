@@ -160,7 +160,7 @@ const AuditLogs = () => {
                                 color: '#FFFFFF'
                             }}
                         >
-                            Logs de Auditoria
+                            Logs de auditoria
                         </Typography>
                     </Stack>
                     <Typography variant="body2" color="textSecondary" sx={{ ml: { xs: 0, sm: 5.5 } }}>
@@ -188,7 +188,7 @@ const AuditLogs = () => {
                         <TextField
                             fullWidth
                             select
-                            label="Filtrar por Módulo"
+                            label="Filtrar por módulo"
                             value={filters.recurso}
                             onChange={(e) => handleFilterChange({ recurso: e.target.value })}
                             variant="outlined"
@@ -203,7 +203,7 @@ const AuditLogs = () => {
                     <Grid item xs={12} sm={3}>
                         <TextField
                             fullWidth
-                            label="Data Início"
+                            label="Data início"
                             type="date"
                             InputLabelProps={{ shrink: true }}
                             value={filters.data_inicio}
@@ -213,7 +213,7 @@ const AuditLogs = () => {
                     <Grid item xs={12} sm={3}>
                         <TextField
                             fullWidth
-                            label="Data Fim"
+                            label="Data fim"
                             type="date"
                             InputLabelProps={{ shrink: true }}
                             value={filters.data_fim}

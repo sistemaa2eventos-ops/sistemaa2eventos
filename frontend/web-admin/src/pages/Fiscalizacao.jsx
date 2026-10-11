@@ -266,7 +266,7 @@ const Fiscalizacao = () => {
                 <PageHeader
                     title="Fiscalização de áreas"
                     subtitle="Valide pulseiras e credenciais nas portarias e áreas internas."
-                    breadcrumbs={[{ text: 'Operação' }, { text: 'Fiscalização de Áreas' }]}
+                    breadcrumbs={[{ text: 'Operação' }, { text: 'Fiscalização de áreas' }]}
                     sx={{ mb: 0 }}
                 />
 
@@ -304,7 +304,7 @@ const Fiscalizacao = () => {
                     </Tooltip>
 
                     {/* Tela Cheia */}
-                    <Tooltip title="Alternar modo Tela Cheia (Kiosk)">
+                    <Tooltip title="Alternar modo tela cheia (kiosk)">
                         <IconButton
                             onClick={() => setIsKiosk(!isKiosk)}
                             sx={{
@@ -345,7 +345,7 @@ const Fiscalizacao = () => {
                                     '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 212, 255, 0.4)' }
                                 }}
                             >
-                                <MenuItem value=""><em>Todas as Áreas (Fiscalização Geral de Portaria)</em></MenuItem>
+                                <MenuItem value=""><em>Todas as áreas (fiscalização geral de portaria)</em></MenuItem>
                                 {areas.map(a => (
                                     <MenuItem key={a.id} value={a.id}>
                                         {a.nome_area} {a.capacidade_maxima ? `(Capacidade: ${a.capacidade_maxima})` : ''}
@@ -577,7 +577,7 @@ const Fiscalizacao = () => {
                                             '&:hover': { borderColor: '#00D4FF', bgcolor: 'rgba(0, 212, 255, 0.1)' }
                                         }}
                                     >
-                                        Ver Ficha Completa
+                                        Ver ficha completa
                                     </Button>
                                 </Box>
                                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'block', mt: 0.5, fontSize: '0.75rem' }}>
@@ -700,7 +700,7 @@ const Fiscalizacao = () => {
                 <GlassCard sx={{ p: 6, textAlign: 'center', bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 1.5 }}>
                     <PortariaIcon sx={{ fontSize: 68, color: '#00D4FF', opacity: 0.35, mb: 2 }} />
                     <Typography variant="h5" sx={{ color: '#FFFFFF', fontWeight: 700, fontFamily: '"Space Grotesk", sans-serif' }}>
-                        Posto de Fiscalização Pronto para Leitura
+                        Posto de fiscalização pronto para leitura
                     </Typography>
                     <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.55)', maxWidth: 540, mx: 'auto', mt: 1.5 }}>
                         Aproxime a pulseira RFID, escaneie o QR Code ou busque o participante pelo nome para validar o acesso na portaria e áreas internas do evento.

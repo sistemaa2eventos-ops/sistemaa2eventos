@@ -75,7 +75,7 @@ const ConfigEvento = () => {
     return (
         <Box>
             <Typography variant="h6" sx={{ color: 'primary.main', mb: 3, fontWeight: 700 }}>
-                Módulo de Evento Ativo
+                Módulo de evento ativo
             </Typography>
 
             <Grid container spacing={3}>
@@ -118,11 +118,11 @@ const ConfigEvento = () => {
                         </Typography>
                         
                         <FormControl fullWidth sx={{ mb: 3 }}>
-                            <InputLabel id="reset-hora-label">Horário de Reset Diário</InputLabel>
+                            <InputLabel id="reset-hora-label">Horário de reset diário</InputLabel>
                             <Select
                                 labelId="reset-hora-label"
                                 value={settings.reset_hora || '03:00'}
-                                label="Horário de Reset Diário"
+                                label="Horário de reset diário"
                                 onChange={(e) => setSettings(prev => ({ ...prev, reset_hora: e.target.value }))}
                             >
                                 <MenuItem value="00:00">00:00</MenuItem>
@@ -148,7 +148,7 @@ const ConfigEvento = () => {
                             onClick={handleResetManual}
                             sx={{ fontWeight: 700 }}
                         >
-                            Executar Reset Agora
+                            Executar reset agora
                         </Button>
                     </GlassCard>
                 </Grid>
@@ -162,7 +162,7 @@ const ConfigEvento = () => {
 
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                             <Box>
-                                <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600 }}>Receber por Email</Typography>
+                                <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600 }}>Receber por email</Typography>
                                 <Typography variant="caption" color="text.secondary">Disparo automático pós-reset</Typography>
                             </Box>
                             <Switch 

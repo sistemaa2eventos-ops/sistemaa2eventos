@@ -302,7 +302,7 @@ const AuditoriaDocumental = () => {
                         </IconButton>
                     </Tooltip>
 
-                    <Tooltip title="Aprovar Documento">
+                    <Tooltip title="Aprovar documento">
                         <IconButton
                             size="small"
                             onClick={() => handleOpenAction(row, 'aprovado')}
@@ -312,7 +312,7 @@ const AuditoriaDocumental = () => {
                         </IconButton>
                     </Tooltip>
 
-                    <Tooltip title="Solicitar Reenvio (Ilegível / Incorreto)">
+                    <Tooltip title="Solicitar reenvio (ilegível / incorreto)">
                         <IconButton
                             size="small"
                             onClick={() => handleOpenAction(row, 'reenvio_solicitado')}
@@ -322,7 +322,7 @@ const AuditoriaDocumental = () => {
                         </IconButton>
                     </Tooltip>
 
-                    <Tooltip title="Reprovar Documento">
+                    <Tooltip title="Reprovar documento">
                         <IconButton
                             size="small"
                             onClick={() => handleOpenAction(row, 'reprovado')}
@@ -522,7 +522,7 @@ const AuditoriaDocumental = () => {
                                 <IconButton
                                     onClick={() => window.open(previewUrl || previewDoc.url_arquivo, '_blank')}
                                     sx={{ color: '#00D4FF' }}
-                                    title="Abrir em Nova Aba"
+                                    title="Abrir em nova aba"
                                 >
                                     <OpenInNewIcon />
                                 </IconButton>
@@ -581,7 +581,7 @@ const AuditoriaDocumental = () => {
                                                 onClick={() => handleOpenAction(previewDoc, 'aprovado')}
                                                 sx={{ fontWeight: 700, py: 1.2, textTransform: 'none' }}
                                             >
-                                                Aprovar Documento
+                                                Aprovar documento
                                             </Button>
 
                                             <Button
@@ -592,7 +592,7 @@ const AuditoriaDocumental = () => {
                                                 onClick={() => handleOpenAction(previewDoc, 'reenvio_solicitado')}
                                                 sx={{ fontWeight: 700, py: 1.2, textTransform: 'none' }}
                                             >
-                                                Solicitar Reenvio
+                                                Solicitar reenvio
                                             </Button>
 
                                             <Button
@@ -645,7 +645,7 @@ const AuditoriaDocumental = () => {
                             {isBatch ? (
                                 <>Aplicando ação para <b>{selectedDocs.length}</b> documento(s) selecionado(s).</>
                             ) : (
-                                <>Colaborador/Empresa: <b>{actionDoc?.entidade_nome}</b><br />
+                                <>Colaborador/empresa: <b>{actionDoc?.entidade_nome}</b><br />
                                 Documento: <span style={{ color: '#00D4FF' }}>{actionDoc?.tipo_nome || actionDoc?.titulo} ({actionDoc?.tipo_doc})</span></>
                             )}
                         </Typography>
@@ -666,10 +666,10 @@ const AuditoriaDocumental = () => {
                         {/* Dropdown de Motivos Pré-definidos */}
                         {(acao === 'reenvio_solicitado' || acao === 'reprovado') && (
                             <FormControl fullWidth sx={{ mt: 1 }}>
-                                <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>Motivo Pré-definido</InputLabel>
+                                <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>Motivo pré-definido</InputLabel>
                                 <Select
                                     value={motivoPredefinido}
-                                    label="Motivo Pré-definido"
+                                    label="Motivo pré-definido"
                                     onChange={(e) => setMotivoPredefinido(e.target.value)}
                                     sx={{
                                         color: '#FFFFFF',
@@ -724,7 +724,7 @@ const AuditoriaDocumental = () => {
                         {/* Data de Emissão (Opcional ao aprovar) */}
                         {acao === 'aprovado' && (
                             <TextField
-                                label="Data de Emissão do Documento (Opcional)"
+                                label="Data de emissão do documento (opcional)"
                                 type="date"
                                 InputLabelProps={{ shrink: true }}
                                 fullWidth

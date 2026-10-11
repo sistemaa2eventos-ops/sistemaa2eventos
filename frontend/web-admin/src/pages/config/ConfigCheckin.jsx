@@ -70,7 +70,7 @@ const ConfigCheckin = () => {
             <PageHeader
                 title="Regras de acesso"
                 subtitle="Tempo mínimo entre passagens e limites de lotação."
-                breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Check-in / Check-out' }]}
+                breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Check-in / check-out' }]}
             />
 
             <Grid container spacing={4} sx={{ mt: 1 }}>
@@ -95,7 +95,7 @@ const ConfigCheckin = () => {
 
                         <Box sx={{ mb: 4, px: 2 }}>
                             <Typography gutterBottom sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                                Tempo de Cooldown Restrito (Minutos)
+                                Tempo de cooldown restrito (minutos)
                             </Typography>
                             <Slider
                                 value={apbCooldown}
@@ -114,7 +114,7 @@ const ConfigCheckin = () => {
 
                         <Box sx={{ mb: 4, px: 2 }}>
                             <Typography gutterBottom sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                                Auto Check-out Virtual (Morte Súbita)
+                                Auto check-out virtual (morte súbita)
                             </Typography>
                             <Slider
                                 value={autoCheckout}
@@ -152,18 +152,18 @@ const ConfigCheckin = () => {
 
                         <FormControlLabel
                             control={<Switch checked={hardBlock} onChange={(e) => setHardBlock(e.target.checked)} color="primary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Bloqueio Rígido em 100% Capacidade</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Bloqueio rígido em 100% capacidade</Typography>}
                             sx={{ mb: 3 }}
                         />
 
                         <FormControlLabel
                             control={<Switch checked={vipBypass} onChange={(e) => setVipBypass(e.target.checked)} color="primary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Verificação de Vínculo Contratual (VIPs ignoram Lotacao)</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Verificação de vínculo contratual (VIPs ignoram lotacao)</Typography>}
                             sx={{ mb: 4 }}
                         />
 
                         <Box sx={{ p: 2, bgcolor: 'rgba(0, 212, 255, 0.05)', border: '1px dashed rgba(0,212,255,0.3)', borderRadius: 1.5 }}>
-                            <Typography variant="subtitle2" sx={{ color: '#00D4FF', mb: 1, fontWeight: 700 }}>Inteligência Edge Ativa</Typography>
+                            <Typography variant="subtitle2" sx={{ color: '#00D4FF', mb: 1, fontWeight: 700 }}>Inteligência Edge ativa</Typography>
                             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                                 O Bloqueio Rígido informa aos terminais faciais o comando &apos;No-Open&apos; instantaneamente assim que o limite local estourar. O acesso só volta ao normal se ocorrer saídas (Check-out).
                             </Typography>

@@ -213,7 +213,7 @@ const ConfigCredenciamento = () => {
 
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                                 <Box>
-                                    <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600 }}>Verificação de E-mail</Typography>
+                                    <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600 }}>Verificação de e-mail</Typography>
                                     <Typography variant="caption" color="text.secondary">Exigir clique antes de liberar o acesso.</Typography>
                                 </Box>
                                 <Switch
@@ -225,7 +225,7 @@ const ConfigCredenciamento = () => {
                             <Divider sx={{ mb: 3, opacity: 0.1 }} />
 
                             <TextField
-                                label="Texto de Consentimento (Privacy Policy)"
+                                label="Texto de consentimento (privacy policy)"
                                 multiline
                                 rows={4}
                                 fullWidth

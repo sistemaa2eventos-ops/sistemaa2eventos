@@ -206,7 +206,7 @@ const PessoaCardDialog = ({
                   }}
                 >
                   <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', letterSpacing: 1, display: 'block', mb: 1.2, fontWeight: 700 }}>
-                    Último Acesso Registrado
+                    Último acesso registrado
                   </Typography>
 
                   <Grid container spacing={2}>
@@ -238,7 +238,7 @@ const PessoaCardDialog = ({
                       <Stack direction="row" spacing={1} alignItems="center">
                         <TerminalIcon sx={{ color: accentColor, fontSize: 16 }} />
                         <Box>
-                          <Typography variant="caption" color="text.secondary" display="block">Dispositivo / Método</Typography>
+                          <Typography variant="caption" color="text.secondary" display="block">Dispositivo / método</Typography>
                           <Typography variant="body2" fontWeight={600} noWrap sx={{ maxWidth: 160 }}>
                             {dispositivoNome} ({metodoAcesso})
                           </Typography>

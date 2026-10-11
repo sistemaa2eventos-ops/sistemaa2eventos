@@ -87,7 +87,7 @@ const ConfigGamificacao = () => {
             <PageHeader
                 title="Gamificação"
                 subtitle="Pontos por ação do participante para medir engajamento."
-                breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Engajamento Global' }]}
+                breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Engajamento global' }]}
             />
 
             <Grid container spacing={4} sx={{ mt: 1 }}>
@@ -102,19 +102,19 @@ const ConfigGamificacao = () => {
 
                         <FormControlLabel
                             control={<Switch checked={gamificationEnabled} onChange={(e) => setGamificationEnabled(e.target.checked)} color="primary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Computar Pontuação por Ações Isoladas</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Computar pontuação por ações isoladas</Typography>}
                             sx={{ mb: 4 }}
                         />
 
                         <Grid container spacing={3}>
                             <Grid item xs={12}>
-                                <TextField fullWidth label="Pontos: Visitar Estandes (Scan Expositor)" value={pointsScan} onChange={(e) => setPointsScan(e.target.value)} type="number" size="small" />
+                                <TextField fullWidth label="Pontos: visitar estandes (scan expositor)" value={pointsScan} onChange={(e) => setPointsScan(e.target.value)} type="number" size="small" />
                             </Grid>
                             <Grid item xs={12}>
-                                <TextField fullWidth label="Pontos: Primeiras 100 Inscrições no Credenciamento" value={pointsEarlybird} onChange={(e) => setPointsEarlybird(e.target.value)} type="number" size="small" />
+                                <TextField fullWidth label="Pontos: primeiras 100 inscrições no credenciamento" value={pointsEarlybird} onChange={(e) => setPointsEarlybird(e.target.value)} type="number" size="small" />
                             </Grid>
                             <Grid item xs={12}>
-                                <TextField fullWidth label="Pontos: Check-in Master de Entrada (Participou Realmente)" value={pointsCheckin} onChange={(e) => setPointsCheckin(e.target.value)} type="number" size="small" />
+                                <TextField fullWidth label="Pontos: check-in master de entrada (participou realmente)" value={pointsCheckin} onChange={(e) => setPointsCheckin(e.target.value)} type="number" size="small" />
                             </Grid>
                         </Grid>
 

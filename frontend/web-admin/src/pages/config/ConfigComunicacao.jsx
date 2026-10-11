@@ -7,6 +7,7 @@ import PageHeader from '../../components/common/PageHeader';
 import GlassCard from '../../components/common/GlassCard';
 import NeonButton from '../../components/common/NeonButton';
 
+import { botaoSecundario } from '../../styles/tokens';
 const ConfigComunicacao = () => {
     const { enqueueSnackbar } = useSnackbar();
     const [loading, setLoading] = useState(true);
@@ -196,7 +197,7 @@ const ConfigComunicacao = () => {
             <PageHeader
                 title="Comunicação"
                 subtitle="E-mail e WhatsApp usados em convites, aprovações e avisos."
-                breadcrumbs={[{ text: 'Configurações' }, { text: 'Módulo de Comunicação' }]}
+                breadcrumbs={[{ text: 'Configurações' }, { text: 'Módulo de comunicação' }]}
             />
 
             <Grid container spacing={4} sx={{ mt: 1 }}>
@@ -212,7 +213,7 @@ const ConfigComunicacao = () => {
 
                             <FormControlLabel
                                 control={<Switch checked={smtpEnabled} onChange={(e) => setSmtpEnabled(e.target.checked)} color="primary" />}
-                                label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Habilitar Envio de E-mails</Typography>}
+                                label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Habilitar envio de e-mails</Typography>}
                                 sx={{ mb: 3 }}
                             />
 
@@ -224,15 +225,15 @@ const ConfigComunicacao = () => {
                                     <TextField fullWidth label="Porta" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} type="number" size="small" />
                                 </Grid>
                                 <Grid item xs={12}>
-                                    <TextField fullWidth label="E-mail Origem (Remetente)" value={smtpEmail} onChange={(e) => setSmtpEmail(e.target.value)} placeholder="contato@meuevento.com.br" size="small" />
+                                    <TextField fullWidth label="E-mail origem (remetente)" value={smtpEmail} onChange={(e) => setSmtpEmail(e.target.value)} placeholder="contato@meuevento.com.br" size="small" />
                                 </Grid>
                                 <Grid item xs={12} md={6}>
-                                    <TextField fullWidth label="Usuário Autenticação" value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} size="small" />
+                                    <TextField fullWidth label="Usuário autenticação" value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} size="small" />
                                 </Grid>
                                 <Grid item xs={12} md={6}>
                                     <TextField 
                                         fullWidth 
-                                        label="Senha (App Password)" 
+                                        label="Senha (app password)" 
                                         value={smtpPass} 
                                         onChange={(e) => setSmtpPass(e.target.value)} 
                                         type="password" 
@@ -243,11 +244,10 @@ const ConfigComunicacao = () => {
                             </Grid>
 
                             <Box sx={{ mt: 4, display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-                                <Button
-                                    variant="text"
-                                    sx={{ color: '#00D4FF' }}
-                                    onClick={handleTestSmtp}
-                                >
+                                <Button variant="outlined"
+                                   
+                                   
+                                    onClick={handleTestSmtp} sx={botaoSecundario}>
                                     Testar disparo
                                 </Button>
                                 <NeonButton type="submit" disabled={savingSmtp} startIcon={<SaveIcon />}>
@@ -270,23 +270,23 @@ const ConfigComunicacao = () => {
 
                             <FormControlLabel
                                 control={<Switch checked={wppEnabled} onChange={(e) => setWppEnabled(e.target.checked)} color="primary" />}
-                                label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Habilitar Disparos Oficiais WhatsApp (Meta)</Typography>}
+                                label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Habilitar disparos oficiais WhatsApp (Meta)</Typography>}
                                 sx={{ mb: 3 }}
                             />
 
                             <Grid container spacing={2}>
                                 <Grid item xs={12}>
-                                    <TextField fullWidth label="API Gateway Privider" value={wppProvider} onChange={(e) => setWppProvider(e.target.value)} select SelectProps={{ native: true }} size="small">
+                                    <TextField fullWidth label="Provedor da API" value={wppProvider} onChange={(e) => setWppProvider(e.target.value)} select SelectProps={{ native: true }} size="small">
                                         <option value="twilio">Twilio (Recomendado)</option>
                                         <option value="zenvia">Zenvia</option>
-                                        <option value="meta">Meta Cloud API Direta</option>
-                                        <option value="wppconnect">WppConnect (Não Oficial)</option>
+                                        <option value="meta">Meta cloud API direta</option>
+                                        <option value="wppconnect">WppConnect (não oficial)</option>
                                     </TextField>
                                 </Grid>
                                 <Grid item xs={12}>
                                     <TextField 
                                         fullWidth 
-                                        label="Authorization Token (Bearer / Secret)" 
+                                        label="Authorization token (Bearer / secret)" 
                                         value={wppToken} 
                                         onChange={(e) => setWppToken(e.target.value)} 
                                         type="password" 
@@ -295,7 +295,7 @@ const ConfigComunicacao = () => {
                                     />
                                 </Grid>
                                 <Grid item xs={12}>
-                                    <TextField fullWidth label="ID do Telefone Remetente" value={wppPhoneId} onChange={(e) => setWppPhoneId(e.target.value)} placeholder="+55 11 99999-9999" size="small" />
+                                    <TextField fullWidth label="ID do telefone remetente" value={wppPhoneId} onChange={(e) => setWppPhoneId(e.target.value)} placeholder="+55 11 99999-9999" size="small" />
                                 </Grid>
                             </Grid>
 
@@ -306,11 +306,10 @@ const ConfigComunicacao = () => {
                             </Box>
 
                             <Box sx={{ mt: 3, display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-                                <Button
-                                    variant="text"
-                                    sx={{ color: '#00FF88' }}
-                                    onClick={handleTestWpp}
-                                >
+                                <Button variant="outlined"
+                                   
+                                   
+                                    onClick={handleTestWpp} sx={botaoSecundario}>
                                     Testar API
                                 </Button>
                                 <NeonButton type="submit" color="success" disabled={savingWpp} startIcon={<SaveIcon />}>
@@ -324,7 +323,7 @@ const ConfigComunicacao = () => {
 
             {/* Editor de Templates */}
             <Typography variant="h5" sx={{ mt: 6, mb: 3, fontWeight: 700, color: '#FFFFFF', letterSpacing: 1 }}>
-                Editor de Mensagens Dinâmicas
+                Editor de mensagens dinâmicas
             </Typography>
             
             <Grid container spacing={4}>
@@ -372,7 +371,7 @@ const ConfigComunicacao = () => {
                                 {selectedTemplate.canal === 'email' && (
                                     <TextField
                                         fullWidth
-                                        label="Assunto do E-mail"
+                                        label="Assunto do e-mail"
                                         value={tempTitle}
                                         onChange={(e) => setTempTitle(e.target.value)}
                                         sx={{ mb: 3 }}
@@ -384,7 +383,7 @@ const ConfigComunicacao = () => {
                                     fullWidth
                                     multiline
                                     rows={8}
-                                    label="Conteúdo da Mensagem"
+                                    label="Conteúdo da mensagem"
                                     value={tempContent}
                                     onChange={(e) => setTempContent(e.target.value)}
                                     helperText="Use {{variavel}} para campos dinâmicos."

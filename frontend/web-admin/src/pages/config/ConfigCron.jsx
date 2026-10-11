@@ -31,12 +31,12 @@ const HORAS = Array.from({ length: 48 }, (_, i) => {
 
 // Jobs com schedule fixo (não configuráveis pelo usuário)
 const JOBS_FIXOS = [
-    { label: 'Auto-checkout de Trava',   schedule: 'A cada 5 min',  desc: 'Detecta pessoas presas em check-in e força checkout.' },
-    { label: 'Saúde dos Dispositivos',   schedule: 'A cada 5 min',  desc: 'Ping em terminais biométricos e atualiza status online/offline.' },
-    { label: 'Fila de Sincronização',    schedule: 'A cada 1 min',  desc: 'Processa comandos enfileirados para terminais offline.' },
-    { label: 'Saúde do Sistema',         schedule: 'A cada 30 seg', desc: 'Verifica memória, conexões e integridade geral do servidor.' },
-    { label: 'Sync Noturno Inteligente', schedule: 'Diário às 01:00', desc: 'Sincroniza acessos e limpa cache de faces desatualizadas.' },
-    { label: 'Revogação de Documentos',  schedule: 'Diário às 04:00', desc: 'Invalida NRs e ASOs vencidos no ECM.' },
+    { label: 'Auto-checkout de trava',   schedule: 'A cada 5 min',  desc: 'Detecta pessoas presas em check-in e força checkout.' },
+    { label: 'Saúde dos dispositivos',   schedule: 'A cada 5 min',  desc: 'Ping em terminais biométricos e atualiza status online/offline.' },
+    { label: 'Fila de sincronização',    schedule: 'A cada 1 min',  desc: 'Processa comandos enfileirados para terminais offline.' },
+    { label: 'Saúde do sistema',         schedule: 'A cada 30 seg', desc: 'Verifica memória, conexões e integridade geral do servidor.' },
+    { label: 'Sync noturno inteligente', schedule: 'Diário às 01:00', desc: 'Sincroniza acessos e limpa cache de faces desatualizadas.' },
+    { label: 'Revogação de documentos',  schedule: 'Diário às 04:00', desc: 'Invalida NRs e ASOs vencidos no ECM.' },
 ];
 
 const ConfigCron = () => {
@@ -141,14 +141,14 @@ const ConfigCron = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                             <CronIcon sx={{ color: '#00D4FF' }} fontSize="small" />
                             <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700 }}>
-                                Reset de Turno Diário
+                                Reset de turno diário
                             </Typography>
                         </Box>
                         <FormControl fullWidth size="small">
-                            <InputLabel>Horário de Execução</InputLabel>
+                            <InputLabel>Horário de execução</InputLabel>
                             <Select
                                 value={settings.cron_reset_hora || '03:00'}
-                                label="Horário de Execução"
+                                label="Horário de execução"
                                 onChange={(e) => setSettings(prev => ({ ...prev, cron_reset_hora: e.target.value }))}
                             >
                                 {HORAS.map(h => <MenuItem key={h} value={h}>{h}</MenuItem>)}
@@ -166,14 +166,14 @@ const ConfigCron = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                             <ReportIcon sx={{ color: '#00FF88' }} fontSize="small" />
                             <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700 }}>
-                                Relatório Diário
+                                Relatório diário
                             </Typography>
                         </Box>
                         <FormControl fullWidth size="small">
-                            <InputLabel>Horário de Execução</InputLabel>
+                            <InputLabel>Horário de execução</InputLabel>
                             <Select
                                 value={settings.cron_relatorio_hora || '03:30'}
-                                label="Horário de Execução"
+                                label="Horário de execução"
                                 onChange={(e) => setSettings(prev => ({ ...prev, cron_relatorio_hora: e.target.value }))}
                             >
                                 {HORAS.map(h => <MenuItem key={h} value={h}>{h}</MenuItem>)}
@@ -191,11 +191,11 @@ const ConfigCron = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                             <CleanupIcon sx={{ color: '#FF3366' }} fontSize="small" />
                             <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700 }}>
-                                Retenção de Logs
+                                Retenção de logs
                             </Typography>
                         </Box>
                         <TextField
-                            label="Dias de Retenção"
+                            label="Dias de retenção"
                             type="number"
                             fullWidth
                             size="small"

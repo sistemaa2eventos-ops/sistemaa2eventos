@@ -80,7 +80,7 @@ const ConfigIdiomas = () => {
                             <LangIcon />
                         </ListItemIcon>
                         <ListItemText
-                            primary="Idioma Padrão do Sistema"
+                            primary="Idioma padrão do sistema"
                             secondary="O idioma fallback se detectores automáticos falharem."
                             primaryTypographyProps={{ fontWeight: 600, color: '#FFFFFF' }}
                             secondaryTypographyProps={{ fontSize: '0.75rem', color: 'text.secondary' }}

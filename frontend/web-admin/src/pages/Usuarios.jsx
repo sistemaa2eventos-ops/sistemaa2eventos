@@ -24,7 +24,7 @@ import { useUsuarios, MODULOS, DEFAULT_PERMISSIONS } from '../hooks/useUsuarios'
 import { useAuth } from '../contexts/AuthContext';
 import TituloModal from '../components/common/TituloModal';
 
-import { botaoSecundario } from '../styles/tokens';
+import { botaoSecundario, papeis, tom } from '../styles/tokens';
 const RoleChip = styled(Chip)(({ role }) => ({
     fontWeight: 700, fontSize: '0.75rem', height: 24,
     background: role === 'admin_master' ? 'rgba(0, 212, 255, 0.1)' : 'rgba(0, 212, 255, 0.05)',
@@ -90,10 +90,9 @@ const Usuarios = () => {
                         role={isRowMaster ? 'admin_master' : val} 
                         label={isRowMaster ? 'Admin master' : 'Operador'} 
                         sx={{ 
-                            background: isRowMaster ? 'rgba(0, 212, 255, 0.2)' : 'rgba(255,255,255,0.05)',
-                            color: isRowMaster ? '#00D4FF' : '#FFFFFF',
-                            border: `1px solid ${isRowMaster ? '#00D4FF' : 'rgba(255,255,255,0.1)'}`,
-                            boxShadow: isRowMaster ? '0 0 10px rgba(0, 212, 255, 0.3)' : 'none'
+                            background: tom(papeis[isRowMaster ? 'admin_master' : 'operador'].cor, 0.12),
+                            color: papeis[isRowMaster ? 'admin_master' : 'operador'].cor,
+                            border: `1px solid ${tom(papeis[isRowMaster ? 'admin_master' : 'operador'].cor, 0.4)}`
                         }}
                     />
                 );
@@ -133,7 +132,7 @@ const Usuarios = () => {
                     <Tooltip title={tooltipText || "Nenhum evento vinculado"} arrow>
                         <Chip
                             icon={<EventIcon sx={{ fontSize: '14px !important', color: '#FFB800 !important' }} />}
-                            label={`${permitidos.length} EVENTO(S) ESPECÍFICO(S)`}
+                            label={`${permitidos.length} ${permitidos.length === 1 ? 'evento específico' : 'eventos específicos'}`}
                             size="small"
                             sx={{ background: 'rgba(255, 184, 0, 0.1)', color: '#FFB800', fontWeight: 700, border: '1px solid rgba(255, 184, 0, 0.3)' }}
                         />
@@ -214,7 +213,7 @@ const Usuarios = () => {
                             </span>
                         </Tooltip>
                         {row.status === 'pendente' && (
-                            <Tooltip title="Aprovar Usuário">
+                            <Tooltip title="Aprovar usuário">
                                 <IconButton size="small" onClick={() => handleApprove(row.id)} sx={{ color: '#00FF88' }}><ApproveIcon fontSize="small" /></IconButton>
                             </Tooltip>
                         )}
@@ -325,7 +324,7 @@ const Usuarios = () => {
                                     control={<Radio sx={{ color: '#00D4FF', '&.Mui-checked': { color: '#00D4FF' } }} />}
                                     label={
                                         <Box>
-                                            <Typography variant="body2" fontWeight={700} color="#FFFFFF">Vínculo Global</Typography>
+                                            <Typography variant="body2" fontWeight={700} color="#FFFFFF">Vínculo global</Typography>
                                             <Typography variant="caption" color="text.secondary">Acesso a todos os eventos cadastrados no sistema</Typography>
                                         </Box>
                                     }
@@ -336,7 +335,7 @@ const Usuarios = () => {
                                     control={<Radio sx={{ color: '#00D4FF', '&.Mui-checked': { color: '#00D4FF' } }} />}
                                     label={
                                         <Box>
-                                            <Typography variant="body2" fontWeight={700} color="#FFFFFF">Vínculo Específico</Typography>
+                                            <Typography variant="body2" fontWeight={700} color="#FFFFFF">Vínculo específico</Typography>
                                             <Typography variant="caption" color="text.secondary">Selecionar cada evento disponível com permissões customizadas</Typography>
                                         </Box>
                                     }
@@ -382,7 +381,7 @@ const Usuarios = () => {
                         {formData.vinculo_tipo === 'especifico' && (
                             <Stack spacing={2.5}>
                                 <FormControl fullWidth required>
-                                    <InputLabel id="eventos-select-label">Selecione os Eventos Permitidos para este Operador</InputLabel>
+                                    <InputLabel id="eventos-select-label">Selecione os eventos permitidos para este operador</InputLabel>
                                     <Select
                                         labelId="eventos-select-label"
                                         multiple
@@ -514,7 +513,7 @@ const Usuarios = () => {
                 <DialogTitle sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 }}>Forçar nova senha</DialogTitle>
                 <DialogContent>
                     <Typography variant="caption" sx={{ mb: 2, display: 'block', color: 'text.secondary' }}>Alterando a senha de: <b>{selectedUser?.nome_completo}</b></Typography>
-                    <TextField label="Nova Senha" type="password" fullWidth value={newPassword} onChange={(e) => setNewPassword(e.target.value)} sx={{ mt: 1 }} />
+                    <TextField label="Nova senha" type="password" fullWidth value={newPassword} onChange={(e) => setNewPassword(e.target.value)} sx={{ mt: 1 }} />
                 </DialogContent>
                 <DialogActions sx={{ p: 3 }}>
                     <Button variant="outlined" onClick={() => setOpenPasswordDialog(false)} disabled={resetingPassword} sx={botaoSecundario}>Cancelar</Button>

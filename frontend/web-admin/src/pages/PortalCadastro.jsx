@@ -157,7 +157,7 @@ const PortalCadastro = () => {
                         NZT Intelligent Control System
                     </Typography>
                     <Typography variant="subtitle1" sx={{ color: 'text.secondary', mt: 1 }}>
-                        B2B Onboarding Portal
+                        B2B onboarding portal
                     </Typography>
                 </Box>
 
@@ -200,7 +200,7 @@ const PortalCadastro = () => {
                                 onClick={() => fileInputRef.current.click()}
                                 sx={{ color: '#00D4FF', borderColor: '#00D4FF', '&:hover': { bgcolor: 'rgba(0,212,255,0.1)' } }}
                             >
-                                Tirar ou Fazer Upload de Foto
+                                Tirar ou fazer upload de foto
                             </Button>
                             <Typography variant="caption" sx={{ mt: 1, color: 'text.secondary' }}>* Rosto legível sem óculos escuros.</Typography>
                         </Box>
@@ -211,16 +211,16 @@ const PortalCadastro = () => {
                         <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700, fontSize: '1rem', mb: 2, display: 'block' }}>2. Dados pessoais</Typography>
                         <Grid container spacing={3}>
                             <Grid item xs={12}>(
-                                <TextField fullWidth required label="Nome Completo *" value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} />
+                                <TextField fullWidth required label="Nome completo *" value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} />
                             </Grid>
                             <Grid item xs={12} sm={6}>
                                 <TextField fullWidth required label="CPF *" value={formData.cpf} onChange={e => setFormData({...formData, cpf: e.target.value})} />
                             </Grid>
                             <Grid item xs={12} sm={6}>
-                                <TextField fullWidth required type="date" label="Data de Nascimento *" InputLabelProps={{ shrink: true }} value={formData.data_nascimento} onChange={e => setFormData({...formData, data_nascimento: e.target.value})} />
+                                <TextField fullWidth required type="date" label="Data de nascimento *" InputLabelProps={{ shrink: true }} value={formData.data_nascimento} onChange={e => setFormData({...formData, data_nascimento: e.target.value})} />
                             </Grid>
                             <Grid item xs={12}>
-                                <TextField fullWidth required label="Nome da Mãe *" value={formData.nome_mae} onChange={e => setFormData({...formData, nome_mae: e.target.value})} />
+                                <TextField fullWidth required label="Nome da mãe *" value={formData.nome_mae} onChange={e => setFormData({...formData, nome_mae: e.target.value})} />
                             </Grid>
                             <Grid item xs={12} sm={6}>
                                 <TextField fullWidth label="Telefone" value={formData.telefone} onChange={e => setFormData({...formData, telefone: e.target.value})} />
@@ -229,7 +229,7 @@ const PortalCadastro = () => {
                                 <TextField fullWidth label="E-mail" type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
                             </Grid>
                             <Grid item xs={12}>
-                                <TextField fullWidth label="Cargo / Função" value={formData.funcao} onChange={e => setFormData({...formData, funcao: e.target.value})} />
+                                <TextField fullWidth label="Cargo / função" value={formData.funcao} onChange={e => setFormData({...formData, funcao: e.target.value})} />
                             </Grid>
                         </Grid>
 
@@ -239,10 +239,10 @@ const PortalCadastro = () => {
                         <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700, fontSize: '1rem', mb: 2, display: 'block' }}>3. Integração</Typography>
                         <Grid container spacing={3}>
                             <Grid item xs={12}>
-                                <TextField fullWidth label="Evento de Destino" value={empresaData.eventos?.nome || 'Evento'} disabled />
+                                <TextField fullWidth label="Evento de destino" value={empresaData.eventos?.nome || 'Evento'} disabled />
                             </Grid>
                             <Grid item xs={12}>
-                                <TextField fullWidth label="Empreiteira/Empresa Solicitante" value={empresaData.nome} disabled />
+                                <TextField fullWidth label="Empreiteira/empresa solicitante" value={empresaData.nome} disabled />
                             </Grid>
                             <Grid item xs={12}>
                                 <FormControlLabel 

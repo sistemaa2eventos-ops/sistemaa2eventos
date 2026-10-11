@@ -159,10 +159,10 @@ const ConfigAreas = () => {
                 <PageHeader
                     title="Áreas"
                     subtitle="Crie e gerencie as áreas de acesso do evento. Cada área pode ser associada a um ou mais leitores."
-                    breadcrumbs={[{ text: 'Configurações' }, { text: 'Áreas & Zonas' }]}
+                    breadcrumbs={[{ text: 'Configurações' }, { text: 'Áreas & zonas' }]}
                 />
                 <NeonButton startIcon={<AddIcon />} onClick={() => handleOpenDialog()} sx={{ mt: 2, flexShrink: 0 }}>
-                    Nova Área
+                    Nova área
                 </NeonButton>
             </Box>
 
@@ -185,13 +185,13 @@ const ConfigAreas = () => {
                 <DialogContent>
                     <Stack spacing={3} sx={{ mt: 1 }}>
                         <TextField 
-                            label="Nome da Área" 
+                            label="Nome da área" 
                             fullWidth 
                             value={formData.nome_area}
                             onChange={(e) => setFormData({ ...formData, nome_area: e.target.value })}
                         />
                         <TextField 
-                            label="Capacidade Máxima (0 = ilimitada)" 
+                            label="Capacidade máxima (0 = ilimitada)" 
                             type="number" 
                             fullWidth 
                             value={formData.capacidade_maxima}

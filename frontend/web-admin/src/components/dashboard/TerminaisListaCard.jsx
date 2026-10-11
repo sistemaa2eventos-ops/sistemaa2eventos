@@ -138,7 +138,7 @@ const TerminaisListaCard = ({ terminais = [] }) => {
                         fontSize: '0.75rem !important',
                         color: totalOnline > 0 ? '#00FF88 !important' : '#FF3366 !important'
                     }} />}
-                    label={`${totalOnline} / ${terminais.length} ONLINE`}
+                    label={`${totalOnline} de ${terminais.length} online`}
                     size="small"
                     sx={{
                         fontFamily: '"Inter", sans-serif',

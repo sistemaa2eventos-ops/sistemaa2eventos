@@ -59,7 +59,7 @@ const ConfigGeral = () => {
     return (
         <Box>
             <Typography variant="h6" sx={{ color: 'primary.main', mb: 3, fontWeight: 700 }}>
-                Configurações Gerais
+                Configurações gerais
             </Typography>
 
             <Grid container spacing={3}>
@@ -110,7 +110,7 @@ const ConfigGeral = () => {
                             </Box>
                             
                             <TextField
-                                label="Nome do Sistema"
+                                label="Nome do sistema"
                                 variant="outlined"
                                 fullWidth
                                 value={settings.system_name}
@@ -131,7 +131,7 @@ const ConfigGeral = () => {
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <Box>
-                                    <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600 }}>Login Biométrico</Typography>
+                                    <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600 }}>Login biométrico</Typography>
                                     <Typography variant="caption" color="text.secondary">Habilita uso de digital/facial no login</Typography>
                                 </Box>
                                 <Switch 
@@ -142,7 +142,7 @@ const ConfigGeral = () => {
                             <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)' }} />
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <Box>
-                                    <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600 }}>Cloud Sync Real-time</Typography>
+                                    <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600 }}>Cloud sync real-time</Typography>
                                     <Typography variant="caption" color="text.secondary">Sincronização instantânea com a nuvem</Typography>
                                 </Box>
                                 <Switch 
@@ -153,7 +153,7 @@ const ConfigGeral = () => {
                             <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)' }} />
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <Box>
-                                    <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600 }}>Modo Neon Dinâmico</Typography>
+                                    <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600 }}>Modo neon dinâmico</Typography>
                                     <Typography variant="caption" color="text.secondary">Tema escuro profundo com luzes neon nos cartões principais</Typography>
                                 </Box>
                                 <Switch 
@@ -174,7 +174,7 @@ const ConfigGeral = () => {
                         
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                             <Box>
-                                <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600 }}>Alertas de Lotação</Typography>
+                                <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600 }}>Alertas de lotação</Typography>
                                 <Typography variant="caption" color="text.secondary">Notificar quando atingir o limite</Typography>
                             </Box>
                             <Switch 
