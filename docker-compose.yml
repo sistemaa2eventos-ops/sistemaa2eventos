@@ -120,6 +120,9 @@ services:
         condition: service_started
     environment:
       - TZ=America/Sao_Paulo
+      # Gravados em /config.js ao iniciar (docker-entrypoint.sh); vêm do .env da raiz
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
     networks:
       - a2_net
     deploy:

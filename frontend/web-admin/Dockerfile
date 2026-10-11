@@ -25,5 +25,8 @@ EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD curl -f http://localhost/ || exit 1
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Gera /config.js com SUPABASE_URL/SUPABASE_ANON_KEY do ambiente e inicia o nginx
+# (sed: remove CRLF caso o arquivo venha de checkout no Windows)
+COPY docker-entrypoint.sh /app-entrypoint.sh
+RUN sed -i 's/\r$//' /app-entrypoint.sh && chmod +x /app-entrypoint.sh
+CMD ["/app-entrypoint.sh"]
