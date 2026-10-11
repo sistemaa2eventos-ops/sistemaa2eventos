@@ -23,8 +23,8 @@ const ConfigNotificacoes = () => {
     return (
         <Box sx={{ p: { xs: 2, md: 4 } }}>
             <PageHeader
-                title="Alertas & Notificações Globais"
-                subtitle="Configure os canais e limiares de disparo de alertas do sistema."
+                title="Notificações"
+                subtitle="Quando e por onde o sistema avisa sobre situações importantes."
                 breadcrumbs={[{ text: 'Configurações' }, { text: 'Alertas & Notificações' }]}
             />
 

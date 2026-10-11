@@ -44,7 +44,7 @@ import { useEmpresas } from '../hooks/useEmpresas';
 import api from '../services/api';
 import { useConfirmacao } from '../contexts/ConfirmacaoContext';
 import TituloModal from '../components/common/TituloModal';
-import { acaoTabela, acaoTabelaPerigo } from '../styles/tokens';
+import { acaoTabela, acaoTabelaPerigo, botaoSecundario } from '../styles/tokens';
 import { formatarCnpj } from '../utils/formatadores';
 
 const Empresas = () => {
@@ -81,7 +81,7 @@ const Empresas = () => {
   const columns = [
     {
       id: 'nome',
-      label: 'EMPRESA',
+      label: 'Empresa',
       minWidth: 200,
       format: (val) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -91,10 +91,10 @@ const Empresas = () => {
       )
     },
     { id: 'cnpj', label: 'CNPJ', minWidth: 170, format: (value) => formatarCnpj(value) },
-    { id: 'max_colaboradores', label: 'COTA BASE', minWidth: 100 },
+    { id: 'max_colaboradores', label: 'Cota base', minWidth: 100 },
     {
       id: 'acoes',
-      label: 'AÇÕES',
+      label: 'Ações',
       minWidth: 180,
       align: 'center',
       format: (value, row) => (
@@ -468,10 +468,10 @@ const Empresas = () => {
                   {/* Botões de Navegação Direta de Fases para Empresas */}
                   <Stack direction="row" spacing={1} sx={{ mb: 1.5, flexWrap: 'wrap', gap: 0.5 }}>
                     {[
-                      { id: 'todas', label: 'TODAS AS FASES', color: '#00D4FF' },
-                      { id: 'montagem', label: 'MONTAGEM', color: '#00D4FF' },
-                      { id: 'evento', label: 'EVENTO', color: '#00FF88' },
-                      { id: 'desmontagem', label: 'DESMONTAGEM', color: '#FFB800' }
+                      { id: 'todas', label: 'Todas as fases', color: '#00D4FF' },
+                      { id: 'montagem', label: 'Montagem', color: '#00D4FF' },
+                      { id: 'evento', label: 'Evento', color: '#00FF88' },
+                      { id: 'desmontagem', label: 'Desmontagem', color: '#FFB800' }
                     ].map(tab => (
                       <Button
                         key={tab.id}
@@ -516,9 +516,9 @@ const Empresas = () => {
                     }}
                   >
                     {[
-                      { id: 'montagem', label: 'MONTAGEM', color: '#00D4FF', bg: 'rgba(0,212,255,0.04)', border: 'rgba(0,212,255,0.2)' },
-                      { id: 'evento', label: 'EVENTO', color: '#00FF88', bg: 'rgba(0,255,136,0.04)', border: 'rgba(0,255,136,0.2)' },
-                      { id: 'desmontagem', label: 'DESMONTAGEM', color: '#FFB800', bg: 'rgba(255,184,0,0.05)', border: 'rgba(255,184,0,0.25)' }
+                      { id: 'montagem', label: 'Montagem', color: '#00D4FF', bg: 'rgba(0,212,255,0.04)', border: 'rgba(0,212,255,0.2)' },
+                      { id: 'evento', label: 'Evento', color: '#00FF88', bg: 'rgba(0,255,136,0.04)', border: 'rgba(0,255,136,0.2)' },
+                      { id: 'desmontagem', label: 'Desmontagem', color: '#FFB800', bg: 'rgba(255,184,0,0.05)', border: 'rgba(255,184,0,0.25)' }
                     ]
                       .filter(phase => activePhaseTabEmpresa === 'todas' || activePhaseTabEmpresa === phase.id)
                       .map(phase => {
@@ -539,7 +539,7 @@ const Empresas = () => {
                           >
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.2, flexWrap: 'wrap', gap: 1 }}>
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Typography variant="caption" sx={{ color: phase.color, fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', fontSize: '0.75rem' }}>
+                                <Typography variant="caption" sx={{ color: phase.color, fontWeight: 700, letterSpacing: '1px', fontSize: '0.75rem' }}>
                                   {phase.label}
                                 </Typography>
                                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem' }}>
@@ -668,9 +668,9 @@ const Empresas = () => {
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 3, px: 6, justifyContent: 'space-between', borderTop: '1px solid rgba(255, 255, 255, 0.05)', bgcolor: 'rgba(10, 25, 41, 0.5)' }}>
-          <Button onClick={() => setOpenDialog(false)} disabled={saving} sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, '&:hover': { color: '#FF3366' } }}>Cancelar</Button>
+          <Button variant="outlined" onClick={() => setOpenDialog(false)} disabled={saving} sx={botaoSecundario}>Cancelar</Button>
           <Box sx={{ display: 'flex', gap: 2 }}>
-            {activeStep > 0 && <Button onClick={() => setActiveStep(prev => prev - 1)} sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, '&:hover': { color: '#FFFFFF' } }}>Voltar</Button>}
+            {activeStep > 0 && <Button variant="outlined" onClick={() => setActiveStep(prev => prev - 1)} sx={botaoSecundario}>Voltar</Button>}
             {activeStep < steps.length - 1 ? (
               <NeonButton onClick={() => setActiveStep(prev => prev + 1)}>Próxima etapa</NeonButton>
             ) : (
@@ -703,7 +703,7 @@ const Empresas = () => {
             ) : (
               <Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-                  <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700 }}>PLANEJAMENTO DIÁRIO</Typography>
+                  <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700 }}>Planejamento diário</Typography>
                   <Button size="small" variant="outlined" onClick={() => {
                       const newQuotas = {};
                       getAllEventDates().forEach(d => newQuotas[d] = selectedEmpresa?.max_colaboradores ?? 50);
@@ -722,7 +722,7 @@ const Empresas = () => {
             )}
         </DialogContent>
         <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
-          <Button onClick={() => setOpenQuotaDialog(false)}>Cancelar</Button>
+          <Button variant="outlined" onClick={() => setOpenQuotaDialog(false)} sx={botaoSecundario}>Cancelar</Button>
           <NeonButton onClick={async () => {
               if (await handleSaveQuotas()) setOpenQuotaDialog(false);
           }}>Salvar cotas</NeonButton>
@@ -777,7 +777,7 @@ const Empresas = () => {
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-            <Button onClick={() => setOpenInviteDialog(false)}>Fechar</Button>
+            <Button variant="outlined" onClick={() => setOpenInviteDialog(false)} sx={botaoSecundario}>Fechar</Button>
             <Button 
                 size="small"
                 onClick={async () => {

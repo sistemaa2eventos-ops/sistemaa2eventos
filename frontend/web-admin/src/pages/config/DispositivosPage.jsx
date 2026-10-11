@@ -26,6 +26,7 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import api from '../../services/api';
 import AgentesLocais from '../../components/dispositivos/AgentesLocais';
 
+import { botaoSecundario } from '../../styles/tokens';
 // ── Paleta padronizada do sistema
 const CYAN = '#00D4FF';
 const GREEN = '#00FF88';
@@ -726,7 +727,7 @@ export default function DispositivosPage() {
             </Grid>
 
             <Divider sx={{ borderColor: `${CYAN}22`, my: 1 }} />
-            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>
+            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, letterSpacing: 1 }}>
               Configurações de Controle de Acesso
             </Typography>
 
@@ -785,7 +786,7 @@ export default function DispositivosPage() {
           </Box>
         </DialogContent>
         <DialogActions sx={{ borderTop: `1px solid ${CYAN}22`, p: 2 }}>
-          <Button onClick={() => setOpenDialog(false)} sx={{ color: '#94A3B8' }}>Cancelar</Button>
+          <Button variant="outlined" onClick={() => setOpenDialog(false)} sx={botaoSecundario}>Cancelar</Button>
           <Button onClick={handleSave} variant="contained" sx={{ background: CYAN, color: '#000000', fontWeight: 700 }}>
             {isEditing ? 'Atualizar' : 'Criar'}
           </Button>
@@ -808,7 +809,7 @@ export default function DispositivosPage() {
           <Button
             href={snapshotDialog.url} download={`snapshot_${snapshotDialog.nome}.jpg`}
             sx={{ color: GREEN }}>Baixar</Button>
-          <Button onClick={() => setSnapshotDialog({ open: false, url: null, nome: '' })} sx={{ color: '#94A3B8' }}>Fechar</Button>
+          <Button variant="outlined" onClick={() => setSnapshotDialog({ open: false, url: null, nome: '' })} sx={botaoSecundario}>Fechar</Button>
         </DialogActions>
       </Dialog>
 
@@ -832,7 +833,7 @@ export default function DispositivosPage() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setTestDialog({ open: false, result: null, testing: false })} sx={{ color: '#94A3B8' }}>Fechar</Button>
+          <Button variant="outlined" onClick={() => setTestDialog({ open: false, result: null, testing: false })} sx={botaoSecundario}>Fechar</Button>
           <Button onClick={handleTestConnection} variant="contained" disabled={testDialog.testing || !testIp}
             sx={{ background: CYAN, color: '#000000', fontWeight: 700 }}>
             {testDialog.testing ? 'Testando...' : 'Testar'}
@@ -859,7 +860,7 @@ export default function DispositivosPage() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setPushDialog(p => ({ ...p, open: false }))} sx={{ color: '#94A3B8' }}>Cancelar</Button>
+          <Button variant="outlined" onClick={() => setPushDialog(p => ({ ...p, open: false }))} sx={botaoSecundario}>Cancelar</Button>
           <Button onClick={confirmConfigurePush} variant="contained"
             sx={{ background: CYAN, color: '#000000', fontWeight: 700 }}>
             Aplicar no leitor

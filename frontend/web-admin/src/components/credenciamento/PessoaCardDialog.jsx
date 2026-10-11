@@ -135,7 +135,7 @@ const PessoaCardDialog = ({
 
               <Stack direction="row" spacing={1} mt={2.5} flexWrap="wrap" justifyContent="center">
                 <Chip
-                  label={isCheckout ? 'SAÍDA REGISTRADA' : (statusAcesso === 'checkin_feito' ? 'CREDENCIADO' : 'AUTORIZADO')}
+                  label={isCheckout ? 'Saída registrada' : (statusAcesso === 'checkin_feito' ? 'Credenciado' : 'AUTORIZADO')}
                   size="small"
                   sx={{
                     bgcolor: isCheckout ? 'rgba(255, 51, 102, 0.2)' : 'rgba(0, 255, 136, 0.15)',
@@ -205,7 +205,7 @@ const PessoaCardDialog = ({
                     border: '1px solid rgba(255,255,255,0.08)'
                   }}
                 >
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1, display: 'block', mb: 1.2, fontWeight: 700 }}>
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', letterSpacing: 1, display: 'block', mb: 1.2, fontWeight: 700 }}>
                     Último Acesso Registrado
                   </Typography>
 

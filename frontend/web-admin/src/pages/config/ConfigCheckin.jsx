@@ -68,8 +68,8 @@ const ConfigCheckin = () => {
     return (
         <Box sx={{ p: { xs: 2, md: 4 } }}>
             <PageHeader
-                title="Regras de Acesso (Check-in)"
-                subtitle="Configure temporizadores Anti-Passback e limites de Lotação."
+                title="Regras de acesso"
+                subtitle="Tempo mínimo entre passagens e limites de lotação."
                 breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Check-in / Check-out' }]}
             />
 
@@ -88,7 +88,7 @@ const ConfigCheckin = () => {
                         </Typography>
 
                         <FormControlLabel
-                            control={<Switch checked={apbEnabled} onChange={(e) => setApbEnabled(e.target.checked)} color="secondary" />}
+                            control={<Switch checked={apbEnabled} onChange={(e) => setApbEnabled(e.target.checked)} />}
                             label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Habilitar Anti-Passback</Typography>}
                             sx={{ mb: 3 }}
                         />

@@ -39,7 +39,7 @@ const TerminaisListaCard = ({ terminais = [] }) => {
             return (
                 <Chip
                     icon={<ArrowForwardIcon sx={{ fontSize: 13, color: '#00FF88 !important' }} />}
-                    label="SÓ ENTRADA"
+                    label="Só entrada"
                     size="small"
                     sx={{
                         fontFamily: '"Space Grotesk", sans-serif',
@@ -57,7 +57,7 @@ const TerminaisListaCard = ({ terminais = [] }) => {
             return (
                 <Chip
                     icon={<ArrowBackIcon sx={{ fontSize: 13, color: '#FFB800 !important' }} />}
-                    label="SÓ SAÍDA"
+                    label="Só saída"
                     size="small"
                     sx={{
                         fontFamily: '"Space Grotesk", sans-serif',
@@ -74,7 +74,7 @@ const TerminaisListaCard = ({ terminais = [] }) => {
         return (
             <Chip
                 icon={<SyncAltIcon sx={{ fontSize: 13, color: '#00D4FF !important' }} />}
-                label="ENTRADA & SAÍDA"
+                label="Entrada e saída"
                 size="small"
                 sx={{
                     fontFamily: '"Space Grotesk", sans-serif',
@@ -124,7 +124,7 @@ const TerminaisListaCard = ({ terminais = [] }) => {
                             fontFamily: '"Space Grotesk", sans-serif',
                             lineHeight: 1.2
                         }}>
-                            Terminais & Equipamentos
+                            Terminais e equipamentos
                         </Typography>
                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>
                             Catracas, leitores faciais e postos de controle
@@ -232,7 +232,7 @@ const TerminaisListaCard = ({ terminais = [] }) => {
                                                 fontFamily: '"Inter", sans-serif',
                                                 color: isOnline ? '#00FF88' : (isSync ? '#FFB800' : '#FF3366')
                                             }}>
-                                                {isOnline ? 'ONLINE' : (isSync ? 'SINCRONIZANDO' : 'OFFLINE')}
+                                                {isOnline ? 'Online' : (isSync ? 'Sincronizando' : 'Offline')}
                                             </Typography>
                                         </Stack>
                                     </Box>

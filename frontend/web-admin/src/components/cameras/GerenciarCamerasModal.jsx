@@ -19,6 +19,7 @@ import api from '../../services/api';
 import { useSnackbar } from 'notistack';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
 
+import { botaoSecundario } from '../../styles/tokens';
 const FABRICANTES = ['RTSP / OBS / Webcam', 'Intelbras', 'Hikvision', 'Genérica'];
 
 const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, onCamerasChange, areas = [], eventoId }) => {
@@ -404,7 +405,7 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
             <DialogActions sx={{ p: 2.5, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                 {formMode ? (
                     <>
-                        <Button onClick={handleCloseForm} sx={{ color: '#94A3B8' }}>
+                        <Button variant="outlined" onClick={handleCloseForm} sx={botaoSecundario}>
                             Cancelar
                         </Button>
                         <Button
@@ -422,7 +423,7 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
                         </Button>
                     </>
                 ) : (
-                    <Button onClick={onClose} sx={{ color: '#94A3B8' }}>
+                    <Button variant="outlined" onClick={onClose} sx={botaoSecundario}>
                         Fechar
                     </Button>
                 )}

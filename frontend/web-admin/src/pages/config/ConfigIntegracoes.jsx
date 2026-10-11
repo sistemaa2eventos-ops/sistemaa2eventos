@@ -79,8 +79,8 @@ const ConfigIntegracoes = () => {
     return (
         <Box sx={{ p: { xs: 2, md: 4 } }}>
             <PageHeader
-                title="Integrações & Gateways Externos"
-                subtitle="Monitore o status dos serviços conectados e configure integrações com plataformas externas."
+                title="Integrações"
+                subtitle="Serviços conectados e integrações com outras plataformas."
                 breadcrumbs={[{ text: 'Configurações' }, { text: 'Integrações' }]}
             />
 
@@ -93,21 +93,21 @@ const ConfigIntegracoes = () => {
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                 <StorageIcon color="primary" />
                                 <Box>
-                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>SUPABASE DB</Typography>
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Supabase DB</Typography>
                                     <StatusChip type={status.database} />
                                 </Box>
                             </Box>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                 <CloudIcon sx={{ color: '#00D4FF' }} />
                                 <Box>
-                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>STORAGE BUCKET</Typography>
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Storage bucket</Typography>
                                     <StatusChip type={status.storage} />
                                 </Box>
                             </Box>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                 <MailIcon sx={{ color: '#00FF88' }} />
                                 <Box>
-                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>SMTP SERVER</Typography>
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>SMTP server</Typography>
                                     <StatusChip type={status.smtp} />
                                 </Box>
                             </Box>

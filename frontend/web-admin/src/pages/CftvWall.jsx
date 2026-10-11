@@ -22,6 +22,7 @@ import PessoaFoto from '../components/common/PessoaFoto';
 import { usarConexao } from '../services/realtime';
 import { useAuth } from '../contexts/AuthContext';
 
+import { comoRotulo } from '../utils/formatadores';
 const CftvWall = () => {
     const { enqueueSnackbar } = useSnackbar();
     const { user } = useAuth();
@@ -560,7 +561,7 @@ const CftvWall = () => {
                                                 )}
                                                 {isAlarming && (
                                                     <Chip
-                                                        label="ALVO DETECTADO!"
+                                                        label="Alvo detectado!"
                                                         size="small"
                                                         color="error"
                                                         sx={{ fontWeight: 700, fontSize: '0.75rem', height: 20, animation: 'blink 0.8s infinite' }}
@@ -700,7 +701,7 @@ const CftvWall = () => {
                                         Alvo identificado na watchlist!
                                     </Typography>
                                     <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.9)', fontWeight: 700 }}>
-                                        CFTV • ALERTA DE SEGURANÇA E VIGILÂNCIA IA
+                                        CFTV • alerta de segurança e vigilância IA
                                     </Typography>
                                 </Box>
                             </Stack>
@@ -718,7 +719,7 @@ const CftvWall = () => {
                                 {/* Foto Cadastrada */}
                                 <Grid item xs={6} sx={{ textAlign: 'center' }}>
                                     <Typography variant="caption" sx={{ display: 'block', mb: 0.5, fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>
-                                        FOTO CADASTRADA
+                                        Foto cadastrada
                                     </Typography>
                                     <Box sx={{ display: 'flex', justifyContent: 'center' }}>
                                         <PessoaFoto
@@ -765,7 +766,7 @@ const CftvWall = () => {
                                 CPF: {activeAlert?.pessoa?.cpf || '—'}
                             </Typography>
                             <Chip
-                                label={activeAlert?.watchlist?.nivel_alerta?.toUpperCase() || 'CRÍTICO / ALTO RISCO'}
+                                label={comoRotulo(activeAlert?.watchlist?.nivel_alerta) || 'Crítico / alto risco'}
                                 size="small"
                                 sx={{ mt: 1, bgcolor: '#FFFFFF', color: '#FF3366', fontWeight: 700, fontSize: '0.75rem' }}
                             />
@@ -774,13 +775,13 @@ const CftvWall = () => {
                         {/* DISPOSITIVO QUE IDENTIFICOU & LOCALIZAÇÃO DENTRO DO EVENTO */}
                         <Box sx={{ mt: 2, p: 1.5, borderRadius: 1.5, bgcolor: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)' }}>
                             <Typography variant="body2" sx={{ fontSize: '0.8125rem' }}>
-                                <b>DISPOSITIVO:</b> {activeAlert?.dispositivo?.nome || activeAlert?.location || 'Câmera IP'} ({activeAlert?.dispositivo?.ip || 'Rede'})
+                                <b>Dispositivo:</b> {activeAlert?.dispositivo?.nome || activeAlert?.location || 'Câmera IP'} ({activeAlert?.dispositivo?.ip || 'Rede'})
                             </Typography>
                             <Typography variant="body2" sx={{ fontSize: '0.8125rem', mt: 0.4 }}>
-                                <b>LOCAL NO EVENTO:</b> {activeAlert?.localizacao || activeAlert?.location || 'Área Principal'}
+                                <b>Local no evento:</b> {activeAlert?.localizacao || activeAlert?.location || 'Área Principal'}
                             </Typography>
                             <Typography variant="body2" sx={{ fontSize: '0.8125rem', mt: 0.4 }}>
-                                <b>MOTIVO:</b> {activeAlert?.watchlist?.motivo || 'Alvo em monitoramento de segurança.'}
+                                <b>Motivo:</b> {activeAlert?.watchlist?.motivo || 'Alvo em monitoramento de segurança.'}
                             </Typography>
                             <Typography variant="caption" sx={{ mt: 0.8, display: 'block', opacity: 0.8 }}>
                                 Horário: {activeAlert?.timestamp ? new Date(activeAlert.timestamp).toLocaleTimeString() : 'Agora'} • IA ArcFace 512-D

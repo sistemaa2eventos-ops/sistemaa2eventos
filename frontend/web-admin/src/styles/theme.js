@@ -33,7 +33,7 @@ const theme = createTheme({
         body2: { fontSize: tamanhos.sm, lineHeight: 1.55 },
         button: { textTransform: 'none', fontWeight: 600, letterSpacing: '0.01em' },
         caption: { fontSize: tamanhos.xs, letterSpacing: '0.01em', lineHeight: 1.45 },
-        overline: { fontSize: tamanhos.xs, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1.6 },
+        overline: { fontSize: tamanhos.xs, fontWeight: 600, letterSpacing: '0.02em', textTransform: 'none', lineHeight: 1.6 },
     },
     shape: {
         borderRadius: 8,
@@ -131,9 +131,7 @@ const theme = createTheme({
                     backgroundColor: cores.superficie,
                     color: cores.textoSecundario,
                     fontWeight: 600,
-                    letterSpacing: '0.06em',
-                    fontSize: tamanhos.xs,
-                    textTransform: 'uppercase',
+                    fontSize: tamanhos.sm,
                     whiteSpace: 'nowrap',
                     borderBottom: `1px solid ${cores.borda}`,
                 },
@@ -188,6 +186,10 @@ const theme = createTheme({
                     fontWeight: 500,
                 },
             },
+        },
+        // Interruptores sempre na cor de ação (antes havia roxo e ciano sem significado)
+        MuiSwitch: {
+            defaultProps: { color: 'primary' },
         },
         MuiTab: {
             styleOverrides: {

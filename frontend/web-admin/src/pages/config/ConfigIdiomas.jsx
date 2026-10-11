@@ -57,8 +57,8 @@ const ConfigIdiomas = () => {
     return (
         <Box sx={{ p: { xs: 2, md: 4 } }}>
             <PageHeader
-                title="Configurações de Idioma"
-                subtitle="Central de Traduções do NZT."
+                title="Idiomas"
+                subtitle="Idioma das telas do painel e do portal de cadastro."
                 breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Idiomas' }]}
             />
 
@@ -66,7 +66,7 @@ const ConfigIdiomas = () => {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 4, pb: 2, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <LangIcon sx={{ color: '#00D4FF', fontSize: 32 }} />
                     <Typography variant="h5" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
-                        Idiomas & Regiões
+                        Idioma padrão
                     </Typography>
                 </Box>
 

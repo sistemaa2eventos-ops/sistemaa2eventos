@@ -88,19 +88,19 @@ const ConfigEvento = () => {
                         {evento ? (
                             <Box sx={{ display: 'flex', gap: 4 }}>
                                 <Box>
-                                    <Typography variant="caption" color="text.secondary">NOME:</Typography>
+                                    <Typography variant="caption" color="text.secondary">Nome:</Typography>
                                     <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600 }}>{evento.nome}</Typography>
                                 </Box>
                                 <Box>
-                                    <Typography variant="caption" color="text.secondary">DATAS:</Typography>
+                                    <Typography variant="caption" color="text.secondary">Datas:</Typography>
                                     <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600 }}>
                                         {new Date(evento.data_inicio).toLocaleDateString()} a {new Date(evento.data_fim).toLocaleDateString()}
                                     </Typography>
                                 </Box>
                                 <Box>
-                                    <Typography variant="caption" color="text.secondary">STATUS:</Typography>
+                                    <Typography variant="caption" color="text.secondary">Status:</Typography>
                                     <Box sx={{ bgcolor: 'rgba(0, 255, 136, 0.1)', color: '#00FF88', px: 1, borderRadius: 1, fontSize: '0.75rem', fontWeight: 700, textAlign: 'center' }}>
-                                        ATIVO
+                                        Ativo
                                     </Box>
                                 </Box>
                             </Box>
@@ -171,7 +171,7 @@ const ConfigEvento = () => {
                             />
                         </Box>
 
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>DESTINATÁRIOS:</Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>Destinatários:</Typography>
                         <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1, minHeight: 40, p: 1, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 1.5 }}>
                             {settings.relatorio_emails.map((email, i) => (
                                 <Chip 

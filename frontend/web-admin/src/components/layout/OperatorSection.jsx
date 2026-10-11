@@ -653,7 +653,7 @@ export const OperatorSection = () => {
 
                             <Box>
                                 <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, mb: 1, display: 'block' }}>
-                                    MOTIVOS RÁPIDOS
+                                    Motivos rápidos
                                 </Typography>
                                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
                                     {[
@@ -699,7 +699,7 @@ export const OperatorSection = () => {
                 </DialogContent>
 
                 <DialogActions sx={{ p: 2.5, borderTop: '1px solid rgba(255, 51, 102, 0.2)' }}>
-                    <Button onClick={() => setChamarMasterOpen(false)} disabled={enviandoChamado} sx={{ color: 'text.secondary' }}>
+                    <Button variant="outlined" onClick={() => setChamarMasterOpen(false)} disabled={enviandoChamado} sx={botaoSecundario}>
                         Cancelar
                     </Button>
                     <Button
@@ -749,7 +749,7 @@ export const OperatorSection = () => {
                             <NoteIcon sx={{ color: '#00D4FF', fontSize: 26 }} />
                             <Box>
                                 <Typography variant="h6" sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, color: '#00D4FF' }}>
-                                    Notas & Lembretes do Operador
+                                    Notas do turno
                                 </Typography>
                                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                                     Anotações deste turno (salvas automaticamente no seu relatório)
@@ -808,7 +808,7 @@ export const OperatorSection = () => {
                 </DialogContent>
 
                 <DialogActions sx={{ p: 2.5, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                    <Button onClick={() => setNotesModalOpen(false)} sx={{ color: 'text.secondary' }}>
+                    <Button variant="outlined" onClick={() => setNotesModalOpen(false)} sx={botaoSecundario}>
                         Fechar
                     </Button>
                     <Button

@@ -79,7 +79,7 @@ const EmpresasMetricasCard = ({ empresas = [] }) => {
                             fontFamily: '"Space Grotesk", sans-serif',
                             lineHeight: 1.2
                         }}>
-                            Empresas do Evento & Fluxo
+                            Empresas e fluxo do evento
                         </Typography>
                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>
                             {empresasFiltradas.length} de {empresas.length} empresas credenciadas
@@ -260,7 +260,7 @@ const EmpresasMetricasCard = ({ empresas = [] }) => {
                 gap: 1
             }}>
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700 }}>
-                    TOTAL CONSOLIDADO:
+                    Total consolidado:
                 </Typography>
                 <Stack direction="row" spacing={2} alignItems="center">
                     <Typography variant="caption" sx={{ color: '#FFFFFF', fontFamily: '"Inter", sans-serif' }}>

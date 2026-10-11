@@ -115,8 +115,8 @@ const ConfigCron = () => {
     return (
         <Box sx={{ p: { xs: 2, md: 4 } }}>
             <PageHeader
-                title="Automação & Jobs em Background"
-                subtitle="Configure horários de execução dos jobs e dispare ações manuais de manutenção."
+                title="Rotinas automáticas"
+                subtitle="Horários das rotinas automáticas e ações manuais de manutenção."
                 breadcrumbs={[{ text: 'Configurações' }, { text: 'Automação' }]}
             />
 

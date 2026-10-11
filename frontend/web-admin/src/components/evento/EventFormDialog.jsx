@@ -23,6 +23,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import NeonButton from '../common/NeonButton';
 
+import { botaoSecundario } from '../../styles/tokens';
 const EventFormDialog = ({
     open,
     onClose,
@@ -91,7 +92,7 @@ const EventFormDialog = ({
                     sx={{ borderBottom: '1px solid rgba(255,255,255,0.1)', mb: 3 }}
                 >
                     <Tab label="Informações" sx={{ fontWeight: 700 }} />
-                    <Tab label="Fases & datas" sx={{ fontWeight: 700 }} />
+                    <Tab label="Fases e datas" sx={{ fontWeight: 700 }} />
                 </Tabs>
 
                 {tabValue === 0 ? (
@@ -198,7 +199,7 @@ const EventFormDialog = ({
                                                 }}
                                             />
                                         }
-                                        label={<Typography variant="caption" sx={{ textTransform: 'uppercase' }}>{method.label}</Typography>}
+                                        label={<Typography variant="caption" sx={{ }}>{method.label}</Typography>}
                                     />
                                 ))}
                             </FormGroup>
@@ -229,7 +230,7 @@ const EventFormDialog = ({
                                                 }}
                                             />
                                         }
-                                        label={<Typography variant="caption" sx={{ textTransform: 'uppercase' }}>{method.label}</Typography>}
+                                        label={<Typography variant="caption" sx={{ }}>{method.label}</Typography>}
                                     />
                                 ))}
                             </FormGroup>
@@ -340,9 +341,9 @@ const EventFormDialog = ({
                         ) : (
                             <Stack spacing={4} sx={{ mb: 4 }}>
                                 {[
-                                    { id: 'montagem', label: 'MONTAGEM', color: '#00D4FF', bg: 'rgba(0,212,255,0.04)', border: 'rgba(0,212,255,0.15)' },
-                                    { id: 'evento', label: 'EVENTO', color: '#00FF88', bg: 'rgba(0,255,136,0.04)', border: 'rgba(0,255,136,0.15)' },
-                                    { id: 'desmontagem', label: 'DESMONTAGEM', color: '#FFB800', bg: 'rgba(255,184,0,0.05)', border: 'rgba(255,184,0,0.25)' }
+                                    { id: 'montagem', label: 'Montagem', color: '#00D4FF', bg: 'rgba(0,212,255,0.04)', border: 'rgba(0,212,255,0.15)' },
+                                    { id: 'evento', label: 'Evento', color: '#00FF88', bg: 'rgba(0,255,136,0.04)', border: 'rgba(0,255,136,0.15)' },
+                                    { id: 'desmontagem', label: 'Desmontagem', color: '#FFB800', bg: 'rgba(255,184,0,0.05)', border: 'rgba(255,184,0,0.25)' }
                                 ].map(phase => {
                                     const selectedCount = (formData[`datas_${phase.id}`] || []).length;
                                     const allDates = generateDateRange();
@@ -359,7 +360,7 @@ const EventFormDialog = ({
                                         >
                                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                                    <Typography variant="subtitle2" sx={{ color: phase.color, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px' }}>
+                                                    <Typography variant="subtitle2" sx={{ color: phase.color, fontWeight: 700, letterSpacing: '1px' }}>
                                                         {phase.label}
                                                     </Typography>
                                                     <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem' }}>
@@ -432,7 +433,7 @@ const EventFormDialog = ({
                 </Box>
             </DialogContent>
             <DialogActions sx={{ p: 3, px: 6, justifyContent: 'space-between', borderTop: '1px solid rgba(255, 255, 255, 0.05)', bgcolor: 'rgba(10, 25, 41, 0.5)' }}>
-                <Button onClick={onClose} disabled={saving} sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, '&:hover': { color: '#FF3366' } }}>
+                <Button variant="outlined" onClick={onClose} disabled={saving} sx={botaoSecundario}>
                     Cancelar
                 </Button>
                 <NeonButton onClick={handleSave} loading={saving}>Salvar e ativar</NeonButton>

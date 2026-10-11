@@ -48,12 +48,14 @@ import GerenciarCamerasModal from '../components/cameras/GerenciarCamerasModal';
 import KpiCards from '../components/monitor/KpiCards';
 import AbaSaude from '../components/monitor/AbaSaude';
 
+import { botaoSecundario } from '../styles/tokens';
+import { comoRotulo } from '../utils/formatadores';
 // Selo de conexão em tempo real
 const SELO_CONEXAO = {
-  conectado: { label: 'AO VIVO', cor: '#00FF88' },
-  conectando: { label: 'CONECTANDO...', cor: '#FFB800' },
-  reconectando: { label: 'RECONECTANDO...', cor: '#FFB800' },
-  offline: { label: 'SEM CONEXÃO', cor: '#FF3366' }
+  conectado: { label: 'Ao vivo', cor: '#00FF88' },
+  conectando: { label: 'Conectando...', cor: '#FFB800' },
+  reconectando: { label: 'Reconectando...', cor: '#FFB800' },
+  offline: { label: 'Sem conexão', cor: '#FF3366' }
 };
 
 const LogItem = styled(Box, { shouldForwardProp: (p) => !['tipo', 'monitorado'].includes(p) })(({ tipo, monitorado }) => ({
@@ -229,7 +231,7 @@ const Monitor = () => {
     playAlarmSound?.();
     const camMock = activeStreamCam || cameras[0] || {
       id: 'cam-sim-1',
-      nome: 'CÂMERA 01 - ENTRADA PRINCIPAL',
+      nome: 'Câmera 01 - entrada principal',
       ip_address: '127.0.0.1',
       porta: 8554,
       fabricante: 'Webcam RTSP'
@@ -239,7 +241,7 @@ const Monitor = () => {
       id: `sim_alert_${Date.now()}`,
       target_name: 'PESSOA DE TESTE (SIMULAÇÃO)',
       pessoa: {
-        nome: 'PESSOA DE TESTE (SIMULAÇÃO)',
+        nome: 'Pessoa de teste (simulação)',
         cpf: '000.000.000-00',
         foto_url: null,
         funcao: 'Simulação de alerta',
@@ -658,7 +660,7 @@ const Monitor = () => {
               </Box>
               <Box>
                 <Typography variant="h6" fontWeight={700} sx={{ color: '#FFB800', fontSize: '1rem', lineHeight: 1.2 }}>
-                  CENTRAL DE INTELIGÊNCIA • OCORRÊNCIA SIGILOSA
+                  Central de inteligência • ocorrência sigilosa
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.65)' }}>
                   Alvo da Watchlist Reconhecido por Câmera de Vigilância Facial
@@ -686,12 +688,12 @@ const Monitor = () => {
             mb: 2.5
           }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-              <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.8 }}>
+              <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 0.8 }}>
                 <SecurityIcon sx={{ fontSize: 16, color: '#00D4FF' }} />
                 Comprovação biométrica de reconhecimento facial
               </Typography>
               <Chip
-                label="CORRESPONDÊNCIA CONFIRMADA"
+                label="Correspondência confirmada"
                 size="small"
                 sx={{
                   bgcolor: 'rgba(0, 230, 118, 0.15)',
@@ -785,7 +787,7 @@ const Monitor = () => {
                     justifyContent: 'center'
                   }}>
                     <Chip
-                      label="REGISTRO CADASTRADO"
+                      label="Registro cadastrado"
                       size="small"
                       sx={{
                         height: 22,
@@ -864,7 +866,7 @@ const Monitor = () => {
                   }}>
                     <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: '#FFB800', boxShadow: '0 0 6px #FFB800' }} />
                     <Typography variant="caption" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.75rem', color: '#FFB800', fontWeight: 700 }}>
-                      CFTV • CAPTURA REAL DA CÂMERA
+                      CFTV • captura real da câmera
                     </Typography>
                   </Box>
 
@@ -928,7 +930,7 @@ const Monitor = () => {
                     justifyContent: 'center'
                   }}>
                     <Chip
-                      label="SNAPSHOT DE IDENTIFICAÇÃO (CFTV)"
+                      label="Snapshot de identificação (CFTV)"
                       size="small"
                       sx={{
                         height: 22,
@@ -965,7 +967,7 @@ const Monitor = () => {
                 )}
               </Box>
               <Chip
-                label={activeAlert?.watchlist?.nivel_alerta?.toUpperCase() || 'CRÍTICO'}
+                label={comoRotulo(activeAlert?.watchlist?.nivel_alerta) || 'Crítico'}
                 size="small"
                 sx={{ bgcolor: '#FFB800', color: '#000000', fontWeight: 700, fontSize: '0.75rem' }}
               />
@@ -985,8 +987,8 @@ const Monitor = () => {
                 <Stack direction="row" spacing={1} alignItems="flex-start">
                   <CameraIcon sx={{ color: '#00D4FF', fontSize: 20, mt: 0.2 }} />
                   <Box>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase' }}>
-                      DISPOSITIVO CFTV
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, fontSize: '0.75rem', }}>
+                      Dispositivo CFTV
                     </Typography>
                     <Typography variant="body2" fontWeight={700} color="#FFFFFF">
                       {activeAlert?.dispositivo?.nome || activeAlert?.location || 'Câmera IP'}
@@ -1003,7 +1005,7 @@ const Monitor = () => {
                 <Stack direction="row" spacing={1} alignItems="flex-start">
                   <AreaIcon sx={{ color: '#FFB800', fontSize: 20, mt: 0.2 }} />
                   <Box>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase' }}>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, fontSize: '0.75rem', }}>
                       Localização no evento
                     </Typography>
                     <Typography variant="body2" fontWeight={700} sx={{ color: '#FFB800' }}>
@@ -1067,15 +1069,13 @@ const Monitor = () => {
             Concluir rastreamento
           </Button>
 
-          <Button
-            variant="outlined"
+          <Button variant="outlined"
+           
             size="small"
             onClick={() => {
               setOpenSecretAlertModal(false);
               setActiveAlert(null);
-            }}
-            sx={{ borderColor: 'rgba(255,255,255,0.2)', color: '#94A3B8' }}
-          >
+            }} sx={botaoSecundario}>
             Fechar
           </Button>
         </DialogActions>
@@ -1110,11 +1110,11 @@ const Monitor = () => {
                     />
                     <Box>
                         <Typography variant="h5" fontWeight={700}>{activeAreaAlert?.pessoa_nome || 'Indivíduo Não Autorizado'}</Typography>
-                        <Chip label="ÁREA RESTRITA" sx={{ mt: 0.5, bgcolor: '#FFFFFF', color: '#FF3366', fontWeight: 700, height: 22 }} />
+                        <Chip label="Área restrita" sx={{ mt: 0.5, bgcolor: '#FFFFFF', color: '#FF3366', fontWeight: 700, height: 22 }} />
                     </Box>
                  </Stack>
                  <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.25)' }} />
-                 <Typography variant="body2"><b>ÁREA TENTADA:</b> {activeAreaAlert?.area_nome || 'Restrita'}</Typography>
+                 <Typography variant="body2"><b>Área tentada:</b> {activeAreaAlert?.area_nome || 'Restrita'}</Typography>
                  <Typography variant="caption" sx={{ mt: 1, display: 'block', opacity: 0.8 }}>Horário: {formatLocalTime(activeAreaAlert?.timestamp)}</Typography>
              </Box>
           </Fade>
@@ -1128,7 +1128,7 @@ const Monitor = () => {
       {/* CARROSSEL / SELETOR DE ÁREAS EM TEMPO REAL COM FILTRO DE 1 CLIQUE */}
       {stats.areas && stats.areas.length > 0 && (
           <Box sx={{ mb: 3 }}>
-              <Typography variant="caption" fontWeight={700} color="#94A3B8" sx={{ letterSpacing: 1, textTransform: 'uppercase', mb: 1, display: 'block' }}>
+              <Typography variant="caption" fontWeight={700} color="#94A3B8" sx={{ letterSpacing: 1, mb: 1, display: 'block' }}>
                   Filtrar por área
               </Typography>
               <Stack direction="row" spacing={1.5} sx={{ overflowX: 'auto', pb: 1 }}>
@@ -1342,10 +1342,10 @@ const Monitor = () => {
                               <TableRow key={t.id}>
                                   <TableCell sx={{ fontWeight: 700 }}>{t.nome}</TableCell>
                                   <TableCell>{t.evento_areas?.nome_area || t.evento_areas?.nome || 'Sem área'}</TableCell>
-                                  <TableCell><Chip label={t.tipo?.toUpperCase()} size="small" variant="outlined" /></TableCell>
+                                  <TableCell><Chip label={comoRotulo(t.tipo)} size="small" variant="outlined" /></TableCell>
                                   <TableCell>
                                       <Chip 
-                                        label={t.status?.toUpperCase()} 
+                                        label={comoRotulo(t.status)} 
                                         color={t.status === 'online' ? 'success' : 'error'}
                                         sx={{ fontWeight: 700 }}
                                       />
@@ -1402,10 +1402,10 @@ const Monitor = () => {
                               <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.3)' }}>
                                   <TableRow>
                                       <TableCell sx={{ color: '#FFB800', fontWeight: 700 }}>CPF</TableCell>
-                                      <TableCell sx={{ color: '#FFB800', fontWeight: 700 }}>NOME</TableCell>
-                                      <TableCell sx={{ color: '#FFB800', fontWeight: 700 }}>MOTIVO DO BLOQUEIO</TableCell>
-                                      <TableCell sx={{ color: '#FFB800', fontWeight: 700 }}>NÍVEL</TableCell>
-                                      <TableCell sx={{ color: '#FFB800', fontWeight: 700, textAlign: 'center' }}>AÇÕES DE SEGURANÇA</TableCell>
+                                      <TableCell sx={{ color: '#FFB800', fontWeight: 700 }}>Nome</TableCell>
+                                      <TableCell sx={{ color: '#FFB800', fontWeight: 700 }}>Motivo do bloqueio</TableCell>
+                                      <TableCell sx={{ color: '#FFB800', fontWeight: 700 }}>Nível</TableCell>
+                                      <TableCell sx={{ color: '#FFB800', fontWeight: 700, textAlign: 'center' }}>Ações de segurança</TableCell>
                                   </TableRow>
                               </TableHead>
                               <TableBody>
@@ -1416,7 +1416,7 @@ const Monitor = () => {
                                           <TableCell sx={{ color: 'text.secondary' }}>{w.motivo || 'Monitoramento Policial / Restrição'}</TableCell>
                                           <TableCell>
                                               <Chip 
-                                                  label={(w.nivel_alerta || 'alto').toUpperCase()} 
+                                                  label={comoRotulo(w.nivel_alerta || 'alto')} 
                                                   size="small" 
                                                   color={w.nivel_alerta === 'critico' ? 'error' : w.nivel_alerta === 'alto' ? 'warning' : 'info'} 
                                                   sx={{ fontWeight: 700 }}
@@ -1476,7 +1476,7 @@ const Monitor = () => {
                   <GlassCard sx={{ p: 3 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                           <Box>
-                              <Typography variant="h6" fontWeight={700} color="#00D4FF">NOTIFICAÇÕES EXTERNAS</Typography>
+                              <Typography variant="h6" fontWeight={700} color="#00D4FF">Notificações externas</Typography>
                               <Typography variant="caption" sx={{ display: 'block', opacity: 0.7 }}>
                                   Alertas instantâneos via Telegram e WhatsApp
                               </Typography>
@@ -1509,7 +1509,7 @@ const Monitor = () => {
                                       </Box>
                                   </Box>
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                      <Chip size="small" label="ATIVO" color="success" sx={{ fontSize: '0.75rem', height: 20, fontWeight: 700 }} />
+                                      <Chip size="small" label="Ativo" color="success" sx={{ fontSize: '0.75rem', height: 20, fontWeight: 700 }} />
                                       <IconButton size="small" color="error" onClick={() => removeContato(c.id)}>
                                           <TrashIcon sx={{ fontSize: 16 }} />
                                       </IconButton>
@@ -1644,7 +1644,7 @@ const Monitor = () => {
                             { id: '4', label: '4 CÂM' },
                             { id: '3', label: '3 CÂM' },
                             { id: '2', label: '2 CÂM' },
-                            { id: '1', label: '1 (FOCO)' }
+                            { id: '1', label: '1 (Foco)' }
                         ].map(({ id, label }) => (
                             <Button
                                 key={id}
@@ -1829,7 +1829,7 @@ const Monitor = () => {
                                             )}
                                         </Stack>
                                         <Chip
-                                            label={cam.status?.toUpperCase() || 'OFFLINE'}
+                                            label={comoRotulo(cam.status) || 'Offline'}
                                             size="small"
                                             color={cam.status === 'online' ? 'success' : 'error'}
                                             sx={{ height: 20, fontSize: '0.75rem', fontWeight: 700 }}
@@ -1900,7 +1900,7 @@ const Monitor = () => {
                                             }}>
                                                 <FullscreenIcon sx={{ fontSize: 13, color: '#00D4FF' }} />
                                                 <Typography variant="caption" sx={{ fontSize: '0.75rem', color: '#00D4FF', fontWeight: 700 }}>
-                                                    AO VIVO
+                                                    Ao vivo
                                                 </Typography>
                                             </Box>
                                         </Box>
@@ -1927,7 +1927,7 @@ const Monitor = () => {
                                         {testResults[cam.id] && testResults[cam.id] !== 'testing' && (
                                             <Chip
                                                 size="small"
-                                                label={testResults[cam.id] === 'online' ? 'ONLINE' : 'OFFLINE'}
+                                                label={testResults[cam.id] === 'online' ? 'Online' : 'Offline'}
                                                 color={testResults[cam.id] === 'online' ? 'success' : 'error'}
                                                 sx={{ height: 26, fontSize: '0.75rem', fontWeight: 700 }}
                                             />
@@ -2087,7 +2087,7 @@ const Monitor = () => {
                 </Typography>
                 <Chip
                     icon={<DotIcon sx={{ fontSize: 9, color: '#00FF88 !important' }} />}
-                    label="STREAM AO VIVO • ULTRA-BAIXA LATÊNCIA"
+                    label="Stream ao vivo • ultra-baixa latência"
                     size="small"
                     sx={{ bgcolor: 'rgba(0, 255, 136, 0.1)', color: '#00FF88', fontWeight: 700, fontSize: '0.75rem' }}
                 />
@@ -2224,7 +2224,7 @@ const Monitor = () => {
                                                       {cam.nome}
                                                   </Typography>
                                                   <Chip
-                                                      label={cam.status?.toUpperCase() || 'OFFLINE'}
+                                                      label={comoRotulo(cam.status) || 'Offline'}
                                                       size="small"
                                                       color={cam.status === 'online' ? 'success' : 'default'}
                                                       sx={{ height: 18, fontSize: '0.75rem', fontWeight: 700 }}
@@ -2264,10 +2264,8 @@ const Monitor = () => {
           </DialogContent>
 
           <DialogActions sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-              <Button 
-                  onClick={() => setOpenSelectCamerasDialog(false)}
-                  sx={{ color: '#94A3B8', fontWeight: 700 }}
-              >
+              <Button variant="outlined" 
+                  onClick={() => setOpenSelectCamerasDialog(false)} sx={botaoSecundario}>
                   Cancelar
               </Button>
               <Button 
@@ -2330,7 +2328,7 @@ const Monitor = () => {
               </Stack>
           </DialogContent>
           <DialogActions sx={{ p: 2 }}>
-              <Button onClick={() => setOpenTargetDialog(false)}>Cancelar</Button>
+              <Button variant="outlined" onClick={() => setOpenTargetDialog(false)} sx={botaoSecundario}>Cancelar</Button>
               <Button 
                   variant="contained" 
                   color="warning"
@@ -2408,7 +2406,7 @@ const Monitor = () => {
               </Stack>
           </DialogContent>
           <DialogActions sx={{ p: 2 }}>
-              <Button onClick={() => setOpenContactDialog(false)}>Cancelar</Button>
+              <Button variant="outlined" onClick={() => setOpenContactDialog(false)} sx={botaoSecundario}>Cancelar</Button>
               <Button 
                   variant="contained" 
                   onClick={async () => {
@@ -2445,7 +2443,7 @@ const Monitor = () => {
       >
           <DialogTitle sx={{ color: '#00FF88', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
               <CheckCircleIcon sx={{ color: '#00FF88' }} />
-              DESBLOQUEIO DE ALVO • LIBERAÇÃO GERAL MULTI-EVENTO
+              Desbloqueio de alvo • liberação geral multi-evento
           </DialogTitle>
           <DialogContent>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -2481,7 +2479,7 @@ const Monitor = () => {
               />
           </DialogContent>
           <DialogActions sx={{ p: 2, gap: 1 }}>
-              <Button onClick={() => setOpenUnblockDialog(false)} disabled={unblockLoading} color="inherit">
+              <Button variant="outlined" onClick={() => setOpenUnblockDialog(false)} disabled={unblockLoading} sx={botaoSecundario}>
                   Cancelar
               </Button>
               <Button 
@@ -2514,7 +2512,7 @@ const Monitor = () => {
       >
           <DialogTitle sx={{ color: '#00D4FF', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
               <VisibilityOffIcon sx={{ color: '#00D4FF' }} />
-              ALVO LOCALIZADO • DEIXAR DE MONITORAR
+              Alvo localizado • deixar de monitorar
           </DialogTitle>
           <DialogContent>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -2547,7 +2545,7 @@ const Monitor = () => {
               />
           </DialogContent>
           <DialogActions sx={{ p: 2, gap: 1 }}>
-              <Button onClick={() => setOpenDeixarMonitorarDialog(false)} disabled={stopMonitoringLoading} color="inherit">
+              <Button variant="outlined" onClick={() => setOpenDeixarMonitorarDialog(false)} disabled={stopMonitoringLoading} sx={botaoSecundario}>
                   Cancelar
               </Button>
               <Button 
@@ -2580,7 +2578,7 @@ const Monitor = () => {
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
           <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#FFB800', display: 'flex', alignItems: 'center', gap: 1 }}>
             <PhotoCameraIcon sx={{ color: '#FFB800' }} />
-            INSPEÇÃO PERICIAL • CAPTURA ORIGINAL DA CÂMERA EM ALTA RESOLUÇÃO
+            Inspeção pericial • captura original da câmera em alta resolução
           </Typography>
           <IconButton onClick={() => setZoomSnapshotModal(false)} size="small" sx={{ color: '#94A3B8', '&:hover': { color: '#FFFFFF' } }}>
             <CloseIcon />

@@ -11,6 +11,7 @@ import PageHeader from '../../components/common/PageHeader';
 import { MODULOS } from '../../hooks/useUsuarios';
 import { useSnackbar } from 'notistack';
 
+import { botaoSecundario } from '../../styles/tokens';
 // O sistema tem dois papéis: Admin Master (acesso total) e Operador
 const PERFIS = [
     { value: 'operador', label: 'Operador' }
@@ -91,7 +92,7 @@ const PermissoesAcesso = () => {
     return (
         <Box>
             <PageHeader
-                title="Perfis de Acesso"
+                title="Perfis de acesso"
                 subtitle="Permissões padrão de cada papel. Usuários novos nascem com elas; a tela Usuários ajusta cada pessoa."
             />
 
@@ -162,7 +163,7 @@ const PermissoesAcesso = () => {
                     </Typography>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setConfirmarAplicar(false)} disabled={aplicando}>Cancelar</Button>
+                    <Button variant="outlined" onClick={() => setConfirmarAplicar(false)} disabled={aplicando} sx={botaoSecundario}>Cancelar</Button>
                     <Button color="warning" variant="contained" onClick={aplicar} disabled={aplicando}>
                         {aplicando ? 'Aplicando...' : 'Aplicar'}
                     </Button>

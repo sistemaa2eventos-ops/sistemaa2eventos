@@ -216,7 +216,6 @@ const DataTable = ({
                     fontWeight: 600,
                     fontSize: '0.75rem',
                     letterSpacing: '0.06em',
-                    textTransform: 'uppercase',
                     whiteSpace: 'nowrap',
                     zIndex: 10,
                     borderBottom: '1px solid rgba(148, 163, 184, 0.16)',

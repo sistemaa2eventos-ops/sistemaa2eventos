@@ -4,6 +4,7 @@ import { Security as SecurityIcon, Lock as LockIcon, Save as SaveIcon } from '@m
 import { useSnackbar } from 'notistack';
 import api from '../../services/api';
 import PageHeader from '../../components/common/PageHeader';
+import { funcao, papeis } from '../../styles/tokens';
 import GlassCard from '../../components/common/GlassCard';
 import NeonButton from '../../components/common/NeonButton';
 
@@ -62,8 +63,8 @@ const ConfigSeguranca = () => {
     return (
         <Box sx={{ p: { xs: 2, md: 4 } }}>
             <PageHeader
-                title="Segurança & Permissões"
-                subtitle="Políticas de acesso, criptografia e expiração de sessões AD."
+                title="Segurança"
+                subtitle="Sessões, autenticação e proteção de acesso."
                 breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Segurança' }]}
             />
 
@@ -73,7 +74,7 @@ const ConfigSeguranca = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                             <LockIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
                             <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
-                                JWT & SESSÕES
+                                JWT e sessões
                             </Typography>
                         </Box>
 
@@ -113,43 +114,32 @@ const ConfigSeguranca = () => {
                 <Grid item xs={12} md={7}>
                     <GlassCard sx={{ p: 3, mb: 4, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
-                            <SecurityIcon sx={{ color: '#7B2FBE', fontSize: 28 }} />
+                            <SecurityIcon sx={{ color: funcao.acao, fontSize: 28 }} />
                             <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
-                                Perfis de acesso (rbac)
+                                Perfis de acesso
                             </Typography>
                         </Box>
 
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                            Estes níveis de acesso determinam a visibilidade de botões e APIs nos painéis Frontend.
+                            O sistema tem dois perfis. O que cada operador vê é definido em Perfis de acesso e em Usuários.
                         </Typography>
 
                         <List sx={{ bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 1.5 }}>
                             <ListItem sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                                 <ListItemText
-                                    primary="[ADMIN] High-Level Operations"
-                                    secondary="Acesso full a eventos globais, apagar banco de dados e modificar integrações Node/Python."
-                                    primaryTypographyProps={{ color: '#00FF88', fontWeight: 700 }}
+                                    primary={papeis.admin_master.rotulo}
+                                    secondary="Acesso total: todos os eventos, usuários, configurações e integrações."
+                                    primaryTypographyProps={{ color: papeis.admin_master.cor, fontWeight: 700 }}
                                 />
                             </ListItem>
-                            <ListItem sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                            <ListItem>
                                 <ListItemText
-                                    primary="[SUPERVISOR] Event Management"
-                                    secondary="Pode exportar relatórios, cadastrar participantes, mas não muda parâmetros de hardware."
-                                    primaryTypographyProps={{ color: '#00D4FF', fontWeight: 700 }}
-                                />
-                            </ListItem>
-                            <ListItem sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                <ListItemText
-                                    primary="[OPERADOR] Reception & Control"
-                                    secondary="Restrito ao PDV/Credenciamento final. Não possui acesso a relatórios gerenciais ou configurações."
-                                    primaryTypographyProps={{ color: '#FFFFFF', fontWeight: 600 }}
+                                    primary={papeis.operador.rotulo}
+                                    secondary="Acessa só os módulos liberados para ele (check-in, checkout, relatórios…) nos eventos em que foi vinculado."
+                                    primaryTypographyProps={{ color: papeis.operador.cor, fontWeight: 700 }}
                                 />
                             </ListItem>
                         </List>
-
-                        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
-                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>*Edição customizada de Roles planejada para Update 2.0</Typography>
-                        </Box>
                     </GlassCard>
                 </Grid>
             </Grid>

@@ -39,7 +39,7 @@ class GlobalErrorBoundary extends React.Component {
                     <Container maxWidth="sm">
                         <ErrorIcon sx={{ fontSize: 80, color: '#FF3366', mb: 2 }} />
                         <Typography variant="h4" sx={{ fontWeight: 700, mb: 2, fontFamily: '"Space Grotesk", sans-serif' }}>
-                            SISTEMA INTERCEPTADO
+                            Sistema interceptado
                         </Typography>
                         <Typography variant="body1" sx={{ color: 'text.secondary', mb: 4 }}>
                             Ocorreu uma falha crítica na renderização do módulo atual.

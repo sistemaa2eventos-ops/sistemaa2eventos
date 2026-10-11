@@ -21,6 +21,7 @@ import GlassCard from '../components/common/GlassCard';
 import api from '../services/api';
 import { useConfirmacao } from '../contexts/ConfirmacaoContext';
 
+import { comoRotulo } from '../utils/formatadores';
 const STATUS_COLORS = {
     confirmado: { bg: 'rgba(0,255,136,0.1)', color: '#00FF88', label: 'Confirmado' },
     pendente: { bg: 'rgba(255,184,0,0.1)', color: '#FFB800', label: 'Pendente' },
@@ -137,16 +138,16 @@ export default function Financeiro() {
             {/* KPI Cards */}
             <Grid container spacing={3} sx={{ mb: 3 }}>
                 <Grid item xs={6} md={3}>
-                    <KpiCard icon={<TrendingUpIcon />} label="TOTAL RECEBIDO" value={formatCurrency(kpis.total_recebido)} color="#00FF88" sub={`${kpis.total || 0} transações`} />
+                    <KpiCard icon={<TrendingUpIcon />} label="Total recebido" value={formatCurrency(kpis.total_recebido)} color="#00FF88" sub={`${kpis.total || 0} transações`} />
                 </Grid>
                 <Grid item xs={6} md={3}>
-                    <KpiCard icon={<WarningIcon />} label="PENDENTES" value={kpis.pendentes || 0} color="#FFB800" sub="Aguardando confirmação" />
+                    <KpiCard icon={<WarningIcon />} label="Pendentes" value={kpis.pendentes || 0} color="#FFB800" sub="Aguardando confirmação" />
                 </Grid>
                 <Grid item xs={6} md={3}>
-                    <KpiCard icon={<BlockIcon />} label="REJEITADOS" value={kpis.rejeitados || 0} color="#FF3366" sub="Falha ou cancelamento" />
+                    <KpiCard icon={<BlockIcon />} label="Rejeitados" value={kpis.rejeitados || 0} color="#FF3366" sub="Falha ou cancelamento" />
                 </Grid>
                 <Grid item xs={6} md={3}>
-                    <KpiCard icon={<CheckIcon />} label="TAXA DE SUCESSO" value={`${kpis.taxa_sucesso || 0}%`} color="#00D4FF" sub="Confirmados / Total" />
+                    <KpiCard icon={<CheckIcon />} label="Taxa de sucesso" value={`${kpis.taxa_sucesso || 0}%`} color="#00D4FF" sub="Confirmados / Total" />
                 </Grid>
             </Grid>
 
@@ -203,14 +204,14 @@ export default function Financeiro() {
                             <Table size="small">
                                 <TableHead>
                                     <TableRow sx={{ '& th': { fontWeight: 700, color: 'text.secondary', fontSize: '0.75rem', letterSpacing: 1, borderBottom: '1px solid rgba(255,255,255,0.05)' } }}>
-                                        <TableCell>DATA/HORA</TableCell>
-                                        <TableCell>NOME</TableCell>
+                                        <TableCell>Data/hora</TableCell>
+                                        <TableCell>Nome</TableCell>
                                         <TableCell>CPF</TableCell>
-                                        <TableCell align="right">VALOR</TableCell>
-                                        <TableCell>GATEWAY</TableCell>
-                                        <TableCell>STATUS</TableCell>
-                                        <TableCell>ID EXTERNO</TableCell>
-                                        <TableCell align="center">AÇÕES</TableCell>
+                                        <TableCell align="right">Valor</TableCell>
+                                        <TableCell>Gateway</TableCell>
+                                        <TableCell>Status</TableCell>
+                                        <TableCell>ID externo</TableCell>
+                                        <TableCell align="center">Ações</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -225,7 +226,7 @@ export default function Financeiro() {
                                                 <TableCell sx={{ fontSize: '0.75rem', color: 'text.secondary', fontFamily: '"Inter", sans-serif' }}>{tx.pessoas?.cpf || '-'}</TableCell>
                                                 <TableCell align="right" sx={{ fontWeight: 700, color: '#00FF88', fontSize: '0.875rem' }}>{formatCurrency(tx.valor)}</TableCell>
                                                 <TableCell>
-                                                    <Chip label={(tx.provider || '-').toUpperCase()} size="small"
+                                                    <Chip label={comoRotulo(tx.provider || '-')} size="small"
                                                         sx={{ fontWeight: 700, fontSize: '0.75rem', height: 22, bgcolor: tx.provider === 'stripe' ? 'rgba(123,47,190,0.1)' : 'rgba(0,212,255,0.1)', color: tx.provider === 'stripe' ? '#7B2FBE' : '#00D4FF' }} />
                                                 </TableCell>
                                                 <TableCell>

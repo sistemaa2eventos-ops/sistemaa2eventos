@@ -22,3 +22,13 @@ export const formatarTelefone = (v) => {
     if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
     return v || '—';
 };
+
+/**
+ * Valor de status/tipo para exibir em selos: "checkin_feito" / "AUTORIZADO" -> "Checkin feito" / "Autorizado".
+ * Use no lugar de .toUpperCase() — a interface não usa caixa alta.
+ */
+export const comoRotulo = (v) => {
+    if (v === null || v === undefined || v === '') return '';
+    const t = String(v).replace(/_/g, ' ').trim().toLowerCase();
+    return t.charAt(0).toUpperCase() + t.slice(1);
+};

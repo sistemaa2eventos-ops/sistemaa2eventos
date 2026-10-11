@@ -18,6 +18,7 @@ import PageHeader from '../../components/common/PageHeader';
 import NeonButton from '../../components/common/NeonButton';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
 
+import { botaoSecundario } from '../../styles/tokens';
 const ConfigAreas = () => {
     const confirmar = useConfirmacao();
     const [areas, setAreas] = useState([]);
@@ -31,7 +32,7 @@ const ConfigAreas = () => {
     const columns = [
         {
             id: 'nome_area',
-            label: 'NOME DA ÁREA',
+            label: 'Nome da área',
             minWidth: 200,
             format: (val) => (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -42,14 +43,14 @@ const ConfigAreas = () => {
         },
         {
             id: 'capacidade_maxima',
-            label: 'CAPACIDADE',
+            label: 'Capacidade',
             minWidth: 100,
             align: 'center',
             format: (val) => val || 'Ilimitada'
         },
         {
             id: 'acoes',
-            label: 'AÇÕES',
+            label: 'Ações',
             minWidth: 120,
             align: 'center',
             format: (value, row) => (
@@ -156,7 +157,7 @@ const ConfigAreas = () => {
         <Box sx={{ p: { xs: 2, md: 4 } }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
                 <PageHeader
-                    title="Gestão de Áreas & Zonas"
+                    title="Áreas"
                     subtitle="Crie e gerencie as áreas de acesso do evento. Cada área pode ser associada a um ou mais leitores."
                     breadcrumbs={[{ text: 'Configurações' }, { text: 'Áreas & Zonas' }]}
                 />
@@ -199,7 +200,7 @@ const ConfigAreas = () => {
                     </Stack>
                 </DialogContent>
                 <DialogActions sx={{ p: 3 }}>
-                    <Button onClick={() => setOpenDialog(false)}>Cancelar</Button>
+                    <Button variant="outlined" onClick={() => setOpenDialog(false)} sx={botaoSecundario}>Cancelar</Button>
                     <Button variant="contained" onClick={handleSave} disabled={saving}>
                         {editingId ? 'Salvar' : 'Criar'}
                     </Button>

@@ -24,15 +24,16 @@ import { useUsuarios, MODULOS, DEFAULT_PERMISSIONS } from '../hooks/useUsuarios'
 import { useAuth } from '../contexts/AuthContext';
 import TituloModal from '../components/common/TituloModal';
 
+import { botaoSecundario } from '../styles/tokens';
 const RoleChip = styled(Chip)(({ role }) => ({
-    fontWeight: 700, fontSize: '0.75rem', height: 24, textTransform: 'uppercase',
+    fontWeight: 700, fontSize: '0.75rem', height: 24,
     background: role === 'admin_master' ? 'rgba(0, 212, 255, 0.1)' : 'rgba(0, 212, 255, 0.05)',
     color: role === 'admin_master' ? '#00D4FF' : '#FFFFFF',
     border: `1px solid ${role === 'admin_master' ? 'rgba(0, 212, 255, 0.2)' : 'rgba(255,255,255,0.1)'}`
 }));
 
 const StatusChip = styled(Chip)(({ status }) => ({
-    fontWeight: 700, fontSize: '0.75rem', height: 24, textTransform: 'uppercase',
+    fontWeight: 700, fontSize: '0.75rem', height: 24,
     background: status === 'ativo' ? 'rgba(0, 255, 136, 0.1)' : (status === 'pendente' ? 'rgba(255, 184, 0, 0.1)' : 'rgba(255, 51, 102, 0.1)'),
     color: status === 'ativo' ? '#00FF88' : (status === 'pendente' ? '#FFB800' : '#FF3366'),
     border: `1px solid ${status === 'ativo' ? 'rgba(0, 255, 136, 0.2)' : (status === 'pendente' ? 'rgba(255, 184, 0, 0.2)' : 'rgba(255, 51, 102, 0.2)')}`
@@ -66,7 +67,7 @@ const Usuarios = () => {
 
     const columns = [
         {
-            id: 'nome_completo', label: 'OPERADOR', minWidth: 230,
+            id: 'nome_completo', label: 'Operador', minWidth: 230,
             format: (val, row) => (
                 <Box>
                     <Typography variant="body2" fontWeight={700} color="#FFFFFF">{val || row.email}</Typography>
@@ -79,15 +80,15 @@ const Usuarios = () => {
                 </Box>
             )
         },
-        { id: 'telefone', label: 'TELEFONE', minWidth: 130 },
+        { id: 'telefone', label: 'Telefone', minWidth: 130 },
         {
-            id: 'nivel_acesso', label: 'CARGO', minWidth: 100,
+            id: 'nivel_acesso', label: 'Cargo', minWidth: 100,
             format: (val, _row) => {
                 const isRowMaster = val === 'admin_master';
                 return (
                     <RoleChip 
                         role={isRowMaster ? 'admin_master' : val} 
-                        label={isRowMaster ? 'ADMIN MASTER' : 'OPERADOR'} 
+                        label={isRowMaster ? 'Admin master' : 'Operador'} 
                         sx={{ 
                             background: isRowMaster ? 'rgba(0, 212, 255, 0.2)' : 'rgba(255,255,255,0.05)',
                             color: isRowMaster ? '#00D4FF' : '#FFFFFF',
@@ -99,7 +100,7 @@ const Usuarios = () => {
             }
         },
         {
-            id: 'vinculo', label: 'VÍNCULO COM EVENTOS', minWidth: 200,
+            id: 'vinculo', label: 'Vínculo com eventos', minWidth: 200,
             format: (_, row) => {
                 const isRowMaster = row.nivel_acesso === 'admin_master';
                 if (isRowMaster) {
@@ -141,7 +142,7 @@ const Usuarios = () => {
             }
         },
         {
-            id: 'permissoes', label: 'PERMISSÕES LIBERADAS', minWidth: 200,
+            id: 'permissoes', label: 'Permissões liberadas', minWidth: 200,
             format: (_, row) => {
                 const isRowMaster = row.nivel_acesso === 'admin_master';
                 if (isRowMaster) {
@@ -180,7 +181,7 @@ const Usuarios = () => {
             }
         },
         {
-            id: 'status', label: 'STATUS', minWidth: 90,
+            id: 'status', label: 'Status', minWidth: 90,
             format: (val) => {
                 const status = val || 'pendente';
                 const icons = { ativo: <AtivoIcon sx={{ fontSize: 14 }} />, pendente: <PendenteIcon sx={{ fontSize: 14 }} />, inativo: <InativoIcon sx={{ fontSize: 14 }} /> };
@@ -195,7 +196,7 @@ const Usuarios = () => {
             }
         },
         {
-            id: 'acoes', label: 'AÇÕES', minWidth: 120, align: 'center',
+            id: 'acoes', label: 'Ações', minWidth: 120, align: 'center',
             format: (_, row) => {
                 const isRowMaster = row.nivel_acesso === 'admin_master';
                 const canManage = isAdmin && !isRowMaster;
@@ -503,7 +504,7 @@ const Usuarios = () => {
                     </Stack>
                 </DialogContent>
                 <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                    <Button onClick={() => setOpenDialog(false)} sx={{ color: 'text.secondary' }}>Cancelar</Button>
+                    <Button variant="outlined" onClick={() => setOpenDialog(false)} sx={botaoSecundario}>Cancelar</Button>
                     <NeonButton onClick={handleSave}>{selectedUser ? 'Salvar alterações' : 'Criar operador'}</NeonButton>
                 </DialogActions>
             </Dialog>
@@ -516,7 +517,7 @@ const Usuarios = () => {
                     <TextField label="Nova Senha" type="password" fullWidth value={newPassword} onChange={(e) => setNewPassword(e.target.value)} sx={{ mt: 1 }} />
                 </DialogContent>
                 <DialogActions sx={{ p: 3 }}>
-                    <Button onClick={() => setOpenPasswordDialog(false)} disabled={resetingPassword}>Cancelar</Button>
+                    <Button variant="outlined" onClick={() => setOpenPasswordDialog(false)} disabled={resetingPassword} sx={botaoSecundario}>Cancelar</Button>
                     <NeonButton onClick={() => handleResetPassword(selectedUser.id, newPassword)} loading={resetingPassword}>Confirmar reset</NeonButton>
                 </DialogActions>
             </Dialog>
@@ -533,7 +534,7 @@ const Usuarios = () => {
                     </Typography>
                 </DialogContent>
                 <DialogActions sx={{ p: 3 }}>
-                    <Button onClick={() => setOpenDeleteConfirm(false)} sx={{ color: 'text.secondary' }}>Cancelar</Button>
+                    <Button variant="outlined" onClick={() => setOpenDeleteConfirm(false)} sx={botaoSecundario}>Cancelar</Button>
                     <Button
                         onClick={() => {
                             handleDeleteUser(selectedUser.id);

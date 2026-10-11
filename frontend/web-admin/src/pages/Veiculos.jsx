@@ -51,6 +51,8 @@ import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+import { botaoSecundario } from '../styles/tokens';
+import { comoRotulo } from '../utils/formatadores';
 const Veiculos = () => {
     const { enqueueSnackbar } = useSnackbar();
     const [searchParams] = useSearchParams();
@@ -117,7 +119,7 @@ const Veiculos = () => {
     const columns = [
         {
             id: 'placa',
-            label: 'PLACA / TAG',
+            label: 'Placa / TAG',
             minWidth: 120,
             format: (val) => (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -128,7 +130,7 @@ const Veiculos = () => {
         },
         { 
             id: 'info', 
-            label: 'VEÍCULO', 
+            label: 'Veículo', 
             minWidth: 180,
             format: (_, row) => (
                 <Box>
@@ -139,7 +141,7 @@ const Veiculos = () => {
         },
         {
             id: 'status',
-            label: 'STATUS',
+            label: 'Status',
             minWidth: 120,
             format: (val) => (
                 <StatusBadge 
@@ -150,13 +152,13 @@ const Veiculos = () => {
         },
         {
             id: 'empresas',
-            label: 'EMPRESA',
+            label: 'Empresa',
             minWidth: 150,
             format: (val) => val?.nome || '—'
         },
         {
             id: 'pessoas',
-            label: 'MOTORISTA VINCULADO',
+            label: 'Motorista vinculado',
             minWidth: 220,
             format: (val) => {
                 const nome = val?.nome_completo || val?.nome;
@@ -193,7 +195,7 @@ const Veiculos = () => {
         },
         {
             id: 'acoes',
-            label: 'OPERAÇÕES',
+            label: 'Operações',
             minWidth: 200,
             align: 'center',
             format: (value, row) => (
@@ -208,7 +210,7 @@ const Veiculos = () => {
                         </IconButton>
                     </Tooltip>
 
-                    <Tooltip title="Foto / Vistoria (Câmera & Áudio)">
+                    <Tooltip title="Foto e vistoria">
                         <IconButton
                             size="small"
                             onClick={() => handleOpenFoto(row)}
@@ -772,11 +774,11 @@ const Veiculos = () => {
                         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5, pb: 1.5, borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
                             <Stack direction="row" spacing={1.5} alignItems="center">
                                 {resultadoConsulta.autorizado ? (
-                                    <StatusBadge status="autorizado" label="ACESSO VEICULAR AUTORIZADO" />
+                                    <StatusBadge status="autorizado" label="Acesso veicular autorizado" />
                                 ) : resultadoConsulta.motivo === 'BLOQUEADO' ? (
-                                    <StatusBadge status="bloqueado" label="ACESSO BLOQUEADO / COM RESTRIÇÕES" />
+                                    <StatusBadge status="bloqueado" label="Acesso bloqueado / com restrições" />
                                 ) : (
-                                    <StatusBadge status="pendente" label="VEÍCULO NÃO CADASTRADO NO EVENTO" />
+                                    <StatusBadge status="pendente" label="Veículo não cadastrado no evento" />
                                 )}
                             </Stack>
                             <IconButton 
@@ -802,7 +804,7 @@ const Veiculos = () => {
                             }}>
                                 <BlockIcon sx={{ color: '#FF3366', fontSize: 26, flexShrink: 0 }} />
                                 <Box sx={{ flexGrow: 1 }}>
-                                    <Typography variant="caption" sx={{ color: '#FF3366', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', display: 'block' }}>
+                                    <Typography variant="caption" sx={{ color: '#FF3366', fontWeight: 700, letterSpacing: '1px', display: 'block' }}>
                                         Justificativa do bloqueio:
                                     </Typography>
                                     <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600, mt: 0.3 }}>
@@ -845,7 +847,7 @@ const Veiculos = () => {
 
                                 {/* Dados do Motorista */}
                                 <Grid item xs={12} sm={3.5}>
-                                    <Typography variant="caption" sx={{ color: 'rgba(0, 212, 255, 0.8)', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', display: 'block', mb: 0.5 }}>
+                                    <Typography variant="caption" sx={{ color: 'rgba(0, 212, 255, 0.8)', fontWeight: 700, letterSpacing: '1px', display: 'block', mb: 0.5 }}>
                                         Motorista Vinculado
                                     </Typography>
                                     {resultadoConsulta.veiculo.pessoas ? (
@@ -883,7 +885,7 @@ const Veiculos = () => {
 
                                 {/* Dados do Veículo & Placa ANPR */}
                                 <Grid item xs={12} sm={3}>
-                                    <Typography variant="caption" sx={{ color: 'rgba(0, 212, 255, 0.8)', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', display: 'block', mb: 0.5 }}>
+                                    <Typography variant="caption" sx={{ color: 'rgba(0, 212, 255, 0.8)', fontWeight: 700, letterSpacing: '1px', display: 'block', mb: 0.5 }}>
                                         Dados do Veículo
                                     </Typography>
                                     
@@ -900,7 +902,7 @@ const Veiculos = () => {
                                         mb: 0.8
                                     }}>
                                         <Box sx={{ background: '#0099BB', px: 1, py: 0.2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <Typography sx={{ color: '#FFFFFF', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '1px' }}>BRASIL</Typography>
+                                            <Typography sx={{ color: '#FFFFFF', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '1px' }}>Brasil</Typography>
                                             <Box sx={{ width: 6, height: 4, bgcolor: '#00FF88', borderRadius: '1px' }} />
                                         </Box>
                                         <Typography sx={{
@@ -927,7 +929,7 @@ const Veiculos = () => {
 
                                 {/* Operações do Veículo Consultados (Botões Compactos e Harmônicos) */}
                                 <Grid item xs={12} sm={3.5}>
-                                    <Typography variant="caption" sx={{ color: 'rgba(0, 212, 255, 0.8)', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', display: 'block', mb: 0.8 }}>
+                                    <Typography variant="caption" sx={{ color: 'rgba(0, 212, 255, 0.8)', fontWeight: 700, letterSpacing: '1px', display: 'block', mb: 0.8 }}>
                                         Ações Rápidas
                                     </Typography>
                                     <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 0.8 }}>
@@ -1272,7 +1274,7 @@ const Veiculos = () => {
                     </Box>
                 </DialogContent>
                 <DialogActions sx={{ p: 2.5, borderTop: '1px solid rgba(255,255,255,0.1)', gap: 1 }}>
-                    <Button onClick={handleCloseDialog} disabled={saving} sx={{ height: 38, minHeight: 38, borderRadius: '8px' }}>Cancelar</Button>
+                    <Button variant="outlined" onClick={handleCloseDialog} disabled={saving} sx={botaoSecundario}>Cancelar</Button>
                     <NeonButton onClick={handleSave} loading={saving} sx={{ height: 38, minHeight: 38, borderRadius: '8px' }}>Salvar registro</NeonButton>
                 </DialogActions>
             </Dialog>
@@ -1304,8 +1306,8 @@ const Veiculos = () => {
                                 label="Tipo de Movimento"
                                 onChange={(e) => setPassagemData({ ...passagemData, tipo: e.target.value })}
                             >
-                                <MenuItem value="entrada">ENTRADA</MenuItem>
-                                <MenuItem value="saida">SAÍDA</MenuItem>
+                                <MenuItem value="entrada">Entrada</MenuItem>
+                                <MenuItem value="saida">Saída</MenuItem>
                             </Select>
                         </FormControl>
                         <TextField 
@@ -1318,7 +1320,7 @@ const Veiculos = () => {
                     </Stack>
                 </DialogContent>
                 <DialogActions sx={{ p: 2.5, gap: 1 }}>
-                    <Button onClick={() => setOpenPassagemDialog(false)} sx={{ height: 38, minHeight: 38, borderRadius: '8px' }}>Cancelar</Button>
+                    <Button variant="outlined" onClick={() => setOpenPassagemDialog(false)} sx={botaoSecundario}>Cancelar</Button>
                     <Button variant="contained" color="success" onClick={handleRegistrarPassagem} disabled={saving} sx={{ height: 38, minHeight: 38, borderRadius: '8px', fontWeight: 700 }}>Registrar</Button>
                 </DialogActions>
             </Dialog>
@@ -1354,24 +1356,24 @@ const Veiculos = () => {
                             columns={[
                                 { 
                                     id: 'created_at', 
-                                    label: 'DATA/HORA', 
+                                    label: 'Data/hora', 
                                     format: (v) => format(new Date(v), 'dd/MM/yyyy HH:mm', { locale: ptBR })
                                 },
                                 { 
                                     id: 'tipo', 
-                                    label: 'TIPO',
+                                    label: 'Tipo',
                                     format: (v) => {
-                                        if (v === 'bloqueio') return <StatusBadge status="bloqueado" label="BLOQUEIO" />;
-                                        if (v === 'desbloqueio') return <StatusBadge status="autorizado" label="LIBERAÇÃO" />;
-                                        if (v === 'vistoria') return <StatusBadge status="autorizado" label="VISTORIA / FOTO" />;
-                                        return <StatusBadge status={v === 'entrada' ? 'autorizado' : 'pendente'} label={v?.toUpperCase()} />;
+                                        if (v === 'bloqueio') return <StatusBadge status="bloqueado" label="Bloqueio" />;
+                                        if (v === 'desbloqueio') return <StatusBadge status="autorizado" label="Liberação" />;
+                                        if (v === 'vistoria') return <StatusBadge status="autorizado" label="Vistoria / foto" />;
+                                        return <StatusBadge status={v === 'entrada' ? 'autorizado' : 'pendente'} label={comoRotulo(v)} />;
                                     }
                                 },
-                                { id: 'metodo', label: 'MÉTODO', format: (v) => v?.toUpperCase() },
-                                { id: 'usuarios', label: 'OPERADOR', format: (v) => v?.nome_completo || 'AUTO (LPR)' },
+                                { id: 'metodo', label: 'Método', format: (v) => v?.toUpperCase() },
+                                { id: 'usuarios', label: 'Operador', format: (v) => v?.nome_completo || 'AUTO (LPR)' },
                                 { 
                                     id: 'observacao', 
-                                    label: 'OBSERVAÇÃO / FOTO',
+                                    label: 'Observação / foto',
                                     format: (v) => {
                                         if (!v) return '—';
                                         let parsed = null;
@@ -1417,7 +1419,7 @@ const Veiculos = () => {
                     )}
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={() => setOpenHistoricoDialog(false)} color="inherit" sx={{ height: 38, minHeight: 38, borderRadius: '8px' }}>Fechar</Button>
+                    <Button variant="outlined" onClick={() => setOpenHistoricoDialog(false)} sx={botaoSecundario}>Fechar</Button>
                 </DialogActions>
             </Dialog>
 
@@ -1440,7 +1442,7 @@ const Veiculos = () => {
                     A remoção desta placa impedirá o reconhecimento automático e invalidará o cadastro de trânsito vinculado.
                 </DialogContent>
                 <DialogActions sx={{ p: 2.5, gap: 1 }}>
-                    <Button onClick={() => setOpenDeleteConfirm(false)} sx={{ height: 38, minHeight: 38, borderRadius: '8px' }}>Cancelar</Button>
+                    <Button variant="outlined" onClick={() => setOpenDeleteConfirm(false)} sx={botaoSecundario}>Cancelar</Button>
                     <Button onClick={confirmDelete} sx={{ color: '#FF3366', fontWeight: 'bold', height: 38, minHeight: 38, borderRadius: '8px' }} variant="outlined">Excluir definitivamente</Button>
                 </DialogActions>
             </Dialog>
@@ -1482,7 +1484,7 @@ const Veiculos = () => {
                     />
                 </DialogContent>
                 <DialogActions sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.1)', gap: 1 }}>
-                    <Button onClick={() => setOpenBloqueioDialog(false)} disabled={saving} sx={{ height: 38, borderRadius: '8px' }}>
+                    <Button variant="outlined" onClick={() => setOpenBloqueioDialog(false)} disabled={saving} sx={botaoSecundario}>
                         Cancelar
                     </Button>
                     <Button
@@ -1611,7 +1613,7 @@ const Veiculos = () => {
                     {/* Campo de Texto com Transcrição por Áudio */}
                     <Box>
                         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.8 }}>
-                            <Typography variant="caption" sx={{ color: 'rgba(0, 212, 255, 0.8)', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase' }}>
+                            <Typography variant="caption" sx={{ color: 'rgba(0, 212, 255, 0.8)', fontWeight: 700, letterSpacing: '1px', }}>
                                 Observação / Descrição da Vistoria
                             </Typography>
                             
@@ -1655,7 +1657,7 @@ const Veiculos = () => {
                     </Box>
                 </DialogContent>
                 <DialogActions sx={{ p: 2.5, borderTop: '1px solid rgba(255,255,255,0.1)', gap: 1 }}>
-                    <Button onClick={handleCloseFotoDialog} disabled={saving} sx={{ height: 38, borderRadius: '8px' }}>
+                    <Button variant="outlined" onClick={handleCloseFotoDialog} disabled={saving} sx={botaoSecundario}>
                         Cancelar
                     </Button>
                     <NeonButton onClick={handleSalvarFoto} loading={saving} sx={{ height: 38, borderRadius: '8px' }}>

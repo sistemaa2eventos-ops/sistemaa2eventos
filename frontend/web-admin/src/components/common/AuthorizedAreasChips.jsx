@@ -14,7 +14,7 @@ const AuthorizedAreasChips = ({ pessoa, accentColor = '#00D4FF' }) => {
   return (
     <Box sx={{ mt: 2, p: 1.5, borderRadius: 1.5, bgcolor: `rgba(${rgb},0.05)`, border: `1px solid rgba(${rgb},0.15)` }}>
       <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-        ÁREAS AUTORIZADAS
+        Áreas autorizadas
       </Typography>
       <Stack direction="row" spacing={0.5} flexWrap="wrap">
         {pessoa.areas_info.map((area) => (

@@ -39,13 +39,14 @@ import DataTable from '../../components/common/DataTable';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import PageHeader from '../../components/common/PageHeader';
 
+import { botaoSecundario } from '../../styles/tokens';
 // ============================================
 // SUB-COMPONENTE: Parâmetros Biométricos Globais
 // ============================================
 const ParametrosBiometricos = ({ sensitivity, setSensitivity, liveness, setLiveness, handleSaveGlobal, loading }) => (
     <GlassCard sx={{ p: 3 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF', mb: 3 }}>
-            PARÂMETROS BIOMÉTRICOS
+            Parâmetros biométricos
         </Typography>
 
         <Box sx={{ mb: 4 }}>
@@ -65,13 +66,13 @@ const ParametrosBiometricos = ({ sensitivity, setSensitivity, liveness, setLiven
             <Typography gutterBottom sx={{ color: 'text.secondary' }}>Anti-Fake (Liveness)</Typography>
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                 <Chip
-                    label="ATIVADO"
+                    label="Ativado"
                     onClick={() => setLiveness(true)}
                     color={liveness ? "primary" : "default"}
                     variant={liveness ? "filled" : "outlined"}
                 />
                 <Chip
-                    label="DESATIVADO"
+                    label="Desativado"
                     onClick={() => setLiveness(false)}
                     color={!liveness ? "error" : "default"}
                     variant={!liveness ? "filled" : "outlined"}
@@ -188,7 +189,7 @@ const LeitorFacialForm = ({ open, onClose, formData, setFormData, onSave }) => (
                 </Grid>
             </DialogContent>
             <DialogActions sx={{ p: 3 }}>
-                <Button onClick={onClose} sx={{ color: 'text.secondary' }}>Cancelar</Button>
+                <Button variant="outlined" onClick={onClose} sx={botaoSecundario}>Cancelar</Button>
                 <NeonButton type="submit">Salvar terminal</NeonButton>
             </DialogActions>
         </form>
@@ -230,7 +231,7 @@ const ConfigLeitorFacial = () => {
     const columns = [
         {
             id: 'nome',
-            label: 'DISPOSITIVO',
+            label: 'Dispositivo',
             minWidth: 150,
             format: (val, row) => (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -244,22 +245,22 @@ const ConfigLeitorFacial = () => {
                                 </Tooltip>
                             )}
                         </Stack>
-                        <Typography variant="caption" sx={{ color: 'text.secondary', textTransform: 'uppercase' }}>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', }}>
                             {row.marca}
                         </Typography>
                     </Box>
                 </Box>
             )
         },
-        { id: 'ip_address', label: 'ENDEREÇO IP', minWidth: 120 },
+        { id: 'ip_address', label: 'Endereço IP', minWidth: 120 },
         {
             id: 'status',
-            label: 'STATUS',
+            label: 'Status',
             minWidth: 100,
             format: (val) => (
                 <Chip
                     icon={val === 'online' ? <WifiIcon /> : <WifiOffIcon />}
-                    label={val === 'online' ? 'ONLINE' : 'OFFLINE'}
+                    label={val === 'online' ? 'Online' : 'Offline'}
                     color={val === 'online' ? 'success' : 'error'}
                     size="small"
                     variant="outlined"
@@ -269,7 +270,7 @@ const ConfigLeitorFacial = () => {
         },
         {
             id: 'acoes',
-            label: 'AÇÕES',
+            label: 'Ações',
             minWidth: 180,
             align: 'center',
             format: (_, row) => (
@@ -320,8 +321,8 @@ const ConfigLeitorFacial = () => {
     return (
         <Box sx={{ p: { xs: 2, md: 4 } }}>
             <PageHeader
-                title="Leitores Faciais"
-                subtitle="Provisione endpoints de detecção biométrica standalone."
+                title="Leitor facial"
+                subtitle="Terminais de reconhecimento facial e precisão da identificação."
                 breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Biometria' }]}
             />
             {/* Alerta: Nenhum evento selecionado */}
@@ -348,7 +349,7 @@ const ConfigLeitorFacial = () => {
                         <WifiOffIcon sx={{ color: '#FF3366', fontSize: 28 }} />
                         <Box>
                             <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#FF3366' }}>
-                                SESSÃO EXPIRADA
+                                Sessão expirada
                             </Typography>
                             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                                 Sua sessão expirou. Faça logout e login novamente para continuar.
@@ -369,7 +370,7 @@ const ConfigLeitorFacial = () => {
                                     className={loading ? 'ani-spin' : ''}
                                 />
                                 <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
-                                    TERMINAIS FACIAIS
+                                    Terminais faciais
                                 </Typography>
                             </Box>
                             <NeonButton startIcon={<AddIcon />} size="small" onClick={() => handleOpenDialog()}>

@@ -8,6 +8,7 @@ import { useSnackbar } from 'notistack';
 import api from '../../services/api';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
 
+import { botaoSecundario } from '../../styles/tokens';
 const CYAN = '#00D4FF';
 
 /**
@@ -114,7 +115,7 @@ const AgentesLocais = ({ agentes = [], onChange }) => {
                     )}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={fechar} sx={{ color: '#94A3B8' }}>{criado ? 'Concluir' : 'Cancelar'}</Button>
+                    <Button variant="outlined" onClick={fechar} sx={botaoSecundario}>{criado ? 'Concluir' : 'Cancelar'}</Button>
                     {!criado && (
                         <Button onClick={criar} variant="contained" disabled={salvando || !nome.trim()} sx={{ background: CYAN, color: '#000000', fontWeight: 700 }}>
                             Gerar token

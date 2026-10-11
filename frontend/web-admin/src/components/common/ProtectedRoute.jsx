@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Box, Typography, Button } from '@mui/material';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 
+import { botaoSecundario } from '../../styles/tokens';
 const MODULE_ROUTES = [
   { modulo: 'checkin', path: '/checkin', label: 'Check-in' },
   { modulo: 'checkout', path: '/checkout', label: 'Check-out' },
@@ -81,7 +82,7 @@ const AccessDenied = () => {
         <LockOutlinedIcon sx={{ fontSize: 56, color: '#FF3366' }} />
       </Box>
       <Typography variant="h5" fontWeight={700} sx={{ color: '#FFFFFF', fontFamily: '"Space Grotesk", sans-serif' }}>
-        ACESSO RESTRITO
+        Acesso restrito
       </Typography>
       <Typography variant="body2" sx={{ color: 'text.secondary', maxWidth: 420, lineHeight: 1.6 }}>
         Seu usuário não possui permissão para acessar esta página no evento ativo. Solicite a liberação ao administrador master.
@@ -101,11 +102,9 @@ const AccessDenied = () => {
             Ir para {firstAllowed.label}
           </Button>
         )}
-        <Button
-          variant="outlined"
-          onClick={() => window.history.back()}
-          sx={{ borderColor: 'rgba(255, 255, 255, 0.2)', color: 'text.secondary' }}
-        >
+        <Button variant="outlined"
+         
+          onClick={() => window.history.back()} sx={botaoSecundario}>
           Voltar
         </Button>
       </Box>

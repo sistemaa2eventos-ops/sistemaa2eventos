@@ -31,7 +31,7 @@ const StatusChip = styled(Chip)(({ theme: _theme, status }) => {
     'bloqueado': { bg: 'rgba(255, 51, 102, 0.1)', text: '#FF3366', border: 'rgba(255, 51, 102, 0.2)' }
   };
   const current = colors[status] || colors['ativo'];
-  return { fontWeight: 700, fontSize: '0.75rem', height: 24, background: current.bg, color: current.text, border: `1px solid ${current.border}`, textTransform: 'uppercase', letterSpacing: '1px' }
+  return { fontWeight: 700, fontSize: '0.75rem', height: 24, background: current.bg, color: current.text, border: `1px solid ${current.border}`, letterSpacing: '1px' }
 });
 
 const Pessoas = () => {
@@ -275,7 +275,7 @@ const Pessoas = () => {
         </DialogTitle>
         <DialogContent dividers sx={{ overflowY: 'auto' }}>
           <Box sx={{ mb: 3 }}>
-            <Typography variant="subtitle2" sx={{ color: '#00D4FF', mb: 2 }}>DOCUMENTOS ANEXADOS</Typography>
+            <Typography variant="subtitle2" sx={{ color: '#00D4FF', mb: 2 }}>Documentos anexados</Typography>
             <Stack spacing={1}>
               {(!Array.isArray(documentos) || documentos.length === 0) ? (
                 <Typography variant="body2" color="text.secondary">Nenhum documento encontrado.</Typography>
@@ -323,7 +323,7 @@ const Pessoas = () => {
             <PhotoCapture onPhotoCaptured={(base64) => { if (base64) handleUploadWebcamECM(base64); }} />
           </Box>
         </DialogContent>
-        <DialogActions><Button onClick={() => setOpenWebcamECM(false)} sx={{ height: 38 }}>Fechar</Button></DialogActions>
+        <DialogActions><Button variant="outlined" onClick={() => setOpenWebcamECM(false)} sx={botaoSecundario}>Fechar</Button></DialogActions>
       </Dialog>
 
       <Dialog 
@@ -346,7 +346,7 @@ const Pessoas = () => {
             </label>
           </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}><Button onClick={() => setOpenImport(false)} disabled={importLoading} sx={{ color: 'text.secondary', height: 38 }}>Fechar</Button></DialogActions>
+        <DialogActions sx={{ p: 2 }}><Button variant="outlined" onClick={() => setOpenImport(false)} disabled={importLoading} sx={botaoSecundario}>Fechar</Button></DialogActions>
       </Dialog>
 
       {/* FIX ERR-PF05: Dialog de Bloqueio/Desbloqueio que faltava */}
@@ -385,7 +385,7 @@ const Pessoas = () => {
           />
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenBlockDialog(false)} sx={{ color: 'text.secondary', height: 38 }}>Cancelar</Button>
+          <Button variant="outlined" onClick={() => setOpenBlockDialog(false)} sx={botaoSecundario}>Cancelar</Button>
           <NeonButton
             onClick={handleConfirmBlock}
             loading={blockLoading}
@@ -399,7 +399,7 @@ const Pessoas = () => {
       {/* FIX ERR-GLOBAL04: ConfirmDialog component verificado e utilizado */}
       <ConfirmDialog
         open={openDeleteConfirm}
-        title="CONFIRMAR EXCLUSÃO"
+        title="Confirmar exclusão"
         message="Deseja realmente excluir este participante? Esta ação é irreversível."
         onCancel={() => setOpenDeleteConfirm(false)}
         onConfirm={confirmDelete}
@@ -425,7 +425,7 @@ const Pessoas = () => {
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenQR(false)} sx={{ height: 38 }}>Fechar</Button>
+          <Button variant="outlined" onClick={() => setOpenQR(false)} sx={botaoSecundario}>Fechar</Button>
           {!qrLoading && <Button variant="contained" onClick={() => { const link = document.createElement('a'); link.href = qrImage; link.download = `QR_${qrPessoa?.nome}.png`; link.click(); }} sx={{ bgcolor: '#00FF88', color: '#000000', fontWeight: 700, height: 38 }}>Baixar png</Button>}
         </DialogActions>
       </Dialog>

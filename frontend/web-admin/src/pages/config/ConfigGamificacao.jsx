@@ -85,8 +85,8 @@ const ConfigGamificacao = () => {
     return (
         <Box sx={{ p: { xs: 2, md: 4 } }}>
             <PageHeader
-                title="Gamificação & Analytics"
-                subtitle="Crie pesos (scores) para ações do participante a fim de classificar métricas."
+                title="Gamificação"
+                subtitle="Pontos por ação do participante para medir engajamento."
                 breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Engajamento Global' }]}
             />
 
@@ -119,8 +119,8 @@ const ConfigGamificacao = () => {
                         </Grid>
 
                         <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
-                            <NeonButton onClick={handleSave} disabled={saving} startIcon={<SaveIcon />} sx={{ bgcolor: 'rgba(255, 193, 7, 0.2)', color: '#FFB800', '&:hover': { bgcolor: 'rgba(255, 193, 7, 0.4)' } }}>
-                                {saving ? "Salvando..." : "Deploy engine score"}
+                            <NeonButton onClick={handleSave} disabled={saving} startIcon={<SaveIcon />}>
+                                {saving ? "Salvando..." : "Salvar pontuação"}
                             </NeonButton>
                         </Box>
                     </GlassCard>

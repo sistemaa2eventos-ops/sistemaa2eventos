@@ -107,7 +107,7 @@ const Eventos = ({ isEmbedded = false }) => {
                 onConfirm={confirmDelete}
                 onCancel={() => setOpenDeleteConfirm(false)}
                 loading={deleteLoading}
-                title="DESATIVAR NZT"
+                title="Desativar NZT"
                 message="Esta ação irá remover permanentemente o evento e todas as suas configurações de cota. Deseja prosseguir?"
             />
         </Box>

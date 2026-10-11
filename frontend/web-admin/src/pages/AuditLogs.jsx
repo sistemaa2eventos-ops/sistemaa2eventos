@@ -169,7 +169,7 @@ const AuditLogs = () => {
                 </Box>
                 <Chip
                     icon={<SecurityIcon sx={{ color: '#00FF88 !important' }} />}
-                    label="AMBIENTE MONITORADO"
+                    label="Ambiente monitorado"
                     sx={{
                         background: 'rgba(0, 255, 136, 0.1)',
                         border: '1px solid rgba(0, 255, 136, 0.3)',

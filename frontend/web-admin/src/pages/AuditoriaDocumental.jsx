@@ -23,7 +23,7 @@ import {
 import PageHeader from '../components/common/PageHeader';
 import GlassCard from '../components/common/GlassCard';
 import KpiCard from '../components/common/KpiCard';
-import { cores } from '../styles/tokens';
+import { cores, botaoSecundario } from '../styles/tokens';
 import NeonButton from '../components/common/NeonButton';
 import DataTable from '../components/common/DataTable';
 import api from '../services/api';
@@ -31,6 +31,7 @@ import VisualizadorDocumento from '../components/documentos/VisualizadorDocument
 import AbaColaboradores from '../components/documentos/AbaColaboradores';
 import AbaVencimentos from '../components/documentos/AbaVencimentos';
 
+import { comoRotulo } from '../utils/formatadores';
 const MOTIVOS_REENVIO = [
     'Foto cortada ou ilegível (não é possível ler os dados)',
     'Falta o verso do documento (RG / CNH)',
@@ -232,7 +233,7 @@ const AuditoriaDocumental = () => {
     const columns = [
         {
             id: 'entidade_nome',
-            label: 'NOME (COLABORADOR / EMPRESA)',
+            label: 'Nome (colaborador / empresa)',
             minWidth: 220,
             format: (val, row) => (
                 <Box sx={{ cursor: 'pointer' }} onClick={() => handleQuickPreview(row)}>
@@ -247,11 +248,11 @@ const AuditoriaDocumental = () => {
         },
         {
             id: 'tipo_entidade',
-            label: 'TIPO',
+            label: 'Tipo',
             minWidth: 100,
             format: (val) => (
                 <Chip
-                    label={(val || 'PESSOA').toUpperCase()}
+                    label={comoRotulo(val || 'pessoa')}
                     size="small"
                     sx={{
                         bgcolor: val === 'empresa' ? 'rgba(0,212,255,0.15)' : 'rgba(123,47,190,0.15)',
@@ -265,7 +266,7 @@ const AuditoriaDocumental = () => {
         },
         {
             id: 'titulo',
-            label: 'DOCUMENTO',
+            label: 'Documento',
             minWidth: 180,
             format: (val, row) => (
                 <Box>
@@ -276,7 +277,7 @@ const AuditoriaDocumental = () => {
         },
         {
             id: 'data_inclusao',
-            label: 'SUBMISSÃO',
+            label: 'Submissão',
             minWidth: 120,
             format: (val) => (
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
@@ -286,12 +287,12 @@ const AuditoriaDocumental = () => {
         },
         {
             id: 'acoes',
-            label: 'AÇÕES RÁPIDAS',
+            label: 'Ações rápidas',
             minWidth: 200,
             align: 'right',
             format: (val, row) => (
                 <Stack direction="row" spacing={1} justifyContent="flex-end">
-                    <Tooltip title="Visualizar & Auditar">
+                    <Tooltip title="Ver e analisar documento">
                         <IconButton
                             size="small"
                             onClick={() => handleQuickPreview(row)}
@@ -464,7 +465,7 @@ const AuditoriaDocumental = () => {
                 {documentos.length === 0 && !loading ? (
                     <Box sx={{ textAlign: 'center', py: 8 }}>
                         <AssigIcon sx={{ fontSize: 64, color: '#00FF88', mb: 2, opacity: 0.6 }} />
-                        <Typography variant="h5" sx={{ color: '#00FF88', fontWeight: 700 }}>FILA ZERO</Typography>
+                        <Typography variant="h5" sx={{ color: '#00FF88', fontWeight: 700 }}>Fila zero</Typography>
                         <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)', mt: 1 }}>
                             Parabéns! Todos os documentos enviados foram analisados.
                         </Typography>
@@ -759,7 +760,7 @@ const AuditoriaDocumental = () => {
                 </DialogContent>
 
                 <DialogActions sx={{ p: 3 }}>
-                    <Button onClick={() => setOpenActionDialog(false)} sx={{ color: 'rgba(255,255,255,0.6)' }} disabled={submitting}>
+                    <Button variant="outlined" onClick={() => setOpenActionDialog(false)} disabled={submitting} sx={botaoSecundario}>
                         Cancelar
                     </Button>
                     <NeonButton

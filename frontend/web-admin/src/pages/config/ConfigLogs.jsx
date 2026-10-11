@@ -8,6 +8,7 @@ import GlassCard from '../../components/common/GlassCard';
 import NeonButton from '../../components/common/NeonButton';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
 
+import { comoRotulo } from '../../utils/formatadores';
 const ConfigLogs = () => {
     const confirmar = useConfirmacao();
     const { enqueueSnackbar } = useSnackbar();
@@ -132,8 +133,8 @@ const ConfigLogs = () => {
     return (
         <Box sx={{ p: { xs: 2, md: 4 } }}>
             <PageHeader
-                title="Logs do Sistema"
-                subtitle="Monitore atividades, erros e auditoria do sistema."
+                title="Logs do sistema"
+                subtitle="Atividades e erros registrados pelo sistema."
                 breadcrumbs={[{ text: 'Configurações' }, { text: 'Logs do Sistema' }]}
             />
 
@@ -183,7 +184,7 @@ const ConfigLogs = () => {
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                 <LogsIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
                                 <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
-                                    REGISTROS
+                                    Registros
                                 </Typography>
                             </Box>
                             <Button 
@@ -222,7 +223,7 @@ const ConfigLogs = () => {
                                             primaryTypographyProps={{ color: level === 'error' ? '#FF3366' : '#FFFFFF', fontWeight: 600, fontSize: '0.875rem' }}
                                             secondaryTypographyProps={{ color: 'text.secondary', fontSize: '0.75rem' }}
                                         />
-                                        <Chip label={level.toUpperCase()} size="small" color={level === 'error' ? 'error' : (level === 'warn' || level === 'warning') ? 'warning' : 'info'} variant="outlined" sx={{ fontWeight: 700, fontSize: '0.75rem' }} />
+                                        <Chip label={comoRotulo(level)} size="small" color={level === 'error' ? 'error' : (level === 'warn' || level === 'warning') ? 'warning' : 'info'} variant="outlined" sx={{ fontWeight: 700, fontSize: '0.75rem' }} />
                                     </ListItem>
                                 );
                             })}
@@ -233,7 +234,7 @@ const ConfigLogs = () => {
                 <Grid item xs={12} lg={4}>
                     <GlassCard sx={{ p: 3 }}>
                         <Typography variant="h6" sx={{ fontWeight: 700, color: '#FF3366', mb: 3 }}>
-                            RETENÇÃO
+                            Retenção
                         </Typography>
 
                         <TextField

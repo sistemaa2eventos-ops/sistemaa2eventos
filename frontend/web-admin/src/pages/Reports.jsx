@@ -31,6 +31,7 @@ import { useReports } from '../hooks/useReports';
 import { useEmpresas } from '../hooks/useEmpresas';
 import api from '../services/api';
 
+import { comoRotulo } from '../utils/formatadores';
 /**
  * NZT Relatórios: Central operacional e executiva de relatórios do sistema.
  * Apresenta o Relatório Diário de Acessos consolidado (Empresa, Colaborador, CPF, Função,
@@ -222,7 +223,7 @@ const Reports = () => {
                 if (val === 'No evento') {
                     return (
                         <Chip
-                            label="NO EVENTO"
+                            label="No evento"
                             size="small"
                             sx={{
                                 bgcolor: 'rgba(255, 184, 0, 0.15)',
@@ -282,7 +283,7 @@ const Reports = () => {
             width: 120,
             format: (value) => (
                 <Chip
-                    label={value?.toUpperCase()}
+                    label={comoRotulo(value)}
                     size="small"
                     sx={{
                         bgcolor: (value === 'checkin' || value === 'entrada') ? 'rgba(0, 255, 136, 0.15)' : 'rgba(255, 51, 102, 0.15)',
@@ -364,7 +365,7 @@ const Reports = () => {
             width: 250,
             format: (val) => (
                 <Chip
-                    label={String(val || 'PENDENTE').toUpperCase()}
+                    label={comoRotulo(val || 'pendente')}
                     size="small"
                     sx={{
                         bgcolor: val === 'autorizado' || val === 'ativo' ? 'rgba(0, 255, 136, 0.15)' : 'rgba(255, 184, 0, 0.15)',
@@ -418,7 +419,7 @@ const Reports = () => {
                     {format(new Date(val), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
                 </Typography>
             ) : (
-                <Chip label="ONLINE AGORA" size="small" sx={{ bgcolor: 'rgba(0,255,136,0.15)', color: '#00FF88', fontWeight: 700, fontSize: '0.75rem' }} />
+                <Chip label="Online agora" size="small" sx={{ bgcolor: 'rgba(0,255,136,0.15)', color: '#00FF88', fontWeight: 700, fontSize: '0.75rem' }} />
             )
         },
         {
@@ -643,7 +644,7 @@ const Reports = () => {
                                         onChange={(e) => setSelectedFechamentoId(e.target.value)}
                                         displayEmpty
                                     >
-                                        <MenuItem value="">TEMPO REAL (AO VIVO)</MenuItem>
+                                        <MenuItem value="">Tempo real (ao vivo)</MenuItem>
                                         {fechamentosList.map(f => (
                                             <MenuItem key={f.id} value={f.id}>
                                                 Reset {f.tipo_reset?.toUpperCase()} • {f.hora_fechamento ? format(new Date(f.hora_fechamento), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : f.data_referencia}
@@ -662,7 +663,7 @@ const Reports = () => {
                                         onChange={(e) => setEmpresaId(e.target.value)}
                                         displayEmpty
                                     >
-                                        <MenuItem value="">TODAS AS EMPRESAS</MenuItem>
+                                        <MenuItem value="">Todas as empresas</MenuItem>
                                         {empresas.map(e => (
                                             <MenuItem key={e.id} value={e.id}>{e.nome}</MenuItem>
                                         ))}
@@ -672,7 +673,7 @@ const Reports = () => {
 
                             {/* Campo de Busca Rápida */}
                             <Grid item xs={12} sm={6} md={2.5}>
-                                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, display: 'block', mb: 0.5 }}>PESQUISAR</Typography>
+                                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, display: 'block', mb: 0.5 }}>Pesquisar</Typography>
                                 <TextField
                                     fullWidth
                                     size="small"
@@ -691,7 +692,7 @@ const Reports = () => {
 
                             {/* Botão de Atualização */}
                             <Grid item xs={12} sm={12} md={1}>
-                                <Typography variant="caption" sx={{ opacity: 0, display: 'block', mb: 0.5 }}>AÇÃO</Typography>
+                                <Typography variant="caption" sx={{ opacity: 0, display: 'block', mb: 0.5 }}>Ação</Typography>
                                 <Button
                                     variant="contained"
                                     fullWidth
@@ -706,7 +707,7 @@ const Reports = () => {
 
                         {/* Filtros Rápidos de Status */}
                         <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, mr: 1 }}>STATUS:</Typography>
+                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, mr: 1 }}>Status:</Typography>
                             <ToggleButtonGroup
                                 size="small"
                                 value={statusFiltroDiario}
@@ -729,9 +730,9 @@ const Reports = () => {
                                 }}
                             >
                                 <ToggleButton value="todos">TODOS ({dailyConsolidado.length})</ToggleButton>
-                                <ToggleButton value="presente">PRESENTES</ToggleButton>
-                                <ToggleButton value="finalizado">FINALIZADOS</ToggleButton>
-                                <ToggleButton value="ausente">NÃO COMPARECERAM</ToggleButton>
+                                <ToggleButton value="presente">Presentes</ToggleButton>
+                                <ToggleButton value="finalizado">Finalizados</ToggleButton>
+                                <ToggleButton value="ausente">Não compareceram</ToggleButton>
                             </ToggleButtonGroup>
                         </Box>
                     </GlassCard>
@@ -743,7 +744,7 @@ const Reports = () => {
                 <GlassCard sx={{ p: 2, mb: 3 }}>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
                         <Box sx={{ flex: '1 1 250px' }}>
-                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, display: 'block', mb: 0.5 }}>PERÍODO INICIAL</Typography>
+                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, display: 'block', mb: 0.5 }}>Período inicial</Typography>
                             <TextField 
                                 type="datetime-local" 
                                 fullWidth 
@@ -753,7 +754,7 @@ const Reports = () => {
                             />
                         </Box>
                         <Box sx={{ flex: '1 1 250px' }}>
-                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, display: 'block', mb: 0.5 }}>PERÍODO FINAL</Typography>
+                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, display: 'block', mb: 0.5 }}>Período final</Typography>
                             <TextField 
                                 type="datetime-local" 
                                 fullWidth 
@@ -771,7 +772,7 @@ const Reports = () => {
                                         onChange={(e) => setEmpresaId(e.target.value)}
                                         displayEmpty
                                     >
-                                        <MenuItem value="">TODAS AS EMPRESAS</MenuItem>
+                                        <MenuItem value="">Todas as empresas</MenuItem>
                                         {empresas.map(e => (
                                             <MenuItem key={e.id} value={e.id}>{e.nome}</MenuItem>
                                         ))}
@@ -807,14 +808,14 @@ const Reports = () => {
                     scrollButtons="auto" 
                     sx={{ borderBottom: 1, borderColor: 'divider' }}
                 >
-                    <Tab icon={<DailyIcon />} label="RELATÓRIO DIÁRIO" value="diario" />
-                    <Tab icon={<HistoryIcon />} label="LOGS DE ACESSO" value="logs" />
-                    <Tab icon={<BadgeIcon />} label="SESSÕES DE OPERADOR" value="sessoes" />
-                    <Tab icon={<TableIcon />} label="POR ÁREA" value="area" />
-                    <Tab icon={<BusinessIcon />} label="POR EMPRESA" value="empresa" />
-                    <Tab icon={<DeviceIcon />} label="POR LEITOR" value="leitor" />
-                    <Tab icon={<JobIcon />} label="POR FUNÇÃO" value="funcao" />
-                    <Tab icon={<TimeIcon />} label="POR STATUS" value="status" />
+                    <Tab icon={<DailyIcon />} label="Relatório diário" value="diario" />
+                    <Tab icon={<HistoryIcon />} label="Logs de acesso" value="logs" />
+                    <Tab icon={<BadgeIcon />} label="Sessões de operador" value="sessoes" />
+                    <Tab icon={<TableIcon />} label="Por área" value="area" />
+                    <Tab icon={<BusinessIcon />} label="Por empresa" value="empresa" />
+                    <Tab icon={<DeviceIcon />} label="Por leitor" value="leitor" />
+                    <Tab icon={<JobIcon />} label="Por função" value="funcao" />
+                    <Tab icon={<TimeIcon />} label="Por status" value="status" />
                 </Tabs>
 
                 <Box sx={{ p: 2 }}>
@@ -933,7 +934,7 @@ const Reports = () => {
                     </Paper>
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={() => setModalNotasOpen(false)} variant="contained" sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700 }}>
+                    <Button variant="outlined" onClick={() => setModalNotasOpen(false)} sx={botaoSecundario}>
                         Fechar
                     </Button>
                 </DialogActions>
@@ -968,7 +969,7 @@ const Reports = () => {
                             <Grid container spacing={2}>
                                 <Grid item xs={6} sm={3}>
                                     <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'rgba(0, 255, 136, 0.08)', border: '1px solid rgba(0, 255, 136, 0.2)', borderRadius: 1.5 }}>
-                                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>TEMPO ONLINE</Typography>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>Tempo online</Typography>
                                         <Typography variant="h6" sx={{ color: '#00FF88', fontWeight: 700, fontFamily: '"Inter", sans-serif' }}>
                                             {selectedSessao.tempo_online_formatado}
                                         </Typography>
@@ -976,7 +977,7 @@ const Reports = () => {
                                 </Grid>
                                 <Grid item xs={6} sm={3}>
                                     <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'rgba(0, 212, 255, 0.08)', border: '1px solid rgba(0, 212, 255, 0.2)', borderRadius: 1.5 }}>
-                                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>PESSOAS CRIADAS</Typography>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>Pessoas criadas</Typography>
                                         <Typography variant="h6" sx={{ color: '#00D4FF', fontWeight: 700 }}>
                                             {selectedSessao.pessoas_criadas || 0}
                                         </Typography>
@@ -984,7 +985,7 @@ const Reports = () => {
                                 </Grid>
                                 <Grid item xs={6} sm={3}>
                                     <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'rgba(168, 85, 247, 0.08)', border: '1px solid rgba(168, 85, 247, 0.2)', borderRadius: 1.5 }}>
-                                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>EMPRESAS CRIADAS</Typography>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>Empresas criadas</Typography>
                                         <Typography variant="h6" sx={{ color: '#A855F7', fontWeight: 700 }}>
                                             {selectedSessao.empresas_criadas || 0}
                                         </Typography>
@@ -992,7 +993,7 @@ const Reports = () => {
                                 </Grid>
                                 <Grid item xs={6} sm={3}>
                                     <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'rgba(255, 51, 102, 0.08)', border: '1px solid rgba(255, 51, 102, 0.2)', borderRadius: 1.5 }}>
-                                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>ITENS APAGADOS</Typography>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>Itens apagados</Typography>
                                         <Typography variant="h6" sx={{ color: '#FF3366', fontWeight: 700 }}>
                                             {selectedSessao.itens_apagados || 0}
                                         </Typography>
@@ -1021,7 +1022,7 @@ const Reports = () => {
                     )}
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={() => setModalDetalhesOpen(false)} variant="contained" sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700 }}>
+                    <Button variant="outlined" onClick={() => setModalDetalhesOpen(false)} sx={botaoSecundario}>
                         Fechar
                     </Button>
                 </DialogActions>

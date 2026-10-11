@@ -94,7 +94,7 @@ const ConfigCredenciamento = () => {
     return (
         <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 }, maxWidth: '100%', overflowX: 'hidden' }}>
             <PageHeader
-                title="Configuração de Credenciamento"
+                title="Credenciamento"
                 subtitle="Personalize os campos de cadastro, regras de aprovação e termos LGPD."
                 breadcrumbs={[{ text: 'Configurações' }, { text: 'Credenciamento' }]}
             />
@@ -157,7 +157,6 @@ const ConfigCredenciamento = () => {
                                                 <Switch
                                                     checked={field.required}
                                                     onChange={() => handleFieldToggle(activeTab, field.id, 'required')}
-                                                    color="secondary"
                                                     size="small"
                                                 />
                                             </Box>
@@ -186,7 +185,7 @@ const ConfigCredenciamento = () => {
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
                                 <AutoIcon sx={{ color: '#00D4FF' }} />
                                 <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700 }}>
-                                    AUTO-APROVAÇÃO
+                                    Auto-aprovação
                                 </Typography>
                             </Box>
 
@@ -208,7 +207,7 @@ const ConfigCredenciamento = () => {
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
                                 <SecurityIcon sx={{ color: '#7B2FBE' }} />
                                 <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700 }}>
-                                    LGPD & double opt-in
+                                    LGPD e double opt-in
                                 </Typography>
                             </Box>
 
@@ -220,7 +219,6 @@ const ConfigCredenciamento = () => {
                                 <Switch
                                     checked={registration.double_optin}
                                     onChange={(e) => setRegistration({ ...registration, double_optin: e.target.checked })}
-                                    color="secondary"
                                 />
                             </Box>
 

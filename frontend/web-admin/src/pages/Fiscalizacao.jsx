@@ -265,7 +265,7 @@ const Fiscalizacao = () => {
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
                 <PageHeader
                     title="Fiscalização de áreas"
-                    subtitle="Terminal de controle de acesso interno e portarias com validação instantânea de pulseiras e credenciais."
+                    subtitle="Valide pulseiras e credenciais nas portarias e áreas internas."
                     breadcrumbs={[{ text: 'Operação' }, { text: 'Fiscalização de Áreas' }]}
                     sx={{ mb: 0 }}
                 />
@@ -273,7 +273,7 @@ const Fiscalizacao = () => {
                 <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
                     {/* Status do Posto */}
                     <Chip
-                        label="POSTO ATIVO"
+                        label="Posto ativo"
                         sx={{
                             fontFamily: '"Inter", sans-serif',
                             fontWeight: 700,
@@ -333,7 +333,7 @@ const Fiscalizacao = () => {
                             </InputLabel>
                             <Select
                                 value={areas.some(a => a.id === selectedAreaId) ? selectedAreaId : ''}
-                                label="POSTO DE FISCALIZAÇÃO (ÁREA SOB SEU CONTROLE)"
+                                label="Posto de fiscalização (área sob seu controle)"
                                 onChange={handleAreaChange}
                                 sx={{
                                     bgcolor: 'rgba(0,0,0,0.4)',
@@ -382,7 +382,7 @@ const Fiscalizacao = () => {
                             onConfirm={(val, origem) => handleProcessarCodigo(val, origem)}
                             loading={loading}
                             autoFocus={true}
-                            label="LEITOR DE PULSEIRA / CRACHÁ / RFID"
+                            label="Leitor de pulseira / crachá / RFID"
                             placeholder="Bipe a pulseira ou digite o código"
                             accentColor="#00D4FF"
                         />
@@ -654,7 +654,7 @@ const Fiscalizacao = () => {
                                     {/* Posto Atual */}
                                     <Grid item xs={12} sm={6}>
                                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>
-                                            POSTO FISCALIZADO
+                                            Posto fiscalizado
                                         </Typography>
                                         <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 700, mt: 0.5 }}>
                                             {areaAtual?.nome_area || 'Fiscalização Geral de Portaria'}

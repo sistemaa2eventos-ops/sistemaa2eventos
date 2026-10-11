@@ -25,7 +25,6 @@ const EventBadge = styled(Box)(({ status }) => ({
     background: status === 'ativo' ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255, 184, 0, 0.1)',
     color: status === 'ativo' ? '#00FF88' : '#FFB800',
     border: `1px solid ${status === 'ativo' ? 'rgba(0, 255, 136, 0.2)' : 'rgba(255, 184, 0, 0.2)'}`,
-    textTransform: 'uppercase',
     letterSpacing: '1px'
 }));
 
@@ -55,7 +54,7 @@ const EventCard = ({ evento, toggleStatus, handleGerenciar, handleOpenDialog, ha
                     </Stack>
                 </Box>
 
-                <Typography variant="h5" sx={{ fontWeight: 700, color: '#FFFFFF', mb: 1, textTransform: 'uppercase', letterSpacing: '1px' }}>
+                <Typography variant="h5" sx={{ fontWeight: 700, color: '#FFFFFF', mb: 1, letterSpacing: '1px' }}>
                     {evento.nome}
                 </Typography>
 
@@ -90,14 +89,14 @@ const EventCard = ({ evento, toggleStatus, handleGerenciar, handleOpenDialog, ha
                     }}
                 >
                     <Box sx={{ flex: 1, textAlign: 'center' }}>
-                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>EMPRESAS</Typography>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Empresas</Typography>
                         <Typography variant="h6" sx={{ color: '#00D4FF', fontWeight: 700 }}>
                             {String(evento.total_empresas || 0).padStart(2, '0')}
                         </Typography>
                     </Box>
                     <Box sx={{ width: '1px', background: 'rgba(255,255,255,0.05)' }} />
                     <Box sx={{ flex: 1, textAlign: 'center' }}>
-                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>PESSOAS</Typography>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Pessoas</Typography>
                         <Typography variant="h6" sx={{ color: '#7B2FBE', fontWeight: 700 }}>
                             {evento.total_pessoas > 1000
                                 ? `${(evento.total_pessoas / 1000).toFixed(1)}k`

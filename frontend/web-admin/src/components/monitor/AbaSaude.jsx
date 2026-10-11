@@ -5,6 +5,7 @@ import {
 import { Refresh as RefreshIcon } from '@mui/icons-material';
 import GlassCard from '../common/GlassCard';
 
+import { comoRotulo } from '../../utils/formatadores';
 const COR_STATUS = { online: '#00FF88', local: '#FFB800', offline: '#FF3366', migrado: 'rgba(255,255,255,0.4)', desativado: 'rgba(255,255,255,0.4)' };
 const ROTULO_SERVICO = { supabase: 'Banco (Supabase)', postgresql_edge: 'Banco local (Edge)', redis: 'Redis (filas/tempo real)', tempo_real: 'Tempo real (WebSocket)' };
 const COR_NIVEL = { error: '#FF3366', warn: '#FFB800', info: 'rgba(255,255,255,0.75)', debug: 'rgba(255,255,255,0.45)' };
@@ -53,12 +54,12 @@ const AbaSaude = ({ sysStatus, sysPerf, sysLogs = [], sysError, terminais = [], 
             <Grid container spacing={2.5}>
                 <Grid item xs={12} md={4}>
                     <GlassCard sx={{ p: 2.5, height: '100%' }}>
-                        <Titulo>SERVIÇOS</Titulo>
+                        <Titulo>Serviços</Titulo>
                         {servicos.length === 0 && <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>Sem dados</Typography>}
                         {servicos.map(([k, v]) => (
                             <Stack key={k} direction="row" justifyContent="space-between" alignItems="center" sx={{ py: 0.5 }}>
                                 <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.75)' }}>{ROTULO_SERVICO[k] || k}</Typography>
-                                <Chip size="small" label={String(v).toUpperCase()}
+                                <Chip size="small" label={comoRotulo(v)}
                                     sx={{ fontWeight: 700, bgcolor: `${COR_STATUS[v] || '#94A3B8'}22`, color: COR_STATUS[v] || '#94A3B8' }} />
                             </Stack>
                         ))}
@@ -68,7 +69,7 @@ const AbaSaude = ({ sysStatus, sysPerf, sysLogs = [], sysError, terminais = [], 
 
                 <Grid item xs={12} md={4}>
                     <GlassCard sx={{ p: 2.5, height: '100%' }}>
-                        <Titulo>LEITORES E AGENTES</Titulo>
+                        <Titulo>Leitores e agentes</Titulo>
                         <Linha rotulo="Leitores online" valor={`${leitoresOnline} / ${leitores.length}`}
                             cor={leitores.length && leitoresOnline < leitores.length ? '#FFB800' : '#00FF88'} />
                         {leitores.filter(t => t.status !== 'online').map(t => (
@@ -85,7 +86,7 @@ const AbaSaude = ({ sysStatus, sysPerf, sysLogs = [], sysError, terminais = [], 
 
                 <Grid item xs={12} md={4}>
                     <GlassCard sx={{ p: 2.5, height: '100%' }}>
-                        <Titulo>SERVIDOR</Titulo>
+                        <Titulo>Servidor</Titulo>
                         <Linha rotulo="No ar há" valor={sysPerf?.node?.uptime_formatado || '—'} />
                         <Linha rotulo="Memória do processo" valor={sysPerf?.node?.memoria ? `${sysPerf.node.memoria.heap_usado_mb} MB (RSS ${sysPerf.node.memoria.rss_mb} MB)` : '—'} />
                         <Linha rotulo="Memória da máquina" valor={memoriaPct !== undefined ? `${memoriaPct}%` : '—'}
@@ -99,7 +100,7 @@ const AbaSaude = ({ sysStatus, sysPerf, sysLogs = [], sysError, terminais = [], 
                 <Grid item xs={12}>
                     <GlassCard sx={{ p: 2.5 }}>
                         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                            <Titulo>LOGS RECENTES</Titulo>
+                            <Titulo>Logs recentes</Titulo>
                             <TextField select size="small" value={nivel} onChange={(e) => setNivel(e.target.value)} sx={{ minWidth: 150 }}>
                                 <MenuItem value="todos">Todos</MenuItem>
                                 <MenuItem value="error">Somente erros</MenuItem>

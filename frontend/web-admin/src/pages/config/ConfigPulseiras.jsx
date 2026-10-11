@@ -33,6 +33,7 @@ import PageHeader from '../../components/common/PageHeader';
 import NeonButton from '../../components/common/NeonButton';
 import DataTable from '../../components/common/DataTable';
 
+import { botaoSecundario } from '../../styles/tokens';
 const MenuProps = {
     PaperProps: {
         sx: {
@@ -77,7 +78,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
         },
         {
             id: 'nome_tipo',
-            label: 'CÓDIGO SOCIAL',
+            label: 'Código social',
             minWidth: 150,
             format: (val) => (
                 <Typography variant="body2" sx={{ fontWeight: 700 }}>{val?.toUpperCase()}</Typography>
@@ -85,7 +86,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
         },
         {
             id: 'tipo_leitura',
-            label: 'MÉTODO DE LEITURA',
+            label: 'Método de leitura',
             minWidth: 150,
             format: (val) => {
                 const map = {
@@ -107,7 +108,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
         },
         {
             id: 'lote',
-            label: 'LOTE NUMÉRICO',
+            label: 'Lote numérico',
             minWidth: 150,
             format: (_, row) => (
                 <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', letterSpacing: '1px' }}>
@@ -117,7 +118,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
         },
         {
             id: 'pulseira_areas_permitidas',
-            label: 'PERMISSÕES DE ZONA',
+            label: 'Permissões de zona',
             minWidth: 200,
             format: (permits) => (
                 <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
@@ -129,13 +130,13 @@ const ConfigPulseiras = ({ embedded = false }) => {
                             sx={{ background: 'rgba(0, 212, 255, 0.1)', color: '#00D4FF', fontSize: '0.75rem', fontWeight: 700 }}
                         />
                     ))}
-                    {!permits?.length && <Typography variant="caption" color="error">SEM ACESSO</Typography>}
+                    {!permits?.length && <Typography variant="caption" color="error">Sem acesso</Typography>}
                 </Box>
             )
         },
         {
             id: 'acoes',
-            label: 'AÇÕES',
+            label: 'Ações',
             minWidth: 120,
             align: 'center',
             format: (value, row) => (
@@ -285,8 +286,8 @@ const ConfigPulseiras = ({ embedded = false }) => {
             {!embedded && (
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
                     <PageHeader
-                        title="Matriz de Pulseiras"
-                        subtitle="Provisione lotes e aplique políticas restritivas de zonas baseadas em matriz de cores."
+                        title="Pulseiras"
+                        subtitle="Lotes de pulseiras, suas cores e as áreas que cada uma libera."
                         breadcrumbs={[{ text: 'Configurações' }, { text: 'Matriz de Pulseiras' }]}
                     />
                     <NeonButton
@@ -446,7 +447,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
                     </Box>
                 </DialogContent>
                 <DialogActions sx={{ p: 3 }}>
-                    <Button onClick={handleCloseDialog} disabled={saving} sx={{ color: 'text.secondary' }}>Cancelar</Button>
+                    <Button variant="outlined" onClick={handleCloseDialog} disabled={saving} sx={botaoSecundario}>Cancelar</Button>
                     <NeonButton onClick={handleSave} loading={saving} autoFocus>
                         {editingId ? 'Salvar' : 'Executar'}
                     </NeonButton>

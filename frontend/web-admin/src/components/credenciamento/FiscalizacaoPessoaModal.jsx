@@ -174,7 +174,7 @@ const FiscalizacaoPessoaModal = ({
                         }}
                     >
                         <PortariaIcon sx={{ fontSize: 18 }} />
-                        FICHA DO PARTICIPANTE • POSTO DE FISCALIZAÇÃO & PORTARIA
+                        Ficha do participante
                     </Typography>
                 </Box>
 
@@ -210,7 +210,7 @@ const FiscalizacaoPessoaModal = ({
                                         <BlockIcon sx={{ color: '#FF3366', fontSize: 22 }} />
                                         <Box sx={{ textAlign: 'left' }}>
                                             <Typography variant="body2" sx={{ color: '#FF3366', fontWeight: 700, lineHeight: 1.1 }}>
-                                                ACESSO BLOQUEADO
+                                                Acesso bloqueado
                                             </Typography>
                                             {motivoBloqueio && (
                                                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem' }}>
@@ -235,7 +235,7 @@ const FiscalizacaoPessoaModal = ({
                                         <WarningIcon sx={{ color: '#FFB800', fontSize: 22 }} />
                                         <Box sx={{ textAlign: 'left' }}>
                                             <Typography variant="body2" sx={{ color: '#FFB800', fontWeight: 700, lineHeight: 1.1 }}>
-                                                ÁREA RESTRITA
+                                                Área restrita
                                             </Typography>
                                             <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem' }}>
                                                 Não autorizado para {areaFiscalizada.nome_area}
@@ -257,7 +257,7 @@ const FiscalizacaoPessoaModal = ({
                                     >
                                         <SuccessIcon sx={{ color: '#00FF88', fontSize: 22 }} />
                                         <Typography variant="body2" sx={{ color: '#00FF88', fontWeight: 700, letterSpacing: '0.5px' }}>
-                                            ACESSO LIBERADO
+                                            Acesso liberado
                                         </Typography>
                                     </Box>
                                 )}
@@ -321,7 +321,7 @@ const FiscalizacaoPessoaModal = ({
                         {/* 1. DADOS DA PESSOA */}
                         <Box sx={{ mb: 2.5 }}>
                             <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, letterSpacing: '1px', display: 'block', mb: 1.2 }}>
-                                DADOS CADASTRAIS
+                                Dados cadastrais
                             </Typography>
                             <Grid container spacing={2}>
                                 <Grid item xs={6}>

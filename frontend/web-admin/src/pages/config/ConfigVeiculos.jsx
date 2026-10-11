@@ -65,8 +65,8 @@ const ConfigVeiculos = () => {
     return (
         <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 }, maxWidth: '100%', overflowX: 'hidden' }}>
             <PageHeader
-                title="Veículos & Estacionamento"
-                subtitle="Integre câmeras LPR (Leitura de Placas) e Cancelas."
+                title="Veículos e estacionamento"
+                subtitle="Leitura de placas (LPR) e cancelas."
                 breadcrumbs={[{ text: 'Configurações' }, { text: 'Veículos & Estacionamento' }]}
             />
 

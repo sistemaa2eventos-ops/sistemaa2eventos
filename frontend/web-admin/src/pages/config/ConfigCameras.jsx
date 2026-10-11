@@ -20,6 +20,7 @@ import NeonButton from '../../components/common/NeonButton';
 import PageHeader from '../../components/common/PageHeader';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
 
+import { botaoSecundario } from '../../styles/tokens';
 const FABRICANTES = ['RTSP / OBS / Webcam', 'Intelbras', 'Hikvision', 'Genérica'];
 
 const ConfigCameras = () => {
@@ -224,8 +225,8 @@ const ConfigCameras = () => {
     return (
         <Box sx={{ p: { xs: 2, md: 4 } }}>
             <PageHeader
-                title="Configuração de Câmeras & Hardwares"
-                subtitle="Cadastre e gerencie as câmeras IP que estarão disponíveis no painel de Monitoramento CFTV e na vigilância com IA."
+                title="Câmeras"
+                subtitle="Câmeras IP usadas no monitor de CFTV e no reconhecimento por IA."
                 breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Câmeras IP' }]}
             />
 
@@ -319,7 +320,7 @@ const ConfigCameras = () => {
                                                     display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                                                 }}>
                                                     <Chip
-                                                        label={status === 'online' ? 'ONLINE' : status === 'offline' ? 'OFFLINE' : 'CÂMERA IP'}
+                                                        label={status === 'online' ? 'Online' : status === 'offline' ? 'Offline' : 'CÂMERA IP'}
                                                         size="small"
                                                         color={status === 'online' ? 'success' : status === 'offline' ? 'error' : 'default'}
                                                         sx={{ fontWeight: 700, fontSize: '0.75rem' }}
@@ -631,7 +632,7 @@ const ConfigCameras = () => {
                     </Stack>
                 </DialogContent>
                 <DialogActions sx={{ p: 2.5, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                    <Button onClick={() => setCameraModalOpen(false)}>Cancelar</Button>
+                    <Button variant="outlined" onClick={() => setCameraModalOpen(false)} sx={botaoSecundario}>Cancelar</Button>
                     <NeonButton
                         loading={savingCamera}
                         startIcon={<SaveIcon />}

@@ -3,6 +3,7 @@ import { Box, Typography, Grid, TextField, Button, List, ListItem, ListItemText,
 import { Code as CodeIcon, Delete as DeleteIcon, ContentCopy as CopyIcon, Add as AddIcon, Webhook as WebhookIcon } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import api from '../../services/api';
+import NeonButton from '../../components/common/NeonButton';
 import PageHeader from '../../components/common/PageHeader';
 import GlassCard from '../../components/common/GlassCard';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
@@ -109,8 +110,8 @@ const ConfigWebhooks = () => {
     return (
         <Box sx={{ p: { xs: 2, md: 4 } }}>
             <PageHeader
-                title="Webhooks & API Keys"
-                subtitle="Exponha endpoints para conectar o NZT ao ERP, PowerBI ou Zapier da empresa."
+                title="Webhooks e chaves de API"
+                subtitle="Conecte o NZT a outros sistemas, como ERP, PowerBI ou Zapier."
                 breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Integrações Externas' }]}
             />
 
@@ -189,7 +190,7 @@ const ConfigWebhooks = () => {
                             ))}
                         </List>
 
-                        <Typography variant="h6" sx={{ color: '#7B2FBE', fontWeight: 700, mb: 2, fontSize: '1rem' }}>+ ADICIONAR NOVO WEBHOOK</Typography>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>Novo webhook</Typography>
                         <Box sx={{ p: 2, border: '1px solid rgba(123, 47, 190, 0.3)', borderRadius: 1.5, bgcolor: 'rgba(123,47,190,0.05)' }}>
                             <TextField
                                 select
@@ -213,9 +214,9 @@ const ConfigWebhooks = () => {
                                 size="small"
                                 sx={{ mb: 2 }}
                             />
-                            <Button variant="contained" onClick={handleCreateWebhook} fullWidth sx={{ bgcolor: '#7B2FBE', color: '#FFFFFF', '&:hover': { bgcolor: '#7B2FBE' } }}>
-                                Inscrever endpoint
-                            </Button>
+                            <NeonButton onClick={handleCreateWebhook} fullWidth>
+                                Adicionar webhook
+                            </NeonButton>
                         </Box>
 
                     </GlassCard>

@@ -80,8 +80,8 @@ const ConfigBancoDados = () => {
     return (
         <Box sx={{ p: { xs: 2, md: 4 } }}>
             <PageHeader
-                title="Banco de Dados e Nuvem"
-                subtitle="Gerenciamento de conexões e sincronização offline primária."
+                title="Banco de dados"
+                subtitle="Conexão com o banco de dados e sincronização."
                 breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Datawarehouse' }]}
             />
             <Grid container spacing={4} sx={{ mt: 1 }}>
@@ -90,7 +90,7 @@ const ConfigBancoDados = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                             <DatabaseIcon sx={{ color: '#00D4FF' }} />
                             <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
-                                CONEXÃO DATAWAREHOUSE
+                                Conexão com o banco
                             </Typography>
                         </Box>
 
@@ -141,7 +141,7 @@ const ConfigBancoDados = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                             <SyncIcon sx={{ color: '#7B2FBE' }} />
                             <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
-                                SINCRONIZAÇÃO & BACKUP
+                                Sincronização e backup
                             </Typography>
                         </Box>
 

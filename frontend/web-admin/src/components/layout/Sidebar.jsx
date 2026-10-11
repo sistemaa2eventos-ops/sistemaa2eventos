@@ -578,7 +578,7 @@ const Sidebar = ({ open, onClose }) => {
                         }}
                     >
                         <Box sx={{ px: 2, py: 1, borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                            <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, textTransform: 'uppercase' }}>
+                            <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, }}>
                                 Selecionar evento ativo
                             </Typography>
                         </Box>

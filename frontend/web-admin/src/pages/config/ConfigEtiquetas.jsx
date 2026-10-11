@@ -106,8 +106,8 @@ const ConfigEtiquetas = () => {
     return (
         <Box sx={{ p: { xs: 2, md: 4 } }}>
             <PageHeader
-                title="Impressão & Etiquetas"
-                subtitle="Configure os drivers de impressão térmica e layout de credenciais."
+                title="Etiquetas e crachás"
+                subtitle="Impressora térmica e layout do crachá."
                 breadcrumbs={[{ text: 'Configurações' }, { text: 'Impressão & Etiquetas' }]}
             />
             <Grid container spacing={4} sx={{ mt: 1 }}>
@@ -152,7 +152,7 @@ const ConfigEtiquetas = () => {
                         </GlassCard>
 
                         <GlassCard sx={{ p: 3 }}>
-                            <Typography variant="subtitle2" sx={{ color: '#00D4FF', fontWeight: 700, mb: 2 }}>ADICIONAR ELEMENTOS</Typography>
+                            <Typography variant="subtitle2" sx={{ color: '#00D4FF', fontWeight: 700, mb: 2 }}>Adicionar elementos</Typography>
                             <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
                                 <NeonButton size="small" variant="outlined" startIcon={<AddIcon />} onClick={() => addElement('text')}>Texto / variável</NeonButton>
                                 <NeonButton size="small" variant="outlined" startIcon={<AddIcon />} color="secondary" onClick={() => addElement('qrcode')}>QR code</NeonButton>

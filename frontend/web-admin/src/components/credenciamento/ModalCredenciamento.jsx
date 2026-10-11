@@ -25,6 +25,7 @@ import api from '../../services/api';
 import ListaDocumentos from '../documentos/ListaDocumentos';
 import { SITUACAO_DOCUMENTAL, MOTIVO_PENDENCIA } from '../documentos/documentosUtils';
 
+import { comoRotulo } from '../../utils/formatadores';
 export const ModalCredenciamento = ({
     open,
     pessoa,
@@ -212,7 +213,7 @@ export const ModalCredenciamento = ({
                                     icon={statusDocs === 'aprovado' ? <VerifiedIcon sx={{ fontSize: '16px !important' }} />
                                         : statusDocs === 'reprovado' ? <CancelIcon sx={{ fontSize: '16px !important' }} />
                                         : <WarningIcon sx={{ fontSize: '16px !important' }} />}
-                                    label={infoDocs.label.toUpperCase()}
+                                    label={comoRotulo(infoDocs.label)}
                                     size="small"
                                     sx={{ bgcolor: `${infoDocs.color}26`, color: infoDocs.color, fontWeight: 700, fontSize: '0.75rem' }}
                                 />
@@ -296,7 +297,7 @@ export const ModalCredenciamento = ({
                             {/* Áreas Autorizadas */}
                             <Box mb={2.5}>
                                 <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.5)', fontWeight: 700, letterSpacing: '1px' }}>
-                                    ÁREAS AUTORIZADAS:
+                                    Áreas autorizadas:
                                 </Typography>
                                 <Box mt={0.5}>
                                     <AuthorizedAreasChips pessoa={pessoa} accentColor="#00D4FF" />

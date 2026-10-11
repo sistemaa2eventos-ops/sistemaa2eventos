@@ -189,7 +189,6 @@ const VerificationDialog = ({ image, result, onSave, onRetry }) => (
                 <Grid item xs={12} sm={7}>
                     <Typography variant="caption" sx={{
                         color: 'text.disabled',
-                        textTransform: 'uppercase',
                         letterSpacing: '0.08em',
                         fontWeight: 600,
                         display: 'block',

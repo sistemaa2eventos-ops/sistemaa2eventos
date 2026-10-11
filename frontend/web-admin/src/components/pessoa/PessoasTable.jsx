@@ -15,6 +15,7 @@ import PessoaFoto from '../common/PessoaFoto';
 import { acaoTabela, acaoTabelaPerigo } from '../../styles/tokens';
 import { formatarCpf } from '../../utils/formatadores';
 
+import { comoRotulo } from '../../utils/formatadores';
 const StatusChip = styled(Chip)(({ status }) => {
   const colors = {
     'ativo': { bg: 'rgba(0, 255, 136, 0.1)', text: '#00FF88', border: 'rgba(0, 255, 136, 0.2)' },
@@ -33,7 +34,6 @@ const StatusChip = styled(Chip)(({ status }) => {
     background: current.bg,
     color: current.text,
     border: `1px solid ${current.border}`,
-    textTransform: 'uppercase',
     letterSpacing: '1px'
   }
 });
@@ -59,7 +59,7 @@ const PessoasTable = ({
   const columns = [
     {
       id: 'foto_url',
-      label: 'FOTO',
+      label: 'Foto',
       minWidth: 80,
       format: (val, row) => (
         <PessoaFoto
@@ -73,7 +73,7 @@ const PessoasTable = ({
     },
     {
       id: 'nome',
-      label: 'NOME/PARTICIPANTE',
+      label: 'Nome/participante',
       minWidth: 250,
       format: (val, row) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -82,7 +82,7 @@ const PessoasTable = ({
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
               <Typography variant="caption" sx={{ color: 'text.secondary' }}>{row.funcao || 'Participante'}</Typography>
               <Chip
-                label={row.tipo_pessoa === 'colaborador' ? 'COLABORADOR' : (row.tipo_pessoa === 'visitante' ? 'VISITANTE' : (row.tipo_pessoa === 'participante' ? 'PARTICIPANTE' : row.tipo_pessoa?.toUpperCase() || 'COLABORADOR'))}
+                label={row.tipo_pessoa === 'colaborador' ? 'Colaborador' : (row.tipo_pessoa === 'visitante' ? 'Visitante' : (row.tipo_pessoa === 'participante' ? 'Participante' : comoRotulo(row.tipo_pessoa) || 'Colaborador'))}
                 size="small"
                 sx={{
                   height: 16,
@@ -100,13 +100,13 @@ const PessoasTable = ({
     { id: 'cpf', label: 'CPF', minWidth: 150, format: (value) => formatarCpf(value) },
     {
       id: 'empresas',
-      label: 'EMPRESA',
+      label: 'Empresa',
       minWidth: 150,
       format: (val, row) => row.empresa_nome || row.empresas?.nome || '—'
     },
     {
       id: 'status_acesso',
-      label: 'ESTADO',
+      label: 'Estado',
       minWidth: 150,
       format: (val) => {
         const STATUS_LABELS = {
@@ -126,7 +126,7 @@ const PessoasTable = ({
     },
     {
       id: 'acoes',
-      label: 'AÇÕES',
+      label: 'Ações',
       minWidth: 180,
       align: 'center',
       format: (value, row) => (

@@ -194,8 +194,8 @@ const ConfigComunicacao = () => {
     return (
         <Box sx={{ p: { xs: 2, md: 4 } }}>
             <PageHeader
-                title="Módulo de Comunicação (SMTP/SMS)"
-                subtitle="Integre gateways nativos para disparar aprovações e links de credenciamento web e whatsapp."
+                title="Comunicação"
+                subtitle="E-mail e WhatsApp usados em convites, aprovações e avisos."
                 breadcrumbs={[{ text: 'Configurações' }, { text: 'Módulo de Comunicação' }]}
             />
 
@@ -323,7 +323,7 @@ const ConfigComunicacao = () => {
             </Grid>
 
             {/* Editor de Templates */}
-            <Typography variant="h5" sx={{ mt: 6, mb: 3, fontWeight: 700, color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: 1 }}>
+            <Typography variant="h5" sx={{ mt: 6, mb: 3, fontWeight: 700, color: '#FFFFFF', letterSpacing: 1 }}>
                 Editor de Mensagens Dinâmicas
             </Typography>
             
@@ -343,7 +343,7 @@ const ConfigComunicacao = () => {
                                     startIcon={t.canal === 'email' ? <MailIcon /> : <SmsIcon />}
                                 >
                                     <Box>
-                                        <Typography variant="body2" sx={{ fontWeight: 700, textTransform: 'uppercase' }}>
+                                        <Typography variant="body2" sx={{ fontWeight: 700, }}>
                                             {t.slug.replace(/_/g, ' ')}
                                         </Typography>
                                         <Typography variant="caption" sx={{ opacity: 0.7 }}>
@@ -395,7 +395,7 @@ const ConfigComunicacao = () => {
 
                                 <Box sx={{ mt: 3, p: 2, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 1.5 }}>
                                     <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block', mb: 1 }}>
-                                        VARIÁVEIS DISPONÍVEIS:
+                                        Variáveis disponíveis:
                                     </Typography>
                                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                                         {['nome_empresa', 'responsavel', 'link_onboarding', 'evento_nome', 'data_expiracao', 'link_qrcode'].map(v => (

@@ -28,7 +28,7 @@ import { useConfirmacao } from '../contexts/ConfirmacaoContext';
  * 1. Topo: Header Limpo com Leitores Online e Ações Rápidas Padronizadas.
  * 2. Telemetria Operacional em Tempo Real: 5 mini-cards compactos responsivos.
  * 3. Base Estrutural: 2 Cards integrados de Empresas e Participantes cadastrados.
- * 4. Bloco Central: Empresas & Fluxo ao lado de Terminais e Equipamentos.
+ * 4. Bloco Central: Empresas & Fluxo ao lado de Terminais e equipamentos.
  * 5. Base: Últimos participantes cadastrados.
  */
 const Dashboard = () => {
@@ -215,7 +215,7 @@ const Dashboard = () => {
                                     color: '#FFFFFF',
                                     fontFamily: '"Space Grotesk", sans-serif'
                                 }}>
-                                    Últimos Participantes Cadastrados no Evento
+                                    Últimos participantes cadastrados
                                 </Typography>
                                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
                                     Conferência imediata dos colaboradores recém-adicionados com foto e empresa
