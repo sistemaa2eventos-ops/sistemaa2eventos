@@ -1,33 +1,15 @@
 version: '3.8'
 
 services:
-  postgres_edge:
-    image: ankane/pgvector:v0.5.1
-    container_name: a2_eventos_pg_edge
-    restart: unless-stopped
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_USER: a2_edge_user
-      POSTGRES_PASSWORD: a2_edge_password
-      POSTGRES_DB: a2_edge_db
-    volumes:
-      - pg_edge_data:/var/lib/postgresql/data
-      - ./backend/api-nodejs/src/scripts/init_pg_edge.sql:/docker-entrypoint-initdb.d/init_pg_edge.sql
-    networks:
-      - a2_net
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U a2_edge_user -d a2_edge_db"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # postgres_edge (banco local "Edge") removido em 2026-10-10: estava vazio e o backend grava tudo
+  # direto no Supabase. Para voltar a usá-lo: recriar o serviço e definir EDGE_DB_ENABLED=true.
 
   redis:
     image: redis:7-alpine
     container_name: a2_eventos_redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379" # Redis sem senha: só acessível no próprio servidor (Docker ignora o UFW)
     volumes:
       - redis_data:/data
     networks:
@@ -48,11 +30,9 @@ services:
     container_name: a2_eventos_api
     restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3001:3001" # acesso externo só pelo Nginx (gateway)
     depends_on:
       redis:
-        condition: service_healthy
-      postgres_edge:
         condition: service_healthy
     environment:
       - NODE_ENV=production
@@ -82,7 +62,7 @@ services:
     container_name: a2_eventos_api_intelbras
     restart: unless-stopped
     ports:
-      - "3003:3002"
+      - "127.0.0.1:3003:3002" # leitores chegam via Nginx (leitores.nzt.app.br)
     command: npm run start:intelbras
     depends_on:
       redis:
@@ -117,6 +97,10 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      # Certificado de origem Cloudflare (origin.pem + origin.key) — fora do git
+      - ./gateway/certs:/etc/nginx/certs:ro
     depends_on:
       api:
         condition: service_started
@@ -178,4 +162,3 @@ networks:
 
 volumes:
   redis_data:
-  pg_edge_data:
