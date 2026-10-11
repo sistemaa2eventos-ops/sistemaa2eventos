@@ -43,6 +43,46 @@ router.get(
     documentoController.listarPendentes
 );
 
+// Estatísticas da auditoria documental
+router.get(
+    '/estatisticas',
+    checkPermission('documentos', 'aprovar'),
+    documentoController.obterEstatisticas
+);
+
+// Colaboradores com documentos, pendências e validade (busca por pessoa/empresa)
+router.get(
+    '/colaboradores',
+    checkPermission('documentos', 'ler'),
+    documentoController.listarColaboradores
+);
+
+// Documentos vencidos e a vencer
+router.get(
+    '/vencimentos',
+    checkPermission('documentos', 'ler'),
+    documentoController.listarVencimentos
+);
+
+// Configuração documental do evento (tipos, obrigatórios por função, aviso)
+router.get(
+    '/config',
+    checkPermission('documentos', 'ler'),
+    documentoController.obterConfiguracao
+);
+router.put(
+    '/config',
+    checkPermission('documentos', 'aprovar'),
+    documentoController.salvarConfiguracao
+);
+
+// URL assinada temporária para visualizar o arquivo
+router.get(
+    '/:entityType/:docId/url',
+    checkPermission('documentos', 'ler'),
+    documentoController.obterUrlArquivo
+);
+
 // Submissão de documentos (Roles de upload)
 router.post(
     '/:entityType/:entityId/upload',
