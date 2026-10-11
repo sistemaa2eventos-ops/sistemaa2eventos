@@ -4,7 +4,6 @@
   "pythonPath": "C:\\Users\\SD_Ad\\AppData\\Local\\Programs\\Python\\Python311_Custom\\python.exe",
   "extraPaths": [
     "C:\\Users\\SD_Ad\\AppData\\Local\\Programs\\Python\\Python311_Custom\\Lib\\site-packages",
-    "backend/microservice-face-python/src",
-    "a2-eventos/backend/microservice-face-python/src"
+    "backend/microservice-face-python/src"
   ]
 }

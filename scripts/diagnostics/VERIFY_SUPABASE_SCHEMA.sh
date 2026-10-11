@@ -116,7 +116,7 @@ fi
 echo -e "\n${YELLOW}4️⃣  ARQUIVO DE MIGRAÇÃO${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-MIGRATION_FILE="a2-eventos/supabase/migrations/20260428_criar_pivot_pessoa_evento_empresa.sql"
+MIGRATION_FILE="supabase/migrations/20260428_criar_pivot_pessoa_evento_empresa.sql"
 
 if [ -f "$MIGRATION_FILE" ]; then
     echo -e "${GREEN}✓${NC} Arquivo de migração encontrado:"
@@ -169,7 +169,7 @@ else
     echo ""
     echo "Próximas ações:"
     echo "1. Testar criação de pessoas:"
-    echo "   bash a2-eventos/QUICK_LOGS.sh all"
+    echo "   docker compose logs -f --tail=50"
     echo ""
     echo "2. Testar geração de QR code no painel"
 fi

@@ -55,11 +55,11 @@ done
 echo -e "\n${YELLOW}2️⃣  MIGRATIONS APLICADAS${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-MIGRATION_COUNT=$(find /c/Projetos/Projeto_A2_Eventos/a2-eventos/supabase/migrations -name "*.sql" 2>/dev/null | wc -l)
+MIGRATION_COUNT=$(find /c/Projetos/Projeto_A2_Eventos/supabase/migrations -name "*.sql" 2>/dev/null | wc -l)
 echo -e "${GREEN}✓${NC} $MIGRATION_COUNT migrations encontradas"
 
 echo -e "\nMigrations mais recentes:"
-ls -1 /c/Projetos/Projeto_A2_Eventos/a2-eventos/supabase/migrations/*.sql 2>/dev/null | sort -r | head -5 | sed 's/.*\//  • /'
+ls -1 /c/Projetos/Projeto_A2_Eventos/supabase/migrations/*.sql 2>/dev/null | sort -r | head -5 | sed 's/.*\//  • /'
 
 # ============================================
 # 3. VERIFICAR CONFIGURAÇÕES DE RLS

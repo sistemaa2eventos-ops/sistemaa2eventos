@@ -13,10 +13,10 @@ const path = require('path');
 
 // Diretórios para processar (apenas produção, não scripts)
 const PRODUCTION_DIRS = [
-  'a2-eventos/backend/api-nodejs/src/config',
-  'a2-eventos/backend/api-nodejs/src/services',
-  'a2-eventos/backend/api-nodejs/src/middleware',
-  'a2-eventos/backend/api-nodejs/src/modules'
+  'backend/api-nodejs/src/config',
+  'backend/api-nodejs/src/services',
+  'backend/api-nodejs/src/middleware',
+  'backend/api-nodejs/src/modules'
 ];
 
 // Padrões a NUNCA mudar (false positives)

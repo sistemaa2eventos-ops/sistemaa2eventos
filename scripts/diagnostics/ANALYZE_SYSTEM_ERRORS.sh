@@ -106,17 +106,17 @@ echo "  Erros HTTP: $GATEWAY_ERRORS"
 echo -e "\n${YELLOW}4️⃣  CONFIGURAÇÃO DO FRONTEND${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-if [ -f "a2-eventos/frontend/web-admin/.env" ]; then
+if [ -f "frontend/web-admin/.env" ]; then
     echo -e "${GREEN}✓${NC} Arquivo .env do frontend encontrado"
-    grep "^VITE_\|^REACT_" "a2-eventos/frontend/web-admin/.env" | head -10
+    grep "^VITE_\|^REACT_" "frontend/web-admin/.env" | head -10
 else
     echo -e "${YELLOW}⚠${NC} Arquivo .env do frontend não encontrado (pode ser gerado em build)"
 fi
 
-if [ -f "a2-eventos/frontend/web-admin/.env.example" ]; then
+if [ -f "frontend/web-admin/.env.example" ]; then
     echo ""
     echo "Variáveis esperadas (.env.example):"
-    grep "^VITE_\|^REACT_" "a2-eventos/frontend/web-admin/.env.example" | head -10
+    grep "^VITE_\|^REACT_" "frontend/web-admin/.env.example" | head -10
 fi
 
 # ============================================
@@ -186,7 +186,7 @@ if [ "$ISSUES" -eq 0 ]; then
     echo -e "${GREEN}✅ Nenhum problema crítico identificado!${NC}"
     echo ""
     echo "Próximos passos:"
-    echo "1. Monitorar logs: bash a2-eventos/QUICK_LOGS.sh all"
+    echo "1. Monitorar logs: docker compose logs -f --tail=50"
     echo "2. Verificar painel: https://painel.nzt.app.br"
     echo "3. Se houver erros, coletar logs: docker logs a2_eventos_api > /tmp/api.log"
 fi

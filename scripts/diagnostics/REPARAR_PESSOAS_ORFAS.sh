@@ -21,7 +21,7 @@ echo "Pessoas que foram criadas mas não têm registro na tabela pivot"
 echo "pessoa_evento_empresa. Isso impede que gerem QR code."
 echo ""
 
-MIGRATION_FILE="a2-eventos/supabase/migrations/20260428_reparar_pessoas_orfas.sql"
+MIGRATION_FILE="supabase/migrations/20260428_reparar_pessoas_orfas.sql"
 
 if [ ! -f "$MIGRATION_FILE" ]; then
     echo -e "${RED}❌ Arquivo de migração não encontrado: $MIGRATION_FILE${NC}"
