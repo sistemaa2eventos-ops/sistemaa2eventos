@@ -1,10 +1,35 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import api from '@/lib/api';
 
+interface ClienteTicket {
+    nome_completo?: string;
+    nome_credencial?: string;
+    qrcode?: string;
+    pagamento_validado?: boolean;
+    foto_url?: string | null;
+    status_ingresso?: string;
+    eventos?: {
+        nome?: string;
+        local?: string;
+    };
+}
+
+const extractApiErrorMessage = (error: unknown, fallback: string) => {
+    if (typeof error === 'object' && error !== null && 'response' in error) {
+        const response = (error as { response?: { data?: { error?: string } } }).response;
+        if (response?.data?.error) {
+            return response.data.error;
+        }
+    }
+
+    return fallback;
+};
+
 export default function ClientePortal() {
-    const [ticket, setTicket] = useState<any>(null);
+    const [ticket, setTicket] = useState<ClienteTicket | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isUploading, setIsUploading] = useState(false);
 
@@ -136,8 +161,8 @@ export default function ClientePortal() {
                 alert('Transferência gerada! Copie o link e envie ao novo titular.');
                 loadTicket(); // Atualiza painel para pendente
             }
-        } catch (error: any) {
-            alert(error.response?.data?.error || 'Erro ao gerar transferência. Tente novamente.');
+        } catch (error: unknown) {
+            alert(extractApiErrorMessage(error, 'Erro ao gerar transferência. Tente novamente.'));
             console.error(error);
         } finally {
             setIsLoading(false);
@@ -152,8 +177,8 @@ export default function ClientePortal() {
                 alert('TRANSFERÊNCIA ACEITA! O Ingresso agora é de sua titularidade.');
                 window.location.href = '/cliente'; // Limpa o token da URL
             }
-        } catch (error: any) {
-            alert(error.response?.data?.error || 'Link inválido ou já expirado.');
+        } catch (error: unknown) {
+            alert(extractApiErrorMessage(error, 'Link inválido ou já expirado.'));
         } finally {
             setIsUploading(false);
         }
@@ -170,7 +195,7 @@ export default function ClientePortal() {
     const needsSelfie = !ticket?.foto_url;
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+        <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#e0f2fe_0,_#f8fafc_45%,_#f1f5f9_100%)] flex flex-col items-center justify-center p-4">
             <div className="max-w-md w-full bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
 
                 {/* Card Header Promocional */}
@@ -246,7 +271,16 @@ export default function ClientePortal() {
                     /* PASSO 2: INGRESSO LIBERADO E ÁREA B2C ATIVA */
                     <div className="p-8">
                         <div className="text-center mb-6">
-                            <img src={ticket?.foto_url} alt="Sua Biometria" className="w-20 h-20 rounded-full mx-auto object-cover border-4 border-white shadow-xl -mt-16 mb-4" />
+                            {ticket?.foto_url && (
+                                <Image
+                                    src={ticket.foto_url}
+                                    alt="Sua Biometria"
+                                    width={80}
+                                    height={80}
+                                    className="w-20 h-20 rounded-full mx-auto object-cover border-4 border-white shadow-xl -mt-16 mb-4"
+                                    unoptimized
+                                />
+                            )}
                             <h3 className="text-xl font-bold text-gray-800">{ticket?.nome_completo}</h3>
                             <p className="text-gray-500 font-medium tracking-wide text-sm mt-1">{ticket?.nome_credencial}</p>
 
@@ -267,7 +301,14 @@ export default function ClientePortal() {
                                 <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-2xl border border-gray-100 mb-6">
                                     <div className="w-48 h-48 bg-white border border-gray-200 rounded-xl flex items-center justify-center p-4 shadow-sm relative overflow-hidden">
                                         {/* Mocked QR Code visualization */}
-                                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${ticket?.qrcode || 'TICKET-INVALID'}`} alt="QR Code" className="w-full h-full object-contain" />
+                                        <Image
+                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${ticket?.qrcode || 'TICKET-INVALID'}`}
+                                            alt="QR Code"
+                                            width={250}
+                                            height={250}
+                                            className="w-full h-full object-contain"
+                                            unoptimized
+                                        />
 
                                         {/* Dynamic Scan Line Simulation */}
                                         <div className="absolute top-0 left-0 w-full h-1 bg-cyan-400 shadow-[0_0_10px_#00D4FF] opacity-75 animate-[scan_2s_ease-in-out_infinite]"></div>

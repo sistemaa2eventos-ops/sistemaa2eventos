@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -13,16 +13,37 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "A2 Eventos | Credenciamento",
-  description: "Plataforma Inteligente de Gestão de Bordo, Controle de Acesso e Credenciamento Biométrico B2B/B2C.",
+  title: "NZT - Intelligent Control System",
+  description: "Plataforma Inteligente de Gestão de Bordo, Controle de Acesso e Credenciamento Biométrico.",
   manifest: "/manifest.webmanifest",
-  themeColor: "#020617",
+  icons: {
+    icon: "/logo.jpg",
+    apple: "/logo.jpg",
+  },
+  openGraph: {
+    title: "NZT - Intelligent Control System",
+    description: "Credenciamento Biométrico Inteligente",
+    images: ["/logo.jpg"],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "NZT - Intelligent Control System",
+    images: ["/logo.jpg"],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "A2 Acesso",
-  },
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0",
+    title: "NZT Control",
+  }
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#020617"
 };
 
 import { I18nProvider } from '@/components/I18nProvider';
