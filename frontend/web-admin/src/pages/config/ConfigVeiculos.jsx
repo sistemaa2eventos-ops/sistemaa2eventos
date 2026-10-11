@@ -120,7 +120,7 @@ const ConfigVeiculos = () => {
 
                         <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
                             <NeonButton onClick={handleSave} disabled={saving} startIcon={<SaveIcon />} sx={{ height: 38, minHeight: 38, borderRadius: '8px' }}>
-                                {saving ? "Salvando..." : "Salvar IA LPR"}
+                                {saving ? "Salvando..." : "Salvar leitura de placas"}
                             </NeonButton>
                         </Box>
                     </GlassCard>

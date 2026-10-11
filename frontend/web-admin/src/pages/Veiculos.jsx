@@ -51,7 +51,7 @@ import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-import { botaoSecundario } from '../styles/tokens';
+import { botaoSecundario, acaoTabela, acaoTabelaPerigo } from '../styles/tokens';
 import { comoRotulo } from '../utils/formatadores';
 const Veiculos = () => {
     const { enqueueSnackbar } = useSnackbar();
@@ -204,7 +204,7 @@ const Veiculos = () => {
                         <IconButton
                             size="small"
                             onClick={() => handleOpenPassagem(row)}
-                            sx={{ color: '#00FF88', background: 'rgba(0,230,118,0.05)' }}
+                            sx={acaoTabela}
                         >
                             <PassagemIcon fontSize="small" />
                         </IconButton>
@@ -214,20 +214,17 @@ const Veiculos = () => {
                         <IconButton
                             size="small"
                             onClick={() => handleOpenFoto(row)}
-                            sx={{ color: '#00D4FF', background: 'rgba(0,212,255,0.05)' }}
+                            sx={acaoTabela}
                         >
                             <CameraIcon fontSize="small" />
                         </IconButton>
                     </Tooltip>
 
-                    <Tooltip title={row.status === 'liberado' ? "Bloquear Veículo" : "Liberar Veículo"}>
+                    <Tooltip title={row.status === 'liberado' ? "Bloquear veículo" : "Liberar veículo"}>
                         <IconButton
                             size="small"
                             onClick={() => handleToggleStatus(row)}
-                            sx={{ 
-                                color: row.status === 'liberado' ? '#FF3366' : '#00FF88', 
-                                background: row.status === 'liberado' ? 'rgba(255,51,102,0.08)' : 'rgba(0,230,118,0.08)' 
-                            }}
+                            sx={row.status === 'liberado' ? acaoTabelaPerigo : acaoTabela}
                         >
                             {row.status === 'liberado' ? <BlockIcon fontSize="small" /> : <CheckCircleIcon fontSize="small" />}
                         </IconButton>
@@ -237,7 +234,7 @@ const Veiculos = () => {
                         <IconButton
                             size="small"
                             onClick={() => handleOpenHistorico(row)}
-                            sx={{ color: '#00D4FF', background: 'rgba(0,176,255,0.05)' }}
+                            sx={acaoTabela}
                         >
                             <HistoryIcon fontSize="small" />
                         </IconButton>
@@ -1273,7 +1270,7 @@ const Veiculos = () => {
                 </DialogContent>
                 <DialogActions sx={{ p: 2.5, borderTop: '1px solid rgba(255,255,255,0.1)', gap: 1 }}>
                     <Button variant="outlined" onClick={handleCloseDialog} disabled={saving} sx={botaoSecundario}>Cancelar</Button>
-                    <NeonButton onClick={handleSave} loading={saving} sx={{ height: 38, minHeight: 38, borderRadius: '8px' }}>Salvar registro</NeonButton>
+                    <NeonButton onClick={handleSave} loading={saving}>{selectedVeiculo ? 'Salvar alterações' : 'Cadastrar veículo'}</NeonButton>
                 </DialogActions>
             </Dialog>
 

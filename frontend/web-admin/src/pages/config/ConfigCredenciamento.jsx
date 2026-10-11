@@ -138,7 +138,6 @@ const ConfigCredenciamento = () => {
                                         </ListItemIcon>
                                         <ListItemText
                                             primary={field.label}
-                                            secondary={field.id.toUpperCase()}
                                             primaryTypographyProps={{ color: '#FFFFFF', fontWeight: 600 }}
                                             secondaryTypographyProps={{ fontSize: '0.75rem' }}
                                         />

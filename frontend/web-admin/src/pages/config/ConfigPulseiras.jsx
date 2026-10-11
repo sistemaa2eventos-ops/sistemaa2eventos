@@ -449,7 +449,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
                 <DialogActions sx={{ p: 3 }}>
                     <Button variant="outlined" onClick={handleCloseDialog} disabled={saving} sx={botaoSecundario}>Cancelar</Button>
                     <NeonButton onClick={handleSave} loading={saving} autoFocus>
-                        {editingId ? 'Salvar' : 'Executar'}
+                        {editingId ? 'Salvar alterações' : 'Criar lote'}
                     </NeonButton>
                 </DialogActions>
             </Dialog>

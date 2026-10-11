@@ -7,6 +7,7 @@ import PageHeader from '../../components/common/PageHeader';
 import GlassCard from '../../components/common/GlassCard';
 import NeonButton from '../../components/common/NeonButton';
 
+import { funcao, tom } from '../../styles/tokens';
 const ConfigCheckin = () => {
     const { enqueueSnackbar } = useSnackbar();
     const [loading, setLoading] = useState(true);
@@ -77,25 +78,25 @@ const ConfigCheckin = () => {
                 <Grid item xs={12} md={6}>
                     <GlassCard sx={{ p: 3, mb: 4, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
-                            <TimerIcon sx={{ color: '#FF3366', fontSize: 28 }} />
+                            <TimerIcon sx={{ color: funcao.acao, fontSize: 28 }} />
                             <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
                                 Bloqueio temporal (anti-passback)
                             </Typography>
                         </Box>
 
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-                            Evite que a mesma credencial (QR Code ou Face) seja usada para múltiplos ingressos seguidos na mesma catraca ou evento.
+                            Impede que a mesma credencial (QR code, pulseira ou rosto) seja usada para entrar de novo logo em seguida.
                         </Typography>
 
                         <FormControlLabel
                             control={<Switch checked={apbEnabled} onChange={(e) => setApbEnabled(e.target.checked)} />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Habilitar Anti-Passback</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Ativar anti-passback</Typography>}
                             sx={{ mb: 3 }}
                         />
 
                         <Box sx={{ mb: 4, px: 2 }}>
                             <Typography gutterBottom sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                                Tempo de cooldown restrito (minutos)
+                                Tempo mínimo entre entradas (minutos)
                             </Typography>
                             <Slider
                                 value={apbCooldown}
@@ -105,16 +106,15 @@ const ConfigCheckin = () => {
                                 min={0}
                                 max={120}
                                 valueLabelDisplay="auto"
-                                sx={{ color: '#FF3366' }}
                             />
                             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                Tempo mínimo exigido antes que a credencial autorize uma nova entrada. 0 = Desativado.
+                                Depois de entrar, a mesma credencial só libera uma nova entrada após esse tempo. 0 = sem limite.
                             </Typography>
                         </Box>
 
                         <Box sx={{ mb: 4, px: 2 }}>
                             <Typography gutterBottom sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                                Auto check-out virtual (morte súbita)
+                                Saída automática por inatividade (minutos)
                             </Typography>
                             <Slider
                                 value={autoCheckout}
@@ -124,15 +124,14 @@ const ConfigCheckin = () => {
                                 min={30}
                                 max={720}
                                 valueLabelDisplay="auto"
-                                sx={{ color: '#00D4FF' }}
                             />
                             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                O Motor de Background fará check-out de credenciais paradas há mais de X minutos (Atual 300 min).
+                                Quem está há mais de {autoCheckout} minutos sem nenhuma passagem recebe saída automática.
                             </Typography>
                         </Box>
 
-                        <NeonButton color="secondary" onClick={handleSave} disabled={saving} startIcon={<SaveIcon />}>
-                            {saving ? "Salvando..." : "Aplicar temporizadores"}
+                        <NeonButton onClick={handleSave} disabled={saving} startIcon={<SaveIcon />}>
+                            {saving ? "Salvando..." : "Salvar regras de tempo"}
                         </NeonButton>
                     </GlassCard>
                 </Grid>
@@ -140,32 +139,32 @@ const ConfigCheckin = () => {
                 <Grid item xs={12} md={6}>
                     <GlassCard sx={{ p: 3, mb: 4, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
-                            <GroupIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
+                            <GroupIcon sx={{ color: funcao.acao, fontSize: 28 }} />
                             <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
                                 Contenção e lotação
                             </Typography>
                         </Box>
 
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-                            Caso o evento (Global) ou uma área atinja 100% de capacidade, o NZT bloqueará automaticamente as catracas para evitar superlotação do corpo de bombeiros.
+                            Quando o evento ou uma área chega à capacidade máxima, as entradas são bloqueadas para não passar do limite aprovado (bombeiros).
                         </Typography>
 
                         <FormControlLabel
                             control={<Switch checked={hardBlock} onChange={(e) => setHardBlock(e.target.checked)} color="primary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Bloqueio rígido em 100% capacidade</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Bloquear entradas ao atingir a capacidade</Typography>}
                             sx={{ mb: 3 }}
                         />
 
                         <FormControlLabel
                             control={<Switch checked={vipBypass} onChange={(e) => setVipBypass(e.target.checked)} color="primary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Verificação de vínculo contratual (VIPs ignoram lotacao)</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>VIPs entram mesmo com a lotação cheia</Typography>}
                             sx={{ mb: 4 }}
                         />
 
-                        <Box sx={{ p: 2, bgcolor: 'rgba(0, 212, 255, 0.05)', border: '1px dashed rgba(0,212,255,0.3)', borderRadius: 1.5 }}>
-                            <Typography variant="subtitle2" sx={{ color: '#00D4FF', mb: 1, fontWeight: 700 }}>Inteligência Edge ativa</Typography>
+                        <Box sx={{ p: 2, bgcolor: tom(funcao.acao, 0.05), border: `1px solid ${tom(funcao.acao, 0.25)}`, borderRadius: 1.5 }}>
+                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Como funciona nos leitores</Typography>
                             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                O Bloqueio Rígido informa aos terminais faciais o comando &apos;No-Open&apos; instantaneamente assim que o limite local estourar. O acesso só volta ao normal se ocorrer saídas (Check-out).
+                                Com o bloqueio ligado, os leitores faciais deixam de liberar a catraca assim que a lotação enche. As entradas voltam quando houver saídas.
                             </Typography>
                         </Box>
                         <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>

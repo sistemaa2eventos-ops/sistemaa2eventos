@@ -40,6 +40,7 @@ import { formatLocalTime } from '../utils/dateUtils';
 import api from '../services/api';
 import { urlMidiaCamera } from '../utils/cameraMedia';
 import PageHeader from '../components/common/PageHeader';
+import NeonButton from '../components/common/NeonButton';
 import GlassCard from '../components/common/GlassCard';
 import PessoaFoto from '../components/common/PessoaFoto';
 import { useMonitor } from '../hooks/useMonitor';
@@ -1364,31 +1365,25 @@ const Monitor = () => {
                   <GlassCard sx={{ p: 3 }}>
                       <Stack direction={{ xs: 'column', md: 'row' }} gap={2} justifyContent="space-between" mb={3}>
                         <Box>
-                            <Typography variant="h6" fontWeight={700} color="#FFB800">Alvos em monitoramento (watchlist)</Typography>
+                            <Typography variant="h6" fontWeight={700}>Alvos em monitoramento (watchlist)</Typography>
                             <Typography variant="caption" color="text.secondary">
                                 Pessoas procuradas ou em atenção especial. Disparam alarmes ao passar em catracas, check-ins ou câmeras.
                             </Typography>
                         </Box>
-                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                            <Button 
-                                variant="contained" 
-                                color="warning" 
-                                startIcon={<PersonAddIcon />} 
-                                onClick={() => setOpenTargetDialog(true)}
-                                sx={{ fontWeight: 700 }}
-                            >
-                                Novo alvo
-                            </Button>
-                            <Button variant="outlined" component="label" startIcon={<UploadIcon />}>
+                        <Stack direction="row" useFlexGap flexWrap="wrap" gap={1} alignItems="flex-start" sx={{ flexShrink: 0 }}>
+                            <Button variant="outlined" component="label" startIcon={<UploadIcon />} sx={botaoSecundario}>
                                 Importar CSV
                                 <input type="file" hidden accept=".csv" onChange={handleUploadCSV} />
                             </Button>
-                            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={baixarModeloCSV}>
+                            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={baixarModeloCSV} sx={botaoSecundario}>
                                 Modelo CSV
                             </Button>
-                            <Button variant="contained" color="primary" startIcon={<DownloadIcon />} onClick={handleExportCSV} sx={{ fontWeight: 700 }}>
+                            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExportCSV} sx={botaoSecundario}>
                                 Exportar participantes
                             </Button>
+                            <NeonButton startIcon={<PersonAddIcon />} onClick={() => setOpenTargetDialog(true)} sx={{ whiteSpace: 'nowrap' }}>
+                                Novo alvo
+                            </NeonButton>
                         </Stack>
                       </Stack>
                       <TableContainer sx={{ 
@@ -1552,7 +1547,7 @@ const Monitor = () => {
                         </Typography>
                         <Chip
                             icon={<DotIcon sx={{ fontSize: 10, color: isScanning ? '#FFB800 !important' : '#00FF88 !important' }} />}
-                            label={isScanning ? "IA PROCESSANDO..." : "VIGILÂNCIA IA ATIVA"}
+                            label={isScanning ? "IA processando..." : "Vigilância por IA ativa"}
                             size="small"
                             sx={{
                                 bgcolor: isScanning ? 'rgba(255, 184, 0, 0.12)' : 'rgba(0, 255, 136, 0.12)',
@@ -1563,7 +1558,7 @@ const Monitor = () => {
                             }}
                         />
                         <Chip
-                            label={`${displayedCameras.length} de ${cameras.length} CÂMERA(S) NO MOSAICO`}
+                            label={`${displayedCameras.length} de ${cameras.length} câmeras no mosaico`}
                             size="small"
                             sx={{
                                 bgcolor: 'rgba(0, 212, 255, 0.12)',
@@ -1597,18 +1592,7 @@ const Monitor = () => {
                         size="small"
                         startIcon={<SettingsIcon sx={{ fontSize: 16 }} />}
                         onClick={() => setOpenGerenciarCamerasModal(true)}
-                        sx={{
-                            height: 32,
-                            bgcolor: '#00D4FF',
-                            color: '#000000',
-                            fontWeight: 700,
-                            fontSize: '0.75rem',
-                            px: 1.5,
-                            borderRadius: 1.5,
-                            boxShadow: 'none',
-                            whiteSpace: 'nowrap',
-                            '&:hover': { bgcolor: '#00D4FF', color: '#000000' }
-                        }}
+                        sx={{ height: 32, whiteSpace: 'nowrap' }}
                     >
                         Gerenciar câmeras
                     </Button>
@@ -1618,19 +1602,9 @@ const Monitor = () => {
                         size="small"
                         startIcon={<GridViewIcon sx={{ fontSize: 16 }} />}
                         onClick={() => setOpenSelectCamerasDialog(true)}
-                        sx={{
-                            height: 32,
-                            borderColor: 'rgba(255, 255, 255, 0.25)',
-                            color: '#FFFFFF',
-                            fontWeight: 700,
-                            fontSize: '0.75rem',
-                            px: 1.5,
-                            borderRadius: 1.5,
-                            whiteSpace: 'nowrap',
-                            '&:hover': { borderColor: '#00D4FF', color: '#00D4FF', bgcolor: 'rgba(0, 212, 255, 0.05)' }
-                        }}
+                        sx={{ ...botaoSecundario, height: 32, minHeight: 32 }}
                     >
-                        SELECIONAR CÂMERAS ({displayedCameras.length})
+                        Selecionar câmeras ({displayedCameras.length})
                     </Button>
                 </Stack>
 
@@ -1639,9 +1613,9 @@ const Monitor = () => {
                     {/* SELETOR DE COLUNAS DA GRADE */}
                     <ButtonGroup size="small" variant="outlined" sx={{ height: 32, borderColor: 'rgba(255,255,255,0.15)' }}>
                         {[
-                            { id: '4', label: '4 CÂM' },
-                            { id: '3', label: '3 CÂM' },
-                            { id: '2', label: '2 CÂM' },
+                            { id: '4', label: '4 câmeras' },
+                            { id: '3', label: '3 câmeras' },
+                            { id: '2', label: '2 câmeras' },
                             { id: '1', label: '1 (Foco)' }
                         ].map(({ id, label }) => (
                             <Button
@@ -1907,10 +1881,10 @@ const Monitor = () => {
                                     {/* BARRA DE AÇÕES DO CARD */}
                                     <Box sx={{ p: 1, display: 'flex', gap: 1, alignItems: 'center', bgcolor: 'rgba(0,0,0,0.6)', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
                                         <Button
-                                            size="small" fullWidth variant="contained"
+                                            size="small" fullWidth variant="outlined"
                                             startIcon={<CameraIcon sx={{ fontSize: 16 }} />}
                                             onClick={() => setActiveStreamCam(cam)}
-                                            sx={{ height: 32, fontWeight: 700, fontSize: '0.75rem', bgcolor: '#00D4FF', color: '#000000', '&:hover': { bgcolor: '#00D4FF' } }}
+                                            sx={{ ...botaoSecundario, height: 32, minHeight: 32 }}
                                         >
                                             Ao vivo
                                         </Button>
@@ -1918,7 +1892,7 @@ const Monitor = () => {
                                             size="small" fullWidth variant="outlined"
                                             disabled={testResults[cam.id] === 'testing'}
                                             onClick={() => handleTestCamera(cam.id)}
-                                            sx={{ height: 32, fontWeight: 700, fontSize: '0.75rem', borderColor: 'rgba(255,255,255,0.18)', color: '#FFFFFF' }}
+                                            sx={{ ...botaoSecundario, height: 32, minHeight: 32 }}
                                         >
                                             {testResults[cam.id] === 'testing' ? <CircularProgress size={14} /> : 'Testar'}
                                         </Button>

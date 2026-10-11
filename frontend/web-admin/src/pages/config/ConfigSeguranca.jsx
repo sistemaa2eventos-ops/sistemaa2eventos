@@ -74,32 +74,32 @@ const ConfigSeguranca = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                             <LockIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
                             <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
-                                JWT e sessões
+                                Sessões de login
                             </Typography>
                         </Box>
 
                         <Box sx={{ mb: 3 }}>
                             <TextField
                                 fullWidth
-                                label="Token expiration (horas)"
+                                label="Duração do login (horas)"
                                 value={jwtExpiration}
                                 onChange={(e) => setJwtExpiration(e.target.value)}
                                 type="number"
                                 size="small"
                             />
                             <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                                Após esse tempo, o sistema força logout automático do backoffice.
+                                Depois desse tempo, o operador precisa entrar de novo no painel.
                             </Typography>
                         </Box>
 
                         <FormControlLabel
                             control={<Switch checked={force2FA} onChange={(e) => setForce2FA(e.target.checked)} color="primary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Forçar autenticação em 2 fatores (admin)</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Exigir verificação em duas etapas para admins</Typography>}
                             sx={{ mb: 2 }}
                         />
                         <FormControlLabel
                             control={<Switch checked={ddosShield} onChange={(e) => setDdosShield(e.target.checked)} color="primary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Habilitar bloqueio de IP (DDoS shield)</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Bloquear IPs com tentativas suspeitas</Typography>}
                             sx={{ mb: 4 }}
                         />
 
