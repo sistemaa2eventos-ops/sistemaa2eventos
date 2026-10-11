@@ -59,9 +59,11 @@ function Saude-Motor {
 }
 
 # Python que consegue rodar o motor (numpy/faiss/insightface íntegros).
-# Os venvs da raiz e do microservice estão com numpy corrompido; o do camera-service está bom.
+# venv-ia: com placa de vídeo (DirectML, ver requirements-windows-gpu.txt). Reserva: o do camera-service (só CPU).
+# Os venvs da raiz e o "venv" do microservice estão com numpy corrompido.
 function Achar-Python {
     $candidatos = @(
+        (Join-Path $DirMotor 'venv-ia\Scripts\python.exe'),
         (Join-Path $Raiz 'camera-service\venv\Scripts\python.exe'),
         (Join-Path $DirMotor 'venv\Scripts\python.exe'),
         (Join-Path $Raiz 'venv\Scripts\python.exe')
@@ -157,9 +159,11 @@ function Mostrar-Motor {
     if (-not $s) { return }
     $faiss = $null
     try { $faiss = Invoke-RestMethod "http://127.0.0.1:$PortaMotor/api/engine/status" -TimeoutSec 5 } catch {}
-    Escrever ("[2/3] Motor de IA: LIGADO em http://localhost:{0}  |  motor {1}  |  {2} rostos indexados  |  câmera padrão {3} ({4} fps)" -f `
-        $PortaMotor, $s.engine, $s.registered_persons, $(if ($s.rtsp_connected) { 'conectada' } else { 'sem sinal' }), $s.rtsp_fps) 'Green'
+    $hw = if ($faiss -and $faiss.hardware_acceleration) { $faiss.hardware_acceleration } else { 'CPU' }
+    Escrever ("[2/3] Motor de IA: LIGADO em http://localhost:{0}  |  {1}  |  {2} rostos indexados  |  câmera padrão {3} ({4} fps)" -f `
+        $PortaMotor, $hw, $s.registered_persons, $(if ($s.rtsp_connected) { 'conectada' } else { 'sem sinal' }), $s.rtsp_fps) 'Green'
     if ($s.engine -ne 'insightface_onnx') { Escrever '      Atenção: InsightFace não carregou; o motor está em modo simulado.' 'Red' }
+    if ($hw -eq 'CPU') { Escrever '      Atenção: IA rodando na CPU (lenta). Veja backend\microservice-face-python\requirements-windows-gpu.txt para usar a placa de vídeo.' 'Yellow' }
     if ($faiss -and $faiss.faiss_total_vectors -eq 0) { Escrever '      Atenção: nenhum rosto no índice. Confira a chave do Supabase e se há pessoas com biometria.' 'Yellow' }
 }
 

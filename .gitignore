@@ -78,6 +78,7 @@ __pycache__/
 venv/
 .venv/
 venv_311/
+venv-ia/
 env/
 
 # Arquivos temporários / logs de diagnóstico

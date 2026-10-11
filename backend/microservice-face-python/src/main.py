@@ -19,8 +19,13 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from loguru import logger
 
-# Desativar uso forçado de GPU (CPU/ONNX por padrão)
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+# Placa de vídeo: IA_GPU=auto (padrão) usa DirectML/CUDA se o onnxruntime tiver; IA_GPU=off força a CPU.
+# Na RTX 5060 com onnxruntime-directml: ~52 ms por quadro contra ~620 ms na CPU, mesmos embeddings.
+IA_GPU = os.getenv("IA_GPU", "auto").lower()
+IA_FPS = max(1.0, float(os.getenv("IA_FPS", "10")))                       # análises de IA por segundo, por câmera
+IA_CAMERA_OCIOSA_S = max(15, int(os.getenv("IA_CAMERA_OCIOSA_S", "60")))  # sem uso por esse tempo → câmera desligada
+if IA_GPU == "off":
+    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 # Suporte UTF-8 no Windows
 if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
@@ -59,12 +64,21 @@ if INSIGHTFACE_AVAILABLE and FaceAnalysis is not None:
     except Exception as prov_err:
         logger.warning(f"Erro ao detectar provedores ONNX: {prov_err}")
         gpu_provs = ['CPUExecutionProvider']
+    if IA_GPU == "off":
+        gpu_provs = ['CPUExecutionProvider']
 
-    logger.info("🚀 Inicializando InsightFace Buffalo_L (Motor Biométrico AVX2/CPU + FAISS)...")
-    face_app = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])
-    face_app.prepare(ctx_id=0, det_size=(640, 640))
-    active_providers = ['CPUExecutionProvider']
-    logger.info("✅ InsightFace Buffalo_L carregado e estabilizado com sucesso.")
+    logger.info(f"🚀 Inicializando InsightFace Buffalo_L + FAISS (provedores: {gpu_provs})...")
+    try:
+        face_app = FaceAnalysis(name='buffalo_l', providers=gpu_provs)
+        face_app.prepare(ctx_id=0, det_size=(640, 640))
+    except Exception as gpu_err:
+        # Driver/placa com problema: segue na CPU em vez de ficar sem IA
+        logger.warning(f"Placa de vídeo indisponível ({gpu_err}); usando CPU.")
+        face_app = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])
+        face_app.prepare(ctx_id=0, det_size=(640, 640))
+    # Provedor que cada modelo realmente usa (o onnxruntime cai para CPU sozinho se precisar)
+    active_providers = sorted({m.session.get_providers()[0] for m in face_app.models.values()})
+    logger.info(f"✅ InsightFace Buffalo_L carregado em {active_providers}.")
 
 model_lock = threading.Lock()
 
@@ -163,6 +177,10 @@ class RTSPStreamReader:
         self.fps = 0.0
         self.last_frame_time = 0.0
         self.reconnect_count = 0
+        self.ultimo_uso = time.time()  # último pedido de alguém (painel/API), não da própria IA
+
+    def tocar(self):
+        self.ultimo_uso = time.time()
 
     def start(self):
         if self.running:
@@ -174,15 +192,12 @@ class RTSPStreamReader:
         self.ai_thread.start()
 
     def stop(self):
+        # A própria thread de leitura libera a câmera ao sair (liberar aqui, no meio de um read(), pode derrubar o OpenCV)
         self.running = False
         if self.thread:
-            self.thread.join(timeout=1.0)
+            self.thread.join(timeout=2.0)
         if self.ai_thread:
-            self.ai_thread.join(timeout=1.0)
-        with self.lock:
-            if self.cap:
-                self.cap.release()
-                self.cap = None
+            self.ai_thread.join(timeout=2.0)
 
     def _read_loop(self):
         logger.info(f"📹 Conectando ao stream RTSP com Zero-Latency: {self.url}")
@@ -217,19 +232,26 @@ class RTSPStreamReader:
                 logger.error(f"Erro no loop RTSP: {e}")
                 time.sleep(0.5)
 
+        if self.cap is not None:
+            self.cap.release()
+            self.cap = None
+
     def _ai_loop(self):
         """Worker desacoplado de IA: processa detecção/reconhecimento sem travar o vídeo"""
+        intervalo = 1.0 / IA_FPS
         while self.running:
+            inicio = time.time()
             frame = self.get_frame()
             if frame is not None and face_app is not None:
                 try:
-                    annotated, results = process_and_annotate_frame(frame)
+                    annotated, results = process_and_annotate_frame(frame, fps=self.fps)
                     with self.lock:
                         self.latest_annotated_frame = annotated
                         self.latest_results = results
                 except Exception as e:
                     pass
-            time.sleep(0.07)  # ~14 FPS de processamento de IA contínuo
+            # Alvo de IA_FPS análises/s por câmera, descontando o tempo da própria análise
+            time.sleep(max(0.01, intervalo - (time.time() - inicio)))
 
     def get_frame(self) -> Optional[np.ndarray]:
         with self.lock:
@@ -238,6 +260,7 @@ class RTSPStreamReader:
             return None
 
     def get_annotated_frame(self) -> Optional[np.ndarray]:
+        self.tocar()  # usado só por quem assiste (vídeo/snapshot); a IA usa get_frame
         with self.lock:
             if self.latest_annotated_frame is not None:
                 return self.latest_annotated_frame.copy()
@@ -248,16 +271,36 @@ class RTSPStreamReader:
 # Instância padrão para a webcam do usuário
 DEFAULT_RTSP_URL = "rtsp://a2eventos:19022020@localhost:8554/live"
 active_streams: Dict[str, RTSPStreamReader] = {}
+streams_lock = threading.Lock()
 
 def get_or_create_stream(url: str = DEFAULT_RTSP_URL) -> RTSPStreamReader:
-    if url not in active_streams:
-        reader = RTSPStreamReader(url)
-        reader.start()
-        active_streams[url] = reader
-    return active_streams[url]
+    with streams_lock:
+        reader = active_streams.get(url)
+        if reader is None:
+            reader = RTSPStreamReader(url)
+            reader.start()
+            active_streams[url] = reader
+    reader.tocar()
+    return reader
 
-# Inicia o leitor da câmera padrão do usuário
-default_reader = get_or_create_stream(DEFAULT_RTSP_URL)
+def _desligar_streams_ociosos():
+    """Câmera sem ninguém usando há IA_CAMERA_OCIOSA_S para de ler vídeo e de rodar IA.
+    Antes cada câmera aberta uma vez ficava analisando ~14 quadros/s para sempre."""
+    while True:
+        time.sleep(15)
+        agora = time.time()
+        with streams_lock:
+            ociosos = [(u, r) for u, r in active_streams.items() if agora - r.ultimo_uso > IA_CAMERA_OCIOSA_S]
+            for url, _ in ociosos:
+                del active_streams[url]
+        for url, reader in ociosos:
+            reader.stop()
+            logger.info(f"💤 Câmera sem uso há {IA_CAMERA_OCIOSA_S}s, desligada (religa no próximo pedido): {url.split('@')[-1]}")
+
+threading.Thread(target=_desligar_streams_ociosos, daemon=True).start()
+
+# Inicia o leitor da câmera padrão do usuário (desliga sozinho se ninguém usar)
+get_or_create_stream(DEFAULT_RTSP_URL)
 
 # ==========================================================
 # 4. RASTREADOR DE FACES (CENTROID / IOU TRACKER)
@@ -337,12 +380,16 @@ class ExtractRequest(BaseModel):
 
 @app.get("/health")
 async def health():
+    # Não usa get_or_create_stream: a checagem de saúde não pode manter câmeras ligadas
+    padrao = active_streams.get(DEFAULT_RTSP_URL)
     return {
         "status": "healthy",
         "engine": "insightface_onnx" if INSIGHTFACE_AVAILABLE else "mock",
+        "providers": active_providers,
         "registered_persons": len(known_persons),
-        "rtsp_connected": default_reader.cap.isOpened() if default_reader.cap else False,
-        "rtsp_fps": round(default_reader.fps, 1)
+        "cameras_em_uso": len(active_streams),
+        "rtsp_connected": bool(padrao and padrao.cap is not None and padrao.cap.isOpened()),
+        "rtsp_fps": round(padrao.fps, 1) if padrao else 0.0
     }
 
 @app.post("/api/reload-faces")
@@ -431,7 +478,7 @@ async def get_camera_snapshot(stream_url: str = DEFAULT_RTSP_URL, annotate: bool
     _, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, max(30, min(quality, 95))])
     return Response(content=jpeg.tobytes(), media_type="image/jpeg")
 
-def process_and_annotate_frame(frame: np.ndarray, threshold: float = 0.50):
+def process_and_annotate_frame(frame: np.ndarray, threshold: float = 0.50, fps: float = 0.0):
     """Detecta faces, compara com o banco de dados e renderiza HUD de rastreamento no frame"""
     h, w, _ = frame.shape
     faces = []
@@ -573,7 +620,7 @@ def process_and_annotate_frame(frame: np.ndarray, threshold: float = 0.50):
     # Banner superior de telemetria
     cv2.rectangle(frame, (0, 0), (w, 36), (10, 15, 25), -1)
     cv2.line(frame, (0, 36), (w, 36), (0, 212, 255), 1)
-    cv2.putText(frame, f"A2 EVENTOS - RASTREAMENTO FACIAL ATIVO | FACES: {len(faces)} | FPS: {default_reader.fps:.1f} | BASE: {len(known_persons)} PESSOAS",
+    cv2.putText(frame, f"A2 EVENTOS - RASTREAMENTO FACIAL ATIVO | FACES: {len(faces)} | FPS: {fps:.1f} | BASE: {len(known_persons)} PESSOAS",
                 (15, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 212, 255), 1, cv2.LINE_AA)
 
     return frame, tracking_results
@@ -592,7 +639,7 @@ def track_live_endpoint(stream_url: str = DEFAULT_RTSP_URL, threshold: float = 0
         }
 
     t0 = time.time()
-    annotated_frame, results = process_and_annotate_frame(frame, threshold=threshold)
+    annotated_frame, results = process_and_annotate_frame(frame, threshold=threshold, fps=reader.fps)
     proc_time_ms = (time.time() - t0) * 1000
 
     # Converter imagem anotada para base64 para visualização na UI se desejado
@@ -633,7 +680,11 @@ def get_engine_status():
     """Retorna o status detalhado do hardware de aceleracao e indice FAISS"""
     return {
         "engine": "InsightFace Buffalo_L (SCRFD 10G + ArcFace 512-D ONNX)",
-        "hardware_acceleration": "CPU AVX2 Multi-Threaded",
+        "hardware_acceleration": "GPU (DirectML)" if "DmlExecutionProvider" in active_providers
+            else ("GPU (CUDA)" if "CUDAExecutionProvider" in active_providers else "CPU"),
+        "ia_fps_por_camera": IA_FPS,
+        "camera_ociosa_desliga_s": IA_CAMERA_OCIOSA_S,
+        "cameras_em_uso": len(active_streams),
         "active_providers": active_providers,
         "vector_search_engine": "FAISS IndexFlatIP (Sub-millisecond Search)",
         "registered_faces_indexed": len(known_persons),
