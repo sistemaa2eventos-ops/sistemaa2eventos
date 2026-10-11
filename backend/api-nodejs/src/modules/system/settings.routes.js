@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const settingsController = require('./settings.controller');
 const { getDbMetrics } = require('./metrics.controller');
-const { authorize, authenticate } = require('../../middleware/auth');
+const { authorize, authenticate, checkPermission } = require('../../middleware/auth');
+const { smtpValidators, handleValidationErrors } = require('../../middleware/validators');
 
 router.use(authenticate);
 
@@ -20,6 +21,8 @@ router.delete('/apikeys/:id', authorize(['admin', 'master']), settingsController
 
 router.get('/webhooks', authorize(['admin', 'master']), settingsController.getWebhooks);
 router.post('/webhooks', authorize(['admin', 'master']), settingsController.createWebhook);
+router.put('/webhooks/:id', checkPermission('configuracoes', 'escrita'), settingsController.updateWebhook);
+router.post('/webhooks/:id/test', checkPermission('configuracoes', 'escrita'), settingsController.testWebhook);
 router.delete('/webhooks/:id', authorize(['admin', 'master']), settingsController.deleteWebhook);
 
 // Auditoria
@@ -27,7 +30,12 @@ router.get('/test-connection', authorize(['admin', 'master']), settingsControlle
 router.get('/sync-history', authorize(['admin', 'master']), settingsController.getSyncHistory);
 
 // Comunicação
-router.post('/verify-smtp', authorize(['admin', 'master']), settingsController.verifySmtp);
+router.post('/verify-smtp', authorize(['admin', 'master']), smtpValidators.verify, handleValidationErrors, settingsController.verifySmtp);
 router.post('/verify-wpp', authorize(['admin', 'master']), settingsController.verifyWpp);
+router.post('/test-email', checkPermission('configuracoes', 'escrita'), settingsController.testEmail);
+
+// Segurança Avançada
+router.post('/generate-api-key', checkPermission('configuracoes', 'escrita'), settingsController.generateApiKey);
+router.post('/force-logout-all', checkPermission('configuracoes', 'escrita'), settingsController.forceLogoutAll);
 
 module.exports = router;

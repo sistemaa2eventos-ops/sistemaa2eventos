@@ -1,5 +1,32 @@
 const { supabase } = require('../config/supabase');
 const logger = require('../services/logger');
+const { normalize } = require('./auth');
+
+// Cache curto do evento: toda requisição com contexto de evento buscava a linha inteira no banco.
+const CACHE_EVENTO_MS = 15 * 1000;
+const cacheEvento = new Map(); // id → { evento, expiraEm }
+
+async function buscarEvento(eventoId) {
+    const item = cacheEvento.get(eventoId);
+    if (item && item.expiraEm > Date.now()) return { evento: { ...item.evento }, error: null };
+
+    const { data: evento, error } = await supabase
+        .from('eventos')
+        .select('*')
+        .eq('id', eventoId)
+        .single();
+    if (evento) {
+        if (cacheEvento.size > 500) cacheEvento.clear();
+        cacheEvento.set(eventoId, { evento, expiraEm: Date.now() + CACHE_EVENTO_MS });
+    }
+    return { evento: evento ? { ...evento } : null, error };
+}
+
+/** Chamado quando um evento é alterado (status, horários, config...) */
+function invalidarEvento(eventoId) {
+    if (eventoId) cacheEvento.delete(eventoId);
+    else cacheEvento.clear();
+}
 
 /**
  * Middleware para garantir que a requisição opere dentro de um contexto de evento (Nexus)
@@ -14,44 +41,50 @@ async function requireEvent(req, res, next) {
             return res.status(401).json({ error: 'Usuário não autenticado no middleware de evento' });
         }
 
-        // Prioridade 1: Header x-evento-id (Mobile App)
-        // Prioridade 2: Query String (Web Admin React Router fallback)
-        // Prioridade 3: User Metadata JWT (Fixed assignment)
-        const eventoId = req.headers['x-evento-id'] || req.query.evento_id || req.body?.evento_id || req.user.evento_id;
+        // --- 🔒 ARQUITETURA DE TENANT IMUTÁVEL ---
+        // Se o middleware de auth já validou o tenantId, usamos ele.
+        // Caso contrário, Masters podem usar headers, outros usam o JWT fixo.
+        // Sanitizar valores que o frontend pode enviar como string literal "undefined" ou "null"
+        const sanitize = (v) => (v && v !== 'undefined' && v !== 'null') ? v : null;
+        const { extractRole } = require('./auth');
+        const userRole = extractRole(req.user);
+        const isSovereign = userRole === 'admin_master' || userRole === 'admin';
+
+        const eventoId = sanitize(req.tenantId) || 
+                        (isSovereign
+                            ? (sanitize(req.headers['x-evento-id']) || sanitize(req.query.evento_id) || sanitize(req.body?.evento_id)) 
+                            : sanitize(req.user.evento_id));
 
         req.event = null;
 
-        if (!eventoId && req.user.role !== 'master') {
-            return res.status(400).json({
-                error: 'Falta vincular evento ativo. Utilize o seletor na interface para prosseguir.'
-            });
+        if (!eventoId) {
+            if (isSovereign) {
+                logger.info(`[Master Bypass] Usuário ${req.user.email} operando sem evento contextualizado.`);
+                req.event = { id: null, nome: 'Global (Sem Evento)', status: 'ativo' };
+                // Master sem evento: tenantId fica null intencionalmente
+                if (!req.tenantId) req.tenantId = null;
+                return next();
+            }
+            return res.status(400).json({ error: 'Falta vincular evento ativo para prosseguir.' });
         }
 
-        // Se for Master e não tiver eventoId, permite prosseguir sem carregar req.event
-        if (!eventoId && req.user.role === 'master') {
-            logger.info(`[Master Bypass] Usuário ${req.user.email} operando sem evento contextualizado.`);
-            return next();
-        }
+        const { evento, error } = await buscarEvento(eventoId);
 
-        // Buscar detalhes do evento (Cache idealmente aqui no futuro)
-        const { data: evento, error } = await supabase
-            .from('eventos')
-            .select('*')
-            .eq('id', eventoId)
-            .single();
-
-        if ((error || !evento) && req.user.role !== 'master') {
+        if ((error || !evento) && !isSovereign) {
             logger.warn(`Usuário ${req.user.id} tentou acessar evento inexistente: ${eventoId}`);
             return res.status(404).json({ error: 'Nexus de evento não encontrado ou inválido.' });
         }
 
-        // Se for Master e o evento não existir, permitimos prosseguir (bypass de lixo de cache)
-        if (!evento && req.user.role === 'master') {
+        // Se for Soberano e o evento não existir, permitimos prosseguir (bypass de lixo de cache)
+        if (!evento && isSovereign) {
+            req.event = { id: eventoId || null, nome: 'Global (Bypass)', status: 'ativo' };
             return next();
         }
 
-        // Bloquear acesso se o evento não estiver ativo (exceto para Admin que pode estar configurando)
-        if (evento.status !== 'ativo' && req.user.role !== 'admin') {
+        // Bloquear acesso se o evento não estiver ativo (exceto para Gestores que podem estar configurando)
+        const isManager = userRole === 'admin' || isSovereign || userRole === 'supervisor';
+        if (evento.status !== 'ativo' && !isManager) {
+            logger.warn(`🚫 [EVENT LOCKED] Usuário ${req.user.id} barrado porque o evento ${eventoId} está ${evento.status}`);
             return res.status(403).json({
                 error: `O Nexus "${evento.nome}" está atualmente ${evento.status} e não permite operações.`
             });
@@ -59,18 +92,23 @@ async function requireEvent(req, res, next) {
 
         // --- CRITICAL SECURITY FIX: HORIZONTAL PRIVILEGE ESCALATION (IDOR) PREVENTION ---
         // Valida se o usuário autenticado realmente tem laço com o evento que está tentando acessar
-        if (req.user.role !== 'admin' && req.user.role !== 'supervisor' && req.user.role !== 'master') {
+        if (userRole !== 'admin' && userRole !== 'supervisor' && !isSovereign) {
             if (req.user.evento_id && req.user.evento_id !== eventoId) {
-                logger.warn(`[SECURITY ALERT] Usuário ${req.user.email} tentou IDOR no evento ${eventoId}`);
+                logger.warn(`🚨 [IDOR PREVENT] Usuário ${req.user.email} tentou IDOR: Preso a ${req.user.evento_id} mas tentou ${eventoId}`);
                 return res.status(403).json({ error: 'Você não tem permissão para operar o Nexus deste evento.' });
             }
         }
 
         // ANEXAR CONTEXTO
         req.event = evento;
-
-        // SEGURANÇA: Se o evento veio de outra fonte, garantimos que todas as queries daqui pra frente usem o evento_id validado
         req.user.evento_id = eventoId;
+
+        // 🔑 FIX CRÍTICO: Garantir que req.tenantId esteja sempre disponível
+        // para controllers que não passam por checkPermission (ex: GET /, GET /search)
+        if (!req.tenantId) {
+            req.tenantId = eventoId;
+        }
+
         req.body = req.body || {};
         req.query = req.query || {};
 
@@ -84,4 +122,4 @@ async function requireEvent(req, res, next) {
     }
 }
 
-module.exports = { requireEvent };
+module.exports = { requireEvent, invalidarEvento };

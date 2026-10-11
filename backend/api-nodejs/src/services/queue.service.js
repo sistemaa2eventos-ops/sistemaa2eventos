@@ -12,19 +12,41 @@ class QueueService {
 
         this.client = null;
         this.isConnected = false;
+        this._redisErrorLogged = false;
         
         const redisUrl = process.env.REDIS_URL || 
             (process.env.REDIS_HOST ? `redis://${process.env.REDIS_PASSWORD ? ':' + process.env.REDIS_PASSWORD + '@' : ''}${process.env.REDIS_HOST}:${process.env.REDIS_PORT || 6379}` : null);
 
         if (redisUrl || process.env.USE_REDIS === 'true') {
-            this.client = createClient({ url: redisUrl || 'redis://localhost:6379' });
+            this.client = createClient({ 
+                url: redisUrl || 'redis://localhost:6379',
+                socket: {
+                    // Nunca desiste: antes parava após 3 tentativas e o cliente ficava
+                    // "closed" até reiniciar o backend. Agora tenta a cada 1 s… até 30 s.
+                    reconnectStrategy: (retries) => {
+                        if (retries === 3 && !this._redisErrorLogged) {
+                            logger.warn('⚠️ [QueueService] Redis indisponível; seguindo sem fila e tentando reconectar em segundo plano.');
+                            this._redisErrorLogged = true;
+                        }
+                        return Math.min((retries + 1) * 1000, 30000);
+                    }
+                }
+            });
             
-            this.client.on('error', (err) => logger.error('❌ [QueueService] Redis Client Error:', err.message));
-            this.client.on('connect', () => logger.info('✅ [QueueService] Redis Connected. Queues ready.'));
+            this.client.on('error', (err) => {
+                if (!this._redisErrorLogged) {
+                    logger.error('❌ [QueueService] Redis Client Error: ' + err.message);
+                }
+            });
+            this.client.on('ready', () => {
+                if (this._redisErrorLogged) logger.info('✅ [QueueService] Redis reconectado.');
+                this._redisErrorLogged = false;
+                logger.info('✅ [QueueService] Redis Connected. Queues ready.');
+            });
             
             this.connect();
         } else {
-            logger.warn('⚠️ [QueueService] Redis desativado. Local Queues operarão em Fallback (Memory) - Não recomendado para Produção Múltipla.');
+            logger.warn('⚠️ [QueueService] Redis desativado. Local Queues operarão em Fallback (Memory).');
         }
     }
 
@@ -60,7 +82,7 @@ class QueueService {
      * @param {Object} logData 
      */
     async publishLogToCloud(logData) {
-        if (!this.isConnected) {
+        if (!this.isConnected || !this.client?.isReady) {
             logger.warn('⚠️ [QueueService] Publicação ignorada. Redis desconectado.');
             return false;
         }
@@ -73,7 +95,10 @@ class QueueService {
                 timestamp: Date.now().toString()
             };
 
-            const msgId = await this.client.xAdd(this.UP_STREAM_KEY, '*', payload);
+            // Limita o tamanho do stream (antes crescia para sempre)
+            const msgId = await this.client.xAdd(this.UP_STREAM_KEY, '*', payload, {
+                TRIM: { strategy: 'MAXLEN', strategyModifier: '~', threshold: 10000 }
+            });
             logger.debug(`📤 [QueueService] Log inserido na fila. ID Stream: ${msgId}`);
             return msgId;
         } catch (error) {

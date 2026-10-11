@@ -12,21 +12,28 @@ class VeiculoService {
         const from = (page - 1) * limit;
 
         // Passo 1: Capturar IDs de empresas do evento (Isolamento de Tenant)
-        const { data: empData } = await supabaseClient
-            .from('empresas')
-            .select('id, nome, evento_id')
-            .eq('evento_id', eventoId);
-        
-        const empIds = (empData || []).map(e => e.id);
-        if (empIds.length === 0) return { data: [], total: 0 };
-
-        const empMap = (empData || []).reduce((acc, e) => { acc[e.id] = e; return acc; }, {});
+        let empIds = [];
+        let empMap = {};
+        if (eventoId) {
+            const { data: empData } = await supabaseClient
+                .from('empresas')
+                .select('id, nome, evento_id')
+                .eq('evento_id', eventoId);
+            
+            empIds = (empData || []).map(e => e.id);
+            empMap = (empData || []).reduce((acc, e) => { acc[e.id] = e; return acc; }, {});
+        }
 
         // Passo 2: Buscar veículos com paginação
         let query = supabaseClient
             .from('veiculos')
-            .select('*', { count: 'exact' })
-            .in('empresa_id', empIds);
+            .select('*', { count: 'exact' });
+
+        if (eventoId && empIds.length > 0) {
+            query = query.or(`evento_id.eq.${eventoId},empresa_id.in.(${empIds.join(',')})`);
+        } else if (eventoId) {
+            query = query.eq('evento_id', eventoId);
+        }
 
         if (search) {
             // Busca expandida para incluir Marca
@@ -40,22 +47,31 @@ class VeiculoService {
         if (vError) throw vError;
 
         // Passo 3: Popular motoristas (Pessoas) se existirem
-        const motoristaIds = [...new Set(veiculos.map(v => v.motorista_id).filter(id => id))];
+        const motoristaIds = [...new Set(veiculos.map(v => v.motorista_id || v.pessoa_id).filter(id => id))];
         let motoristaMap = {};
         if (motoristaIds.length > 0) {
             const { data: pData } = await supabaseClient
                 .from('pessoas')
-                .select('id, nome_completo, cpf')
+                .select('id, nome_completo, cpf, foto_url, funcao')
                 .in('id', motoristaIds);
-            motoristaMap = (pData || []).reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
+            motoristaMap = (pData || []).reduce((acc, p) => { 
+                acc[p.id] = {
+                    ...p,
+                    nome_completo: p.nome_completo || p.nome || 'Motorista'
+                }; 
+                return acc; 
+            }, {});
         }
 
         // Passo 4: Unificar dados
-        const formattedData = veiculos.map(v => ({
-            ...v,
-            empresas: empMap[v.empresa_id] || null,
-            pessoas: v.motorista_id ? (motoristaMap[v.motorista_id] || null) : null
-        }));
+        const formattedData = veiculos.map(v => {
+            const mId = v.motorista_id || v.pessoa_id;
+            return {
+                ...v,
+                empresas: empMap[v.empresa_id] || null,
+                pessoas: mId ? (motoristaMap[mId] || null) : null
+            };
+        });
 
         return { data: formattedData, total: count || 0 };
     }
@@ -82,14 +98,15 @@ class VeiculoService {
         }
 
         // Passo 3: Buscar motorista se existir
+        const motoristaId = veiculo.motorista_id || veiculo.pessoa_id;
         let motorista = null;
-        if (veiculo.motorista_id) {
+        if (motoristaId) {
             const { data: p } = await supabaseClient
                 .from('pessoas')
-                .select('nome_completo, cpf')
-                .eq('id', veiculo.motorista_id)
-                .single();
-            motorista = p;
+                .select('id, nome_completo, cpf, foto_url, funcao')
+                .eq('id', motoristaId)
+                .maybeSingle();
+            motorista = p ? { ...p, nome_completo: p.nome_completo || p.nome || 'Motorista' } : null;
         }
 
         return { ...veiculo, empresas: empresa, pessoas: motorista };
@@ -117,7 +134,9 @@ class VeiculoService {
                 marca: marca?.toUpperCase().trim() || '',
                 modelo: modelo?.toUpperCase().trim() || '',
                 empresa_id,
+                evento_id: eventoId,
                 motorista_id: motorista_id || null,
+                pessoa_id: motorista_id || null,
                 status: 'liberado',
                 created_at: new Date()
             }])
@@ -165,12 +184,14 @@ class VeiculoService {
             if (!empCheck) throw new Error('A nova empresa informada não pertence a este evento.');
         }
 
-        const updates = { atualizado_em: new Date() };
+        const updates = {};
         if (placa) updates.placa = placa.toUpperCase().trim().replace(/\s/g, '');
         if (marca) updates.marca = marca.toUpperCase().trim();
         if (modelo) updates.modelo = modelo.toUpperCase().trim();
         if (empresa_id) updates.empresa_id = empresa_id;
         updates.motorista_id = motorista_id || null;
+        updates.pessoa_id = motorista_id || null;
+        if (eventoId) updates.evento_id = eventoId;
 
         const { data, error } = await supabaseClient
             .from('veiculos')
@@ -210,6 +231,11 @@ class VeiculoService {
         const { error } = await supabaseClient.from('veiculos').delete().eq('id', id);
         if (error) throw error;
         return true;
+    }
+
+    async listByEvent(supabaseClient, eventoId, search) {
+        const res = await this.list(supabaseClient, eventoId, search, 1, 1000);
+        return res.data;
     }
 }
 

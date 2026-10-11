@@ -1,6 +1,13 @@
-FROM node:18-alpine
+FROM node:20-alpine
+
+# Instalar timezone data — Alpine não inclui por padrão
+# Sem isso, TZ=America/Sao_Paulo não funciona corretamente
+RUN apk add --no-cache tzdata
+ENV TZ=America/Sao_Paulo
 
 WORKDIR /app
+
+RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 
 # Copiar arquivos de dependências
 COPY package*.json ./
@@ -9,8 +16,10 @@ RUN npm ci --only=production
 # Copiar código fonte
 COPY . .
 
-# Criar diretório de logs
-RUN mkdir -p logs
+# Criar diretório de logs e atribuir ao usuário
+RUN mkdir -p logs && chown -R nodejs:nodejs logs
+
+USER nodejs
 
 # Expor porta
 EXPOSE 3001

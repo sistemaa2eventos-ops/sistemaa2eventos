@@ -50,7 +50,7 @@ class LGPDService {
             .eq('pessoa_id', pessoaId);
 
         // 4. Remover face dos terminais (Intelbras/Hikvision)
-        syncService.deleteUserFromAllDevices(pessoaId, pessoa.evento_id)
+        syncService.deleteUserFromAllDevices(pessoa, pessoa.evento_id)
             .catch(e => logger.error(`[LGPD] Falha ao remover do terminal:`, e));
 
         // 5. Anonimizar dados na tabela principal

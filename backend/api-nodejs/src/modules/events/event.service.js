@@ -40,11 +40,16 @@ class EventService {
      */
     async getById(supabaseClient, id) {
         const [eventoResult, modulesResult] = await Promise.all([
-            supabaseClient.from('eventos').select('*, empresas(*)').eq('id', id).single(),
+            supabaseClient.from('eventos').select('*, empresas(*)').eq('id', id).maybeSingle(),
             supabaseClient.from('event_modules').select('*').eq('evento_id', id)
         ]);
 
         if (eventoResult.error) throw eventoResult.error;
+        if (!eventoResult.data) {
+            const err = new Error('Evento não encontrado');
+            err.status = 404;
+            throw err;
+        }
 
         return {
             ...eventoResult.data,
@@ -98,6 +103,39 @@ class EventService {
             .single();
 
         if (error) throw error;
+
+        // Propagar datas do evento para empresas e pessoas
+        if (updates.datas_montagem || updates.datas_evento || updates.datas_desmontagem) {
+            // Obter os dados completos do evento recém atualizado para garantir que temos todas as listas
+            const { data: eventoFull } = await supabaseClient
+                .from('eventos')
+                .select('datas_montagem, datas_evento, datas_desmontagem')
+                .eq('id', id)
+                .single();
+            
+            if (eventoFull) {
+                const combinedDates = [...new Set([
+                    ...(eventoFull.datas_montagem || []),
+                    ...(eventoFull.datas_evento || []),
+                    ...(eventoFull.datas_desmontagem || [])
+                ])].sort();
+
+                logger.info(`📅 Propagando novas datas para o evento ${id}: ${combinedDates.length} dias.`);
+
+                // Atualizar empresas
+                await supabaseClient
+                    .from('empresas')
+                    .update({ datas_presenca: combinedDates })
+                    .eq('evento_id', id);
+
+                // Atualizar pessoas
+                await supabaseClient
+                    .from('pessoas')
+                    .update({ dias_acesso: combinedDates })
+                    .eq('evento_id', id);
+            }
+        }
+
         return data;
     }
 

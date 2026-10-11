@@ -1,267 +1,187 @@
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
+const eventService = require('./event.service');
+const websocketService = require('../../services/websocketService');
+const ApiResponse = require('../../utils/apiResponse');
 
 class EventoController {
     async list(req, res) {
         try {
-            // Buscar todos os eventos
-            const { data: eventos, error: eventError } = await supabase
-                .from('eventos')
-                .select('*')
-                .order('data_inicio', { ascending: false });
+            const supabaseClient = req.supabase || supabase;
+            let data = await eventService.listAll(supabaseClient);
 
-            if (eventError) throw eventError;
+            // Operador com vínculo específico recebe apenas os eventos autorizados pelo administrador
+            const userRole = req.user?.role || req.user?.nivel_acesso;
+            if (userRole === 'operador') {
+                const vinculoTipo = req.user?.vinculo_tipo || req.user?.permissions?.vinculo_tipo;
+                const permitidos = req.user?.eventos_permitidos || req.user?.permissions?.eventos_permitidos;
 
-            // Buscar contagens em batch (evita N+1 queries)
-            const eventoIds = eventos.map(e => e.id);
+                if (vinculoTipo === 'especifico' && Array.isArray(permitidos)) {
+                    data = (data || []).filter(e => permitidos.includes(e.id));
+                }
+            }
 
-            const [empResult, pesResult] = await Promise.all([
-                supabase.from('empresas')
-                    .select('evento_id')
-                    .in('evento_id', eventoIds),
-                supabase.from('pessoas')
-                    .select('evento_id')
-                    .in('evento_id', eventoIds)
-            ]);
-
-            // Agrupar contagens por evento_id
-            const empCounts = {};
-            const pesCounts = {};
-            (empResult.data || []).forEach(e => { empCounts[e.evento_id] = (empCounts[e.evento_id] || 0) + 1; });
-            (pesResult.data || []).forEach(p => { pesCounts[p.evento_id] = (pesCounts[p.evento_id] || 0) + 1; });
-
-            const eventosComStats = eventos.map(evento => ({
-                ...evento,
-                total_empresas: empCounts[evento.id] || 0,
-                total_pessoas: pesCounts[evento.id] || 0
-            }));
-
-            res.json({ success: true, data: eventosComStats });
+            return ApiResponse.success(res, data);
         } catch (error) {
             logger.error('Erro ao listar eventos:', error.message);
-            res.status(500).json({ error: error.message });
+            return ApiResponse.error(res, error.message);
         }
     }
 
     async getById(req, res) {
         try {
             const { id } = req.params;
+            const supabaseClient = req.supabase || supabase;
+            const data = await eventService.getById(supabaseClient, id);
 
-            // Buscar evento e módulos em queries separadas para evitar problema de
-            // cache de schema do Supabase com a relação event_modules
-            const [eventoResult, modulesResult] = await Promise.all([
-                supabase.from('eventos').select('*, empresas(*)').eq('id', id).single(),
-                supabase.from('event_modules').select('*').eq('evento_id', id)
-            ]);
-
-            if (eventoResult.error) throw eventoResult.error;
-
-            const data = {
-                ...eventoResult.data,
-                event_modules: modulesResult.data || []
-            };
-
-            res.json({ success: true, data });
+            return ApiResponse.success(res, data);
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            logger.error('Erro ao buscar evento por ID:', error.message);
+            return ApiResponse.error(res, error.message, 404);
         }
     }
 
     async create(req, res) {
         try {
-            const {
-                nome,
-                descricao,
-                local,
-                data_inicio,
-                data_fim,
-                capacidade_total,
-                datas_montagem,
-                datas_evento,
-                datas_desmontagem,
-                horario_reset,
-                tipos_checkin,
-                tipos_checkout,
-                impressao_etiquetas
-            } = req.body;
+            const { nome, data_inicio } = req.body;
 
             if (!nome || !data_inicio) {
-                return res.status(400).json({ error: 'Nome e data de início são obrigatórios' });
+                return ApiResponse.error(res, 'Nome e data de início são obrigatórios', 400);
             }
 
-            const slugify = (text) => {
-                return text
-                    .toString()
-                    .toLowerCase()
-                    .trim()
-                    .replace(/\s+/g, '-')
-                    .replace(/[^\w-]+/g, '')
-                    .replace(/--+/g, '-');
+            const payload = {
+                descricao: '',
+                local: '',
+                capacidade_total: 0,
+                datas_montagem: [],
+                datas_evento: [],
+                datas_desmontagem: [],
+                horario_reset: '00:00:00',
+                tipos_checkin: ['qrcode', 'barcode', 'manual'],
+                tipos_checkout: ['qrcode', 'barcode', 'manual'],
+                impressao_etiquetas: false,
+                ...req.body
             };
+            payload.impressao_etiquetas = !!payload.impressao_etiquetas;
 
-            const slug = `${slugify(nome)}-${Date.now().toString(36)}`;
+            const supabaseClient = req.supabase || supabase;
+            const data = await eventService.createEvent(supabaseClient, payload, req.user?.id);
 
-            // Usar service-role client (admin bypass RLS) — authorize('admin') já validou RBAC
-            const { data, error } = await supabase
-                .from('eventos')
-                .insert([{
-                    nome,
-                    slug,
-                    descricao: descricao || '',
-                    local: local || '',
-                    data_inicio,
-                    data_fim: data_fim || null,
-                    capacidade_total: capacidade_total || 0,
-                    datas_montagem: datas_montagem || [],
-                    datas_evento: datas_evento || [],
-                    datas_desmontagem: datas_desmontagem || [],
-                    horario_reset: horario_reset || '00:00:00',
-                    tipos_checkin: tipos_checkin || ['qrcode', 'barcode', 'manual'],
-                    tipos_checkout: tipos_checkout || ['qrcode', 'barcode', 'manual'],
-                    impressao_etiquetas: !!impressao_etiquetas,
-                    status: 'rascunho', // Inicia como rascunho até ativação manual
-                    created_by: req.user?.id
-                }])
-                .select()
-                .single();
-
-            if (error) throw error;
-            logger.info(`🎉 Evento criado: ${nome}`);
-            res.status(201).json({ success: true, data });
+            return ApiResponse.success(res, data, 201);
         } catch (error) {
             logger.error('Erro ao criar evento:', error.message);
-            res.status(500).json({ error: error.message });
+            return ApiResponse.error(res, error.message);
         }
     }
 
     async update(req, res) {
         try {
             const { id } = req.params;
-            const updates = req.body;
+            const supabaseClient = req.supabase || supabase;
 
-            const { data, error } = await supabase
-                .from('eventos')
-                .update({
-                    ...updates,
-                    updated_at: new Date()
-                })
-                .eq('id', id)
-                .select()
-                .single();
+            // 1. Verificar se a mudança é crítica para disparar alerta
+            const isCriticalChange = req.body.config || req.body.status;
 
-            if (error) throw error;
-            res.json({ success: true, data });
+            const data = await eventService.updateEvent(supabaseClient, id, req.body);
+
+            // 2. Disparar alerta WebSocket se for crítico
+            if (isCriticalChange) {
+                websocketService.emit('system:alert', {
+                    type: 'CRITICAL_CONFIG_CHANGE',
+                    severity: 'warning',
+                    message: `Configuração crítica alterada no evento: ${data.nome}`,
+                    details: {
+                        event_id: id,
+                        updated_by: req.user?.nome || 'Admin',
+                        changes: Object.keys(req.body)
+                    }
+                }, 'system_admin');
+            }
+
+            return ApiResponse.success(res, data);
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            logger.error('Erro ao atualizar evento:', error.message);
+            return ApiResponse.error(res, error.message);
         }
     }
 
     async activate(req, res) {
         try {
             const { id } = req.params;
-            const { data, error } = await supabase
-                .from('eventos')
-                .update({ status: 'ativo', updated_at: new Date() })
-                .eq('id', id)
-                .select()
-                .single();
-            if (error) throw error;
-            res.json({ success: true, message: 'Evento ativado!', data });
+            const supabaseClient = req.supabase || supabase;
+            const data = await eventService.setStatus(supabaseClient, id, 'ativo');
+
+            return ApiResponse.success(res, data, 200);
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            logger.error('Erro ao ativar evento:', error.message);
+            return ApiResponse.error(res, error.message);
         }
     }
 
     async deactivate(req, res) {
         try {
             const { id } = req.params;
-            const { data, error } = await supabase
-                .from('eventos')
-                .update({ status: 'encerrado', updated_at: new Date() })
-                .eq('id', id)
-                .select()
-                .single();
-            if (error) throw error;
-            res.json({ success: true, message: 'Evento desativado!', data });
+            const supabaseClient = req.supabase || supabase;
+            const data = await eventService.setStatus(supabaseClient, id, 'encerrado');
+
+            return ApiResponse.success(res, data, 200);
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            logger.error('Erro ao desativar evento:', error.message);
+            return ApiResponse.error(res, error.message);
         }
     }
 
     async delete(req, res) {
         try {
             const { id } = req.params;
-            const { error } = await supabase.from('eventos').delete().eq('id', id);
-            if (error) throw error;
-            res.json({ success: true, message: 'Evento deletado com sucesso' });
+            const supabaseClient = req.supabase || supabase;
+            await eventService.deleteEvent(supabaseClient, id);
+
+            return ApiResponse.success(res, { message: 'Evento deletado com sucesso' });
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            logger.error('Erro ao deletar evento:', error.message);
+            return ApiResponse.error(res, error.message);
         }
     }
 
     async getQuotas(req, res) {
         try {
-            const db = req.supabase || supabase;
             const { id, empresa_id } = req.params;
-            const { data, error } = await db
-                .from('quotas_diarias')
-                .select('*')
-                .eq('evento_id', id)
-                .eq('empresa_id', empresa_id);
+            const supabaseClient = req.supabase || supabase;
+            const data = await eventService.getQuotas(supabaseClient, id, empresa_id);
 
-            if (error) throw error;
-            res.json({ success: true, data });
+            return ApiResponse.success(res, data);
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            logger.error('Erro ao buscar quotas:', error.message);
+            return ApiResponse.error(res, error.message);
         }
     }
 
     async getStats(req, res) {
         try {
-            const db = req.supabase || supabase;
             const { id } = req.params;
+            const supabaseClient = req.supabase || supabase;
+            const data = await eventService.getStats(supabaseClient, id);
 
-            // Buscar contagem de funcionários e empresas
-            const [funcCount, empCount] = await Promise.all([
-                db.from('pessoas').select('id', { count: 'exact', head: true }).eq('evento_id', id),
-                db.from('empresas').select('id', { count: 'exact', head: true }).eq('evento_id', id)
-            ]);
-
-            res.json({
-                success: true,
-                stats: {
-                    total_pessoas: funcCount.count || 0,
-                    total_empresas: empCount.count || 0
-                }
-            });
+            return ApiResponse.success(res, data);
         } catch (error) {
             logger.error('Erro ao buscar stats do evento:', error.message);
-            res.status(500).json({ error: error.message });
+            return ApiResponse.error(res, error.message);
         }
     }
 
     async updateQuotas(req, res) {
         try {
             const { id, empresa_id } = req.params;
-            const { quotas } = req.body; // { '2023-10-01': 10, '2023-10-02': 15 }
+            const { quotas } = req.body;
+            const supabaseClient = req.supabase || supabase;
 
-            const insertData = Object.entries(quotas).map(([date, quotaVal]) => ({
-                evento_id: id,
-                empresa_id,
-                data: date,
-                quota: quotaVal
-            }));
+            await eventService.updateQuotas(supabaseClient, id, empresa_id, quotas);
 
-            // Upsert quotas para cada data
-            const db = req.supabase || supabase;
-            const { error } = await db
-                .from('quotas_diarias')
-                .upsert(insertData, { onConflict: 'evento_id, empresa_id, data' });
-
-            if (error) throw error;
-            res.json({ success: true, message: 'Cotas atualizadas!' });
+            return ApiResponse.success(res, { message: 'Cotas atualizadas!' });
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            logger.error('Erro ao atualizar quotas:', error.message);
+            return ApiResponse.error(res, error.message);
         }
     }
 
@@ -271,26 +191,75 @@ class EventoController {
             const { module_key, is_enabled } = req.body;
 
             if (!module_key) {
-                return res.status(400).json({ error: 'module_key é obrigatório' });
+                return ApiResponse.error(res, 'module_key é obrigatório', 400);
             }
 
-            const db = req.supabase || supabase;
-            const { data, error } = await db
-                .from('event_modules')
-                .upsert({
-                    evento_id,
-                    module_key,
-                    is_enabled,
-                    updated_at: new Date()
-                }, { onConflict: 'evento_id, module_key' })
-                .select()
-                .single();
+            const supabaseClient = req.supabase || supabase;
 
-            if (error) throw error;
-            res.json({ success: true, data });
+            const data = await eventService.toggleModule(supabaseClient, evento_id, module_key, is_enabled);
+
+            return ApiResponse.success(res, data);
         } catch (error) {
             logger.error('Erro ao alternar módulo:', error.message);
-            res.status(500).json({ error: error.message });
+            return ApiResponse.error(res, error.message);
+        }
+    }
+
+    async listPresets(req, res) {
+        try {
+            const data = eventService.getPresets();
+            return ApiResponse.success(res, data);
+        } catch (error) {
+            return ApiResponse.error(res, error.message);
+        }
+    }
+
+    async applyPreset(req, res) {
+        try {
+            const { id } = req.params;
+            const { preset_key } = req.body;
+            const supabaseClient = req.supabase || supabase;
+
+            const data = await eventService.applyPreset(supabaseClient, id, preset_key);
+
+            // Alerta crítico de aplicação de preset
+            websocketService.emit('system:alert', {
+                type: 'PRESET_APPLIED',
+                severity: 'info',
+                message: `Perfil de Evento '${preset_key}' aplicado em: ${data.nome}`,
+                details: { event_id: id }
+            }, 'system_admin');
+
+            return ApiResponse.success(res, data);
+        } catch (error) {
+            logger.error('Erro ao aplicar preset:', error.message);
+            return ApiResponse.error(res, error.message);
+        }
+    }
+
+    /**
+     * Obter áreas de acesso de um evento (para seleção durante aprovação de pessoa)
+     */
+    async getAreas(req, res) {
+        try {
+            const { id } = req.params;
+            const supabaseClient = req.supabase || supabase;
+
+            const { data, error } = await supabaseClient
+                .from('evento_areas')
+                .select('id, nome_area')
+                .eq('evento_id', id)
+                .order('nome_area', { ascending: true });
+
+            if (error) throw error;
+
+            return ApiResponse.success(res, {
+                data: data || [],
+                total: (data || []).length
+            });
+        } catch (error) {
+            logger.error('Erro ao obter áreas do evento:', error);
+            return ApiResponse.error(res, error.message);
         }
     }
 }

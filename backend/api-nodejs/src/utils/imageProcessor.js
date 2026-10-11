@@ -1,4 +1,9 @@
-const sharp = require('sharp');
+let sharp = null;
+try {
+    sharp = require('sharp');
+} catch (e) {
+    // sharp não instalado ou sem binários nativos no Windows
+}
 const logger = require('../services/logger');
 
 /**
@@ -16,16 +21,26 @@ class ImageProcessor {
         try {
             let buffer;
 
-            // 1. Converter Base64 para Buffer se necessário
+            // 1. Converter Base64 ou URL para Buffer se necessário
             if (typeof input === 'string') {
-                const base64Data = input.replace(/^data:image\/\w+;base64,/, '');
-                buffer = Buffer.from(base64Data, 'base64');
+                if (input.startsWith('http://') || input.startsWith('https://')) {
+                    const axios = require('axios');
+                    const resp = await axios.get(input, { responseType: 'arraybuffer', timeout: 7000 });
+                    buffer = Buffer.from(resp.data);
+                } else {
+                    const base64Data = input.replace(/^data:image\/\w+;base64,/, '');
+                    buffer = Buffer.from(base64Data, 'base64');
+                }
             } else {
                 buffer = input;
             }
 
             if (!buffer || buffer.length === 0) {
                 throw new Error('Input de imagem vazio ou inválido');
+            }
+
+            if (!sharp) {
+                return buffer;
             }
 
             // 2. Processar com Sharp
@@ -42,7 +57,7 @@ class ImageProcessor {
                 })
                 .jpeg({
                     quality: 80,
-                    progressive: true,
+                    progressive: false,
                     chromaSubsampling: '4:2:0'
                 })
                 .withMetadata(false) // Remove EXIF
@@ -52,7 +67,7 @@ class ImageProcessor {
             if (optimizedBuffer.length > 100000) {
                 logger.warn(`⚠️ [ImageProcessor] Imagem ainda pesada (${Math.round(optimizedBuffer.length/1024)}KB). Re-comprimindo...`);
                 return await sharp(optimizedBuffer)
-                    .jpeg({ quality: 60 }) // Reduz qualidade para garantir entrada
+                    .jpeg({ quality: 60, progressive: false }) // Reduz qualidade para garantir entrada
                     .toBuffer();
             }
 

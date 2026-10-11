@@ -1,6 +1,9 @@
 const { supabase } = require('../config/supabase');
 const logger = require('./logger');
 
+// A coluna de nome em pessoas é nome_completo (pessoa.nome não existe)
+const nomeDaPessoa = (pessoa) => String(pessoa?.nome_completo || pessoa?.nome || '');
+
 /**
  * Serviço de Abstração para Impressoras Térmicas (ESC/POS)
  * v26.2 - Suporte a Layouts Dinâmicos via Supabase
@@ -25,11 +28,33 @@ class PrinterService {
     }
 
     /**
+     * Gera comandos ZPL para Zebra
+     */
+    generateZPL(pessoa, empresaNome) {
+        const nome = nomeDaPessoa(pessoa).toUpperCase();
+        const empresa = (empresaNome || '').toUpperCase();
+        const cpf = pessoa.cpf || '';
+
+        let zpl = "^XA"; // Start
+        zpl += "^CF0,60"; // Default Font
+        zpl += "^FO50,50^FD" + nome + "^FS"; // Nome
+        zpl += "^CF0,30";
+        zpl += "^FO50,120^FD" + empresa + "^FS"; // Empresa
+        zpl += "^FO50,160^FDCentral de Acesso A2^FS"; // Footer
+        zpl += "^XZ"; // End
+        return zpl;
+    }
+
+    /**
      * Gera o buffer para impressão de credencial
      * Agora com carregamento de layout dinâmico
      */
-    async generateBadgeBuffer(pessoa, empresaNome, eventoId) {
-        const { RESET, ALIGN_CENTER, BOLD_ON, TEXT_NORMAL, DOUBLE_HEIGHT_ON, CUT_PAPER } = this.COMMANDS;
+    async generateBadgeBuffer(pessoa, empresaNome, eventoId, protocolo = 'ESC_POS') {
+        if (protocolo === 'ZPL') {
+            return this.generateZPL(pessoa, empresaNome);
+        }
+
+        const { RESET, ALIGN_CENTER, BOLD_ON, BOLD_OFF, TEXT_NORMAL, DOUBLE_HEIGHT_ON, CUT_PAPER } = this.COMMANDS;
 
         try {
             // Tentar buscar layout personalizado para o evento
@@ -49,9 +74,9 @@ class PrinterService {
                     if (el.tipo === 'texto') {
                         let txt = el.valor || '';
                         // Replace placeholders
-                        txt = txt.replace('{nome}', (pessoa.nome || '').toUpperCase());
-                        txt = txt.replace('{empresa}', (empresaNome || '').toUpperCase());
-                        txt = txt.replace('{cpf}', pessoa.cpf || '');
+                        txt = txt.split('{nome}').join(nomeDaPessoa(pessoa).toUpperCase());
+                        txt = txt.split('{empresa}').join((empresaNome || '').toUpperCase());
+                        txt = txt.split('{cpf}').join(pessoa.cpf || '');
                         
                         if (el.negrito) buffer += BOLD_ON;
                         if (el.tamanho === 'grande') buffer += DOUBLE_HEIGHT_ON;
@@ -64,13 +89,13 @@ class PrinterService {
                 // MODO FALLBACK (Layout Padrão A2)
                 buffer += BOLD_ON + "A2 EVENTOS\n" + TEXT_NORMAL;
                 buffer += "--------------------------------\n\n";
-                buffer += DOUBLE_HEIGHT_ON + BOLD_ON + (pessoa.nome || '').toUpperCase() + "\n" + TEXT_NORMAL;
+                buffer += DOUBLE_HEIGHT_ON + BOLD_ON + nomeDaPessoa(pessoa).toUpperCase() + "\n" + TEXT_NORMAL;
                 if (empresaNome) buffer += empresaNome + "\n";
                 buffer += "CPF: " + (pessoa.cpf || '') + "\n\n";
             }
 
             // Footer e Corte
-            buffer += "Validado em: " + new Date().toLocaleString() + "\n";
+            buffer += "Validado em: " + new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) + "\n";
             buffer += "\n\n\n" + CUT_PAPER;
 
             return buffer;

@@ -67,9 +67,22 @@ class PessoaService {
             query = query.range(offset, offset + limit - 1);
         }
 
+        // Mapeamento de grupos de status para as abas do painel de pessoas
+        const STATUS_GROUPS = {
+            ativos:    ['autorizado', 'checkin_feito', 'checkout_feito'],
+            pendentes: ['pendente', 'verificacao'],
+            bloqueados: ['bloqueado', 'expulso']
+        };
+
         // Filtros Adicionais
         if (filters.status) {
-            query = query.eq('status_acesso', filters.status.toLowerCase());
+            const statusKey = filters.status.toLowerCase();
+            const group = STATUS_GROUPS[statusKey];
+            if (group) {
+                query = query.in('status_acesso', group);
+            } else {
+                query = query.eq('status_acesso', statusKey);
+            }
         }
         if (busca) {
             query = query.or(`nome.ilike.%${busca}%,cpf.ilike.%${busca}%,email.ilike.%${busca}%`);
@@ -81,11 +94,43 @@ class PessoaService {
              query = query.or(`updated_at.gte.${since},pivot_updated_at.gte.${since}`);
         }
 
-        const { data, count, error } = await query;
+        let { data, count, error } = await query;
 
+        // --- FALLBACK ESTRATÉGICO: Se a View falhar, tentamos a tabela base ---
         if (error) {
-            logger.error(`[PessoaService.listByEvent] Erro:`, error);
-            throw error;
+            logger.error(`[PessoaService.listByEvent] View falhou (provável schema drift), tentando fallback para tabela 'pessoas':`, error);
+
+            let fallbackQuery = supabaseClient
+                .from('pessoas')
+                .select('id, nome_completo, cpf, email, status_acesso, created_at, empresa_id', { count: 'exact' })
+                .eq('evento_id', eventoId)
+                .order('nome_completo', { ascending: true });
+
+            if (!since) {
+                fallbackQuery = fallbackQuery.range(offset, offset + limit - 1);
+            }
+            if (filters.status) {
+                const statusKey = filters.status.toLowerCase();
+                const group = STATUS_GROUPS[statusKey];
+                if (group) {
+                    fallbackQuery = fallbackQuery.in('status_acesso', group);
+                } else {
+                    fallbackQuery = fallbackQuery.eq('status_acesso', statusKey);
+                }
+            }
+            if (busca) {
+                fallbackQuery = fallbackQuery.or(`nome_completo.ilike.%${busca}%,cpf.ilike.%${busca}%,email.ilike.%${busca}%`);
+            }
+
+            const fb = await fallbackQuery;
+            if (fb.error) {
+                logger.error(`[PessoaService.listByEvent] Fallback também falhou:`, fb.error);
+                throw fb.error;
+            }
+            
+            data = fb.data?.map(p => ({ ...p, nome: p.nome_completo })) || [];
+            count = fb.count;
+            error = null;
         }
 
         return {
@@ -126,10 +171,22 @@ class PessoaService {
         const { data: pessoas, error: pesErr } = await pesQuery.limit(100);
         if (pesErr) throw pesErr;
 
-        // Passo 3: Unificar com empresas
+        // Passo 3: Unificar com empresas e buscar áreas autorizadas em batch
         const eIds = [...new Set(pivots.map(p => p.empresa_id))];
-        const { data: empData } = await supabaseClient.from('empresas').select('id, nome').in('id', eIds);
-        const empMap = (empData || []).reduce((acc, e) => { acc[e.id] = e; return acc; }, {});
+        const [empResult, areasResult] = await Promise.all([
+            supabaseClient.from('empresas').select('id, nome').in('id', eIds),
+            supabaseClient.from('pessoa_areas_acesso')
+                .select('pessoa_id, area_id')
+                .in('pessoa_id', pIds)
+                .eq('evento_id', eventoId)
+        ]);
+
+        const empMap = (empResult.data || []).reduce((acc, e) => { acc[e.id] = e; return acc; }, {});
+        const areasMap = (areasResult.data || []).reduce((acc, a) => {
+            if (!acc[a.pessoa_id]) acc[a.pessoa_id] = [];
+            acc[a.pessoa_id].push(a.area_id);
+            return acc;
+        }, {});
         const pesMap = (pessoas || []).reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
 
         return pivots.map(p => {
@@ -137,11 +194,12 @@ class PessoaService {
             if (!pessoa) return null;
             return {
                 ...pessoa,
-                nome: pessoa.nome_completo, // Compatibilidade com frontend
+                nome: pessoa.nome_completo,
                 status: pessoa.status_acesso,
                 empresas: empMap[p.empresa_id] || { nome: 'Sem Empresa' },
                 vinculo_id: p.id,
-                status_pivot: p.status_aprovacao
+                status_pivot: p.status_aprovacao,
+                areas_autorizadas: areasMap[pessoa.id] || []
             };
         }).filter(p => p !== null);
     }
@@ -168,7 +226,7 @@ class PessoaService {
         // 🛡️ WHITELIST: filtrar campos extras vindos do frontend
         const ALLOWED_INSERT = new Set([
             'email', 'funcao', 'tipo_pessoa', 'nome_mae', 'data_nascimento',
-            'telefone', 'documento', 'dias_trabalho', 'foto_url', 'face_encoding',
+            'telefone', 'documento', 'dias_trabalho', 'dias_acesso', 'foto_url', 'face_encoding',
             'numero_pulseira', 'tipo_fluxo', 'fase_montagem', 'fase_showday',
             'fase_desmontagem', 'observacao', 'nome_credencial', 'passaporte',
             'trabalho_area_tecnica', 'trabalho_altura', 'pagamento_validado',
@@ -183,6 +241,20 @@ class PessoaService {
         }
 
         const cpfLimpo = cpf || null;
+
+        // VERIFICAÇÃO DE BLOQUEIO GLOBAL NA WATCHLIST (MULTI-EVENTO)
+        if (cpfLimpo) {
+            const { data: bloqueioAtivo } = await supabaseClient
+                .from('watchlist')
+                .select('*')
+                .eq('cpf', cpfLimpo)
+                .eq('ativo', true)
+                .limit(1);
+
+            if (bloqueioAtivo && bloqueioAtivo.length > 0) {
+                throw new Error(`Cadastro Negado: CPF [${cpfLimpo}] possui BLOQUEIO ATIVO em todos os eventos da organização (Motivo: ${bloqueioAtivo[0].motivo || 'Restrição de Segurança na Watchlist'}).`);
+            }
+        }
 
         // 1. Verificar limite da empresa e evento
         const { data: empresa, error: empError } = await supabaseClient
@@ -334,8 +406,8 @@ class PessoaService {
 
         const updateData = {
             bloqueado: !!isBlocking,
-            motivo_bloqueio: motivo || null,
-            status_acesso: isBlocking ? 'bloqueado' : 'verificacao',
+            motivo_bloqueio: isBlocking ? (motivo || null) : null,
+            status_acesso: isBlocking ? 'bloqueado' : 'autorizado',
             updated_at: new Date()
         };
 
@@ -350,6 +422,18 @@ class PessoaService {
         if (error) throw error;
 
         logger.info(`🚫 Pessoa [${id}] ${isBlocking ? 'BLOQUEADA' : 'DESBLOQUEADA'} por ${operatorId}. Motivo: ${motivo}`);
+
+        // Notificar painéis em tempo real
+        try {
+            const websocketService = require('../../services/websocketService');
+            websocketService.emit('pessoa_status_alterado', {
+                pessoa_id: id,
+                bloqueado: !!isBlocking,
+                status_acesso: updateData.status_acesso,
+                motivo: motivo,
+                operador: operatorId
+            }, tenantId);
+        } catch (_) {}
 
         // Sincronização Assíncrona com Hardware
         if (isBlocking) {
@@ -373,14 +457,57 @@ class PessoaService {
 
         if (error || !pessoa) throw new Error('Pessoa não encontrada ou acesso negado.');
 
-        // Buscar empresa separadamente
-        const { data: empresa } = await supabaseClient
-            .from('empresas')
-            .select('nome')
-            .eq('id', pessoa.empresa_id)
-            .single();
+        // Buscar empresa, áreas de acesso e último check-in
+        const [empresaRes, paaRes, papRes, checkinRes] = await Promise.all([
+            supabaseClient
+                .from('empresas')
+                .select('nome')
+                .eq('id', pessoa.empresa_id)
+                .maybeSingle(),
+            supabaseClient
+                .from('pessoa_areas_acesso')
+                .select('area_id, evento_areas(id, nome_area)')
+                .eq('pessoa_id', id),
+            pessoa.tipo_pulseira_id
+                ? supabaseClient
+                    .from('pulseira_areas_permitidas')
+                    .select('area_id, evento_areas(id, nome_area)')
+                    .eq('tipo_pulseira_id', pessoa.tipo_pulseira_id)
+                : Promise.resolve({ data: [] }),
+            supabaseClient
+                .from('logs_acesso')
+                .select('created_at, area_id, metodo, evento_areas(nome_area)')
+                .eq('pessoa_id', id)
+                .in('tipo', ['checkin', 'entrada'])
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle()
+        ]);
 
-        return { ...pessoa, empresas: empresa || { nome: 'Sem Empresa' } };
+        const areasMap = new Map();
+        (paaRes.data || []).forEach(item => {
+            if (item.area_id) {
+                areasMap.set(item.area_id, item.evento_areas?.nome_area || 'Área');
+            }
+        });
+        (papRes.data || []).forEach(item => {
+            if (item.area_id) {
+                areasMap.set(item.area_id, item.evento_areas?.nome_area || 'Área');
+            }
+        });
+
+        const areasAutorizadas = Array.from(areasMap.entries()).map(([areaId, nome]) => ({ id: areaId, nome_area: nome }));
+        const ultimoCheckin = checkinRes.data;
+
+        return {
+            ...pessoa,
+            empresas: empresaRes.data || { nome: 'Sem Empresa' },
+            empresa_nome: empresaRes.data?.nome || 'Sem Empresa',
+            areas_autorizadas: areasAutorizadas,
+            horario_checkin: ultimoCheckin?.created_at || null,
+            area_checkin: ultimoCheckin?.evento_areas?.nome_area || null,
+            metodo_checkin: ultimoCheckin?.metodo || null
+        };
     }
 
     async update(supabaseClient, id, updateData, tenantId) {
@@ -393,7 +520,7 @@ class PessoaService {
         const ALLOWED_COLUMNS = new Set([
             'nome_completo', 'cpf', 'email', 'funcao', 'tipo_pessoa',
             'nome_mae', 'data_nascimento', 'telefone', 'documento',
-            'dias_trabalho', 'foto_url', 'face_encoding', 'qr_code',
+            'dias_trabalho', 'dias_acesso', 'foto_url', 'face_encoding', 'qr_code',
             'numero_pulseira', 'tipo_fluxo', 'fase_montagem',
             'fase_showday', 'fase_desmontagem', 'bloqueado',
             'motivo_bloqueio', 'observacao', 'ativo', 'nome_credencial',
@@ -437,7 +564,7 @@ class PessoaService {
         // 1. Buscar dados necessários para cleanup ANTES de deletar
         const { data: pessoa, error: getErr } = await supabaseClient
             .from('pessoas')
-            .select('evento_id, foto_url, face_encoding')
+            .select('id, cpf, nome_completo, evento_id, foto_url, face_encoding')
             .eq('id', id)
             .eq('evento_id', tenantId)
             .single();
@@ -496,7 +623,8 @@ class PessoaService {
         if (error) throw error;
 
         // 5. Cleanup nos terminais de hardware (Intelbras/Hikvision)
-        syncService.deleteUserFromAllDevices(id, pessoa.evento_id)
+        // Passa o objeto (com CPF): o registro já foi apagado do banco
+        syncService.deleteUserFromAllDevices(pessoa, pessoa.evento_id)
             .catch(e => logger.error(`[DeleteService] Falha ao remover do terminal:`, e));
 
         logger.info(`🗑️ [LGPD] Pessoa ${id} completamente removida (DB + Storage + Terminais)`);
@@ -511,29 +639,43 @@ class PessoaService {
         // Buscar pessoa com status da pivot
         const { data: pessoa, error } = await supabaseClient
             .from('pessoas')
-            .select('id, cpf, qr_code, evento_id, status_acesso')
+            .select('id, cpf, qr_code, evento_id, status_acesso, ativo, bloqueado')
             .eq('id', id)
             .eq('evento_id', tenantId)
             .single();
 
         if (error || !pessoa) throw new Error('Pessoa não encontrada ou acesso negado.');
 
-        // Verificar aprovação via pivot table
-        const { data: pivot, error: pivotError } = await supabaseClient
-            .from('pessoa_evento_empresa')
-            .select('status_aprovacao')
-            .eq('pessoa_id', id)
-            .eq('evento_id', tenantId)
-            .in('status_aprovacao', ['aprovado', 'pendente'])
-            .limit(1)
-            .single();
-
-        if (pivotError || !pivot) {
-            throw new Error('Pessoa não vinculada a este evento.');
+        // Verificar se está ativa
+        if (pessoa.ativo === false) {
+            throw new Error('Pessoa inativa. Não é possível gerar QR code.');
         }
 
-        // QR Code só para aprovados
-        if (pivot.status_aprovacao !== 'aprovado') {
+        // Verificar se está bloqueada
+        if (pessoa.bloqueado === true) {
+            throw new Error('Pessoa bloqueada. Não é possível gerar QR code.');
+        }
+
+        // Aprovação: status de acesso autorizado OU vínculo aprovado na pivot
+        let aprovada = pessoa.status_acesso === 'autorizado';
+
+        if (!aprovada) {
+            const { data: pivot } = await supabaseClient
+                .from('pessoa_evento_empresa')
+                .select('status_aprovacao')
+                .eq('pessoa_id', id)
+                .eq('evento_id', tenantId)
+                .in('status_aprovacao', ['aprovado'])
+                .limit(1)
+                .maybeSingle();
+
+            aprovada = !!(pivot && pivot.status_aprovacao === 'aprovado');
+        }
+
+        if (!aprovada) {
+            if (pessoa.status_acesso !== 'autorizado' && pessoa.status_acesso !== 'pendente') {
+                throw new Error('Pessoa não está autorizada. Status: ' + pessoa.status_acesso);
+            }
             throw new Error('Pessoa pendente de aprovação. Aguarde a confirmação.');
         }
 

@@ -29,12 +29,12 @@ class EmailService {
 
         try {
             const mailOptions = {
-                from: `"Nexus Control - A2 Eventos" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
+                from: `"CREDENCIAMENTO - A2 EVENTOS" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
                 to: email,
                 subject: 'Confirmação de Solicitação de Credenciamento ✔',
                 html: `
                     <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
-                        <h2 style="color: #00D4FF; background-color: #050B18; padding: 15px; border-radius: 8px;">A2 Eventos - Nexus Control</h2>
+                        <h2 style="color: #00D4FF; background-color: #050B18; padding: 15px; border-radius: 8px;">CREDENCIAMENTO - A2 EVENTOS</h2>
                         <p>Olá, <strong>${nome}</strong>!</p>
                         <p>Sua solicitação de credenciamento para atuar junto à <strong>${empresaNome}</strong> foi recebida com sucesso em nossa base de dados.</p>
                         <p>Seus dados biométricos e documentais estão sendo validados por nossa inteligência artificial e em breve sua credencial estará pronta para uso nos terminais de acesso facial.</p>
@@ -48,6 +48,400 @@ class EmailService {
             logger.info(`📧 [EmailService] E-mail enviado para ${email} (MessageId: ${info.messageId})`);
         } catch (error) {
             logger.error(`❌ [EmailService] Falha ao enviar e-mail para ${email}:`, error);
+        }
+    }
+    /**
+     * Envia e-mail com os dados para portabilidade (JSON anexado e resumo inline)
+     */
+    async sendDataPortability(email, nome, data) {
+        try {
+            const mailOptions = {
+                from: `"CREDENCIAMENTO - LGPD" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
+                to: email,
+                subject: 'Relatório de Portabilidade de Dados (Art. 18 LGPD) 📑',
+                html: `
+                    <div style="font-family: Arial, sans-serif; padding: 20px;">
+                        <h2 style="color: #00D4FF;">Relatório de Dados Pessoais</h2>
+                        <p>Olá, <strong>${nome}</strong>.</p>
+                        <p>Em conformidade com o seu direito de portabilidade (Art. 18, V da LGPD), anexamos a este e-mail todos os seus dados pessoais e de tratamento vinculados ao sistema A2 Eventos.</p>
+                        <p>O arquivo está em formato JSON para garantir a interoperabilidade entre sistemas.</p>
+                        <hr style="border: 0; border-top: 1px solid #ddd; margin: 20px 0;" />
+                        <p style="font-size: 11px; color: #888;">Controlador: A2 Eventos | Operador: CREDENCIAMENTO - A2 EVENTOS</p>
+                    </div>
+                `,
+                attachments: [
+                    {
+                        filename: `dados_pessoais_${nome.replace(/\s+/g, '_').toLowerCase()}.json`,
+                        content: JSON.stringify(data, null, 2)
+                    }
+                ]
+            };
+
+            await this.transporter.sendMail(mailOptions);
+            logger.info(`📧 [LGPD] E-mail de portabilidade enviado para ${email}`);
+        } catch (error) {
+            logger.error(`❌ [LGPD] Falha ao enviar e-mail de portabilidade:`, error);
+        }
+    }
+
+    /**
+     * Confirmação de pedido de exclusão/anonimização
+     */
+    async sendForgetMeConfirmation(email, nome) {
+        try {
+            const mailOptions = {
+                from: `"CREDENCIAMENTO - LGPD" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
+                to: email,
+                subject: 'Confirmação de Direito ao Esquecimento 🔒',
+                html: `
+                    <div style="font-family: Arial, sans-serif; padding: 20px;">
+                        <h2 style="color: #FF1744;">Dados Anonimizados com Sucesso</h2>
+                        <p>Olá, <strong>${nome}</strong>.</p>
+                        <p>Confirmamos que o seu pedido de exclusão de dados foi processado. Seus dados pessoais foram anonimizados irreversivelmente ou excluídos de nossa base de produção.</p>
+                        <p>Mantemos apenas os logs técnicos de auditoria exigidos por lei para comprovação da operação, sem possibilidade de re-identificação.</p>
+                    </div>
+                `
+            };
+            await this.transporter.sendMail(mailOptions);
+        } catch (error) {
+        }
+    }
+
+    /**
+     * Envia o Relatório Diário Operacional para os administradores
+     */
+    async sendDailyReport(email, eventoNome, data, workbookBuffer) {
+        try {
+            const mailOptions = {
+                from: `"CREDENCIAMENTO - Analytics" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
+                to: email,
+                subject: `Relatório Diário - ${eventoNome} - ${data} 📊`,
+                html: `
+                    <div style="font-family: Arial, sans-serif; padding: 20px;">
+                        <h2 style="color: #1A237E;">CREDENCIAMENTO - Relatório Diário Operacional</h2>
+                        <p>Olá,</p>
+                        <p>Segue em anexo o relatório operacional consolidado do evento <strong>${eventoNome}</strong> referente ao dia <strong>${data}</strong>.</p>
+                        <p>Este relatório contém o detalhamento de horas trabalhadas agrupado por empresa.</p>
+                        <hr style="border: 0; border-top: 1px solid #ddd; margin: 20px 0;" />
+                        <p style="font-size: 11px; color: #888;">Gerado automaticamente pelo Sistema de CREDENCIAMENTO - A2 Eventos.</p>
+                    </div>
+                `,
+                attachments: [
+                    {
+                        filename: `Relatorio_Diario_${eventoNome.replace(/\s+/g, '_')}_${data}.xlsx`,
+                        content: workbookBuffer
+                    }
+                ]
+            };
+            await this.transporter.sendMail(mailOptions);
+            logger.info(`📧 [Cron] Relatório diário enviado para ${email}`);
+        } catch (error) {
+            logger.error(`❌ [Cron] Falha ao enviar relatório diário para ${email}:`, error);
+        }
+    }
+
+    /**
+     * Envia convite corporativo unificado para Empresa (B2B)
+     */
+    async sendCompanyInvite(email, nomeEmpresa, link) {
+        try {
+            const mailOptions = {
+                from: `"CREDENCIAMENTO - Cadastro B2B" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
+                to: email,
+                subject: `Portal de Credenciamento - ${nomeEmpresa} 🏢`,
+                html: `
+                    <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                        <div style="background: #050B18; padding: 30px; text-align: center;">
+                            <h1 style="color: #00D4FF; margin: 0; font-size: 24px; letter-spacing: 2px;">CREDENCIAMENTO BIOMÉTRICO</h1>
+                        </div>
+                        <div style="padding: 40px; color: #333; line-height: 1.6;">
+                            <h2 style="color: #050B18;">Olá, ${nomeEmpresa}!</h2>
+                            <p>Sua empresa foi cadastrada com sucesso para atuar no evento.</p>
+                            <p>Para iniciar o credenciamento de acesso da sua equipe, você deve utilizar o link exclusivo abaixo. <strong>Atenção:</strong> Você pode preencher o cadastro pela sua equipe ou compartilhar este link diretamente com eles para que preencham seus próprios dados.</p>
+                            
+                            <div style="text-align: center; margin: 35px 0;">
+                                <a href="${link}" style="background: linear-gradient(135deg, #00D4FF 0%, #094798 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">ACESSAR PORTAL DE INSCRIÇÕES</a>
+                            </div>
+
+                            <p style="font-size: 14px; color: #666;"><strong>Dica:</strong> Através do mesmo link fornecido acima, você poderá acompanhar o status de aprovação de todos os colaboradores já cadastrados pela sua empresa.</p>
+                            <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;" />
+                            <p style="font-size: 12px; color: #999; text-align: center;">Suporte Técnico: suporte@nzt.app.br<br>© 2026 A2 Eventos - Sistema Soberano de Acesso</p>
+                        </div>
+                    </div>
+                `
+            };
+            await this.transporter.sendMail(mailOptions);
+            logger.info(`📧 [Invite] Convite de empresa enviado para ${email}`);
+        } catch (error) {
+            logger.error(`❌ [Invite] Erro ao enviar convite de empresa para ${email}:`, error);
+        }
+    }
+
+    /**
+     * Envia convite de pré-cadastro para o Colaborador
+     */
+    async sendEmployeeInvite(email, nomePessoa, nomeEmpresa, link) {
+        try {
+            const mailOptions = {
+                from: `"CREDENCIAMENTO - ${nomeEmpresa}" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
+                to: email,
+                subject: `Convite de Credenciamento - ${nomeEmpresa} 🪪`,
+                html: `
+                    <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 12px; overflow: hidden;">
+                        <div style="background: #050B18; padding: 30px; text-align: center;">
+                            <h1 style="color: #00D4FF; margin: 0; font-size: 20px;">CREDENCIAMENTO BIOMÉTRICO</h1>
+                        </div>
+                        <div style="padding: 40px; color: #333; line-height: 1.6;">
+                            <p>Olá, <strong>${nomePessoa}</strong>.</p>
+                            <p>A empresa <strong>${nomeEmpresa}</strong> solicitou o seu credenciamento para trabalhar no evento.</p>
+                            <p>Para concluir o seu registro e liberar seu acesso facial nos terminais, clique no botão abaixo para preencher os dados restantes e anexar sua foto e documentos:</p>
+                            
+                            <div style="text-align: center; margin: 35px 0;">
+                                <a href="${link}" style="background: #00D4FF; color: #050B18; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">COMPLETAR MEU CADASTRO</a>
+                            </div>
+
+                            <p style="font-size: 13px; color: #777;"><em>Importante: Sem a conclusão deste cadastro e o upload da foto, seu acesso aos recintos do evento será bloqueado.</em></p>
+                        </div>
+                        <div style="background: #f9f9f9; padding: 20px; text-align: center; font-size: 11px; color: #999;">
+                            Plataforma Operada por A2 Eventos | CREDENCIAMENTO
+                        </div>
+                    </div>
+                `
+            };
+            await this.transporter.sendMail(mailOptions);
+            logger.info(`📧 [Invite] Convite de colaborador enviado para ${email}`);
+        } catch (error) {
+            logger.error(`❌ [Invite] Erro ao enviar convite de colaborador para ${email}:`, error);
+        }
+    }
+
+    /**
+     * Notificação de Aprovação de Cadastro (Enviado para a Empresa)
+     */
+    async sendApprovalNotification(email, nomePessoa, nomeEmpresa, qrCode = null) {
+        try {
+            // Gerar QR code inline se não fornecido
+            let qrImageHtml = '';
+            if (qrCode) {
+                qrImageHtml = `
+                    <div style="text-align: center; margin: 30px 0;">
+                        <p style="font-size: 14px; margin-bottom: 10px;"><strong>QR Code de Acesso:</strong></p>
+                        <div style="display: inline-block; padding: 15px; background: white; border-radius: 8px;">
+                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrCode)}" alt="QR Code" style="width: 200px; height: 200px;"/>
+                        </div>
+                        <p style="font-size: 12px; margin-top: 10px; color: #666;">Código: ${qrCode}</p>
+                    </div>
+                `;
+            }
+
+            const mailOptions = {
+                from: `"A2 Eventos - Credenciamento" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
+                to: email,
+                subject: `Credenciamento Aprovado: ${nomePessoa}`,
+                html: `
+                    <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 40px; border: 1px solid #eee; border-radius: 12px;">
+                        <div style="text-align: center; margin-bottom: 30px;">
+                            <div style="font-size: 60px; margin-bottom: 20px;">✅</div>
+                            <h2 style="color: #2E7D32; margin: 0;">Credenciamento Aprovado!</h2>
+                        </div>
+                        <p>Olá, <strong>${nomeEmpresa}</strong>.</p>
+                        <p>O credenciamento de <strong>${nomePessoa}</strong> foi <strong>APROVADO</strong> e já está liberado para acesso.</p>
+                        
+                        ${qrImageHtml}
+
+                        <div style="background: #f0fdf4; border-radius: 8px; padding: 20px; margin: 30px 0; border: 1px solid #dcfce7; color: #166534; font-size: 14px;">
+                            <strong>Instruções:</strong><br>
+                            • Apresente o QR Code na entrada ou use biometria facial<br>
+                            • O acesso está liberado para as datas definidas no cadastro
+                        </div>
+
+                        <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;" />
+                        <p style="font-size: 11px; color: #999; text-align: center;">A2 Eventos - Sistema de Credenciamento<br>© 2026</p>
+                    </div>
+                `
+            };
+            await this.transporter.sendMail(mailOptions);
+            logger.info(`📧 [Approval] Notificação enviada para a empresa ${nomeEmpresa} (${email})`);
+        } catch (error) {
+             logger.error(`❌ [Approval] Erro ao enviar notificação de aprovação para ${email}:`, error);
+        }
+    }
+
+    /**
+     * Envia convite de acesso ao painel administrativo para novo operador
+     * @param {string} email Email do operador
+     * @param {string} nomeOperador Nome completo do operador
+     * @param {string} link Link de ativação/reset-password
+     */
+    async sendOperatorInvite(email, nomeOperador, link) {
+        try {
+            const mailOptions = {
+                from: `"A2 Eventos - Painel Admin" <${process.env.SMTP_USER || 'no-reply@a2eventos.com.br'}>`,
+                to: email,
+                subject: `Você foi convidado para acessar o Painel A2 Eventos`,
+                html: `
+                    <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 12px; overflow: hidden;">
+                        <div style="background: #050B18; padding: 30px; text-align: center;">
+                            <h1 style="color: #00D4FF; margin: 0; font-size: 22px; letter-spacing: 2px;">A2 EVENTOS</h1>
+                            <p style="color: #8899BB; margin: 8px 0 0;">Painel Administrativo</p>
+                        </div>
+                        <div style="padding: 40px; color: #333; line-height: 1.6;">
+                            <p>Olá, <strong>${nomeOperador}</strong>.</p>
+                            <p>Você foi cadastrado como operador no sistema A2 Eventos. Para ativar seu acesso e definir sua senha, clique no botão abaixo:</p>
+                            <div style="text-align: center; margin: 35px 0;">
+                                <a href="${link}" style="background: linear-gradient(135deg, #00D4FF 0%, #094798 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">ATIVAR MINHA CONTA</a>
+                            </div>
+                            <p style="font-size: 13px; color: #777;"><em>Este link expira em 24 horas. Caso não reconheça este convite, ignore este e-mail.</em></p>
+                        </div>
+                        <div style="background: #f5f5f5; padding: 20px; text-align: center; font-size: 11px; color: #999;">
+                            © 2026 A2 Eventos | suporte@nzt.app.br
+                        </div>
+                    </div>
+                `
+            };
+            await this.transporter.sendMail(mailOptions);
+            logger.info(`📧 [Operator Invite] Convite enviado para: ${email}`);
+        } catch (error) {
+            logger.error(`❌ [Operator Invite] Erro ao enviar convite de operador para ${email}:`, error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * Envia e-mail de alerta de segurança urgente quando um alvo procurado é identificado
+     */
+    async sendSecurityAlert(email, alerta) {
+        if (!email) return;
+        try {
+            const mailOptions = {
+                from: `"SEGURANÇA - A2 EVENTOS" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
+                to: email,
+                subject: `🚨 ALERTA CRÍTICO: ALVO LOCALIZADO - ${alerta.nome || 'INDIVÍDUO PROCURADO'}`,
+                html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 650px; margin: auto; border: 2px solid #FF1E56; border-radius: 12px; overflow: hidden; background: #0A0F1D; color: #FFFFFF;">
+                        <div style="background: linear-gradient(135deg, #FF1E56 0%, #B00028 100%); padding: 25px; text-align: center;">
+                            <h1 style="color: #FFFFFF; margin: 0; font-size: 22px; letter-spacing: 1px;">🚨 ALERTA DE SEGURANÇA: ALVO LOCALIZADO</h1>
+                            <p style="color: #FFDEE6; margin: 6px 0 0; font-size: 13px; font-weight: bold;">INTERCEPTAÇÃO / FISCALIZAÇÃO EM TEMPO REAL</p>
+                        </div>
+                        <div style="padding: 30px; line-height: 1.6;">
+                            <div style="background: rgba(255, 30, 86, 0.15); border-left: 4px solid #FF1E56; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <strong style="color: #FF3366; font-size: 15px;">Atenção Equipe de Segurança:</strong>
+                                <p style="margin: 5px 0 0; color: #DDD;">Um indivíduo sob alerta de monitoramento (pessoa procurada) foi abordado no posto de fiscalização do evento.</p>
+                            </div>
+
+                            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; color: #DDD;">
+                                <tr>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); width: 140px; color: #8899BB;">Nome do Alvo:</td>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight: bold; color: #FFF; font-size: 16px;">${alerta.nome}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #8899BB;">CPF:</td>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); font-family: monospace; font-size: 14px;">${alerta.cpf || 'Não informado'}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #8899BB;">Pulseira / Código:</td>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); font-family: monospace; font-size: 14px; color: #00D4FF; font-weight: bold;">${alerta.numero_pulseira || 'Sem pulseira vinculada'}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #8899BB;">Função / Cargo:</td>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">${alerta.funcao || 'Não informada'}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #8899BB;">Motivo do Alerta:</td>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #FFB800; font-weight: bold;">${alerta.motivo || 'Alvo em monitoramento'}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #8899BB;">Nível de Risco:</td>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #FF1E56; font-weight: bold;">${(alerta.nivel_alerta || 'ALTO').toUpperCase()}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #8899BB;">Posto / Área:</td>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight: bold; color: #00FF88;">${alerta.area || 'Fiscalização Geral'}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #8899BB;">Fiscal Responsável:</td>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">${alerta.operador_nome || 'Operador de Campo'}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px 8px; color: #8899BB;">Horário da Abordagem:</td>
+                                    <td style="padding: 10px 8px; font-family: monospace; color: #00D4FF;">${alerta.horario || new Date().toLocaleString('pt-BR')}</td>
+                                </tr>
+                            </table>
+
+                            <p style="font-size: 12px; color: #8899AA; text-align: center; margin-top: 25px;">
+                                Mensagem de segurança gerada automaticamente pelo Console Central A2 Eventos Intelligence.
+                            </p>
+                        </div>
+                    </div>
+                `
+            };
+            await this.transporter.sendMail(mailOptions);
+            logger.info(`📧 [Security Alert] E-mail de alerta de segurança enviado com sucesso para: ${email}`);
+        } catch (error) {
+            logger.error(`❌ [Security Alert] Erro ao enviar e-mail de alerta para ${email}:`, error.message);
+        }
+    }
+
+    /**
+     * Envia notificação de Desbloqueio da Watchlist para o ADMIN_MASTER
+     */
+    async sendDesbloqueioAlert(email, dados) {
+        try {
+            if (!this.transporter) return;
+            const mailOptions = {
+                from: `"A2 Eventos Security" <${process.env.EMAIL_USER || 'sistemaa2eventos@gmail.com'}>`,
+                to: email,
+                subject: `🔓 NOTIFICAÇÃO: INDIVÍDUO DESBLOQUEADO DA WATCHLIST - ${dados.nome}`,
+                html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 650px; margin: auto; border: 2px solid #00FF88; border-radius: 12px; overflow: hidden; background: #0A0F1D; color: #FFFFFF;">
+                        <div style="background: linear-gradient(135deg, #00FF88 0%, #009944 100%); padding: 25px; text-align: center;">
+                            <h1 style="color: #000000; margin: 0; font-size: 22px; letter-spacing: 1px; font-weight: 900;">🔓 NOTIFICAÇÃO DE DESBLOQUEIO DE SEGURANÇA</h1>
+                            <p style="color: #002200; margin: 6px 0 0; font-size: 13px; font-weight: bold;">WATCHLIST GLOBAL • LIBERAÇÃO DE ACESSO</p>
+                        </div>
+                        <div style="padding: 30px; line-height: 1.6;">
+                            <div style="background: rgba(0, 255, 136, 0.15); border-left: 4px solid #00FF88; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <strong style="color: #00FF88; font-size: 15px;">Aviso ao Administrador Master:</strong>
+                                <p style="margin: 5px 0 0; color: #DDD;">Um indivíduo previamente cadastrado na Watchlist/Lista de Bloqueados teve sua restrição <b>CANCELADA</b> e foi liberado para acesso e credenciamento em todos os eventos.</p>
+                            </div>
+
+                            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; color: #DDD;">
+                                <tr>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); width: 160px; color: #8899BB;">Nome do Indivíduo:</td>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight: bold; color: #FFF; font-size: 16px;">${dados.nome}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #8899BB;">CPF:</td>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); font-family: monospace; font-size: 14px; color: #00D4FF;">${dados.cpf || 'Não informado'}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #8899BB;">Responsável pelo Desbloqueio:</td>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight: bold; color: #FFF;">${dados.operador_nome || 'Operador de Segurança'}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #8899BB;">Data e Horário:</td>
+                                    <td style="padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); font-family: monospace; color: #FFF;">${dados.horario || new Date().toLocaleString('pt-BR')}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 12px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #FFB800; font-weight: bold;">MOTIVO DO DESBLOQUEIO:</td>
+                                    <td style="padding: 12px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #FFB800; font-weight: bold; font-size: 15px;">${dados.motivo_desbloqueio || 'Sem justificativa detalhada'}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px 8px; color: #8899BB;">Status Atual:</td>
+                                    <td style="padding: 10px 8px; color: #00FF88; font-weight: bold;">LIBERADO PARA CADASTRO E ACESSO EM TODOS OS EVENTOS</td>
+                                </tr>
+                            </table>
+
+                            <p style="font-size: 12px; color: #8899AA; text-align: center; margin-top: 25px;">
+                                Registro de auditoria gerado pelo Módulo de Inteligência A2 Eventos.
+                            </p>
+                        </div>
+                    </div>
+                `
+            };
+            await this.transporter.sendMail(mailOptions);
+            logger.info(`📧 [Desbloqueio Alert] E-mail de alerta de desbloqueio enviado com sucesso para: ${email}`);
+        } catch (error) {
+            logger.error(`❌ [Desbloqueio Alert] Erro ao enviar e-mail de alerta de desbloqueio para ${email}:`, error.message);
         }
     }
 }

@@ -70,10 +70,41 @@ function formatarDataLocal(date, options = {}) {
     }).format(new Date(date));
 }
 
+/**
+ * Limites (início/fim) de um dia LOCAL convertidos para ISO UTC.
+ * logs_acesso.created_at é gravado em UTC, então "hoje" precisa ser
+ * 03:00Z → 02:59:59.999Z do dia seguinte (America/Sao_Paulo).
+ */
+function getLimitesDiaLocalUTC(dia = getHojeLocal()) {
+    const ref = new Date(`${dia}T12:00:00Z`);
+    const local = new Date(ref.toLocaleString('en-US', { timeZone: TIMEZONE }));
+    const utc = new Date(ref.toLocaleString('en-US', { timeZone: 'UTC' }));
+    const offsetMs = local - utc;
+    const start = new Date(Date.parse(`${dia}T00:00:00Z`) - offsetMs);
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
+    return { start: start.toISOString(), end: end.toISOString() };
+}
+
+/**
+ * Próxima ocorrência (futura) de um horário local "HH:MM[:SS]" — hoje, se ainda não passou;
+ * senão, amanhã. Ex.: horário de reset do evento às 06:00.
+ * @returns {Date}
+ */
+function proximaOcorrenciaHorario(horario = '00:00:00', agora = new Date()) {
+    const [h = 0, m = 0, s = 0] = String(horario).split(':').map(n => parseInt(n, 10) || 0);
+    const offsetMs = ((h * 60 + m) * 60 + s) * 1000;
+    const hojeLocal = getHojeLocal();
+    let alvo = new Date(new Date(getLimitesDiaLocalUTC(hojeLocal).start).getTime() + offsetMs);
+    if (alvo <= agora) alvo = new Date(alvo.getTime() + 24 * 60 * 60 * 1000);
+    return alvo;
+}
+
 module.exports = {
+    proximaOcorrenciaHorario,
     getHojeLocal,
     getNowLocal,
     getInicioHojeLocal,
+    getLimitesDiaLocalUTC,
     formatarDataLocal,
     TIMEZONE,
 };

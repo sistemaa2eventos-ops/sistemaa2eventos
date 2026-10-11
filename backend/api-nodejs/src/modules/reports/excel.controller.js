@@ -2,6 +2,7 @@ const ExcelJS = require('exceljs');
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const qrGenerator = require('../../utils/qrGenerator');
+const { buscarTodos } = require('../../utils/buscarTodos');
 
 class ExcelController {
     /**
@@ -172,43 +173,62 @@ class ExcelController {
      */
     async exportEmployees(req, res) {
         try {
-            const { eventoId } = req.query;
-            const { data: pessoas, error } = await supabase
-                .from('pessoas')
-                .select('nome, cpf, nome_mae, data_nascimento, funcao, empresas(nome)')
-                .eq('evento_id', eventoId);
+            // Sempre restrito a um evento (antes, sem evento_id exportava as pessoas de todos os eventos)
+            const eventoId = req.event?.id;
+            if (!eventoId) return res.status(400).json({ error: 'Selecione um evento para exportar.' });
 
+            const { data: pessoas, error } = await buscarTodos(supabase
+                .from('pessoas')
+                .select('id, nome_completo, cpf, nome_mae, data_nascimento, funcao, status_acesso, numero_pulseira, bloqueado, motivo_bloqueio, empresas(nome)')
+                .eq('evento_id', eventoId)
+                .order('nome_completo', { ascending: true }));
             if (error) throw error;
 
             const workbook = new ExcelJS.Workbook();
-            const worksheet = workbook.addWorksheet('Relatório Nexus');
+            const worksheet = workbook.addWorksheet('Participantes e Acesso');
 
             worksheet.columns = [
-                { header: 'NOME', key: 'nome', width: 30 },
-                { header: 'CPF', key: 'cpf', width: 20 },
-                { header: 'MÃE', key: 'nome_mae', width: 30 },
-                { header: 'NASCIMENTO', key: 'data_nascimento', width: 15 },
-                { header: 'FUNÇÃO', key: 'funcao', width: 20 },
+                { header: 'NOME COMPLETO', key: 'nome', width: 32 },
+                { header: 'CPF', key: 'cpf', width: 18 },
+                { header: 'PULSEIRA / TAG', key: 'pulseira', width: 18 },
+                { header: 'STATUS ACESSO', key: 'status_acesso', width: 18 },
+                { header: 'BLOQUEADO', key: 'bloqueado', width: 14 },
+                { header: 'MOTIVO BLOQUEIO', key: 'motivo_bloqueio', width: 30 },
+                { header: 'FUNÇÃO / CARGO', key: 'funcao', width: 22 },
                 { header: 'EMPRESA', key: 'empresa', width: 25 },
+                { header: 'NASCIMENTO', key: 'data_nascimento', width: 15 },
             ];
 
-            pessoas.forEach(f => {
+            // Estilizar cabeçalho
+            const headerRow = worksheet.getRow(1);
+            headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            headerRow.eachCell((cell) => {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0D1B2A' } };
+            });
+
+            (pessoas || []).forEach(f => {
+                const nomeFinal = f.nome_completo || f.nome || 'Sem Nome';
+                const isBloqueado = f.bloqueado ? 'SIM' : 'NÃO';
                 worksheet.addRow({
-                    nome: f.nome,
-                    cpf: f.cpf,
-                    nome_mae: f.nome_mae,
-                    data_nascimento: f.data_nascimento,
-                    funcao: f.funcao,
-                    empresa: f.empresas?.nome || 'N/A'
+                    nome: nomeFinal,
+                    cpf: f.cpf || 'N/A',
+                    pulseira: f.numero_pulseira || 'Sem Pulseira',
+                    status_acesso: (f.status_acesso || 'pendente').toUpperCase(),
+                    bloqueado: isBloqueado,
+                    motivo_bloqueio: f.motivo_bloqueio || '-',
+                    funcao: f.funcao || 'Participante',
+                    empresa: f.empresas?.nome || 'Geral / Visitante',
+                    data_nascimento: f.data_nascimento || '-'
                 });
             });
 
             res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            res.setHeader('Content-Disposition', `attachment; filename=Nexus_Export_${Date.now()}.xlsx`);
+            res.setHeader('Content-Disposition', `attachment; filename=Participantes_${Date.now()}.xlsx`);
 
             await workbook.xlsx.write(res);
             res.end();
         } catch (error) {
+            logger.error('Erro na exportação Excel de participantes:', error);
             res.status(500).json({ error: error.message });
         }
     }

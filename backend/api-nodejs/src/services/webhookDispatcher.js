@@ -1,68 +1,58 @@
 const { supabase } = require('../config/supabase');
 const logger = require('./logger');
+const { TIMEOUT_CONFIG } = require('../config/timeouts');
 
-/**
- * Serviço de Dispatch de Webhooks
- * Dispara webhooks quando eventos ocorrem no sistema
- */
 class WebhookDispatcher {
     constructor() {
         this.retryAttempts = 3;
         this.retryDelay = 1000;
     }
 
-    /**
-     * Dispara webhooks para um evento específico
-     * @param {string} evento_id - ID do evento
-     * @param {string} tipo_evento - Tipo de evento (CHECKIN, CHECKOUT, NOVO_CADASTRO, PESSOA_BLOQUEADA)
-     * @param {object} payload - Dados do evento
-     */
     async dispatch(evento_id, tipo_evento, payload) {
         try {
-            // Buscar webhooks ativos para o evento e tipo na tabela system_webhooks
             const { data: webhooks, error } = await supabase
                 .from('system_webhooks')
                 .select('*')
                 .eq('is_active', true)
-                .contains('eventos', [tipo_evento]);
+                .eq('trigger_event', tipo_evento); // trigger_event é o campo configurado pelo usuário
 
             if (error) {
-                logger.error('Erro ao buscar webhooks:', error.message);
+                logger.error('Failed to fetch webhooks', { err: error.message });
                 return;
             }
 
             if (!webhooks || webhooks.length === 0) {
-                logger.info(`Nenhum webhook ativo para evento ${tipo_evento}`);
+                logger.info('No active webhooks found', { event_type: tipo_evento });
                 return;
             }
 
-            // Disparar cada webhook em background
             for (const webhook of webhooks) {
-                this.fireAndForget(webhook.target_url, tipo_evento, payload, webhook.id);
+                this.fireAndForget(webhook, tipo_evento, payload);
             }
 
-            logger.info(`Webhooks dispatched: ${webhooks.length} para evento ${tipo_evento}`);
+            logger.info('Webhooks dispatched', { webhook_count: webhooks.length, event_type: tipo_evento });
         } catch (error) {
-            logger.error('Erro ao dispatch webhooks:', error.message);
+            logger.error({ err: error }, 'Failed to dispatch webhooks');
         }
     }
 
-    /**
-     * Dispara webhook de forma assíncrona (fire-and-forget)
-     */
-    async fireAndForget(url, tipo_evento, payload, webhookId) {
+    async fireAndForget(webhook, tipo_evento, payload) {
         setImmediate(async () => {
+            let lastStatusCode = null;
+            let lastError = null;
+            let succeeded = false;
+
             for (let attempt = 1; attempt <= this.retryAttempts; attempt++) {
                 try {
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 10000);
+                    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_CONFIG.API_REQUEST);
 
-                    const response = await fetch(url, {
+                    const response = await fetch(webhook.target_url, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                             'X-Webhook-Event': tipo_evento,
-                            'X-Webhook-ID': webhookId
+                            'X-Webhook-ID': webhook.id
                         },
                         body: JSON.stringify({
                             event: tipo_evento,
@@ -73,30 +63,83 @@ class WebhookDispatcher {
                     });
 
                     clearTimeout(timeoutId);
+                    lastStatusCode = response.status;
 
                     if (response.ok) {
-                        logger.info(`Webhook ${webhookId} dispatchado com sucesso para ${url}`);
-                        return;
-                    } else {
-                        logger.warn(`Webhook ${webhookId} retornou status ${response.status}`);
+                        logger.info('Webhook dispatched successfully', { webhook_id: webhook.id, status: response.status, event_type: tipo_evento });
+                        succeeded = true;
+                        break;
                     }
-                } catch (error) {
-                    logger.warn(`Tentativa ${attempt}/${this.retryAttempts} falhou para webhook ${webhookId}: ${error.message}`);
+
+                    lastError = `HTTP ${response.status}`;
+                    logger.warn('Webhook returned non-OK status', { webhook_id: webhook.id, status: response.status });
+                } catch (err) {
+                    lastError = err.message;
+                    logger.warn('Webhook dispatch attempt failed', { webhook_id: webhook.id, attempt, error: err.message });
                     if (attempt < this.retryAttempts) {
                         await this.delay(this.retryDelay * attempt);
                     }
                 }
             }
 
-            logger.error(`Webhook ${webhookId} falhou após ${this.retryAttempts} tentativas`);
+            if (!succeeded) {
+                logger.error('Webhook failed after all retries', { webhook_id: webhook.id, event_type: tipo_evento });
+            }
+
+            // Atualizar status de rastreamento independente do resultado
+            await supabase.from('system_webhooks').update({
+                last_dispatch_at: new Date().toISOString(),
+                last_status_code: lastStatusCode,
+                failure_count: succeeded ? 0 : (webhook.failure_count || 0) + 1,
+                last_error: succeeded ? null : lastError
+            }).eq('id', webhook.id);
         });
+    }
+
+    // Disparo síncrono para testar webhook (retorna resultado ao caller)
+    async testDispatch(targetUrl, triggerEvent) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const startedAt = Date.now();
+
+        try {
+            const response = await fetch(targetUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Webhook-Event': triggerEvent,
+                    'X-Webhook-Test': 'true'
+                },
+                body: JSON.stringify({
+                    event: triggerEvent,
+                    timestamp: new Date().toISOString(),
+                    test: true,
+                    data: { message: 'Webhook de teste do sistema A2 Eventos' }
+                }),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+            return {
+                success: response.ok,
+                status_code: response.status,
+                response_time_ms: Date.now() - startedAt
+            };
+        } catch (err) {
+            clearTimeout(timeoutId);
+            return {
+                success: false,
+                status_code: null,
+                response_time_ms: Date.now() - startedAt,
+                error: err.name === 'AbortError' ? 'Timeout (10s)' : err.message
+            };
+        }
     }
 
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    // Métodos de conveniência
     async dispatchCheckin(evento_id, pessoa, terminal = null) {
         return this.dispatch(evento_id, 'CHECKIN', {
             pessoa_id: pessoa.id,
@@ -105,7 +148,7 @@ class WebhookDispatcher {
             empresa: pessoa.empresas?.nome,
             funcao: pessoa.funcao,
             numero_pulseira: pessoa.numero_pulseira,
-            terminal: terminal,
+            terminal,
             timestamp: new Date().toISOString()
         });
     }
@@ -117,7 +160,7 @@ class WebhookDispatcher {
             cpf: pessoa.cpf,
             empresa: pessoa.empresas?.nome,
             numero_pulseira: pessoa.numero_pulseira,
-            terminal: terminal,
+            terminal,
             timestamp: new Date().toISOString()
         });
     }
@@ -138,7 +181,7 @@ class WebhookDispatcher {
             pessoa_id: pessoa.id,
             nome: pessoa.nome_completo || pessoa.nome,
             cpf: pessoa.cpf,
-            motivo: motivo,
+            motivo,
             timestamp: new Date().toISOString()
         });
     }

@@ -1,6 +1,7 @@
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 
+
 class MessageTemplateService {
     /**
      * Busca um template com fallback (Evento -> Global)
@@ -79,20 +80,25 @@ class MessageTemplateService {
      */
     async listAvailableTemplates(eventoId) {
         // Busca todos os globais e sobrescreve com os do evento se existirem
-        const { data: all } = await supabase
+        const { data: all, error } = await supabase
             .from('mensagem_templates')
             .select('*')
             .or(`evento_id.is.null,evento_id.eq.${eventoId}`);
-        
+
+        if (error || !all) {
+            logger.warn('Falha ao buscar templates de mensagem:', error?.message);
+            return [];
+        }
+
         // Agrupar por slug+canal para garantir que o do evento vença o global
         const map = new Map();
-        all.forEach(t => {
+        for (const t of all) {
             const key = `${t.slug}:${t.canal}`;
             if (!map.has(key) || t.evento_id !== null) {
                 map.set(key, t);
             }
-        });
-        
+        }
+
         return Array.from(map.values());
     }
 }

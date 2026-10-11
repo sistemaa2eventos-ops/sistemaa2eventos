@@ -1,102 +1,131 @@
-// SOVEREIGN_VERIFIED_V13_4
 const logger = require('../services/logger');
 const queueService = require('../services/queue.service');
 const { supabase } = require('../config/supabase');
-const { getConnection, sql } = require('../config/database');
 
+// Erros do Postgres que nunca vão se resolver tentando de novo (dado inválido)
+const ERROS_PERMANENTES = new Set([
+    '23502', // not null
+    '23503', // foreign key (pessoa/evento não existe)
+    '23514', // check constraint
+    '22P02', // tipo inválido (uuid etc.)
+    'PGRST204' // coluna inexistente
+]);
+
+const RECUPERAR_PENDENTES_MS = 60 * 1000; // mensagens sem ACK há mais de 1 min voltam a ser processadas
+
+/**
+ * Retentativa de logs de acesso que NÃO conseguiram ser gravados direto no Supabase
+ * (database.service publica no stream só quando a gravação direta falha).
+ */
 class CloudSyncWorker {
     constructor() {
         this.isRunning = false;
         this.client = null;
+        this.falhasSeguidas = 0;
+        this.ultimaRecuperacao = 0;
     }
 
     start() {
         if (this.isRunning) return;
         this.isRunning = true;
-        
-        logger.info('🚀 [CloudSyncWorker] Iniciado: aguardando eventos do Redis...');
-        this.client = queueService.getClient();
-        
-        if (!this.client) {
-             logger.warn('⚠️ [CloudSyncWorker] Redis ausente. O processamento assíncrono falhará na memória.');
-             return;
+
+        logger.info('🚀 [CloudSyncWorker] Iniciado: aguardando logs para retentativa no Redis...');
+        const shared = queueService.getClient();
+
+        if (!shared) {
+            logger.warn('⚠️ [CloudSyncWorker] Redis ausente. Retentativa de logs desativada.');
+            return;
         }
 
-        // Diferenciar a thread (offloading do event loop)
-        setTimeout(() => this.loop(), 5000); 
+        // Conexão PRÓPRIA para o XREADGROUP BLOCK: na conexão compartilhada, a espera
+        // bloqueante (5 s) segurava cada XADD de log de acesso — e a resposta à porta.
+        setTimeout(async () => {
+            try {
+                this.client = shared.duplicate();
+                this.client.on('error', (err) => logger.debug(`[CloudSyncWorker] Redis: ${err.message}`));
+                await this.client.connect();
+            } catch (err) {
+                logger.warn(`[CloudSyncWorker] Falha ao abrir conexão dedicada, usando a compartilhada: ${err.message}`);
+                this.client = shared;
+            }
+            this.loop();
+        }, 5000);
     }
 
     async loop() {
         while (this.isRunning) {
             try {
-                // XREADGROUP BLOCK 5000 STREAMS stream:access_logs_up >
+                if (Date.now() - this.ultimaRecuperacao > RECUPERAR_PENDENTES_MS) {
+                    this.ultimaRecuperacao = Date.now();
+                    await this.recuperarPendentes();
+                }
+
                 const results = await this.client.xReadGroup(
-                    queueService.CONSUMER_GROUP, 
-                    'worker_instance_1', 
-                    [{
-                        key: queueService.UP_STREAM_KEY,
-                        id: '>' // Apenas mensagens não processadas
-                    }],
+                    queueService.CONSUMER_GROUP,
+                    'worker_instance_1',
+                    [{ key: queueService.UP_STREAM_KEY, id: '>' }],
                     { BLOCK: 5000, COUNT: 20 }
                 );
 
-                if (results && results.length > 0) {
-                    for (const stream of results) {
-                        for (const message of stream.messages) {
-                            await this.processMessage(message);
-                        }
+                for (const stream of results || []) {
+                    for (const message of stream.messages) {
+                        await this.processMessage(message);
                     }
                 }
+                this.falhasSeguidas = 0;
             } catch (error) {
-                logger.error(`[CloudSyncWorker] Erro no loop de escuta: ${error.message}`);
-                await new Promise(r => setTimeout(r, 3000)); // Esperar antes de reconectar
+                this.falhasSeguidas++;
+                // Com o Redis fora do ar, registra a 1ª falha e depois só a cada 20 (antes: uma linha a cada 3 s)
+                if (this.falhasSeguidas === 1 || this.falhasSeguidas % 20 === 0) {
+                    logger.error(`[CloudSyncWorker] Erro no loop de escuta (${this.falhasSeguidas}x): ${error.message}`);
+                }
+                const espera = Math.min(3000 * this.falhasSeguidas, 60000);
+                await new Promise(r => setTimeout(r, espera));
             }
         }
     }
 
+    /** Reprocessa mensagens que ficaram sem ACK (falha temporária numa tentativa anterior). */
+    async recuperarPendentes() {
+        let inicio = '0-0';
+        do {
+            const reply = await this.client.xAutoClaim(
+                queueService.UP_STREAM_KEY, queueService.CONSUMER_GROUP, 'worker_instance_1',
+                RECUPERAR_PENDENTES_MS, inicio, { COUNT: 20 }
+            );
+            for (const message of reply.messages || []) {
+                if (message) await this.processMessage(message);
+            }
+            inicio = reply.nextId;
+        } while (inicio && inicio !== '0-0');
+    }
+
     async processMessage(message) {
+        const { id, message: payloadMap } = message;
+        let logData = null;
         try {
-            const { id, message: payloadMap } = message;
-            const logData = JSON.parse(payloadMap.payload_json);
-
-            logger.info(`📤 [CloudSyncWorker] Upsert Nuvem: Processando Log ${logData.id}`);
-
-            // Transformar num DTO aceitável pelo Supabase Cloud
+            logData = JSON.parse(payloadMap.payload_json);
             const cloudPayload = { ...logData };
             delete cloudPayload.pessoas; // remover relações se houver
-            
+
             const { error } = await supabase.from('logs_acesso').upsert(cloudPayload, {
                 onConflict: 'id',
                 ignoreDuplicates: true
             });
+            if (error) throw error;
 
-            if (error) {
-                 if (error.message.includes('foreign key')) {
-                     logger.warn(`⚠️ [CloudSyncWorker] FK Missing: Pessoa ${logData.pessoa_id} não sincronizada ainda na nuvem.`);
-                 } else {
-                     throw error;
-                 }
-            }
-            
-            // XACK - Confirma que gravou no Supabase (Mata fisicamente do Consumer Group)
             await this.client.xAck(queueService.UP_STREAM_KEY, queueService.CONSUMER_GROUP, id);
-            
-            // Atualizar status no MS SQL (Edge Local DB)
-            try {
-                const connection = await getConnection();
-                await connection.request()
-                    .input('ids', sql.VarChar, logData.id)
-                    .execute('sp_marcar_logs_sincronizados');
-            } catch (sqlErr) {
-                logger.warn(`⚠️ [CloudSyncWorker] ACK Nuvem enviado, mas falha ao marcar sincronizado no MS SQL local: ${sqlErr.message}`);
-            }
-
-            logger.info(`✅ [CloudSyncWorker] Log da borda perfeitamente salvo na Cloud (ID: ${logData.id}).`);
-
+            logger.info(`✅ [CloudSyncWorker] Log ${logData.id} regravado no Supabase.`);
         } catch (error) {
-            logger.error(`❌ [CloudSyncWorker] Falha ao processar log (msg ${message.id}): ${error.message}`);
-            // Mensagem cai na Pending Entries List (PEL) e não recebe XACK.
-            // Para não travar, ignoramos - deve ser feito AutoClaim pra retentativas futuras.
+            const permanente = !logData || ERROS_PERMANENTES.has(error.code);
+            if (permanente) {
+                // Dado inválido: confirmar para não reprocessar para sempre (fica registrado no log)
+                logger.error(`❌ [CloudSyncWorker] Log descartado (msg ${id}, erro ${error.code || 'parse'}): ${error.message}`, { log: logData });
+                await this.client.xAck(queueService.UP_STREAM_KEY, queueService.CONSUMER_GROUP, id).catch(() => {});
+            } else {
+                // Falha temporária: sem ACK, volta via recuperarPendentes()
+                logger.warn(`⚠️ [CloudSyncWorker] Falha temporária no log (msg ${id}), nova tentativa em ~1 min: ${error.message}`);
+            }
         }
     }
 }

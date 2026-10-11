@@ -13,6 +13,7 @@ class ConfigController {
 
         this.getEtiquetas = this.getEtiquetas.bind(this);
         this.saveEtiquetas = this.saveEtiquetas.bind(this);
+        this.clearCache = this.clearCache.bind(this);
     }
 
     // ==========================================
@@ -73,12 +74,40 @@ class ConfigController {
         }
     }
 
+    async updateArea(req, res) {
+        try {
+            const { id } = req.params;
+            const { nome_area, capacidade_maxima } = req.body;
+            const eventoId = req.event?.id;
+
+            const updateData = { atualizado_em: new Date() };
+            if (nome_area !== undefined && nome_area !== null) updateData.nome_area = nome_area;
+            if (capacidade_maxima !== undefined && capacidade_maxima !== null) updateData.capacidade_maxima = capacidade_maxima;
+
+            const { data, error } = await supabase
+                .from('evento_areas')
+                .update(updateData)
+                .eq('id', id)
+                .eq('evento_id', eventoId)
+                .select()
+                .single();
+
+            if (error) throw error;
+            res.json({ success: true, data });
+        } catch (error) {
+            logger.error('Erro ao atualizar área:', error);
+            res.status(500).json({ error: 'Erro ao atualizar área.' });
+        }
+    }
+
     // ==========================================
     // TIPOS DE PULSEIRAS E REGRAS
     // ==========================================
     async getPulseiras(req, res) {
         try {
             const evento_id = req.event?.id || req.query.evento_id;
+            if (!evento_id) return res.status(400).json({ error: 'Contexto de evento não identificado' });
+
             const { data, error } = await supabase
                 .from('evento_tipos_pulseira')
                 .select(`
@@ -91,11 +120,32 @@ class ConfigController {
                 .eq('evento_id', evento_id)
                 .order('numero_inicial', { ascending: true });
 
-            if (error) throw error;
+            if (error) {
+                logger.error('Erro Supabase ao listar pulseiras:', error);
+                
+                // Fallback se a junção falhar
+                if (error.message.includes('relation') || error.message.includes('join')) {
+                    const { data: simpleData, error: simpleError } = await supabase
+                        .from('evento_tipos_pulseira')
+                        .select('*')
+                        .eq('evento_id', evento_id)
+                        .order('numero_inicial', { ascending: true });
+                    
+                    if (simpleError) throw simpleError;
+                    return res.json({ success: true, data: simpleData });
+                }
+                
+                throw error;
+            }
+
             res.json({ success: true, data });
         } catch (error) {
-            logger.error('Erro ao listar tipos de pulseira:', error);
-            res.status(500).json({ error: 'Erro ao buscar pulseiras' });
+            logger.error('Erro fatal ao listar tipos de pulseira:', error);
+            res.status(500).json({ 
+                error: 'Erro ao buscar pulseiras',
+                message: error.message,
+                details: error.details
+            });
         }
     }
 
@@ -208,6 +258,7 @@ class ConfigController {
                 .eq('id', evento_id);
 
             if (updateErr) throw updateErr;
+            require('../../middleware/eventMiddleware').invalidarEvento(evento_id);
 
             res.json({ success: true, message: 'Configurações de credenciamento salvas!' });
         } catch (error) {
@@ -226,6 +277,80 @@ class ConfigController {
         } catch (error) {
             logger.error('Erro ao excluir pulseira:', error);
             res.status(500).json({ error: 'Erro ao excluir pulseira.' });
+        }
+    }
+
+    async updatePulseira(req, res) {
+        try {
+            const { id } = req.params;
+            const eventoId = req.event?.id;
+            const { nome_tipo, cor_hex, numero_inicial, numero_final, areas_permitidas, tipo_leitura, prefixo_codigo, alerta_duplicidade, tempo_confirmacao_checkout } = req.body;
+
+            // Validar range
+            if (numero_inicial && numero_final && numero_inicial > numero_final) {
+                return res.status(400).json({ error: 'O número inicial não pode ser maior que o final' });
+            }
+
+            // Atualizar pulseira (usar !== undefined para aceitar valores 0 e string vazia)
+            const updateData = { atualizado_em: new Date() };
+            if (nome_tipo !== undefined) updateData.nome_tipo = nome_tipo;
+            if (cor_hex !== undefined) updateData.cor_hex = cor_hex;
+            if (numero_inicial !== undefined) updateData.numero_inicial = numero_inicial;
+            if (numero_final !== undefined) updateData.numero_final = numero_final;
+            if (tipo_leitura !== undefined) updateData.tipo_leitura = tipo_leitura;
+            if (prefixo_codigo !== undefined) updateData.prefixo_codigo = prefixo_codigo;
+            if (alerta_duplicidade !== undefined) updateData.alerta_duplicidade = alerta_duplicidade;
+            if (tempo_confirmacao_checkout !== undefined) updateData.tempo_confirmacao_checkout = tempo_confirmacao_checkout;
+
+            const { data: pulseira, error: pulseiraErr } = await supabase
+                .from('evento_tipos_pulseira')
+                .update(updateData)
+                .eq('id', id)
+                .eq('evento_id', eventoId)
+                .select()
+                .single();
+
+            if (pulseiraErr) throw pulseiraErr;
+
+            // Atualizar áreas permitidas se fornecidas
+            if (areas_permitidas !== undefined) {
+                logger.info(`🔄 Atualizando áreas para pulseira ${id}:`, { areas_permitidas });
+
+                // Remover áreas existentes
+                const { error: deleteErr } = await supabase.from('pulseira_areas_permitidas').delete().eq('pulseira_id', id);
+                if (deleteErr) logger.warn(`⚠️ Erro ao deletar áreas antigas:`, deleteErr);
+
+                // Inserir novas áreas
+                if (Array.isArray(areas_permitidas) && areas_permitidas.length > 0) {
+                    const permits = areas_permitidas.map(area_id => ({
+                        pulseira_id: id,
+                        area_id: area_id
+                    }));
+                    logger.info(`📌 Inserindo ${permits.length} áreas:`, permits);
+                    const { error: insertErr } = await supabase.from('pulseira_areas_permitidas').insert(permits);
+                    if (insertErr) {
+                        logger.error(`❌ Erro ao inserir áreas: ${JSON.stringify(insertErr)}`);
+                        throw insertErr;
+                    } else {
+                        logger.info(`✅ Áreas inseridas com sucesso`);
+                    }
+                }
+            }
+
+            res.json({ success: true, message: 'Pulseira atualizada com sucesso', data: pulseira });
+        } catch (error) {
+            logger.error('❌ Erro ao atualizar pulseira:', {
+                message: error.message,
+                details: error.details,
+                hint: error.hint,
+                code: error.code,
+                fullError: JSON.stringify(error)
+            });
+            res.status(500).json({
+                error: 'Erro ao atualizar pulseira.',
+                details: error.message,
+                hint: error.hint
+            });
         }
     }
 
@@ -279,6 +404,22 @@ class ConfigController {
         } catch (error) {
             logger.error('Erro ao salvar layout de etiqueta:', error.message || error);
             res.status(500).json({ error: `Falha ao salvar configuração: ${error.message || 'Verifique se a tabela evento_etiqueta_layouts existe no Supabase'}` });
+        }
+    }
+
+    // ==========================================
+    // MANUTENÇÃO E CACHE
+    // ==========================================
+    async clearCache(req, res) {
+        try {
+            const cacheService = require('../../services/cacheService');
+            cacheService.clear();
+
+            logger.info(`🧹 Cache limpo via Admin por ${req.user?.email || 'Sistema'}`);
+            res.json({ success: true, message: 'Fila de cache invalidada com sucesso. Os dados serão recarregados do banco no próximo acesso.' });
+        } catch (error) {
+            logger.error('Erro ao limpar cache:', error);
+            res.status(500).json({ error: 'Falha ao processar limpeza de cache' });
         }
     }
 }

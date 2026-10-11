@@ -58,47 +58,24 @@ router.get('/stats', async (req, res) => {
     try {
         const empresaId = req.user.id;
 
-        // 1. Info da Empresa (Cota Total)
-        const { data: empresa } = await req.userClient
-            .from('empresas')
-            .select('quota')
-            .eq('id', empresaId)
-            .single();
+        // Paralelizar todas as queries — nenhuma depende do resultado de outra
+        const [empresaRes, aprovadosRes, docsRes, checkinsRes, logsRes] = await Promise.all([
+            req.userClient.from('empresas').select('quota').eq('id', empresaId).single(),
+            req.userClient.from('pessoa_evento_empresa').select('pessoa_id', { count: 'exact', head: true })
+                .eq('status_aprovacao', 'aprovado'),
+            req.userClient.from('pessoa_documentos').select('id', { count: 'exact', head: true })
+                .eq('status', 'pendente'),
+            req.userClient.from('pessoa_evento_empresa')
+                .select('pessoa_id, pessoas!inner(id, nome, status_acesso)')
+                .eq('status_aprovacao', 'aprovado')
+                .eq('pessoas.status_acesso', 'checkin_feito'),
+            req.userClient.from('logs_acesso').select('*, pessoas!inner(nome, cpf)')
+                .eq('tipo', 'CHECKIN').order('data_hora', { ascending: false }).limit(5)
+        ]);
 
-        const cotaTotal = empresa?.quota || 0;
-
-        // 2. Colaboradores Aprovados (Pivot)
-        const { data: pivotAprovados } = await req.userClient
-            .from('pessoa_evento_empresa')
-            .select('pessoa_id')
-            .eq('status_aprovacao', 'aprovado');
-
-        const totalCredenciados = pivotAprovados ? pivotAprovados.length : 0;
-
-        // 3. Documentos Pendentes / ECM
-        // RLS cuidará para puxarmos apenas documentos atrelados a pessoas vinculadas a essa empresa
-        const { data: docsPendentes } = await req.userClient
-            .from('pessoa_documentos')
-            .select('id', { count: 'exact', head: true })
-            .eq('status', 'pendente');
-
-        // 4. Pessoas com Check-in (M:N)
-        const { data: listCheckins } = await req.userClient
-            .from('pessoa_evento_empresa')
-            .select('pessoa_id, pessoas!inner(id, nome, status_acesso)')
-            .eq('status_aprovacao', 'aprovado')
-            .eq('pessoas.status_acesso', 'checkin_feito');
-
-        const presentesDesteMomento = listCheckins ? listCheckins.length : 0;
-
-        // Últimos Check-ins (Logs Recentes)
-        // Isso requer join. O RLS isola as Pessoas para esta tela
-        const { data: recentLogs } = await req.userClient
-            .from('logs_acesso')
-            .select('*, pessoas!inner(nome, cpf)')
-            .eq('tipo', 'CHECKIN')
-            .order('data_hora', { ascending: false })
-            .limit(5);
+        const cotaTotal = empresaRes.data?.quota || 0;
+        const totalCredenciados = aprovadosRes.count || 0;
+        const presentesDesteMomento = checkinsRes.data ? checkinsRes.data.length : 0;
 
         res.json({
             success: true,
@@ -107,9 +84,9 @@ router.get('/stats', async (req, res) => {
                 totalCredenciados,
                 cotaUsadaPerc: cotaTotal > 0 ? ((totalCredenciados / cotaTotal) * 100).toFixed(1) : 0,
                 presentesAgora: presentesDesteMomento,
-                ecmPendentes: docsPendentes ? docsPendentes.count : 0
+                ecmPendentes: docsRes.count || 0
             },
-            recent_activity: recentLogs || []
+            recent_activity: logsRes.data || []
         });
 
     } catch (error) {
@@ -149,6 +126,9 @@ router.get('/colaboradores', async (req, res) => {
     }
 });
 
+const crypto = require('crypto');
+const emailService = require('../../services/emailService');
+
 /**
  * ➕ POST /api/portal/empresa/colaboradores
  * Permite que a empresa insira um colaborador diretamente no seu contexto
@@ -158,12 +138,17 @@ router.post('/colaboradores', async (req, res) => {
         const empresaId = req.user.id;
         const payload = req.body;
 
+        // 1. Gerar Token de Registro para o Colaborador
+        const token = crypto.randomUUID();
+        const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 dias
+
         // Force security: Ignore whatever empresa_id the frontend sent and hardcode the token's ID
         payload.empresa_id = empresaId;
-        payload.status_acesso = 'pendente'; // Força aprovação de segurança
+        payload.status_acesso = 'pendente'; 
+        payload.registration_token = token;
+        payload.registration_token_expires_at = expires.toISOString();
 
-        // Utilizamos req.userClient para que as policies RLS de INSERT sejam respeitadas,
-        // garantindo que não estamos injetando dados para empresas das quais não temos token.
+        // Utilizamos req.userClient para que as policies RLS de INSERT sejam respeitadas
         const { data, error } = await req.userClient
             .from('pessoas')
             .insert([payload])
@@ -172,23 +157,38 @@ router.post('/colaboradores', async (req, res) => {
 
         if (error) throw error;
 
-        // Registra o vínculo M:N na tabela Pivot
+        // 2. Registra o vínculo M:N na tabela Pivot
         const { error: pivotErr } = await req.userClient.from('pessoa_evento_empresa').insert([{
             pessoa_id: data.id,
             empresa_id: empresaId,
-            evento_id: payload.evento_id || null, // Se a empresa postou com evento
+            evento_id: payload.evento_id || null,
             status_aprovacao: 'pendente',
             cargo_funcao: data.funcao || 'N/D'
         }]);
 
         if (pivotErr) logger.error('Falha ao registrar Pivot Table do Portal empresa', pivotErr);
 
-        logger.info(`Empresa [${empresaId}] cadastrou novo colaborador: ${payload.cpf}`);
-        res.status(201).json({ success: true, message: 'Colaborador cadastrado.', data });
+        // 3. Obter nome da empresa para o e-mail
+        const { data: empresa } = await req.userClient
+            .from('empresas')
+            .select('nome')
+            .eq('id', empresaId)
+            .single();
+
+        // 4. Enviar e-mail de convite ao colaborador
+        if (payload.email) {
+            const inviteLink = `${process.env.PUBLIC_PORTAL_URL || 'http://localhost:3000'}/register/${token}`;
+            emailService.sendEmployeeInvite(payload.email, data.nome, empresa?.nome || 'Empresa Parceira', inviteLink)
+                .catch(e => logger.error('❌ Erro silencioso ao enviar convite ao colaborador:', e));
+        }
+
+        logger.info(`Empresa [${empresaId}] cadastrou novo colaborador: ${payload.cpf}. Token gerado: ${token}`);
+        res.status(201).json({ success: true, message: 'Colaborador cadastrado e convite enviado.', data });
     } catch (error) {
         logger.error('Portal B2B: Erro insert colaborador:', error);
         res.status(500).json({ error: 'Falha ao registrar colaborador.' });
     }
 });
+
 
 module.exports = router;

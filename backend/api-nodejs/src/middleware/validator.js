@@ -54,7 +54,7 @@ const validatePessoa = [
         if (!isValidCPF(value)) throw new Error('CPF inválido');
         return true;
     }),
-    body('empresa_id').isUUID().withMessage('ID de empresa inválido'),
+    body('empresa_id').optional({ nullable: true }).isUUID().withMessage('ID de empresa inválido'), // FIX I-02: visitantes podem não ter empresa
     validate
 ];
 

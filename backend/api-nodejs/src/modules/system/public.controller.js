@@ -2,6 +2,28 @@ const { supabase, uploadImage } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const qrGenerator = require('../../utils/qrGenerator');
 const emailService = require('../../services/emailService');
+const cacheService = require('../../services/cacheService');
+
+/**
+ * Registro de documento enviado pelo portal no formato real de pessoa_documentos.
+ * O nome vem como "<TIPO>_<arquivo>" (ex.: RG_FRENTE_foto.jpg); o tipo vira o título.
+ */
+const documentoDoPortal = (doc, url) => {
+    const nome = String(doc.label || doc.tipo || doc.name || 'Documento');
+    const titulo = (doc.label || doc.tipo || nome.replace(/_[^_]*\.[a-z0-9]+$/i, '')).replace(/_/g, ' ').trim().toUpperCase() || 'DOCUMENTO';
+    return { titulo: titulo.substring(0, 255), tipo_doc: 'PORTAL', url_arquivo: url, status: 'pendente' };
+};
+
+/** Grava os documentos do portal e recalcula a situação da pessoa. */
+const salvarDocumentosPortal = async (pessoaId, documentos) => {
+    if (!documentos.length || !pessoaId) return;
+    const { error } = await supabase.from('pessoa_documentos').insert(documentos.map(d => ({ ...d, pessoa_id: pessoaId })));
+    if (error) {
+        logger.error(`[Portal] Falha ao gravar ${documentos.length} documento(s) da pessoa ${pessoaId}: ${error.message}`);
+        return;
+    }
+    await require('../entities/documento.service').sincronizarStatusPessoa(null, pessoaId);
+};
 
 class PublicController {
     /**
@@ -10,88 +32,250 @@ class PublicController {
     async getCompanyByToken(req, res) {
         try {
             const { token } = req.params;
-
+            
             const { data: empresa, error } = await supabase
                 .from('empresas')
-                .select('id, nome, datas_presenca, max_colaboradores')
+                .select(`
+                    id, nome, datas_presenca, max_colaboradores, registration_token_expires_at, evento_id,
+                    eventos (
+                        nome, logo_url, campos_obrigatorios, politica_privacidade_url, datas_montagem, datas_evento, datas_desmontagem
+                    )
+                `)
                 .eq('registration_token', token)
                 .single();
 
             if (error || !empresa) {
-                return res.status(404).json({ error: 'Link de cadastro inválido ou expirado.' });
+                logger.error({ err: error, token }, `[PortalPublico] Falha ao localizar empresa por token: ${token}`);
+                return res.status(404).json({ error: 'Link de cadastro inválido ou inexistente. Gere um novo convite no painel admin.' });
             }
 
-            let totalPessoas = 0;
-            if (empresa.max_colaboradores > 0) {
-                const { count } = await supabase
-                    .from('pessoas')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('empresa_id', empresa.id);
-                totalPessoas = count || 0;
+            logger.info(`[PortalPublico] Empresa identificada: ${empresa.nome} para o evento ${empresa.eventos?.nome}`);
+
+            const evento = empresa.eventos;
+
+            // Validar expiração
+            if (empresa.registration_token_expires_at && new Date(empresa.registration_token_expires_at) < new Date()) {
+                return res.status(403).json({ error: 'Este link de registro expirou. Solicite um novo convite ao administrador do evento.' });
             }
+
+            // --- ⚡ PERFORMANCE: Otimização de Contagem (Inscritos) ---
+            const { count: totalPessoas } = await supabase
+                .from('pessoas')
+                .select('id', { count: 'exact', head: true })
+                .eq('empresa_id', empresa.id);
 
             // Verificar se ainda há vagas
             const vagas = empresa.max_colaboradores > 0
-                ? empresa.max_colaboradores - totalPessoas
+                ? empresa.max_colaboradores - (totalPessoas || 0)
                 : Infinity;
 
-            res.json({
+            // Montar array consolidados das datas do evento, caso a empresa não tenha datas fixas
+            const eventDates = evento ? [
+                ...(evento.datas_montagem || []),
+                ...(evento.datas_evento || []),
+                ...(evento.datas_desmontagem || [])
+            ] : [];
+
+            // Remover datas duplicadas do evento, e ordenar
+            const allEventDates = [...new Set(eventDates)].sort();
+
+            const branding = evento ? {
+                evento_nome: evento.nome,
+                logo_url: evento.logo_url || null,
+                politica_url: evento.politica_privacidade_url || null
+            } : null;
+
+            const responseData = {
                 success: true,
                 company: {
                     id: empresa.id,
                     nome: empresa.nome,
                     vagas: vagas,
-                    datas_disponiveis: empresa.datas_presenca || []
-                }
-            });
+                    datas_disponiveis: (empresa.datas_presenca && empresa.datas_presenca.length > 0) 
+                        ? empresa.datas_presenca 
+                        : allEventDates
+                },
+                branding,
+                requiredFields: evento?.campos_obrigatorios || null
+            };
+
+            cacheService.set(`company_${token}`, responseData);
+            res.json(responseData);
 
         } catch (error) {
-            res.status(500).json({ error: 'Erro ao buscar empresa' });
+            logger.error('Erro em getCompanyByToken:', error);
+            res.status(500).json({ error: 'Erro ao buscar dados da empresa' });
         }
     }
 
     /**
-     * Gerar Pre-signed URL para upload de foto (Performance)
+     * Obter a lista de colaboradores associados à empresa do token (Publico, ofuscado)
+     */
+    async getCompanyEmployeesByToken(req, res) {
+        try {
+            const { token } = req.params;
+            
+            // Encontrar empresa vinculada ao token público
+            const { data: empresa, error: empresaError } = await supabase
+                .from('empresas')
+                .select('id, evento_id')
+                .eq('registration_token', token)
+                .single();
+
+            if (empresaError || !empresa) {
+                logger.warn(`🛑 Token 404 em getCompanyEmployeesByToken: ${token}`);
+                return res.status(404).json({ error: 'Link corporativo inválido.' });
+            }
+
+            // Selecionar os colaboradores — usa select('*') para resiliência de schema
+            const { data: rawEmployees, error: empError } = await supabase
+                .from('pessoas')
+                .select('*')
+                .eq('empresa_id', empresa.id)
+                .order('created_at', { ascending: false });
+
+            if (empError) {
+                logger.error('Supabase error in getCompanyEmployeesByToken:', JSON.stringify(empError));
+                return res.status(500).json({ error: 'Erro ao buscar lista de credenciados', detail: empError.message, code: empError.code });
+            }
+
+            const employees = (rawEmployees || []).map(emp => ({
+                id: emp.id,
+                nome: emp.nome_completo || emp.nome || 'Sem nome',
+                funcao: emp.funcao,
+                status_acesso: emp.status_acesso
+            }));
+
+            return res.json({ success: true, employees });
+
+        } catch (error) {
+            logger.error('Erro em getCompanyEmployeesByToken:', error);
+            res.status(500).json({ error: 'Erro ao buscar lista de credenciados', detail: error.message });
+        }
+    }
+
+    /**
+     * Obter dados de um colaborador pelo token de convite (Publico)
+     */
+    async getPersonByToken(req, res) {
+
+        try {
+            const { token } = req.params;
+
+            const { data: pessoa, error } = await supabase
+                .from('pessoas')
+                .select(`
+                    id, nome, cpf, email, funcao, registration_token_expires_at, evento_id, empresa_id,
+                    eventos (
+                        nome, cor_primaria, cor_secundaria, logo_url, banner_url, campos_obrigatorios, politica_privacidade_url
+                    ),
+                    empresas ( nome )
+                `)
+                .eq('registration_token', token)
+                .single();
+
+            if (error || !pessoa) {
+                return res.status(404).json({ error: 'Convite individual inválido ou expirado.' });
+            }
+
+            // Validar expiração
+            if (pessoa.registration_token_expires_at && new Date(pessoa.registration_token_expires_at) < new Date()) {
+                return res.status(403).json({ error: 'Este link de convite expirou. Solicite um novo à sua empresa.' });
+            }
+
+            const evento = pessoa.eventos;
+            const branding = evento ? {
+                evento_nome: evento.nome,
+                cor_primaria: evento.cor_primaria || null,
+                cor_secundaria: evento.cor_secundaria || null,
+                logo_url: evento.logo_url || null,
+                banner_url: evento.banner_url || null,
+                politica_url: evento.politica_privacidade_url || null
+            } : null;
+
+            res.json({
+                success: true,
+                isPreRegistered: true,
+                pessoa: {
+                    id: pessoa.id,
+                    nome: pessoa.nome,
+                    cpf: pessoa.cpf,
+                    email: pessoa.email,
+                    funcao: pessoa.funcao,
+                    empresa_nome: pessoa.empresas?.nome
+                },
+                branding,
+                requiredFields: evento?.campos_obrigatorios || null
+            });
+        } catch (error) {
+            logger.error('Erro em getPersonByToken:', error);
+            res.status(500).json({ error: 'Erro ao validar convite individual' });
+        }
+    }
+
+    /**
+     * Gerar URL assinada para upload direto (Frontend -> Storage)
      */
     async generateUploadUrl(req, res) {
         try {
             const { token } = req.params;
             const { cpf } = req.body;
+            const requestedBucket = req.body.bucket || 'selfies';
+            const UPLOAD_BUCKETS = ['selfies', 'documentos'];
+            const bucket = UPLOAD_BUCKETS.includes(requestedBucket) ? requestedBucket : 'selfies';
 
-            if (!cpf) return res.status(400).json({ error: 'CPF é obrigatório.' });
+            if (!cpf) return res.status(400).json({ error: 'CPF é obrigatório para gerar URL.' });
 
-            // 1. Validar Token e Empresa
-            const { data: empresa, error: empError } = await supabase
+            // 1. Validar Token (Pode ser de empresa ou convite individual)
+            const { data: empresaContext } = await supabase
                 .from('empresas')
-                .select('*')
+                .select('id, evento_id')
                 .eq('registration_token', token)
                 .single();
 
-            if (empError || !empresa) {
-                return res.status(404).json({ error: 'Link inválido.' });
+            let eventoId = empresaContext?.evento_id;
+
+            if (!empresaContext) {
+                const { data: pessoaContext } = await supabase
+                    .from('pessoas')
+                    .select('id, evento_id')
+                    .eq('registration_token', token)
+                    .single();
+                
+                if (!pessoaContext) {
+                    return res.status(404).json({ error: 'Link de registro inválido para upload.' });
+                }
+                eventoId = pessoaContext.evento_id;
             }
 
-            const cpfLimpo = cpf.replace(/[^\d]/g, '');
-            const filePath = `event_${empresa.evento_id}/${cpfLimpo}_${Date.now()}.jpg`;
+            const cleanCpf = cpf.replace(/\D/g, '');
+            const fileName = `${cleanCpf}_${Date.now()}.jpg`;
+            const path = `event_${eventoId}/${bucket}/${fileName}`;
 
-            const { data, error } = await supabase.storage
-                .from('selfies')
-                .createSignedUploadUrl(filePath);
+            const { data, error } = await supabase
+                .storage
+                .from(bucket)
+                .createSignedUploadUrl(path);
 
             if (error) throw error;
 
-            const publicUrlData = supabase.storage.from('selfies').getPublicUrl(filePath);
+            // 4. Gerar URL pública para leitura posterior
+            const { data: publicData } = supabase
+                .storage
+                .from(bucket)
+                .getPublicUrl(path);
 
             res.json({
                 success: true,
                 uploadUrl: data.signedUrl,
-                path: filePath,
-                publicUrl: publicUrlData.data.publicUrl
+                publicUrl: publicData.publicUrl,
+                path: path,
+                token: data.token
             });
 
         } catch (error) {
-            logger.error('Erro ao gerar URL pre-assinada:', error);
-            res.status(500).json({ error: 'Erro ao gerar upload URL' });
+            logger.error('Erro em generateUploadUrl:', error);
+            res.status(500).json({ error: 'Erro ao gerar URL de upload.' });
         }
     }
 
@@ -106,51 +290,345 @@ class PublicController {
                 data_nascimento,
                 funcao,
                 dias_trabalho,
-                foto_url, // Agora recebe a URL direta após upload do client
-                foto_base64, // Fallback
-                documentos // Array de base64 ou arquivos
+                foto_url,
+                foto_base64,
+                documentos,
+                aceite_lgpd,
+                tipo_pessoa,
+                fases_acesso,
+                documento_foto,
+                trabalho_area_tecnica,
+                trabalho_altura
             } = req.body;
 
-            // 1. Validar Token e Empresa
-            const { data: empresa, error: empError } = await supabase
-                .from('empresas')
-                .select('*')
+            // Validar aceite LGPD - aceitar como boolean ou string 'true'
+            const aceiteValido = aceite_lgpd === true || aceite_lgpd === 'true' || aceite_lgpd === 1 || aceite_lgpd === '1';
+            if (!aceiteValido) {
+                return res.status(400).json({ error: 'O aceite dos termos de privacidade (LGPD) é obrigatório.' });
+            }
+
+            // 1. Identificar Contexto do Token (Empresa ou Pessoa?)
+            let context = null;
+            let targetId = null;
+            let activeContext = null;
+
+            // Tenta Pessoa Primeiro (Convite Direto)
+            const { data: pessoaContext } = await supabase
+                .from('pessoas')
+                .select('id, evento_id, empresa_id, registration_token_expires_at')
                 .eq('registration_token', token)
                 .single();
 
-            if (empError || !empresa) {
-                return res.status(404).json({ error: 'Link inválido.' });
-            }
+            if (pessoaContext) {
+                context = 'PESSOA';
+                targetId = pessoaContext.id;
+                activeContext = pessoaContext;
+            } else {
+                // Tenta Empresa (Ficha Limpa)
+                const { data: empresaContext } = await supabase
+                    .from('empresas')
+                    .select('id, evento_id, registration_token_expires_at, max_colaboradores')
+                    .eq('registration_token', token)
+                    .single();
 
-            // 2. Verificar Limite
-            if (empresa.max_colaboradores > 0) {
-                const { count } = await supabase
-                    .from('pessoas')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('empresa_id', empresa.id);
-
-                if ((count || 0) >= empresa.max_colaboradores) {
-                    return res.status(403).json({ error: 'Limite de colaboradores atingido para esta empresa' });
+                if (empresaContext) {
+                    context = 'EMPRESA';
+                    targetId = empresaContext.id;
+                    activeContext = empresaContext;
                 }
             }
 
-            // 3. Validar CPF e Duplicidade
-            const cpfLimpo = cpf.replace(/[^\d]/g, '');
-            const { data: existe } = await supabase
-                .from('pessoas')
-                .select('id')
-                .eq('cpf', cpfLimpo)
-                .eq('evento_id', empresa.evento_id)
-                .single();
-
-            if (existe) {
-                return res.status(400).json({ error: 'Este CPF já está cadastrado para este evento.' });
+            if (!context || !activeContext) {
+                logger.warn(`[RegisterEmployee] Token não encontrado: ${token.substring(0, 8)}...`);
+                return res.status(404).json({ error: 'Link de registro inválido ou expirado.' });
             }
 
-            // 4. Upload de Foto Biométrica (Fallback se foto_url não for enviada e vier base64)
+            // Validar expiração
+            if (activeContext.registration_token_expires_at && new Date(activeContext.registration_token_expires_at) < new Date()) {
+                return res.status(403).json({ error: 'O link de registro expirou.' });
+            }
+
+            const eventoId = activeContext.evento_id;
+            const empresaId = context === 'PESSOA' ? activeContext.empresa_id : activeContext.id;
+
+            // 2. Validar CPF e Duplicidade (Apenas se for novo registro)
+            const cpfLimpo = cpf.replace(/[^\d]/g, '');
+            if (context === 'EMPRESA') {
+                const { data: existe } = await supabase
+                    .from('pessoas')
+                    .select('id')
+                    .eq('cpf', cpfLimpo)
+                    .eq('evento_id', eventoId)
+                    .single();
+
+                if (existe) return res.status(400).json({ error: 'Este CPF já está cadastrado.' });
+
+                // Verificar Limite
+                if (activeContext.max_colaboradores > 0) {
+                    const { count } = await supabase
+                        .from('pessoas')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('empresa_id', empresaId);
+
+                    if ((count || 0) >= activeContext.max_colaboradores) {
+                        return res.status(403).json({ error: 'Limite de vagas atingido.' });
+                    }
+                }
+            }
+
+            // 3. Upload de Foto
             let finalFotoUrl = foto_url || '';
             if (!finalFotoUrl && foto_base64) {
                 const buffer = Buffer.from(foto_base64.split(',')[1], 'base64');
+                const uploadResult = await uploadImage('selfies', `event_${eventoId}/${cpfLimpo}_${Date.now()}.jpg`, buffer, 'image/jpeg');
+                if (uploadResult.success) {
+                    finalFotoUrl = uploadResult.url;
+                } else {
+                    logger.error('Falha no upload de foto pública:', uploadResult.error);
+                }
+            }
+
+            // 4. Upload de Documentos
+            let documentosSalvos = [];
+            if (documentos && Array.isArray(documentos) && documentos.length > 0) {
+                for (const doc of documentos) {
+                    if (doc.base64 && doc.name) {
+                        try {
+                            const buffer = Buffer.from(doc.base64.split(',')[1], 'base64');
+                            const ext = doc.name.split('.').pop().toLowerCase();
+                            const mimeType = ext === 'pdf' ? 'application/pdf' : (ext === 'png' ? 'image/png' : 'image/jpeg');
+                            const path = `event_${eventoId}/docs/${cpfLimpo}_${Date.now()}_${doc.name.replace(/[^a-zA-Z0-9.]/g, '_')}.${ext}`;
+                            const upload = await uploadImage('documentos', path, buffer, mimeType);
+                            if (upload.success) {
+                                documentosSalvos.push(documentoDoPortal(doc, upload.url));
+                            }
+                        } catch (docErr) {
+                            logger.error(`Falha no upload do documento ${doc.name}:`, docErr);
+                        }
+                    }
+                }
+            }
+            // 4.5 Verificar se CPF já existe antes de inserir (Para evitar 500 de UNIQUE constraint)
+            const { data: cpfExistente } = await supabase
+                .from('pessoas')
+                .select('id')
+                .eq('evento_id', eventoId)
+                .eq('cpf', cpfLimpo)
+                .maybeSingle();
+
+            if (cpfExistente && context === 'EMPRESA') {
+                return res.status(409).json({ error: 'Este CPF já está cadastrado para este evento.' });
+            }
+
+            // 5. Descobrir schema real da tabela pessoas (nome vs nome_completo)
+            //    Faz um select rápido para ver quais colunas existem
+            const { data: schemaSample } = await supabase
+                .from('pessoas')
+                .select('*')
+                .limit(1);
+
+            const sampleKeys = schemaSample && schemaSample.length > 0 ? Object.keys(schemaSample[0]) : [];
+            const hasNomeCompleto = sampleKeys.includes('nome_completo');
+            const nameField = hasNomeCompleto ? 'nome_completo' : 'nome';
+            logger.info(`[Schema] Tabela pessoas usa campo: ${nameField} (colunas: ${sampleKeys.slice(0, 10).join(', ')}...)`);
+
+            // Salvar / Atualizar Pessoa (QR code NÃO é gerado aqui - apenas após aprovação)
+            const rawPersonaData = {
+                [nameField]: nome,
+                cpf: cpfLimpo,
+                email: email || null,
+                nome_mae: nome_mae || null,
+                data_nascimento: data_nascimento || null,
+                funcao: funcao || null,
+                foto_url: finalFotoUrl || null,
+                documento_foto: documento_foto || null,
+                qr_code: null,
+                status_acesso: 'pendente',
+                origem_cadastro: 'externo',
+                tipo_pessoa: tipo_pessoa || 'colaborador',
+                fases_acesso: fases_acesso || [],
+                dias_acesso: dias_trabalho || [],
+                dias_trabalho: dias_trabalho || [],
+                trabalha_area_tecnica: trabalho_area_tecnica || false,
+                trabalha_altura: trabalho_altura || false,
+                aceite_lgpd: true,
+                data_aceite_lgpd: new Date(),
+                registration_token: null,
+                registration_token_expires_at: null
+            };
+
+            // Filtrar apenas campos que existem na tabela (evita 400 por coluna inexistente)
+            const personaData = {};
+            const ignoredFields = [];
+            for (const [key, value] of Object.entries(rawPersonaData)) {
+                if (sampleKeys.length === 0 || sampleKeys.includes(key)) {
+                    personaData[key] = value;
+                } else {
+                    ignoredFields.push(key);
+                }
+            }
+            if (ignoredFields.length > 0) {
+                logger.info(`[Schema] Campos ignorados (não existem na tabela): ${ignoredFields.join(', ')}`);
+            }
+
+            let finalPessoaId = null;
+
+            if (context === 'PESSOA') {
+                const { error: updErr } = await supabase
+                    .from('pessoas')
+                    .update(personaData)
+                    .eq('id', targetId);
+                if (updErr) throw updErr;
+                finalPessoaId = targetId;
+            } else {
+                logger.info(`[INSERT] Tentando inserir: ${JSON.stringify(personaData).substring(0, 200)}...`);
+                const { data: newPessoa, error: insErr } = await supabase
+                    .from('pessoas')
+                    .insert([{ ...personaData, evento_id: eventoId, empresa_id: empresaId }])
+                    .select('id')
+                    .single();
+
+                logger.info(`[INSERT] Resultado: data=${JSON.stringify(newPessoa)}, error=${JSON.stringify(insErr)}`);
+
+                if (insErr) {
+                    logger.error(`[INSERT ERROR] Code: ${insErr.code} | Message: ${insErr.message} | Details: ${insErr.details}`);
+                    return res.status(400).json({
+                        error: insErr.code === '23505' ? 'Este CPF já está cadastrado.' : 'Erro ao criar registro de colaborador.',
+                        detail: insErr.message,
+                        code: insErr.code
+                    });
+                }
+                
+                if (!newPessoa) throw new Error('Falha ao obter ID da nova pessoa');
+                finalPessoaId = newPessoa.id;
+            }
+
+            // 5.1. Garantir registro pivot pessoa_evento_empresa
+            // Pessoas cadastradas via link não têm esse vínculo criado automaticamente,
+            // o que as torna invisíveis na busca do check-in (searchPessoas filtra por pivot).
+            const { data: pivotExistente } = await supabase
+                .from('pessoa_evento_empresa')
+                .select('id')
+                .eq('pessoa_id', finalPessoaId)
+                .eq('evento_id', eventoId)
+                .maybeSingle();
+
+            if (!pivotExistente) {
+                const { error: pivotErr } = await supabase
+                    .from('pessoa_evento_empresa')
+                    .insert([{
+                        pessoa_id: finalPessoaId,
+                        empresa_id: empresaId,
+                        evento_id: eventoId,
+                        status_aprovacao: 'pendente',
+                        cargo_funcao: funcao || nome
+                    }]);
+                if (pivotErr) {
+                    logger.warn(`[Pivot] Falha ao criar vínculo pessoa_evento_empresa: ${pivotErr.message}`);
+                } else {
+                    logger.info(`[Pivot] Vínculo pessoa_evento_empresa criado para pessoa ${finalPessoaId}`);
+                }
+            }
+
+            // 6. Vincular Documentos
+            await salvarDocumentosPortal(finalPessoaId, documentosSalvos);
+
+            // 7. Registro LGPD (não bloqueia o cadastro se falhar)
+            try {
+                const lgpdService = require('./lgpd.service');
+                await lgpdService.recordConsent(finalPessoaId, eventoId, {
+                    ip: req.ip,
+                    userAgent: req.headers['user-agent']
+                });
+            } catch (lgpdErr) {
+                logger.warn(`[LGPD] Falha ao registrar consentimento (não bloqueante): ${lgpdErr.message}`);
+            }
+
+            logger.info(`✅ Cadastro concluído via token (${context}): ${nome}`);
+
+            // Enviar emails de notificação (não bloqueiam o cadastro)
+            try {
+                const { data: empresaData } = await supabase
+                    .from('empresas')
+                    .select('email, nome')
+                    .eq('id', empresaId)
+                    .single();
+
+                // Confirmação para o colaborador
+                if (email) {
+                    emailService.sendRegistrationConfirmation(email, nome, empresaData?.nome || '')
+                        .catch(e => logger.error('[EmailTrigger] Erro silencioso:', e));
+                }
+
+                // Notificação para a empresa
+                if (empresaData?.email) {
+                    await emailService.sendEmployeeInvite(
+                        empresaData.email,
+                        nome,
+                        empresaData.nome,
+                        `${process.env.PUBLIC_PORTAL_URL || 'http://localhost:3002'}`
+                    ).catch(e => logger.warn('Erro ao enviar email de confirmação:', e.message));
+                }
+            } catch (emailErr) {
+                logger.warn('Erro ao buscar email da empresa para notificação:', emailErr.message);
+            }
+
+            res.status(201).json({
+                success: true,
+                message: 'Cadastro concluído! A empresa foi notificada.',
+                qr_code: null
+            });
+
+        } catch (error) {
+            logger.error('Erro em registerEmployee (token):', error);
+            res.status(500).json({ error: 'Erro interno ao processar cadastro.' });
+        }
+    }
+
+
+    async validateInvite(req, res) {
+        try {
+            const { token } = req.params;
+            const { data, error } = await supabase
+                .from('empresas')
+                .select('id, nome, evento_id, eventos(nome)')
+                .eq('invite_token', token)
+                .gt('invite_expires', new Date().toISOString())
+                .single();
+
+            if (error || !data) {
+                return res.status(404).json({
+                    error: 'Link inválido ou expirado.'
+                });
+            }
+            res.json({ success: true, empresa: data });
+        } catch (error) {
+            logger.error('Erro em validateInvite:', error);
+            res.status(500).json({ error: 'Erro ao validar convite' });
+        }
+    }
+
+    async submitCadastro(req, res) {
+        try {
+            const { token, pessoa } = req.body;
+
+            // Valida token
+            const { data: empresa, error } = await supabase
+                .from('empresas')
+                .select('id, evento_id')
+                .eq('invite_token', token)
+                .gt('invite_expires', new Date().toISOString())
+                .single();
+
+            if (error || !empresa) {
+                return res.status(403).json({ error: 'Link inválido ou expirado.' });
+            }
+
+            // --- 🛡️ Upload de Foto Base64 Integrado ---
+            let finalFotoUrl = null;
+            if (pessoa.foto_base64) {
+                const cpfLimpo = pessoa.cpf.replace(/[^\d]/g, '');
+                const buffer = Buffer.from(pessoa.foto_base64.split(',')[1], 'base64');
                 const uploadResult = await uploadImage(
                     'selfies',
                     `event_${empresa.evento_id}/${cpfLimpo}_${Date.now()}.jpg`,
@@ -159,101 +637,76 @@ class PublicController {
                 );
                 if (uploadResult.success) {
                     finalFotoUrl = uploadResult.url;
-                } else {
-                    logger.error('Falha no upload de foto pública:', uploadResult.error);
                 }
             }
 
-            // 4.5. Upload de Documentos ECM
+            const cleanPessoa = { ...pessoa };
+            delete cleanPessoa.foto_base64; // Remove huge payload part
+            if (finalFotoUrl) cleanPessoa.foto_url = finalFotoUrl;
+
+            // --- 🛡️ Upload de Documentos Base64 Integrado ---
             let documentosSalvos = [];
-            if (documentos && Array.isArray(documentos) && documentos.length > 0) {
-                for (const doc of documentos) {
-                    if (doc.base64 && doc.name) {
-                        try {
-                            const docBuffer = Buffer.from(doc.base64.split(',')[1], 'base64');
-                            const fileExt = doc.name.split('.').pop().toLowerCase();
-                            const mimeType = fileExt === 'pdf' ? 'application/pdf' : (fileExt === 'png' ? 'image/png' : 'image/jpeg');
-                            const docPath = `event_${empresa.evento_id}/docs/${cpfLimpo}_${Date.now()}_${doc.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+            if (cleanPessoa.documentos && Array.isArray(cleanPessoa.documentos) && cleanPessoa.documentos.length > 0) {
+                 const cpfLimpo = cleanPessoa.cpf.replace(/[^\d]/g, '');
+                 for (const doc of cleanPessoa.documentos) {
+                     if (doc.base64 && doc.name) {
+                         const docBuffer = Buffer.from(doc.base64.split(',')[1], 'base64');
+                         const fileExt = doc.name.split('.').pop().toLowerCase();
+                         const mimeType = fileExt === 'pdf' ? 'application/pdf' : (fileExt === 'png' ? 'image/png' : 'image/jpeg');
+                         const docPath = `event_${empresa.evento_id}/docs/${cpfLimpo}_${Date.now()}_${doc.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
 
-                            const uploadResult = await uploadImage(
-                                'documentos',
-                                docPath,
-                                docBuffer,
-                                mimeType
-                            );
+                         const uploadResult = await uploadImage(
+                             'documentos',
+                             docPath,
+                             docBuffer,
+                             mimeType
+                         );
 
-                            if (uploadResult.success) {
-                                documentosSalvos.push({
-                                    nome_arquivo: doc.name,
-                                    caminho_arquivo: uploadResult.url,
-                                    tipo_documento: 'OUTROS', // General default for public upload
-                                    status_auditoria: 'pendente'
-                                });
-                            }
-                        } catch (docErr) {
-                            logger.error(`Falha no upload do documento ${doc.name}:`, docErr);
-                        }
-                    }
-                }
+                         if (uploadResult.success) {
+                             documentosSalvos.push(documentoDoPortal(doc, uploadResult.url));
+                         }
+                     }
+                 }
             }
+            delete cleanPessoa.documentos;
 
-            // 5. Gerar QR Code
-            const qrData = await qrGenerator.generate(cpfLimpo);
+            // 5. Gerar QR Code (Safety check)
+            const cpfLimpo2 = cleanPessoa.cpf.replace(/[^\d]/g, '');
+            const qrData = await qrGenerator.generate(cpfLimpo2);
+            cleanPessoa.qr_code = qrData.code;
 
-            // 6. Salvar Pessoa
-            const { data: pessoa, error: saveErr } = await supabase
+            // Salva pessoa como pendente
+            const { data: insertedPessoa, error: insertError } = await supabase
                 .from('pessoas')
-                .insert([{
-                    evento_id: empresa.evento_id,
+                .insert({
+                    ...cleanPessoa,
                     empresa_id: empresa.id,
-                    nome,
-                    cpf: cpfLimpo,
-                    nome_mae,
-                    data_nascimento,
-                    funcao,
-                    foto_url: finalFotoUrl,
-                    qr_code: qrData.code,
-                    status_acesso: 'pendente', // Aguarda aprovação
+                    evento_id: empresa.evento_id,
+                    status: 'PENDENTE',
+                    status_acesso: 'pendente',
+                    origem: 'portal_empresa',
                     origem_cadastro: 'externo',
-                    dias_trabalho: dias_trabalho || []
-                }])
-                .select()
+                    created_at: new Date().toISOString()
+                })
+                .select('id')
                 .single();
 
-            if (saveErr) throw saveErr;
-
-            // 6.5. Salvar Documentos na Tabela
-            if (documentosSalvos.length > 0) {
-                const docsToInsert = documentosSalvos.map(doc => ({
-                    ...doc,
-                    pessoa_id: pessoa.id,
-                    evento_id: empresa.evento_id
-                }));
-                const { error: insertDocsErr } = await supabase
-                    .from('pessoa_documentos')
-                    .insert(docsToInsert);
-                if (insertDocsErr) {
-                    logger.error(`[PublicController] Erro ao vincular documentos da pessoa ${pessoa.id}:`, insertDocsErr);
-                }
+            if (insertError) {
+                logger.error('Erro DB cadastro:', insertError);
+                return res.status(500).json({ error: 'Erro ao salvar cadastro. CPFs não podem ser duplicados.' });
             }
 
-            logger.info(`📝 Novo auto-cadastro: ${nome} (Empresa: ${empresa.nome}, Docs: ${documentosSalvos.length})`);
+            // Salvar Documentos na Tabela associativa
+            if (insertedPessoa) await salvarDocumentosPortal(insertedPessoa.id, documentosSalvos);
 
-            // 7. Enviar E-mail de Confirmação (Assíncrono)
-            if (email) {
-                emailService.sendRegistrationConfirmation(email, nome, empresa.nome)
-                    .catch(e => logger.error('[EmailTrigger] Erro silencioso:', e));
-            }
-
-            res.status(201).json({
+            res.json({
                 success: true,
-                message: 'Cadastro realizado com sucesso! Aguarde a aprovação.',
-                qr_code: qrData.image
+                message: 'Cadastro enviado! Aguarde aprovação da equipe.'
             });
 
         } catch (error) {
-            logger.error('Erro no auto-cadastro:', error);
-            res.status(500).json({ error: 'Erro interno ao processar cadastro' });
+            logger.error('Erro fatal em submitCadastro:', error);
+            res.status(500).json({ error: 'Erro fatal interno no cadastro.' });
         }
     }
 }

@@ -37,6 +37,9 @@ const sqlConfig = host ? {
 let pool = null;
 
 async function getConnection() {
+    if (!sqlConfig) {
+        throw new Error('MSSQL desativado: SQL_SERVER_HOST não configurado no .env');
+    }
     try {
         if (!pool) {
             console.log('🔌 Conectando ao SQL Server:', sqlConfig.server);
@@ -52,7 +55,7 @@ async function getConnection() {
         console.error('❌ ERRO CRÍTICO - SQL Server:', error.message);
 
         // Solução alternativa: tentar sem instância nomeada
-        if (error.message.includes('Instance name')) {
+        if (error.message.includes('Instance name') && sqlConfig) {
             console.log('🔄 Tentando conexão alternativa (sem instância nomeada)...');
             const baseHost = (process.env.SQL_SERVER_HOST || '').split('\\')[0];
             sqlConfig.server = baseHost;
@@ -73,6 +76,10 @@ async function getConnection() {
 }
 
 async function testConnection() {
+    if (!sqlConfig) {
+        console.log('ℹ️ SQL Server (MSSQL legado) desativado (SQL_SERVER_HOST ausente no .env).');
+        return false;
+    }
     try {
         const conn = await getConnection();
         const result = await conn.request().query('SELECT GETDATE() as data');

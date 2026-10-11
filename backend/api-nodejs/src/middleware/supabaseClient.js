@@ -23,10 +23,10 @@ const injectSupabaseClient = (req, res, next) => {
 
     if (token) {
         req.supabase = createClientForUser(token);
-        logger.info({
+        logger.debug('[Supabase] Cliente com escopo de usuário injetado', {
             userId: req.user?.id,
             path: req.path
-        }, '[Supabase] Cliente com escopo de usuário injetado');
+        });
     }
     // Se não há token, req.supabase fica undefined e os controllers
     // fazem fallback para o supabase de service_role (rotas públicas de terminal)
