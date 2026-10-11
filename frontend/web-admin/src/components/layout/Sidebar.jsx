@@ -160,8 +160,10 @@ const Sidebar = ({ open, onClose }) => {
                 if (isSubscribed) {
                     setAvailableEvents(list);
                     const currentActiveId = localStorage.getItem('active_evento_id');
-                    if (!currentActiveId && list.length > 0) {
-                        const first = list[0];
+                    // Sem evento ativo, ou o salvo não existe mais: escolhe um (de preferência ativo)
+                    const salvoExiste = list.some((ev) => ev.id === currentActiveId);
+                    if (!salvoExiste && list.length > 0) {
+                        const first = list.find((ev) => ev.status === 'ativo') || list[0];
                         if (changeActiveEvento) {
                             changeActiveEvento(first.id, first.nome);
                         } else {

@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { authService } from '../services/auth';
+import api from '../services/api';
 
 const log = import.meta.env.DEV ? console.log : () => {};
 
@@ -79,13 +80,16 @@ const readStoredUser = () => {
   return null;
 };
 
-// Soberania Master: contexto de evento sempre global.
+// Admin master: o evento escolhido é mantido ao recarregar a página (só é limpo ao entrar
+// e ao sair), para não trocar de evento sem perceber no meio do credenciamento.
 // Demais cargos: evento atribuído volta a ser o ativo no reload (produção).
-const syncEventoContext = (user) => {
+const syncEventoContext = (user, { inicioDeSessao = false } = {}) => {
   if (!user) return user;
   if (isSuperUser(user.nivel_acesso)) {
-    localStorage.removeItem('active_evento_id');
-    localStorage.removeItem('active_evento_nome');
+    if (inicioDeSessao) {
+      localStorage.removeItem('active_evento_id');
+      localStorage.removeItem('active_evento_nome');
+    }
     return user;
   }
   if (user.evento_id && user.eventos && user.eventos.nome) {
@@ -93,6 +97,27 @@ const syncEventoContext = (user) => {
     localStorage.setItem('active_evento_nome', user.eventos.nome);
   }
   return user;
+};
+
+const eventoValido = (id) => Boolean(id) && id !== 'undefined' && id !== 'null';
+
+// Admin master sem evento ativo: escolhe um antes de liberar as telas, senão elas consultam
+// a API sem evento e falham.
+const garantirEventoAtivo = async (user) => {
+  if (!user || !isSuperUser(user.nivel_acesso)) return;
+  if (eventoValido(localStorage.getItem('active_evento_id'))) return;
+  try {
+    const res = await api.get('/eventos');
+    const lista = res.data?.data || res.data || [];
+    const escolhido = lista.find((e) => e.status === 'ativo') || lista[0];
+    if (escolhido) {
+      localStorage.setItem('active_evento_id', escolhido.id);
+      localStorage.setItem('active_evento_nome', escolhido.nome);
+      window.dispatchEvent(new Event('storage'));
+    }
+  } catch (err) {
+    log('Não foi possível definir o evento ativo:', err);
+  }
 };
 
 export const AuthProvider = ({ children }) => {
@@ -122,6 +147,7 @@ export const AuthProvider = ({ children }) => {
 
       // Produção: sessão imediata a partir do cache (sem flicker, funciona offline)
       const storedUser = readStoredUser();
+      if (storedUser) await garantirEventoAtivo(storedUser);
       if (storedUser && isMounted) {
         const cachedUser = syncEventoContext(storedUser);
         setUser(cachedUser);
@@ -152,6 +178,7 @@ export const AuthProvider = ({ children }) => {
         };
 
         const nextUser = syncEventoContext(merged);
+        await garantirEventoAtivo(nextUser);
         if (isMounted) {
           setUser(nextUser);
           setToken(storedToken);
@@ -196,7 +223,7 @@ export const AuthProvider = ({ children }) => {
         let finalUser = { ...payloadUser };
         if (!finalUser.email) finalUser.email = payloadUser.userEmail || email;
 
-        finalUser = syncEventoContext(finalUser);
+        finalUser = syncEventoContext(finalUser, { inicioDeSessao: true });
 
         // Regra 25: "Lembrar de mim" decide o storage.
         // Sem preferência explícita → localStorage (comportamento de produção).
@@ -215,6 +242,7 @@ export const AuthProvider = ({ children }) => {
           window.dispatchEvent(new Event('storage'));
         }
 
+        await garantirEventoAtivo(finalUser);
         setUser(finalUser);
         setToken(payloadToken);
 

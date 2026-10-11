@@ -138,12 +138,14 @@ class DocumentoController {
         try {
             const supabaseClient = req.supabase || supabase;
             const { page, limit, search = '' } = req.query;
-            const eventoId = req.headers['x-evento-id'] || req.query.evento_id;
+            const eventoId = eventoDaRequisicao(req);
 
             if (page === undefined && limit === undefined) {
                 const todos = await documentoService.listPendentesLegado(supabaseClient);
                 return ApiResponse.success(res, todos);
             }
+
+            if (!eventoId) return ApiResponse.error(res, 'Selecione um evento para continuar.', 400);
 
             const result = await documentoService.listPendentes(supabaseClient, {
                 evento_id: eventoId,

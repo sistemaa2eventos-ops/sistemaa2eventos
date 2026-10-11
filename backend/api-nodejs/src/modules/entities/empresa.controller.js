@@ -4,7 +4,8 @@ const logger = require('../../services/logger');
 class EmpresaController {
     async list(req, res) {
         try {
-            const eventoId = req.event.id;
+            const eventoId = req.event?.id;
+            if (!eventoId) return res.status(400).json({ error: 'Selecione um evento para continuar.' });
 
             const { data, error } = await supabase
                 .from('empresas')
@@ -21,7 +22,8 @@ class EmpresaController {
     async search(req, res) {
         try {
             const { q } = req.query;
-            const evId = req.event.id;
+            const evId = req.event?.id;
+            if (!evId) return res.status(400).json({ error: 'Selecione um evento para continuar.' });
 
             let query = supabase.from('empresas').select('*').eq('evento_id', evId);
 
