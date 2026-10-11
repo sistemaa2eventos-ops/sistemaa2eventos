@@ -24,7 +24,8 @@ i18n
             escapeValue: false // not needed for react as it escapes by default
         },
         detection: {
-            order: ['queryString', 'cookie', 'localStorage', 'navigator', 'htmlTag'],
+            // Sem 'navigator': o painel é em português; outro idioma só se escolhido em Configurações > Idiomas
+            order: ['queryString', 'cookie', 'localStorage'],
             caches: ['localStorage', 'cookie']
         }
     });

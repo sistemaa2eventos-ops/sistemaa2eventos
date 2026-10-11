@@ -1,4 +1,5 @@
 import { Box, Typography, FormControl, Select, MenuItem, Chip } from '@mui/material';
+import { tom } from '../../styles/tokens';
 
 /**
  * Seletor de área/portaria usado em check-in e checkout.
@@ -8,7 +9,6 @@ import { Box, Typography, FormControl, Select, MenuItem, Chip } from '@mui/mater
 const AreaSelector = ({ areas, value, onChange, accentColor = '#00D4FF', compacto = false }) => {
   if (!areas?.length) return null;
 
-  const rgb = accentColor === '#FF3366' ? '255,51,102' : '0,212,255';
   const selectedName = areas.find(a => a.id === value)?.nome_area;
 
   const select = (
@@ -24,8 +24,8 @@ const AreaSelector = ({ areas, value, onChange, accentColor = '#00D4FF', compact
           : undefined}
         sx={{
           borderRadius: 1.5,
-          bgcolor: `rgba(${rgb},0.05)`,
-          border: `1px solid rgba(${rgb},0.2)`,
+          bgcolor: tom(accentColor, 0.05),
+          border: `1px solid ${tom(accentColor, 0.2)}`,
           fontSize: compacto ? '0.875rem' : undefined,
           '& .MuiSelect-select': { py: compacto ? 0.75 : 1 }
         }}
@@ -52,7 +52,7 @@ const AreaSelector = ({ areas, value, onChange, accentColor = '#00D4FF', compact
           label={selectedName || 'Área selecionada'}
           size="small"
           onDelete={() => onChange(null)}
-          sx={{ fontWeight: 700, bgcolor: `rgba(${rgb},0.15)`, color: accentColor, border: `1px solid rgba(${rgb},0.3)` }}
+          sx={{ fontWeight: 700, bgcolor: tom(accentColor, 0.15), color: accentColor, border: `1px solid ${tom(accentColor, 0.3)}` }}
         />
       )}
     </Box>

@@ -15,6 +15,10 @@ import PessoaCardDialog from '../components/credenciamento/PessoaCardDialog';
 import RecentAccessList from '../components/credenciamento/RecentAccessList';
 import CabecalhoOperacao, { BotaoJanelaRegistros } from '../components/credenciamento/CabecalhoOperacao';
 import { useCheckin } from '../hooks/useCheckin';
+import { funcao, tom } from '../styles/tokens';
+
+// Saída tem cor própria; vermelho fica só para acesso negado
+const COR = funcao.saida;
 import { useSyncedClock } from '../hooks/useSyncedClock';
 
 const playCheckoutSound = (type) => {
@@ -50,12 +54,12 @@ const BotaoSaida = styled(Button)(() => ({
     fontWeight: 700,
     textTransform: 'none',
     borderRadius: 10,
-    background: '#FF3366',
-    color: '#FFFFFF',
+    background: COR,
+    color: '#000000',
     boxShadow: 'none',
-    '&:hover': { background: '#FF3366', filter: 'brightness(1.1)', boxShadow: 'none' },
-    '&:focus-visible': { outline: '2px solid #FF3366', outlineOffset: 2 },
-    '&.Mui-disabled': { background: 'rgba(255,51,102,0.35)', color: 'rgba(255,255,255,0.7)' }
+    '&:hover': { background: COR, filter: 'brightness(1.1)', boxShadow: 'none' },
+    '&:focus-visible': { outline: `2px solid ${COR}`, outlineOffset: 2 },
+    '&.Mui-disabled': { background: tom(COR, 0.3), color: 'rgba(255,255,255,0.7)' }
 }));
 
 const LinhaResumo = ({ rotulo, valor, cor = 'rgba(255,255,255,0.9)', dica }) => {
@@ -70,9 +74,9 @@ const LinhaResumo = ({ rotulo, valor, cor = 'rgba(255,255,255,0.9)', dica }) => 
 
 const FeedbackOverlay = styled(Box, { shouldForwardProp: (p) => p !== 'status' })(({ status }) => ({
     position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-    background: status === 'sucesso' ? 'rgba(255,51,102,0.15)' : 'rgba(255,165,0,0.15)',
+    background: status === 'sucesso' ? tom(COR, 0.15) : tom(funcao.negado, 0.15),
     zIndex: 90, display: 'flex', flexDirection: 'column', alignItems: 'center', 
-    justifyContent: 'center', borderRadius: 12, border: status === 'sucesso' ? '4px solid #FF3366' : '4px solid #FFB800',
+    justifyContent: 'center', borderRadius: 12, border: `4px solid ${status === 'sucesso' ? COR : funcao.negado}`,
     backdropFilter: 'blur(8px)', animation: 'fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
 }));
 
@@ -96,7 +100,7 @@ const Checkout = () => {
     carregarDispositivosDisponiveis
   } = useCheckin('checkout', { logsTipo: 'checkout' });
 
-  const { currentTime, currentDate, timezoneLabel, isSynced } = useSyncedClock();
+  const { currentTime, currentDate, timezoneLabel } = useSyncedClock();
 
   const [cardLog, setCardLog] = useState(null);
   const [pulseiraValue, setPulseiraValue] = useState('');
@@ -161,7 +165,7 @@ const Checkout = () => {
       <CabecalhoOperacao
           titulo="Check-out"
           icone={<LogoutIcon />}
-          cor="#FF3366"
+          cor={COR}
           dataHora={`${currentDate} ${currentTime} (${timezoneLabel})`}
           estacao={{
               sessaoAtiva,
@@ -186,7 +190,7 @@ const Checkout = () => {
                 <UniversalPulseiraInput
                     value={pulseiraValue}
                     onChange={setPulseiraValue}
-                    accentColor="#FF3366"
+                    accentColor={COR}
                     label="Leitor, CPF ou pulseira"
                     placeholder="Bipe a pulseira ou digite o código"
                     helperText="Enter registra a saída na hora"
@@ -200,13 +204,7 @@ const Checkout = () => {
                 </BotaoSaida>
 
                 <Stack spacing={0.75} sx={{ pt: 1.5, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                    <LinhaResumo rotulo="Saídas nesta tela" valor={checkoutLogs.length} cor="#FF3366" />
-                    <LinhaResumo
-                        rotulo="Horário oficial"
-                        valor={`${currentTime} ${timezoneLabel}`}
-                        cor={isSynced ? '#00FF88' : 'rgba(255,255,255,0.9)'}
-                        dica={isSynced ? 'Relógio sincronizado com o servidor' : 'Relógio do computador (sem sincronizar com o servidor)'}
-                    />
+                    <LinhaResumo rotulo="Saídas registradas" valor={checkoutLogs.length} cor={COR} />
                 </Stack>
             </GlassCard>
         </Grid>
@@ -217,12 +215,12 @@ const Checkout = () => {
                 <RecentAccessList
                     logs={checkoutLogs}
                     title="Saídas"
-                    accentColor="#FF3366"
+                    accentColor={COR}
                     badgeLabel="Saída"
                     firstLabel="Última saída"
                     emptyTitle="Nenhuma saída registrada ainda"
                     emptySubtitle="Cada saída aparece aqui na hora, com foto, empresa e pulseira."
-                    acoes={<BotaoJanelaRegistros tipo="checkout" cor="#FF3366" />}
+                    acoes={<BotaoJanelaRegistros tipo="checkout" cor={COR} />}
                     onSelect={(log) => setCardLog(log)}
                 />
             </GlassCard>
@@ -234,9 +232,9 @@ const Checkout = () => {
           <FeedbackOverlay status={checkinResult}>
               <Zoom in={!!checkinResult}>
                   <Box sx={{ textAlign: 'center', p: 2 }}>
-                      {checkinResult === 'sucesso' ? <CheckoutIcon sx={{ fontSize: 100, color: '#FF3366' }} /> : <WarningIcon sx={{ fontSize: 100, color: '#FFB800' }} />}
+                      {checkinResult === 'sucesso' ? <CheckoutIcon sx={{ fontSize: 100, color: COR }} /> : <WarningIcon sx={{ fontSize: 100, color: funcao.negado }} />}
                       <Typography variant="h4" fontWeight={700} mt={2}>
-                          {checkinResult === 'sucesso' ? 'SAÍDA LIBERADA' : 'ATENÇÃO'}
+                          {checkinResult === 'sucesso' ? 'Saída registrada' : 'Saída negada'}
                       </Typography>
                       <Typography variant="body1" sx={{ opacity: 0.9, mt: 1 }}>{resultMessage}</Typography>
                       {checkinResult === 'sucesso' && (
@@ -254,7 +252,7 @@ const Checkout = () => {
           open={!!cardLog}
           log={cardLog}
           onClose={() => setCardLog(null)}
-          accentColor="#FF3366"
+          accentColor={COR}
       />
     </Box>
   );

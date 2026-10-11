@@ -1,19 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-    Box, Typography, Avatar, IconButton, Button, Menu, MenuItem,
+    Box, Typography, Avatar, IconButton, Button, Menu, MenuItem, ButtonBase,
     Dialog, DialogTitle, DialogContent, DialogActions, TextField,
     Tabs, Tab, Grid, Chip, Tooltip, Stack, CircularProgress, Alert
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import {
-    Settings as SettingsIcon,
+    MoreVert as MoreIcon,
     Logout as LogoutIcon,
     PhotoCamera as PhotoCameraIcon,
     Campaign as EmergencyIcon,
     EditNote as NoteIcon,
     Save as SaveIcon,
     CheckCircle as CheckCircleIcon,
-    AccessTime as TimeIcon,
     DeleteOutline as ClearIcon,
     Warning as WarningIcon
 } from '@mui/icons-material';
@@ -21,6 +20,10 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
+import { cores, funcao, papeis, tom, tamanhos, botaoSecundario } from '../../styles/tokens';
+import TituloModal from '../common/TituloModal';
+import NeonButton from '../common/NeonButton';
+import EnquadrarAvatar from '../common/EnquadrarAvatar';
 
 // --- PALETA DE AVATARES TÁTICOS (SVG DATA URIS) ---
 const TACTICAL_AVATARS = [
@@ -117,58 +120,40 @@ const UserSectionContainer = styled(Box)(({ theme }) => ({
     bottom: 0,
     zIndex: 40,
     width: '100%',
-    padding: theme.spacing(1.5, 1.5, 2, 1.5),
-    background: 'linear-gradient(180deg, rgba(8, 18, 38, 0.94) 0%, rgba(3, 8, 18, 0.98) 100%)',
-    backdropFilter: 'blur(25px)',
-    borderTop: '1px solid rgba(0, 212, 255, 0.3)',
-    boxShadow: '0 -10px 30px rgba(0, 0, 0, 0.85)',
+    padding: theme.spacing(1.5),
+    background: cores.superficie,
+    borderTop: `1px solid ${cores.borda}`,
     flexShrink: 0
 }));
 
-const UserCard = styled(Box)(() => ({
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-    padding: '10px 12px',
-    borderRadius: 12,
-    background: 'rgba(10, 22, 40, 0.75)',
-    border: '1px solid rgba(0, 212, 255, 0.25)',
-    boxShadow: 'inset 0 0 15px rgba(0, 212, 255, 0.05)',
-    transition: 'all 0.3s ease',
-    '&:hover': {
-        borderColor: 'rgba(0, 212, 255, 0.5)',
-        boxShadow: '0 0 20px rgba(0, 212, 255, 0.2)',
-        transform: 'translateY(-1px)'
-    }
-}));
+/** Nome para exibir: se o cadastro guardou o e-mail como nome, mostra só a parte antes do @. */
+const nomeParaExibir = (user) => {
+    const nome = user?.nome_completo || user?.nome || '';
+    if (nome && !nome.includes('@')) return nome;
+    const base = (nome || user?.email || 'Operador').split('@')[0];
+    return base.charAt(0).toUpperCase() + base.slice(1);
+};
 
-const ActionButton = styled(Button)(({ glowcolor = '#00D4FF' }) => ({
-    flex: 1,
-    minWidth: 0,
-    height: 38,
-    minHeight: 38,
-    padding: '0 8px',
-    borderRadius: 8,
-    fontSize: '0.8125rem',
-    fontWeight: 600,
-    textTransform: 'none',
-    border: `1px solid ${glowcolor}40`,
-    background: `${glowcolor}12`,
-    color: '#FFFFFF',
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    whiteSpace: 'nowrap',
-    transition: 'all 0.2s ease',
-    '& .MuiButton-startIcon': {
-        marginRight: 6,
-        marginLeft: 0
-    },
-    '&:hover': {
-        background: `${glowcolor}25`,
-        borderColor: glowcolor,
-    }
-}));
+/** Reduz a foto enviada (lado maior até 1600 px) antes de enquadrar. */
+const lerFotoReduzida = (arquivo) => new Promise((resolve, reject) => {
+    const leitor = new FileReader();
+    leitor.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+            const max = 1600;
+            const k = Math.min(1, max / Math.max(img.width, img.height));
+            const c = document.createElement('canvas');
+            c.width = Math.round(img.width * k);
+            c.height = Math.round(img.height * k);
+            c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+            resolve(c.toDataURL('image/jpeg', 0.92));
+        };
+        img.onerror = reject;
+        img.src = ev.target.result;
+    };
+    leitor.onerror = reject;
+    leitor.readAsDataURL(arquivo);
+});
 
 export const OperatorSection = () => {
     const { user, logout, updateUserAvatar } = useAuth();
@@ -183,6 +168,7 @@ export const OperatorSection = () => {
     const [avatarTab, setAvatarTab] = useState('gallery');
     const [selectedAvatarUrl, setSelectedAvatarUrl] = useState('');
     const [customAvatarBase64, setCustomAvatarBase64] = useState('');
+    const [fotoOriginal, setFotoOriginal] = useState('');
     const [savingAvatar, setSavingAvatar] = useState(false);
     const fileInputRef = useRef(null);
 
@@ -198,6 +184,7 @@ export const OperatorSection = () => {
 
     // Tempo Online & Login
     const [onlineTimeFormatted, setOnlineTimeFormatted] = useState('00h 00m 00s');
+    const [tempoTurno, setTempoTurno] = useState('0 min');
     const [loginTimeFormatted, setLoginTimeFormatted] = useState('--:--:--');
 
     const opId = user?.id || 'default_op';
@@ -229,6 +216,7 @@ export const OperatorSection = () => {
             setOnlineTimeFormatted(
                 `${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`
             );
+            setTempoTurno(h > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${m} min`);
         };
 
         updateClock();
@@ -269,46 +257,22 @@ export const OperatorSection = () => {
         }
     };
 
-    // Upload de arquivo de imagem do computador
-    const handleFileChange = (e) => {
+    // Upload: a foto vai para o enquadramento (arrastar + zoom) antes de salvar
+    const handleFileChange = async (e) => {
         const file = e.target.files?.[0];
+        e.target.value = '';
         if (!file) return;
-
-        // Converter para Base64 com redimensionamento em Canvas para otimização
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const maxSize = 300;
-                let width = img.width;
-                let height = img.height;
-
-                if (width > height) {
-                    if (width > maxSize) {
-                        height = Math.round((height * maxSize) / width);
-                        width = maxSize;
-                    }
-                } else {
-                    if (height > maxSize) {
-                        width = Math.round((width * maxSize) / height);
-                        height = maxSize;
-                    }
-                }
-
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-
-                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-                setCustomAvatarBase64(compressedDataUrl);
-                setSelectedAvatarUrl(compressedDataUrl);
-            };
-            img.src = event.target.result;
-        };
-        reader.readAsDataURL(file);
+        try {
+            setFotoOriginal(await lerFotoReduzida(file));
+        } catch (err) {
+            console.error('Não foi possível ler a imagem:', err);
+        }
     };
+
+    const aoEnquadrar = useCallback((dataUrl) => {
+        setCustomAvatarBase64(dataUrl);
+        setSelectedAvatarUrl(dataUrl);
+    }, []);
 
     // Salvar Notas
     const handleSaveNotes = () => {
@@ -355,194 +319,100 @@ export const OperatorSection = () => {
         }
     };
 
-    const roleColor = (() => {
-        const nivel = user?.nivel_acesso?.toLowerCase();
-        if (nivel === 'admin_master' || nivel === 'master') return '#FFB800';
-        if (nivel === 'supervisor') return '#7B2FBE';
-        if (nivel === 'admin') return '#00D4FF';
-        return '#00FF88';
-    })();
+    const papel = papeis[user?.nivel_acesso?.toLowerCase()] || { rotulo: 'Acesso', cor: funcao.neutro };
+    const nomeExibido = nomeParaExibir(user);
+    const ehMaster = ['admin_master', 'master'].includes(user?.nivel_acesso);
+
+    const abrirTrocaDeFoto = () => {
+        setSelectedAvatarUrl(currentAvatar);
+        setFotoOriginal('');
+        setAvatarModalOpen(true);
+    };
 
     return (
         <UserSectionContainer>
-            {/* Header com indicador de presença ao vivo */}
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, px: 0.5 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Box sx={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: '50%',
-                        bgcolor: '#00FF88',
-                        boxShadow: '0 0 8px #00FF88',
-                        animation: 'pulse 1.8s infinite'
-                    }} />
-                    <Typography
-                        variant="caption"
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                {/* Avatar: clique troca a foto; ponto verde = conectado */}
+                <Tooltip title="Trocar foto" arrow placement="top">
+                    <ButtonBase
+                        onClick={abrirTrocaDeFoto}
+                        aria-label="Trocar foto do operador"
                         sx={{
-                            color: 'text.secondary',
-                            fontWeight: 600,
-                            fontSize: '0.75rem',
-                            whiteSpace: 'nowrap'
-                        }}
-                    >
-                        Conectado
-                    </Typography>
-                </Box>
-                <Chip
-                    label={{ admin_master: 'Admin Master', master: 'Admin Master', admin: 'Admin', supervisor: 'Supervisor', operador: 'Operador' }[user?.nivel_acesso] || 'Acesso'}
-                    size="small"
-                    sx={{
-                        height: 18,
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        color: roleColor,
-                        bgcolor: `${roleColor}18`,
-                        border: `1px solid ${roleColor}50`,
-                        fontFamily: '"Inter", sans-serif'
-                    }}
-                />
-            </Box>
-
-            {/* Cartão Principal do Operador */}
-            <UserCard>
-                {/* Avatar com ação de troca */}
-                <Tooltip title="Clique para alterar foto ou avatar" arrow placement="top">
-                    <Box
-                        sx={{ position: 'relative', cursor: 'pointer' }}
-                        onClick={() => {
-                            setSelectedAvatarUrl(currentAvatar);
-                            setAvatarModalOpen(true);
+                            position: 'relative', borderRadius: '50%', flexShrink: 0,
+                            '&:hover .trocar-foto, &:focus-visible .trocar-foto': { opacity: 1 },
+                            '&:focus-visible': { outline: `2px solid ${funcao.acao}`, outlineOffset: 2 }
                         }}
                     >
                         <Avatar
                             src={currentAvatar}
-                            sx={{
-                                width: 48,
-                                height: 48,
-                                border: '2px solid',
-                                borderColor: roleColor,
-                                boxShadow: `0 0 15px ${roleColor}60`,
-                                background: '#050B18',
-                                transition: 'all 0.3s ease',
-                                '&:hover': {
-                                    transform: 'scale(1.05)',
-                                    borderColor: '#00D4FF',
-                                    boxShadow: '0 0 20px rgba(0, 212, 255, 0.7)'
-                                }
-                            }}
+                            alt={nomeExibido}
+                            sx={{ width: 44, height: 44, border: `2px solid ${papel.cor}`, bgcolor: cores.fundo, fontWeight: 700 }}
                         >
-                            {user?.nome_completo?.charAt(0) || user?.nome?.charAt(0) || 'U'}
+                            {nomeExibido.charAt(0)}
                         </Avatar>
-                        <Box sx={{
-                            position: 'absolute',
-                            bottom: -2,
-                            right: -2,
-                            width: 18,
-                            height: 18,
-                            borderRadius: '50%',
-                            bgcolor: '#0A1628',
-                            border: '1px solid #00D4FF',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            boxShadow: '0 0 6px #00D4FF'
+                        <Box className="trocar-foto" sx={{
+                            position: 'absolute', inset: 0, borderRadius: '50%', bgcolor: 'rgba(0,0,0,0.55)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            opacity: 0, transition: 'opacity 0.15s ease'
                         }}>
-                            <PhotoCameraIcon sx={{ fontSize: 10, color: '#00D4FF' }} />
+                            <PhotoCameraIcon sx={{ fontSize: 18, color: cores.textoForte }} />
                         </Box>
-                    </Box>
+                        <Box aria-hidden sx={{
+                            position: 'absolute', right: 0, bottom: 0, width: 12, height: 12, borderRadius: '50%',
+                            bgcolor: funcao.liberado, border: `2px solid ${cores.superficie}`
+                        }} />
+                    </ButtonBase>
                 </Tooltip>
 
-                {/* Informações de Nome, Entrada e Tempo Online */}
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography
-                        variant="subtitle2"
-                        noWrap
-                        sx={{
-                            fontWeight: 700,
-                            fontSize: '0.875rem',
-                            color: '#FFFFFF',
-                            fontFamily: '"Space Grotesk", sans-serif',
-                            letterSpacing: '0.3px',
-                            lineHeight: 1.2
-                        }}
-                    >
-                        {user?.nome_completo || user?.nome || 'Operador Central'}
+                    <Typography noWrap title={nomeExibido} sx={{ fontWeight: 700, fontSize: tamanhos.md, color: cores.textoForte, lineHeight: 1.3 }}>
+                        {nomeExibido}
                     </Typography>
-
-                    {/* Hora de Login */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.3 }}>
-                        <TimeIcon sx={{ fontSize: 11, color: 'text.secondary' }} />
-                        <Typography
-                            variant="caption"
-                            sx={{
-                                color: 'text.secondary',
-                                fontSize: '0.75rem',
-                                fontFamily: '"Inter", sans-serif',
-                                fontWeight: 600
-                            }}
-                        >
-                            Entrada: <span style={{ color: '#00D4FF' }}>{loginTimeFormatted}</span>
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, minWidth: 0 }}>
+                        <Typography noWrap sx={{ fontSize: tamanhos.xs, color: papel.cor, fontWeight: 600, minWidth: 0 }}>
+                            {papel.rotulo}
                         </Typography>
-                    </Box>
-
-                    {/* Tempo Online Vivo */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.2 }}>
-                        <Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: '#00FF88' }} />
-                        <Typography
-                            variant="caption"
-                            sx={{
-                                color: '#00FF88',
-                                fontSize: '0.75rem',
-                                fontFamily: '"Inter", sans-serif',
-                                fontWeight: 700,
-                                letterSpacing: '0.5px'
-                            }}
-                        >
-                            {onlineTimeFormatted}
-                        </Typography>
+                        <Tooltip title={`No turno desde ${loginTimeFormatted}`} placement="top">
+                            <Typography sx={{ ml: 'auto', fontSize: tamanhos.xs, color: cores.textoSecundario, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                                {tempoTurno}
+                            </Typography>
+                        </Tooltip>
                     </Box>
                 </Box>
 
-                {/* Botão de Menu e Configurações */}
-                <IconButton
+                <Tooltip title="Opções">
+                    <IconButton size="small" onClick={handleMenuOpen} aria-label="Opções do operador" sx={{ color: cores.textoSecundario }}>
+                        <MoreIcon fontSize="small" />
+                    </IconButton>
+                </Tooltip>
+            </Box>
+
+            <Stack direction="row" spacing={1} sx={{ mt: 1.25 }}>
+                <Button
                     size="small"
-                    onClick={handleMenuOpen}
-                    sx={{
-                        color: 'text.secondary',
-                        p: 0.5,
-                        '&:hover': { color: '#00D4FF', bgcolor: 'rgba(0, 212, 255, 0.1)' }
-                    }}
-                >
-                    <SettingsIcon sx={{ fontSize: 18 }} />
-                </IconButton>
-            </UserCard>
-
-            {/* Barra de Ações Rápidas: Chamar Master & Notas */}
-            <Stack direction="row" spacing={1} sx={{ mt: 1.2, width: '100%' }}>
-                {/* Chamar o Master não faz sentido para o próprio Admin Master */}
-                {!['admin_master', 'master'].includes(user?.nivel_acesso) && (
-                <ActionButton
-                    glowcolor="#FF3366"
-                    startIcon={<EmergencyIcon sx={{ fontSize: 15 }} />}
-                    onClick={() => {
-                        setChamarMasterOpen(true);
-                        playAlertSound('beep');
-                    }}
-                >
-                    Chamar Master
-                </ActionButton>
-                )}
-
-                <ActionButton
-                    glowcolor="#00D4FF"
-                    startIcon={<NoteIcon sx={{ fontSize: 15 }} />}
-                    onClick={() => {
-                        setNotesModalOpen(true);
-                        playAlertSound('beep');
-                    }}
+                    variant="outlined"
+                    startIcon={<NoteIcon sx={{ fontSize: 16 }} />}
+                    onClick={() => setNotesModalOpen(true)}
+                    sx={{ ...botaoSecundario, flex: 1, minHeight: 34 }}
                 >
                     Notas
-                </ActionButton>
+                </Button>
+                {/* Chamar o master não faz sentido para o próprio admin master */}
+                {!ehMaster && (
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<EmergencyIcon sx={{ fontSize: 16 }} />}
+                        onClick={() => { setChamarMasterOpen(true); playAlertSound('beep'); }}
+                        sx={{
+                            flex: 1, minHeight: 34, whiteSpace: 'nowrap', color: funcao.negado,
+                            borderColor: tom(funcao.negado, 0.45),
+                            '&:hover': { borderColor: funcao.negado, bgcolor: tom(funcao.negado, 0.08) }
+                        }}
+                    >
+                        Chamar master
+                    </Button>
+                )}
             </Stack>
 
             {/* Menu Popover do Operador */}
@@ -564,24 +434,24 @@ export const OperatorSection = () => {
                 }}
             >
                 <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.06)', mb: 1 }}>
-                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>OPERADOR CONECTADO</Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Conectado como</Typography>
                     <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 700, fontSize: '0.8125rem' }} noWrap>
                         {user?.email}
                     </Typography>
                     <Typography variant="caption" sx={{ color: '#00D4FF', fontFamily: '"Inter", sans-serif' }}>
-                        Turno Ativo: {onlineTimeFormatted}
+                        No turno há {onlineTimeFormatted}
                     </Typography>
                 </Box>
 
                 <MenuItem
                     onClick={() => {
                         handleMenuClose();
-                        setAvatarModalOpen(true);
+                        abrirTrocaDeFoto();
                     }}
                     sx={{ gap: 1.5, mx: 1, borderRadius: 1.5, '&:hover': { background: 'rgba(0, 212, 255, 0.1)' } }}
                 >
                     <PhotoCameraIcon fontSize="small" sx={{ color: '#00D4FF' }} />
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>Trocar Foto / Avatar</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>Trocar foto</Typography>
                 </MenuItem>
 
                 <MenuItem
@@ -592,9 +462,10 @@ export const OperatorSection = () => {
                     sx={{ gap: 1.5, mx: 1, borderRadius: 1.5, '&:hover': { background: 'rgba(0, 212, 255, 0.1)' } }}
                 >
                     <NoteIcon fontSize="small" sx={{ color: '#00FF88' }} />
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>Bloco de Notas do Turno</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>Notas do turno</Typography>
                 </MenuItem>
 
+                {!ehMaster && (
                 <MenuItem
                     onClick={() => {
                         handleMenuClose();
@@ -603,8 +474,9 @@ export const OperatorSection = () => {
                     sx={{ gap: 1.5, mx: 1, borderRadius: 1.5, '&:hover': { background: 'rgba(255, 51, 102, 0.1)', color: '#FF3366' } }}
                 >
                     <EmergencyIcon fontSize="small" sx={{ color: '#FF3366' }} />
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>Chamar Administrador Master</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>Chamar admin master</Typography>
                 </MenuItem>
+                )}
 
                 <MenuItem
                     onClick={() => {
@@ -624,9 +496,9 @@ export const OperatorSection = () => {
                 >
                     <LogoutIcon fontSize="small" />
                     <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 700 }}>Encerrar Turno (Logoff)</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>Encerrar turno e sair</Typography>
                         <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontSize: '0.75rem' }}>
-                            Salva relatório consolidado
+                            Salva o relatório do turno
                         </Typography>
                     </Box>
                 </MenuItem>
@@ -635,169 +507,84 @@ export const OperatorSection = () => {
             {/* ========================================================================= */}
             {/* MODAL 1: SELETOR DE AVATAR & UPLOAD DE FOTO */}
             {/* ========================================================================= */}
-            <Dialog
-                open={avatarModalOpen}
-                onClose={() => setAvatarModalOpen(false)}
-                maxWidth="sm"
-                fullWidth
-                PaperProps={{
-                    sx: {
-                        background: '#050B18',
-                        border: '1px solid rgba(0, 212, 255, 0.3)',
-                        borderRadius: 1.5,
-                        boxShadow: '0 20px 60px rgba(0,0,0,0.9)',
-                        maxHeight: '90vh',
-                        overflowY: 'auto'
-                    }
-                }}
-            >
-                <DialogTitle sx={{ pb: 1, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <Typography variant="h6" sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, color: '#00D4FF' }}>
-                        Personalizar Avatar do Operador
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                        Escolha um avatar tático do sistema ou faça upload da sua própria foto.
-                    </Typography>
-                </DialogTitle>
+            <Dialog open={avatarModalOpen} onClose={() => setAvatarModalOpen(false)} maxWidth="xs" fullWidth>
+                <TituloModal
+                    titulo="Foto do operador"
+                    subtitulo="Escolha um avatar ou envie uma foto e enquadre no círculo."
+                    onFechar={() => setAvatarModalOpen(false)}
+                />
 
-                <DialogContent sx={{ pt: 2 }}>
-                    <Tabs
-                        value={avatarTab}
-                        onChange={(e, v) => setAvatarTab(v)}
-                        sx={{
-                            mb: 3,
-                            '& .MuiTab-root': { color: 'text.secondary', fontWeight: 700 },
-                            '& .Mui-selected': { color: '#00D4FF' },
-                            '& .MuiTabs-indicator': { backgroundColor: '#00D4FF' }
-                        }}
-                    >
-                        <Tab label="Galeria Tática" value="gallery" />
-                        <Tab label="Fazer Upload de Foto" value="upload" />
+                <DialogContent sx={{ pt: 1 }}>
+                    <Tabs value={avatarTab} onChange={(e, v) => setAvatarTab(v)} sx={{ mb: 2 }} variant="fullWidth">
+                        <Tab label="Avatares" value="gallery" />
+                        <Tab label="Enviar foto" value="upload" />
                     </Tabs>
 
                     {avatarTab === 'gallery' ? (
-                        <Grid container spacing={2}>
+                        <Grid container spacing={1.5}>
                             {TACTICAL_AVATARS.map((av) => {
                                 const isSelected = selectedAvatarUrl === av.dataUri;
                                 return (
-                                    <Grid item xs={6} sm={3} key={av.id}>
-                                        <Box
+                                    <Grid item xs={4} key={av.id}>
+                                        <ButtonBase
                                             onClick={() => setSelectedAvatarUrl(av.dataUri)}
+                                            aria-pressed={isSelected}
                                             sx={{
-                                                p: 1.5,
-                                                borderRadius: 1.5,
-                                                textAlign: 'center',
-                                                cursor: 'pointer',
-                                                background: isSelected ? `${av.color}25` : 'rgba(255,255,255,0.03)',
-                                                border: `2px solid ${isSelected ? av.color : 'rgba(255,255,255,0.1)'}`,
-                                                boxShadow: isSelected ? `0 0 20px ${av.color}50` : 'none',
-                                                transition: 'all 0.2s ease',
-                                                '&:hover': {
-                                                    borderColor: av.color,
-                                                    transform: 'translateY(-2px)'
-                                                }
+                                                width: '100%', p: 1.25, borderRadius: 1.5, flexDirection: 'column',
+                                                bgcolor: isSelected ? tom(funcao.acao, 0.12) : 'rgba(255,255,255,0.03)',
+                                                border: `1px solid ${isSelected ? funcao.acao : cores.borda}`,
+                                                '&:hover': { borderColor: funcao.acao },
+                                                '&:focus-visible': { outline: `2px solid ${funcao.acao}`, outlineOffset: 2 }
                                             }}
                                         >
-                                            <Avatar
-                                                src={av.dataUri}
-                                                sx={{
-                                                    width: 56,
-                                                    height: 56,
-                                                    mx: 'auto',
-                                                    mb: 1,
-                                                    border: `2px solid ${av.color}`,
-                                                    bgcolor: '#050B18'
-                                                }}
-                                            />
-                                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#FFFFFF', display: 'block' }}>
+                                            <Avatar src={av.dataUri} sx={{ width: 52, height: 52, mb: 0.75, bgcolor: cores.fundo }} />
+                                            <Typography sx={{ fontSize: tamanhos.xs, fontWeight: 600, color: cores.texto }} noWrap>
                                                 {av.name}
                                             </Typography>
-                                        </Box>
+                                        </ButtonBase>
                                     </Grid>
                                 );
                             })}
                         </Grid>
                     ) : (
-                        <Box sx={{ textAlign: 'center', py: 2 }}>
-                            <input
-                                type="file"
-                                accept="image/*"
-                                ref={fileInputRef}
-                                onChange={handleFileChange}
-                                style={{ display: 'none' }}
-                            />
-
-                            {customAvatarBase64 ? (
-                                <Box sx={{ mb: 3 }}>
-                                    <Avatar
-                                        src={customAvatarBase64}
-                                        sx={{
-                                            width: 110,
-                                            height: 110,
-                                            mx: 'auto',
-                                            mb: 2,
-                                            border: '3px solid #00D4FF',
-                                            boxShadow: '0 0 25px rgba(0, 212, 255, 0.5)'
-                                        }}
-                                    />
-                                    <Typography variant="body2" sx={{ color: '#00FF88', fontWeight: 700 }}>
-                                        Foto carregada com sucesso!
-                                    </Typography>
-                                </Box>
+                        <Box sx={{ textAlign: 'center' }}>
+                            <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} />
+                            {fotoOriginal ? (
+                                <>
+                                    <EnquadrarAvatar src={fotoOriginal} onAlterar={aoEnquadrar} />
+                                    <Button size="small" variant="outlined" startIcon={<PhotoCameraIcon />} onClick={() => fileInputRef.current?.click()} sx={{ ...botaoSecundario, mt: 2 }}>
+                                        Escolher outra foto
+                                    </Button>
+                                </>
                             ) : (
-                                <Box
+                                <ButtonBase
                                     onClick={() => fileInputRef.current?.click()}
                                     sx={{
-                                        border: '2px dashed rgba(0, 212, 255, 0.4)',
-                                        borderRadius: 1.5,
-                                        p: 4,
-                                        cursor: 'pointer',
-                                        background: 'rgba(0, 212, 255, 0.03)',
-                                        transition: 'all 0.2s ease',
-                                        '&:hover': {
-                                            borderColor: '#00D4FF',
-                                            background: 'rgba(0, 212, 255, 0.08)'
-                                        }
+                                        width: '100%', flexDirection: 'column', p: 4, borderRadius: 1.5,
+                                        border: `2px dashed ${tom(funcao.acao, 0.4)}`, bgcolor: tom(funcao.acao, 0.03),
+                                        '&:hover': { borderColor: funcao.acao, bgcolor: tom(funcao.acao, 0.08) }
                                     }}
                                 >
-                                    <PhotoCameraIcon sx={{ fontSize: 48, color: '#00D4FF', mb: 1 }} />
-                                    <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700 }}>
-                                        Clique para selecionar imagem
-                                    </Typography>
-                                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                        Formatos aceitos: JPG, PNG, WEBP (Max 5MB)
-                                    </Typography>
-                                </Box>
+                                    <PhotoCameraIcon sx={{ fontSize: 40, color: funcao.acao, mb: 1 }} />
+                                    <Typography sx={{ color: cores.textoForte, fontWeight: 600 }}>Escolher foto do computador</Typography>
+                                    <Typography sx={{ fontSize: tamanhos.xs, color: cores.textoSecundario, mt: 0.5 }}>JPG, PNG ou WEBP</Typography>
+                                </ButtonBase>
                             )}
-
-                            <Button
-                                variant="outlined"
-                                startIcon={<PhotoCameraIcon />}
-                                onClick={() => fileInputRef.current?.click()}
-                                sx={{ mt: 2, borderColor: '#00D4FF', color: '#00D4FF' }}
-                            >
-                                Escolher outro arquivo
-                            </Button>
                         </Box>
                     )}
                 </DialogContent>
 
-                <DialogActions sx={{ p: 2.5, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                    <Button onClick={() => setAvatarModalOpen(false)} sx={{ color: 'text.secondary' }}>
+                <DialogActions>
+                    <Button variant="outlined" onClick={() => setAvatarModalOpen(false)} sx={botaoSecundario}>
                         Cancelar
                     </Button>
-                    <Button
-                        variant="contained"
-                        onClick={() => handleSaveAvatar()}
-                        disabled={savingAvatar || (!selectedAvatarUrl && !customAvatarBase64)}
-                        sx={{
-                            background: 'linear-gradient(135deg, #00D4FF 0%, #00D4FF 100%)',
-                            fontWeight: 700,
-                            px: 3
-                        }}
+                    <NeonButton
+                        onClick={() => handleSaveAvatar(avatarTab === 'upload' ? customAvatarBase64 : selectedAvatarUrl)}
+                        loading={savingAvatar}
+                        disabled={avatarTab === 'upload' ? !customAvatarBase64 : !selectedAvatarUrl}
                     >
-                        {savingAvatar ? <CircularProgress size={20} color="inherit" /> : 'Salvar Avatar'}
-                    </Button>
+                        Salvar foto
+                    </NeonButton>
                 </DialogActions>
             </Dialog>
 

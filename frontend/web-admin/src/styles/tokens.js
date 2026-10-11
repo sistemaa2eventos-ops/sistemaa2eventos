@@ -37,6 +37,30 @@ export const cores = {
     whatsapp: '#25D366'
 };
 
+/**
+ * Cor por FUNÇÃO — a cor diz o que a coisa é/faz, igual em todas as telas.
+ * Ex.: tudo que é saída é laranja; vermelho é só para negado/erro/excluir/emergência.
+ */
+export const funcao = {
+    acao: cores.primaria,               // ação principal, links, foco, seleção
+    entrada: cores.primaria,            // check-in / credenciamento (operação de entrada)
+    saida: cores.saida,                 // check-out / baixa
+    liberado: cores.sucesso,            // acesso liberado, salvo, online, aprovado
+    negado: cores.erro,                 // acesso negado, erro, excluir, emergência, offline
+    alerta: cores.alerta,               // pendente, atenção, vencendo, aguardando
+    fiscalizacao: cores.secundariaClara, // fiscalização / auditoria
+    neutro: cores.textoSecundario       // informação sem estado
+};
+
+/** Cor por perfil de acesso (chips de usuário, cartão do operador). */
+export const papeis = {
+    admin_master: { rotulo: 'Admin master', cor: cores.alerta },
+    master: { rotulo: 'Admin master', cor: cores.alerta },
+    admin: { rotulo: 'Admin', cor: cores.primaria },
+    supervisor: { rotulo: 'Supervisor', cor: cores.secundariaClara },
+    operador: { rotulo: 'Operador', cor: cores.sucesso }
+};
+
 /** Fundo translúcido de uma cor de estado (chips, ícones, destaques) */
 export const tom = (hex, alfa = 0.12) => {
     const n = parseInt(hex.replace('#', ''), 16);

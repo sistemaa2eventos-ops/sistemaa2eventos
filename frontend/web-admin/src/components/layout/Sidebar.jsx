@@ -219,7 +219,7 @@ const Sidebar = ({ open, onClose }) => {
             roles: ['admin_master', 'operador']
         },
         {
-            text: 'Auditoria Documental',
+            text: 'Auditoria documental',
             icon: <AssignmentTurnedInIcon />,
             menuKey: 'auditoria_documentos',
             legacyMenuKey: 'auditoria',
@@ -272,7 +272,7 @@ const Sidebar = ({ open, onClose }) => {
             roles: ['admin_master', 'operador']
         },
         {
-            text: 'Fiscalização de Áreas',
+            text: 'Fiscalização de áreas',
             icon: <SecurityIcon />,
             menuKey: 'fiscalizacao',
             get path() {
@@ -295,7 +295,7 @@ const Sidebar = ({ open, onClose }) => {
 
         { divider: true },
         { 
-            text: 'Logs de Auditoria', 
+            text: 'Logs de auditoria',
             icon: <HistoryIcon />, 
             menuKey: 'auditoria_sistema', 
             path: '/audit-logs', 
@@ -312,7 +312,7 @@ const Sidebar = ({ open, onClose }) => {
                 // --- GRUPO 1: CONFIGURAÇÕES DO EVENTO ---
                 { text: 'Geral', path: '/config/geral', icon: <TuneIcon sx={{ fontSize: 16 }} /> },
                 {
-                    text: 'Leitor Facial',
+                    text: 'Leitor facial',
                     icon: <FaceIcon sx={{ fontSize: 16 }} />,
                     get path() {
                         const eventoId = localStorage.getItem('active_evento_id');
@@ -321,7 +321,7 @@ const Sidebar = ({ open, onClose }) => {
                 },
                 { text: 'Eventos', path: '/eventos', icon: <EventIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Credenciamento', path: '/config/credenciamento', icon: <CredIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Regras de Acesso', path: '/config/checkin', icon: <CheckConfigIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Regras de acesso', path: '/config/checkin', icon: <CheckConfigIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Áreas', path: '/config/areas', icon: <AreaIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Pulseiras', path: '/config/pulseiras', icon: <PulseiraIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Leitores e dispositivos', path: '/config/dispositivos', icon: <FaceIcon sx={{ fontSize: 16 }} /> },
@@ -329,7 +329,7 @@ const Sidebar = ({ open, onClose }) => {
                 { text: 'Veículos', path: '/config/veiculos', icon: <CarIcon sx={{ fontSize: 16 }} /> },
                 { divider: true },
                 // --- GRUPO 2: SEGURANÇA & USUÁRIOS ---
-                { text: 'Perfis de Acesso', path: '/config/permissoes', icon: <VerifiedIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Perfis de acesso', path: '/config/permissoes', icon: <VerifiedIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Segurança', path: '/config/seguranca', icon: <SecurityIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Comunicação', path: '/config/comunicacao', icon: <ChatIcon sx={{ fontSize: 16 }} /> },
                 { divider: true },
@@ -344,7 +344,7 @@ const Sidebar = ({ open, onClose }) => {
                 { text: 'Idiomas', path: '/config/idiomas', icon: <PaletteIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Banco de dados', path: '/config/banco-dados', icon: <StorageIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Gamificação', path: '/config/gamificacao', icon: <TrophyIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Logs do Sistema', path: '/config/logs', icon: <LogsIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Logs do sistema', path: '/config/logs', icon: <LogsIcon sx={{ fontSize: 16 }} /> },
 
             ]
         },

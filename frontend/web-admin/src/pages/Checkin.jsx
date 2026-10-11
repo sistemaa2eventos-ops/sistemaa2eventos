@@ -263,7 +263,7 @@ const Checkin = () => {
                   <Box sx={{ textAlign: 'center' }}>
                       {checkinResult === 'sucesso' ? <SuccessIcon sx={{ fontSize: 130, color: '#00FF88' }} /> : <ErrorIcon sx={{ fontSize: 130, color: '#FF3366' }} />}
                       <Typography variant="h3" fontWeight={700} mt={2}>
-                          {checkinResult === 'sucesso' ? 'LIBERADO' : 'NEGADO'}
+                          {checkinResult === 'sucesso' ? 'Entrada liberada' : 'Entrada negada'}
                       </Typography>
                       <Typography variant="h6" sx={{ opacity: 0.8 }}>{resultMessage}</Typography>
                       {checkinResult === 'sucesso' && (
