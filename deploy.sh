@@ -161,7 +161,7 @@ build_docker() {
     log_info "Building Docker images (sem cache)..."
     log_warn "Isso pode levar 10-15 minutos..."
 
-    docker-compose build frontend api gateway api_intelbras
+    docker-compose build frontend cadastro api gateway api_intelbras
 
     log_success "Build concluído"
 }
@@ -173,7 +173,7 @@ start_services() {
     log_info "Iniciando containers..."
 
     log_info "Limpando containers antigos conflitantes..."
-    docker rm -f a2_eventos_pg_edge a2_eventos_redis a2_eventos_api a2_eventos_api_intelbras a2_eventos_gateway a2_eventos_admin_web a2_eventos_ai_worker 2>/dev/null || true
+    docker rm -f a2_eventos_pg_edge a2_eventos_redis a2_eventos_api a2_eventos_api_intelbras a2_eventos_gateway a2_eventos_admin_web a2_eventos_portal a2_eventos_ai_worker 2>/dev/null || true
 
     docker-compose up -d
 
@@ -324,9 +324,11 @@ main() {
             log_info "⚡ INICIANDO DEPLOY RÁPIDO..."
             echo ""
             pre_deploy_check
-            stop_services
             update_git
+            # Constrói com o sistema no ar; só derruba e sobe na troca (segundos).
+            # Se o build falhar (set -e), o sistema atual continua rodando.
             build_docker
+            stop_services
             start_services
             post_deploy_check
             log_success "✨ DEPLOY RÁPIDO FINALIZADO COM SUCESSO!"
