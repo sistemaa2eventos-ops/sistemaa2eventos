@@ -1,651 +1,2618 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  Box,
-  Typography,
-  Grid,
-  Stack,
-  Avatar,
-  Tabs,
-  Tab,
-  Card,
-  CardContent,
-  Divider
+  Box, Typography, Grid, Stack, Avatar, Tabs, Tab,
+  IconButton, TextField, MenuItem, Select, FormControl,
+  InputLabel, Button, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, Paper, Chip,
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  CircularProgress, LinearProgress, Tooltip, Fade, Divider,
+  ButtonGroup,
+  Checkbox, List, ListItem, ListItemButton, ListItemIcon, ListItemText
 } from '@mui/material';
+import { useSnackbar } from 'notistack';
 import {
   MonitorHeart as MonitorIcon,
-  Sensors as SensorIcon,
-  Memory as MemoryIcon,
-  WifiTethering as NetworkIcon,
-  Storage as StorageIcon,
-  FiberManualRecord as DotIcon,
+  FiberManualRecord as DotIcon, Videocam as CameraIcon, 
+  PersonAdd as PersonAddIcon,
+  NotificationsActive as AlarmIcon, Close as CloseIcon,
+  Delete as TrashIcon, FilterList as FilterIcon,
+  Refresh as RefreshIcon, ExitToApp as CheckoutIcon,
+  Login as LoginIcon, Block as BlockIcon, CloudUpload as UploadIcon,
+  FileDownload as DownloadIcon, Settings as SettingsIcon,
+  Add as AddIcon,
+  Security as SecurityIcon,
+  Shield as ShieldIcon,
+  Place as AreaIcon,
+  Telegram as TelegramIcon, WhatsApp as WhatsAppIcon, Email as EmailIcon,
+  Fullscreen as FullscreenIcon, FullscreenExit as FullscreenExitIcon,
+  ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon,
+  GridView as GridViewIcon,
+  CheckCircle as CheckCircleIcon,
+  DesktopWindows as DesktopWindowsIcon,
+  PhotoCamera as PhotoCameraIcon,
+  VisibilityOff as VisibilityOffIcon,
+  Dvr as DvrIcon
 } from '@mui/icons-material';
-import api from '../services/api';
-import GlassCard from '../components/common/GlassCard';
-
-import PageHeader from '../components/common/PageHeader';
 import { styled } from '@mui/material/styles';
 import { format } from 'date-fns';
+import { formatLocalTime } from '../utils/dateUtils';
 
-import io from 'socket.io-client';
-import {
-  Videocam as CameraIcon,
-  Search as SearchIcon,
-  Warning as AlertIcon,
-  PersonAdd as PersonAddIcon,
-  NotificationsActive as AlarmIcon,
-  Close as CloseIcon,
-  Visibility as ViewIcon,
-  Delete as TrashIcon
-} from '@mui/icons-material';
-import { Button, TextField, Chip, IconButton, Badge, Tooltip, Drawer } from '@mui/material';
+import api from '../services/api';
+import { urlMidiaCamera } from '../utils/cameraMedia';
+import PageHeader from '../components/common/PageHeader';
+import GlassCard from '../components/common/GlassCard';
+import PessoaFoto from '../components/common/PessoaFoto';
+import { useMonitor } from '../hooks/useMonitor';
+import { useAuth } from '../contexts/AuthContext';
+import GerenciarCamerasModal from '../components/cameras/GerenciarCamerasModal';
+import KpiCards from '../components/monitor/KpiCards';
+import AbaSaude from '../components/monitor/AbaSaude';
 
-const MonitorGrid = styled(Box)(({ theme }) => ({
-  height: '75vh',
-  background: 'rgba(5, 12, 25, 0.7)',
-  backdropFilter: 'blur(10px)',
-  borderRadius: 24,
-  border: '1px solid rgba(0, 212, 255, 0.1)',
-  position: 'relative',
-  overflow: 'hidden',
-  display: 'flex',
-  flexDirection: 'column',
-  boxShadow: '0 0 40px rgba(0,0,0,0.5)'
-}));
+// Selo de conexão em tempo real
+const SELO_CONEXAO = {
+  conectado: { label: 'AO VIVO', cor: '#00FF88' },
+  conectando: { label: 'CONECTANDO...', cor: '#FFB800' },
+  reconectando: { label: 'RECONECTANDO...', cor: '#FFB800' },
+  offline: { label: 'SEM CONEXÃO', cor: '#FF3366' }
+};
 
-const CameraCard = styled(Box)(({ theme }) => ({
-  background: '#000',
-  borderRadius: 12,
-  overflow: 'hidden',
-  position: 'relative',
-  aspectRatio: '16/9',
-  border: '1px solid rgba(255,255,255,0.05)',
-  '&:hover .cam-controls': {
-    opacity: 1
-  }
-}));
-
-const WatchlistPanel = styled(Box)(({ theme }) => ({
-  background: 'rgba(255, 51, 102, 0.03)',
-  borderRadius: 16,
-  border: '1px solid rgba(255, 51, 102, 0.1)',
-  height: '100%',
-  display: 'flex',
-  flexDirection: 'column'
-}));
-
-const AlertOverlay = styled(Box)(({ theme }) => ({
-  position: 'fixed',
-  top: 40,
-  right: 40,
-  width: 400,
-  background: 'rgba(255, 51, 102, 0.95)',
-  color: '#fff',
-  borderRadius: 16,
-  padding: theme.spacing(3),
-  zIndex: 9999,
-  boxShadow: '0 0 50px rgba(255, 51, 102, 0.5)',
-  animation: 'slideInRight 0.5s ease-out, pulseAlert 2s infinite',
-  '@keyframes slideInRight': {
-    from: { transform: 'translateX(100%)', opacity: 0 },
-    to: { transform: 'translateX(0)', opacity: 1 }
-  },
-  '@keyframes pulseAlert': {
-    '0%': { boxShadow: '0 0 20px rgba(255, 51, 102, 0.4)' },
-    '50%': { boxShadow: '0 0 50px rgba(255, 51, 102, 0.8)' },
-    '100%': { boxShadow: '0 0 20px rgba(255, 51, 102, 0.4)' }
-  }
-}));
-
-const CustomTab = styled(Tab)({
-  fontWeight: 700,
-  fontSize: '0.9rem',
-  color: 'rgba(255,255,255,0.5)',
-  '&.Mui-selected': {
-    color: '#00D4FF',
-    textShadow: '0 0 10px rgba(0,212,255,0.5)',
-  }
-});
-
-const MetricCard = styled(Card)(({ theme }) => ({
-  background: 'rgba(5, 12, 25, 0.8)',
-  backdropFilter: 'blur(10px)',
-  borderRadius: 16,
-  border: '1px solid rgba(0, 212, 255, 0.1)',
-  boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
-  height: '100%',
+const LogItem = styled(Box, { shouldForwardProp: (p) => !['tipo', 'monitorado'].includes(p) })(({ tipo, monitorado }) => ({
+    // styled() não entende os atalhos do sx (p, gap: 2): valores em px
+    display: 'flex', alignItems: 'center', padding: '12px 16px', gap: '16px',
+    borderBottom: '1px solid rgba(148,163,184,0.08)',
+    borderLeft: `3px solid ${
+        monitorado ? '#FFB800' : 
+        tipo === 'negado' ? '#FF3366' : 
+        tipo === 'checkin' ? '#00FF88' : 
+        tipo === 'checkout' ? '#FF8800' : 
+        tipo === 'fiscalizacao' ? '#00D4FF' :
+        'transparent'
+    }`,
+    background: tipo === 'negado' ? 'rgba(255, 51, 102, 0.05)' : 
+               monitorado ? 'rgba(255, 184, 0, 0.05)' : 
+               tipo === 'fiscalizacao' ? 'rgba(0, 212, 255, 0.03)' : 'transparent',
+    transition: 'all 0.2s ease'
 }));
 
 const Monitor = () => {
-  const [tabIndex, setTabIndex] = useState(0);
+  const { enqueueSnackbar } = useSnackbar();
+  const { user } = useAuth();
+  const isAdminMaster = user?.nivel_acesso === 'admin_master';
 
-  // --- TAB 0 STATS (Nexus Command) ---
-  const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ presentes: 0, capacidade: 0, empresas: [] });
+  // Abas dinâmicas: 'watchlist' só existe para admin_master (sigilo total para operadores)
+  const TABS_CONFIG = useMemo(() => {
+    const list = [
+      { id: 'feed', label: 'Ao vivo' },
+      { id: 'terminais', label: 'Leitores' },
+    ];
+    if (isAdminMaster) {
+      list.push({ id: 'watchlist', label: 'Watchlist' });
+    }
+    list.push({ id: 'cameras', label: 'Câmeras' });
+    list.push({ id: 'saude', label: 'Saúde do sistema' });
+    return list;
+  }, [isAdminMaster]);
 
-  // Cameras
-  const [cameras, setCameras] = useState([]);
-  const [selectedCameras, setSelectedCameras] = useState([]);
-  const [isCamDrawerOpen, setIsCamDrawerOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('feed');
 
-  // Watchlist
-  const [watchlist, setWatchlist] = useState([]);
-  const [newCpf, setNewCpf] = useState('');
-  const [isTracking, setIsTracking] = useState(false);
-  const [activeAlert, setActiveAlert] = useState(null);
+  const {
+    logs, stats, loading, tick, areas, dispositivosLista, terminais,
+    cameras, fetchCameras, fetchWatchlist,
+    watchlist, contatos, addContato, removeContato,
+    desbloquearAlvo, deixarDeMonitorar, exportarParticipantes, baixarModeloCSV,
+    activeAlert, setActiveAlert,
+    activeAreaAlert, setActiveAreaAlert,
+    playAlarmSound,
+    sysPerf, sysStatus, sysLogs, sysError,
+    conexao, ultimaAtualizacao,
+    addToWatchlist, fetchSystemHealth,
+    concluirRastreamento,
+    filtros, setFiltros, eventoId
+  } = useMonitor({ isAdminMaster });
 
-  // Audio Alerts
-  const alertAudio = React.useMemo(() => new Audio('/assets/alarm.mp3'), []);
+  // Estados de Desbloqueio da Watchlist com Justificativa
+  const [openUnblockDialog, setOpenUnblockDialog] = useState(false);
+  const [targetToUnblock, setTargetToUnblock] = useState(null);
+  const [unblockReason, setUnblockReason] = useState('');
+  const [unblockLoading, setUnblockLoading] = useState(false);
 
-  const [sysStatus, setSysStatus] = useState(null);
-  const [sysLogs, setSysLogs] = useState([]);
-  const [sysPerf, setSysPerf] = useState(null);
-  const [sysError, setSysError] = useState(false);  // Estado de erro na aba Saúde
+  // Estados para Deixar de Monitorar (Alvo Localizado)
+  const [openDeixarMonitorarDialog, setOpenDeixarMonitorarDialog] = useState(false);
+  const [targetToStopMonitoring, setTargetToStopMonitoring] = useState(null);
+  const [stopMonitoringReason, setStopMonitoringReason] = useState('');
+  const [stopMonitoringLoading, setStopMonitoringLoading] = useState(false);
 
-  // Snapshot Refresh Tick
-  const [tick, setTick] = useState(0);
+  // Modal direto de gerenciamento de câmeras na própria tela
+  const [openGerenciarCamerasModal, setOpenGerenciarCamerasModal] = useState(false);
 
-  const [searchParams] = useSearchParams();
-  const eventoId = searchParams.get('evento_id') || localStorage.getItem('active_evento_id');
+  // Modal executivo discreto de ocorrência da Watchlist (apenas admin_master)
+  const [openSecretAlertModal, setOpenSecretAlertModal] = useState(false);
 
-  useEffect(() => {
-    fetchData();
-    fetchCameras();
-    fetchWatchlist();
-    const interval = setInterval(fetchData, 30000);
+  // Bloqueio de loops: controle de requisições de escaneamento e alvos já notificados
+  const isScanningRef = useRef(false);
+  const notifiedTargetsRef = useRef(new Set());
 
-    const socketUrl = (import.meta.env.VITE_API_URL || '').replace(/\/api$/, '') || window.location.origin;
-    const socket = io(socketUrl, { transports: ['polling', 'websocket'], reconnectionAttempts: 5 });
+  // Seleção de Câmeras para Exibição no Mosaico CFTV
+  const [openSelectCamerasDialog, setOpenSelectCamerasDialog] = useState(false);
+  const [selectedCameraIds, setSelectedCameraIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('monitor_cftv_selected_cams');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
 
-    socket.on('connect', () => {
-      if (eventoId) socket.emit('join_event', eventoId);
+  const handleToggleSelectCamera = (id) => {
+    setSelectedCameraIds(prev => {
+      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+      localStorage.setItem('monitor_cftv_selected_cams', JSON.stringify(next));
+      return next;
     });
+  };
 
-    socket.on('new_access', (newLog) => {
-      setLogs(prev => [newLog, ...prev.slice(0, 19)]);
-      if (newLog.tipo === 'checkin' || newLog.tipo === 'checkout') {
-        updateStats(newLog);
+  const handleSelectAllCameras = () => {
+    const allIds = cameras.map(c => c.id);
+    setSelectedCameraIds(allIds);
+    localStorage.setItem('monitor_cftv_selected_cams', JSON.stringify(allIds));
+  };
+
+  const handleClearSelectedCameras = () => {
+    setSelectedCameraIds([]);
+    localStorage.setItem('monitor_cftv_selected_cams', JSON.stringify([]));
+  };
+
+  const displayedCameras = useMemo(() => {
+    if (!selectedCameraIds || selectedCameraIds.length === 0) return cameras;
+    const filtered = cameras.filter(c => selectedCameraIds.includes(c.id));
+    return filtered.length > 0 ? filtered : cameras;
+  }, [cameras, selectedCameraIds]);
+
+  // Snapshot ou Frame completo da Câmera para a ocorrência da Watchlist
+  const cameraSnapshotSrc = useMemo(() => {
+    if (!activeAlert) return null;
+    const src = activeAlert.foto_capturada || activeAlert.snapshot_url || activeAlert.face_crop;
+    if (!src) return null;
+    if (src.startsWith('data:') || src.startsWith('http')) return src;
+    return `data:image/jpeg;base64,${src}`;
+  }, [activeAlert]);
+
+  // Modo de visualização do Snapshot CFTV (padrão 'cover' para preenchimento total profissional sem cantos pretos)
+  const [snapshotFitMode, setSnapshotFitMode] = useState('cover');
+  const [zoomSnapshotModal, setZoomSnapshotModal] = useState(false);
+
+  const handleOpenVideoWallPopup = () => {
+    const url = `/cftv?evento_id=${eventoId || ''}`;
+    window.open(url, '_blank', 'popup=yes,width=1400,height=900,left=80,top=80');
+  };
+
+  // Dialogs States
+  const [testResults, setTestResults] = useState({});
+  const [activeStreamCam, setActiveStreamCam] = useState(null);
+
+  // Watchlist Dialogs
+  const [openTargetDialog, setOpenTargetDialog] = useState(false);
+  const [newTarget, setNewTarget] = useState({ cpf: '', nome: '', motivo: '', nivel_alerta: 'alto' });
+  const [openContactDialog, setOpenContactDialog] = useState(false);
+  const [newContact, setNewContact] = useState({ nome: '', canal: 'telegram', telefone: '', bot_token: '' });
+
+  // Configurações da Grade de Câmeras CFTV
+  const [gridColumns, setGridColumns] = useState(() => {
+    return localStorage.getItem('monitor_camera_grid_cols') || '3'; // '4', '3', '2', '1'
+  });
+  const [liveStreamInGrid, setLiveStreamInGrid] = useState(() => {
+    return localStorage.getItem('monitor_camera_live_in_grid') === 'true';
+  });
+
+  // Scanner Automático de IA & Vigilância da Watchlist
+  const [aiSurveillance] = useState(true);
+  const [isScanning, setIsScanning] = useState(false);
+  const [lastScanInfo, setLastScanInfo] = useState(null);
+  const [alertCameras, setAlertCameras] = useState({}); // { [camId]: timestamp }
+
+  // Controles do Dialog Ao Vivo
+  const [streamModalSize, setStreamModalSize] = useState('lg'); // 'md', 'lg', 'xl', 'fullscreen'
+  const [streamZoom, setStreamZoom] = useState(100);
+
+  const handleColsChange = (cols) => {
+    setGridColumns(cols);
+    localStorage.setItem('monitor_camera_grid_cols', cols);
+  };
+
+  const handleLiveGridToggle = (val) => {
+    setLiveStreamInGrid(val);
+    localStorage.setItem('monitor_camera_live_in_grid', val ? 'true' : 'false');
+  };
+  // Simulação / Teste Rápido de Alerta Discreto (apenas visível/usado por admin_master)
+  const handleTriggerTestAlert = () => {
+    if (!isAdminMaster) return;
+    playAlarmSound?.();
+    const camMock = activeStreamCam || cameras[0] || {
+      id: 'cam-sim-1',
+      nome: 'CÂMERA 01 - ENTRADA PRINCIPAL',
+      ip_address: '127.0.0.1',
+      porta: 8554,
+      fabricante: 'Webcam RTSP'
+    };
+
+    setActiveAlert({
+      id: `sim_alert_${Date.now()}`,
+      target_name: 'PESSOA DE TESTE (SIMULAÇÃO)',
+      pessoa: {
+        nome: 'PESSOA DE TESTE (SIMULAÇÃO)',
+        cpf: '000.000.000-00',
+        foto_url: null,
+        funcao: 'Simulação de alerta',
+        categoria: 'Teste',
+        pulseira: '—'
+      },
+      location: camMock.nome,
+      timestamp: new Date().toISOString(),
+      metodo: 'Vigilância Facial em Tempo Real (IA ArcFace 512-D)',
+      watchlist: {
+        motivo: 'SIMULAÇÃO — teste do fluxo de alerta (nenhum alvo real).',
+        nivel_alerta: 'TESTE'
+      },
+      foto_capturada: urlMidiaCamera(camMock.id, 'snapshot', { t: Date.now() }),
+      face_crop: null,
+      snapshot_url: urlMidiaCamera(camMock.id, 'snapshot', { t: Date.now() }),
+      dispositivo: {
+        id: camMock.id,
+        nome: camMock.nome,
+        ip: camMock.ip_address || '127.0.0.1',
+        porta: camMock.porta || 8554,
+        fabricante: camMock.fabricante || 'Webcam RTSP'
+      },
+      localizacao: {
+        nome_area: camMock.area?.nome_area || 'Área Principal',
+        setor: 'Geral',
+        localizacao: camMock.nome,
+        camera_nome: camMock.nome
       }
     });
+    enqueueSnackbar('Notificação de ocorrência sigilosa emitida no console.', { variant: 'info' });
+  };
 
-    socket.on('new_alert', (alert) => {
-      console.log('🚨 ALERTA WATCHLIST:', alert);
-      setActiveAlert(alert);
-      try { alertAudio.play().catch(e => console.warn('Audio blocked')); } catch (e) { }
-
-      // Auto-hide alert after 10s
-      setTimeout(() => setActiveAlert(null), 10000);
-    });
-
-    return () => {
-      clearInterval(interval);
-      socket.disconnect();
-    };
-  }, [eventoId]);
-
-  // Snapshot Auto-Refresh (5s)
+  // Sincronização automática da foto oficial do alvo na ocorrência caso venha vazia
   useEffect(() => {
-    const timer = setInterval(() => setTick(t => t + 1), 5000);
+    if (activeAlert?.pessoa && !activeAlert.pessoa.foto_url && activeAlert.pessoa.cpf) {
+      const cpfLimpo = String(activeAlert.pessoa.cpf).replace(/\D/g, '');
+      api.get('/pessoas', { params: { busca: cpfLimpo, limit: 1 }, hideDefaultError: true })
+        .then(res => {
+          const found = res.data?.data?.[0];
+          if (found?.foto_url) {
+            setActiveAlert(prev => prev ? ({
+              ...prev,
+              pessoa: {
+                ...prev.pessoa,
+                foto_url: found.foto_url
+              }
+            }) : null);
+          }
+        })
+        .catch(() => {});
+    }
+    // Depende só de cpf/foto: com o objeto inteiro, cada atualização da foto dispararia de novo
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeAlert?.pessoa?.cpf, activeAlert?.pessoa?.foto_url]);
+
+  // Ciclo Automático de Scanner de IA para detecção em tempo real de alvos
+  useEffect(() => {
+    if (!aiSurveillance || !isAdminMaster || cameras.length === 0) return;
+
+    const scanInterval = setInterval(async () => {
+      // Evitar requisições sobrepostas e não varrer com a aba do navegador oculta
+      if (isScanningRef.current || document.hidden) return;
+
+      // Priorizar a câmera que está aberta em stream ou a primeira câmera online
+      const targetCam = activeStreamCam || cameras.find(c => c.status === 'online') || cameras[0];
+      if (!targetCam || !targetCam.id) return;
+
+      try {
+        isScanningRef.current = true;
+        setIsScanning(true);
+        const resp = await api.get(`/cameras/${targetCam.id}/track`, {
+          params: { threshold: 0.48 },
+          timeout: 10000,
+          hideDefaultError: true
+        });
+
+        if (resp.data?.success && Array.isArray(resp.data.results)) {
+          setLastScanInfo({
+            camName: targetCam.nome,
+            camId: targetCam.id,
+            facesCount: resp.data.faces_detected || resp.data.results.length,
+            time: new Date().toLocaleTimeString()
+          });
+
+          // SIGILO ABSOLUTO: Se o operador logado NÃO for admin_master, ignora completamente alertas de watchlist
+          if (isAdminMaster) {
+            for (const item of resp.data.results) {
+              const mp = item.matched_person;
+              if (mp && (mp.is_watchlist || mp.watchlist || mp.bloqueado)) {
+                const cpfLimpo = String(mp.cpf || '').replace(/\D/g, '');
+
+                // Se o alvo já está sob rastreamento ativo ou já foi notificado, não repetir som nem duplicar ocorrência
+                if (mp.em_rastreamento || (cpfLimpo && notifiedTargetsRef.current.has(cpfLimpo))) {
+                  setAlertCameras(prev => ({ ...prev, [targetCam.id]: Date.now() }));
+                  break;
+                }
+
+                if (cpfLimpo) {
+                  notifiedTargetsRef.current.add(cpfLimpo);
+                }
+
+                // Toca bipe suave e discreto de mensagem/notificação (nunca sirene estridente)
+                playAlarmSound?.();
+                setAlertCameras(prev => ({ ...prev, [targetCam.id]: Date.now() }));
+
+                setActiveAlert({
+                  id: `alert_${Date.now()}_${targetCam.id}`,
+                  target_name: mp.nome,
+                  pessoa: {
+                    nome: mp.nome,
+                    cpf: mp.cpf,
+                    foto_url: mp.foto_url,
+                    bloqueado: mp.bloqueado,
+                    funcao: mp.funcao || mp.tipo,
+                    categoria: mp.categoria,
+                    pulseira: mp.pulseira
+                  },
+                  location: targetCam.nome,
+                  timestamp: new Date().toISOString(),
+                  metodo: 'Vigilância IA Facial (Câmera IP)',
+                  watchlist: mp.watchlist || {
+                    motivo: mp.bloqueado ? 'Acesso Proibido / Bloqueado no Sistema' : 'Alvo em Monitoramento (Watchlist)',
+                    nivel_alerta: 'CRÍTICO'
+                  },
+                  foto_capturada: resp.data?.annotated_frame_base64 || item.annotated_frame_base64 || mp.foto_capturada || null,
+                  face_crop: item.face_crop_base64 || mp.face_crop || null,
+                  snapshot_url: resp.data?.snapshot_url || mp.snapshot_url || null,
+                  dispositivo: resp.data?.dispositivo || {
+                    id: targetCam.id,
+                    nome: targetCam.nome,
+                    ip: targetCam.ip_address,
+                    porta: targetCam.porta,
+                    fabricante: targetCam.fabricante
+                  },
+                  localizacao: resp.data?.localizacao || {
+                    nome_area: targetCam.area?.nome_area || targetCam.area_nome || 'Área Principal',
+                    setor: targetCam.area?.setor || 'Geral',
+                    localizacao: targetCam.area?.localizacao || targetCam.nome,
+                    camera_nome: targetCam.nome
+                  }
+                });
+                break;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        // Conexão temporária com a câmera ocupada ou timeout silencioso
+      } finally {
+        isScanningRef.current = false;
+        setIsScanning(false);
+      }
+    }, 4500);
+
+    return () => clearInterval(scanInterval);
+  }, [aiSurveillance, cameras, activeStreamCam, playAlarmSound, setActiveAlert, isAdminMaster]);
+
+  // Aba Saúde: carrega ao entrar e atualiza a cada 15 s enquanto estiver aberta
+  const [saudeAtualizadaEm, setSaudeAtualizadaEm] = useState(null);
+  const atualizarSaude = React.useCallback(async () => {
+    await fetchSystemHealth();
+    setSaudeAtualizadaEm(new Date());
+  }, [fetchSystemHealth]);
+  useEffect(() => {
+    if (activeTab !== 'saude') return undefined;
+    atualizarSaude();
+    const timer = setInterval(() => { if (!document.hidden) atualizarSaude(); }, 15000);
     return () => clearInterval(timer);
-  }, []);
+  }, [activeTab, atualizarSaude]);
 
-  const updateStats = (newLog) => {
-    setStats(prev => {
-      const isCheckin = newLog.tipo === 'checkin';
-      const newPresentes = isCheckin ? prev.presentes + 1 : Math.max(0, prev.presentes - 1);
-      return { ...prev, presentes: newPresentes };
-    });
+  // Handlers
+  const handleExportCSV = async () => {
+    await exportarParticipantes();
   };
 
-  const fetchCameras = async () => {
-    try {
-      const response = await api.get('/dispositivos', { params: { evento_id: eventoId, tipo: 'camera' } });
-      const cams = response.data.data.filter(d => d.tipo === 'camera');
-      setCameras(cams);
-      // Selecionar as primeiras 2 por padrão
-      if (selectedCameras.length === 0) setSelectedCameras(cams.slice(0, 2));
-    } catch (e) { console.error('Erro cams:', e); }
+  const handleOpenUnblock = (alvo) => {
+    setTargetToUnblock(alvo);
+    setUnblockReason('');
+    setOpenUnblockDialog(true);
   };
 
-  const fetchWatchlist = async () => {
-    try {
-      const response = await api.get('/monitor/watchlist', { params: { evento_id: eventoId } });
-      setWatchlist(response.data.data);
-    } catch (e) { console.error('Erro watchlist:', e); }
-  };
-
-  const addToWatchlist = async () => {
-    if (!newCpf) return;
-    try {
-      setIsTracking(true);
-      await api.post('/monitor/watchlist', { cpf: newCpf, evento_id: eventoId });
-      setNewCpf('');
-      fetchWatchlist();
-    } catch (e) { console.error('Erro tracking:', e); }
-    finally { setIsTracking(false); }
-  };
-
-  const removeFromWatchlist = async (id) => {
-    try {
-      await api.delete(`/monitor/watchlist/${id}`);
-      fetchWatchlist();
-    } catch (e) { console.error('Erro remove:', e); }
-  };
-
-  useEffect(() => {
-    if (tabIndex === 1) {
-      fetchSystemHealth();
+  const handleConfirmUnblock = async () => {
+    if (!unblockReason || unblockReason.trim().length < 3) {
+      enqueueSnackbar('Por favor, informe a justificativa do desbloqueio (mínimo 3 caracteres).', { variant: 'warning' });
+      return;
     }
-  }, [tabIndex]);
-
-  const fetchData = async () => {
+    setUnblockLoading(true);
     try {
-      const [logsResp, statsResp] = await Promise.all([
-        api.get('/access/logs', { params: { limit: 15, evento_id: eventoId } }),
-        api.get('/access/stats/realtime', { params: { evento_id: eventoId } })
-      ]);
-
-      setLogs(logsResp.data.data || []);
-      setStats(statsResp.data.data || { presentes: 0, capacidade: 0, empresas: [] });
-    } catch (error) {
-      console.error('Erro no monitoramento:', error);
+      const ok = await desbloquearAlvo(targetToUnblock.id, unblockReason.trim());
+      if (ok) {
+        setOpenUnblockDialog(false);
+        setTargetToUnblock(null);
+        setUnblockReason('');
+      }
     } finally {
-      setLoading(false);
+      setUnblockLoading(false);
     }
   };
 
-  const fetchSystemHealth = async () => {
-    setSysError(false);
-    setSysStatus(null);  // Reset para mostrar loading enquanto carrega
+  const handleOpenDeixarMonitorar = (alvo) => {
+    setTargetToStopMonitoring(alvo);
+    setStopMonitoringReason('Alvo localizado e abordado pela equipe de segurança no evento.');
+    setOpenDeixarMonitorarDialog(true);
+  };
+
+  const handleConfirmDeixarMonitorar = async () => {
+    if (!targetToStopMonitoring) return;
+    setStopMonitoringLoading(true);
     try {
-      const [statusR, logsR, perfR] = await Promise.all([
-        api.get('/monitor/system/status'),   // Rota global, sem evento_id
-        api.get('/monitor/system/logs?lines=30'),
-        api.get('/monitor/system/performance')
-      ]);
-      setSysStatus(statusR.data);
-      setSysLogs(logsR.data.logs || []);
-      setSysPerf(perfR.data);
-    } catch (error) {
-      console.error('Falha ao obter saude do sistema', error);
-      setSysError(true);
+      const ok = await deixarDeMonitorar(targetToStopMonitoring.id, stopMonitoringReason);
+      if (ok) {
+        setOpenDeixarMonitorarDialog(false);
+        setTargetToStopMonitoring(null);
+        setStopMonitoringReason('');
+      }
+    } finally {
+      setStopMonitoringLoading(false);
+    }
+  };
+
+  const handleUploadCSV = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('evento_id', eventoId);
+    try {
+        await api.post('/watchlist/upload', formData);
+        enqueueSnackbar('CSV da Watchlist importado e bloqueios globais ativados com sucesso!', { variant: 'success' });
+        fetchWatchlist();
+    } catch (err) {
+        enqueueSnackbar('Erro ao importar CSV: ' + (err.response?.data?.error || err.message), { variant: 'error' });
+    } finally {
+        e.target.value = ''; // Reset input
+    }
+  };
+
+  const handleTestCamera = async (id) => {
+    setTestResults(prev => ({ ...prev, [id]: 'testing' }));
+    try {
+        const resp = await api.post(`/cameras/${id}/testar`);
+        setTestResults(prev => ({ ...prev, [id]: resp.data.online ? 'online' : 'offline' }));
+    } catch (err) {
+        setTestResults(prev => ({ ...prev, [id]: 'offline' }));
     }
   };
 
   return (
-    <Box sx={{ p: 4, maxWidth: 1400, margin: '0 auto' }}>
-      <PageHeader
-        title="Monitoramento NZT"
-        subtitle="Fluxo de dados biométricos, eventos de acesso em tempo real e saúde do sistema."
-        breadcrumbs={[{ text: 'Dashboard' }, { text: 'Monitor' }]}
-      />
+    <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 }, maxWidth: '100%', overflowX: 'hidden' }}>
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: { xs: 'flex-start', sm: 'center' }, 
+        mb: { xs: 2, sm: 2.5 }, 
+        flexDirection: { xs: 'column', sm: 'row' },
+        gap: 1.5 
+      }}>
+        <PageHeader
+          title="Monitor em tempo real"
+          subtitle="Passagens, leitores, câmeras e saúde do sistema ao vivo."
+          icon={<MonitorIcon sx={{ fontSize: 36, color: '#00D4FF' }} />}
+          sx={{ mb: 0 }}
+        />
+        <Tooltip title={ultimaAtualizacao ? `Dados atualizados às ${ultimaAtualizacao.toLocaleTimeString('pt-BR')}` : 'Aguardando dados'}>
+          <Chip
+            icon={<DotIcon sx={{ fontSize: 10, color: `${(SELO_CONEXAO[conexao] || SELO_CONEXAO.offline).cor} !important` }} />}
+            label={(SELO_CONEXAO[conexao] || SELO_CONEXAO.offline).label}
+            sx={{
+              fontFamily: '"Inter", sans-serif',
+              fontWeight: 700,
+              fontSize: '0.75rem',
+              bgcolor: `${(SELO_CONEXAO[conexao] || SELO_CONEXAO.offline).cor}1A`,
+              color: (SELO_CONEXAO[conexao] || SELO_CONEXAO.offline).cor,
+              border: `1px solid ${(SELO_CONEXAO[conexao] || SELO_CONEXAO.offline).cor}4D`,
+              height: 36,
+              borderRadius: '10px',
+              alignSelf: { xs: 'flex-start', sm: 'center' }
+            }}
+          />
+        </Tooltip>
+      </Box>
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs value={tabIndex} onChange={(e, v) => setTabIndex(v)} textColor="inherit" TabIndicatorProps={{ style: { backgroundColor: '#00D4FF', boxShadow: '0 0 10px #00D4FF' } }}>
-          <CustomTab label="FEED EM TEMPO REAL" />
-          <CustomTab label="SAÚDE DO SISTEMA" />
+        <Tabs 
+          value={activeTab} 
+          onChange={(e, v) => setActiveTab(v)} 
+          textColor="inherit" 
+          TabIndicatorProps={{ style: { backgroundColor: '#00D4FF' } }}
+        >
+          {TABS_CONFIG.map(tab => (
+            <Tab 
+              key={tab.id} 
+              value={tab.id} 
+              label={tab.label} 
+              sx={{ fontWeight: 700, fontSize: '0.8125rem' }} 
+            />
+          ))}
         </Tabs>
       </Box>
 
-      {/* ALERT OVERLAY */}
-      {activeAlert && (
-        <AlertOverlay>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-              <AlarmIcon sx={{ fontSize: 32 }} />
-              <Typography variant="h6" sx={{ fontWeight: 900 }}>ALVO DETECTADO!</Typography>
-            </Box>
-            <IconButton onClick={() => setActiveAlert(null)} sx={{ color: '#fff' }}><CloseIcon /></IconButton>
-          </Box>
-          <Stack spacing={2} sx={{ mt: 2 }}>
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <Avatar src={activeAlert.pessoa?.foto_url} sx={{ width: 80, height: 80, border: '3px solid #fff' }} />
-              <Box>
-                <Typography variant="h5" sx={{ fontWeight: 800 }}>{activeAlert.target_name}</Typography>
-                <Typography variant="body2" sx={{ opacity: 0.8 }}>CPF: {activeAlert.pessoa?.cpf || 'Não informado'}</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 700, mt: 1 }}>📍 {activeAlert.location}</Typography>
-              </Box>
-            </Box>
-            <Divider sx={{ bgcolor: 'rgba(255,255,255,0.2)' }} />
-            <Typography variant="caption" sx={{ fontStyle: 'italic' }}>
-              Detectado em: {format(new Date(activeAlert.timestamp), 'HH:mm:ss')} via {(activeAlert.metodo || '').toUpperCase()}
-            </Typography>
-          </Stack>
-        </AlertOverlay>
-      )}
-
-      {/* NEXUS COMMAND DASHBOARD */}
-      {tabIndex === 0 && (
-        <Grid container spacing={2} sx={{ animation: 'fadeIn 0.5s ease-out' }}>
-
-          {/* COLUNA 1: CAMERAS & RECENT FEED */}
-          <Grid item xs={12} lg={8}>
-            <Stack spacing={2}>
-              {/* Camera Grid */}
-              <Grid container spacing={2}>
-                {selectedCameras.map((cam, idx) => (
-                  <Grid item xs={12} md={selectedCameras.length > 1 ? 6 : 12} key={cam.id}>
-                    <CameraCard>
-                      <Box sx={{ position: 'absolute', top: 12, left: 12, zIndex: 10, display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <DotIcon sx={{ color: '#ff0000', fontSize: 12, animation: 'pulse 1s infinite' }} />
-                        <Typography variant="caption" sx={{ color: '#fff', fontWeight: 900, textShadow: '0 0 5px #000', letterSpacing: 1 }}>
-                          CAM-{idx + 1}: {cam.nome.toUpperCase()}
-                        </Typography>
-                      </Box>
-
-                      <Box sx={{ width: '100%', height: '100%', bgcolor: '#050a14', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                        {/* Imagem real via Proxy */}
-                        <Box
-                          component="img"
-                          src={`${api.defaults.baseURL}/dispositivos/${cam.id}/snapshot?t=${tick}`}
-                          sx={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                            position: 'absolute',
-                            top: 0, left: 0,
-                            zIndex: 1
-                          }}
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            e.target.nextSibling.style.display = 'flex';
-                          }}
-                        />
-
-                        <Box sx={{ width: '100%', height: '100%', bgcolor: '#050a14', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', zIndex: 0 }}>
-                          <CameraIcon sx={{ fontSize: 60, color: 'rgba(0,212,255,0.1)', mb: 1 }} />
-                          <Typography variant="caption" sx={{ color: 'rgba(0,212,255,0.3)' }}>ESTABELECENDO CONEXÃO RTSP / SNAPSHOT...</Typography>
-                        </Box>
-                      </Box>
-
-                      <Box className="cam-controls" sx={{ position: 'absolute', bottom: 12, right: 12, opacity: 0, transition: '0.3s', display: 'flex', gap: 1, zIndex: 10 }}>
-                        <IconButton size="small" sx={{ bgcolor: 'rgba(0,0,0,0.5)', color: '#fff' }}><ViewIcon fontSize="small" /></IconButton>
-                      </Box>
-                    </CameraCard>
-                  </Grid>
-                ))}
-
-                {selectedCameras.length === 0 && (
-                  <Grid item xs={12}>
-                    <Box sx={{ height: 300, bgcolor: 'rgba(0,0,0,0.3)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', border: '2px dashed rgba(0,212,255,0.1)' }}>
-                      <CameraIcon sx={{ fontSize: 48, color: 'rgba(0,212,255,0.2)', mb: 2 }} />
-                      <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>Nenhuma câmera selecionada para exibição.</Typography>
-                      <Button variant="outlined" onClick={() => setIsCamDrawerOpen(true)}>SELECIONAR CÂMERAS</Button>
-                    </Box>
-                  </Grid>
-                )}
-              </Grid>
-
-              {/* Feed de Acessos */}
-              <MonitorGrid sx={{ height: 400 }}>
-                <Box sx={{ p: 2, borderBottom: '1px solid rgba(0,212,255,0.1)', bgcolor: 'rgba(0,0,0,0.3)', display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="caption" sx={{ fontWeight: 900, letterSpacing: 1 }}>ULTIMOS EVENTOS DE ACESSO</Typography>
-                  <Typography variant="caption" sx={{ color: '#00FF88' }}>● LIVE</Typography>
+      {/* NOTIFICAÇÃO DISCRETA DE SEGURANÇA (EXCLUSIVA PARA ADMIN_MASTER - ZERO IMPACTO EM OPERADORES) */}
+      {activeAlert && isAdminMaster && !openSecretAlertModal && (
+        <Fade in={!!activeAlert && !openSecretAlertModal}>
+          <Box sx={{ 
+            position: 'fixed', 
+            top: 24, 
+            right: 24, 
+            zIndex: 99999, 
+            width: { xs: '92vw', sm: 420 },
+            bgcolor: '#0A1628', 
+            borderRadius: 1.5,
+            p: 2, 
+            boxShadow: '0 10px 40px rgba(0,0,0,0.85), 0 0 1px 1px rgba(255, 184, 0, 0.4)',
+            border: '1px solid rgba(255, 184, 0, 0.5)',
+            backdropFilter: 'blur(12px)'
+          }}>
+            <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between">
+              <Stack direction="row" spacing={1.2} alignItems="center">
+                <Box sx={{
+                  width: 34, height: 34, borderRadius: 1.5,
+                  bgcolor: 'rgba(255, 184, 0, 0.12)',
+                  border: '1px solid rgba(255, 184, 0, 0.3)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                  <SecurityIcon sx={{ fontSize: 18, color: '#FFB800' }} />
                 </Box>
-                <Box sx={{ flex: 1, overflowY: 'auto' }}>
-                  {logs.map(log => {
-                    const isNegado = log.tipo === 'negado' || log.tipo === 'expulsao';
-                    const color = isNegado ? '#FF3366' : '#00FF88';
-                    return (
-                      <Box key={log.id} sx={{ display: 'flex', alignItems: 'center', p: 1.5, borderBottom: '1px solid rgba(255,255,255,0.03)', gap: 2 }}>
-                        <Avatar src={log.pessoas?.foto_url} sx={{ width: 32, height: 32, border: `1px solid ${color}` }} />
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="caption" sx={{ fontWeight: 700, color: '#fff', display: 'block' }}>{log.pessoas?.nome}</Typography>
-                          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '10px' }}>📍 {log.dispositivo_id} • {(log.metodo || '').toUpperCase()}</Typography>
-                        </Box>
-                        <Box sx={{ textAlign: 'right' }}>
-                          <Typography variant="caption" sx={{ color: color, fontWeight: 900, fontSize: '10px', display: 'block' }}>
-                            {isNegado ? 'NEGADO' : 'AUTORIZADO'}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '10px' }}>{format(new Date(log.created_at), 'HH:mm:ss')}</Typography>
-                        </Box>
-                      </Box>
-                    );
-                  })}
+                <Box>
+                  <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#FFB800', lineHeight: 1.15 }}>
+                    Notificação Sigilosa de Segurança
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.75rem' }}>
+                    Alvo da Watchlist detectado por câmera
+                  </Typography>
                 </Box>
-              </MonitorGrid>
+              </Stack>
+              <IconButton 
+                size="small" 
+                onClick={() => setActiveAlert(null)} 
+                sx={{ color: 'rgba(255,255,255,0.6)', '&:hover': { color: '#FFFFFF' } }}
+              >
+                <CloseIcon fontSize="small" />
+              </IconButton>
             </Stack>
-          </Grid>
 
-          {/* COLUNA 2: WATCHLIST & ALERTS */}
-          <Grid item xs={12} lg={4}>
-            <WatchlistPanel>
-              <Box sx={{ p: 3, borderBottom: '1px solid rgba(255, 51, 102, 0.2)', bgcolor: 'rgba(255, 51, 102, 0.1)' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                  <AlertIcon sx={{ color: '#FF3366' }} />
-                  <Typography variant="h6" sx={{ fontWeight: 900 }}>NEXUS WATCHLIST</Typography>
-                </Box>
-
-                <Stack direction="row" spacing={1}>
-                  <TextField
-                    size="small"
-                    placeholder="CPF para rastrear..."
-                    fullWidth
-                    value={newCpf}
-                    onChange={(e) => setNewCpf(e.target.value)}
-                    sx={{ bgcolor: 'rgba(0,0,0,0.3)', borderRadius: 1 }}
-                  />
-                  <IconButton color="error" sx={{ bgcolor: 'rgba(255, 51, 102, 0.1)' }} onClick={addToWatchlist} disabled={isTracking}>
-                    <PersonAddIcon />
-                  </IconButton>
-                </Stack>
-              </Box>
-
-              <Box sx={{ flex: 1, overflowY: 'auto', p: 2 }}>
-                <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', mb: 2, display: 'block' }}>
-                  ALVOS SENDO RASTREADOS ({watchlist.length})
-                </Typography>
-                <Stack spacing={1.5}>
-                  {watchlist.map(item => (
-                    <Box key={item.id} sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Avatar src={item.pessoas?.foto_url} sx={{ width: 40, height: 40, border: '1px solid rgba(255, 51, 102, 0.3)' }} />
-                      <Box sx={{ flex: 1 }}>
-                        <Typography variant="caption" sx={{ fontWeight: 700, color: '#fff', display: 'block' }}>
-                          {item.pessoas?.nome || item.cpf}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: '#FF3366', fontWeight: 600 }}>EM RASTREAMENTO</Typography>
-                      </Box>
-                      <IconButton size="small" color="error" onClick={() => removeFromWatchlist(item.id)}><TrashIcon fontSize="small" /></IconButton>
-                    </Box>
-                  ))}
-                  {watchlist.length === 0 && (
-                    <Typography variant="caption" sx={{ color: 'text.secondary', textAlign: 'center', py: 4 }}>
-                      Nenhum CPF na lista de rastreamento.
-                    </Typography>
-                  )}
-                </Stack>
-              </Box>
-
-              <Box sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.05)', bgcolor: 'rgba(0,0,0,0.2)' }}>
-                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <AlarmIcon sx={{ fontSize: 14 }} /> Alertas automáticos via WebSocket ativados.
-                </Typography>
-              </Box>
-            </WatchlistPanel>
-          </Grid>
-
-        </Grid>
-      )}
-
-      {/* SEARCH/CAM DRAWER */}
-      <Drawer anchor="right" open={isCamDrawerOpen} onClose={() => setIsCamDrawerOpen(false)} PaperProps={{ sx: { width: 350, bgcolor: '#0A0F1A', p: 3, borderLeft: '1px solid rgba(0,212,255,0.2)' } }}>
-        <Typography variant="h6" sx={{ fontWeight: 900, mb: 3 }}>SELECIONAR CÂMERAS</Typography>
-        <Stack spacing={2}>
-          {cameras.map(cam => (
-            <Box
-              key={cam.id}
-              sx={{
-                p: 2, borderRadius: 2, border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer',
-                bgcolor: selectedCameras.find(c => c.id === cam.id) ? 'rgba(0,212,255,0.1)' : 'transparent',
-                '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' }
-              }}
-              onClick={() => {
-                if (selectedCameras.find(c => c.id === cam.id)) {
-                  setSelectedCameras(selectedCameras.filter(c => c.id !== cam.id));
-                } else {
-                  if (selectedCameras.length < 4) setSelectedCameras([...selectedCameras, cam]);
-                }
-              }}
-            >
-              <Typography variant="subtitle2">{cam.nome}</Typography>
-              <Typography variant="caption" sx={{ opacity: 0.6 }}>IP: {cam.ip_address}</Typography>
+            <Box sx={{ mt: 1.5, p: 1.2, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <Typography variant="body2" fontWeight={700} color="#FFFFFF" noWrap>
+                {activeAlert?.target_name || activeAlert?.pessoa?.nome || 'Alvo em Monitoramento'}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#00D4FF', display: 'block', mt: 0.3, fontWeight: 700 }}>
+                {activeAlert?.localizacao?.nome_area || activeAlert?.location || 'Câmera CFTV'}
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block', fontSize: '0.75rem', mt: 0.2 }}>
+                Identificado às {activeAlert?.timestamp ? new Date(activeAlert.timestamp).toLocaleTimeString() : 'Agora'}
+              </Typography>
             </Box>
-          ))}
-        </Stack>
-        <Button fullWidth variant="contained" sx={{ mt: 4 }} onClick={() => setIsCamDrawerOpen(false)}>CONFIRMAR</Button>
-      </Drawer>
 
-      {/* TABA 1: SAÚDE DO SISTEMA */}
-      {tabIndex === 1 && !sysStatus && !sysError && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300, flexDirection: 'column', gap: 2 }}>
-          <MonitorIcon sx={{ fontSize: 48, color: 'rgba(0,212,255,0.2)', animation: 'pulse 1.5s infinite' }} />
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>Carregando saúde do sistema...</Typography>
-        </Box>
+            <Stack direction="row" spacing={1} mt={1.5}>
+              <Button
+                fullWidth
+                variant="contained"
+                size="small"
+                onClick={() => setOpenSecretAlertModal(true)}
+                sx={{ 
+                  bgcolor: '#FFB800', 
+                  color: '#000000', 
+                  fontWeight: 700, 
+                  fontSize: '0.75rem',
+                  '&:hover': { bgcolor: '#FFB800' } 
+                }}
+              >
+                Abrir ocorrência (sigiloso)
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setActiveAlert(null)}
+                sx={{ borderColor: 'rgba(255,255,255,0.15)', color: '#94A3B8', fontSize: '0.75rem' }}
+              >
+                Dispensar
+              </Button>
+            </Stack>
+          </Box>
+        </Fade>
       )}
-      {tabIndex === 1 && sysError && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300, flexDirection: 'column', gap: 2 }}>
-          <AlertIcon sx={{ fontSize: 48, color: 'rgba(255,51,102,0.5)' }} />
-          <Typography variant="body2" sx={{ color: '#FF3366' }}>Erro ao conectar com o backend. Verifique se o servidor está online.</Typography>
-          <Button variant="outlined" color="error" onClick={fetchSystemHealth} size="small">Tentar Novamente</Button>
-        </Box>
-      )}
-      {tabIndex === 1 && sysStatus && (
-        <Grid container spacing={3} sx={{ animation: 'fadeIn 0.3s' }}>
 
-          <Grid item xs={12} md={4}>
-            <MetricCard>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
-                  <MemoryIcon sx={{ color: '#00D4FF' }} />
-                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#fff' }}>USO DE MEMÓRIA (NODE VM)</Typography>
+      {/* MODAL EXECUTIVO DE OCORRÊNCIA SIGILOSA DA WATCHLIST (ADMIN_MASTER ONLY) */}
+      <Dialog
+        open={openSecretAlertModal && !!activeAlert && isAdminMaster}
+        onClose={() => { setOpenSecretAlertModal(false); setActiveAlert(null); }}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: '#050B18',
+            border: '1px solid #FFB800',
+            boxShadow: '0 0 50px rgba(0,0,0,0.9), 0 0 30px rgba(255, 184, 0, 0.2)',
+            borderRadius: 1.5,
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            '&::-webkit-scrollbar': { width: 6 },
+            '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255, 184, 0, 0.2)', borderRadius: 1.5 }
+          }
+        }}
+      >
+        <DialogTitle sx={{ pb: 1, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Box sx={{
+                width: 36, height: 36, borderRadius: 1.5,
+                bgcolor: 'rgba(255, 184, 0, 0.15)',
+                border: '1px solid #FFB800',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <SecurityIcon sx={{ fontSize: 20, color: '#FFB800' }} />
+              </Box>
+              <Box>
+                <Typography variant="h6" fontWeight={700} sx={{ color: '#FFB800', fontSize: '1rem', lineHeight: 1.2 }}>
+                  CENTRAL DE INTELIGÊNCIA • OCORRÊNCIA SIGILOSA
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.65)' }}>
+                  Alvo da Watchlist Reconhecido por Câmera de Vigilância Facial
+                </Typography>
+              </Box>
+            </Stack>
+            <IconButton 
+              onClick={() => { setOpenSecretAlertModal(false); setActiveAlert(null); }} 
+              size="small" 
+              sx={{ color: '#94A3B8', '&:hover': { color: '#FFFFFF' } }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </Stack>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 2.5 }}>
+          {/* COMPARATIVO FOTO OFICIAL VS SNAPSHOT GRAVADO NO STORAGE */}
+          <Box sx={{
+            p: 2.5,
+            borderRadius: 1.5,
+            bgcolor: 'rgba(0,0,0,0.65)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+            mb: 2.5
+          }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+              <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                <SecurityIcon sx={{ fontSize: 16, color: '#00D4FF' }} />
+                Comprovação biométrica de reconhecimento facial
+              </Typography>
+              <Chip
+                label="CORRESPONDÊNCIA CONFIRMADA"
+                size="small"
+                sx={{
+                  bgcolor: 'rgba(0, 230, 118, 0.15)',
+                  color: '#00FF88',
+                  border: '1px solid rgba(0, 230, 118, 0.4)',
+                  fontWeight: 700,
+                  fontSize: '0.75rem'
+                }}
+              />
+            </Stack>
+
+            <Box sx={{
+              display: 'flex',
+              flexDirection: { xs: 'column', md: 'row' },
+              alignItems: 'stretch',
+              justifyContent: 'center',
+              gap: 2.5,
+              width: '100%'
+            }}>
+              {/* PAINEL 1: FOTO DO REGISTRO CADASTRADO (PROPORÇÃO BIOMÉTRICA RETRATO 3:4 - ZERO CORTE) */}
+              <Box sx={{
+                width: { xs: '100%', md: 230 },
+                flexShrink: 0,
+                display: 'flex',
+                flexDirection: 'column'
+              }}>
+                <Box sx={{
+                  width: '100%',
+                  height: 290,
+                  borderRadius: 1.5,
+                  overflow: 'hidden',
+                  border: '2px solid #00D4FF',
+                  bgcolor: '#050B18',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.8), 0 0 15px rgba(0, 212, 255, 0.15)'
+                }}>
+                  {activeAlert?.pessoa?.foto_url ? (
+                    <img
+                      src={activeAlert.pessoa.foto_url}
+                      alt="Cadastro Oficial"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        objectPosition: 'center',
+                        display: 'block',
+                        backgroundColor: '#050B18'
+                      }}
+                    />
+                  ) : (
+                    <PessoaFoto
+                      src={activeAlert?.pessoa?.foto_url}
+                      nome={activeAlert?.target_name || activeAlert?.pessoa?.nome}
+                      width={140}
+                      borderRadius="12px"
+                    />
+                  )}
+
+                  {/* OSD BIOMÉTRICO SUPERIOR */}
+                  <Box sx={{
+                    position: 'absolute',
+                    top: 8,
+                    left: 8,
+                    bgcolor: 'rgba(4, 7, 13, 0.85)',
+                    px: 0.9,
+                    py: 0.3,
+                    borderRadius: 1,
+                    border: '1px solid rgba(0, 212, 255, 0.4)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.6
+                  }}>
+                    <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#00D4FF', boxShadow: '0 0 6px #00D4FF' }} />
+                    <Typography variant="caption" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.75rem', color: '#00D4FF', fontWeight: 700 }}>
+                      ID BIOMÉTRICO (3:4)
+                    </Typography>
+                  </Box>
+
+                  {/* BADGE INFERIOR */}
+                  <Box sx={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    p: 0.8,
+                    background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.4) 70%, transparent 100%)',
+                    display: 'flex',
+                    justifyContent: 'center'
+                  }}>
+                    <Chip
+                      label="REGISTRO CADASTRADO"
+                      size="small"
+                      sx={{
+                        height: 22,
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        bgcolor: '#00D4FF',
+                        color: '#000000',
+                        letterSpacing: 0.5
+                      }}
+                    />
+                  </Box>
                 </Box>
-                <Divider sx={{ mb: 2, borderColor: 'rgba(255,255,255,0.05)' }} />
-                <Typography variant="body2" sx={{ color: 'text.secondary', display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <span>Memória RSS:</span> <span style={{ color: '#fff' }}>{sysStatus.system?.memory?.rss || (sysPerf?.node?.memoria?.rss_mb ? sysPerf.node.memoria.rss_mb + ' MB' : '—')}</span>
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', mt: 0.8, textAlign: 'center', fontSize: '0.75rem', fontWeight: 600 }}>
+                  Foto Oficial de Perfil (Sem Cortes)
                 </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary', display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <span>Heap Total:</span> <span style={{ color: '#fff' }}>{sysStatus.system?.memory?.heapTotal || (sysPerf?.node?.memoria?.heap_total_mb ? sysPerf.node.memoria.heap_total_mb + ' MB' : '—')}</span>
+              </Box>
+
+              {/* PAINEL 2: SNAPSHOT DE IDENTIFICAÇÃO CFTV (WIDESCREEN 16:9 - SEM BORDAS PRETAS) */}
+              <Box sx={{
+                flex: 1,
+                minWidth: { xs: '100%', md: 480 },
+                display: 'flex',
+                flexDirection: 'column'
+              }}>
+                <Box sx={{
+                  width: '100%',
+                  height: 290,
+                  borderRadius: 1.5,
+                  overflow: 'hidden',
+                  border: '2px solid #FFB800',
+                  bgcolor: '#000000',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.8), 0 0 15px rgba(255, 184, 0, 0.15)'
+                }}>
+                  {cameraSnapshotSrc ? (
+                    <img
+                      src={cameraSnapshotSrc}
+                      alt="Snapshot da Câmera CFTV"
+                      onClick={() => setZoomSnapshotModal(true)}
+                      title="Clique para inspecionar em tela cheia"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: snapshotFitMode,
+                        objectPosition: 'center',
+                        display: 'block',
+                        backgroundColor: '#000000',
+                        cursor: 'pointer'
+                      }}
+                    />
+                  ) : (
+                    <Stack alignItems="center" spacing={1}>
+                      <PhotoCameraIcon sx={{ fontSize: 44, color: '#FFB800', opacity: 0.8 }} />
+                      <Typography variant="caption" sx={{ fontSize: '0.75rem', color: '#FFB800', fontWeight: 700 }}>
+                        Aguardando frame da câmera
+                      </Typography>
+                    </Stack>
+                  )}
+
+                  {/* OSD CFTV SUPERIOR */}
+                  <Box sx={{
+                    position: 'absolute',
+                    top: 8,
+                    left: 8,
+                    bgcolor: 'rgba(0,0,0,0.85)',
+                    px: 0.9,
+                    py: 0.3,
+                    borderRadius: 1,
+                    border: '1px solid rgba(255, 184, 0, 0.4)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.6
+                  }}>
+                    <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: '#FFB800', boxShadow: '0 0 6px #FFB800' }} />
+                    <Typography variant="caption" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.75rem', color: '#FFB800', fontWeight: 700 }}>
+                      CFTV • CAPTURA REAL DA CÂMERA
+                    </Typography>
+                  </Box>
+
+                  {/* CONTROLES SUPERIORES (FIT MODE & ZOOM) */}
+                  <Box sx={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.8,
+                    zIndex: 2
+                  }}>
+                    <Tooltip title={snapshotFitMode === 'cover' ? "Modo Preenchimento Total (Sem bordas pretas). Clique para ver a lente inteira." : "Modo Lente Original. Clique para preencher o quadro sem bordas pretas."}>
+                      <Button
+                        size="small"
+                        onClick={() => setSnapshotFitMode(prev => prev === 'cover' ? 'contain' : 'cover')}
+                        sx={{
+                          height: 22,
+                          px: 1,
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          bgcolor: 'rgba(0,0,0,0.85)',
+                          color: '#FFB800',
+                          border: '1px solid rgba(255, 184, 0, 0.5)',
+                          borderRadius: 1,
+                          '&:hover': { bgcolor: 'rgba(255, 184, 0, 0.25)' }
+                        }}
+                      >
+                        {snapshotFitMode === 'cover' ? 'Preenchimento 100%' : 'Lente original'}
+                      </Button>
+                    </Tooltip>
+                    <Tooltip title="Inspecionar Captura em Tela Cheia">
+                      <IconButton
+                        size="small"
+                        onClick={() => setZoomSnapshotModal(true)}
+                        sx={{
+                          width: 22,
+                          height: 22,
+                          bgcolor: 'rgba(0,0,0,0.85)',
+                          color: '#FFB800',
+                          border: '1px solid rgba(255, 184, 0, 0.5)',
+                          borderRadius: 1,
+                          '&:hover': { bgcolor: 'rgba(255, 184, 0, 0.25)' }
+                        }}
+                      >
+                        <ZoomInIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+
+                  {/* CHIP INFERIOR */}
+                  <Box sx={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    p: 0.8,
+                    background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.4) 70%, transparent 100%)',
+                    display: 'flex',
+                    justifyContent: 'center'
+                  }}>
+                    <Chip
+                      label="SNAPSHOT DE IDENTIFICAÇÃO (CFTV)"
+                      size="small"
+                      sx={{
+                        height: 22,
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        bgcolor: '#FFB800',
+                        color: '#000000',
+                        letterSpacing: 0.5
+                      }}
+                    />
+                  </Box>
+                </Box>
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', mt: 0.8, textAlign: 'center', fontSize: '0.75rem', fontWeight: 600 }}>
+                  Captura Completa da Câmera no Momento da Detecção (16:9)
                 </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary', display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Heap Used:</span> <span style={{ color: '#00FF88', fontWeight: 700 }}>{sysStatus.system?.memory?.heapUsed || (sysPerf?.node?.memoria?.heap_usado_mb ? sysPerf.node.memoria.heap_usado_mb + ' MB' : '—')}</span>
+              </Box>
+            </Box>
+          </Box>
+
+          {/* DADOS DO ALVO */}
+          <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', mb: 2 }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={1}>
+              <Box>
+                <Typography variant="h6" fontWeight={700} sx={{ color: '#FFFFFF', fontSize: '1rem', lineHeight: 1.2 }}>
+                  {activeAlert?.target_name || activeAlert?.pessoa?.nome || 'Alvo em Monitoramento'}
                 </Typography>
-                {sysPerf?.os && (
-                  <Typography variant="body2" sx={{ color: 'text.secondary', display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                    <span>RAM do Servidor:</span> <span style={{ color: sysPerf.os.uso_memoria_pct > 80 ? '#FF3366' : '#FFB800' }}>{sysPerf.os.uso_memoria_pct}% ({sysPerf.os.memoria_livre_mb} MB livres)</span>
+                <Typography variant="body2" sx={{ color: '#00D4FF', fontWeight: 700, fontFamily: '"Inter", sans-serif', mt: 0.3 }}>
+                  CPF: {activeAlert?.pessoa?.cpf || 'Não informado'}
+                </Typography>
+                {activeAlert?.pessoa?.funcao && (
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', display: 'block', mt: 0.2 }}>
+                    Função: <b>{activeAlert.pessoa.funcao}</b> {activeAlert.pessoa?.categoria ? `• Categoria: ${activeAlert.pessoa.categoria}` : ''}
                   </Typography>
                 )}
-                <Typography variant="caption" sx={{ display: 'block', mt: 3, color: 'text.secondary' }}>
-                  Uptime: {sysStatus.system?.uptime || sysPerf?.node?.uptime_formatado || '—'}
-                </Typography>
-              </CardContent>
-            </MetricCard>
-          </Grid>
+              </Box>
+              <Chip
+                label={activeAlert?.watchlist?.nivel_alerta?.toUpperCase() || 'CRÍTICO'}
+                size="small"
+                sx={{ bgcolor: '#FFB800', color: '#000000', fontWeight: 700, fontSize: '0.75rem' }}
+              />
+            </Stack>
 
-          <Grid item xs={12} md={4}>
-            <MetricCard>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
-                  <StorageIcon sx={{ color: '#7B2FBE' }} />
-                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#fff' }}>BANCOS DE DADOS</Typography>
-                </Box>
-                <Divider sx={{ mb: 2, borderColor: 'rgba(255,255,255,0.05)' }} />
-                <Typography variant="body2" sx={{ color: 'text.secondary', display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <span>Supabase (PostgreSQL):</span>
-                  <span style={{ color: sysStatus.services.supabase === 'online' ? '#00FF88' : '#FF3366', fontWeight: 700 }}>
-                    {sysStatus.services.supabase.toUpperCase()}
-                  </span>
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary', display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <span>SQL Server LPR/Logs:</span>
-                  <span style={{ color: sysStatus.services.sql_server === 'online' ? '#00FF88' : '#FF3366', fontWeight: 700 }}>
-                    {sysStatus.services.sql_server.toUpperCase()}
-                  </span>
-                </Typography>
+            <Divider sx={{ my: 1.5, borderColor: 'rgba(255,255,255,0.08)' }} />
 
-                {sysPerf && (
-                  <Box sx={{ mt: 3, pt: 2, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>SQL Server:</Typography>
-                    <Typography variant="body2" sx={{ color: sysPerf.sql_server?.status === 'ok' ? '#00FF88' : '#FFB800', fontWeight: 700 }}>
-                      {sysPerf.sql_server?.status === 'ok' ? '✅ CONECTADO' : '⚠️ SEM PERMISSÃO VIEW STATE'}
+            <Typography variant="body2" sx={{ fontSize: '0.8125rem', color: '#FFB800', lineHeight: 1.4 }}>
+              <b>Motivo da restrição:</b> {activeAlert?.watchlist?.motivo || 'Indivíduo cadastrado na Watchlist com restrição de acesso.'}
+            </Typography>
+          </Box>
+
+          {/* LOCALIZAÇÃO E DISPOSITIVO */}
+          <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: 'rgba(0, 212, 255, 0.04)', border: '1px solid rgba(0, 212, 255, 0.2)' }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <Stack direction="row" spacing={1} alignItems="flex-start">
+                  <CameraIcon sx={{ color: '#00D4FF', fontSize: 20, mt: 0.2 }} />
+                  <Box>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase' }}>
+                      DISPOSITIVO CFTV
                     </Typography>
-                    {sysPerf.os && (
-                      <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1 }}>CPUs: {sysPerf.os.cpus}x {sysPerf.os.modelo_cpu?.split('@')[0]?.trim()}</Typography>
-                    )}
+                    <Typography variant="body2" fontWeight={700} color="#FFFFFF">
+                      {activeAlert?.dispositivo?.nome || activeAlert?.location || 'Câmera IP'}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.65)', fontFamily: '"Inter", sans-serif', display: 'block' }}>
+                      {activeAlert?.dispositivo?.fabricante ? `${activeAlert.dispositivo.fabricante} • ` : ''}
+                      {activeAlert?.dispositivo?.ip ? `${activeAlert.dispositivo.ip}:${activeAlert.dispositivo.porta || ''}` : 'Rede CFTV'}
+                    </Typography>
                   </Box>
-                )}
-              </CardContent>
-            </MetricCard>
-          </Grid>
+                </Stack>
+              </Grid>
 
-          <Grid item xs={12} md={4}>
-            <MetricCard>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
-                  <NetworkIcon sx={{ color: '#FFB800' }} />
-                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#fff' }}>SINCRONIZAÇÃO OFFLINE</Typography>
-                </Box>
-                <Divider sx={{ mb: 2, borderColor: 'rgba(255,255,255,0.05)' }} />
-                <Typography variant="body2" sx={{ color: 'text.secondary', display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <span>Itens Pendentes (Queue):</span>
-                  <span style={{ color: sysStatus.sync.pending > 0 ? '#FFB800' : '#00FF88', fontWeight: 700 }}>
-                    {sysStatus.sync.pending}
-                  </span>
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary', display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <span>Lote Sincronizado:</span> <span style={{ color: '#fff' }}>{sysStatus.sync.synced}</span>
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary', display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <span>Falhas Isoladas:</span> <span style={{ color: sysStatus.sync.failed > 0 ? '#FF3366' : '#fff' }}>{sysStatus.sync.failed}</span>
-                </Typography>
-              </CardContent>
-            </MetricCard>
-          </Grid>
+              <Grid item xs={12} sm={6}>
+                <Stack direction="row" spacing={1} alignItems="flex-start">
+                  <AreaIcon sx={{ color: '#FFB800', fontSize: 20, mt: 0.2 }} />
+                  <Box>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase' }}>
+                      Localização no evento
+                    </Typography>
+                    <Typography variant="body2" fontWeight={700} sx={{ color: '#FFB800' }}>
+                      {activeAlert?.localizacao?.nome_area || 'Área Principal do Evento'}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.65)', display: 'block' }}>
+                      {activeAlert?.localizacao?.setor ? `Setor: ${activeAlert.localizacao.setor}` : ''}
+                      {activeAlert?.localizacao?.localizacao ? ` • ${activeAlert.localizacao.localizacao}` : ''}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Grid>
+            </Grid>
+            <Typography variant="caption" sx={{ mt: 1.2, display: 'block', opacity: 0.6, fontSize: '0.75rem', textAlign: 'right' }}>
+              Registro gerado em {activeAlert?.timestamp ? new Date(activeAlert.timestamp).toLocaleString() : 'Agora'}
+            </Typography>
+          </Box>
+        </DialogContent>
 
-          {/* Raw System Logs Console */}
-          <Grid item xs={12}>
-            <MetricCard sx={{ bgcolor: '#02040A' }}>
-              <CardContent>
-                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#fff', mb: 2, display: 'flex', justifyContent: 'space-between' }}>
-                  <span>RAW SYSTEM TERMINAL</span>
-                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>Últimas 30 linhas (/logs/combined.log)</Typography>
-                </Typography>
-                <Box sx={{
-                  height: 300,
-                  overflowY: 'auto',
-                  bgcolor: '#000',
-                  borderRadius: 2,
-                  p: 2,
-                  fontFamily: '"Fira Code", monospace',
-                  fontSize: '0.75rem',
-                  color: '#A0AABF',
-                  border: '1px solid rgba(255,255,255,0.05)',
-                  boxShadow: 'inset 0 0 20px rgba(0,0,0,0.8)'
-                }}>
-                  {sysLogs.length === 0 ? (
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>Arquivo de log vazio ou não encontrado pelo agente de borda.</Typography>
-                  ) : (
-                    sysLogs.map((logLine, idx) => {
-                      let color = '#A0AABF';
-                      const strLog = typeof logLine === 'string' ? logLine : JSON.stringify(logLine);
-                      if (strLog.includes('ERROR') || strLog.includes('FAIL')) color = '#FF3366';
-                      else if (strLog.includes('WARN')) color = '#FFB800';
-                      else if (strLog.includes('INFO')) color = '#00FF88';
+        <DialogActions sx={{ p: 2.5, borderTop: '1px solid rgba(255,255,255,0.08)', gap: 1 }}>
+          {cameras.length > 0 && (
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<CameraIcon />}
+              onClick={() => {
+                const foundCam = cameras.find(c => c.nome === (activeAlert?.dispositivo?.nome || activeAlert?.location)) || cameras[0];
+                if (foundCam) setActiveStreamCam(foundCam);
+                setOpenSecretAlertModal(false);
+                setActiveAlert(null);
+              }}
+              sx={{ borderColor: '#00D4FF', color: '#00D4FF', fontWeight: 700 }}
+            >
+              Ver câmera ao vivo
+            </Button>
+          )}
 
+          <Button
+            variant="contained"
+            color="success"
+            size="small"
+            startIcon={<CheckCircleIcon />}
+            onClick={async () => {
+              const cpf = activeAlert?.pessoa?.cpf;
+              if (cpf) {
+                const cpfLimpo = String(cpf).replace(/\D/g, '');
+                notifiedTargetsRef.current.delete(cpfLimpo);
+              }
+              await concluirRastreamento(cpf);
+              setOpenSecretAlertModal(false);
+              setActiveAlert(null);
+            }}
+            sx={{
+              bgcolor: '#00FF88',
+              color: '#000000',
+              fontWeight: 700,
+              boxShadow: '0 4px 14px rgba(0, 230, 118, 0.4)',
+              '&:hover': { bgcolor: '#00FF88', color: '#000000' }
+            }}
+          >
+            Concluir rastreamento
+          </Button>
+
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => {
+              setOpenSecretAlertModal(false);
+              setActiveAlert(null);
+            }}
+            sx={{ borderColor: 'rgba(255,255,255,0.2)', color: '#94A3B8' }}
+          >
+            Fechar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* AREA RESTRICTED ALERT OVERLAY */}
+      {activeAreaAlert && (
+          <Fade in={!!activeAreaAlert}>
+             <Box sx={{ 
+                 position: 'fixed', top: activeAlert ? 240 : 40, right: 40, width: 450, zIndex: 9999,
+                 background: 'linear-gradient(135deg, rgba(255, 30, 86, 0.96) 0%, rgba(180, 0, 40, 0.98) 100%)',
+                 color: '#FFFFFF', borderRadius: 1.5,
+                 p: 3, boxShadow: '0 20px 50px rgba(255,0,80,0.4)', border: '2px solid #FF3366',
+                 backdropFilter: 'blur(10px)'
+             }}>
+                 <Stack direction="row" spacing={2} justifyContent="space-between" alignItems="center">
+                    <Stack direction="row" spacing={1} alignItems="center">
+                        <ShieldIcon sx={{ fontSize: 36, color: '#FFFFFF' }} />
+                        <Typography variant="h6" fontWeight={700} letterSpacing={0.5}>Acesso não autorizado!</Typography>
+                    </Stack>
+                    <IconButton onClick={() => setActiveAreaAlert(null)} size="small" sx={{ color: '#FFFFFF' }}><CloseIcon /></IconButton>
+                 </Stack>
+
+                 <Stack direction="row" spacing={2.5} mt={2.5} alignItems="center">
+                    <PessoaFoto
+                        src={activeAreaAlert?.pessoa_foto}
+                        nome={activeAreaAlert?.pessoa_nome}
+                        width={75}
+                        borderRadius="10px"
+                        accentColor="#FF3366"
+                        borderWidth="2px"
+                    />
+                    <Box>
+                        <Typography variant="h5" fontWeight={700}>{activeAreaAlert?.pessoa_nome || 'Indivíduo Não Autorizado'}</Typography>
+                        <Chip label="ÁREA RESTRITA" sx={{ mt: 0.5, bgcolor: '#FFFFFF', color: '#FF3366', fontWeight: 700, height: 22 }} />
+                    </Box>
+                 </Stack>
+                 <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.25)' }} />
+                 <Typography variant="body2"><b>ÁREA TENTADA:</b> {activeAreaAlert?.area_nome || 'Restrita'}</Typography>
+                 <Typography variant="caption" sx={{ mt: 1, display: 'block', opacity: 0.8 }}>Horário: {formatLocalTime(activeAreaAlert?.timestamp)}</Typography>
+             </Box>
+          </Fade>
+      )}
+
+
+
+      {/* INDICADORES DO DIA (fuso local) */}
+      <KpiCards stats={stats} />
+
+      {/* CARROSSEL / SELETOR DE ÁREAS EM TEMPO REAL COM FILTRO DE 1 CLIQUE */}
+      {stats.areas && stats.areas.length > 0 && (
+          <Box sx={{ mb: 3 }}>
+              <Typography variant="caption" fontWeight={700} color="#94A3B8" sx={{ letterSpacing: 1, textTransform: 'uppercase', mb: 1, display: 'block' }}>
+                  Filtrar por área
+              </Typography>
+              <Stack direction="row" spacing={1.5} sx={{ overflowX: 'auto', pb: 1 }}>
+                  <Chip
+                      clickable
+                      onClick={() => setFiltros(f => ({ ...f, area_id: '' }))}
+                      label="Todas as áreas"
+                      variant={filtros.area_id === '' ? 'filled' : 'outlined'}
+                      color={filtros.area_id === '' ? 'primary' : 'default'}
+                      sx={{ fontWeight: 700, px: 1 }}
+                  />
+                  {stats.areas.map(area => {
+                      const isSelected = filtros.area_id === area.id;
                       return (
-                        <Box key={idx} sx={{ mb: 0.5, borderBottom: '1px solid rgba(255,255,255,0.02)', pb: 0.5, color }}>
-                          {strLog}
-                        </Box>
+                          <Chip
+                              key={area.id}
+                              clickable
+                              onClick={() => setFiltros(f => ({ ...f, area_id: isSelected ? '' : area.id }))}
+                              icon={<AreaIcon sx={{ fontSize: 16 }} />}
+                              label={`${area.nome || area.nome_area} (${area.total_acessos_hoje || 0})${area.total_negados_hoje > 0 ? ` ${area.total_negados_hoje}` : ''}`}
+                              color={isSelected ? 'info' : area.total_negados_hoje > 0 ? 'error' : 'default'}
+                              variant={isSelected ? 'filled' : 'outlined'}
+                              sx={{
+                                  fontWeight: 700,
+                                  borderColor: isSelected ? '#00D4FF' : area.total_negados_hoje > 0 ? '#FF3366' : 'rgba(255,255,255,0.15)',
+                                  boxShadow: isSelected ? '0 0 10px rgba(0,212,255,0.4)' : 'none'
+                              }}
+                          />
                       );
-                    })
-                  )}
-                </Box>
-              </CardContent>
-            </MetricCard>
-          </Grid>
+                  })}
+              </Stack>
+          </Box>
+      )}
 
+      {/* ABA 0: FEED AO VIVO */}
+      {activeTab === 'feed' && (
+        <Grid container spacing={3}>
+            <Grid item xs={12}>
+                <GlassCard sx={{ 
+                    p: { xs: 1.5, sm: 2 }, 
+                    mb: 2, 
+                    display: 'flex', 
+                    flexDirection: { xs: 'column', md: 'row' }, 
+                    gap: 1.5, 
+                    alignItems: { xs: 'stretch', md: 'center' },
+                    flexWrap: 'wrap'
+                }}>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ display: { xs: 'none', md: 'flex' } }}>
+                        <FilterIcon sx={{ color: '#00D4FF', fontSize: 22 }} />
+                    </Stack>
+                    <FormControl size="small" sx={{ flex: { xs: '1 1 100%', sm: '1 1 180px' }, minWidth: 140 }}>
+                        <InputLabel>Área</InputLabel>
+                        <Select 
+                            label="Área" 
+                            value={filtros.area_id} 
+                            onChange={(e) => setFiltros({...filtros, area_id: e.target.value})}
+                            sx={{ height: 38, borderRadius: '8px', fontSize: '0.8125rem' }}
+                        >
+                            <MenuItem value="">Todas as áreas</MenuItem>
+                            {areas.map(a => <MenuItem key={a.id} value={a.id}>{a.nome || a.nome_area}</MenuItem>)}
+                        </Select>
+                    </FormControl>
+                    <FormControl size="small" sx={{ flex: { xs: '1 1 100%', sm: '1 1 180px' }, minWidth: 140 }}>
+                        <InputLabel>Leitor</InputLabel>
+                        <Select 
+                            label="Leitor" 
+                            value={filtros.dispositivo_id} 
+                            onChange={(e) => setFiltros({...filtros, dispositivo_id: e.target.value})}
+                            sx={{ height: 38, borderRadius: '8px', fontSize: '0.8125rem' }}
+                        >
+                            <MenuItem value="">Todos os leitores</MenuItem>
+                            {dispositivosLista.map(d => <MenuItem key={d.id} value={d.id}>{d.nome}</MenuItem>)}
+                        </Select>
+                    </FormControl>
+                    <FormControl size="small" sx={{ flex: { xs: '1 1 100%', sm: '1 1 140px' }, minWidth: 120 }}>
+                        <InputLabel>Tipo</InputLabel>
+                        <Select 
+                            label="Tipo" 
+                            value={filtros.tipo} 
+                            onChange={(e) => setFiltros({...filtros, tipo: e.target.value})}
+                            sx={{ height: 38, borderRadius: '8px', fontSize: '0.8125rem' }}
+                        >
+                            <MenuItem value="todos">Todos</MenuItem>
+                            <MenuItem value="checkin">Check-in</MenuItem>
+                            <MenuItem value="checkout">Check-out</MenuItem>
+                            <MenuItem value="fiscalizacao">Fiscalização</MenuItem>
+                            <MenuItem value="negado">Negado</MenuItem>
+                        </Select>
+                    </FormControl>
+                    <Button 
+                        variant="outlined" 
+                        color="primary" 
+                        onClick={() => setFiltros({area_id:'', dispositivo_id: '', tipo: ''})}
+                        sx={{ 
+                            height: 38, 
+                            minHeight: 38,
+                            fontWeight: 700, 
+                            fontSize: '0.75rem',
+                            borderRadius: '8px',
+                            px: 2.5
+                        }}
+                    >
+                        Limpar
+                    </Button>
+                </GlassCard>
+
+                <GlassCard sx={{ 
+                    minHeight: { xs: 450, md: 520 }, 
+                    maxHeight: { xs: '70vh', md: 'calc(100vh - 280px)' }, 
+                    overflow: 'hidden', 
+                    display: 'flex', 
+                    flexDirection: 'column' 
+                }}>
+                    <Box sx={{ p: 2, background: 'rgba(0,0,0,0.3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="subtitle2" fontWeight={700} color="#FFFFFF">Acessos em tempo real</Typography>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                            {loading && <CircularProgress size={12} sx={{ color: '#00D4FF' }} />}
+                            <Typography variant="caption" color="#94A3B8">{logs.length} registros</Typography>
+                        </Stack>
+                    </Box>
+                    {loading && logs.length === 0 && <LinearProgress sx={{ height: 2 }} />}
+                    <Box sx={{ 
+                        flex: 1, 
+                        overflowY: 'auto',
+                        '&::-webkit-scrollbar': { width: 6 },
+                        '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0, 212, 255, 0.2)', borderRadius: 1.5 }
+                    }}>
+                        {!loading && logs.length === 0 && (
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 2, opacity: 0.5 }}>
+                                <MonitorIcon sx={{ fontSize: 48, color: '#00D4FF' }} />
+                                <Typography variant="body2" color="text.secondary">Nenhum acesso registrado ainda.</Typography>
+                                <Typography variant="caption" color="text.secondary">Os eventos aparecerão aqui em tempo real conforme as pessoas passam pelos leitores.</Typography>
+                            </Box>
+                        )}
+                        {logs.map((log, idx) => {
+                            const isNegado = log.tipo === 'negado' || log.resultado === 'negado';
+                            const isFiscalizacao = log.tipo === 'fiscalizacao';
+                            const isWatchlist = isAdminMaster && watchlist.some(w => w.cpf === log.pessoas?.cpf);
+                            return (
+                                <LogItem key={log.id || idx} tipo={isNegado ? 'negado' : log.tipo} monitorado={isWatchlist}>
+                                    <PessoaFoto
+                                        src={log.pessoas?.foto_url}
+                                        nome={log.pessoas?.nome_completo || log.pessoas?.nome || log.pessoa_nome}
+                                        width={48}
+                                        borderRadius="8px"
+                                        accentColor={isNegado ? '#FF3366' : isWatchlist ? '#FFB800' : isFiscalizacao ? '#00D4FF' : log.tipo === 'checkin' ? '#00FF88' : '#FF8800'}
+                                    />
+                                    <Box sx={{ flex: 1 }}>
+                                        <Typography component="div" variant="body1" fontWeight={700} color={isWatchlist ? '#FFB800' : '#FFFFFF'}>
+                                            {log.pessoas?.nome_completo || log.pessoas?.nome || log.pessoa_nome || 'Anônimo'}
+                                            {isWatchlist && <Chip label="Monitorado" size="small" sx={{ ml: 1, bgcolor: '#FFB800', color: '#000000', fontWeight: 700, height: 20 }} />}
+                                        </Typography>
+                                        <Stack direction="row" spacing={2}>
+                                            <Typography variant="caption" color="text.secondary">{log.area_nome || 'Sem área'}</Typography>
+                                            <Typography variant="caption" color="text.secondary">Leitor: {log.dispositivos_acesso?.nome || log.dispositivo_nome || (/^[0-9a-f]{8}-/i.test(log.dispositivo_id || '') ? 'Leitor' : log.dispositivo_id) || 'Fiscal Portátil'}</Typography>
+                                        </Stack>
+                                    </Box>
+                                    <Box sx={{ textAlign: 'right', minWidth: 120, flexShrink: 0 }}>
+                                        <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center">
+                                            {isNegado ? <BlockIcon sx={{ color: '#FF3366', fontSize: 18 }} /> : 
+                                             isFiscalizacao ? <SecurityIcon sx={{ color: '#00D4FF', fontSize: 18 }} /> :
+                                             log.tipo === 'checkin' ? <LoginIcon sx={{ color: '#00FF88', fontSize: 18 }} /> : 
+                                             <CheckoutIcon sx={{ color: '#FF8800', fontSize: 18 }} />}
+                                            <Typography
+                                                variant="subtitle2"
+                                                fontWeight={700}
+                                                color={
+                                                    isNegado ? '#FF3366' : 
+                                                    isFiscalizacao ? '#00D4FF' :
+                                                    log.tipo === 'checkin' ? '#00FF88' : '#FF8800'
+                                                }
+                                            >
+                                                {isNegado ? 'Negado' : isFiscalizacao ? 'Fiscalização' : log.tipo === 'checkin' ? 'Entrada' : 'Saída'}
+                                            </Typography>
+                                        </Stack>
+                                        <Typography variant="caption" color="text.secondary">
+                                            {formatLocalTime(log.created_at)}
+                                        </Typography>
+                                        {isNegado && <Typography variant="caption" display="block" color="#FF3366" sx={{ maxWidth: 260 }}>{log.observacao}</Typography>}
+                                    </Box>
+                                </LogItem>
+                            );
+                        })}
+                    </Box>
+                </GlassCard>
+            </Grid>
         </Grid>
       )}
+
+      {/* ABA 1: TERMINAIS */}
+      {activeTab === 'terminais' && (
+          <GlassCard sx={{ p: 0 }}>
+              <TableContainer component={Paper} sx={{ 
+                  background: 'transparent',
+                  overflowX: 'auto',
+                  '&::-webkit-scrollbar': { height: 6 },
+                  '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0, 212, 255, 0.2)', borderRadius: 1.5 }
+              }}>
+                  <Table sx={{ minWidth: 620 }}>
+                      <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.4)' }}>
+                          <TableRow>
+                              <TableCell>Leitor</TableCell>
+                              <TableCell>Área</TableCell>
+                              <TableCell>Tipo</TableCell>
+                              <TableCell>Status</TableCell>
+                              <TableCell>Último contato</TableCell>
+                          </TableRow>
+                      </TableHead>
+                      <TableBody>
+                          {terminais.map(t => (
+                              <TableRow key={t.id}>
+                                  <TableCell sx={{ fontWeight: 700 }}>{t.nome}</TableCell>
+                                  <TableCell>{t.evento_areas?.nome_area || t.evento_areas?.nome || 'Sem área'}</TableCell>
+                                  <TableCell><Chip label={t.tipo?.toUpperCase()} size="small" variant="outlined" /></TableCell>
+                                  <TableCell>
+                                      <Chip 
+                                        label={t.status?.toUpperCase()} 
+                                        color={t.status === 'online' ? 'success' : 'error'}
+                                        sx={{ fontWeight: 700 }}
+                                      />
+                                  </TableCell>
+                                  <TableCell>{t.ultimo_ping ? format(new Date(t.ultimo_ping), 'dd/MM HH:mm:ss') : 'Nunca Conectado'}</TableCell>
+                              </TableRow>
+                          ))}
+                      </TableBody>
+                  </Table>
+              </TableContainer>
+          </GlassCard>
+      )}
+
+      {/* ABA 2: WATCHLIST (ADMIN_MASTER ONLY) */}
+      {activeTab === 'watchlist' && isAdminMaster && (
+          <Grid container spacing={3}>
+              <Grid item xs={12} md={8}>
+                  <GlassCard sx={{ p: 3 }}>
+                      <Stack direction={{ xs: 'column', md: 'row' }} gap={2} justifyContent="space-between" mb={3}>
+                        <Box>
+                            <Typography variant="h6" fontWeight={700} color="#FFB800">Alvos em monitoramento (watchlist)</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                                Pessoas procuradas ou em atenção especial. Disparam alarmes ao passar em catracas, check-ins ou câmeras.
+                            </Typography>
+                        </Box>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                            <Button 
+                                variant="contained" 
+                                color="warning" 
+                                startIcon={<PersonAddIcon />} 
+                                onClick={() => setOpenTargetDialog(true)}
+                                sx={{ fontWeight: 700 }}
+                            >
+                                Novo alvo
+                            </Button>
+                            <Button variant="outlined" component="label" startIcon={<UploadIcon />}>
+                                Importar CSV
+                                <input type="file" hidden accept=".csv" onChange={handleUploadCSV} />
+                            </Button>
+                            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={baixarModeloCSV}>
+                                Modelo CSV
+                            </Button>
+                            <Button variant="contained" color="primary" startIcon={<DownloadIcon />} onClick={handleExportCSV} sx={{ fontWeight: 700 }}>
+                                Exportar participantes
+                            </Button>
+                        </Stack>
+                      </Stack>
+                      <TableContainer sx={{ 
+                          overflowX: 'auto',
+                          '&::-webkit-scrollbar': { height: 6 },
+                          '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255, 184, 0, 0.2)', borderRadius: 1.5 }
+                      }}>
+                          <Table size="small" sx={{ minWidth: 560 }}>
+                              <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.3)' }}>
+                                  <TableRow>
+                                      <TableCell sx={{ color: '#FFB800', fontWeight: 700 }}>CPF</TableCell>
+                                      <TableCell sx={{ color: '#FFB800', fontWeight: 700 }}>NOME</TableCell>
+                                      <TableCell sx={{ color: '#FFB800', fontWeight: 700 }}>MOTIVO DO BLOQUEIO</TableCell>
+                                      <TableCell sx={{ color: '#FFB800', fontWeight: 700 }}>NÍVEL</TableCell>
+                                      <TableCell sx={{ color: '#FFB800', fontWeight: 700, textAlign: 'center' }}>AÇÕES DE SEGURANÇA</TableCell>
+                                  </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                  {watchlist.map(w => (
+                                      <TableRow key={w.id} sx={{ '&:hover': { bgcolor: 'rgba(255, 184, 0, 0.05)' } }}>
+                                          <TableCell sx={{ fontFamily: '"Inter", sans-serif', fontWeight: 700 }}>{w.cpf}</TableCell>
+                                          <TableCell sx={{ fontWeight: 700 }}>{w.nome || 'Alvo Monitorado'}</TableCell>
+                                          <TableCell sx={{ color: 'text.secondary' }}>{w.motivo || 'Monitoramento Policial / Restrição'}</TableCell>
+                                          <TableCell>
+                                              <Chip 
+                                                  label={(w.nivel_alerta || 'alto').toUpperCase()} 
+                                                  size="small" 
+                                                  color={w.nivel_alerta === 'critico' ? 'error' : w.nivel_alerta === 'alto' ? 'warning' : 'info'} 
+                                                  sx={{ fontWeight: 700 }}
+                                              />
+                                          </TableCell>
+                                          <TableCell sx={{ textAlign: 'center' }}>
+                                              <Stack direction="row" spacing={1} justifyContent="center">
+                                                  <Tooltip title="Alvo Localizado! Deixar de Monitorar e Encerrar Rastreamento">
+                                                      <Button
+                                                          variant="outlined"
+                                                          size="small"
+                                                          startIcon={<VisibilityOffIcon fontSize="small" />}
+                                                          onClick={() => handleOpenDeixarMonitorar(w)}
+                                                          sx={{ 
+                                                              fontSize: '0.75rem', 
+                                                              fontWeight: 700, 
+                                                              borderColor: '#00D4FF', 
+                                                              color: '#00D4FF',
+                                                              px: 1.2,
+                                                              py: 0.5,
+                                                              '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.1)', borderColor: '#00D4FF' } 
+                                                          }}
+                                                      >
+                                                          Localizado
+                                                      </Button>
+                                                  </Tooltip>
+                                                  <Tooltip title="Desbloquear Indivíduo (Libera Acesso Geral em Todos os Eventos)">
+                                                      <Button
+                                                          variant="contained"
+                                                          color="success"
+                                                          size="small"
+                                                          startIcon={<CheckCircleIcon fontSize="small" />}
+                                                          onClick={() => handleOpenUnblock(w)}
+                                                          sx={{ fontSize: '0.75rem', fontWeight: 700, px: 1.2, py: 0.5 }}
+                                                      >
+                                                          Desbloquear
+                                                      </Button>
+                                                  </Tooltip>
+                                              </Stack>
+                                          </TableCell>
+                                      </TableRow>
+                                  ))}
+                                  {watchlist.length === 0 && (
+                                      <TableRow>
+                                          <TableCell colSpan={5} sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
+                                              Nenhum CPF cadastrado na lista de alvos monitorados deste evento.
+                                          </TableCell>
+                                      </TableRow>
+                                  )}
+                              </TableBody>
+                          </Table>
+                      </TableContainer>
+                  </GlassCard>
+              </Grid>
+
+              <Grid item xs={12} md={4}>
+                  <GlassCard sx={{ p: 3 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                          <Box>
+                              <Typography variant="h6" fontWeight={700} color="#00D4FF">NOTIFICAÇÕES EXTERNAS</Typography>
+                              <Typography variant="caption" sx={{ display: 'block', opacity: 0.7 }}>
+                                  Alertas instantâneos via Telegram e WhatsApp
+                              </Typography>
+                          </Box>
+                          <IconButton 
+                              size="small" 
+                              onClick={() => setOpenContactDialog(true)}
+                              sx={{ bgcolor: 'rgba(0,212,255,0.1)', color: '#00D4FF', '&:hover': { bgcolor: 'rgba(0,212,255,0.2)' } }}
+                          >
+                              <AddIcon fontSize="small" />
+                          </IconButton>
+                      </Box>
+                      
+                      <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                          {contatos.map(c => (
+                              <GlassCard key={c.id} sx={{ p: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.3)' }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                      <Avatar sx={{ 
+                                          bgcolor: c.canal === 'telegram' ? 'rgba(0, 136, 204, 0.2)' : c.canal === 'whatsapp' ? 'rgba(37, 211, 102, 0.2)' : 'rgba(255, 136, 0, 0.2)',
+                                          color: c.canal === 'telegram' ? '#0099BB' : c.canal === 'whatsapp' ? '#25D366' : '#FF8800',
+                                          width: 36, height: 36
+                                      }}>
+                                          {c.canal === 'telegram' ? <TelegramIcon sx={{ fontSize: 20 }} /> : c.canal === 'whatsapp' ? <WhatsAppIcon sx={{ fontSize: 20 }} /> : <EmailIcon sx={{ fontSize: 20 }} />}
+                                      </Avatar>
+                                      <Box>
+                                          <Typography variant="subtitle2" fontWeight={700}>{c.nome}</Typography>
+                                          <Typography variant="caption" sx={{ fontFamily: '"Inter", sans-serif', color: 'text.secondary', display: 'block' }}>
+                                              {c.canal?.toUpperCase()}: {c.telefone}
+                                          </Typography>
+                                      </Box>
+                                  </Box>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <Chip size="small" label="ATIVO" color="success" sx={{ fontSize: '0.75rem', height: 20, fontWeight: 700 }} />
+                                      <IconButton size="small" color="error" onClick={() => removeContato(c.id)}>
+                                          <TrashIcon sx={{ fontSize: 16 }} />
+                                      </IconButton>
+                                  </Box>
+                              </GlassCard>
+                          ))}
+
+                          {contatos.length === 0 && (
+                              <Box sx={{ p: 2, textAlign: 'center', bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 1.5 }}>
+                                  <Typography variant="caption" color="text.secondary">
+                                      Nenhum contato externo configurado.<br />
+                                      Os alertas serão despachados aos Administradores Master.
+                                  </Typography>
+                              </Box>
+                          )}
+
+                          <Button 
+                              fullWidth 
+                              variant="outlined" 
+                              startIcon={<AddIcon />} 
+                              onClick={() => setOpenContactDialog(true)}
+                              sx={{ mt: 1, borderColor: '#00D4FF', color: '#00D4FF' }}
+                          >
+                              Adicionar contato
+                          </Button>
+                      </Box>
+                  </GlassCard>
+              </Grid>
+          </Grid>
+      )}
+
+      {/* ABA 3: CENTRAL CFTV & CÂMERAS IP */}
+      {activeTab === 'cameras' && (
+          <Box>
+            {/* CABEÇALHO DA CENTRAL CFTV */}
+            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} gap={2} mb={2.5}>
+                <Box>
+                    <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
+                        <Typography variant="h5" fontWeight={700} sx={{ letterSpacing: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <DvrIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
+                            Central de monitoramento CFTV
+                        </Typography>
+                        <Chip
+                            icon={<DotIcon sx={{ fontSize: 10, color: isScanning ? '#FFB800 !important' : '#00FF88 !important' }} />}
+                            label={isScanning ? "IA PROCESSANDO..." : "VIGILÂNCIA IA ATIVA"}
+                            size="small"
+                            sx={{
+                                bgcolor: isScanning ? 'rgba(255, 184, 0, 0.12)' : 'rgba(0, 255, 136, 0.12)',
+                                color: isScanning ? '#FFB800' : '#00FF88',
+                                border: '1px solid currentColor',
+                                fontWeight: 700,
+                                fontSize: '0.75rem'
+                            }}
+                        />
+                        <Chip
+                            label={`${displayedCameras.length} de ${cameras.length} CÂMERA(S) NO MOSAICO`}
+                            size="small"
+                            sx={{
+                                bgcolor: 'rgba(0, 212, 255, 0.12)',
+                                color: '#00D4FF',
+                                border: '1px solid rgba(0, 212, 255, 0.3)',
+                                fontWeight: 700,
+                                fontSize: '0.75rem'
+                            }}
+                        />
+                    </Stack>
+                    <Typography variant="caption" color="text.secondary">
+                        Stream IP / RTSP • Detecção Facial SCRFD • Rastreamento ArcFace 512-D
+                        {lastScanInfo && ` • Último Scan: ${lastScanInfo.camName} (${lastScanInfo.facesCount} face(s) às ${lastScanInfo.time})`}
+                    </Typography>
+                </Box>
+            </Stack>
+
+            {/* BARRA DE FERRAMENTAS CFTV (COMPACTA, BOTÕES PEQUENOS, SEM QUADRO PESADO) */}
+            <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between', 
+                flexWrap: 'wrap', 
+                gap: 1, 
+                mb: 2
+            }}>
+                {/* BOTÕES DE GERENCIAMENTO E SELEÇÃO */}
+                <Stack direction="row" spacing={1} alignItems="center">
+                    <Button
+                        variant="contained"
+                        size="small"
+                        startIcon={<SettingsIcon sx={{ fontSize: 16 }} />}
+                        onClick={() => setOpenGerenciarCamerasModal(true)}
+                        sx={{
+                            height: 32,
+                            bgcolor: '#00D4FF',
+                            color: '#000000',
+                            fontWeight: 700,
+                            fontSize: '0.75rem',
+                            px: 1.5,
+                            borderRadius: 1.5,
+                            boxShadow: 'none',
+                            whiteSpace: 'nowrap',
+                            '&:hover': { bgcolor: '#00D4FF', color: '#000000' }
+                        }}
+                    >
+                        Gerenciar câmeras
+                    </Button>
+
+                    <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<GridViewIcon sx={{ fontSize: 16 }} />}
+                        onClick={() => setOpenSelectCamerasDialog(true)}
+                        sx={{
+                            height: 32,
+                            borderColor: 'rgba(255, 255, 255, 0.25)',
+                            color: '#FFFFFF',
+                            fontWeight: 700,
+                            fontSize: '0.75rem',
+                            px: 1.5,
+                            borderRadius: 1.5,
+                            whiteSpace: 'nowrap',
+                            '&:hover': { borderColor: '#00D4FF', color: '#00D4FF', bgcolor: 'rgba(0, 212, 255, 0.05)' }
+                        }}
+                    >
+                        SELECIONAR CÂMERAS ({displayedCameras.length})
+                    </Button>
+                </Stack>
+
+                {/* CONTROLES DE GRADE, MODO, VIDEO WALL E ATUALIZAR */}
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ overflowX: 'auto' }}>
+                    {/* SELETOR DE COLUNAS DA GRADE */}
+                    <ButtonGroup size="small" variant="outlined" sx={{ height: 32, borderColor: 'rgba(255,255,255,0.15)' }}>
+                        {[
+                            { id: '4', label: '4 CÂM' },
+                            { id: '3', label: '3 CÂM' },
+                            { id: '2', label: '2 CÂM' },
+                            { id: '1', label: '1 (FOCO)' }
+                        ].map(({ id, label }) => (
+                            <Button
+                                key={id}
+                                onClick={() => handleColsChange(id)}
+                                sx={{
+                                    height: 32,
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    px: 1.2,
+                                    whiteSpace: 'nowrap',
+                                    bgcolor: gridColumns === id ? '#00D4FF' : 'transparent',
+                                    color: gridColumns === id ? '#000000' : '#94A3B8',
+                                    borderColor: 'rgba(255,255,255,0.15)',
+                                    '&:hover': { bgcolor: gridColumns === id ? '#00D4FF' : 'rgba(255,255,255,0.05)' }
+                                }}
+                            >
+                                {label}
+                            </Button>
+                        ))}
+                    </ButtonGroup>
+
+                    {/* MODO DE TRANSMISSÃO */}
+                    <ButtonGroup size="small" variant="outlined" sx={{ height: 32, borderColor: 'rgba(255,255,255,0.15)' }}>
+                        <Button
+                            onClick={() => handleLiveGridToggle(true)}
+                            sx={{
+                                height: 32,
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                px: 1.2,
+                                whiteSpace: 'nowrap',
+                                bgcolor: liveStreamInGrid ? 'rgba(0, 255, 136, 0.15)' : 'transparent',
+                                color: liveStreamInGrid ? '#00FF88' : '#94A3B8',
+                                borderColor: liveStreamInGrid ? '#00FF88' : 'rgba(255,255,255,0.15)',
+                                '&:hover': { bgcolor: 'rgba(0, 255, 136, 0.2)' }
+                            }}
+                        >
+                            Ao vivo
+                        </Button>
+                        <Button
+                            onClick={() => handleLiveGridToggle(false)}
+                            sx={{
+                                height: 32,
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                px: 1.2,
+                                whiteSpace: 'nowrap',
+                                bgcolor: !liveStreamInGrid ? 'rgba(0, 212, 255, 0.15)' : 'transparent',
+                                color: !liveStreamInGrid ? '#00D4FF' : '#94A3B8',
+                                borderColor: !liveStreamInGrid ? '#00D4FF' : 'rgba(255,255,255,0.15)',
+                                '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.2)' }
+                            }}
+                        >
+                            Snapshots
+                        </Button>
+                    </ButtonGroup>
+
+                    {/* VIDEO WALL PARA 2º MONITOR */}
+                    <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<DesktopWindowsIcon sx={{ fontSize: 16 }} />}
+                        onClick={handleOpenVideoWallPopup}
+                        sx={{
+                            height: 32,
+                            borderColor: 'rgba(0, 255, 136, 0.5)',
+                            color: '#00FF88',
+                            fontWeight: 700,
+                            fontSize: '0.75rem',
+                            px: 1.5,
+                            borderRadius: 1.5,
+                            whiteSpace: 'nowrap',
+                            bgcolor: 'rgba(0, 255, 136, 0.05)',
+                            '&:hover': {
+                                borderColor: '#00FF88',
+                                bgcolor: 'rgba(0, 255, 136, 0.15)'
+                            }
+                        }}
+                    >
+                        Video wall
+                    </Button>
+
+                    {/* ATUALIZAR GRID */}
+                    <Tooltip title="Atualizar Câmeras">
+                        <IconButton
+                            size="small"
+                            onClick={fetchCameras}
+                            sx={{
+                                height: 32,
+                                width: 32,
+                                border: '1px solid rgba(255,255,255,0.18)',
+                                color: '#00D4FF',
+                                borderRadius: 1.5,
+                                '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.1)', borderColor: '#00D4FF' }
+                            }}
+                        >
+                            <RefreshIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                    </Tooltip>
+                </Stack>
+            </Box>
+
+            {/* SE NENHUMA CÂMERA CADASTRADA OU SELECIONADA */}
+            {displayedCameras.length === 0 ? (
+                <GlassCard sx={{ p: 5, textAlign: 'center', border: '1px dashed rgba(0, 212, 255, 0.3)' }}>
+                    <CameraIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2, opacity: 0.5 }} />
+                    <Typography variant="h6" fontWeight={700} color="#FFFFFF" gutterBottom>
+                        {cameras.length === 0 ? 'Nenhuma câmera IP cadastrada no sistema' : 'Nenhuma câmera selecionada no mosaico'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 520, mx: 'auto', mb: 3 }}>
+                        {cameras.length === 0
+                            ? 'Cadastre câmeras RTSP ou IPs da rede para iniciar a vigilância e monitoramento biométrico.'
+                            : 'Você filtrou ou desmarcou as câmeras. Clique no botão abaixo para escolher quais exibir.'}
+                    </Typography>
+                    <Stack direction="row" spacing={2} justifyContent="center">
+                        {cameras.length > 0 ? (
+                            <Button
+                                variant="contained"
+                                startIcon={<GridViewIcon />}
+                                onClick={() => setOpenSelectCamerasDialog(true)}
+                                sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700 }}
+                            >
+                                Selecionar câmeras no mosaico
+                            </Button>
+                        ) : (
+                            <Button
+                                variant="contained"
+                                startIcon={<SettingsIcon />}
+                                onClick={() => setOpenGerenciarCamerasModal(true)}
+                                sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700 }}
+                            >
+                                Gerenciar câmeras agora
+                            </Button>
+                        )}
+                    </Stack>
+                </GlassCard>
+            ) : (
+                /* GRADE DE CÂMERAS CFTV PROFISSIONAL 16:9 NATIVO COM OSD */
+                <Grid container spacing={2}>
+                    {displayedCameras.map(cam => {
+                        const isAlertActive = alertCameras[cam.id] && (Date.now() - alertCameras[cam.id] < 30000);
+                        const colProps = gridColumns === '4'
+                            ? { xs: 12, sm: 6, md: 4, lg: 3 }
+                            : gridColumns === '3'
+                            ? { xs: 12, sm: 6, md: 6, lg: 4 }
+                            : gridColumns === '2'
+                            ? { xs: 12, md: 6, lg: 6 }
+                            : { xs: 12, lg: 12 };
+
+                        return (
+                            <Grid item {...colProps} key={cam.id}>
+                                <GlassCard sx={{
+                                    p: 0,
+                                    overflow: 'hidden',
+                                    transition: 'all 0.3s ease',
+                                    border: isAlertActive ? '2px solid #FF3366' : '1px solid rgba(0, 212, 255, 0.2)',
+                                    bgcolor: '#050B18',
+                                    boxShadow: isAlertActive ? '0 0 30px rgba(255, 30, 86, 0.7)' : '0 10px 25px rgba(0,0,0,0.6)',
+                                    display: 'flex',
+                                    flexDirection: 'column'
+                                }}>
+                                    {/* CABEÇALHO DO CARD DA CÂMERA */}
+                                    <Box sx={{
+                                        px: 1.5, py: 1,
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        background: 'rgba(10, 15, 26, 0.95)',
+                                        borderBottom: '1px solid rgba(255,255,255,0.06)'
+                                    }}>
+                                        <Stack direction="row" spacing={1} alignItems="center" sx={{ overflow: 'hidden', flex: 1, mr: 1 }}>
+                                            <CameraIcon sx={{ fontSize: 16, color: '#00D4FF', flexShrink: 0 }} />
+                                            <Typography variant="subtitle2" fontWeight={700} noWrap sx={{ fontSize: '0.8125rem', color: '#FFFFFF' }}>
+                                                {cam.nome}
+                                            </Typography>
+                                            {cam.area?.nome_area && (
+                                                <Chip
+                                                    label={cam.area.nome_area}
+                                                    size="small"
+                                                    sx={{ height: 18, fontSize: '0.75rem', bgcolor: 'rgba(255,255,255,0.08)', color: '#94A3B8', fontWeight: 700 }}
+                                                />
+                                            )}
+                                        </Stack>
+                                        <Chip
+                                            label={cam.status?.toUpperCase() || 'OFFLINE'}
+                                            size="small"
+                                            color={cam.status === 'online' ? 'success' : 'error'}
+                                            sx={{ height: 20, fontSize: '0.75rem', fontWeight: 700 }}
+                                        />
+                                    </Box>
+
+                                    {/* CONTAINER DE VÍDEO NATIVO 16:9 COM OSD PROFISSIONAL */}
+                                    <Box 
+                                        sx={{
+                                            position: 'relative',
+                                            width: '100%',
+                                            aspectRatio: '16/9',
+                                            bgcolor: '#000000',
+                                            cursor: 'pointer',
+                                            overflow: 'hidden',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                        }}
+                                        onClick={() => setActiveStreamCam(cam)}
+                                    >
+                                        <img 
+                                            src={
+                                                liveStreamInGrid
+                                                    ? urlMidiaCamera(cam.id, 'stream', { annotate: true })
+                                                    : urlMidiaCamera(cam.id, 'snapshot', { t: tick })
+                                            } 
+                                            style={{
+                                                width: '100%',
+                                                height: '100%',
+                                                objectFit: 'cover',
+                                                display: 'block'
+                                            }}
+                                            onError={(e) => { e.target.src = '/assets/cam_offline.png'; }}
+                                            alt={cam.nome}
+                                        />
+
+                                        {/* OSD: AO VIVO & RELÓGIO (CANTO SUPERIOR ESQUERDO) */}
+                                        <Box sx={{
+                                            position: 'absolute', top: 8, left: 8,
+                                            bgcolor: 'rgba(0,0,0,0.75)', px: 0.8, py: 0.3, borderRadius: 1,
+                                            display: 'flex', alignItems: 'center', gap: 0.6,
+                                            border: '1px solid rgba(255,255,255,0.1)'
+                                        }}>
+                                            <DotIcon sx={{ fontSize: 9, color: cam.status === 'online' ? '#00FF88' : '#94A3B8' }} />
+                                            <Typography variant="caption" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.75rem', color: '#FFFFFF', fontWeight: 700 }}>
+                                                {liveStreamInGrid ? 'STREAM' : 'REC'} • {new Date().toLocaleTimeString()}
+                                            </Typography>
+                                        </Box>
+
+                                        {/* OSD: IP DA CÂMERA (CANTO INFERIOR ESQUERDO COM GRADIENTE) */}
+                                        <Box sx={{
+                                            position: 'absolute', bottom: 0, left: 0, right: 0,
+                                            background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)',
+                                            px: 1.2, pb: 0.8, pt: 2,
+                                            display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end'
+                                        }}>
+                                            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', fontFamily: '"Inter", sans-serif', fontSize: '0.75rem' }}>
+                                                {cam.ip_address ? `${cam.ip_address}:${cam.porta || 554}` : (cam.fabricante || 'RTSP')}
+                                            </Typography>
+
+                                            <Box sx={{
+                                                bgcolor: 'rgba(0, 212, 255, 0.2)',
+                                                border: '1px solid rgba(0, 212, 255, 0.4)',
+                                                borderRadius: 1,
+                                                px: 0.8, py: 0.2,
+                                                display: 'flex', alignItems: 'center', gap: 0.4
+                                            }}>
+                                                <FullscreenIcon sx={{ fontSize: 13, color: '#00D4FF' }} />
+                                                <Typography variant="caption" sx={{ fontSize: '0.75rem', color: '#00D4FF', fontWeight: 700 }}>
+                                                    AO VIVO
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                    </Box>
+
+                                    {/* BARRA DE AÇÕES DO CARD */}
+                                    <Box sx={{ p: 1, display: 'flex', gap: 1, alignItems: 'center', bgcolor: 'rgba(0,0,0,0.6)', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                                        <Button
+                                            size="small" fullWidth variant="contained"
+                                            startIcon={<CameraIcon sx={{ fontSize: 16 }} />}
+                                            onClick={() => setActiveStreamCam(cam)}
+                                            sx={{ height: 32, fontWeight: 700, fontSize: '0.75rem', bgcolor: '#00D4FF', color: '#000000', '&:hover': { bgcolor: '#00D4FF' } }}
+                                        >
+                                            Ao vivo
+                                        </Button>
+                                        <Button
+                                            size="small" fullWidth variant="outlined"
+                                            disabled={testResults[cam.id] === 'testing'}
+                                            onClick={() => handleTestCamera(cam.id)}
+                                            sx={{ height: 32, fontWeight: 700, fontSize: '0.75rem', borderColor: 'rgba(255,255,255,0.18)', color: '#FFFFFF' }}
+                                        >
+                                            {testResults[cam.id] === 'testing' ? <CircularProgress size={14} /> : 'Testar'}
+                                        </Button>
+                                        {testResults[cam.id] && testResults[cam.id] !== 'testing' && (
+                                            <Chip
+                                                size="small"
+                                                label={testResults[cam.id] === 'online' ? 'ONLINE' : 'OFFLINE'}
+                                                color={testResults[cam.id] === 'online' ? 'success' : 'error'}
+                                                sx={{ height: 26, fontSize: '0.75rem', fontWeight: 700 }}
+                                            />
+                                        )}
+                                    </Box>
+                                </GlassCard>
+                            </Grid>
+                        );
+                    })}
+                </Grid>
+            )}
+          </Box>
+      )}
+
+      {/* ABA 4: SAÚDE DO SISTEMA */}
+      {activeTab === 'saude' && (
+          <AbaSaude
+              sysStatus={sysStatus}
+              sysPerf={sysPerf}
+              sysLogs={sysLogs}
+              sysError={sysError}
+              terminais={terminais}
+              atualizadoEm={saudeAtualizadaEm}
+              onAtualizar={atualizarSaude}
+          />
+      )}
+
+      {/* DIALOG DE TRANSMISSÃO AO VIVO COM CONTROLE DE REDIMENSIONAMENTO E ZOOM */}
+      <Dialog 
+        open={!!activeStreamCam} 
+        onClose={() => { setActiveStreamCam(null); setStreamZoom(100); }} 
+        maxWidth={streamModalSize === 'fullscreen' ? false : streamModalSize} 
+        fullWidth
+        fullScreen={streamModalSize === 'fullscreen'}
+        PaperProps={{
+            sx: { bgcolor: '#0A1628', border: '1px solid #00D4FF', boxShadow: '0 0 45px rgba(0,212,255,0.3)', borderRadius: streamModalSize === 'fullscreen' ? 0 : 2 }
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+                <CameraIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
+                <Box>
+                    <Typography variant="h6" fontWeight={700} color="#FFFFFF">
+                        {activeStreamCam?.nome || 'Transmissão Ao Vivo'}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                        Stream IP / RTSP • Detecção SCRFD e Rastreamento Facial ArcFace 512-D • Baixa Latência
+                    </Typography>
+                </Box>
+            </Stack>
+
+            <Stack direction="row" spacing={1.5} alignItems="center">
+                {/* CONTROLES DE ZOOM DA IMAGEM */}
+                <ButtonGroup size="small" variant="outlined" sx={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                    <Tooltip title="Diminuir Zoom">
+                        <IconButton
+                            size="small"
+                            onClick={() => setStreamZoom(z => Math.max(80, z - 15))}
+                            sx={{ color: '#94A3B8', '&:hover': { color: '#00D4FF' } }}
+                        >
+                            <ZoomOutIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+                    <Button 
+                        size="small" 
+                        onClick={() => setStreamZoom(100)} 
+                        sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#00D4FF', px: 1 }}
+                    >
+                        {streamZoom}%
+                    </Button>
+                    <Tooltip title="Aumentar Zoom">
+                        <IconButton
+                            size="small"
+                            onClick={() => setStreamZoom(z => Math.min(220, z + 15))}
+                            sx={{ color: '#94A3B8', '&:hover': { color: '#00D4FF' } }}
+                        >
+                            <ZoomInIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+                </ButtonGroup>
+
+                {/* CONTROLES DE TAMANHO DA JANELA */}
+                <ButtonGroup size="small" variant="outlined" sx={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                    {['md', 'lg', 'xl'].map(sz => (
+                        <Button
+                            key={sz}
+                            onClick={() => setStreamModalSize(sz)}
+                            sx={{
+                                fontSize: '0.75rem', fontWeight: 700,
+                                bgcolor: streamModalSize === sz ? '#00D4FF' : 'transparent',
+                                color: streamModalSize === sz ? '#000000' : '#94A3B8'
+                            }}
+                        >
+                            {sz.toUpperCase()}
+                        </Button>
+                    ))}
+                    <Tooltip title={streamModalSize === 'fullscreen' ? "Restaurar Janela" : "Tela Cheia"}>
+                        <IconButton
+                            size="small"
+                            onClick={() => setStreamModalSize(s => s === 'fullscreen' ? 'md' : 'fullscreen')}
+                            sx={{ color: streamModalSize === 'fullscreen' ? '#00D4FF' : '#94A3B8' }}
+                        >
+                            {streamModalSize === 'fullscreen' ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
+                        </IconButton>
+                    </Tooltip>
+                </ButtonGroup>
+
+                <IconButton onClick={() => { setActiveStreamCam(null); setStreamZoom(100); }} size="small" sx={{ color: '#94A3B8' }}>
+                    <CloseIcon />
+                </IconButton>
+            </Stack>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 2, overflow: 'auto', bgcolor: '#000000' }}>
+            {activeStreamCam && (
+                <Box sx={{
+                    position: 'relative',
+                    width: '100%',
+                    borderRadius: 1.5,
+                    overflow: 'hidden',
+                    bgcolor: '#000000',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minHeight: streamModalSize === 'fullscreen' ? '82vh' : '450px'
+                }}>
+                    <img
+                        src={urlMidiaCamera(activeStreamCam.id, 'stream', { annotate: true, t: Date.now() })}
+                        alt={activeStreamCam.nome}
+                        style={{
+                            maxWidth: '100%',
+                            maxHeight: streamModalSize === 'fullscreen' ? '85vh' : '70vh',
+                            transform: `scale(${streamZoom / 100})`,
+                            transformOrigin: 'center center',
+                            transition: 'transform 0.15s ease',
+                            objectFit: 'contain',
+                            display: 'block'
+                        }}
+                        onError={(e) => {
+                            if (!e.target.dataset.fallbackTried) {
+                                e.target.dataset.fallbackTried = 'true';
+                                e.target.src = urlMidiaCamera(activeStreamCam.id, 'snapshot', { t: Date.now() });
+                            } else {
+                                e.target.src = '/assets/cam_offline.png';
+                            }
+                        }}
+                    />
+                </Box>
+            )}
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 2, justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <Stack direction="row" spacing={2} alignItems="center">
+                <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Inter", sans-serif' }}>
+                    {activeStreamCam?.stream_url || `${activeStreamCam?.ip_address}:${activeStreamCam?.porta}`}
+                </Typography>
+                <Chip
+                    icon={<DotIcon sx={{ fontSize: 9, color: '#00FF88 !important' }} />}
+                    label="STREAM AO VIVO • ULTRA-BAIXA LATÊNCIA"
+                    size="small"
+                    sx={{ bgcolor: 'rgba(0, 255, 136, 0.1)', color: '#00FF88', fontWeight: 700, fontSize: '0.75rem' }}
+                />
+            </Stack>
+            <Stack direction="row" spacing={1}>
+                <Button
+                    variant="outlined"
+                    color="warning"
+                    size="small"
+                    startIcon={<AlarmIcon />}
+                    onClick={handleTriggerTestAlert}
+                    sx={{ fontWeight: 700 }}
+                >
+                    Testar alerta
+                </Button>
+                <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => { setActiveStreamCam(null); setStreamZoom(100); }}
+                    sx={{ borderColor: '#00D4FF', color: '#00D4FF', fontWeight: 700 }}
+                >
+                    Fechar janela
+                </Button>
+            </Stack>
+        </DialogActions>
+      </Dialog>
+
+      {/* DIALOG SELEÇÃO DE CÂMERAS NO MOSAICO CFTV */}
+      <Dialog 
+          open={openSelectCamerasDialog} 
+          onClose={() => setOpenSelectCamerasDialog(false)} 
+          fullWidth 
+          maxWidth="sm"
+          PaperProps={{
+              sx: { 
+                  bgcolor: '#0A1628', 
+                  border: '1px solid rgba(0, 212, 255, 0.4)', 
+                  borderRadius: 1.5,
+                  maxHeight: '90vh'
+              }
+          }}
+      >
+          <DialogTitle sx={{ pb: 1, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                  <GridViewIcon sx={{ color: '#00D4FF', fontSize: 26 }} />
+                  <Box>
+                      <Typography variant="h6" fontWeight={700} color="#FFFFFF">
+                          Selecionar câmeras no mosaico
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                          Escolha quais câmeras cadastradas no sistema serão exibidas nesta tela
+                      </Typography>
+                  </Box>
+              </Stack>
+          </DialogTitle>
+
+          <DialogContent sx={{ p: 2, overflowY: 'auto' }}>
+              {/* BARRA DE AÇÕES RÁPIDAS: MARCAR / DESMARCAR TODAS */}
+              <Stack direction="row" justifyContent="space-between" alignItems="center" my={1.5}>
+                  <Stack direction="row" spacing={1}>
+                      <Button 
+                          size="small" 
+                          variant="outlined" 
+                          onClick={handleSelectAllCameras}
+                          sx={{ fontSize: '0.75rem', borderColor: 'rgba(255,255,255,0.2)', color: '#00D4FF' }}
+                      >
+                          MARCAR TODAS ({cameras.length})
+                      </Button>
+                      <Button 
+                          size="small" 
+                          variant="outlined" 
+                          onClick={handleClearSelectedCameras}
+                          sx={{ fontSize: '0.75rem', borderColor: 'rgba(255,255,255,0.2)', color: '#94A3B8' }}
+                      >
+                          Limpar seleção
+                      </Button>
+                  </Stack>
+                  <Chip
+                      label={`${selectedCameraIds.length === 0 ? 'Exibindo Todas (' + cameras.length + ')' : selectedCameraIds.length + ' Selecionada(s)'}`}
+                      size="small"
+                      sx={{ bgcolor: 'rgba(0, 212, 255, 0.1)', color: '#00D4FF', fontWeight: 700, fontSize: '0.75rem' }}
+                  />
+              </Stack>
+
+              {/* LISTA DE CÂMERAS DISPONÍVEIS */}
+              {cameras.length === 0 ? (
+                  <Box sx={{ p: 4, textAlign: 'center', bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 1.5 }}>
+                      <CameraIcon sx={{ fontSize: 48, color: 'text.secondary', opacity: 0.5, mb: 1 }} />
+                      <Typography variant="subtitle2" color="#FFFFFF" fontWeight={700}>
+                          Nenhuma câmera cadastrada no sistema.
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                          As câmeras devem ser configuradas primeiro na página de Configurações.
+                      </Typography>
+                      <Button
+                          variant="contained"
+                          size="small"
+                          startIcon={<SettingsIcon />}
+                          onClick={() => { setOpenSelectCamerasDialog(false); setOpenGerenciarCamerasModal(true); }}
+                          sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700 }}
+                      >
+                          Gerenciar câmeras agora
+                      </Button>
+                  </Box>
+              ) : (
+                  <List sx={{ maxHeight: 380, overflow: 'auto', p: 0 }}>
+                      {cameras.map(cam => {
+                          const isChecked = selectedCameraIds.length === 0 || selectedCameraIds.includes(cam.id);
+                          return (
+                              <ListItem 
+                                  key={cam.id} 
+                                  disablePadding 
+                                  sx={{ 
+                                      mb: 1, 
+                                      borderRadius: 1.5, 
+                                      bgcolor: isChecked ? 'rgba(0, 212, 255, 0.06)' : 'rgba(255,255,255,0.02)',
+                                      border: isChecked ? '1px solid rgba(0, 212, 255, 0.3)' : '1px solid rgba(255,255,255,0.06)'
+                                  }}
+                              >
+                                  <ListItemButton onClick={() => handleToggleSelectCamera(cam.id)} dense>
+                                      <ListItemIcon sx={{ minWidth: 38 }}>
+                                          <Checkbox
+                                              edge="start"
+                                              checked={isChecked}
+                                              tabIndex={-1}
+                                              disableRipple
+                                              sx={{ color: '#00D4FF', '&.Mui-checked': { color: '#00D4FF' } }}
+                                          />
+                                      </ListItemIcon>
+                                      <ListItemText
+                                          primary={
+                                              <Stack direction="row" spacing={1} alignItems="center">
+                                                  <Typography variant="subtitle2" fontWeight={700} color="#FFFFFF">
+                                                      {cam.nome}
+                                                  </Typography>
+                                                  <Chip
+                                                      label={cam.status?.toUpperCase() || 'OFFLINE'}
+                                                      size="small"
+                                                      color={cam.status === 'online' ? 'success' : 'default'}
+                                                      sx={{ height: 18, fontSize: '0.75rem', fontWeight: 700 }}
+                                                  />
+                                              </Stack>
+                                          }
+                                          secondary={
+                                              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', display: 'block' }}>
+                                                  {cam.fabricante} • {cam.ip_address}:{cam.porta} 
+                                                  {cam.area?.nome_area ? ` • Área: ${cam.area.nome_area}` : ''}
+                                              </Typography>
+                                          }
+                                      />
+                                  </ListItemButton>
+                              </ListItem>
+                          );
+                      })}
+                  </List>
+              )}
+
+              {/* ATALHO PARA GERENCIAR CÂMERAS */}
+              <Box sx={{ mt: 2, p: 1.5, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.1)' }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography variant="caption" color="text.secondary">
+                          Precisa cadastrar, editar IP ou testar uma nova câmera?
+                      </Typography>
+                      <Button
+                          size="small"
+                          startIcon={<SettingsIcon sx={{ fontSize: 16 }} />}
+                          onClick={() => { setOpenSelectCamerasDialog(false); setOpenGerenciarCamerasModal(true); }}
+                          sx={{ fontSize: '0.75rem', color: '#00D4FF', fontWeight: 700 }}
+                      >
+                          Gerenciar câmeras
+                      </Button>
+                  </Stack>
+              </Box>
+          </DialogContent>
+
+          <DialogActions sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <Button 
+                  onClick={() => setOpenSelectCamerasDialog(false)}
+                  sx={{ color: '#94A3B8', fontWeight: 700 }}
+              >
+                  Cancelar
+              </Button>
+              <Button 
+                  variant="contained" 
+                  onClick={() => {
+                      setOpenSelectCamerasDialog(false);
+                      enqueueSnackbar('Mosaico CFTV atualizado!', { variant: 'success' });
+                  }}
+                  sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700, '&:hover': { bgcolor: '#00D4FF' } }}
+              >
+                  Aplicar mosaico
+              </Button>
+          </DialogActions>
+      </Dialog>
+
+      {/* DIALOG CADASTRAR ALVO NA WATCHLIST */}
+      <Dialog 
+          open={openTargetDialog} 
+          onClose={() => setOpenTargetDialog(false)} 
+          fullWidth 
+          maxWidth="xs"
+          PaperProps={{
+              sx: { maxHeight: '90vh' }
+          }}
+      >
+          <DialogTitle sx={{ fontWeight: 700, color: '#FFB800' }}>Cadastrar alvo na watchlist</DialogTitle>
+          <DialogContent sx={{ overflowY: 'auto' }}>
+              <Stack spacing={2} pt={1}>
+                  <TextField
+                      label="CPF do Alvo" fullWidth required
+                      placeholder="000.000.000-00"
+                      value={newTarget.cpf}
+                      onChange={(e) => setNewTarget({ ...newTarget, cpf: e.target.value })}
+                      helperText="CPF numérico ou formatado da pessoa procurada."
+                  />
+                  <TextField
+                      label="Nome Completo (opcional)" fullWidth
+                      placeholder="Nome do indivíduo"
+                      value={newTarget.nome}
+                      onChange={(e) => setNewTarget({ ...newTarget, nome: e.target.value })}
+                  />
+                  <TextField
+                      label="Motivo / Descrição" fullWidth
+                      placeholder="Ex: Mandado de prisão, Bloqueio judicial, VIP Blacklist"
+                      value={newTarget.motivo}
+                      onChange={(e) => setNewTarget({ ...newTarget, motivo: e.target.value })}
+                  />
+                  <FormControl fullWidth>
+                      <InputLabel>Nível de Risco</InputLabel>
+                      <Select
+                          label="Nível de Risco"
+                          value={newTarget.nivel_alerta}
+                          onChange={(e) => setNewTarget({ ...newTarget, nivel_alerta: e.target.value })}
+                      >
+                          <MenuItem value="critico">CRÍTICO (Perigo Imediato)</MenuItem>
+                          <MenuItem value="alto">ALTO (Risco Elevado)</MenuItem>
+                          <MenuItem value="medio">MÉDIO (Atenção / Monitoramento)</MenuItem>
+                      </Select>
+                  </FormControl>
+              </Stack>
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+              <Button onClick={() => setOpenTargetDialog(false)}>Cancelar</Button>
+              <Button 
+                  variant="contained" 
+                  color="warning"
+                  onClick={async () => {
+                      if (!newTarget.cpf) {
+                          enqueueSnackbar('O CPF é obrigatório para cadastrar na Watchlist.', { variant: 'warning' });
+                          return;
+                      }
+                      const ok = await addToWatchlist(newTarget);
+                      if (ok) {
+                          setOpenTargetDialog(false);
+                          setNewTarget({ cpf: '', nome: '', motivo: '', nivel_alerta: 'alto' });
+                      }
+                  }}
+              >
+                  Salvar alvo
+              </Button>
+          </DialogActions>
+      </Dialog>
+
+      {/* DIALOG CADASTRAR CONTATO PARA NOTIFICAÇÕES EXTERNAS */}
+      <Dialog 
+          open={openContactDialog} 
+          onClose={() => setOpenContactDialog(false)} 
+          fullWidth 
+          maxWidth="xs"
+          PaperProps={{
+              sx: { maxHeight: '90vh' }
+          }}
+      >
+          <DialogTitle sx={{ fontWeight: 700, color: '#00D4FF' }}>Novo contato de alerta</DialogTitle>
+          <DialogContent sx={{ overflowY: 'auto' }}>
+              <Stack spacing={2} pt={1}>
+                  <TextField
+                      label="Nome do Contato ou Central" fullWidth required
+                      placeholder="Ex: Cel. Roberto, Central de Comando, Wanderley"
+                      value={newContact.nome}
+                      onChange={(e) => setNewContact({ ...newContact, nome: e.target.value })}
+                  />
+                  <FormControl fullWidth required>
+                      <InputLabel>Canal de Notificação</InputLabel>
+                      <Select
+                          label="Canal de Notificação"
+                          value={newContact.canal}
+                          onChange={(e) => setNewContact({ ...newContact, canal: e.target.value })}
+                      >
+                          <MenuItem value="telegram">TELEGRAM (Chat / Grupo)</MenuItem>
+                          <MenuItem value="whatsapp">WHATSAPP (Mensagem Direta)</MenuItem>
+                          <MenuItem value="email">E-MAIL (Relatório Imediato)</MenuItem>
+                      </Select>
+                  </FormControl>
+                  <TextField
+                      label={newContact.canal === 'telegram' ? 'Chat ID do Telegram ou @Canal' : newContact.canal === 'whatsapp' ? 'Número WhatsApp (com DDI)' : 'E-mail para Alerta'}
+                      fullWidth required
+                      placeholder={newContact.canal === 'telegram' ? 'Ex: 123456789 ou -100123456789' : newContact.canal === 'whatsapp' ? 'Ex: 5511999999999' : 'seguranca@empresa.com'}
+                      value={newContact.telefone}
+                      onChange={(e) => setNewContact({ ...newContact, telefone: e.target.value })}
+                      helperText={
+                          newContact.canal === 'telegram' 
+                              ? 'Obtenha o Chat ID enviando /start para o bot ou usando @userinfobot.'
+                              : newContact.canal === 'whatsapp' 
+                              ? 'Digite número completo com DDI (55) e DDD sem traços ou parênteses.'
+                              : 'Endereço de e-mail que receberá a ficha do alvo com foto.'
+                      }
+                  />
+                  {newContact.canal === 'telegram' && (
+                      <TextField
+                          label="Token do Bot (opcional)" fullWidth
+                          placeholder="Deixe vazio para usar o bot padrão do sistema"
+                          value={newContact.bot_token}
+                          onChange={(e) => setNewContact({ ...newContact, bot_token: e.target.value })}
+                          helperText="Token fornecido pelo @BotFather caso queira bot exclusivo."
+                      />
+                  )}
+              </Stack>
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+              <Button onClick={() => setOpenContactDialog(false)}>Cancelar</Button>
+              <Button 
+                  variant="contained" 
+                  onClick={async () => {
+                      if (!newContact.nome || !newContact.telefone) {
+                          enqueueSnackbar('Nome e destinatário (Chat ID / Telefone) são obrigatórios.', { variant: 'warning' });
+                          return;
+                      }
+                      const ok = await addContato(newContact);
+                      if (ok) {
+                          setOpenContactDialog(false);
+                          setNewContact({ nome: '', canal: 'telegram', telefone: '', bot_token: '' });
+                      }
+                  }}
+              >
+                  Salvar contato
+              </Button>
+          </DialogActions>
+      </Dialog>
+
+      {/* MODAL DE DESBLOQUEIO DE ALVO DA WATCHLIST (ADMIN_MASTER ONLY) */}
+      <Dialog 
+          open={openUnblockDialog} 
+          onClose={() => !unblockLoading && setOpenUnblockDialog(false)} 
+          maxWidth="sm" 
+          fullWidth
+          PaperProps={{
+            sx: {
+              bgcolor: '#0A1628',
+              border: '1px solid rgba(0, 255, 136, 0.4)',
+              boxShadow: '0 0 40px rgba(0, 255, 136, 0.2)',
+              borderRadius: 2
+            }
+          }}
+      >
+          <DialogTitle sx={{ color: '#00FF88', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <CheckCircleIcon sx={{ color: '#00FF88' }} />
+              DESBLOQUEIO DE ALVO • LIBERAÇÃO GERAL MULTI-EVENTO
+          </DialogTitle>
+          <DialogContent>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Esta ação revoga imediatamente o bloqueio do indivíduo. Ele será <strong>automaticamente liberado para credenciamento, cadastro e acesso em todos os eventos</strong>.
+              </Typography>
+
+              {targetToUnblock && (
+                  <Paper sx={{ p: 2, mb: 2.5, bgcolor: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 1.5 }}>
+                      <Typography variant="subtitle1" fontWeight={700} color="#FFFFFF">
+                          {targetToUnblock.nome || 'Nome Não Informado'}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', color: '#FFB800', mt: 0.5 }}>
+                          CPF: {targetToUnblock.cpf}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                          <strong>Motivo da restrição atual:</strong> {targetToUnblock.motivo || 'Restrição geral de segurança'}
+                      </Typography>
+                  </Paper>
+              )}
+
+              <TextField
+                  label="Motivo / Justificativa do Desbloqueio (Obrigatório)"
+                  fullWidth
+                  multiline
+                  rows={3}
+                  required
+                  placeholder="Ex: Situação regularizada, ordem do responsável pelo evento, engano cadastral..."
+                  value={unblockReason}
+                  onChange={(e) => setUnblockReason(e.target.value)}
+                  disabled={unblockLoading}
+                  helperText="O Admin Master receberá uma notificação formal de segurança por e-mail com esta justificativa."
+                  sx={{ mt: 1 }}
+              />
+          </DialogContent>
+          <DialogActions sx={{ p: 2, gap: 1 }}>
+              <Button onClick={() => setOpenUnblockDialog(false)} disabled={unblockLoading} color="inherit">
+                  Cancelar
+              </Button>
+              <Button 
+                  variant="contained" 
+                  color="success" 
+                  onClick={handleConfirmUnblock}
+                  disabled={unblockLoading || !unblockReason.trim()}
+                  startIcon={unblockLoading ? <CircularProgress size={16} color="inherit" /> : <CheckCircleIcon />}
+                  sx={{ fontWeight: 700 }}
+              >
+                  {unblockLoading ? 'Liberando...' : 'Confirmar desbloqueio e liberar'}
+              </Button>
+          </DialogActions>
+      </Dialog>
+
+      {/* MODAL DE ALVO LOCALIZADO / DEIXAR DE MONITORAR */}
+      <Dialog 
+          open={openDeixarMonitorarDialog} 
+          onClose={() => !stopMonitoringLoading && setOpenDeixarMonitorarDialog(false)} 
+          maxWidth="sm" 
+          fullWidth
+          PaperProps={{
+            sx: {
+              bgcolor: '#0A1628',
+              border: '1px solid rgba(0, 212, 255, 0.4)',
+              boxShadow: '0 0 40px rgba(0, 212, 255, 0.2)',
+              borderRadius: 2
+            }
+          }}
+      >
+          <DialogTitle sx={{ color: '#00D4FF', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <VisibilityOffIcon sx={{ color: '#00D4FF' }} />
+              ALVO LOCALIZADO • DEIXAR DE MONITORAR
+          </DialogTitle>
+          <DialogContent>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Confirma que o alvo procurado foi <strong>localizado no evento</strong>? Ao confirmar, o sistema encerrará o rastreamento, desativará os alarmes sonoros/visuais e <strong>retirará o indivíduo da lista de monitoramento ativo</strong>.
+              </Typography>
+
+              {targetToStopMonitoring && (
+                  <Paper sx={{ p: 2, mb: 2, bgcolor: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 1.5 }}>
+                      <Typography variant="subtitle1" fontWeight={700} color="#FFFFFF">
+                          {targetToStopMonitoring.nome || 'Nome Não Informado'}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', color: '#00D4FF', mt: 0.5 }}>
+                          CPF: {targetToStopMonitoring.cpf}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                          <strong>Motivo do monitoramento:</strong> {targetToStopMonitoring.motivo || 'Atenção especial de segurança'}
+                      </Typography>
+                  </Paper>
+              )}
+
+              <TextField
+                  label="Observação da Abordagem / Encerramento"
+                  fullWidth
+                  multiline
+                  rows={2}
+                  value={stopMonitoringReason}
+                  onChange={(e) => setStopMonitoringReason(e.target.value)}
+                  disabled={stopMonitoringLoading}
+                  sx={{ mt: 1 }}
+              />
+          </DialogContent>
+          <DialogActions sx={{ p: 2, gap: 1 }}>
+              <Button onClick={() => setOpenDeixarMonitorarDialog(false)} disabled={stopMonitoringLoading} color="inherit">
+                  Cancelar
+              </Button>
+              <Button 
+                  variant="contained" 
+                  onClick={handleConfirmDeixarMonitorar}
+                  disabled={stopMonitoringLoading}
+                  startIcon={stopMonitoringLoading ? <CircularProgress size={16} color="inherit" /> : <VisibilityOffIcon />}
+                  sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700, '&:hover': { bgcolor: '#00D4FF' } }}
+              >
+                  {stopMonitoringLoading ? 'Encerrando...' : 'Confirmar e deixar de monitorar'}
+              </Button>
+          </DialogActions>
+      </Dialog>
+
+      {/* MODAL DE ZOOM PERICIAL DO SNAPSHOT CFTV EM ALTA RESOLUÇÃO */}
+      <Dialog
+        open={zoomSnapshotModal}
+        onClose={() => setZoomSnapshotModal(false)}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: '#050B18',
+            border: '2px solid #FFB800',
+            boxShadow: '0 0 50px rgba(0,0,0,0.95)',
+            borderRadius: 2
+          }
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+          <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#FFB800', display: 'flex', alignItems: 'center', gap: 1 }}>
+            <PhotoCameraIcon sx={{ color: '#FFB800' }} />
+            INSPEÇÃO PERICIAL • CAPTURA ORIGINAL DA CÂMERA EM ALTA RESOLUÇÃO
+          </Typography>
+          <IconButton onClick={() => setZoomSnapshotModal(false)} size="small" sx={{ color: '#94A3B8', '&:hover': { color: '#FFFFFF' } }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', bgcolor: '#000000', minHeight: 400 }}>
+          {cameraSnapshotSrc && (
+            <img
+              src={cameraSnapshotSrc}
+              alt="Perícia CFTV"
+              style={{
+                maxWidth: '100%',
+                maxHeight: '82vh',
+                objectFit: 'contain',
+                borderRadius: 1.5,
+                boxShadow: '0 0 30px rgba(0,0,0,0.8)'
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL / GAVETA DIRETO DE GERENCIAMENTO DE CÂMERAS IP NA TELA */}
+      <GerenciarCamerasModal
+        open={openGerenciarCamerasModal}
+        onClose={() => setOpenGerenciarCamerasModal(false)}
+        cameras={cameras}
+        eventoId={eventoId}
+        areas={areas}
+        onCamerasUpdated={fetchCameras}
+        onCamerasChange={fetchCameras}
+      />
     </Box>
   );
 };

@@ -1,5 +1,4 @@
 const router = require('express').Router();
-const { supabase } = require('../../config/supabase');
 
 router.get('/health', async (req, res) => {
   const checks = {};
@@ -22,6 +21,17 @@ router.get('/health', async (req, res) => {
     uptime: Math.floor(process.uptime()),
     version: process.env.npm_package_version || '1.0.0',
     timestamp: new Date().toISOString(),
+    epoch_ms: Date.now()
+  });
+});
+
+router.get(['/time', '/api/time', '/api/system/time'], (req, res) => {
+  const now = new Date();
+  res.json({
+    timestamp: now.toISOString(),
+    epoch_ms: now.getTime(),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Sao_Paulo',
+    offset_minutes: -now.getTimezoneOffset()
   });
 });
 

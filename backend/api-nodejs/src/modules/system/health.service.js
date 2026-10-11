@@ -2,7 +2,7 @@ const logger = require('../../services/logger');
 const syncService = require('../devices/sync.service');
 const webSocketService = require('../../services/websocketService');
 const { supabase } = require('../../config/supabase');
-const { testPgConnection } = require('../../config/pgEdge');
+const { testPgConnection, edgeAtivo } = require('../../config/pgEdge');
 
 /**
  * HealthService: Monitora proativamente a saúde do sistema NZT.
@@ -54,8 +54,8 @@ class HealthService {
             const stats = syncService.getStats();
             const alerts = [];
 
-            // 1. Verificar Sincronia
-            if (stats.lastSync) {
+            // 1. Verificar Sincronia (só existe com o banco local Edge ativo)
+            if (edgeAtivo() && stats.lastSync) {
                 const diffMinutes = (Date.now() - new Date(stats.lastSync).getTime()) / 1000 / 60;
                 if (diffMinutes > thresholds.maxSyncDelayMinutes) {
                     alerts.push({
@@ -67,7 +67,7 @@ class HealthService {
                 }
             }
 
-            if (stats.pendingItems > thresholds.maxPendingItems) {
+            if (edgeAtivo() && stats.pendingItems > thresholds.maxPendingItems) {
                 alerts.push({
                     type: 'SYNC_BACKLOG',
                     severity: 'warning',
@@ -101,8 +101,8 @@ class HealthService {
             }
 
             // 3. Verificar Banco Local (Edge)
-            const isPgOk = await testPgConnection();
-            if (!isPgOk) {
+            const isPgOk = await testPgConnection(); // null = Edge desativado
+            if (isPgOk === false) {
                 alerts.push({
                     type: 'EDGE_OFFLINE',
                     severity: 'critical',
@@ -110,8 +110,9 @@ class HealthService {
                 });
             }
 
-            // 4. Verificar Liveness dos Dispositivos (Watchdog)
-            await this.checkDeviceLiveness(customThresholds.watchdog_timeout_min || 10);
+            // 4. Status dos leitores: fica só com o deviceHealthCheck (keepalive → agente → TCP).
+            //    O watchdog daqui usava outra regra e ping TCP direto, que falha na VPS com leitores
+            //    atrás do agente local — o leitor "piscava" entre offline e online.
 
             // 5. Disparar Alertas via WebSocket se necessário
             if (alerts.length > 0) {
@@ -119,48 +120,6 @@ class HealthService {
             }
         } catch (error) {
             logger.error('❌ Erro no runDiagnostics:', error.message);
-        }
-    }
-
-    /**
-     * Verifica se os dispositivos estão enviando pulsos (Watchdog)
-     */
-    async checkDeviceLiveness(timeoutMinutes) {
-        try {
-            const { data: devices, error } = await supabase
-                .from('dispositivos_acesso')
-                .select('id, nome, last_push_at, status_online')
-                .eq('status_online', 'online');
-
-            if (error || !devices) return;
-
-            const now = Date.now();
-            const timeoutMs = timeoutMinutes * 60 * 1000;
-
-            for (const device of devices) {
-                if (device.last_push_at) {
-                    const diff = now - new Date(device.last_push_at).getTime();
-                    if (diff > timeoutMs) {
-                        logger.warn(`🔦 [Watchdog] Dispositivo offline por inatividade: ${device.nome}`);
-                        
-                        // Atualizar para offline no banco
-                        await supabase
-                            .from('dispositivos_acesso')
-                            .update({ status_online: 'offline' })
-                            .eq('id', device.id);
-
-                        // Alerta imediato de queda de hardware
-                        webSocketService.emit('system:alert', {
-                            type: 'DEVICE_OFFLINE',
-                            severity: 'critical',
-                            message: `Leitor desconectado ou sem sinal: ${device.nome}`,
-                            details: { device_id: device.id }
-                        }, 'system_admin');
-                    }
-                }
-            }
-        } catch (err) {
-            logger.error('Erro no checkDeviceLiveness:', err.message);
         }
     }
 
