@@ -45,7 +45,8 @@ class PublicController {
                 .single();
 
             if (error || !empresa) {
-                logger.error({ err: error, token }, `[PortalPublico] Falha ao localizar empresa por token: ${token}`);
+                // Link vencido/apagado é uso normal do portal: aviso, não erro
+                logger.warn({ err: error?.message }, '[PortalPublico] Convite de empresa não encontrado');
                 return res.status(404).json({ error: 'Link de cadastro inválido ou inexistente. Gere um novo convite no painel admin.' });
             }
 

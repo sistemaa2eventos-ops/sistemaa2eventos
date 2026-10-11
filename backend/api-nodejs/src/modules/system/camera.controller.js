@@ -4,6 +4,16 @@ const axios = require('axios');
 
 // Quando o microserviço de IA falha, fica marcado como indisponível até este instante (ms)
 let iaIndisponivelAte = 0;
+// A IA das câmeras roda no PC local do evento; sem ela, imagem/vídeo respondem 503 na hora
+// e o aviso vai para o log uma vez por minuto (antes: um erro por imagem pedida).
+const MSG_IA_OFFLINE = 'Serviço de câmeras/IA do evento não está conectado';
+const erroDeConexao = (err) => ['ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNABORTED', 'EHOSTUNREACH'].includes(err?.code);
+const marcarIaIndisponivel = (origem, err) => {
+    if (Date.now() >= iaIndisponivelAte) {
+        logger.warn(`[${origem}] ${MSG_IA_OFFLINE} (${err.code}); nova tentativa em 60 s`);
+    }
+    iaIndisponivelAte = Date.now() + 60000;
+};
 const watchlistService = require('./watchlist.service');
 
 // Credenciais nunca vão para o navegador: rtsp://user:senha@host → rtsp://user:***@host
@@ -204,6 +214,7 @@ class CameraController {
             const isRtsp = cam.protocolo === 'rtsp' || (cam.stream_url && cam.stream_url.startsWith('rtsp://'));
 
             if (isRtsp) {
+                if (Date.now() < iaIndisponivelAte) return res.status(503).send(MSG_IA_OFFLINE);
                 const pythonUrl = process.env.PYTHON_MICROSERVICE_URL || 'http://localhost:8000';
                 const response = await axios.get(`${pythonUrl}/api/camera/snapshot`, {
                     params: {
@@ -230,6 +241,10 @@ class CameraController {
             res.set('Content-Type', response.headers['content-type'] || 'image/jpeg');
             res.send(response.data);
         } catch (error) {
+            if (erroDeConexao(error)) {
+                marcarIaIndisponivel('getSnapshot', error);
+                return res.status(503).send(MSG_IA_OFFLINE);
+            }
             logger.error(`[getSnapshot] Erro ao obter snapshot: ${error.message}`);
             res.status(502).send('Gateway Error: ' + error.message);
         }
@@ -244,6 +259,7 @@ class CameraController {
             const { data: cam } = await supabase.from('cameras_ip').select('*').eq('id', id).single();
             if (!cam) return res.status(404).send('Camera Not Found');
 
+            if (Date.now() < iaIndisponivelAte) return res.status(503).send(MSG_IA_OFFLINE);
             const pythonUrl = process.env.PYTHON_MICROSERVICE_URL || 'http://localhost:8000';
             const streamUrl = cam.stream_url || cam.snapshot_url;
 
@@ -271,6 +287,11 @@ class CameraController {
                 }
             });
         } catch (error) {
+            if (erroDeConexao(error)) {
+                marcarIaIndisponivel('getStream', error);
+                if (!res.headersSent) res.status(503).send(MSG_IA_OFFLINE);
+                return;
+            }
             logger.error(`[getStream] Erro no streaming da câmera: ${error.message}`);
             if (!res.headersSent) {
                 res.status(502).send('Gateway Stream Error: ' + error.message);
