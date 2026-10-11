@@ -152,16 +152,11 @@ export const ModalCredenciamento = ({
             fullWidth
             PaperProps={{
                 sx: {
-                    background: 'rgba(12, 16, 28, 0.95)',
-                    backdropFilter: 'blur(20px)',
-                    border: '1px solid rgba(0, 212, 255, 0.3)',
-                    borderRadius: 1.5,
-                    boxShadow: '0 16px 48px rgba(0, 0, 0, 0.85)',
                     maxHeight: '90vh',
                     overflowY: 'auto',
                     '&::-webkit-scrollbar': { width: '6px' },
                     '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0, 212, 255, 0.25)', borderRadius: '10px' }
-                }
+                    }
             }}
         >
             <DialogContent sx={{ p: { xs: 2.5, md: 4 } }}>
@@ -413,16 +408,12 @@ export const ModalCredenciamento = ({
                 fullWidth
                 PaperProps={{
                     sx: {
-                        background: 'rgba(15, 20, 32, 0.98)',
-                        backdropFilter: 'blur(20px)',
-                        border: '1px solid rgba(0, 212, 255, 0.4)',
-                        borderRadius: 1.5,
                         maxHeight: '90vh'
                     }
                 }}
             >
                 <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
-                    <Typography variant="h6" sx={{ color: '#00D4FF', fontWeight: 700 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
                         Documentos de {pessoa?.nome_completo || pessoa?.nome}
                     </Typography>
                     <IconButton size="small" onClick={() => setOpenDocsModal(false)} sx={{ color: 'rgba(255,255,255,0.6)' }}>

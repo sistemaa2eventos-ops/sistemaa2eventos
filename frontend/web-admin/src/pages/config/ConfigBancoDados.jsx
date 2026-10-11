@@ -187,10 +187,7 @@ const ConfigBancoDados = () => {
                 fullWidth
                 PaperProps={{
                     sx: {
-                        bgcolor: '#0F1E37',
-                        backgroundImage: 'none',
-                        color: '#FFFFFF',
-                        border: '1px solid rgba(255,255,255,0.1)'
+                        color: '#FFFFFF'
                     }
                 }}
             >

@@ -598,9 +598,7 @@ export const OperatorSection = () => {
                 fullWidth
                 PaperProps={{
                     sx: {
-                        background: '#0A1628',
                         border: '2px solid rgba(255, 51, 102, 0.5)',
-                        borderRadius: 1.5,
                         boxShadow: '0 20px 60px rgba(255, 51, 102, 0.3)',
                         maxHeight: '90vh',
                         overflowY: 'auto'
@@ -734,10 +732,6 @@ export const OperatorSection = () => {
                 fullWidth
                 PaperProps={{
                     sx: {
-                        background: '#050B18',
-                        border: '1px solid rgba(0, 212, 255, 0.3)',
-                        borderRadius: 1.5,
-                        boxShadow: '0 20px 60px rgba(0,0,0,0.9)',
                         maxHeight: '90vh',
                         overflowY: 'auto'
                     }
@@ -746,9 +740,9 @@ export const OperatorSection = () => {
                 <DialogTitle sx={{ pb: 1, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            <NoteIcon sx={{ color: '#00D4FF', fontSize: 26 }} />
+                            <NoteIcon sx={{ fontSize: 26 }} />
                             <Box>
-                                <Typography variant="h6" sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, color: '#00D4FF' }}>
+                                <Typography variant="h6" sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 }}>
                                     Notas do turno
                                 </Typography>
                                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>

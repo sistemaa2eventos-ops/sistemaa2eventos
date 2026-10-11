@@ -131,17 +131,12 @@ const FiscalizacaoPessoaModal = ({
             fullWidth
             PaperProps={{
                 sx: {
-                    bgcolor: 'rgba(10, 15, 29, 0.98)',
-                    backdropFilter: 'blur(28px)',
-                    borderRadius: 1.5,
-                    border: `1.5px solid ${corTema}`,
-                    boxShadow: `0 24px 60px rgba(0, 0, 0, 0.9), 0 0 35px ${corTema}33`,
                     color: '#FFFFFF',
                     maxHeight: '90vh',
                     overflowY: 'auto',
                     '&::-webkit-scrollbar': { width: '6px' },
                     '&::-webkit-scrollbar-thumb': { bgcolor: `${corTema}55`, borderRadius: '10px' }
-                }
+                    }
             }}
         >
             <DialogContent sx={{ p: { xs: 2.5, sm: 4 }, position: 'relative' }}>

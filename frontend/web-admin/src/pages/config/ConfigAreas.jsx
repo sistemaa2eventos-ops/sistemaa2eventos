@@ -180,7 +180,7 @@ const ConfigAreas = () => {
 
             <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="xs" fullWidth>
                 <DialogTitle sx={{ fontWeight: 700 }}>
-                    {editingId ? 'Editar Área' : 'Nova Área de Acesso'}
+                    {editingId ? 'Editar área' : 'Nova área de acesso'}
                 </DialogTitle>
                 <DialogContent>
                     <Stack spacing={3} sx={{ mt: 1 }}>

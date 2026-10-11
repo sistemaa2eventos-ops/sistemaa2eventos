@@ -127,15 +127,10 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
             fullWidth
             PaperProps={{
                 sx: {
-                    bgcolor: '#050B18',
-                    backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(0,212,255,0.05) 1px, transparent 0)',
                     backgroundSize: '24px 24px',
-                    border: '1px solid rgba(0, 212, 255, 0.1)',
-                    borderRadius: 1.5,
-                    boxShadow: '0 0 50px rgba(0,0,0,0.8)',
                     overflow: 'hidden',
                     mx: { xs: 1, sm: 2 }
-                }
+                    }
             }}
             disableEnforceFocus
         >

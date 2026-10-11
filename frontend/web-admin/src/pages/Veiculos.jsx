@@ -1180,14 +1180,12 @@ const Veiculos = () => {
                     sx: {
                         maxHeight: '90vh',
                         display: 'flex',
-                        flexDirection: 'column',
-                        borderRadius: '12px',
-                        backgroundImage: 'none'
+                        flexDirection: 'column'
                     }
                 }}
             >
                 <DialogTitle sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                    {selectedVeiculo ? 'MODIFICAR VEÍCULO' : 'CADASTRAR VEÍCULO'}
+                    {selectedVeiculo ? 'Modificar veículo' : 'Cadastrar veículo'}
                 </DialogTitle>
                 <DialogContent sx={{ overflowY: 'auto' }}>
                     <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
@@ -1289,9 +1287,7 @@ const Veiculos = () => {
                     sx: {
                         maxHeight: '90vh',
                         display: 'flex',
-                        flexDirection: 'column',
-                        borderRadius: '12px',
-                        backgroundImage: 'none'
+                        flexDirection: 'column'
                     }
                 }}
             >
@@ -1335,9 +1331,7 @@ const Veiculos = () => {
                     sx: {
                         maxHeight: '90vh',
                         display: 'flex',
-                        flexDirection: 'column',
-                        borderRadius: '12px',
-                        backgroundImage: 'none'
+                        flexDirection: 'column'
                     }
                 }}
             >
@@ -1431,9 +1425,7 @@ const Veiculos = () => {
                 fullWidth
                 PaperProps={{
                     sx: {
-                        maxHeight: '90vh',
-                        borderRadius: '12px',
-                        backgroundImage: 'none'
+                        maxHeight: '90vh'
                     }
                 }}
             >
@@ -1456,8 +1448,6 @@ const Veiculos = () => {
                 disableRestoreFocus
                 PaperProps={{
                     sx: {
-                        borderRadius: '12px',
-                        backgroundImage: 'none',
                         border: '1px solid rgba(255, 51, 102, 0.4)',
                         boxShadow: '0 0 25px rgba(255, 51, 102, 0.2)'
                     }
@@ -1512,18 +1502,10 @@ const Veiculos = () => {
                 maxWidth="sm"
                 fullWidth
                 disableRestoreFocus
-                PaperProps={{
-                    sx: {
-                        borderRadius: '12px',
-                        backgroundImage: 'none',
-                        border: '1px solid rgba(0, 212, 255, 0.4)',
-                        boxShadow: '0 0 25px rgba(0, 212, 255, 0.2)'
-                    }
-                }}
             >
                 <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
                     <Stack direction="row" spacing={1} alignItems="center">
-                        <CameraIcon sx={{ color: '#00D4FF' }} />
+                        <CameraIcon sx={{ }} />
                         <Typography variant="h6" sx={{ fontWeight: 700, fontSize: { xs: '1rem', sm: '1.25rem' } }}>
                             VISTORIA / REGISTRAR FOTO — {veiculoParaFoto?.placa}
                         </Typography>
@@ -1671,7 +1653,7 @@ const Veiculos = () => {
                 open={Boolean(previewFotoUrl)}
                 onClose={() => setPreviewFotoUrl(null)}
                 maxWidth="md"
-                PaperProps={{ sx: { background: 'transparent', boxShadow: 'none', overflow: 'hidden' } }}
+                PaperProps={{ sx: { overflow: 'hidden' } }}
             >
                 <Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                     <IconButton

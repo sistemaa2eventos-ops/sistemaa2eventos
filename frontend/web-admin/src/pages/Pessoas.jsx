@@ -266,7 +266,7 @@ const Pessoas = () => {
         maxWidth="md" 
         fullWidth
         PaperProps={{
-          sx: { bgcolor: '#0A1628', border: '1px solid rgba(0, 212, 255, 0.3)', borderRadius: 1.5, maxHeight: '90vh' }
+          sx: { maxHeight: '90vh' }
         }}
       >
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -314,7 +314,7 @@ const Pessoas = () => {
         maxWidth="sm" 
         fullWidth
         PaperProps={{
-          sx: { bgcolor: '#0A1628', border: '1px solid rgba(0, 212, 255, 0.3)', borderRadius: 1.5, maxHeight: '90vh' }
+          sx: { maxHeight: '90vh' }
         }}
       >
         <DialogTitle>Capturar foto do documento</DialogTitle>
@@ -333,7 +333,7 @@ const Pessoas = () => {
         fullWidth 
         fullScreen={isMobile}
         PaperProps={{
-          sx: { bgcolor: '#0A1628', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: 1.5, maxHeight: '90vh' }
+          sx: { maxHeight: '90vh' }
         }}
       >
         <DialogTitle sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 }}>Importação em lote</DialogTitle>
@@ -357,15 +357,13 @@ const Pessoas = () => {
         fullWidth
         PaperProps={{
           sx: { 
-            bgcolor: '#0A1628', 
             border: `1px solid ${isBlocking ? 'rgba(255,51,102,0.4)' : 'rgba(0,255,136,0.4)'}`, 
-            borderRadius: 1.5, 
-            maxHeight: '90vh' 
-          }
+            maxHeight: '90vh'
+                    }
         }}
       >
         <DialogTitle sx={{ fontWeight: 700, color: isBlocking ? '#FF3366' : '#00FF88' }}>
-          {isBlocking ? 'BLOQUEAR PARTICIPANTE' : 'DESBLOQUEAR PARTICIPANTE'}
+          {isBlocking ? 'Bloquear participante' : 'Desbloquear participante'}
         </DialogTitle>
         <DialogContent sx={{ overflowY: 'auto' }}>
           <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
@@ -412,7 +410,7 @@ const Pessoas = () => {
         maxWidth="xs" 
         fullWidth
         PaperProps={{
-          sx: { bgcolor: '#0A1628', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: 1.5, maxHeight: '90vh' }
+          sx: { maxHeight: '90vh' }
         }}
       >
         <DialogTitle sx={{ textAlign: 'center', fontWeight: 700 }}>ACRESCITAR CREDENCIAL: {qrPessoa?.nome}</DialogTitle>

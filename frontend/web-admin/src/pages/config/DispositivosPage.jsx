@@ -605,8 +605,7 @@ export default function DispositivosPage() {
       </GlassCard>
 
       {/* ── Dialog: Criar / Editar dispositivo */}
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth
-        PaperProps={{ sx: { background: 'linear-gradient(135deg,#050B18,#0A1628)', border: `1px solid ${CYAN}33` } }}>
+      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ color: CYAN, fontWeight: 700, borderBottom: `1px solid ${CYAN}22` }}>
           {isEditing ? 'Editar dispositivo' : 'Novo dispositivo'}
         </DialogTitle>
@@ -792,8 +791,7 @@ export default function DispositivosPage() {
       </Dialog>
 
       {/* ── Dialog: Snapshot */}
-      <Dialog open={snapshotDialog.open} onClose={() => setSnapshotDialog({ open: false, url: null, nome: '' })} maxWidth="md"
-        PaperProps={{ sx: { background: '#050B18', border: `1px solid ${CYAN}33` } }}>
+      <Dialog open={snapshotDialog.open} onClose={() => setSnapshotDialog({ open: false, url: null, nome: '' })} maxWidth="md">
         <DialogTitle sx={{ color: CYAN }}>Snapshot — {snapshotDialog.nome}</DialogTitle>
         <DialogContent>
           {snapshotDialog.url ? (
@@ -812,8 +810,7 @@ export default function DispositivosPage() {
       </Dialog>
 
       {/* ── Dialog: Test Connection */}
-      <Dialog open={testDialog.open} onClose={() => setTestDialog({ open: false, result: null, testing: false })} maxWidth="xs" fullWidth
-        PaperProps={{ sx: { background: 'linear-gradient(135deg,#050B18,#0A1628)', border: `1px solid ${CYAN}33` } }}>
+      <Dialog open={testDialog.open} onClose={() => setTestDialog({ open: false, result: null, testing: false })} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ color: CYAN, fontWeight: 700 }}>Testar conexão</DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
@@ -840,8 +837,7 @@ export default function DispositivosPage() {
       </Dialog>
 
       {/* ── Dialog: Configurar modo online */}
-      <Dialog open={pushDialog.open} onClose={() => setPushDialog(p => ({ ...p, open: false }))} maxWidth="xs" fullWidth
-        PaperProps={{ sx: { background: 'linear-gradient(135deg,#050B18,#0A1628)', border: `1px solid ${CYAN}33` } }}>
+      <Dialog open={pushDialog.open} onClose={() => setPushDialog(p => ({ ...p, open: false }))} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ color: CYAN, fontWeight: 700 }}>Configurar Modo Online — {pushDialog.device?.nome}</DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>

@@ -86,14 +86,13 @@ const ListaDocumentos = ({ documentos = [], onAuditar, compacto = false }) => {
                 })}
             </Stack>
 
-            <Dialog open={!!aberto} onClose={() => setAberto(null)} maxWidth="lg" fullWidth
-                PaperProps={{ sx: { background: 'rgba(12,16,28,0.97)', border: '1px solid rgba(0,212,255,0.3)', borderRadius: 1.5 } }}>
+            <Dialog open={!!aberto} onClose={() => setAberto(null)} maxWidth="lg" fullWidth>
                 {aberto && (
                     <>
                         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#FFFFFF' }}>
                             <Typography variant="h6" sx={{ fontWeight: 700 }}>{aberto.tipo_nome || aberto.titulo}</Typography>
                             <Box>
-                                <IconButton onClick={() => urlAberta && window.open(urlAberta, '_blank')} sx={{ color: '#00D4FF' }} title="Abrir em nova aba">
+                                <IconButton onClick={() => urlAberta && window.open(urlAberta, '_blank')} sx={{ }} title="Abrir em nova aba">
                                     <OpenInNewIcon />
                                 </IconButton>
                                 <IconButton onClick={() => setAberto(null)} sx={{ color: 'rgba(255,255,255,0.6)' }}>

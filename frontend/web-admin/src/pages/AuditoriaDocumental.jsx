@@ -499,10 +499,6 @@ const AuditoriaDocumental = () => {
                 fullWidth
                 PaperProps={{
                     sx: {
-                        background: 'rgba(12, 16, 28, 0.97)',
-                        backdropFilter: 'blur(20px)',
-                        border: '1px solid rgba(0, 212, 255, 0.3)',
-                        borderRadius: 1.5,
                         minHeight: '80vh'
                     }
                 }}
@@ -512,16 +508,16 @@ const AuditoriaDocumental = () => {
                         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                             <Box>
                                 <Typography variant="h6" sx={{ color: '#FFFFFF', fontWeight: 700 }}>
-                                    {previewDoc.titulo || 'Visualização do Documento'}
+                                    {previewDoc.titulo || 'Visualização do documento'}
                                 </Typography>
-                                <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700 }}>
+                                <Typography variant="caption" sx={{ fontWeight: 700 }}>
                                     {previewDoc.tipo_doc} • {previewDoc.entidade_nome} ({previewDoc.tipo_entidade?.toUpperCase()})
                                 </Typography>
                             </Box>
                             <Stack direction="row" spacing={1} alignItems="center">
                                 <IconButton
                                     onClick={() => window.open(previewUrl || previewDoc.url_arquivo, '_blank')}
-                                    sx={{ color: '#00D4FF' }}
+                                    sx={{ }}
                                     title="Abrir em nova aba"
                                 >
                                     <OpenInNewIcon />
@@ -622,11 +618,7 @@ const AuditoriaDocumental = () => {
                 fullWidth
                 PaperProps={{
                     sx: {
-                        background: 'rgba(15, 20, 32, 0.98)',
-                        backdropFilter: 'blur(20px)',
-                        border: '1px solid',
-                        borderColor: acao === 'aprovado' ? '#00FF88' : acao === 'reenvio_solicitado' ? '#FFB800' : '#FF3366',
-                        borderRadius: 3
+                        borderColor: acao === 'aprovado' ? '#00FF88' : acao === 'reenvio_solicitado' ? '#FFB800' : '#FF3366'
                     }
                 }}
             >
@@ -634,9 +626,9 @@ const AuditoriaDocumental = () => {
                     color: acao === 'aprovado' ? '#00FF88' : acao === 'reenvio_solicitado' ? '#FFB800' : '#FF3366',
                     fontWeight: 700
                 }}>
-                    {acao === 'aprovado' && 'APROVAR DOCUMENTO'}
-                    {acao === 'reenvio_solicitado' && 'SOLICITAR REENVIO DE DOCUMENTO'}
-                    {acao === 'reprovado' && 'REPROVAR DOCUMENTO'}
+                    {acao === 'aprovado' && 'Aprovar documento'}
+                    {acao === 'reenvio_solicitado' && 'Solicitar reenvio de documento'}
+                    {acao === 'reprovado' && 'Reprovar documento'}
                 </DialogTitle>
 
                 <DialogContent>

@@ -910,18 +910,11 @@ const Reports = () => {
                 onClose={() => setModalNotasOpen(false)}
                 maxWidth="sm"
                 fullWidth
-                PaperProps={{
-                    sx: {
-                        background: '#050B18',
-                        border: '1px solid rgba(0, 212, 255, 0.3)',
-                        borderRadius: 3
-                    }
-                }}
             >
                 <DialogTitle sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <NoteIcon sx={{ color: '#00D4FF' }} />
-                        <Typography variant="h6" sx={{ color: '#00D4FF', fontWeight: 700 }}>
+                        <NoteIcon sx={{ }} />
+                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
                             Notas do Turno • {notasOperadorNome}
                         </Typography>
                     </Box>
@@ -946,16 +939,9 @@ const Reports = () => {
                 onClose={() => setModalDetalhesOpen(false)}
                 maxWidth="md"
                 fullWidth
-                PaperProps={{
-                    sx: {
-                        background: '#050B18',
-                        border: '1px solid rgba(0, 212, 255, 0.3)',
-                        borderRadius: 3
-                    }
-                }}
             >
                 <DialogTitle sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <Typography variant="h6" sx={{ color: '#00D4FF', fontWeight: 700 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
                         Relatório consolidado de turno
                     </Typography>
                     <Typography variant="caption" sx={{ color: 'text.secondary' }}>

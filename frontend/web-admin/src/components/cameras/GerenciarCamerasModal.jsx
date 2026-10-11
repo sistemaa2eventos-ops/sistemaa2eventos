@@ -140,19 +140,15 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
             fullWidth
             PaperProps={{
                 sx: {
-                    bgcolor: '#0A1628',
-                    color: '#FFFFFF',
-                    borderRadius: 1.5,
-                    border: '1px solid rgba(0, 212, 255, 0.25)',
-                    boxShadow: '0 20px 60px rgba(0,0,0,0.8)'
-                }
+                    color: '#FFFFFF'
+                    }
             }}
         >
             <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <CameraIcon sx={{ color: '#00D4FF' }} />
+                    <CameraIcon sx={{ }} />
                     <Typography variant="h6" sx={{ fontWeight: 700, fontFamily: '"Space Grotesk", sans-serif' }}>
-                        {formMode ? (editingCamera?.id ? 'Editar Câmera IP' : 'Cadastrar Nova Câmera IP') : 'Gerenciamento de Câmeras IP'}
+                        {formMode ? (editingCamera?.id ? 'Editar câmera IP' : 'Cadastrar nova câmera IP') : 'Gerenciamento de câmeras IP'}
                     </Typography>
                 </Box>
                 <IconButton onClick={onClose} sx={{ color: '#94A3B8', '&:hover': { color: '#FFFFFF' } }}>

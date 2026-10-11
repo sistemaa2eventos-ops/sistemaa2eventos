@@ -88,8 +88,7 @@ const AgentesLocais = ({ agentes = [], onChange }) => {
                 ))}
             </Stack>
 
-            <Dialog open={novoAberto} onClose={fechar} maxWidth="sm" fullWidth
-                PaperProps={{ sx: { background: 'linear-gradient(135deg,#050B18,#0A1628)', border: `1px solid ${CYAN}33` } }}>
+            <Dialog open={novoAberto} onClose={fechar} maxWidth="sm" fullWidth>
                 <DialogTitle sx={{ color: CYAN, fontWeight: 700 }}>Novo agente local</DialogTitle>
                 <DialogContent>
                     {!criado ? (

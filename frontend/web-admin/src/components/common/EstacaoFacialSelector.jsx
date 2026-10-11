@@ -224,19 +224,10 @@ export const EstacaoFacialSelector = ({
                 onClose={handleClose}
                 maxWidth="xs"
                 fullWidth
-                PaperProps={{
-                    sx: {
-                        background: 'rgba(18, 22, 36, 0.95)',
-                        backdropFilter: 'blur(16px)',
-                        border: '1px solid rgba(0, 229, 255, 0.3)',
-                        borderRadius: 1.5,
-                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.8)'
-                    }
-                }}
             >
                 <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
                     <Stack direction="row" spacing={1.5} alignItems="center">
-                        <FaceIcon sx={{ color: '#00D4FF', fontSize: 24 }} />
+                        <FaceIcon sx={{ fontSize: 24 }} />
                         <Typography variant="subtitle1" fontWeight={700} color="#FFFFFF">
                             Leitor facial desta estação
                         </Typography>

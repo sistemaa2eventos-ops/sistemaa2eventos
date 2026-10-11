@@ -355,19 +355,13 @@ const Empresas = () => {
         disableRestoreFocus
         PaperProps={{
           sx: {
-            bgcolor: 'rgba(10, 25, 41, 0.95)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(0, 212, 255, 0.15)',
-            borderRadius: 1.5,
             minHeight: { xs: '100%', md: '80vh' },
             maxHeight: { xs: '100%', md: '90vh' },
             height: { xs: '100%', md: '88vh' },
             display: 'flex',
             flexDirection: 'column',
-            overflow: 'hidden',
-            backgroundImage: 'none',
-            boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 40px rgba(0,212,255,0.05)'
-          }
+            overflow: 'hidden'
+                    }
         }}
       >
         <TituloModal

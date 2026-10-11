@@ -90,17 +90,12 @@ const PessoaCardDialog = ({
       fullWidth
       PaperProps={{
         sx: {
-          bgcolor: 'rgba(15, 23, 42, 0.95)',
-          backdropFilter: 'blur(24px)',
-          borderRadius: { xs: 3, sm: 4 },
-          border: `1px solid ${accentColor}40`,
-          boxShadow: `0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px ${accentColor}25`,
           color: '#FFFFFF',
           maxHeight: '90vh',
           overflowY: 'auto',
           '&::-webkit-scrollbar': { width: 6 },
           '&::-webkit-scrollbar-thumb': { bgcolor: `${accentColor}40`, borderRadius: 1.5 }
-        }
+                    }
       }}
     >
       <DialogContent sx={{ p: { xs: 2.5, sm: 4 }, position: 'relative' }}>

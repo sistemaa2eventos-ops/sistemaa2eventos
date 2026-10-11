@@ -54,19 +54,13 @@ const PessoaFormDialog = ({
       fullScreen={isMobile}
       PaperProps={{
         sx: {
-          bgcolor: 'rgba(10, 25, 41, 0.95)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(0, 212, 255, 0.15)',
-          borderRadius: 1.5,
           minHeight: isMobile ? '100%' : '80vh',
           maxHeight: isMobile ? '100%' : '90vh',
           height: isMobile ? '100%' : '88vh',
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden',
-          backgroundImage: 'none',
-          boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 40px rgba(0,212,255,0.05)'
-        }
+          overflow: 'hidden'
+                    }
       }}
     >
       <TituloModal

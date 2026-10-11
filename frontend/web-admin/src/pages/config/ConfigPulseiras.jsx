@@ -325,8 +325,8 @@ const ConfigPulseiras = ({ embedded = false }) => {
             </GlassCard>
 
             <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth disableRestoreFocus>
-                <DialogTitle sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, color: '#00D4FF' }}>
-                    {editingId ? 'EDITAR PULSEIRA' : 'PROVISIONAMENTO DE PULSEIRA'}
+                <DialogTitle sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 }}>
+                    {editingId ? 'Editar pulseira' : 'Provisionamento de pulseira'}
                 </DialogTitle>
                 <DialogContent>
                     <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>

@@ -94,7 +94,7 @@ const LeitorFacialForm = ({ open, onClose, formData, setFormData, onSave }) => (
         <form onSubmit={onSave}>
             <DialogTitle>
                 <Typography variant="h6" component="span" sx={{ fontWeight: 700 }}>
-                    {formData.id ? 'EDITAR TERMINAL' : 'Novo terminal facial'}
+                    {formData.id ? 'Editar terminal' : 'Novo terminal facial'}
                 </Typography>
             </DialogTitle>
             <DialogContent>

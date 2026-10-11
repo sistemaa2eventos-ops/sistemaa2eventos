@@ -518,8 +518,8 @@ const ConfigCameras = () => {
                 fullWidth
                 maxWidth="sm"
             >
-                <DialogTitle sx={{ fontWeight: 700, color: '#00D4FF', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                    {editingCamera?.id ? 'EDITAR CÂMERA IP' : 'CADASTRAR NOVA CÂMERA IP'}
+                <DialogTitle sx={{ fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                    {editingCamera?.id ? 'Editar câmera IP' : 'Cadastrar nova câmera IP'}
                 </DialogTitle>
                 <DialogContent sx={{ pt: 2.5 }}>
                     <Stack spacing={2.5}>

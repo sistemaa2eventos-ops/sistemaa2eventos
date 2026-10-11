@@ -629,7 +629,7 @@ const CftvWall = () => {
                 fullWidth
                 maxWidth="sm"
             >
-                <DialogTitle sx={{ fontWeight: 700, color: '#00D4FF' }}>
+                <DialogTitle sx={{ fontWeight: 700 }}>
                     Selecionar câmeras no mosaico
                 </DialogTitle>
                 <DialogContent>

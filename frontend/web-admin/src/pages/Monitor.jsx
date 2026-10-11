@@ -636,15 +636,13 @@ const Monitor = () => {
         fullWidth
         PaperProps={{
           sx: {
-            bgcolor: '#050B18',
             border: '1px solid #FFB800',
             boxShadow: '0 0 50px rgba(0,0,0,0.9), 0 0 30px rgba(255, 184, 0, 0.2)',
-            borderRadius: 1.5,
             maxHeight: '90vh',
             overflowY: 'auto',
             '&::-webkit-scrollbar': { width: 6 },
             '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255, 184, 0, 0.2)', borderRadius: 1.5 }
-          }
+                    }
         }}
       >
         <DialogTitle sx={{ pb: 1, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
@@ -1962,16 +1960,13 @@ const Monitor = () => {
         maxWidth={streamModalSize === 'fullscreen' ? false : streamModalSize} 
         fullWidth
         fullScreen={streamModalSize === 'fullscreen'}
-        PaperProps={{
-            sx: { bgcolor: '#0A1628', border: '1px solid #00D4FF', boxShadow: '0 0 45px rgba(0,212,255,0.3)', borderRadius: streamModalSize === 'fullscreen' ? 0 : 2 }
-        }}
       >
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             <Stack direction="row" spacing={1.5} alignItems="center">
-                <CameraIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
+                <CameraIcon sx={{ fontSize: 28 }} />
                 <Box>
                     <Typography variant="h6" fontWeight={700} color="#FFFFFF">
-                        {activeStreamCam?.nome || 'Transmissão Ao Vivo'}
+                        {activeStreamCam?.nome || 'Transmissão ao vivo'}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                         Stream IP / RTSP • Detecção SCRFD e Rastreamento Facial ArcFace 512-D • Baixa Latência
@@ -1986,7 +1981,7 @@ const Monitor = () => {
                         <IconButton
                             size="small"
                             onClick={() => setStreamZoom(z => Math.max(80, z - 15))}
-                            sx={{ color: '#94A3B8', '&:hover': { color: '#00D4FF' } }}
+                            sx={{ color: '#94A3B8', '&:hover': { } }}
                         >
                             <ZoomOutIcon fontSize="small" />
                         </IconButton>
@@ -1994,7 +1989,7 @@ const Monitor = () => {
                     <Button 
                         size="small" 
                         onClick={() => setStreamZoom(100)} 
-                        sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#00D4FF', px: 1 }}
+                        sx={{ fontSize: '0.75rem', fontWeight: 700, px: 1 }}
                     >
                         {streamZoom}%
                     </Button>
@@ -2002,7 +1997,7 @@ const Monitor = () => {
                         <IconButton
                             size="small"
                             onClick={() => setStreamZoom(z => Math.min(220, z + 15))}
-                            sx={{ color: '#94A3B8', '&:hover': { color: '#00D4FF' } }}
+                            sx={{ color: '#94A3B8', '&:hover': { } }}
                         >
                             <ZoomInIcon fontSize="small" />
                         </IconButton>
@@ -2122,17 +2117,14 @@ const Monitor = () => {
           fullWidth 
           maxWidth="sm"
           PaperProps={{
-              sx: { 
-                  bgcolor: '#0A1628', 
-                  border: '1px solid rgba(0, 212, 255, 0.4)', 
-                  borderRadius: 1.5,
+              sx: {
                   maxHeight: '90vh'
-              }
+                    }
           }}
       >
           <DialogTitle sx={{ pb: 1, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
               <Stack direction="row" spacing={1.5} alignItems="center">
-                  <GridViewIcon sx={{ color: '#00D4FF', fontSize: 26 }} />
+                  <GridViewIcon sx={{ fontSize: 26 }} />
                   <Box>
                       <Typography variant="h6" fontWeight={700} color="#FFFFFF">
                           Selecionar câmeras no mosaico
@@ -2359,7 +2351,7 @@ const Monitor = () => {
               sx: { maxHeight: '90vh' }
           }}
       >
-          <DialogTitle sx={{ fontWeight: 700, color: '#00D4FF' }}>Novo contato de alerta</DialogTitle>
+          <DialogTitle sx={{ fontWeight: 700 }}>Novo contato de alerta</DialogTitle>
           <DialogContent sx={{ overflowY: 'auto' }}>
               <Stack spacing={2} pt={1}>
                   <TextField
@@ -2432,14 +2424,6 @@ const Monitor = () => {
           onClose={() => !unblockLoading && setOpenUnblockDialog(false)} 
           maxWidth="sm" 
           fullWidth
-          PaperProps={{
-            sx: {
-              bgcolor: '#0A1628',
-              border: '1px solid rgba(0, 255, 136, 0.4)',
-              boxShadow: '0 0 40px rgba(0, 255, 136, 0.2)',
-              borderRadius: 2
-            }
-          }}
       >
           <DialogTitle sx={{ color: '#00FF88', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
               <CheckCircleIcon sx={{ color: '#00FF88' }} />
@@ -2501,17 +2485,9 @@ const Monitor = () => {
           onClose={() => !stopMonitoringLoading && setOpenDeixarMonitorarDialog(false)} 
           maxWidth="sm" 
           fullWidth
-          PaperProps={{
-            sx: {
-              bgcolor: '#0A1628',
-              border: '1px solid rgba(0, 212, 255, 0.4)',
-              boxShadow: '0 0 40px rgba(0, 212, 255, 0.2)',
-              borderRadius: 2
-            }
-          }}
       >
-          <DialogTitle sx={{ color: '#00D4FF', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <VisibilityOffIcon sx={{ color: '#00D4FF' }} />
+          <DialogTitle sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <VisibilityOffIcon sx={{ }} />
               Alvo localizado • deixar de monitorar
           </DialogTitle>
           <DialogContent>
@@ -2568,11 +2544,8 @@ const Monitor = () => {
         fullWidth
         PaperProps={{
           sx: {
-            bgcolor: '#050B18',
-            border: '2px solid #FFB800',
-            boxShadow: '0 0 50px rgba(0,0,0,0.95)',
-            borderRadius: 2
-          }
+            border: '2px solid #FFB800'
+                    }
         }}
       >
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>

@@ -142,13 +142,6 @@ const VerificationDialog = ({ image, result, onSave, onRetry }) => (
         open
         maxWidth="sm"
         fullWidth
-        PaperProps={{
-            sx: {
-                bgcolor: 'background.paper',
-                border: '1px solid rgba(0, 212, 255, 0.15)',
-                borderRadius: 1.5,
-            }
-        }}
     >
         <DialogTitle sx={{
             fontFamily: '"Space Grotesk", sans-serif',
