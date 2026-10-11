@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Typography, Grid, Slider, Switch, FormControlLabel, CircularProgress } from '@mui/material';
-import { SyncAlt as CheckInOutIcon, Timer as TimerIcon, Group as GroupIcon, Save as SaveIcon } from '@mui/icons-material';
+import { Timer as TimerIcon, Group as GroupIcon, Save as SaveIcon } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import api from '../../services/api';
 import PageHeader from '../../components/common/PageHeader';
@@ -18,11 +18,7 @@ const ConfigCheckin = () => {
     const [hardBlock, setHardBlock] = useState(true);
     const [vipBypass, setVipBypass] = useState(false);
 
-    useEffect(() => {
-        loadSettings();
-    }, []);
-
-    const loadSettings = async () => {
+    const loadSettings = useCallback(async () => {
         try {
             const { data } = await api.get('/settings');
             if (data?.success && data?.data) {
@@ -38,7 +34,11 @@ const ConfigCheckin = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [enqueueSnackbar]);
+
+    useEffect(() => {
+        loadSettings();
+    }, [loadSettings]);
 
     const handleSave = async () => {
         setSaving(true);
@@ -77,9 +77,9 @@ const ConfigCheckin = () => {
                 <Grid item xs={12} md={6}>
                     <GlassCard sx={{ p: 3, mb: 4, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
-                            <TimerIcon sx={{ color: '#FF0088', fontSize: 28 }} />
-                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff' }}>
-                                BLOQUEIO TEMPORAL (ANTI-PASSBACK)
+                            <TimerIcon sx={{ color: '#FF3366', fontSize: 28 }} />
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                                Bloqueio temporal (anti-passback)
                             </Typography>
                         </Box>
 
@@ -89,7 +89,7 @@ const ConfigCheckin = () => {
 
                         <FormControlLabel
                             control={<Switch checked={apbEnabled} onChange={(e) => setApbEnabled(e.target.checked)} color="secondary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#fff' }}>Habilitar Anti-Passback</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Habilitar Anti-Passback</Typography>}
                             sx={{ mb: 3 }}
                         />
 
@@ -105,7 +105,7 @@ const ConfigCheckin = () => {
                                 min={0}
                                 max={120}
                                 valueLabelDisplay="auto"
-                                sx={{ color: '#FF0088' }}
+                                sx={{ color: '#FF3366' }}
                             />
                             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                                 Tempo mínimo exigido antes que a credencial autorize uma nova entrada. 0 = Desativado.
@@ -132,7 +132,7 @@ const ConfigCheckin = () => {
                         </Box>
 
                         <NeonButton color="secondary" onClick={handleSave} disabled={saving} startIcon={<SaveIcon />}>
-                            {saving ? "SALVANDO..." : "APLICAR TEMPORIZADORES"}
+                            {saving ? "Salvando..." : "Aplicar temporizadores"}
                         </NeonButton>
                     </GlassCard>
                 </Grid>
@@ -141,8 +141,8 @@ const ConfigCheckin = () => {
                     <GlassCard sx={{ p: 3, mb: 4, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                             <GroupIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
-                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff' }}>
-                                CONTENÇÃO E LOTAÇÃO
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                                Contenção e lotação
                             </Typography>
                         </Box>
 
@@ -152,25 +152,25 @@ const ConfigCheckin = () => {
 
                         <FormControlLabel
                             control={<Switch checked={hardBlock} onChange={(e) => setHardBlock(e.target.checked)} color="primary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#fff' }}>Bloqueio Rígido em 100% Capacidade</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Bloqueio Rígido em 100% Capacidade</Typography>}
                             sx={{ mb: 3 }}
                         />
 
                         <FormControlLabel
                             control={<Switch checked={vipBypass} onChange={(e) => setVipBypass(e.target.checked)} color="primary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#fff' }}>Verificação de Vínculo Contratual (VIPs ignoram Lotacao)</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Verificação de Vínculo Contratual (VIPs ignoram Lotacao)</Typography>}
                             sx={{ mb: 4 }}
                         />
 
-                        <Box sx={{ p: 2, bgcolor: 'rgba(0, 212, 255, 0.05)', border: '1px dashed rgba(0,212,255,0.3)', borderRadius: 2 }}>
+                        <Box sx={{ p: 2, bgcolor: 'rgba(0, 212, 255, 0.05)', border: '1px dashed rgba(0,212,255,0.3)', borderRadius: 1.5 }}>
                             <Typography variant="subtitle2" sx={{ color: '#00D4FF', mb: 1, fontWeight: 700 }}>Inteligência Edge Ativa</Typography>
                             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                O Bloqueio Rígido informa aos terminais faciais o comando 'No-Open' instantaneamente assim que o limite local estourar. O acesso só volta ao normal se ocorrer saídas (Check-out).
+                                O Bloqueio Rígido informa aos terminais faciais o comando &apos;No-Open&apos; instantaneamente assim que o limite local estourar. O acesso só volta ao normal se ocorrer saídas (Check-out).
                             </Typography>
                         </Box>
                         <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
                             <NeonButton onClick={handleSave} disabled={saving} startIcon={<SaveIcon />}>
-                                {saving ? "SALVANDO..." : "SALVAR LOTAÇÃO"}
+                                {saving ? "Salvando..." : "Salvar lotação"}
                             </NeonButton>
                         </Box>
                     </GlassCard>

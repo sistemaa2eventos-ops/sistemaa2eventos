@@ -1,6 +1,12 @@
 const { supabase } = require('../../../config/supabase');
+const { buscarTodos } = require('../../../utils/buscarTodos');
 const logger = require('../../../services/logger');
-const { getHojeLocal } = require('../../../utils/dateUtils');
+const cacheService = require('../../../services/cacheService');
+const { getHojeLocal, getInicioHojeLocal, getLimitesDiaLocalUTC, TIMEZONE } = require('../../../utils/dateUtils');
+
+// Logs gravados pelo credenciamento (entrega de pulseira) não contam como passagem em leitor
+const MARCADOR_CREDENCIAMENTO = 'CREDENCIAMENTO';
+const semCredenciamento = (query) => query.or(`observacao.is.null,observacao.neq.${MARCADOR_CREDENCIAMENTO}`);
 
 class ValidationService {
     async verificarFaseEvento(evento_id, pessoa, metodo = 'manual') {
@@ -10,58 +16,142 @@ class ValidationService {
         const { data: evento } = await supabase.from('eventos').select('*').eq('id', evento_id).single();
         if (!evento) return true;
 
-        const hojeLiteral = getHojeLocal(); 
         const datasMontagem = evento.datas_montagem || [];
-        if (datasMontagem.includes(hojeLiteral)) return !!pessoa.fase_montagem;
-
         const datasEvento = evento.datas_evento || [];
-        if (datasEvento.includes(hojeLiteral)) return !!pessoa.fase_showday;
-
         const datasDesmontagem = evento.datas_desmontagem || [];
-        if (datasDesmontagem.includes(hojeLiteral)) return !!pessoa.fase_desmontagem;
 
-        return false;
+        // Se nenhuma data foi configurada no evento, libera acesso (sem restrição de fase)
+        const nenhumaDatasConfigurada =
+            datasMontagem.length === 0 &&
+            datasEvento.length === 0 &&
+            datasDesmontagem.length === 0;
+
+        if (nenhumaDatasConfigurada) return true;
+
+        const hojeLiteral = getHojeLocal();
+        
+        logger.info({
+            hojeLiteral,
+            datasMontagem,
+            datasEvento,
+            datasDesmontagem,
+            pessoa_fases: {
+                montagem: pessoa.fase_montagem,
+                showday: pessoa.fase_showday,
+                desmontagem: pessoa.fase_desmontagem
+            },
+            pessoa_nome: pessoa.nome_completo || pessoa.nome
+        }, '[FaseEvento] Diagnóstico de validação de fase');
+
+        // Lógica Inclusiva: Identifica todas as fases que ocorrem hoje
+        const ocorrendoHoje = {
+            montagem: datasMontagem.includes(hojeLiteral),
+            showday: datasEvento.includes(hojeLiteral),
+            desmontagem: datasDesmontagem.includes(hojeLiteral)
+        };
+
+        // Se hoje não está em nenhuma das listas, mas o evento TEM datas, bloqueia por segurança
+        if (!ocorrendoHoje.montagem && !ocorrendoHoje.showday && !ocorrendoHoje.desmontagem) {
+            logger.warn({ hojeLiteral, datasMontagem, datasEvento, datasDesmontagem }, '[FaseEvento] Hoje não consta em nenhuma lista de datas do evento — BLOQUEADO');
+            return false;
+        }
+
+        // Se hoje está em alguma fase, o usuário deve ter permissão para PELO MENOS UMA fase que ocorre hoje
+        const permitidoMontagem = ocorrendoHoje.montagem && !!pessoa.fase_montagem;
+        const permitidoShowday = ocorrendoHoje.showday && !!pessoa.fase_showday;
+        const permitidoDesmontagem = ocorrendoHoje.desmontagem && !!pessoa.fase_desmontagem;
+
+        const resultado = permitidoMontagem || permitidoShowday || permitidoDesmontagem;
+        if (!resultado) {
+            logger.warn({ ocorrendoHoje, permitidoMontagem, permitidoShowday, permitidoDesmontagem, pessoa_nome: pessoa.nome_completo || pessoa.nome }, '[FaseEvento] Pessoa não autorizada para a fase vigente — BLOQUEADO');
+        }
+
+        return resultado;
     }
 
     async getRealtimeStatsInternal(evento_id) {
         const hoje = getHojeLocal();
-        const { count: countPresentes } = await supabase
-            .from('pessoas')
-            .select('id', { count: 'exact', head: true })
-            .eq('evento_id', evento_id)
-            .eq('status_acesso', 'checkin_feito');
+        // created_at é gravado em UTC: o dia local (America/Sao_Paulo) vai de 03:00Z a 02:59:59Z
+        const { start: startOfDay, end: endOfDay } = getLimitesDiaLocalUTC(hoje);
 
-        const { data: presentesNtoN } = await supabase
-            .from('pessoa_evento_empresa')
-            .select('empresa_id, empresas(nome), pessoas!inner(status_acesso)')
-            .eq('evento_id', evento_id)
-            .eq('status_aprovacao', 'aprovado')
-            .eq('pessoas.status_acesso', 'checkin_feito');
+        // Contagens exatas feitas no banco (head: true), todas em paralelo.
+        // Antes: 6 consultas em sequência e os logs do dia trazidos para a memória —
+        // e o PostgREST corta em 1000 linhas, o que zerava/errava os números em dias grandes.
+        const contarLogs = (filtro) => {
+            let q = supabase.from('logs_acesso').select('id', { count: 'exact', head: true })
+                .eq('evento_id', evento_id).gte('created_at', startOfDay).lte('created_at', endOfDay);
+            return filtro(q);
+        };
 
-        const { data: quotasHoje } = await supabase
-            .from('quotas_diarias')
-            .select('empresa_id, quota')
-            .eq('evento_id', evento_id)
-            .eq('data', hoje);
+        const [
+            { count: countPresentes },
+            { data: evento },
+            { count: countCheckinsHoje },
+            { count: countCheckoutsHoje },
+            { count: countNegadosHoje },
+            { count: countFiscalizacoesHoje },
+            { data: areasData },
+            { data: presentesNtoN },
+            { data: quotasHoje }
+        ] = await Promise.all([
+            // Presentes = quem está com entrada registrada (mesmo estado usado pelo anti-passback;
+            // o fechamento de turno zera no horario_reset)
+            supabase.from('pessoas').select('id', { count: 'exact', head: true })
+                .eq('evento_id', evento_id).eq('status_acesso', 'checkin_feito'),
+            supabase.from('eventos').select('capacidade_total').eq('id', evento_id).single(),
+            contarLogs(q => q.eq('tipo', 'checkin')),
+            contarLogs(q => q.eq('tipo', 'checkout')),
+            contarLogs(q => q.eq('tipo', 'negado')),
+            contarLogs(q => q.eq('tipo', 'fiscalizacao')),
+            supabase.from('evento_areas').select('id, nome_area').eq('evento_id', evento_id),
+            buscarTodos(supabase
+                .from('pessoa_evento_empresa')
+                .select('id, empresa_id, empresas(nome), pessoas!inner(status_acesso)')
+                .eq('evento_id', evento_id)
+                .eq('status_aprovacao', 'aprovado')
+                .eq('pessoas.status_acesso', 'checkin_feito')),
+            supabase.from('quotas_diarias').select('empresa_id, quota').eq('evento_id', evento_id).eq('data', hoje)
+        ]);
 
-        const { data: evento } = await supabase.from('eventos').select('capacidade_total').eq('id', evento_id).single();
-        const ocupacaoPorEmpresa = {};
-
-        if (presentesNtoN) {
-            presentesNtoN.forEach(vinculo => {
-                const eid = vinculo.empresa_id;
-                if (!ocupacaoPorEmpresa[eid]) {
-                    ocupacaoPorEmpresa[eid] = { id: eid, nome: vinculo.empresas?.nome || 'Desconhecida', total: 0, quota: 0 };
-                }
-                ocupacaoPorEmpresa[eid].total++;
-            });
+        // Passagens de hoje por área: 2 contagens por área, em paralelo
+        let areasComStats = [];
+        if (areasData && areasData.length > 0) {
+            areasComStats = await Promise.all(areasData.map(async (a) => {
+                const [{ count: total }, { count: negados }] = await Promise.all([
+                    contarLogs(q => q.eq('area_id', a.id)),
+                    contarLogs(q => q.eq('area_id', a.id).eq('tipo', 'negado'))
+                ]);
+                return {
+                    id: a.id,
+                    nome: a.nome_area,
+                    nome_area: a.nome_area,
+                    total_acessos_hoje: total || 0,
+                    total_negados_hoje: negados || 0
+                };
+            }));
         }
 
-        if (quotasHoje) {
+        // Ocupação por empresa N:N
+        const ocupacaoPorEmpresa = {};
+        (presentesNtoN || []).forEach(vinculo => {
+            const eid = vinculo.empresa_id;
+            if (!ocupacaoPorEmpresa[eid]) {
+                ocupacaoPorEmpresa[eid] = { id: eid, nome: vinculo.empresas?.nome || 'Desconhecida', total: 0, quota: 0 };
+            }
+            ocupacaoPorEmpresa[eid].total++;
+        });
+
+        if (quotasHoje && quotasHoje.length > 0) {
+            const semNome = quotasHoje.map(q => q.empresa_id).filter(eid => !ocupacaoPorEmpresa[eid]);
+            const nomes = {};
+            if (semNome.length > 0) {
+                const { data: emps } = await supabase.from('empresas').select('id, nome').in('id', semNome);
+                (emps || []).forEach(e => { nomes[e.id] = e.nome; });
+            }
             quotasHoje.forEach(q => {
                 const eid = q.empresa_id;
                 if (!ocupacaoPorEmpresa[eid]) {
-                    ocupacaoPorEmpresa[eid] = { id: eid, nome: 'Empresa', total: 0, quota: q.quota };
+                    ocupacaoPorEmpresa[eid] = { id: eid, nome: nomes[eid] || 'Empresa', total: 0, quota: q.quota };
                 } else {
                     ocupacaoPorEmpresa[eid].quota = q.quota;
                 }
@@ -71,32 +161,214 @@ class ValidationService {
         return {
             presentes: countPresentes || 0,
             capacidade: evento?.capacidade_total || 0,
+            checkins_hoje: countCheckinsHoje || 0,
+            checkouts_hoje: countCheckoutsHoje || 0,
+            negados_hoje: countNegadosHoje || 0,
+            fiscalizacoes_hoje: countFiscalizacoesHoje || 0,
+            areas: areasComStats,
             empresas: Object.values(ocupacaoPorEmpresa)
         };
     }
 
-    async validateAccessRules(evento_id, pessoa, tipo, metodo, timestamp, confianca) {
-        if (pessoa.status_acesso === 'pendente') throw this._buildError('Cadastro Incompleto (Pendente)');
+    async isFirstAccessOfDay(pessoa_id, evento_id, area_id = null) {
+        const { start, end } = getLimitesDiaLocalUTC();
 
-        if (tipo === 'checkin') {
+        let query = supabase
+            .from('logs_acesso')
+            .select('id', { count: 'exact', head: true })
+            .eq('pessoa_id', pessoa_id)
+            .eq('evento_id', evento_id)
+            .in('tipo', ['checkin', 'checkout'])
+            .gte('created_at', start)
+            .lte('created_at', end);
+
+        if (area_id) query = query.eq('area_id', area_id);
+        query = semCredenciamento(query);
+
+        const { count, error } = await query;
+
+        if (error) {
+            logger.error(`Erro ao verificar primeiro acesso do dia para ${pessoa_id}:`, error);
+            return false;
+        }
+
+        return count === 0;
+    }
+
+    async determineSmartAccessType(pessoa_id, evento_id, requestedTipo = null, area_id = null) {
+        // Se o tipo foi solicitado manualmente, respeita (ex: página de checkout força 'checkout')
+        if (requestedTipo) return requestedTipo;
+
+        // Uma única consulta: último log da área. Sem log hoje = primeiro acesso do dia = CHECK-IN;
+        // com log hoje, alterna (toggle).
+        let query = supabase
+            .from('logs_acesso')
+            .select('tipo, created_at')
+            .eq('pessoa_id', pessoa_id)
+            .eq('evento_id', evento_id)
+            .in('tipo', ['checkin', 'checkout'])
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+        if (area_id) query = query.eq('area_id', area_id);
+        query = semCredenciamento(query);
+
+        const { data: lastLog } = await query.maybeSingle();
+
+        const { start } = getLimitesDiaLocalUTC();
+        const lastAt = lastLog ? new Date(/Z|[+-]\d{2}:\d{2}$/.test(lastLog.created_at) ? lastLog.created_at : `${lastLog.created_at}Z`) : null;
+        if (!lastLog || lastAt < new Date(start)) {
+            logger.info(`✨ [SmartAccess] Primeiro acesso do dia para ${pessoa_id} (area: ${area_id || 'global'}). Forçando CHECK-IN.`);
+            return 'checkin';
+        }
+        return lastLog.tipo === 'checkout' ? 'checkin' : 'checkout';
+    }
+
+    /**
+     * Estatísticas para checagem de lotação/cota com cache de 10 s.
+     * Evita ~600 ms por passagem; o painel continua usando getRealtimeStatsInternal sem cache.
+     */
+    async _getStatsParaValidacao(evento_id) {
+        const cacheKey = `stats_validacao_${evento_id}`;
+        const cached = cacheService.get(cacheKey);
+        if (cached) return cached;
+        const stats = await this.getRealtimeStatsInternal(evento_id);
+        cacheService.set(cacheKey, stats, 10000);
+        return stats;
+    }
+
+    async getCheckinSettings(evento_id) {
+        const cacheKey = `checkin_settings_${evento_id}`;
+        const cached = cacheService.get(cacheKey);
+        if (cached) return cached;
+
+        const { data } = await supabase
+            .from('system_settings')
+            .select('*')
+            .eq('id', 1)
+            .single();
+
+        const settings = data || {};
+        cacheService.set(cacheKey, settings, 60000); // 60s
+        return settings;
+    }
+
+    async validateAccessRules(evento_id, pessoa, tipo, metodo, timestamp, confianca, area_id = null) {
+        // Operações manuais (admin web), pulseira e leitor de código de barras = decisão humana do operador
+        const isHumanOperator = metodo === 'pulseira' || metodo === 'manual' || metodo === 'barcode';
+
+        // Liberação manual do operador (documentação pendente) vale até o checkout ou o reset do evento
+        const liberadaManualmente = !!(pessoa.liberacao_manual_ate && new Date(pessoa.liberacao_manual_ate) > new Date());
+
+        // Permitir bypass se for operação humana ou liberação manual vigente; caso contrário bloquear pendentes
+        if (pessoa.status_acesso === 'pendente' && !isHumanOperator && !liberadaManualmente) {
+            throw this._buildError('Cadastro Incompleto (Pendente)');
+        }
+        if (pessoa.status_acesso === 'bloqueado' && !isHumanOperator) {
+            throw this._buildError('Pessoa Bloqueada');
+        }
+        if (pessoa.status_acesso === 'recusado' && !isHumanOperator && !liberadaManualmente) {
+            throw this._buildError('Cadastro Recusado');
+        }
+
+        const [{ data: evento }, s] = await Promise.all([
+            supabase.from('eventos').select('min_face_score').eq('id', evento_id).single(),
+            this.getCheckinSettings(evento_id)
+        ]);
+
+        const isFacial = metodo === 'facial' || metodo === 'face';
+
+        // Cooldown: configurável para facial, 15 min por padrão para os demais métodos
+        const cooldownFacial = s.checkin_cooldown_min ?? 15;
+        const cooldownPulseira = s.pulseira_cooldown_min ?? 15;
+        let cooldown = isFacial ? cooldownFacial : cooldownPulseira;
+        if (isHumanOperator || metodo === 'pulseira' || metodo === 'manual' || metodo === 'face-rfid' || metodo === 'barcode') {
+            cooldown = 0;
+        }
+
+        // Confiança: apenas para facial
+        const targetConfidence = evento?.min_face_score ?? s.biometric_confidence ?? 75;
+
+        const blockDays = s.block_unauthorized_days ?? true;
+        const allowOffhour = s.allow_offhour_checkin ?? false;
+
+        // 0. Validação de ÁREA específica (Zonamento de Segurança)
+        if (area_id && tipo === 'checkin') {
+            // Se a pessoa estiver tentando acessar área restrita sem ter passado pelo credenciamento/portaria
+            if (pessoa.status_acesso === 'pendente' && !isHumanOperator && !liberadaManualmente) {
+                throw this._buildError('Credenciamento Pendente: Dirija-se à Portaria Principal');
+            }
+            if (pessoa.status_documentos === 'reprovado' && !isHumanOperator && !liberadaManualmente) {
+                throw this._buildError('Acesso Bloqueado: Documentação Reprovada');
+            }
+
+            // 1. Cache de áreas gravado na própria pessoa (credenciamento) — sem consulta
+            const cachePermit = Array.isArray(pessoa.areas_autorizadas) && pessoa.areas_autorizadas.includes(area_id);
+
+            // 2. Autorização individual e da pulseira (coluna real: pulseira_id), em paralelo
+            let pessoaPermit = null;
+            let pulseiraPermit = null;
+            if (!cachePermit && !isHumanOperator) {
+                const [direta, daPulseira] = await Promise.all([
+                    supabase.from('pessoa_areas_acesso').select('id')
+                        .eq('pessoa_id', pessoa.id).eq('area_id', area_id).limit(1).maybeSingle(),
+                    pessoa.tipo_pulseira_id
+                        ? supabase.from('pulseira_areas_permitidas').select('area_id')
+                            .eq('pulseira_id', pessoa.tipo_pulseira_id).eq('area_id', area_id).limit(1).maybeSingle()
+                        : Promise.resolve({ data: null })
+                ]);
+                pessoaPermit = direta.data;
+                pulseiraPermit = daPulseira.data;
+            }
+
+            if (!pessoaPermit && !pulseiraPermit && !cachePermit && !isHumanOperator) {
+                throw this._buildError('Acesso Negado: Área Restrita Não Autorizada');
+            }
+        }
+
+        // 1. Validação de Fase do Evento
+        // Operação humana (manual/pulseira/barcode) sempre bypassa fase — o operador decide.
+        // Facial/QRCode automático respeita allowOffhour.
+        const skipPhaseCheck = isHumanOperator || (allowOffhour && !isFacial);
+
+        if (tipo === 'checkin' && !skipPhaseCheck) {
             const fasePermitida = await this.verificarFaseEvento(evento_id, pessoa, metodo);
             if (!fasePermitida) throw this._buildError('Fase do evento não permitida para este perfil');
         }
 
+        // 2. Validação de Dia (Prioriza dias_acesso; dias_trabalho é legado)
         const hojeLiteral = getHojeLocal();
-        if (metodo !== 'manual' && pessoa.dias_trabalho && pessoa.dias_trabalho.length > 0) {
-            if (!pessoa.dias_trabalho.includes(hojeLiteral)) throw this._buildError(`Acesso não autorizado para esta data (${hojeLiteral})`);
+        const diasAcesso = Array.isArray(pessoa.dias_acesso) && pessoa.dias_acesso.length > 0 ? pessoa.dias_acesso : null;
+        const diasTrabalho = Array.isArray(pessoa.dias_trabalho) && pessoa.dias_trabalho.length > 0 ? pessoa.dias_trabalho : null;
+        const diasPermitidos = diasAcesso || diasTrabalho;
+
+        if (diasPermitidos && !isHumanOperator) {
+            if (!diasPermitidos.includes(hojeLiteral)) {
+                throw this._buildError(`Acesso não autorizado para esta data (${hojeLiteral})`);
+            }
         }
 
+        // 3. Validação de Empresa/Bloqueio
         const empresaBloqueada = pessoa.empresas && pessoa.empresas.ativo === false;
         if (pessoa.bloqueado || empresaBloqueada) {
             throw this._buildError(pessoa.bloqueado ? (pessoa.motivo_bloqueio || 'Pessoa Bloqueada') : 'Empresa Bloqueada');
         }
 
+        // 4. Capacidade
+        let quotaBypassed = false;
         if (tipo === 'checkin') {
-            const stats = await this.getRealtimeStatsInternal(evento_id);
-            if (stats.presentes >= stats.capacidade && stats.capacidade > 0) throw this._buildError('Capacidade máxima do evento atingida');
+            const stats = await this._getStatsParaValidacao(evento_id);
+            if (stats.presentes >= stats.capacidade && stats.capacidade > 0) {
+                // Operação humana (pulseira/manual) pode ultrapassar cota — operador decide
+                if (isHumanOperator) {
+                    logger.warn(`⚠️ [BYPASS] Cota excedida, liberada via ${metodo}`);
+                    quotaBypassed = true;
+                } else {
+                    throw this._buildError('Capacidade máxima do evento atingida');
+                }
+            }
 
+            // Cota por empresa (vinculo aprovado em pessoa_evento_empresa)
             const { data: vinculos } = await supabase
                 .from('pessoa_evento_empresa').select('empresa_id')
                 .eq('pessoa_id', pessoa.id).eq('evento_id', evento_id).eq('status_aprovacao', 'aprovado');
@@ -116,36 +388,74 @@ class ValidationService {
                 }
                 if (!hasAvailableQuota) throw this._buildError(`Cota esgotada: ${companyViolations.join(', ')}`);
             }
-
-            if (metodo === 'face' && confianca !== null && parseFloat(confianca) < 75.0) {
-                throw this._buildError(`Baixa confiança biométrica: ${confianca}% (Piso: 75.0%)`);
-            }
         }
 
-        if (tipo === 'checkin' || tipo === 'checkout') {
-            const apEnabled = true; const apCooldown = 15;
-            if (apEnabled && metodo !== 'manual' && metodo !== 'face-rfid') {
-                const { data: lastLog } = await supabase
-                    .from('logs_acesso').select('created_at, tipo')
-                    .eq('pessoa_id', pessoa.id).in('tipo', ['checkin', 'checkout']).order('created_at', { ascending: false }).limit(1).single();
-
-                if (lastLog) {
-                    let lastTimeStr = lastLog.created_at;
-                    if (!lastTimeStr.endsWith('Z') && !lastTimeStr.includes('+') && !lastTimeStr.match(/-\d{2}:\d{2}$/)) lastTimeStr += 'Z';
-                    const lastTime = new Date(lastTimeStr);
-                    const diffMins = (timestamp - lastTime) / 60000;
-
-                    if (diffMins >= 0 && apCooldown > 0 && diffMins < apCooldown) {
-                        const err = this._buildError(`Anti-Passback: Aguarde ${Math.ceil(apCooldown - diffMins)} min.`);
-                        err.is_passback_cooldown = true; throw err;
-                    }
-                    if (diffMins >= 0 && lastLog.tipo === tipo) {
-                        const err = this._buildError(`Anti-Passback: Acesso duplicado recusado`);
-                        err.is_passback_double = true; throw err;
-                    }
-                }
-            }
+        // Validar confiança biométrica
+        if (isFacial && confianca !== null && parseFloat(confianca) < targetConfidence) {
+            throw this._buildError(`Baixa confiança biométrica: ${confianca}% (Piso: ${targetConfidence}%)`);
         }
+
+        // 5. Anti-passback (cooldown por área)
+        if ((tipo === 'checkin' || tipo === 'checkout') && cooldown > 0) {
+            await this.validateAntiPassback(evento_id, pessoa.id, tipo, metodo, cooldown, area_id, timestamp);
+        }
+
+        return { quotaBypassed, cooldown, targetConfidence };
+    }
+
+    /**
+     * Validar anti-passback (evitar check-in/checkout duplo rápido)
+     */
+    async validateAntiPassback(evento_id, pessoa_id, tipo, metodo, cooldownMinutos, area_id = null, timestamp = null) {
+        if (cooldownMinutos <= 0) return true;
+
+        let query = supabase
+            .from('logs_acesso')
+            .select('created_at, tipo')
+            .eq('pessoa_id', pessoa_id)
+            .eq('evento_id', evento_id)
+            .in('tipo', ['checkin', 'checkout'])
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+        // Anti-passback por área: cooldown é por área, não global
+        if (area_id) query = query.eq('area_id', area_id);
+        // Entrega de pulseira no credenciamento não é passagem em leitor
+        query = semCredenciamento(query);
+
+        const { data: lastLog } = await query.maybeSingle();
+
+        if (!lastLog) return true;
+
+        let lastTimeStr = lastLog.created_at;
+        if (!lastTimeStr.endsWith('Z') && !lastTimeStr.includes('+') && !lastTimeStr.match(/-\d{2}:\d{2}$/)) {
+            lastTimeStr += 'Z';
+        }
+        
+        const lastTime = new Date(lastTimeStr);
+        const now = timestamp ? new Date(timestamp) : new Date();
+        const diffMins = (now - lastTime) / 60000;
+
+        if (diffMins >= 0 && diffMins < cooldownMinutos && lastLog.tipo === tipo) {
+            const error = new Error(`Anti-Passback: Aguarde ${Math.ceil(cooldownMinutos - diffMins)} min.`);
+            error.status = 403;
+            error.is_passback_cooldown = true;
+            throw error;
+        }
+
+        // Acesso duplicado recusado: mesmo tipo no mesmo dia, mesmo após o cooldown
+        const formatadorDia = new Intl.DateTimeFormat('en-CA', {
+            timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit'
+        });
+        const diaLocal = formatadorDia.format(lastTime);
+        const diaAcesso = formatadorDia.format(now);
+        if (diffMins >= 0 && lastLog.tipo === tipo && diaLocal === diaAcesso) {
+            const error = new Error('Anti-Passback: Acesso duplicado recusado');
+            error.status = 403;
+            error.is_passback_double = true;
+            throw error;
+        }
+
         return true;
     }
 
@@ -157,3 +467,4 @@ class ValidationService {
 }
 
 module.exports = new ValidationService();
+module.exports.MARCADOR_CREDENCIAMENTO = MARCADOR_CREDENCIAMENTO;

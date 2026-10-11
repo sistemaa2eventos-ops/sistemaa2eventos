@@ -1,59 +1,73 @@
 const { supabase } = require('../../../config/supabase');
-const { getConnection: getMsSql, sql } = require('../../../config/database');
-const { getPgConnection } = require('../../../config/pgEdge');
 const logger = require('../../../services/logger');
 const websocketService = require('../../../services/websocketService');
 const queueService = require('../../../services/queue.service');
 
 class DatabaseService {
-    async logDeniedAccess(evento_id, pessoa_id, metodo, dispositivo_id, created_by, motivo) {
+    /**
+     * Grava o acesso negado e emite UM aviso 'new_access' para o painel.
+     * @param {Object} [extras] dados só para exibição em tempo real e área do log:
+     *   { pessoa, area_id, area_nome, dispositivo_nome }
+     */
+    async logDeniedAccess(evento_id, pessoa_id, metodo, dispositivo_id, created_by, motivo, extras = {}) {
         logger.warn(`🛑 ACESSO NEGADO: ID ${pessoa_id} - Motivo: ${motivo}`);
-        
-        const pool = await getPgConnection();
         const logId = require('uuid').v4();
-        
-        await pool.query(`
-            INSERT INTO logs_acesso (id, evento_id, pessoa_id, tipo, metodo, dispositivo_id, created_at, created_by, sincronizado)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false)
-        `, [logId, evento_id, pessoa_id, 'negado', metodo, dispositivo_id, new Date(), created_by]);
+        const logNegado = {
+            id: logId, evento_id, pessoa_id, tipo: 'negado',
+            status_log: 'rejeitado',
+            metodo, dispositivo_id,
+            created_by, observacao: motivo,
+            area_id: extras.area_id || null,
+            created_at: new Date().toISOString()
+        };
 
-        const logNegado = { id: logId, evento_id, pessoa_id, tipo: 'negado', metodo, dispositivo_id, is_alert: true, created_by, observacao: motivo };
-        await queueService.publishLogToCloud(logNegado);
-        websocketService.emit('new_access', logNegado, evento_id);
+        const { error } = await supabase.from('logs_acesso').insert([logNegado]);
+        if (error) {
+            logger.error('Erro ao salvar log negado no Supabase (vai para a fila de retentativa):', error);
+            // Plano B: o CloudSyncWorker regrava quando o Supabase voltar
+            await queueService.publishLogToCloud(logNegado);
+        }
+        const p = extras.pessoa;
+        websocketService.emit('new_access', {
+            ...logNegado,
+            tipo_acesso: 'negado',
+            erro: motivo,
+            pessoa_nome: p?.nome_completo || null,
+            pessoas: p ? { id: p.id, nome_completo: p.nome_completo, cpf: p.cpf, foto_url: p.foto_url } : null,
+            area_nome: extras.area_nome || null,
+            dispositivo_nome: extras.dispositivo_nome || null
+        }, evento_id);
     }
 
     async registerAccessTransaction(logId, timestamp, payload, pessoa, new_status) {
-        const { evento_id, pessoa_id, tipo, metodo, dispositivo_id, confianca, foto_capturada, created_by, sync_id } = payload;
+        const { evento_id, pessoa_id, tipo, metodo, dispositivo_id, confianca, foto_capturada, created_by, area_id, observacao } = payload;
         
         let rpcResult = { success: true };
 
-        const logPayload = {
-            id: logId, evento_id, pessoa_id, tipo, metodo, dispositivo_id,
-            confianca, foto_capturada, created_by, sincronizado: false, sync_id, created_at: timestamp
-        };
-
-        // Fase 3 do Outbox Pattern: Borda Ultra-Rápida Postgres Edge
-        // Latência da nuvem foi banida do processo de catraca.
         try {
-            const pool = await getPgConnection();
-            
-            const insertQuery = `
-                INSERT INTO logs_acesso (id, evento_id, pessoa_id, tipo, metodo, dispositivo_id, confianca, foto_capturada, created_at, created_by, sincronizado, sync_id)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false, $11)
-                ON CONFLICT (id) DO NOTHING
-            `;
-            const values = [logId, evento_id, pessoa_id, tipo, metodo, dispositivo_id, confianca, foto_capturada, timestamp, created_by, sync_id];
-            
-            await pool.query(insertQuery, values);
-                 
+            const numero_pulseira = pessoa?.numero_pulseira || payload?.numero_pulseira || null;
+            const { error: insertErr } = await supabase
+                .from('logs_acesso')
+                .insert([{
+                    id: logId, evento_id, pessoa_id, tipo, metodo,
+                    dispositivo_id, confianca, foto_capturada, area_id,
+                    numero_pulseira,
+                    observacao: observacao || null,
+                    created_at: timestamp.toISOString(),
+                    created_by
+                }]);
+
+            // Ignorar erro de duplicidade (ON CONFLICT equivalente)
+            if (insertErr && insertErr.code !== '23505') throw insertErr;
+            if (insertErr?.code === '23505') return { success: true, already_done: true };
+
             if (pessoa.status_acesso !== new_status) {
-                 await pool.query(
-                     'UPDATE pessoas SET status_acesso = $1, atualizado_em = NOW() WHERE id = $2',
-                     [new_status, pessoa_id]
-                 );
+                await supabase
+                    .from('pessoas')
+                    .update({ status_acesso: new_status, atualizado_em: new Date().toISOString() })
+                    .eq('id', pessoa_id);
             }
         } catch (error) {
-            // Postgres unique violation code is 23505
             if (error.code === '23505') return { success: true, already_done: true };
             throw error;
         }
@@ -61,9 +75,18 @@ class DatabaseService {
         rpcResult.log_id = logId;
         rpcResult.new_status = new_status;
 
-        // Publica no Redis Stream para o Cloud Worker assumir de forma desacoplada
-        await queueService.publishLogToCloud(logPayload);
-        logger.info(`💾 Log ${logId} salvo Fisicamente na Borda e encaminhado ao Redis Queue (Latência 0).`);
+        // Saída encerra a liberação manual do turno e reavalia a documentação
+        // (quem saiu com pendência volta a "pendente" para a próxima entrada).
+        if (tipo === 'checkout') {
+            (async () => {
+                const liberacaoManual = require('../../entities/liberacaoManual.service');
+                await liberacaoManual.encerrar(pessoa_id, 'checkout');
+                await require('../../entities/documento.service').sincronizarStatusPessoa(null, pessoa_id);
+            })().catch(e => logger.warn(`[Checkout] Falha ao encerrar liberação/reavaliar ${pessoa_id}: ${e.message}`));
+        }
+
+        // O log já foi gravado direto no Supabase acima; republicar no Redis só o regravava.
+        logger.info(`💾 Log ${logId} salvo.`);
 
         return rpcResult;
     }

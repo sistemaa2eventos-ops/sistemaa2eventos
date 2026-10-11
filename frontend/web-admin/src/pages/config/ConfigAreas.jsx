@@ -1,37 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Box,
-    Typography,
-    Stack,
-    IconButton,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    TextField,
-    Button
+    Box, Typography, Stack, IconButton, Dialog, 
+    DialogTitle, DialogContent, DialogActions, 
+    TextField, Button, CircularProgress, Grid
 } from '@mui/material';
 import { useSnackbar } from 'notistack';
 import {
     Add as AddIcon,
     Delete as DeleteIcon,
-    Map as MapIcon
+    Edit as EditIcon,
+    Place as PlaceIcon
 } from '@mui/icons-material';
 import api from '../../services/api';
 import GlassCard from '../../components/common/GlassCard';
+import DataTable from '../../components/common/DataTable';
 import PageHeader from '../../components/common/PageHeader';
 import NeonButton from '../../components/common/NeonButton';
-import DataTable from '../../components/common/DataTable';
-import { styled } from '@mui/material/styles';
+import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
 
 const ConfigAreas = () => {
+    const confirmar = useConfirmacao();
     const [areas, setAreas] = useState([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [openDialog, setOpenDialog] = useState(false);
-    const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
-    const [areaToDelete, setAreaToDelete] = useState(null);
-    const [formData, setFormData] = useState({ nome_area: '' });
+    const [editingId, setEditingId] = useState(null);
+    const [formData, setFormData] = useState({ nome_area: '', capacidade_maxima: '' });
     const { enqueueSnackbar } = useSnackbar();
 
     const columns = [
@@ -41,23 +35,36 @@ const ConfigAreas = () => {
             minWidth: 200,
             format: (val) => (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <MapIcon sx={{ color: '#00D4FF', fontSize: 20 }} />
-                    <Typography variant="body2" sx={{ fontWeight: 700, letterSpacing: '1px' }}>{val?.toUpperCase()}</Typography>
+                    <PlaceIcon sx={{ color: 'primary.main', fontSize: 20 }} />
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>{val?.toUpperCase()}</Typography>
                 </Box>
             )
         },
         {
+            id: 'capacidade_maxima',
+            label: 'CAPACIDADE',
+            minWidth: 100,
+            align: 'center',
+            format: (val) => val || 'Ilimitada'
+        },
+        {
             id: 'acoes',
             label: 'AÇÕES',
-            minWidth: 100,
+            minWidth: 120,
             align: 'center',
             format: (value, row) => (
                 <Stack direction="row" spacing={1} justifyContent="center">
                     <IconButton
                         size="small"
+                        onClick={() => handleOpenDialog(row)}
+                        sx={{ color: 'primary.main', bgcolor: 'rgba(0, 212, 255, 0.05)' }}
+                    >
+                        <EditIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                        size="small"
                         onClick={() => handleDelete(row.id)}
-                        sx={{ color: '#FF3366', background: 'rgba(255,51,102,0.05)' }}
-                        title="Excluir"
+                        sx={{ color: 'error.main', bgcolor: 'rgba(255, 51, 102, 0.05)' }}
                     >
                         <DeleteIcon fontSize="small" />
                     </IconButton>
@@ -66,131 +73,136 @@ const ConfigAreas = () => {
         },
     ];
 
-    useEffect(() => {
-        loadAreas();
-    }, []);
-
-    const loadAreas = async () => {
+    const loadAreas = useCallback(async () => {
         try {
+            const eventoId = sessionStorage.getItem('active_evento_id') || localStorage.getItem('active_evento_id');
+            if (!eventoId) {
+                enqueueSnackbar('Selecione um evento para gerenciar as áreas.', { variant: 'info' });
+                setLoading(false);
+                return;
+            }
+
             setLoading(true);
-            const response = await api.get('/config/areas');
+            const response = await api.get('/config/areas', { 
+                params: { evento_id: eventoId } 
+            });
             setAreas(response.data.data || []);
         } catch (error) {
             console.error('Erro ao carregar áreas:', error);
-            enqueueSnackbar('Falha ao carregar zonas de acesso.', { variant: 'error' });
+            enqueueSnackbar('Falha ao carregar áreas. Verifique sua conexão.', { variant: 'error' });
         } finally {
             setLoading(false);
         }
-    };
+    }, [enqueueSnackbar]);
 
-    const handleOpenDialog = () => {
-        setFormData({ nome_area: '' });
+    useEffect(() => {
+        loadAreas();
+    }, [loadAreas]);
+
+    const handleOpenDialog = (area = null) => {
+        if (area) {
+            setEditingId(area.id);
+            setFormData({
+                nome_area: area.nome_area || '',
+                capacidade_maxima: area.capacidade_maxima || ''
+            });
+        } else {
+            setEditingId(null);
+            setFormData({ nome_area: '', capacidade_maxima: '' });
+        }
         setOpenDialog(true);
     };
 
-    const handleCloseDialog = () => {
-        setOpenDialog(false);
-    };
-
     const handleSave = async () => {
-        if (!formData.nome_area) {
-            enqueueSnackbar('O nome da área é obrigatório.', { variant: 'warning' });
-            return;
-        }
+        if (!formData.nome_area) return enqueueSnackbar('Nome é obrigatório.', { variant: 'warning' });
         try {
             setSaving(true);
-            await api.post('/config/areas', formData);
-            enqueueSnackbar('Zona de acesso registrada com sucesso!', { variant: 'success' });
-            handleCloseDialog();
+            if (editingId) {
+                await api.put(`/config/areas/${editingId}`, {
+                    nome_area: formData.nome_area,
+                    capacidade_maxima: formData.capacidade_maxima ? parseInt(formData.capacidade_maxima) : null
+                });
+                enqueueSnackbar('Área atualizada!', { variant: 'success' });
+            } else {
+                await api.post('/config/areas', {
+                    nome_area: formData.nome_area,
+                    capacidade_maxima: formData.capacidade_maxima ? parseInt(formData.capacidade_maxima) : null
+                });
+                enqueueSnackbar('Área criada com sucesso!', { variant: 'success' });
+            }
+            setOpenDialog(false);
             loadAreas();
         } catch (error) {
-            console.error('Erro ao salvar área:', error);
-            const detail = error.response?.data?.details ? `Detalhes: ${error.response.data.details}` : '';
-            enqueueSnackbar(`${error.response?.data?.error || 'Erro ao criar área'}. ${detail}`, { variant: 'error' });
+            enqueueSnackbar('Erro ao salvar área.', { variant: 'error' });
         } finally {
             setSaving(false);
         }
     };
 
-    const handleDelete = (id) => {
-        setAreaToDelete(id);
-        setOpenDeleteConfirm(true);
-    };
-
-    const confirmDelete = async () => {
+    const handleDelete = async (id) => {
+        if (!(await confirmar({ titulo: 'Excluir área', mensagem: 'Excluir esta área permanentemente?', textoConfirmar: 'Excluir' }))) return;
         try {
-            await api.delete(`/config/areas/${areaToDelete}`);
-            enqueueSnackbar('Zona de acesso pulverizada com sucesso.', { variant: 'success' });
-            setOpenDeleteConfirm(false);
-            setAreaToDelete(null);
+            await api.delete(`/config/areas/${id}`);
+            enqueueSnackbar('Área removida.', { variant: 'success' });
             loadAreas();
         } catch (error) {
-            console.error('Erro ao excluir área:', error);
-            enqueueSnackbar('Falha ao remover área. Ela pode estar em uso por uma pulseira ou regra de acesso.', { variant: 'error' });
+            enqueueSnackbar('Erro ao remover área.', { variant: 'error' });
         }
     };
 
+    if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>;
+
     return (
-        <Box sx={{ p: 4, maxWidth: 900, margin: '0 auto' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
+        <Box sx={{ p: { xs: 2, md: 4 } }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
                 <PageHeader
-                    title="Zonas de Acesso (Áreas)"
-                    subtitle="Gere mapeamentos macro para controle do perímetro de acessos independentes."
-                    breadcrumbs={[{ text: 'Configurações' }, { text: 'Credenciamento' }, { text: 'Zonas e Áreas' }]}
+                    title="Gestão de Áreas & Zonas"
+                    subtitle="Crie e gerencie as áreas de acesso do evento. Cada área pode ser associada a um ou mais leitores."
+                    breadcrumbs={[{ text: 'Configurações' }, { text: 'Áreas & Zonas' }]}
                 />
-                <NeonButton
-                    startIcon={<AddIcon />}
-                    onClick={handleOpenDialog}
-                    sx={{ mt: 2 }}
-                >
-                    Nova Zona de Acesso
+                <NeonButton startIcon={<AddIcon />} onClick={() => handleOpenDialog()} sx={{ mt: 2, flexShrink: 0 }}>
+                    Nova Área
                 </NeonButton>
             </Box>
 
-            <GlassCard glowColor="#00D4FF" sx={{ p: 3, mb: 3 }}>
-                <DataTable
-                    columns={columns}
-                    data={areas}
-                    loading={loading}
-                    sx={{
-                        '& .MuiTableHead-root': { background: 'rgba(0,212,255,0.05)' },
-                        border: '1px solid rgba(0,212,255,0.05)'
-                    }}
-                />
-            </GlassCard>
+            <Grid container spacing={3}>
+                <Grid item xs={12}>
+                    <GlassCard sx={{ p: 2 }}>
+                        <DataTable
+                            columns={columns}
+                            data={areas}
+                            loading={loading}
+                        />
+                    </GlassCard>
+                </Grid>
+            </Grid>
 
-            <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth disableRestoreFocus>
-                <DialogTitle sx={{ fontFamily: '"Orbitron", sans-serif', fontWeight: 700, letterSpacing: '2px' }}>
-                    REGISTRAR NOVA ZONA
+            <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="xs" fullWidth>
+                <DialogTitle sx={{ fontWeight: 700 }}>
+                    {editingId ? 'Editar Área' : 'Nova Área de Acesso'}
                 </DialogTitle>
                 <DialogContent>
-                    <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                        <TextField
-                            label="Nome ou Identificação da Área"
-                            fullWidth
+                    <Stack spacing={3} sx={{ mt: 1 }}>
+                        <TextField 
+                            label="Nome da Área" 
+                            fullWidth 
                             value={formData.nome_area}
                             onChange={(e) => setFormData({ ...formData, nome_area: e.target.value })}
-                            placeholder="Ex: BACKSTAGE, PISTA PREMIUM, CAMAROTE 1..."
                         />
-                    </Box>
+                        <TextField 
+                            label="Capacidade Máxima (0 = ilimitada)" 
+                            type="number" 
+                            fullWidth 
+                            value={formData.capacidade_maxima}
+                            onChange={(e) => setFormData({ ...formData, capacidade_maxima: e.target.value })}
+                        />
+                    </Stack>
                 </DialogContent>
                 <DialogActions sx={{ p: 3 }}>
-                    <Button onClick={handleCloseDialog} disabled={saving} sx={{ color: 'text.secondary' }}>ABORTAR</Button>
-                    <NeonButton onClick={handleSave} loading={saving} autoFocus>CONCLUIR CADASTRO</NeonButton>
-                </DialogActions>
-            </Dialog>
-
-            <Dialog open={openDeleteConfirm} onClose={() => setOpenDeleteConfirm(false)} maxWidth="xs" fullWidth>
-                <DialogTitle sx={{ color: '#FF3366' }}>EXCLUIR ZONA DE ACESSO</DialogTitle>
-                <DialogContent>
-                    <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-                        Atenção: A remoção de uma zona quebrará regras de acesso se existirem pulseiras atreladas a ela.
-                    </Typography>
-                    Deseja realmente pulverizar o registro desta área?
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setOpenDeleteConfirm(false)} sx={{ color: 'text.secondary' }}>Cancelar</Button>
-                    <Button onClick={confirmDelete} sx={{ color: '#FF3366', fontWeight: 'bold' }}>Excluir Definitivamente</Button>
+                    <Button onClick={() => setOpenDialog(false)}>Cancelar</Button>
+                    <Button variant="contained" onClick={handleSave} disabled={saving}>
+                        {editingId ? 'Salvar' : 'Criar'}
+                    </Button>
                 </DialogActions>
             </Dialog>
         </Box>

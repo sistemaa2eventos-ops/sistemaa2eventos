@@ -1,6 +1,7 @@
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const websocketService = require('../../services/websocketService');
+const cacheService = require('../../services/cacheService');
 const ValidationService = require('./services/validation.service');
 const DatabaseService = require('./services/database.service');
 
@@ -48,8 +49,8 @@ class CheckinService {
 
 
 
-        // 2. Determinar tipo inteligente (Toggle ou Primeiro do Dia)
-        const tipoFinal = await ValidationService.determineSmartAccessType(pessoa_id, evento_id, accessData.tipo);
+        // 2. Determinar tipo inteligente (Toggle ou Primeiro do Dia) — POR ÁREA
+        const tipoFinal = await ValidationService.determineSmartAccessType(pessoa_id, evento_id, accessData.tipo, area_id);
         const timestamp = offline_timestamp ? new Date(offline_timestamp) : new Date();
 
         // 3. Validar políticas de acesso
@@ -65,16 +66,19 @@ class CheckinService {
                 timestamp,
                 {
                     evento_id, pessoa_id, tipo: tipoFinal, metodo,
-                    dispositivo_id, created_by, sync_id,
+                    dispositivo_id, created_by, sync_id, area_id,
                     confianca: accessData.confianca || null,
                     foto_capturada: accessData.foto_capturada || null,
-                    observacao: (validation && validation.quotaBypassed) ? '⚠️ BYPASS_COTA (Capacidade Excedida)' : null
+                    observacao: (validation && validation.quotaBypassed)
+                        ? '⚠️ BYPASS_COTA (Capacidade Excedida)'
+                        : (accessData.observacao || null)
                 },
                 pessoa,
                 new_status
             );
 
             if (!result.success) return { error: 'Falha ao persistir acesso' };
+            cacheService.invalidatePessoa(pessoa_id);
             const resultData = { id: logId, evento_id, pessoa_id, tipo: tipoFinal,
                                  metodo, dispositivo_id, created_at: timestamp };
 
@@ -82,14 +86,19 @@ class CheckinService {
             websocketService.emit('new_access', {
                 ...resultData,
                 pessoa_nome: pessoa.nome_completo,
+                pessoas: { id: pessoa.id, nome_completo: pessoa.nome_completo, cpf: pessoa.cpf, foto_url: pessoa.foto_url },
                 tipo_acesso: tipoFinal,
-                area_id: area_id || null
+                area_id: area_id || null,
+                area_nome: accessData.area_nome || null,
+                dispositivo_nome: accessData.dispositivo_nome || null
             }, evento_id);
 
-            // 6. Integração Watchlist (Rastreamento de CPFs)
+            // 6. Integração Watchlist (Rastreamento de CPFs) — em segundo plano:
+            //    a porta/estação recebe a resposta sem esperar a consulta e os alertas externos.
+            (async () => {
             const watchlistService = require('../system/watchlist.service');
             const monitorado = await watchlistService.verificarCPF(pessoa.cpf, evento_id);
-            
+
             if (monitorado) {
                 logger.warn(`🚨 WATCHLIST: Alvo '${pessoa.nome_completo}' detectado no ${tipoFinal}!`);
                 
@@ -106,7 +115,7 @@ class CheckinService {
                     area: accessData.area_nome || 'Portaria Principal',
                     terminal: accessData.dispositivo_nome || dispositivo_id,
                     hora: new Date()
-                }, evento_id);
+                }, 'system_watchlist');
 
                 // Disparar notificações externas (Telegram/WhatsApp)
                 await watchlistService.registrarAlerta(monitorado, {
@@ -120,6 +129,7 @@ class CheckinService {
                     terminal: accessData.dispositivo_nome
                 });
             }
+            })().catch(e => logger.error(`[Watchlist] Falha na verificação: ${e.message}`));
 
             return { ...resultData, action: 'allow' };
 
@@ -127,28 +137,22 @@ class CheckinService {
             logger.warn(`🚫 Acesso NEGADO para ${pessoa.nome_completo}: ${valErr.message}`);
 
             // Regra NZT: SEMPRE registrar o log, mesmo se negado
+            // Grava e emite o aviso em tempo real (um único 'new_access')
             await DatabaseService.logDeniedAccess(
                 evento_id,
                 pessoa_id,
                 metodo,
                 dispositivo_id,
                 created_by,
-                valErr.message
+                valErr.message,
+                { pessoa, area_id, area_nome: accessData.area_nome, dispositivo_nome: accessData.dispositivo_nome }
             );
             const resultNegado = { data: { evento_id, pessoa_id, tipo: 'negado',
                                            metodo, observacao: valErr.message } };
 
-            // Notifica o painel sobre o acesso negado em tempo real
-            websocketService.emit('new_access', {
-                ...(resultNegado.data || {}),
-                pessoa_nome: pessoa.nome_completo,
-                tipo_acesso: 'negado',
-                erro: valErr.message,
-                area_id: area_id || null
-            }, evento_id);
 
-            // Verificação de Watchlist também em Acessos Negados
-            try {
+            // Verificação de Watchlist também em Acessos Negados (em segundo plano)
+            (async () => {
                 const watchlistService = require('../system/watchlist.service');
                 const monitoradoVal = await watchlistService.verificarCPF(pessoa.cpf, evento_id);
                 if (monitoradoVal) {
@@ -159,11 +163,11 @@ class CheckinService {
                         area: accessData.area_nome || 'Acesso Restrito',
                         terminal: accessData.dispositivo_nome || dispositivo_id,
                         hora: new Date()
-                    }, evento_id);
+                    }, 'system_watchlist');
                 }
-            } catch (wErr) { /* silêncio */ }
+            })().catch(() => { /* silêncio */ });
 
-            return { 
+            return {
                 error: valErr.message, 
                 status: valErr.status || 403, 
                 action: 'deny',

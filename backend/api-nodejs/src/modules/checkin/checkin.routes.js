@@ -5,37 +5,65 @@ const { authenticate, authorize, validateInternalApiKey } = require('../../middl
 const { requireEvent } = require('../../middleware/eventMiddleware');
 const rateLimiter = require('../../middleware/rateLimiter');
 
-// Rota para microsserviço facial (API key) - Sem contexto de evento via Token
-router.post('/face/process', validateInternalApiKey, accessController.processFaceRecognition);
+// ============================================
+// ROTAS PÚBLICAS (sem autenticação - para terminais)
+// ============================================
+// Check-in/out via terminal facial (API key interna)
+router.post('/facial', validateInternalApiKey, accessController.checkinFacial);
 
-// Middleware global para rotas de Dashboard/Operação
+// ============================================
+// Middleware para rotas autenticadas
+// ============================================
 const sessionMiddleware = [authenticate, requireEvent];
 
-const { body } = require('express-validator');
-const { handleValidationErrors } = require('../../middleware/validators');
+// ============================================
+// CHECK-IN / CHECK-OUT VIA PULSEIRA
+// ============================================
+router.post('/pulseira/checkin', sessionMiddleware, rateLimiter.access, accessController.checkinPulseira);
+router.post('/pulseira/checkout', sessionMiddleware, rateLimiter.access, accessController.checkoutPulseira);
+router.post('/pulseira/link-checkin', sessionMiddleware, rateLimiter.access, accessController.credenciarPulseira);
+router.post('/link-checkin', sessionMiddleware, rateLimiter.access, accessController.credenciarPulseira);
+router.get('/pulseira/buscar', sessionMiddleware, accessController.buscarPessoaPulseira);
+router.get('/pulseira/ultimo/:pessoa_id', sessionMiddleware, accessController.ultimoCheckin);
 
-// Rotas para operadores (check-in/out)
-router.post('/validate/qrcode', sessionMiddleware, rateLimiter.access, accessController.validateQRCode);
-router.post('/checkin/qrcode', sessionMiddleware, rateLimiter.access, accessController.checkinQRCode);
-router.post('/checkin/barcode', sessionMiddleware, rateLimiter.access, accessController.checkinBarcode);
-router.post('/checkin/rfid', sessionMiddleware, rateLimiter.access, accessController.checkinRFID);
+// ============================================
+// CHECK-IN GENÉRICO (manual e qrcode — painel web)
+// ============================================
 router.post('/checkin/manual', sessionMiddleware, rateLimiter.access, accessController.checkinManual);
+router.post('/checkin/qrcode', sessionMiddleware, rateLimiter.access, accessController.checkinQrcode);
 
-router.post('/pulseira/link-checkin', sessionMiddleware, rateLimiter.access, [
-  body('pessoa_id').isUUID().withMessage('ID da pessoa inválido'),
-  body('tipo_pulseira_id').isUUID().withMessage('Tipo de pulseira inválido'),
-  body('numero_pulseira').notEmpty().withMessage('Número da pulseira obrigatório')
-], handleValidationErrors, accessController.linkPulseiraAndCheckin);
+// ============================================
+// CREDENCIAMENTO & LEITOR RÁPIDO (CÓDIGO DE BARRAS / CPF / ENTRADA & SAÍDA SEM PULSEIRA)
+// ============================================
+router.post('/credenciar-pulseira', sessionMiddleware, rateLimiter.access, accessController.credenciarPulseira);
+router.post('/leitor-rapido', sessionMiddleware, rateLimiter.access, accessController.leitorRapido);
 
-router.post('/checkout', sessionMiddleware, rateLimiter.access, accessController.checkout);
-router.post('/checkout/qrcode', sessionMiddleware, rateLimiter.access, accessController.checkoutQRCode);
-router.post('/vincular-pulseira-facial', sessionMiddleware, rateLimiter.access, accessController.vincularPulseiraFacial);
+// ============================================
+// CONSULTA E FISCALIZAÇÃO DE PULSEIRA / ÁREAS (painel web & app fiscal)
+// ============================================
+router.get('/consultar-pulseira/:codigo', sessionMiddleware, accessController.consultarPulseira);
+router.get('/fiscalizacoes-recentes', sessionMiddleware, accessController.getFiscalizacoesRecentes);
+router.post('/fiscalizar', sessionMiddleware, rateLimiter.access, accessController.fiscalizarAcesso);
+router.post('/checkin/fiscalizar', sessionMiddleware, rateLimiter.access, accessController.fiscalizarAcesso);
 
-// Rotas de consulta
+// ============================================
+// CONSULTAS
+// ============================================
 router.get('/logs', sessionMiddleware, accessController.getLogs);
 router.get('/stats/realtime', sessionMiddleware, accessController.getRealtimeStats);
 
-// Rotas administrativas
-router.post('/expulsar/:pessoa_id', sessionMiddleware, authorize('admin', 'supervisor'), accessController.expulsar);
+// ============================================
+// ADMINISTRATIVAS
+// ============================================
+router.post('/expulsar/:pessoa_id', sessionMiddleware, authorize('admin_master'), accessController.expulsar);
+
+// ============================================
+// DEPRECATED (ainda removidas):
+// - /validate/qrcode
+// - /checkin/barcode
+// - /checkin/rfid
+// - /checkout/qrcode
+// - /vincular-pulseira-facial
+// ============================================
 
 module.exports = router;

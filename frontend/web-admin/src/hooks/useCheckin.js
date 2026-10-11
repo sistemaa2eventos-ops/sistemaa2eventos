@@ -1,0 +1,562 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { usarConexao } from '../services/realtime';
+import api from '../services/api';
+import localCheckinService from '../services/LocalCheckinService';
+
+/**
+ * useCheckin: Hook de controle para a operação de recepção (NZT).
+ * Modificado para focar em Checkout Manual, QR Code e Pulseiras (Barcode).
+ */
+export const useCheckin = (defaultMode, options = {}) => {
+    const [searchParams] = useSearchParams();
+    const eventoId = searchParams.get('evento_id') || localStorage.getItem('active_evento_id');
+    const logsTipo = options.logsTipo || (defaultMode === 'checkout' ? 'checkout' : null);
+
+    // States - Fluxo de Atendimento
+    const [selectedPessoa, setSelectedPessoa] = useState(null);
+    const [activeScanner, setActiveScanner] = useState(false);
+    const [checkinResult, setCheckinResult] = useState(null); // 'sucesso' | 'negado' | null
+    const [resultMessage, setResultMessage] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [manualSaving, setManualSaving] = useState(false);
+
+    // States - Modo Quiosque
+    const [modoQuiosque, setModoQuiosque] = useState(false);
+
+    // States - Configurações e Logs
+    const [operationMode, setOperationMode] = useState(defaultMode || localStorage.getItem('nzt_op_mode') || 'auto');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [eventModules, setEventModules] = useState([]);
+    const [recentLogs, setRecentLogs] = useState([]);
+    const [offlineCount, setOfflineCount] = useState(0);
+    const [realtimeStats, setRealtimeStats] = useState(null);
+    const [areaId, setAreaId] = useState(localStorage.getItem('nzt_area_id') || null);
+    const [eventAreas, setEventAreas] = useState([]);
+    const [pulseiraTypes, setPulseiraTypes] = useState([]);
+
+    // Estados de Vínculo com Leitor Facial (Fase 1)
+    const [sessaoAtiva, setSessaoAtiva] = useState(null);
+    const [dispositivosDisponiveis, setDispositivosDisponiveis] = useState([]);
+    const [loadingSessao, setLoadingSessao] = useState(false);
+
+    const rfidInputRef = useRef(null);
+    const resetTimerRef = useRef(null);
+    const refreshTimerRef = useRef(null);
+    // Valores atuais para os listeners do socket (registrados uma vez por evento)
+    const latestRef = useRef({});
+
+    const tocarBipeNotificacao = useCallback(() => {
+        try {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) return;
+            const audioCtx = new AudioContextClass();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1320, audioCtx.currentTime + 0.12);
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.22);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.22);
+        } catch (_) {}
+    }, []);
+
+    const updateOfflineCount = useCallback(async () => {
+        const count = await localCheckinService.getPendenteCount();
+        setOfflineCount(count);
+    }, []);
+
+    const carregarSessaoAtiva = useCallback(async () => {
+        if (!eventoId) return;
+        try {
+            setLoadingSessao(true);
+            const res = await api.get('/devices/sessao/ativa');
+            if (res.data?.success) {
+                setSessaoAtiva(res.data.data);
+            }
+        } catch (err) {
+            console.warn('Erro ao carregar sessão de operador:', err.message);
+        } finally {
+            setLoadingSessao(false);
+        }
+    }, [eventoId]);
+
+    const carregarDispositivosDisponiveis = useCallback(async () => {
+        if (!eventoId) return;
+        try {
+            const res = await api.get('/devices/sessao/disponiveis', { params: { evento_id: eventoId } });
+            if (res.data?.success) {
+                setDispositivosDisponiveis(res.data.data || []);
+            }
+        } catch (err) {
+            console.warn('Erro ao carregar dispositivos para vínculo:', err.message);
+        }
+    }, [eventoId]);
+
+    const vincularLeitor = async (dispositivoId, estacaoNome) => {
+        try {
+            setLoadingSessao(true);
+            const res = await api.post('/devices/sessao/vincular', {
+                dispositivo_id: dispositivoId,
+                estacao_nome: estacaoNome,
+                evento_id: eventoId
+            });
+            if (res.data?.success) {
+                setSessaoAtiva(res.data.data);
+                await carregarDispositivosDisponiveis();
+                return { success: true, data: res.data.data };
+            }
+            return { success: false, error: res.data?.error || 'Erro ao vincular leitor' };
+        } catch (err) {
+            return { success: false, error: err.response?.data?.error || err.message };
+        } finally {
+            setLoadingSessao(false);
+        }
+    };
+
+    const desvincularLeitor = async () => {
+        try {
+            setLoadingSessao(true);
+            const res = await api.post('/devices/sessao/desvincular');
+            if (res.data?.success) {
+                setSessaoAtiva(null);
+                await carregarDispositivosDisponiveis();
+                return { success: true };
+            }
+            return { success: false, error: res.data?.error || 'Erro ao desvincular leitor' };
+        } catch (err) {
+            return { success: false, error: err.response?.data?.error || err.message };
+        } finally {
+            setLoadingSessao(false);
+        }
+    };
+
+    const refreshLogs = useCallback(async () => {
+        if (!eventoId) return;
+        try {
+            const logParams = { limit: 50, evento_id: eventoId };
+            if (logsTipo) {
+                logParams.tipo = logsTipo;
+            } else if (defaultMode === 'checkout') {
+                logParams.tipo = 'checkout';
+            }
+            const res = await api.get('/access/logs', { params: logParams });
+            if (res.data?.data) {
+                setRecentLogs(res.data.data);
+            }
+        } catch (err) {
+            console.error('Erro ao atualizar logs recentes:', err);
+        }
+    }, [eventoId, logsTipo, defaultMode]);
+
+    const loadInitialData = useCallback(async () => {
+        if (!eventoId) return;
+        try {
+            const logParams = { limit: 50, evento_id: eventoId };
+            if (logsTipo) {
+                logParams.tipo = logsTipo;
+            } else if (defaultMode === 'checkout') {
+                logParams.tipo = 'checkout';
+            }
+            const [logRes, eventRes, statsRes, areasRes, pulseiraRes] = await Promise.all([
+                api.get(`/access/logs`, { params: logParams }),
+                api.get(`/eventos/${eventoId}`),
+                api.get('/access/stats/realtime', { params: { evento_id: eventoId } }),
+                api.get('/config/areas', { params: { evento_id: eventoId } }).catch(() => ({ data: { data: [] } })),
+                api.get('/config/pulseiras', { params: { evento_id: eventoId } }).catch(() => ({ data: { data: [] } }))
+            ]);
+            setRecentLogs(logRes.data.data || []);
+            setEventModules(eventRes.data.data?.event_modules || []);
+            setRealtimeStats(statsRes.data.data || null);
+            setEventAreas(areasRes.data.data || []);
+            setPulseiraTypes(pulseiraRes.data.data || []);
+
+            // Carregar sessão de leitor do operador
+            carregarSessaoAtiva();
+            carregarDispositivosDisponiveis();
+        } catch (error) {
+            console.error('Erro ao carregar dados de check-in:', error);
+        }
+    }, [eventoId, defaultMode, logsTipo, carregarSessaoAtiva, carregarDispositivosDisponiveis]);
+
+    // WebSocket Listeners
+    useEffect(() => {
+        if (!eventoId) return;
+
+        // Conexão compartilhada da aba (services/realtime.js)
+        const socket = usarConexao();
+        socket.entrarEvento(eventoId);
+
+        socket.on('new_access', (newLog) => {
+            if (newLog.evento_id && newLog.evento_id !== eventoId) return;
+            const targetTipo = logsTipo || (defaultMode === 'checkout' ? 'checkout' : null);
+            if (targetTipo && newLog.tipo && newLog.tipo !== targetTipo) return;
+            setRecentLogs(prev => {
+                const updated = [newLog, ...prev.filter(l => l.id !== newLog.id)];
+                return updated.slice(0, 50);
+            });
+
+            // Agendar refresh para trazer foto e relações completas da API
+            if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+            refreshTimerRef.current = setTimeout(() => {
+                refreshLogs();
+            }, 600);
+        });
+
+        // 🎯 ABERTURA / IDENTIFICAÇÃO AUTOMÁTICA VIA LEITOR FACIAL (Fase 1)
+        socket.on('credenciamento_abrir', (data) => {
+            const { operationMode: modoAtual, sessaoAtiva: sessao, handleSelectPessoa: selecionar, executarLeituraRapida: leituraRapida } = latestRef.current;
+            // Só a estação vinculada a este leitor reage
+            if (sessao?.dispositivo_id && data?.dispositivo_id && sessao.dispositivo_id !== data.dispositivo_id) return;
+            console.log('📡 [WS] Leitor facial reconheceu:', data);
+            if (data?.pessoa) {
+                tocarBipeNotificacao();
+                if (defaultMode === 'checkout' || modoAtual === 'checkout') {
+                    // Modo Checkout: baixa automática e imediata pelo leitor facial
+                    leituraRapida?.(data.pessoa.id, 'checkout', 'facial');
+                } else {
+                    selecionar?.(data.pessoa);
+                }
+            }
+        });
+
+        // Atualização de status da sessão do operador
+        socket.on('sessao_operador_atualizada', (novaSessao) => {
+            setSessaoAtiva(novaSessao);
+        });
+
+        return () => socket.liberar();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [eventoId, defaultMode, tocarBipeNotificacao]);
+
+    // Fullscreen Listener
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            if (!document.fullscreenElement) {
+                setModoQuiosque(false);
+                document.body.classList.remove('modo-quiosque');
+            }
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, []);
+
+    // Lifecycle
+    useEffect(() => {
+        loadInitialData();
+        updateOfflineCount();
+    }, [loadInitialData, updateOfflineCount]);
+
+    // Actions
+    const handleSearch = async (val) => {
+        setSearchQuery(val);
+        if (val.length < 3) {
+            setSearchResults([]);
+            return;
+        }
+        try {
+            setLoading(true);
+            const res = await api.get('/pessoas/search', { params: { q: val, evento_id: eventoId } });
+            if (res.data.success) {
+                setSearchResults(res.data.data);
+            }
+        } catch (error) {
+            console.error('Erro na busca:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSelectPessoa = (pessoa) => {
+        setSelectedPessoa(pessoa);
+        setSearchResults([]);
+        setSearchQuery('');
+
+        if (pessoa?.areas_autorizadas?.length > 0 && eventAreas.length > 0) {
+            const areaNames = eventAreas.filter(a => pessoa.areas_autorizadas.includes(a.id));
+            if (areaNames.length > 0) {
+                setSelectedPessoa(prev => ({
+                    ...prev,
+                    areas_info: areaNames.map(a => ({ area_id: a.id, nome_area: a.nome_area }))
+                }));
+            }
+        }
+    };
+
+    const consultarPulseiraAPI = async (codigo) => {
+        if (!codigo || !eventoId) return;
+        try {
+            setLoading(true);
+            const res = await api.get(`/access/consultar-pulseira/${codigo}`, { params: { evento_id: eventoId } });
+            if (res.data.success) {
+                const pessoa = res.data.data;
+                handleSelectPessoa(pessoa);
+                performCheckin('pulseira', codigo, pessoa.id);
+            }
+        } catch (error) {
+            console.warn('Pulseira não encontrada:', codigo);
+            setResultMessage('Pulseira não cadastrada.');
+            setCheckinResult('negado');
+            setTimeout(() => {
+                setCheckinResult(null);
+                setResultMessage('');
+            }, 3000);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const executarLeituraRapida = async (codigo, tipoForcado = null, metodoForcado = 'barcode') => {
+        if (!codigo || !eventoId) return { success: false, error: 'Código ou evento ausente' };
+        const tipoFinal = tipoForcado || (defaultMode === 'checkout' ? 'checkout' : 'checkin');
+        try {
+            setLoading(true);
+            const res = await api.post('/access/leitor-rapido', {
+                codigo,
+                tipo: tipoFinal,
+                area_id: areaId,
+                metodo: metodoForcado
+            });
+
+            if (res.data?.success) {
+                const data = res.data.data;
+                tocarBipeNotificacao();
+                setCheckinResult('sucesso');
+                setResultMessage(tipoFinal === 'checkout'
+                    ? `SAÍDA LIBERADA: ${data.pessoa?.nome || 'COLABORADOR'}`
+                    : `ENTRADA LIBERADA: ${data.pessoa?.nome || 'COLABORADOR'}`);
+
+                loadInitialData();
+
+                clearTimeout(resetTimerRef.current);
+                resetTimerRef.current = setTimeout(() => {
+                    setCheckinResult(null);
+                    setResultMessage('');
+                    setSelectedPessoa(null);
+                }, 3000);
+                return { success: true, data };
+            } else {
+                setCheckinResult('negado');
+                setResultMessage(res.data?.error || 'Acesso não autorizado.');
+                clearTimeout(resetTimerRef.current);
+                resetTimerRef.current = setTimeout(() => {
+                    setCheckinResult(null);
+                    setResultMessage('');
+                }, 3500);
+                return { success: false, error: res.data?.error };
+            }
+        } catch (error) {
+            setCheckinResult('negado');
+            setResultMessage(error.response?.data?.error || 'Participante não localizado ou sem autorização.');
+            clearTimeout(resetTimerRef.current);
+            resetTimerRef.current = setTimeout(() => {
+                setCheckinResult(null);
+                setResultMessage('');
+            }, 3500);
+            return { success: false, error: error.response?.data?.error || error.message };
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const performCheckin = async (metodo, extraValue = null, forcedPessoaId = null) => {
+        let targetPessoa = forcedPessoaId ? { id: forcedPessoaId } : selectedPessoa;
+        const isCheckout = defaultMode === 'checkout' || operationMode === 'checkout';
+
+        // Se é pulseira/barcode e não tem pessoa selecionada:
+        if (!targetPessoa && (metodo === 'pulseira' || metodo === 'barcode') && extraValue) {
+            if (isCheckout) {
+                // No checkout direto por bipe, executar baixa rápida
+                return await executarLeituraRapida(extraValue, 'checkout', metodo);
+            } else {
+                await consultarPulseiraAPI(extraValue);
+                return;
+            }
+        }
+
+        if (!targetPessoa && metodo !== 'qrcode') return;
+
+        try {
+            setManualSaving(true);
+            let res;
+
+            if (isCheckout) {
+                // OPERAÇÃO DE BAIXA / CHECKOUT
+                if (metodo === 'pulseira' || metodo === 'barcode') {
+                    res = await api.post('/access/pulseira/checkout', {
+                        numero_pulseira: extraValue || targetPessoa?.numero_pulseira || targetPessoa?.cpf || targetPessoa?.id,
+                        area_id: areaId
+                    });
+                } else {
+                    const payload = {
+                        pessoa_id: targetPessoa.id,
+                        dispositivoId: 'web-dashboard',
+                        evento_id: eventoId,
+                        tipo: 'checkout',
+                        metodo: metodo || 'manual',
+                        area_id: areaId
+                    };
+                    res = await localCheckinService.realizarCheckin(payload, 'manual');
+                }
+            } else if (metodo === 'pulseira') {
+                // CREDENCIAMENTO via BARCODE/PULSEIRA: endpoint que vincula áreas + auto check-in
+                res = await api.post(`/access/credenciar-pulseira`, {
+                    pessoa_id: targetPessoa.id,
+                    numero_pulseira: extraValue,
+                    area_id: areaId
+                });
+            } else {
+                // CHECK-IN MANUAL ou QRCODE
+                const payload = {
+                    dispositivoId: 'web-dashboard',
+                    evento_id: eventoId,
+                    tipo: operationMode === 'auto' ? null : operationMode,
+                    area_id: areaId
+                };
+
+                if (metodo === 'qrcode') {
+                    payload.qrCode = extraValue;
+                } else {
+                    payload.busca = targetPessoa.id;
+                }
+
+                res = await localCheckinService.realizarCheckin(payload, metodo === 'qrcode' ? 'qrcode' : 'manual');
+            }
+
+            const finalData = res.data?.data || res.data || res;
+
+            if (res.status === 'erro_negocio' || (finalData && finalData.tipo === 'negado')) {
+                setCheckinResult('negado');
+                setResultMessage(finalData.erro || finalData.observacao || 'Acesso não autorizado.');
+            } else {
+                setCheckinResult('sucesso');
+                setResultMessage(isCheckout ? 'SAÍDA LIBERADA' : 'CHECK-IN REALIZADO');
+            }
+
+            // Reset automático após 3s
+            clearTimeout(resetTimerRef.current);
+            resetTimerRef.current = setTimeout(() => {
+                setSelectedPessoa(null);
+                setCheckinResult(null);
+                setResultMessage('');
+                setSearchResults([]);
+                setSearchQuery('');
+            }, 3000);
+
+            loadInitialData();
+        } catch (error) {
+            setCheckinResult('negado');
+            setResultMessage(error.response?.data?.error || 'Falha na comunicação com o servidor.');
+            clearTimeout(resetTimerRef.current);
+            resetTimerRef.current = setTimeout(() => {
+                setCheckinResult(null);
+                setResultMessage('');
+            }, 3000);
+        } finally {
+            setManualSaving(false);
+        }
+    };
+
+    const handleLinkPulseiraAndCheckin = async (pessoaId, tipoPulseiraId, numeroPulseira) => {
+        try {
+            setManualSaving(true);
+            const res = await api.post('/access/credenciar-pulseira', {
+                pessoa_id: pessoaId,
+                tipo_pulseira_id: tipoPulseiraId,
+                numero_pulseira: numeroPulseira,
+                area_id: areaId,
+                dispositivoId: 'web-dashboard'
+            });
+
+            if (res.data?.success || res.status === 200) {
+                setCheckinResult('sucesso');
+                setResultMessage('Pulseira vinculada e Entrada autorizada!');
+            }
+
+            clearTimeout(resetTimerRef.current);
+            resetTimerRef.current = setTimeout(() => {
+                setSelectedPessoa(null);
+                setCheckinResult(null);
+                setResultMessage('');
+                setSearchResults([]);
+                setSearchQuery('');
+            }, 3000);
+
+            loadInitialData();
+            return true;
+        } catch (error) {
+            setCheckinResult('negado');
+            setResultMessage(error.response?.data?.error || 'Erro ao vincular pulseira');
+            clearTimeout(resetTimerRef.current);
+            resetTimerRef.current = setTimeout(() => {
+                setCheckinResult(null);
+                setResultMessage('');
+            }, 3000);
+            return false;
+        } finally {
+            setManualSaving(false);
+        }
+    };
+
+    const toggleQuiosque = () => {
+        if (!modoQuiosque) {
+            document.documentElement.requestFullscreen().then(() => {
+                setModoQuiosque(true);
+                document.body.classList.add('modo-quiosque');
+            }).catch(err => console.error('Erro Fullscreen:', err));
+        } else {
+            document.exitFullscreen().then(() => {
+                setModoQuiosque(false);
+                document.body.classList.remove('modo-quiosque');
+            }).catch(err => console.error('Erro Exit Fullscreen:', err));
+        }
+    };
+
+    const changeOperationMode = (mode) => {
+        setOperationMode(mode);
+        // Só persiste se não há modo forçado pela página (ex: 'checkout')
+        if (!defaultMode) localStorage.setItem('nzt_op_mode', mode);
+    };
+
+    const changeAreaId = (id) => {
+        setAreaId(id);
+        if (id) localStorage.setItem('nzt_area_id', id);
+        else localStorage.removeItem('nzt_area_id');
+    };
+
+    latestRef.current = { operationMode, sessaoAtiva, handleSelectPessoa, executarLeituraRapida };
+
+    return {
+        selectedPessoa, setSelectedPessoa: handleSelectPessoa,
+        activeScanner, setActiveScanner,
+        checkinResult, setCheckinResult,
+        resultMessage, setResultMessage,
+        loading, manualSaving,
+        operationMode, changeOperationMode,
+        modoQuiosque, toggleQuiosque,
+        searchQuery, setSearchQuery, handleSearch,
+        searchResults, setSearchResults,
+        eventModules, rfidInputRef,
+        recentLogs, offlineCount, realtimeStats,
+        refreshLogs,
+        areaId, changeAreaId, eventAreas, pulseiraTypes,
+        consultarPulseiraAPI,
+        performCheckin,
+        executarLeituraRapida,
+        handleLinkPulseiraAndCheckin,
+        eventoId,
+        // Sessão do Leitor Facial (Fase 1)
+        sessaoAtiva,
+        dispositivosDisponiveis,
+        loadingSessao,
+        carregarSessaoAtiva,
+        carregarDispositivosDisponiveis,
+        vincularLeitor,
+        desvincularLeitor
+    };
+};

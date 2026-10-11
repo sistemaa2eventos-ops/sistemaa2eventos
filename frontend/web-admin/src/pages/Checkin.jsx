@@ -1,610 +1,368 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
 import { Html5Qrcode } from "html5-qrcode";
-
 import {
-  Box,
-  Typography,
-  Grid,
-  Stack,
-  IconButton,
-  Tooltip,
-  TextField,
-  Autocomplete,
-  Avatar,
-  CircularProgress,
-  List,
-  ListItem,
-  ListItemAvatar,
-  ListItemText,
-  Chip,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
+  Box, Typography, Grid, TextField,
+  List, ListItemText,
+  ListItemButton, Chip, Zoom
 } from '@mui/material';
+import AreaSelector from '../components/common/AreaSelector';
 import {
-  QrCodeScanner as ScannerIcon,
-  FlashOn as FlashOnIcon,
-  FlashOff as FlashOffIcon,
-  FlipCameraIos as CameraIcon,
-  CheckCircle as SuccessIcon,
-  Error as ErrorIcon,
-  Search as SearchIcon,
-  History as HistoryIcon,
+  QrCodeScanner as ScannerIcon, 
+  CheckCircle as SuccessIcon, Cancel as ErrorIcon, Search as SearchIcon,
+  AutoMode as AutoIcon, Fullscreen as KioskIcon,
+  FullscreenExit as ExitKioskIcon,
+  Timer as TimeIcon, Badge as BadgeIcon,
+  EventAvailable as EventIcon
 } from '@mui/icons-material';
-import io from 'socket.io-client';
-import api from '../services/api';
-import localCheckinService from '../services/LocalCheckinService';
-import GlassCard from '../components/common/GlassCard';
-import PageHeader from '../components/common/PageHeader';
-import NeonButton from '../components/common/NeonButton';
 import { styled } from '@mui/material/styles';
 
-const CameraFeed = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'active' && prop !== 'result'
-})(({ theme, active, result }) => ({
-  width: '100%',
-  height: 480,
-  background: '#000',
-  borderRadius: 24,
-  position: 'relative',
-  overflow: 'hidden',
-  border: active ? '2px solid #00D4FF' : (result?.success ? '2px solid #00FF88' : '2px solid rgba(255,255,255,0.05)'),
-  boxShadow: active ? '0 0 30px rgba(0, 212, 255, 0.2)' : (result?.success ? '0 0 30px rgba(0, 255, 136, 0.2)' : 'none'),
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  transition: '0.3s'
-}));
+import PageHeader from '../components/common/PageHeader';
+import GlassCard from '../components/common/GlassCard';
+import NeonButton from '../components/common/NeonButton';
+import UniversalPulseiraInput from '../components/common/UniversalPulseiraInput';
+import EstacaoFacialSelector from '../components/common/EstacaoFacialSelector';
+import ModalCredenciamento from '../components/credenciamento/ModalCredenciamento';
+import PessoaFoto from '../components/common/PessoaFoto';
+import PessoaCardDialog from '../components/credenciamento/PessoaCardDialog';
+import RecentAccessList from '../components/credenciamento/RecentAccessList';
+import { useCheckin } from '../hooks/useCheckin';
+import { useSyncedClock } from '../hooks/useSyncedClock';
 
-const ScanOverlay = styled(Box)(({ theme }) => ({
-  position: 'absolute',
-  top: '50%',
-  left: '50%',
-  transform: 'translate(-50%, -50%)',
-  width: 250,
-  height: 250,
-  border: '2px solid #00D4FF',
-  borderRadius: 24,
-  boxShadow: '0 0 0 1000px rgba(0,0,0,0.5)',
-  '&::after': {
-    content: '""',
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: '100%',
-    height: 2,
-    background: '#00D4FF',
-    boxShadow: '0 0 15px #00D4FF',
-    animation: 'scanline 2s linear infinite',
-  }
+const FeedbackOverlay = styled(Box, { shouldForwardProp: (p) => p !== 'status' })(({ status }) => ({
+    position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+    background: status === 'sucesso' ? 'rgba(0,255,136,0.15)' : 'rgba(255,51,102,0.15)',
+    zIndex: 90, display: 'flex', flexDirection: 'column', alignItems: 'center', 
+    justifyContent: 'center', borderRadius: 12, border: status === 'sucesso' ? '4px solid #00FF88' : '4px solid #FF3366',
+    backdropFilter: 'blur(8px)', animation: 'fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
 }));
 
 const Checkin = () => {
-  const [active, setActive] = useState(false);
-  const [result, setResult] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [manualSaving, setManualSaving] = useState(false);
-  const [devices, setDevices] = useState([]);
-  const [selectedDevice, setSelectedDevice] = useState(null);
-  const [recentLogs, setRecentLogs] = useState([]);
-  const [offlineCount, setOfflineCount] = useState(0);
-  const [eventModules, setEventModules] = useState([]);
-  const [rfidValue, setRfidValue] = useState('');
-  const [linkedTerminal, setLinkedTerminal] = useState(localStorage.getItem('linked_facial_terminal') || '');
-  const [realtimeStats, setRealtimeStats] = useState(null);
-  const rfidInputRef = useRef(null);
+  const {
+    selectedPessoa, setSelectedPessoa, activeScanner, setActiveScanner,
+    checkinResult, resultMessage, loading, manualSaving,
+    modoQuiosque, toggleQuiosque,
+    searchQuery, handleSearch, searchResults,
+    recentLogs, realtimeStats, offlineCount,
+    areaId, changeAreaId, eventAreas, pulseiraTypes,
+    performCheckin,
+    executarLeituraRapida,
+    handleLinkPulseiraAndCheckin,
+    // Vínculo Facial (Fase 1)
+    sessaoAtiva,
+    dispositivosDisponiveis,
+    loadingSessao,
+    vincularLeitor,
+    desvincularLeitor,
+    carregarDispositivosDisponiveis
+  } = useCheckin(undefined, { logsTipo: 'checkin' });
 
-  const [searchParams] = useSearchParams();
-  const eventoId = searchParams.get('evento_id') || localStorage.getItem('active_evento_id');
+  const { currentTime, currentDate, timezoneLabel } = useSyncedClock();
 
-  useEffect(() => {
-    loadInitialData();
-    updateOfflineCount();
+  const [cardLog, setCardLog] = useState(null);
+  const [barcodeValue, setBarcodeValue] = useState('');
 
-    // Add listener to update offline count badge when online 
-    window.addEventListener('online', updateOfflineCount);
-    window.addEventListener('sync-status-changed', updateOfflineCount);
-    // WebSocket setup for real-time monitoring
-    const socket = io((import.meta.env.VITE_API_URL || '').replace(/\/api$/, '') || window.location.origin, {
-      transports: ['polling', 'websocket'],
-      reconnectionAttempts: 5
-    });
-
-    socket.on('connect', () => {
-      console.log('🔌 Conectado ao WebSocket de Acesso');
-      if (eventoId) socket.emit('join_event', eventoId);
-    });
-
-    socket.on('new_access', (newLog) => {
-      // Se for de outro evento, ignora (redundância do servidor)
-      if (eventoId && newLog.evento_id && newLog.evento_id !== eventoId) return;
-
-      console.log('🚀 Novo acesso detectado:', newLog);
-
-      // Atualiza lista de logs recentes
-      setRecentLogs(prev => {
-        const updated = [newLog, ...prev];
-        return updated.slice(0, 5); // Mantém apenas os 5 últimos
-      });
-
-      // Se for checkin com sucesso, mostra o feedback visual grande
-      if (newLog.tipo === 'checkin' || newLog.tipo === 'negado' || newLog.tipo === 'expulsao') {
-        setResult(newLog);
-        // Auto-clear após 7 segundos para não travar a tela se for automático
-        setTimeout(() => setResult(null), 7000);
-      }
-    });
-
-    socket.on('face_identified', (identityLog) => {
-      if (eventoId && identityLog.evento_id !== eventoId) return;
-
-      console.log('👤 Face Identificada (Modo Automação):', identityLog);
-
-      // Auto-preencher se o terminal atual está vinculado ao terminal que fez a leitura
-      const currentLinkedTerminal = localStorage.getItem('linked_facial_terminal');
-      if (currentLinkedTerminal && currentLinkedTerminal === identityLog.dispositivo_id) {
-        // Preencher campo de busca com o ID direto para evitar a lista ambígua
-        setSearchQuery(identityLog.pessoas?.nome || '');
-
-        // Popular resultados diretos
-        setSearchResults([{
-          id: identityLog.pessoa_id,
-          nome: identityLog.pessoas?.nome,
-          cpf: identityLog.pessoas?.cpf,
-          status: identityLog.pessoas?.status_acesso,
-          confianca: identityLog.confianca
-        }]);
-
-        // Focar cursor no input de RFID se o módulo estiver ativo
-        setTimeout(() => {
-          if (rfidInputRef.current) {
-            rfidInputRef.current.focus();
-          }
-        }, 300);
-      }
-    });
-
-    return () => {
-      window.removeEventListener('online', updateOfflineCount);
-      window.removeEventListener('sync-status-changed', updateOfflineCount);
-      socket.disconnect();
-    };
-  }, [eventoId]);
-
-  const updateOfflineCount = async () => {
-    const count = await localCheckinService.getPendenteCount();
-    setOfflineCount(count);
+  // Confirmação de credenciamento do modal (Fase 2)
+  const handleConfirmarCredenciamento = ({ pessoa_id, numero_pulseira, tipo_pulseira_id }) => {
+    if (manualSaving || loading || !pessoa_id) return;
+    if (tipo_pulseira_id && numero_pulseira) {
+      handleLinkPulseiraAndCheckin(pessoa_id, tipo_pulseira_id, numero_pulseira);
+    } else if (numero_pulseira) {
+      performCheckin('pulseira', numero_pulseira, pessoa_id);
+    } else {
+      performCheckin('manual', null, pessoa_id);
+    }
   };
 
+  // QR Scanner Lifecycle
   useEffect(() => {
     let html5QrCode;
-    if (active) {
+    if (activeScanner) {
       const startScanner = async () => {
         try {
-          html5QrCode = new Html5Qrcode("reader");
+          html5QrCode = new Html5Qrcode("reader-quiosque");
           await html5QrCode.start(
             { facingMode: "user" },
-            {
-              fps: 10,
-              qrbox: { width: 250, height: 250 }
-            },
+            { fps: 10, qrbox: { width: 250, height: 250 } },
             async (decodedText) => {
-              // Success
-              console.log("QR Code detected:", decodedText);
               await html5QrCode.stop();
-              setActive(false);
-              await handleQRCodeCheckin(decodedText);
+              setActiveScanner(false);
+              performCheckin('qrcode', decodedText);
             },
-            (errorMessage) => {
-              // Ignore standard scanning errors
-            }
+            () => {}
           );
         } catch (err) {
-          console.error("Error starting scanner:", err);
-          setActive(false);
+          console.error("Scanner fail:", err);
+          setActiveScanner(false);
         }
       };
-      // Small timeout to ensure DOM element is ready
       setTimeout(startScanner, 100);
     }
-
-    return () => {
-      if (html5QrCode && html5QrCode.isScanning) {
-        html5QrCode.stop().catch(err => console.error("Error stopping scanner", err));
-      }
-    };
-  }, [active]);
-
-  const handleQRCodeCheckin = async (qrCode) => {
-    try {
-      setLoading(true);
-      const res = await localCheckinService.realizarCheckin(
-        { qrCode, dispositivoId: 'web-dashboard', evento_id: eventoId },
-        'qrcode'
-      );
-
-      setResult(res.data || res);
-      loadInitialData();
-      updateOfflineCount();
-    } catch (error) {
-      console.error('Erro no checkin QR:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
-  const loadInitialData = async () => {
-    try {
-      const [devRes, logRes, eventRes, statsRes] = await Promise.all([
-        api.get('/devices', { params: { evento_id: eventoId } }),
-        api.get(`/access/logs?limit=5&evento_id=${eventoId}`),
-        api.get(`/eventos/${eventoId}`),
-        api.get('/access/stats/realtime', { params: { evento_id: eventoId } })
-      ]);
-      setDevices(devRes.data.data || []);
-      setRecentLogs(logRes.data.data || []);
-      setEventModules(eventRes.data.data?.event_modules || []);
-      setRealtimeStats(statsRes.data.data || null);
-
-      if (devRes.data.data?.length > 0) {
-        setSelectedDevice(devRes.data.data[0]);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-    }
-  };
-
-  const handleSearch = async (val) => {
-    setSearchQuery(val);
-    if (val.length < 3) return;
-    try {
-      setLoading(true);
-      // USAMOS O ENDPOINT DE BUSCA PURA (PessoaController.search)
-      // Isso evita tentar fazer check-in automático enquanto o operador digita
-      const res = await api.get('/pessoas/search', { params: { q: val } });
-
-      if (res.data.success) {
-        setSearchResults(res.data.data);
-      }
-    } catch (error) {
-      console.error('Erro na busca manual:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleManualCheckin = async (pessoaId) => {
-    try {
-      setManualSaving(true);
-      const payload = {
-        busca: pessoaId,
-        dispositivoId: 'web-dashboard',
-        evento_id: eventoId
-      };
-
-      // Se o módulo RFID estiver ativo e houver valor, envia
-      const rfidModule = eventModules.find(m => m.module_key === 'checkin_rfid' && m.is_enabled);
-      if (rfidModule && rfidValue) {
-        payload.rfid = rfidValue;
-
-        // Se temos um valor RFID e foi inserido via automação (campo único), o serviço central 
-        // espera o payload correto para pulseira
-        if (rfidValue.length >= 4) {
-          // Opcional: Se a lógica no localCheckinService já der suporte a RFID misto no 'manual'.
-          // Se não, poderíamos chamar localCheckinService.realizarCheckin(..., 'rfid') direto caso 
-          // seja estritamente RFID. Por hora, enviamos 'manual' com a tag anexada.
-        }
-      }
-
-      const res = await localCheckinService.realizarCheckin(payload, 'manual');
-
-      // Auto-imprimir etiqueta se o módulo estiver ativo e a resposta for sucesso
-      if ((res.data?.success || res?.success) && eventModules.find(m => m.module_key === 'checkin_etiqueta' && m.is_enabled)) {
-        console.log("🖨️ Disparando impressão de etiqueta para:", pessoaId);
-        // Chama endpoint de fila de impressão se existir
-        api.post(`/devices/print-label`, { pessoa_id: pessoaId, evento_id: eventoId })
-          .catch(err => console.error("Falha ao enviar comando de impressão:", err));
-      }
-
-      setResult(res.data || res);
-      setSearchResults([]);
-      setSearchQuery('');
-      setRfidValue('');
-      loadInitialData();
-      updateOfflineCount();
-    } catch (error) {
-      console.error('Erro no checkin:', error);
-    } finally {
-      setManualSaving(false);
-    }
-  };
-
-  const handleLinkTerminalChange = (e) => {
-    const val = e.target.value;
-    setLinkedTerminal(val);
-    if (val) {
-      localStorage.setItem('linked_facial_terminal', val);
-    } else {
-      localStorage.removeItem('linked_facial_terminal');
-    }
-  };
+    return () => { if (html5QrCode?.isScanning) html5QrCode.stop(); };
+  }, [activeScanner, performCheckin, setActiveScanner]);
 
   return (
-    <Box sx={{ p: 4 }}>
-      <PageHeader
-        title="Controle de Acesso - NEXUS"
-        subtitle="Gerenciamento de entrada e saída em tempo real"
-        icon={<ScannerIcon sx={{ fontSize: 40, color: '#00D4FF' }} />}
-      />
+    <Box sx={{ 
+        p: modoQuiosque ? 2 : { xs: 1.5, sm: 2.5, md: 3 }, 
+        maxWidth: '100%',
+        overflowX: 'hidden',
+        minHeight: modoQuiosque ? '100vh' : 'auto',
+        display: 'flex', flexDirection: 'column'
+    }}>
+      
+      {/* HEADER SECTION */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <PageHeader
+            title={modoQuiosque ? "" : "Check-in"}
+            subtitle={modoQuiosque ? "" : `Operação de Entrada e Identificação • ${currentDate} ${currentTime} (${timezoneLabel})`}
+            icon={modoQuiosque ? null : <ScannerIcon sx={{ fontSize: 40, color: '#00D4FF' }} />}
+            sx={{ m: 0, p: 0 }}
+        />
+        
+        {modoQuiosque && (
+            <Box sx={{ position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)', opacity: 0.8, textAlign: 'center' }}>
+                <Typography variant="h4" fontWeight={700} color="#00D4FF" letterSpacing={4}>
+                    NZT <BadgeIcon /> ACCESS
+                </Typography>
+                <Typography variant="caption" color="rgba(255,255,255,0.6)" sx={{ fontFamily: '"Inter", sans-serif' }}>
+                    {currentTime} • {timezoneLabel}
+                </Typography>
+            </Box>
+        )}
 
-      <Box sx={{ mb: 3 }}>
-        <GlassCard sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2, border: linkedTerminal ? '1px solid #00FF88' : '1px solid rgba(0, 212, 255, 0.2)' }}>
-          <CameraIcon sx={{ color: linkedTerminal ? '#00FF88' : '#00D4FF' }} />
-          <FormControl fullWidth size="small">
-            <InputLabel sx={{ color: 'text.secondary' }}>Vincular Leitor Facial (Modo Recepcionistta / Pulseira)</InputLabel>
-            <Select
-              value={linkedTerminal}
-              onChange={(e) => {
-                const val = e.target.value;
-                setLinkedTerminal(val);
-                if (val) {
-                  localStorage.setItem('linked_facial_terminal', val);
-                } else {
-                  localStorage.removeItem('linked_facial_terminal');
-                }
-              }}
-              label="Vincular Leitor Facial (Modo Recepcionistta / Pulseira)"
-              sx={{ color: '#fff', '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.1)' } }}
-            >
-              <MenuItem value="">Nenhum (Ignorar Envios Autônomos)</MenuItem>
-              {devices.map(d => (
-                <MenuItem key={d.id} value={d.id}>{d.nome} {d.config?.modo_identificacao ? '(Modo Identidade)' : ''}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </GlassCard>
+        <NeonButton 
+            onClick={toggleQuiosque} 
+            color={modoQuiosque ? "error" : "primary"}
+            sx={{ px: 3, py: 1.5, borderRadius: 1.5 }}
+        >
+            {modoQuiosque ? <ExitKioskIcon sx={{ mr: 1 }} /> : <KioskIcon sx={{ mr: 1 }} />}
+            {modoQuiosque ? "Sair do quiosque" : "Modo quiosque"}
+        </NeonButton>
       </Box>
 
-      <Grid container spacing={3}>
-        <Grid item xs={12} lg={8}>
-          <GlassCard sx={{ p: 0, overflow: 'hidden' }}>
-            <Box sx={{ p: 3, borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="h6" sx={{ color: '#00D4FF', fontWeight: 800 }}>
-                LIVE FEED / MANUAL
-                {offlineCount > 0 && <span style={{ marginLeft: 10, fontSize: '0.8rem', color: '#ffb74d' }}>({offlineCount} OFFLINE)</span>}
-                {!navigator.onLine && <span style={{ marginLeft: 10, fontSize: '0.8rem', color: '#ef5350' }}>[DESCONECTADO]</span>}
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                <FormControl size="small" sx={{ minWidth: 200 }}>
-                  <InputLabel id="link-terminal-label" sx={{ color: '#fff' }}>Vincular Terminal Facial</InputLabel>
-                  <Select
-                    labelId="link-terminal-label"
-                    value={linkedTerminal}
-                    label="Vincular Terminal Facial"
-                    onChange={handleLinkTerminalChange}
-                    sx={{ color: '#fff', '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.2)' } }}
-                  >
-                    <MenuItem value=""><em>Nenhum (Standalone)</em></MenuItem>
-                    {devices.filter(d => d.tipo === 'terminal_facial').map(d => (
-                      <MenuItem key={d.id} value={d.id}>{d.nome}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <Chip label="TERMINAL WEB" variant="outlined" sx={{ color: '#00D4FF', borderColor: 'rgba(0, 212, 255, 0.3)', fontWeight: 800 }} />
-              </Box>
-            </Box>
+      {/* 📡 Seletor e Status da Estação / Leitor Facial (Fase 1) */}
+      {!modoQuiosque && (
+          <EstacaoFacialSelector
+              sessaoAtiva={sessaoAtiva}
+              dispositivos={dispositivosDisponiveis}
+              loading={loadingSessao}
+              onVincular={vincularLeitor}
+              onDesvincular={desvincularLeitor}
+              onRecarregar={carregarDispositivosDisponiveis}
+          />
+      )}
 
-            <Box sx={{ p: 3 }}>
-              <CameraFeed active={active} result={result}>
-                {!active && !result && (
-                  <Stack alignItems="center" spacing={3} sx={{ width: '80%' }}>
-                    <ScannerIcon sx={{ fontSize: 80, opacity: 0.2, color: '#00D4FF' }} />
-                    <Typography sx={{ opacity: 0.5, letterSpacing: 2, fontWeight: 700 }}>AGUARDANDO ATIVAÇÃO DE SENSORES</Typography>
+      <AreaSelector areas={eventAreas} value={areaId} onChange={changeAreaId} accentColor="#00D4FF" />
 
-                    <Stack spacing={2} sx={{ width: '100%' }}>
-                      <Box sx={{ width: '100%', position: 'relative' }}>
-                        <TextField
-                          fullWidth
-                          placeholder="Pesquisar por Nome ou CPF..."
-                          value={searchQuery}
-                          onChange={(e) => handleSearch(e.target.value)}
-                          InputProps={{
-                            startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />,
-                            sx: { height: 56, borderRadius: 4, fontSize: '1.1rem' }
-                          }}
-                        />
-                        {loading && <CircularProgress size={20} sx={{ position: 'absolute', right: 10, top: 18 }} />}
+      {/* MAIN CONTENT AREA */}
+      <Grid container spacing={3} sx={{ flex: 1, minHeight: 'calc(100vh - 200px)' }}>
+        
+        {/* IDENTIFICAÇÃO E ENTRADA (Lado Esquerdo - 4 colunas) */}
+        <Grid item xs={12} lg={4}>
+            <GlassCard sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                {/* 1. LEITOR DE CÓDIGO DE BARRAS / CPF - ENTRADA DIRETA SEM PULSEIRA */}
+                <Box sx={{ mb: 2.5 }}>
+                    <Typography variant="h6" fontWeight={700} color="#00FF88" mb={0.5} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <ScannerIcon /> Entrada direta (leitor / CPF)
+                    </Typography>
+                    <Typography variant="caption" sx={{ opacity: 0.7, mb: 1.5, display: 'block' }}>
+                        Bipe com a pistola ou digite o CPF para autorizar entrada imediata sem pulseira.
+                    </Typography>
 
-                        {searchResults.length > 0 && (
-                          <GlassCard sx={{ position: 'absolute', top: '110%', left: 0, right: 0, zIndex: 10, p: 0, maxHeight: 200, overflow: 'auto' }}>
-                            <List>
-                              {searchResults.map((f) => (
-                                <ListItem
-                                  key={f.id}
-                                  button
-                                  onClick={() => handleManualCheckin(f.id)}
-                                  sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}
-                                >
-                                  <ListItemAvatar><Avatar>{f.nome[0]}</Avatar></ListItemAvatar>
-                                  <ListItemText
-                                    primary={f.nome}
-                                    secondary={f.cpf}
-                                    primaryTypographyProps={{ fontWeight: 700 }}
-                                  />
-                                  <Chip label={f.status_acesso || f.status || 'pendente'} size="small" />
-                                </ListItem>
-                              ))}
-                            </List>
-                          </GlassCard>
-                        )}
-                      </Box>
-
-                      {eventModules.find(m => m.module_key === 'checkin_rfid' && m.is_enabled) && (
-                        <TextField
-                          fullWidth
-                          inputRef={rfidInputRef}
-                          placeholder="Número da Pulseira / RFID..."
-                          value={rfidValue}
-                          onChange={(e) => setRfidValue(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && rfidValue && searchResults.length === 1) {
-                              handleManualCheckin(searchResults[0].id);
+                    <UniversalPulseiraInput
+                        value={barcodeValue}
+                        onChange={setBarcodeValue}
+                        accentColor="#00FF88"
+                        label="LEITOR DE CÓDIGO DE BARRAS / CPF"
+                        placeholder="Bipe o crachá ou digite o CPF"
+                        helperText="Pressione Enter ↵ para liberar a entrada imediatamente"
+                        onConfirm={(val) => {
+                            const cod = (val || barcodeValue || '').trim();
+                            if (cod) {
+                                executarLeituraRapida(cod, 'checkin', 'barcode');
+                                setBarcodeValue('');
                             }
-                          }}
-                          InputProps={{
-                            sx: { height: 50, borderRadius: 3, background: 'rgba(0,0,0,0.2)' }
-                          }}
-                        />
-                      )}
-                    </Stack>
+                        }}
+                        loading={loading}
+                        autoFocus={!modoQuiosque}
+                    />
+                </Box>
 
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>OU</Typography>
-                    <NeonButton
-                      onClick={() => setActive(true)}
-                      disabled={manualSaving}
-                      sx={{ minHeight: 56, borderRadius: 4, width: '100%', fontSize: '1.1rem' }}
-                    >
-                      INICIAR SCANNER ÓPTICO
-                    </NeonButton>
-                  </Stack>
-                )}
+                <Box sx={{ display: 'flex', alignItems: 'center', my: 1.5 }}>
+                    <Box sx={{ flex: 1, height: '1px', bgcolor: 'rgba(255,255,255,0.1)' }} />
+                    <Typography variant="caption" sx={{ px: 1.5, opacity: 0.5, fontWeight: 700, letterSpacing: 1 }}>
+                        Ou localizar no sistema
+                    </Typography>
+                    <Box sx={{ flex: 1, height: '1px', bgcolor: 'rgba(255,255,255,0.1)' }} />
+                </Box>
 
-                {active && (
-                  <>
-                    <div id="reader" style={{ width: '100%', height: '100%' }}></div>
-                    <Box sx={{ position: 'absolute', bottom: 40, width: '100%', display: 'flex', justifyContent: 'center', zIndex: 10 }}>
-                      <NeonButton variant="outlined" color="error" onClick={() => setActive(false)} sx={{ minHeight: 56, width: '80%', borderRadius: 4 }}>ENCERRAR SCANNER</NeonButton>
-                    </Box>
-                  </>
-                )}
+                {/* 2. BUSCA POR NOME / CPF PARA CREDENCIAMENTO */}
+                <Typography variant="subtitle2" fontWeight={700} color="#00D4FF" mb={0.5} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <SearchIcon fontSize="small" /> Busca manual & pulseira
+                </Typography>
+                <Typography variant="caption" sx={{ opacity: 0.7, mb: 1.5 }}>
+                    Localize para abrir o modal de dados ou vincular pulseira física se desejar.
+                </Typography>
 
-                {result && (
-                  <Stack alignItems="center" spacing={2} sx={{ animation: 'counterUp 0.4s ease-out', width: '90%' }}>
-                    {result.tipo === 'checkin' ? (
-                      <>
-                        <SuccessIcon sx={{ fontSize: 100, color: '#00FF88', filter: 'drop-shadow(0 0 10px rgba(0,255,136,0.3))' }} />
-                        <Typography variant="h3" sx={{ fontWeight: 900, fontFamily: '"Orbitron", sans-serif', color: '#fff', textAlign: 'center' }}>ACESSO LIBERADO</Typography>
-                      </>
+                <TextField
+                    fullWidth
+                    placeholder="Buscar por nome ou CPF"
+                    value={searchQuery}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    InputProps={{ 
+                        startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />,
+                        sx: { borderRadius: 1.5, height: 50, fontSize: '1rem', bgcolor: 'rgba(255,255,255,0.03)' }
+                    }}
+                />
+
+                <Box sx={{ mt: 2, flex: 1, overflow: 'auto', minHeight: 260 }}>
+                    {searchResults.length > 0 ? (
+                        <List disablePadding>
+                            {searchResults.map(p => (
+                                <ListItemButton
+                                    key={p.id}
+                                    onClick={() => setSelectedPessoa(p)}
+                                    sx={{ 
+                                        borderRadius: 1.5, 
+                                        mb: 1.2, 
+                                        p: 1.5,
+                                        border: '1px solid rgba(255,255,255,0.06)',
+                                        bgcolor: 'rgba(255,255,255,0.02)',
+                                        '&:hover': {
+                                            bgcolor: 'rgba(0, 212, 255, 0.08)',
+                                            borderColor: 'rgba(0, 212, 255, 0.4)'
+                                        }
+                                    }}
+                                >
+                                    <Box sx={{ mr: 2 }}>
+                                        <PessoaFoto
+                                            src={p.foto_url}
+                                            nome={p.nome}
+                                            width={48}
+                                            borderRadius="8px"
+                                            accentColor="#00D4FF"
+                                        />
+                                    </Box>
+                                    <ListItemText 
+                                        primary={p.nome} 
+                                        secondary={p.cpf || 'Sem CPF'}
+                                        primaryTypographyProps={{ fontWeight: 700, fontSize: '1rem' }}
+                                        secondaryTypographyProps={{ fontSize: '0.8125rem', opacity: 0.7 }}
+                                    />
+                                    {p.empresa_nome && (
+                                        <Chip 
+                                            label={p.empresa_nome} 
+                                            size="small" 
+                                            sx={{ maxWidth: 120, fontSize: '0.75rem' }} 
+                                        />
+                                    )}
+                                </ListItemButton>
+                            ))}
+                        </List>
                     ) : (
-                      <>
-                        <ErrorIcon sx={{ fontSize: 100, color: '#FF3366', filter: 'drop-shadow(0 0 10px rgba(255,51,102,0.3))' }} />
-                        <Typography variant="h3" sx={{ fontWeight: 900, fontFamily: '"Orbitron", sans-serif', color: '#fff', textAlign: 'center' }}>ACESSO NEGADO</Typography>
-                      </>
+                        searchQuery.length >= 3 && !loading && (
+                            <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', opacity: 0.5, mt: 4 }}>
+                                Nenhum participante encontrado para &quot;{searchQuery}&quot;.
+                            </Typography>
+                        )
                     )}
-
-                    <Box sx={{
-                      p: 2.5,
-                      background: result.tipo === 'checkin' ? 'rgba(0,255,136,0.1)' : 'rgba(255,51,102,0.1)',
-                      borderRadius: 4,
-                      textAlign: 'center',
-                      border: result.tipo === 'checkin' ? '1px solid rgba(0,255,136,0.2)' : '1px solid rgba(255,51,102,0.2)',
-                      width: '100%'
-                    }}>
-                      <Typography variant="h5" sx={{ color: result.tipo === 'checkin' ? '#00FF88' : '#FF3366', fontWeight: 800 }}>
-                        {result.pessoas?.nome || result.pessoa?.nome || result.data?.pessoa?.nome || 'USUÁRIO DESCONHECIDO'}
-                      </Typography>
-                      <Typography variant="body1" sx={{ color: 'text.secondary', mt: 0.5 }}>
-                        {result.observacao || result.pessoas?.empresas?.nome || result.pessoa?.empresas?.nome || 'Verifique as credenciais'}
-                      </Typography>
-                    </Box>
-                    <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
-                      <NeonButton variant="outlined" onClick={() => setResult(null)} sx={{ minHeight: 56 }}>LIMPAR TELA</NeonButton>
-                      <NeonButton onClick={() => setResult(null)} sx={{ minHeight: 56 }}>OK</NeonButton>
-                    </Stack>
-                  </Stack>
-                )}
-              </CameraFeed>
-            </Box>
-
-          </GlassCard>
+                </Box>
+            </GlassCard>
         </Grid>
 
-        <Grid item xs={12} lg={4}>
-          <Stack spacing={3}>
-            <GlassCard sx={{ p: 3 }} glowColor="#00FF88">
-              <Typography variant="subtitle2" sx={{ color: '#00FF88', fontWeight: 900, mb: 2, letterSpacing: 2 }}>MÉTRICAS DA OPERAÇÃO</Typography>
-
-              {realtimeStats && (
-                <Stack spacing={1.5} sx={{ mb: 3, p: 2, bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 2, border: '1px solid rgba(0, 255, 136, 0.1)' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 700 }}>Pessoas Presentes:</Typography>
-                    <Typography variant="body1" sx={{ color: '#fff', fontWeight: 800 }}>
-                      {realtimeStats.presentes} {realtimeStats.capacidade > 0 ? `/ ${realtimeStats.capacidade}` : ''}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 700 }}>Empresas Logadas:</Typography>
-                    <Typography variant="body1" sx={{ color: '#fff', fontWeight: 800 }}>
-                      {realtimeStats.empresas?.length || 0}
-                    </Typography>
-                  </Box>
-                </Stack>
-              )}
-
-              <Typography variant="caption" sx={{ color: 'text.secondary', mb: 1, display: 'block', fontWeight: 700 }}>MÓDULOS PERMITIDOS:</Typography>
-              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                {eventModules.filter(m => m.is_enabled).map(mod => (
-                  <Chip
-                    key={mod.module_key}
-                    label={mod.module_key.replace('checkin_', '').toUpperCase()}
-                    size="small"
-                    sx={{ background: 'rgba(0, 212, 255, 0.1)', color: '#00D4FF', border: '1px solid rgba(0, 212, 255, 0.2)', fontWeight: 700 }}
-                  />
-                ))}
-                {eventModules.filter(m => m.is_enabled).length === 0 && (
-                  <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>Nenhum módulo configurado</Typography>
-                )}
-              </Stack>
+        {/* MONITORAMENTO EM TEMPO REAL (Lado Direito - 8 colunas) */}
+        <Grid item xs={12} lg={8}>
+            <GlassCard sx={{ p: 3.5, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <RecentAccessList
+                    logs={recentLogs}
+                    title="Colaboradores credenciados"
+                    subtitle="Últimas entradas registradas com foto, empresa e pulseira."
+                    accentColor="#00D4FF"
+                    badgeLabel="CREDENCIADO"
+                    firstLabel="ÚLTIMA ENTRADA"
+                    emptyTitle="Aguardando credenciamentos..."
+                    emptySubtitle="Conectado em tempo real ao gateway. Assim que uma entrada for realizada, o colaborador aparecerá aqui."
+                    onSelect={(log) => setCardLog(log)}
+                />
             </GlassCard>
-
-            <GlassCard sx={{ p: 3 }}>
-              <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="subtitle2" sx={{ color: 'text.secondary', fontWeight: 700, letterSpacing: 1 }}>FLUXO RECENTE</Typography>
-                <HistoryIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
-              </Stack>
-              <Stack spacing={2}>
-                {recentLogs.map((log, i) => (
-                  <Box key={log.id} sx={{
-                    display: 'flex',
-                    gap: 2,
-                    p: 1.5,
-                    background: 'rgba(255,255,255,0.02)',
-                    borderRadius: 3,
-                    border: '1px solid rgba(255,255,255,0.05)',
-                    transition: '0.2s',
-                    '&:hover': { background: 'rgba(0, 212, 255, 0.05)', borderColor: 'rgba(0, 212, 255, 0.2)' }
-                  }}>
-                    <Avatar sx={{
-                      width: 36,
-                      height: 36,
-                      fontSize: '0.8rem',
-                      bgcolor: log.tipo === 'checkin' ? 'rgba(0,255,136,0.1)' : 'rgba(255,51,102,0.1)',
-                      color: log.tipo === 'checkin' ? '#00FF88' : '#FF3366',
-                      fontWeight: 800
-                    }}>
-                      {log.pessoas?.nome?.charAt(0) || 'U'}
-                    </Avatar>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="caption" sx={{ fontWeight: 800, color: '#fff' }}>{log.pessoas?.nome || 'NEXUS OPERADOR'}</Typography>
-                      <Typography variant="caption" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        {new Date(log.created_at).toLocaleTimeString()} • {log.tipo.toUpperCase()} • {log.dispositivos_acesso?.nome || 'Web Dashboard'}
-                      </Typography>
-                    </Box>
-                  </Box>
-                ))}
-                {recentLogs.length === 0 && (
-                  <Typography variant="caption" sx={{ color: 'text.secondary', textAlign: 'center', py: 2 }}>NENHUMA ATIVIDADE REGISTRADA</Typography>
-                )}
-              </Stack>
-            </GlassCard>
-          </Stack>
         </Grid>
       </Grid>
+
+      {/* FEEDBACK OVERLAY GLOBAL */}
+      {checkinResult && (
+          <FeedbackOverlay status={checkinResult}>
+              <Zoom in={!!checkinResult}>
+                  <Box sx={{ textAlign: 'center' }}>
+                      {checkinResult === 'sucesso' ? <SuccessIcon sx={{ fontSize: 130, color: '#00FF88' }} /> : <ErrorIcon sx={{ fontSize: 130, color: '#FF3366' }} />}
+                      <Typography variant="h3" fontWeight={700} mt={2}>
+                          {checkinResult === 'sucesso' ? 'LIBERADO' : 'NEGADO'}
+                      </Typography>
+                      <Typography variant="h6" sx={{ opacity: 0.8 }}>{resultMessage}</Typography>
+                      {checkinResult === 'sucesso' && (
+                          <Typography variant="h5" sx={{ mt: 2, opacity: 0.6, fontFamily: '"Inter", sans-serif', letterSpacing: 1.5 }}>
+                              {currentTime} • {timezoneLabel}
+                          </Typography>
+                      )}
+                  </Box>
+              </Zoom>
+          </FeedbackOverlay>
+      )}
+
+      {/* MODAL DE CREDENCIAMENTO E ACESSO RÁPIDO */}
+      <ModalCredenciamento
+          open={!!selectedPessoa}
+          pessoa={selectedPessoa}
+          onClose={() => setSelectedPessoa(null)}
+          onConfirmar={handleConfirmarCredenciamento}
+          pulseiraTypes={pulseiraTypes}
+          eventAreas={eventAreas}
+          loading={manualSaving || loading}
+          onOpenQrScanner={() => setActiveScanner(true)}
+      />
+
+      {/* DIALOG DETALHADO DO CARD DO PARTICIPANTE */}
+      <PessoaCardDialog
+          open={!!cardLog}
+          log={cardLog}
+          onClose={() => setCardLog(null)}
+          accentColor="#00D4FF"
+      />
+
+      {/* STATS SECTION (Hidden on Kiosk) */}
+      {!modoQuiosque && (
+        <Box sx={{ mt: 3 }}>
+            <Grid container spacing={3}>
+                <Grid item xs={6} md={4}>
+                    <GlassCard sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <AutoIcon color="primary" />
+                        <Box>
+                            <Typography variant="caption" color="text.secondary">PRESENTES</Typography>
+                            <Typography variant="h5" fontWeight={700}>{realtimeStats?.presentes || 0}</Typography>
+                        </Box>
+                    </GlassCard>
+                </Grid>
+                <Grid item xs={6} md={4}>
+                    <GlassCard sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                         <EventIcon color="secondary" />
+                        <Box>
+                            <Typography variant="caption" color="text.secondary">OFFLINE PENDENTES</Typography>
+                            <Typography variant="h5" fontWeight={700} color={offlineCount > 0 ? "warning.main" : "inherit"}>{offlineCount}</Typography>
+                        </Box>
+                    </GlassCard>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                    <GlassCard sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <TimeIcon sx={{ color: '#00D4FF' }} />
+                        <Box>
+                            <Typography variant="caption" color="text.secondary">HORÁRIO OFICIAL ({timezoneLabel})</Typography>
+                            <Typography variant="h5" fontWeight={700} color="#00D4FF" sx={{ fontFamily: '"Inter", sans-serif', letterSpacing: 1.5 }}>
+                                {currentTime}
+                            </Typography>
+                        </Box>
+                    </GlassCard>
+                </Grid>
+            </Grid>
+        </Box>
+      )}
     </Box>
   );
 };
