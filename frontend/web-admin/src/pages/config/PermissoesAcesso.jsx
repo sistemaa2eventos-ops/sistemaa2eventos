@@ -1,271 +1,173 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Box, Typography, Grid, Switch, FormControlLabel, FormGroup,
-    Select, MenuItem, Stack, Divider, Chip, CircularProgress
+    Box, Typography, Grid, Switch, FormControlLabel, Select, MenuItem, Stack,
+    CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, Button, Alert
 } from '@mui/material';
-import {
-    Security as SecurityIcon,
-    DesktopWindows as WebIcon,
-    PhoneAndroid as MobileIcon,
-    Language as PublicIcon,
-    Save as SaveIcon,
-} from '@mui/icons-material';
+import { Security as SecurityIcon, Save as SaveIcon, GroupAdd as AplicarIcon } from '@mui/icons-material';
 import api from '../../services/api';
 import GlassCard from '../../components/common/GlassCard';
 import NeonButton from '../../components/common/NeonButton';
 import PageHeader from '../../components/common/PageHeader';
+import { MODULOS } from '../../hooks/useUsuarios';
 import { useSnackbar } from 'notistack';
 
-// ============================================================
-// KEY MAP — Todas as chaves de menu para cada plataforma
-// ============================================================
-const WEB_ADMIN_ITEMS = [
-    { key: 'dashboard', label: 'Dashboard' },
-    { key: 'empresas', label: 'Empresas' },
-    { key: 'participantes', label: 'Participantes' },
-    { key: 'auditoria', label: 'Auditoria Documental' },
-    { key: 'relatorios', label: 'Relatórios' },
-    { key: 'frota_lpr', label: 'Frota LPR' },
-    { key: 'checkin', label: 'Check-in' },
-    { key: 'checkout', label: 'Check-out' },
-    { key: 'monitor', label: 'Monitor' },
-    { key: 'usuarios', label: 'Usuários' },
-    { key: 'configuracoes', label: 'Configurações' },
+// O sistema tem dois papéis: Admin Master (acesso total) e Operador
+const PERFIS = [
+    { value: 'operador', label: 'Operador' }
 ];
 
-const MOBILE_APP_ITEMS = [
-    { key: 'mob_scanner', label: 'Scanner QR' },
-    { key: 'mob_explore', label: 'Explorar' },
-    { key: 'mob_monitoring', label: 'Monitoramento' },
-    { key: 'mob_profile', label: 'Perfil' },
-];
-
-const PUBLIC_WEB_ITEMS = [
-    { key: 'pub_inscricao', label: 'Inscrição' },
-    { key: 'pub_consulta', label: 'Consulta de Status' },
-    { key: 'pub_documentos', label: 'Documentos' },
-];
-
-const ROLES = [
-    { value: 'supervisor', label: 'Supervisor' },
-    { value: 'operador', label: 'Operador' },
-    { value: 'op_atendimento', label: 'Op. Atendimento' },
-    { value: 'op_monitoramento', label: 'Op. Monitoramento' },
-    { value: 'op_analista', label: 'Op. Analista' },
-    { value: 'empresa', label: 'Empresa' },
-    { value: 'cliente', label: 'Cliente' },
-];
-
+/**
+ * Perfis de Acesso: modelo de permissões por papel.
+ * Usuário novo nasce com o modelo do seu papel; a tela Usuários ajusta cada pessoa.
+ */
 const PermissoesAcesso = () => {
     const { enqueueSnackbar } = useSnackbar();
-    const [selectedRole, setSelectedRole] = useState('supervisor');
-    const [webAdmin, setWebAdmin] = useState([]);
-    const [mobileApp, setMobileApp] = useState([]);
-    const [publicWeb, setPublicWeb] = useState([]);
+    const [perfil, setPerfil] = useState('operador');
+    const [modulos, setModulos] = useState({});
+    const [info, setInfo] = useState(null);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [alterado, setAlterado] = useState(false);
+    const [confirmarAplicar, setConfirmarAplicar] = useState(false);
+    const [aplicando, setAplicando] = useState(false);
 
-    useEffect(() => {
-        fetchPermissions(selectedRole);
-    }, [selectedRole]);
-
-    const fetchPermissions = async (role) => {
+    const carregar = useCallback(async (p) => {
         try {
             setLoading(true);
-            const response = await api.get(`/auth/permissions/${role}`);
-            const perms = response.data.data;
-            if (perms) {
-                setWebAdmin(perms.web_admin || []);
-                setMobileApp(perms.mobile_app || []);
-                setPublicWeb(perms.public_web || []);
-            } else {
-                // Sem permissões configuradas = todas ativadas
-                setWebAdmin(WEB_ADMIN_ITEMS.map(i => i.key));
-                setMobileApp(MOBILE_APP_ITEMS.map(i => i.key));
-                setPublicWeb(PUBLIC_WEB_ITEMS.map(i => i.key));
-            }
-        } catch (error) {
-            console.error('Erro ao buscar permissões:', error);
-            enqueueSnackbar('Erro ao carregar permissões', { variant: 'error' });
+            const { data } = await api.get(`/auth/permissions/${p}`);
+            setModulos(data.data?.modulos || {});
+            setInfo(data.data || null);
+            setAlterado(false);
+        } catch {
+            enqueueSnackbar('Erro ao carregar o perfil de acesso', { variant: 'error' });
         } finally {
             setLoading(false);
         }
+    }, [enqueueSnackbar]);
+
+    useEffect(() => { carregar(perfil); }, [perfil, carregar]);
+
+    const alternar = (key) => {
+        if (key === 'dashboard') return; // sempre liberado
+        setModulos(prev => ({ ...prev, [key]: !prev[key] }));
+        setAlterado(true);
     };
 
-    const handleToggle = (platform, key) => {
-        const setter = platform === 'web_admin' ? setWebAdmin : platform === 'mobile_app' ? setMobileApp : setPublicWeb;
-        const current = platform === 'web_admin' ? webAdmin : platform === 'mobile_app' ? mobileApp : publicWeb;
-
-        if (current.includes(key)) {
-            setter(current.filter(k => k !== key));
-        } else {
-            setter([...current, key]);
-        }
+    const marcarTodos = (valor) => {
+        setModulos(Object.fromEntries(MODULOS.map(m => [m.key, m.key === 'dashboard' ? true : valor])));
+        setAlterado(true);
     };
 
-    const handleSelectAll = (platform, items) => {
-        const setter = platform === 'web_admin' ? setWebAdmin : platform === 'mobile_app' ? setMobileApp : setPublicWeb;
-        setter(items.map(i => i.key));
-    };
-
-    const handleDeselectAll = (platform) => {
-        const setter = platform === 'web_admin' ? setWebAdmin : platform === 'mobile_app' ? setMobileApp : setPublicWeb;
-        setter([]);
-    };
-
-    const handleSave = async () => {
+    const salvar = async () => {
         try {
             setSaving(true);
-            await api.put(`/auth/permissions/${selectedRole}`, {
-                web_admin: webAdmin,
-                mobile_app: mobileApp,
-                public_web: publicWeb,
-            });
-            enqueueSnackbar(`Permissões do perfil "${selectedRole}" salvas com sucesso!`, { variant: 'success' });
+            const { data } = await api.put(`/auth/permissions/${perfil}`, { modulos });
+            setInfo(data.data);
+            setAlterado(false);
+            enqueueSnackbar('Perfil salvo. Novos usuários deste perfil já nascem com estas permissões.', { variant: 'success' });
         } catch (error) {
-            console.error('Erro ao salvar:', error);
-            enqueueSnackbar('Erro ao salvar permissões', { variant: 'error' });
+            enqueueSnackbar(error.response?.data?.error || 'Erro ao salvar o perfil', { variant: 'error' });
         } finally {
             setSaving(false);
         }
     };
 
-    const renderChecklist = (platform, items, activeKeys, icon, title, color) => (
-        <GlassCard sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    {icon}
-                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#fff', letterSpacing: 1 }}>
-                        {title}
-                    </Typography>
-                </Box>
-                <Chip
-                    label={`${activeKeys.length}/${items.length}`}
-                    size="small"
-                    sx={{
-                        bgcolor: activeKeys.length === items.length ? 'rgba(0,255,136,0.15)' : 'rgba(255,184,0,0.15)',
-                        color: activeKeys.length === items.length ? '#00FF88' : '#FFB800',
-                        fontWeight: 700, fontSize: '0.7rem'
-                    }}
-                />
-            </Box>
+    const aplicar = async () => {
+        try {
+            setAplicando(true);
+            const { data } = await api.post(`/auth/permissions/${perfil}/aplicar`);
+            enqueueSnackbar(`Permissões aplicadas a ${data.data.atualizados} usuário(s).`, { variant: 'success' });
+            setConfirmarAplicar(false);
+        } catch (error) {
+            enqueueSnackbar(error.response?.data?.error || 'Erro ao aplicar o perfil', { variant: 'error' });
+        } finally {
+            setAplicando(false);
+        }
+    };
 
-            <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-                <NeonButton size="small" variant="outlined" onClick={() => handleSelectAll(platform, items)}>
-                    Marcar Todos
-                </NeonButton>
-                <NeonButton size="small" variant="outlined" color="error" onClick={() => handleDeselectAll(platform)}>
-                    Desmarcar Todos
-                </NeonButton>
-            </Stack>
-
-            <FormGroup>
-                {items.map(item => (
-                    <FormControlLabel
-                        key={item.key}
-                        control={
-                            <Switch
-                                checked={activeKeys.includes(item.key)}
-                                onChange={() => handleToggle(platform, item.key)}
-                                sx={{
-                                    '& .MuiSwitch-switchBase.Mui-checked': { color },
-                                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: color },
-                                }}
-                            />
-                        }
-                        label={
-                            <Typography variant="body2" sx={{
-                                color: activeKeys.includes(item.key) ? '#fff' : 'text.secondary',
-                                fontWeight: activeKeys.includes(item.key) ? 600 : 400,
-                                transition: 'all 0.2s'
-                            }}>
-                                {item.label}
-                            </Typography>
-                        }
-                        sx={{ ml: 0, mb: 0.5 }}
-                    />
-                ))}
-            </FormGroup>
-        </GlassCard>
-    );
+    const rotuloPerfil = PERFIS.find(p => p.value === perfil)?.label || perfil;
+    const liberados = MODULOS.filter(m => modulos[m.key]).length;
 
     return (
-        <Box sx={{ p: { xs: 2, md: 4 } }}>
+        <Box>
             <PageHeader
                 title="Perfis de Acesso"
-                subtitle="Controle granular de permissões de menu por nível de acesso."
-                breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Perfis de Acesso' }]}
+                subtitle="Permissões padrão de cada papel. Usuários novos nascem com elas; a tela Usuários ajusta cada pessoa."
             />
 
-            <GlassCard sx={{ p: 3, mb: 4 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-                    <SecurityIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
-                    <Box sx={{ minWidth: 200 }}>
-                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, letterSpacing: 1, display: 'block', mb: 0.5 }}>
-                            SELECIONE O PERFIL
+            <GlassCard sx={{ p: 3, mb: 3 }}>
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }} justifyContent="space-between">
+                    <Stack direction="row" spacing={2} alignItems="center">
+                        <SecurityIcon sx={{ color: '#00D4FF' }} />
+                        {PERFIS.length > 1 ? (
+                            <Select size="small" value={perfil} onChange={(e) => setPerfil(e.target.value)} sx={{ minWidth: 200 }}>
+                                {PERFIS.map(p => <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>)}
+                            </Select>
+                        ) : (
+                            <Typography sx={{ color: '#FFFFFF', fontWeight: 700 }}>{PERFIS[0].label}</Typography>
+                        )}
+                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.55)' }}>
+                            {info?.personalizado
+                                ? `Atualizado ${info.atualizado_em ? new Date(info.atualizado_em).toLocaleString('pt-BR') : ''}${info.atualizado_por ? ` por ${info.atualizado_por}` : ''}`
+                                : 'Padrão do sistema (só Dashboard)'}
                         </Typography>
-                        <Select
-                            value={selectedRole}
-                            onChange={(e) => setSelectedRole(e.target.value)}
-                            size="small"
-                            fullWidth
-                            sx={{
-                                color: '#fff',
-                                '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0,212,255,0.3)' },
-                                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#00D4FF' },
-                            }}
-                        >
-                            {ROLES.map(r => (
-                                <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>
-                            ))}
-                        </Select>
-                    </Box>
-
-                    <Box sx={{ ml: 'auto' }}>
-                        <NeonButton
-                            startIcon={<SaveIcon />}
-                            onClick={handleSave}
-                            loading={saving}
-                        >
-                            SALVAR PERMISSÕES
+                    </Stack>
+                    <Stack direction="row" spacing={1.5}>
+                        <NeonButton variant="outlined" startIcon={<AplicarIcon />} disabled={loading || alterado}
+                            onClick={() => setConfirmarAplicar(true)}>
+                            Aplicar a todos
                         </NeonButton>
-                    </Box>
-                </Box>
-
-                <Typography variant="caption" sx={{ color: 'text.secondary', mt: 2, display: 'block' }}>
-                    ⚠️ Admin e Master sempre têm acesso total. Itens desmarcados ficam invisíveis para o perfil selecionado.
-                </Typography>
+                        <NeonButton startIcon={saving ? <CircularProgress size={16} /> : <SaveIcon />} disabled={loading || saving || !alterado} onClick={salvar}>
+                            Salvar perfil
+                        </NeonButton>
+                    </Stack>
+                </Stack>
             </GlassCard>
 
-            {loading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-                    <CircularProgress sx={{ color: '#00D4FF' }} />
-                </Box>
-            ) : (
-                <Grid container spacing={3}>
-                    <Grid item xs={12} md={4}>
-                        {renderChecklist(
-                            'web_admin', WEB_ADMIN_ITEMS, webAdmin,
-                            <WebIcon sx={{ color: '#00D4FF' }} />,
-                            'WEB ADMIN', '#00D4FF'
-                        )}
+            <GlassCard sx={{ p: 3 }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                        Módulos liberados para {rotuloPerfil} ({liberados}/{MODULOS.length})
+                    </Typography>
+                    <Stack direction="row" spacing={1}>
+                        <Button size="small" onClick={() => marcarTodos(true)}>Liberar todos</Button>
+                        <Button size="small" color="error" onClick={() => marcarTodos(false)}>Bloquear todos</Button>
+                    </Stack>
+                </Stack>
+                {loading ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>
+                ) : (
+                    <Grid container spacing={1}>
+                        {MODULOS.map(m => (
+                            <Grid item xs={12} sm={6} md={4} key={m.key}>
+                                <FormControlLabel
+                                    control={<Switch checked={m.key === 'dashboard' || !!modulos[m.key]} disabled={m.key === 'dashboard'} onChange={() => alternar(m.key)} />}
+                                    label={m.key === 'dashboard' ? `${m.label} (sempre liberado)` : m.label}
+                                    sx={{ color: '#FFFFFF' }}
+                                />
+                            </Grid>
+                        ))}
                     </Grid>
-                    <Grid item xs={12} md={4}>
-                        {renderChecklist(
-                            'mobile_app', MOBILE_APP_ITEMS, mobileApp,
-                            <MobileIcon sx={{ color: '#7B2FBE' }} />,
-                            'MOBILE APP', '#7B2FBE'
-                        )}
-                    </Grid>
-                    <Grid item xs={12} md={4}>
-                        {renderChecklist(
-                            'public_web', PUBLIC_WEB_ITEMS, publicWeb,
-                            <PublicIcon sx={{ color: '#00FF88' }} />,
-                            'PUBLIC WEB', '#00FF88'
-                        )}
-                    </Grid>
-                </Grid>
-            )}
+                )}
+                {alterado && <Alert severity="info" sx={{ mt: 2 }}>Alterações não salvas.</Alert>}
+            </GlassCard>
+
+            <Dialog open={confirmarAplicar} onClose={() => !aplicando && setConfirmarAplicar(false)}>
+                <DialogTitle>Aplicar a todos os usuários com o papel {rotuloPerfil}?</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2">
+                        Os módulos de <b>todos</b> os usuários com o papel {rotuloPerfil} passam a ser exatamente os deste perfil
+                        ({liberados} de {MODULOS.length} liberados). Ajustes individuais feitos na tela Usuários serão substituídos.
+                        O vínculo com eventos de cada pessoa não muda.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setConfirmarAplicar(false)} disabled={aplicando}>Cancelar</Button>
+                    <Button color="warning" variant="contained" onClick={aplicar} disabled={aplicando}>
+                        {aplicando ? 'Aplicando...' : 'Aplicar'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

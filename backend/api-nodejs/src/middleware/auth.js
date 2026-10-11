@@ -1,6 +1,28 @@
 const { supabase, createClientForUser } = require('../config/supabase');
 const logger = require('../services/logger');
 const User = require('../models/User');
+const policyEngine = require('../modules/checkin/policy.service');
+const authCache = require('../services/authCache');
+
+/**
+ * Normalização de papéis: master/admin são aliases de admin_master
+ */
+const ROLE_ALIASES = {
+    'master': 'admin_master',
+    'admin': 'admin',
+    'supervisor': 'supervisor',
+    'operador': 'operador'
+};
+
+const normalize = (role) => (role && ROLE_ALIASES[role]) || role;
+
+/**
+ * Utilitário para extração de Role normalizada
+ */
+const extractRole = (user) => {
+    if (!user) return 'operador';
+    return normalize(user.nivel_acesso || user.role);
+};
 
 /**
  * Middleware de autenticação
@@ -8,7 +30,7 @@ const User = require('../models/User');
  */
 async function authenticate(req, res, next) {
     try {
-        const token = req.headers.authorization?.replace('Bearer ', '');
+        const token = req.headers.authorization?.replace('Bearer ', '') || req.query.token;
 
         if (!token) {
             return res.status(401).json({ error: 'Token não fornecido' });
@@ -16,11 +38,21 @@ async function authenticate(req, res, next) {
 
         let user = null;
         let authError = null;
+        let role = null;
+        let statusPerfil = null;
 
-        try {
-            // --- HIGH PERFORMANCE IAM DECODING ---
-            // Local JWT Verification to eliminate N+1 network calls to Supabase.
-            if (process.env.SUPABASE_JWT_SECRET) {
+        // Validação recente deste mesmo token (60 s): evita 2 idas ao Supabase por requisição
+        const emCache = authCache.obter(token);
+        if (emCache) {
+            user = { ...emCache.user, app_metadata: { ...emCache.user.app_metadata } };
+            role = emCache.role;
+            statusPerfil = emCache.statusPerfil;
+        }
+
+        // --- HIGH PERFORMANCE IAM DECODING ---
+        // Local JWT Verification elimina N+1 chamadas de rede ao Supabase.
+        if (!user && process.env.SUPABASE_JWT_SECRET) {
+            try {
                 const jwt = require('jsonwebtoken');
                 const decoded = jwt.verify(token, process.env.SUPABASE_JWT_SECRET);
                 user = {
@@ -29,55 +61,76 @@ async function authenticate(req, res, next) {
                     user_metadata: decoded.user_metadata,
                     app_metadata: decoded.app_metadata
                 };
-            } else {
-                // Fallback to slow network validation
-                const { data, error } = await supabase.auth.getUser(token);
-                user = data?.user;
-                authError = error;
+            } catch (err) {
+                // Assinatura local não confere (ex: chaves ECC/P-256 do Supabase).
+                // Não rejeita aqui: valida via SDK oficial antes de devolver 401.
+                user = null;
+                authError = err;
             }
-        } catch (err) {
-            authError = err;
+        }
+
+        if (!user) {
+            const { data, error } = await supabase.auth.getUser(token);
+            user = data?.user;
+            authError = error;
         }
 
         if (authError || !user) {
-            logger.warn(`Tentativa de acesso com token inválido: ${token.substring(0, 20)}...`);
-            return res.status(401).json({ error: 'Token inválido' });
-        }
+            const reason = authError?.message || 'Token inválido';
 
-        // Leitura da app_metadata vindo do JWT (Priorizando nível de acesso injetado)
-        let role = user.app_metadata?.nivel_acesso || user.app_metadata?.role || user.user_metadata?.nivel_acesso || 'operador';
-
-        // --- FAILSAFE SOBERANO: Busca em tempo real se o Token estiver desatualizado ---
-        // Adicionado: Failsafe por e-mail para garantir soberania absoluta do sistemaa2eventos
-        if (role !== 'master') {
-            if (user.email === 'sistemaa2eventos@gmail.com') {
-                console.log('🦅 FAILSAFE DE E-MAIL ACIONADO! Soberania absoluta garantida para o administrador.');
-                role = 'master';
-            } else {
-                const { data: dbPerfil } = await supabase
-                    .from('perfis')
-                    .select('nivel_acesso, evento_id')
-                    .eq('id', user.id)
-                    .maybeSingle();
-                
-                console.log(`🔍 AUDITORIA AUTH [${user.email}]: JWT=${role}, DB=${dbPerfil?.nivel_acesso}`);
-                
-                if (dbPerfil?.nivel_acesso === 'master') {
-                    console.log('🦅 SOBERANIA MASTER DETECTADA NO BANCO! Fazendo bypass de token...');
-                    role = 'master';
-                }
+            // Falha de rede não deve derrubar a sessão do usuário
+            if (reason.includes('fetch failed') || reason.includes('SocketError') || reason.includes('socket hang up') || reason.includes('timeout')) {
+                logger.error(`⚠️ Falha de comunicação com o Auth Provider: ${reason}`);
+                return res.status(502).json({
+                    error: 'Instabilidade momentânea de rede na validação. Tente novamente.',
+                    code: 'AUTH_NETWORK_ERROR',
+                    detail: reason
+                });
             }
 
-            if (role === 'master') {
-                user.app_metadata = { ...user.app_metadata, nivel_acesso: 'master' };
-            }
+            logger.warn(`⚠️ 401 UNAUTHORIZED: ${reason}`);
+            return res.status(401).json({
+                error: 'Token inválido',
+                code: 'AUTH_FAILED',
+                detail: reason
+            });
         }
+
+        if (!role) {
+            // Leitura da app_metadata vindo do JWT (Priorizando nível de acesso injetado)
+            role = user.app_metadata?.nivel_acesso || user.app_metadata?.role || user.user_metadata?.nivel_acesso || 'operador';
+
+            // Fonte da verdade: perfis.nivel_acesso (admin_master | operador)
+            const { data: dbPerfil } = await supabase
+                .from('perfis')
+                .select('nivel_acesso, evento_id, status')
+                .eq('id', user.id)
+                .maybeSingle();
+
+            if (dbPerfil?.nivel_acesso) {
+                role = dbPerfil.nivel_acesso;
+            }
+            statusPerfil = dbPerfil?.status || null;
+
+            authCache.guardar(token, { user, role, statusPerfil });
+        }
+
+        // Usuário inativado não usa o sistema nem com sessão já aberta
+        if (statusPerfil === 'inativo') {
+            return res.status(403).json({ error: 'Usuário inativo. Entre em contato com o administrador.', code: 'USER_INACTIVE' });
+        }
+
+        user.app_metadata = { ...user.app_metadata, nivel_acesso: role };
 
         // Mock profile com claims seguras para evitar latência
         const profileProxy = {
             nivel_acesso: role,
             nome_completo: user.user_metadata?.nome_completo || user.email,
-            evento_id: user.user_metadata?.evento_id,
+            // Sanitiza "undefined"/"null" vindos do frontend (bug de conversão de UUID)
+            evento_id: (() => {
+                const v = user.user_metadata?.evento_id || user.app_metadata?.evento_id;
+                return (v && v !== 'undefined' && v !== 'null') ? v : null;
+            })(),
             ativo: user.app_metadata?.ativo !== false // Trust by default unless banned via Supabase
         };
 
@@ -88,10 +141,8 @@ async function authenticate(req, res, next) {
             return res.status(403).json({ error: 'Usuário desativado' });
         }
 
-        // --- RLS ENFORCEMENT ---
-        // Cria um cliente Supabase exclusivo para esta requisição, com o JWT do usuário.
-        // Isso garante que o Row Level Security do Postgres seja respeitado em operações de dados.
-        req.supabase = createClientForUser(token);
+        // --- RLS ENFORCEMENT --- (injectSupabaseClient normalmente já criou o cliente)
+        req.supabase = req.supabase || createClientForUser(token);
 
         next();
     } catch (error) {
@@ -114,17 +165,18 @@ function authorize(...roles) {
 
         // Normalização: se o dev passou um Array em vez de múltiplos argumentos
         const allowedRoles = Array.isArray(roles[0]) ? roles[0] : roles;
+        const allowed = allowedRoles.map(normalize);
+        const userRole = extractRole(req.user);
 
-        // Verifica se o role do usuário está na lista permitida
-        // Master e Admin sempre têm acesso total
-        if (req.user.role === 'master' || req.user.role === 'admin' || allowedRoles.includes(req.user.role)) {
+        // Master/Admin/Admin Master sempre têm acesso total
+        if (userRole === 'admin_master' || userRole === 'admin' || allowed.includes(userRole)) {
             return next();
         }
 
         logger.warn(`Acesso negado: Usuário ${req.user.id} com role ${req.user.role} tentou acessar rota restrita`);
         return res.status(403).json({
             error: 'Acesso negado',
-            required: roles,
+            required: allowedRoles,
             current: req.user.role
         });
     };
@@ -144,11 +196,38 @@ function validateInternalApiKey(req, res, next) {
     next();
 }
 
-const policyEngine = require('../modules/checkin/policy.service');
+/**
+ * Middleware para validar API Key via header X-API-Key ou Authorization Bearer
+ * Usado por webhooks que não requerem autenticação de usuário
+ */
+function validateApiKey(req, res, next) {
+    const apiKey = req.headers['x-api-key'] || req.headers['authorization']?.replace('Bearer ', '');
+
+    if (!apiKey) {
+        logger.warn(`🚫 Webhook sem API key: ${req.path}`);
+        return res.status(401).json({
+            error: 'API Key obrigatória',
+            code: 'MISSING_API_KEY'
+        });
+    }
+
+    const expectedKey = process.env.A2_API_KEY || process.env.INTERNAL_API_KEY || process.env.API_KEY;
+
+    if (!expectedKey || apiKey !== expectedKey) {
+        logger.warn(`🚫 API Key inválida para: ${req.path}`);
+        return res.status(403).json({
+            error: 'API Key inválida',
+            code: 'INVALID_API_KEY'
+        });
+    }
+
+    next();
+}
 
 /**
  * Middleware de autorização dinâmico (RBAC Engine)
  * Verifica na base de policies se o Perfil detém a permissão para aquele Recurso e Ação
+ * + isolamento de Tenant (evento_id imutável vindo do JWT)
  */
 function checkPermission(recurso, acao) {
     return async (req, res, next) => {
@@ -156,18 +235,69 @@ function checkPermission(recurso, acao) {
             return res.status(401).json({ error: 'Não autenticado' });
         }
 
-        const role = req.user.role;
+        const userRole = extractRole(req.user);
 
-        // Bypass Soberano para Master
-        if (role === 'master') return next();
+        // --- 🦅 SOBERANIA MASTER / ADMIN (Super Admin SaaS) ---
+        if (userRole === 'admin_master' || userRole === 'admin') {
+            const _s = (v) => (v && v !== 'undefined' && v !== 'null') ? v : null;
+            req.tenantId = _s(req.headers['x-evento-id']) ||
+                _s(req.query.evento_id) ||
+                (recurso === 'eventos' ? req.params.id : null) ||
+                _s(req.body?.evento_id);
+            return next();
+        }
 
-        const hasPerm = await policyEngine.hasPermission(role, recurso, acao);
+        const _safe = (v) => (v && v !== 'undefined' && v !== 'null') ? v : null;
+        const requestedEventId = _safe(req.headers['x-evento-id']) || _safe(req.query.evento_id) || _safe(req.body?.evento_id);
+        const tenantId = requestedEventId || _safe(req.user.evento_id) || _safe(req.tenantId);
+
+        if (!tenantId) {
+            logger.warn(`⚠️ Sessão sem Evento vinculado: ${req.user.id}`);
+            return res.status(400).json({ error: 'Sua sessão não possui um ID de Evento vinculado. Refaça o login.' });
+        }
+
+        // Se for operador, validar se o evento requisitado é permitido para este operador!
+        if (req.user && typeof req.user.isAllowedEvent === 'function' && !req.user.isAllowedEvent(tenantId)) {
+            logger.warn(`🚨 EVENTO NÃO AUTORIZADO: Operador ${req.user.id} tentou acessar evento ${tenantId}`);
+            return res.status(403).json({ error: 'Acesso negado: Você não possui autorização para operar este evento.' });
+        }
+
+        req.tenantId = tenantId;
+
+        // Verificar permissão efetiva do operador para este módulo no evento
+        const moduloMap = {
+            'dashboard': 'dashboard',
+            'empresas': 'empresas',
+            'pessoas': 'pessoas',
+            'documentos': 'auditoria_documentos',
+            'auditoria': 'auditoria_documentos',
+            'relatorios': 'relatorios',
+            'checkin': 'checkin',
+            'checkout': 'checkout',
+            'fiscalizacao': 'fiscalizacao',
+            'monitor': 'monitoramento',
+            'veiculos': 'veiculos'
+        };
+        const moduloPerm = moduloMap[recurso] || recurso;
+
+        if (req.user && typeof req.user.getEffectivePermissions === 'function') {
+            const effectivePerms = req.user.getEffectivePermissions(tenantId);
+            if (effectivePerms && effectivePerms[moduloPerm] === false) {
+                logger.warn(`Acesso bloqueado: Operador '${req.user.id}' não possui permissão '${moduloPerm}' no evento '${tenantId}'`);
+                return res.status(403).json({
+                    error: `Acesso negado: Sem permissão para acessar ${recurso} neste evento.`,
+                    required_policy: { recurso, acao }
+                });
+            }
+        }
+
+        const hasPerm = await policyEngine.hasPermission(userRole, recurso, acao, tenantId);
 
         if (hasPerm) {
             return next();
         }
 
-        logger.warn(`Acesso bloqueado pelo PolicyEngine: Role '${role}' não possui '{${recurso}, ${acao}}'`);
+        logger.warn(`Acesso bloqueado pelo PolicyEngine: Role '${userRole}' não possui '{${recurso}, ${acao}}'`);
         return res.status(403).json({
             error: 'Acesso negado: Perfil sem permissão para realizar esta ação.',
             required_policy: { recurso, acao }
@@ -175,4 +305,25 @@ function checkPermission(recurso, acao) {
     };
 }
 
-module.exports = { authenticate, authorize, validateInternalApiKey, checkPermission };
+/**
+ * Restringe a rota ao Admin Master (watchlist é sigilosa, inclusive para admin comum).
+ */
+function requireAdminMaster(req, res, next) {
+    if (!req.user) return res.status(401).json({ error: 'Não autenticado' });
+    if (extractRole(req.user) !== 'admin_master') {
+        logger.warn(`Acesso negado à área sigilosa: usuário ${req.user.id} (${req.user.nivel_acesso || req.user.role})`);
+        return res.status(403).json({ error: 'Acesso restrito ao Admin Master' });
+    }
+    return next();
+}
+
+module.exports = {
+    requireAdminMaster,
+    authenticate,
+    authorize,
+    validateInternalApiKey,
+    validateApiKey,
+    checkPermission,
+    normalize,
+    extractRole
+};

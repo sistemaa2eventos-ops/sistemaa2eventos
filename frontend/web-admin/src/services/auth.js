@@ -1,34 +1,48 @@
 import api from './api';
 
+const log = import.meta.env.DEV ? console.log : () => {};
+
 export const authService = {
   async login(email, password) {
     const response = await api.post('/auth/login', { email, password });
-    if (response.data.success) {
-      localStorage.setItem('token', response.data.session.access_token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-    }
     return response.data;
   },
 
-  async logout() {
+  async logout(sessaoReport = null) {
     try {
+      if (sessaoReport) {
+        await api.post('/audit/sessao-logout', sessaoReport).catch(err => {
+          log('Erro ao registrar log consolidado de sessão no backend:', err);
+        });
+      }
       await api.post('/auth/logout');
-    } finally {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+    } catch (e) {
+      log('Erro no logout remoto', e);
     }
   },
 
-  getCurrentUser() {
-    const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
+  async updateAvatar(avatar_url) {
+    const response = await api.post('/auth/avatar', { avatar_url });
+    return response.data;
   },
 
-  getToken() {
-    return localStorage.getItem('token');
+  async me() {
+    const response = await api.get('/auth/me');
+    return response.data;
   },
 
-  isAuthenticated() {
-    return !!localStorage.getItem('token');
+  async forgotPassword(email) {
+    const response = await api.post('/auth/forgot-password', { email });
+    return response.data;
   },
+
+  async setActiveEvent(evento_id) {
+    try {
+      const response = await api.post('/auth/active-event', { evento_id });
+      return response.data;
+    } catch (e) {
+      log('Erro ao definir evento ativo no backend:', e);
+      return { success: false, error: e.message };
+    }
+  }
 };
