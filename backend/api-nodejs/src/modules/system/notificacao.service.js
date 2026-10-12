@@ -22,23 +22,30 @@ class NotificacaoService {
         return data || [];
     }
 
-    async listar(eventoId, { naoLidas = false, limit = 50 } = {}) {
-        let q = supabase.from('notificacoes').select('*', { count: 'exact' })
-            .eq('evento_id', eventoId)
+    /** Tipos que só o Admin Master vê (ex.: operador pedindo nova senha) */
+    get TIPOS_SO_ADMIN() { return ['SENHA_SOLICITADA']; }
+
+    _semTiposAdmin(q, admin) {
+        return admin ? q : q.not('tipo', 'in', `(${this.TIPOS_SO_ADMIN.join(',')})`);
+    }
+
+    async listar(eventoId, { naoLidas = false, limit = 50, admin = false } = {}) {
+        let q = this._semTiposAdmin(supabase.from('notificacoes').select('*', { count: 'exact' })
+            .eq('evento_id', eventoId), admin)
             .order('created_at', { ascending: false })
             .limit(limit);
         if (naoLidas) q = q.is('lida_em', null);
         const [{ data, error }, naoLidasRes] = await Promise.all([
             q,
-            supabase.from('notificacoes').select('id', { count: 'exact', head: true }).eq('evento_id', eventoId).is('lida_em', null)
+            this._semTiposAdmin(supabase.from('notificacoes').select('id', { count: 'exact', head: true }).eq('evento_id', eventoId), admin).is('lida_em', null)
         ]);
         if (error) throw error;
         return { data: data || [], nao_lidas: naoLidasRes.count || 0 };
     }
 
-    async marcarLida(eventoId, id = null) {
-        let q = supabase.from('notificacoes').update({ lida_em: new Date().toISOString() })
-            .eq('evento_id', eventoId).is('lida_em', null);
+    async marcarLida(eventoId, id = null, { admin = false } = {}) {
+        let q = this._semTiposAdmin(supabase.from('notificacoes').update({ lida_em: new Date().toISOString() })
+            .eq('evento_id', eventoId), admin).is('lida_em', null);
         if (id) q = q.eq('id', id);
         const { error } = await q;
         if (error) throw error;

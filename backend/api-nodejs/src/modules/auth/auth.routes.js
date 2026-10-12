@@ -25,7 +25,7 @@ router.use((req, res, next) => {
 // ============================================
 router.post('/login', rateLimiter.auth, validateLogin, authController.login);
 router.post('/register', rateLimiter.auth, validateRegister, authController.register);
-router.post('/forgot-password', rateLimiter.auth, authController.forgotPassword);
+router.post('/forgot-password', rateLimiter.auth, (req, res) => authController.forgotPassword(req, res));
 router.post('/definir-senha', rateLimiter.auth, authController.definirSenha); // link do e-mail (convite / esqueci a senha)
 
 // ============================================

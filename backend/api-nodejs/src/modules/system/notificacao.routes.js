@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { authenticate } = require('../../middleware/auth');
+const { authenticate, extractRole } = require('../../middleware/auth');
 const { requireEvent } = require('../../middleware/eventMiddleware');
 const notificacaoService = require('./notificacao.service');
 const ApiResponse = require('../../utils/apiResponse');
@@ -19,7 +19,8 @@ router.use((req, res, next) => {
 router.get('/', async (req, res) => {
     try {
         const naoLidas = req.query.nao_lidas === '1' || req.query.nao_lidas === 'true';
-        const result = await notificacaoService.listar(req.event.id, { naoLidas, limit: Math.min(parseInt(req.query.limit) || 50, 200) });
+        const admin = extractRole(req.user) === 'admin_master';
+        const result = await notificacaoService.listar(req.event.id, { naoLidas, limit: Math.min(parseInt(req.query.limit) || 50, 200), admin });
         return res.json({ success: true, data: result.data, nao_lidas: result.nao_lidas });
     } catch (error) {
         logger.error(`[Notificações] Falha ao listar: ${error.message}`);
@@ -30,7 +31,7 @@ router.get('/', async (req, res) => {
 // Marca todas como lidas
 router.patch('/lidas', async (req, res) => {
     try {
-        await notificacaoService.marcarLida(req.event.id);
+        await notificacaoService.marcarLida(req.event.id, null, { admin: extractRole(req.user) === 'admin_master' });
         return ApiResponse.success(res, { ok: true });
     } catch (error) {
         return ApiResponse.error(res, error.message);
@@ -40,7 +41,7 @@ router.patch('/lidas', async (req, res) => {
 // Marca uma como lida
 router.patch('/:id/lida', async (req, res) => {
     try {
-        await notificacaoService.marcarLida(req.event.id, req.params.id);
+        await notificacaoService.marcarLida(req.event.id, req.params.id, { admin: extractRole(req.user) === 'admin_master' });
         return ApiResponse.success(res, { ok: true });
     } catch (error) {
         return ApiResponse.error(res, error.message);

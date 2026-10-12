@@ -135,8 +135,8 @@ const Login = () => {
         setLoading(true);
         
         try {
-            await authService.forgotPassword(email);
-            setForgotSuccess('Se este email estiver cadastrado, você receberá um link em instantes.');
+            const r = await authService.forgotPassword(email);
+            setForgotSuccess(r?.message || 'Pedido registrado. O administrador foi avisado e vai redefinir sua senha.');
         } catch (err) {
             let errorMsg = "Erro no servidor. Tente novamente em instantes.";
             if (!err.response) errorMsg = "Sem conexão com o servidor.";
@@ -204,6 +204,13 @@ const Login = () => {
                         >
                             {forgotSuccess}
                         </Alert>
+                    )}
+
+                    {isForgotMode && !forgotSuccess && (
+                        <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1, textAlign: 'left' }}>
+                            A senha dos operadores é redefinida pelo administrador do painel. Informe seu e-mail:
+                            ele recebe o pedido e depois te passa a nova senha.
+                        </Typography>
                     )}
 
                     <form onSubmit={isForgotMode ? handleForgotSubmit : handleLoginSubmit}>
@@ -283,7 +290,7 @@ const Login = () => {
                                         {isForgotMode ? 'Enviando...' : 'Entrando...'}
                                     </>
                                 ) : (
-                                    isForgotMode ? 'Enviar link de recuperação' : 'Entrar'
+                                    isForgotMode ? 'Pedir nova senha ao administrador' : 'Entrar'
                                 )}
                             </NeonButton>
                         </Box>

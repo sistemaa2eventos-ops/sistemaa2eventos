@@ -71,6 +71,14 @@ const Usuarios = () => {
             format: (val, row) => (
                 <Box>
                     <Typography variant="body2" fontWeight={700} color="#FFFFFF">{val || row.email}</Typography>
+                    {/* Pedido feito em "Esqueci minha senha" na tela de login (some quando a senha é redefinida) */}
+                    {row.senha_solicitada_em && (
+                        <Tooltip title={`Pediu em ${new Date(row.senha_solicitada_em).toLocaleString('pt-BR')}. Use Redefinir senha e avise o operador.`}>
+                            <Chip size="small" icon={<ResetIcon sx={{ fontSize: 14 }} />} label="Pediu nova senha"
+                                onClick={isAdmin && row.nivel_acesso !== 'admin_master' ? () => { setSelectedUser(row); setOpenPasswordDialog(true); } : undefined}
+                                sx={{ mt: 0.5, height: 20, fontSize: '0.7rem', color: '#FFB800', bgcolor: 'rgba(255,184,0,0.12)', border: '1px solid rgba(255,184,0,0.4)', '& .MuiChip-icon': { color: '#FFB800' } }} />
+                        </Tooltip>
+                    )}
                     {/* E-mail só quando é diferente do nome (antes aparecia repetido ou vazio) */}
                     {row.email && row.email !== val && (
                         <Typography variant="caption" color="text.secondary" display="flex" alignItems="center" gap={0.5}>

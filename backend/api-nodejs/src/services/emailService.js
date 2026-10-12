@@ -308,6 +308,36 @@ class EmailService {
     }
 
     /**
+     * Avisa o Admin Master que um operador pediu nova senha na tela de login
+     * (só o Admin Master redefine senha de operador).
+     */
+    async sendPasswordRequestToAdmin(email, { nomeOperador, emailOperador, linkPainel }) {
+        const mailOptions = {
+            from: `"NZT - Painel" <${process.env.SMTP_USER || 'no-reply@a2eventos.com.br'}>`,
+            to: email,
+            subject: `${nomeOperador} pediu uma nova senha`,
+            html: `
+                <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 12px; overflow: hidden;">
+                    <div style="background: #050B18; padding: 30px; text-align: center;">
+                        <h1 style="color: #00D4FF; margin: 0; font-size: 22px; letter-spacing: 2px;">NZT</h1>
+                        <p style="color: #8899BB; margin: 8px 0 0;">Intelligent Control System</p>
+                    </div>
+                    <div style="padding: 40px; color: #333; line-height: 1.6;">
+                        <p>O operador <strong>${nomeOperador}</strong> (${emailOperador}) informou na tela de login que esqueceu a senha.</p>
+                        <p>Para liberar o acesso, abra <strong>Usuários</strong> no painel e use <strong>Redefinir senha</strong> nesse operador. Depois, informe a nova senha a ele.</p>
+                        <div style="text-align: center; margin: 35px 0;">
+                            <a href="${linkPainel}" style="background: linear-gradient(135deg, #00D4FF 0%, #094798 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">ABRIR USUÁRIOS</a>
+                        </div>
+                        <p style="font-size: 13px; color: #777;"><em>Se não reconhece este pedido, ignore: nada muda até você redefinir a senha.</em></p>
+                    </div>
+                </div>
+            `
+        };
+        await this.transporter.sendMail(mailOptions);
+        logger.info(`📧 [Senha] Pedido de ${emailOperador} enviado ao admin ${email}`);
+    }
+
+    /**
      * Envia e-mail de alerta de segurança urgente quando um alvo procurado é identificado
      */
     async sendSecurityAlert(email, alerta) {

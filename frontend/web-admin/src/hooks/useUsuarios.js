@@ -307,6 +307,7 @@ export const useUsuarios = () => {
             });
             enqueueSnackbar('Senha resetada com sucesso!', { variant: 'success' });
             setOpenPasswordDialog(false);
+            loadUsuarios(); // tira a marca "Pediu nova senha"
         } catch (error) {
             enqueueSnackbar(error.response?.data?.error || 'Erro ao resetar senha.', { variant: 'error' });
         } finally {

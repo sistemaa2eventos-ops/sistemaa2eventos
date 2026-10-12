@@ -517,33 +517,87 @@ class AuthController {
     }
 
     /**
-     * Recuperar senha
+     * "Esqueci minha senha" na tela de login.
+     * Operador: só o Admin Master redefine a senha — o pedido vira notificação (só admin vê) + e-mail
+     * aos Admin Master. Admin Master: recebe o link de redefinição por e-mail (senão ninguém o destrava).
+     * A resposta é sempre a mesma, para não revelar quais e-mails têm conta.
      */
     async forgotPassword(req, res) {
+        const resposta = {
+            success: true,
+            message: 'Pedido registrado. Se o e-mail tiver acesso ao painel, o administrador foi avisado e vai redefinir sua senha.'
+        };
         try {
-            const { email } = req.body;
+            const email = normalizeEmail(req.body?.email || '');
+            if (!email) return res.status(400).json({ error: 'Email é obrigatório' });
 
-            if (!email) {
-                return res.status(400).json({ error: 'Email é obrigatório' });
+            const { data: perfil } = await supabase.from('perfis')
+                .select('id, email, nome_completo, nivel_acesso, evento_id, permissions, status')
+                .ilike('email', email).maybeSingle();
+
+            if (!perfil) {
+                logger.info(`🔑 Pedido de senha para e-mail sem conta: ${email}`);
+                return res.json(resposta);
             }
 
-            const { error } = await supabasePublic.auth.resetPasswordForEmail(email, {
-                redirectTo: URL_DEFINIR_SENHA
-            });
+            if (perfil.nivel_acesso === 'admin_master') {
+                const { error } = await supabasePublic.auth.resetPasswordForEmail(email, { redirectTo: URL_DEFINIR_SENHA });
+                if (error) throw error;
+                logger.info(`📧 Link de redefinição enviado ao Admin Master ${email}`);
+                return res.json(resposta);
+            }
 
-            if (error) throw error;
-
-            logger.info(`📧 Email de recuperação enviado: ${email}`);
-
-            res.json({
-                success: true,
-                message: 'Email de recuperação enviado'
-            });
-
+            await this._avisarAdminsPedidoSenha(perfil);
+            return res.json(resposta);
         } catch (error) {
-            logger.error('Erro na recuperação de senha:', error);
+            logger.error('Erro no pedido de nova senha:', error);
             res.status(500).json({ error: 'Erro interno no servidor' });
         }
+    }
+
+    /** Notificação no sino (só Admin Master vê) + e-mail para cada Admin Master ativo; no máximo 1 por dia por operador */
+    async _avisarAdminsPedidoSenha(perfil) {
+        const notificacaoService = require('../system/notificacao.service');
+        const websocketService = require('../../services/websocketService');
+        const { getHojeLocal } = require('../../utils/dateUtils');
+
+        let eventoId = perfil.evento_id || perfil.permissions?.eventos_permitidos?.[0] || null;
+        if (!eventoId) {
+            const { data: ev } = await supabase.from('eventos').select('id').eq('status', 'ativo').limit(1).maybeSingle();
+            eventoId = ev?.id || null;
+        }
+        const nome = perfil.nome_completo || perfil.email;
+        const novas = eventoId ? await notificacaoService.criar([{
+            evento_id: eventoId,
+            tipo: 'SENHA_SOLICITADA',
+            severidade: 'warning',
+            titulo: `${nome} pediu uma nova senha`,
+            mensagem: `${perfil.email} não consegue entrar. Redefina em Usuários → Redefinir senha.`,
+            referencia_tipo: 'usuario',
+            referencia_id: perfil.id,
+            chave_dedupe: `SENHA_SOLICITADA:${perfil.id}:${getHojeLocal()}`
+        }]) : [];
+
+        if (eventoId && novas.length === 0) {
+            logger.info(`🔑 Pedido de senha repetido hoje (${perfil.email}): admin já avisado`);
+            return;
+        }
+
+        websocketService.emit('system:alert', {
+            type: 'SENHA_SOLICITADA', severity: 'warning',
+            message: `🔑 ${nome} pediu uma nova senha. Redefina em Usuários.`,
+            usuario_id: perfil.id
+        }, 'system_admin');
+
+        const { data: admins } = await supabase.from('perfis').select('email')
+            .eq('nivel_acesso', 'admin_master').neq('status', 'inativo');
+        const linkPainel = URL_DEFINIR_SENHA.replace(/\/reset-password$/, '/usuarios');
+        for (const a of admins || []) {
+            if (!a.email) continue;
+            await emailService.sendPasswordRequestToAdmin(a.email, { nomeOperador: nome, emailOperador: perfil.email, linkPainel })
+                .catch(err => logger.warn(`[Senha] Falha ao avisar ${a.email}: ${err.message}`));
+        }
+        logger.info(`🔑 Pedido de nova senha de ${perfil.email} enviado a ${(admins || []).length} Admin Master`);
     }
 
     /**
@@ -564,7 +618,18 @@ class AuthController {
                 return res.status(400).json({ error: 'Link expirado ou já usado. Peça um novo em "Esqueci a senha".' });
             }
 
-            const { error } = await supabase.auth.admin.updateUserById(user.id, { password: nova_senha, email_confirm: true });
+            // Operador só define a senha pelo link UMA vez (ativação do convite). Depois disso, só o Admin
+            // Master troca: link de recuperação pode ser pedido direto ao Supabase, fora do painel.
+            const { data: perfil } = await supabase.from('perfis').select('nivel_acesso').eq('id', user.id).maybeSingle();
+            if (perfil?.nivel_acesso !== 'admin_master' && user.app_metadata?.senha_definida) {
+                return res.status(403).json({ error: 'A senha de operador é alterada pelo administrador. Use "Esqueci minha senha" na tela de login para pedir uma nova.' });
+            }
+
+            const { error } = await supabase.auth.admin.updateUserById(user.id, {
+                password: nova_senha,
+                email_confirm: true,
+                app_metadata: { ...user.app_metadata, senha_definida: true }
+            });
             if (error) throw error;
 
             // O token do link vira inútil: encerra a sessão aberta por ele
@@ -656,6 +721,11 @@ class AuthController {
 
             logger.info(`[listUsers] ✅ Query principal sucesso: ${data?.length || 0} usuários`);
 
+            // Pedidos de nova senha ainda não atendidos (tela de login → "Esqueci minha senha")
+            const { data: pedidos } = await supabase.from('notificacoes').select('referencia_id, created_at')
+                .eq('tipo', 'SENHA_SOLICITADA').is('lida_em', null);
+            const pedidoSenha = new Map((pedidos || []).map(p => [p.referencia_id, p.created_at]));
+
             // Enriquecer dados e aplicar filtro de busca
             const enrichedUsers = data
                 .map(user => {
@@ -665,6 +735,7 @@ class AuthController {
 
                     return {
                         ...user,
+                        senha_solicitada_em: pedidoSenha.get(user.id) || null,
                         email: user.email || '',
                         telefone: user.telefone ? formatPhone(user.telefone) : null,
                         eventos: user.eventos?.[0] || (vinculoTipo === 'global' ? { nome: 'Todos os Eventos' } : { nome: 'Específico' }),
@@ -874,6 +945,11 @@ class AuthController {
         try {
             const { nova_senha, confirmar_senha } = req.body;
 
+            // Senha de operador só o Admin Master altera (Usuários → Redefinir senha)
+            if (require('../../middleware/auth').extractRole(req.user) !== 'admin_master') {
+                return res.status(403).json({ error: 'A senha de operador é alterada pelo administrador. Use "Esqueci minha senha" na tela de login para pedir uma nova.' });
+            }
+
             if (!nova_senha || nova_senha.length < 6) {
                 return res.status(400).json({
                     error: 'A senha deve ter pelo menos 6 caracteres.'
@@ -1034,14 +1110,22 @@ class AuthController {
 
             // Atualizar senha via Supabase Admin. email_confirm: o admin responde pela conta — sem isso,
             // operador convidado que nunca abriu o link continuava barrado ("Email not confirmed").
+            const { data: alvo } = await supabase.auth.admin.getUserById(userId);
             const { error } = await supabase.auth.admin.updateUserById(userId, {
                 password: nova_senha,
-                email_confirm: true
+                email_confirm: true,
+                // Daqui em diante o operador não troca a senha por link (ver definirSenha)
+                app_metadata: { ...(alvo?.user?.app_metadata || {}), senha_definida: true }
             });
 
             if (error) throw error;
 
             logger.info(`🔑 Senha resetada por admin: ${userId} por ${req.user.id}`);
+
+            // Pedido de nova senha desse operador (tela de login) fica atendido
+            await supabase.from('notificacoes').update({ lida_em: new Date().toISOString() })
+                .eq('tipo', 'SENHA_SOLICITADA').eq('referencia_id', userId).is('lida_em', null)
+                .then(({ error: nErr }) => nErr && logger.debug(`[Senha] notificação: ${nErr.message}`));
 
             res.json({
                 success: true,
