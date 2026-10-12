@@ -43,10 +43,12 @@ async function authenticate(req, res, next) {
 
         // Validação recente deste mesmo token (60 s): evita 2 idas ao Supabase por requisição
         const emCache = authCache.obter(token);
+        let dbPerfil = null;
         if (emCache) {
             user = { ...emCache.user, app_metadata: { ...emCache.user.app_metadata } };
             role = emCache.role;
             statusPerfil = emCache.statusPerfil;
+            dbPerfil = emCache.perfil || null;
         }
 
         // --- HIGH PERFORMANCE IAM DECODING ---
@@ -100,19 +102,21 @@ async function authenticate(req, res, next) {
             // Leitura da app_metadata vindo do JWT (Priorizando nível de acesso injetado)
             role = user.app_metadata?.nivel_acesso || user.app_metadata?.role || user.user_metadata?.nivel_acesso || 'operador';
 
-            // Fonte da verdade: perfis.nivel_acesso (admin_master | operador)
-            const { data: dbPerfil } = await supabase
+            // Fonte da verdade: perfis (papel, evento e PERMISSÕES dos módulos). Antes as permissões não
+            // eram lidas aqui: o operador chegava sem nenhuma e as liberadas pelo admin não valiam.
+            const { data } = await supabase
                 .from('perfis')
-                .select('nivel_acesso, evento_id, status')
+                .select('nivel_acesso, evento_id, status, permissions')
                 .eq('id', user.id)
                 .maybeSingle();
+            dbPerfil = data || null;
 
             if (dbPerfil?.nivel_acesso) {
                 role = dbPerfil.nivel_acesso;
             }
             statusPerfil = dbPerfil?.status || null;
 
-            authCache.guardar(token, { user, role, statusPerfil });
+            authCache.guardar(token, { user, role, statusPerfil, perfil: dbPerfil });
         }
 
         // Usuário inativado não usa o sistema nem com sessão já aberta
@@ -126,11 +130,14 @@ async function authenticate(req, res, next) {
         const profileProxy = {
             nivel_acesso: role,
             nome_completo: user.user_metadata?.nome_completo || user.email,
+            // Evento do perfil (atualizado ao trocar de evento) antes do gravado no cadastro da conta.
             // Sanitiza "undefined"/"null" vindos do frontend (bug de conversão de UUID)
             evento_id: (() => {
-                const v = user.user_metadata?.evento_id || user.app_metadata?.evento_id;
+                const v = dbPerfil?.evento_id || user.user_metadata?.evento_id || user.app_metadata?.evento_id;
                 return (v && v !== 'undefined' && v !== 'null') ? v : null;
             })(),
+            // Permissões dos módulos, vínculo e eventos permitidos vêm do perfil (Usuários → Permissões)
+            ...(dbPerfil?.permissions ? { permissions: dbPerfil.permissions } : {}),
             ativo: user.app_metadata?.ativo !== false // Trust by default unless banned via Supabase
         };
 
@@ -229,6 +236,10 @@ function validateApiKey(req, res, next) {
  * Verifica na base de policies se o Perfil detém a permissão para aquele Recurso e Ação
  * + isolamento de Tenant (evento_id imutável vindo do JWT)
  */
+// Ações que continuam só de administrador mesmo com o módulo liberado ao operador
+// (monitor/escrita = cadastrar/apagar câmeras e reset diário do evento)
+const ACOES_SO_ADMIN = { monitor: ['escrita'] };
+
 function checkPermission(recurso, acao) {
     return async (req, res, next) => {
         if (!req.user) {
@@ -288,6 +299,14 @@ function checkPermission(recurso, acao) {
                     error: `Acesso negado: Sem permissão para acessar ${recurso} neste evento.`,
                     required_policy: { recurso, acao }
                 });
+            }
+            // A permissão do operador (ligada pelo admin em Usuários) é a regra para os módulos dele.
+            // Antes ela era seguida da tabela de papéis (sys_*), que usa outro vocabulário (view/visualizar
+            // contra leitura/escrita) e estava vazia por evento: todo operador era barrado em câmeras,
+            // relatórios, documentos e veículos, mesmo com o módulo liberado.
+            const soAdmin = ACOES_SO_ADMIN[recurso]?.includes(acao);
+            if (effectivePerms && effectivePerms[moduloPerm] === true && !soAdmin) {
+                return next();
             }
         }
 

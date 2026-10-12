@@ -36,7 +36,7 @@ function obter(token) {
     return item;
 }
 
-function guardar(token, { user, role, statusPerfil = null }) {
+function guardar(token, { user, role, statusPerfil = null, perfil = null }) {
     const expToken = expiracaoDoToken(token);
     const expiraEm = Math.min(Date.now() + TTL_MS, expToken || Infinity);
     if (expiraEm <= Date.now()) return;
@@ -45,7 +45,7 @@ function guardar(token, { user, role, statusPerfil = null }) {
         // Remove o mais antigo (Map mantém ordem de inserção)
         porToken.delete(porToken.keys().next().value);
     }
-    porToken.set(hash(token), { userId: user.id, user, role, statusPerfil, expiraEm });
+    porToken.set(hash(token), { userId: user.id, user, role, statusPerfil, perfil, expiraEm });
 }
 
 function invalidarUsuario(userId) {

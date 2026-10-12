@@ -494,56 +494,6 @@ class DocumentoService {
     }
 
     /**
-     * Listagem legada (sem paginação) usada pela fila de auditoria em produção.
-     * Une empresa_documentos e pessoa_documentos com os vínculos de nome.
-     */
-    async listPendentesLegado(supabaseClient) {
-        const { data: empDocs, error: err1 } = await supabaseClient
-            .from('empresa_documentos')
-            .select('*, empresas(nome, cnpj)')
-            .eq('status', 'pendente');
-
-        if (err1) throw err1;
-
-        const { data: pesDocs, error: err2 } = await supabaseClient
-            .from('pessoa_documentos')
-            .select('*, pessoas(nome_completo, cpf, empresas(nome))')
-            .eq('status', 'pendente');
-
-        if (err2) throw err2;
-
-        const formatadosEmp = (empDocs || []).map(d => ({
-            id: d.id,
-            tipo_entidade: 'empresa',
-            entidade_nome: d.empresas?.nome,
-            entidade_doc: d.empresas?.cnpj,
-            titulo: d.titulo,
-            tipo_doc: d.tipo_doc,
-            url_arquivo: d.url_arquivo,
-            status: d.status,
-            data_inclusao: d.data_inclusao,
-            empresa_id: d.empresa_id
-        }));
-
-        const formatadosPes = (pesDocs || []).map(d => ({
-            id: d.id,
-            tipo_entidade: 'pessoa',
-            entidade_nome: d.pessoas?.nome_completo,
-            entidade_doc: d.pessoas?.cpf,
-            empresa_vinculada: d.pessoas?.empresas?.nome,
-            titulo: d.titulo,
-            tipo_doc: d.tipo_doc,
-            url_arquivo: d.url_arquivo,
-            status: d.status,
-            data_inclusao: d.data_inclusao,
-            pessoa_id: d.pessoa_id
-        }));
-
-        return [...formatadosEmp, ...formatadosPes]
-            .sort((a, b) => new Date(a.data_inclusao) - new Date(b.data_inclusao));
-    }
-
-    /**
      * Estatísticas de auditoria documental para métricas do analista
      * Quando eventoId é informado, restringe aos documentos das pessoas/empresas do evento.
      */

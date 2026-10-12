@@ -140,12 +140,14 @@ class DocumentoController {
             const { page, limit, search = '' } = req.query;
             const eventoId = eventoDaRequisicao(req);
 
-            if (page === undefined && limit === undefined) {
-                const todos = await documentoService.listPendentesLegado(supabaseClient);
-                return ApiResponse.success(res, todos);
-            }
-
             if (!eventoId) return ApiResponse.error(res, 'Selecione um evento para continuar.', 400);
+
+            // Sem paginação: mesma consulta filtrada pelo evento (a antiga listava documentos de TODOS os
+            // eventos e quebrava ao juntar empresa_documentos com empresas, que não têm relação no banco)
+            if (page === undefined && limit === undefined) {
+                const todos = await documentoService.listPendentes(supabaseClient, { evento_id: eventoId, page: 1, limit: 500, search });
+                return ApiResponse.success(res, todos.data);
+            }
 
             const result = await documentoService.listPendentes(supabaseClient, {
                 evento_id: eventoId,

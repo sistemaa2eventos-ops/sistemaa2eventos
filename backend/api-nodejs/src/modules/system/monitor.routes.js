@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const monitorController = require('./monitor.controller');
-const { authenticate, authorize, checkPermission } = require('../../middleware/auth');
+const { authenticate, authorize, checkPermission, requireAdminMaster } = require('../../middleware/auth');
 const { requireEvent } = require('../../middleware/eventMiddleware');
 
 // Todas as rotas de monitoramento requerem autenticação
@@ -23,8 +23,10 @@ router.post('/clear-cache', authorize('master', 'admin'), monitorController.clea
 router.get('/terminais', checkPermission('monitor', 'leitura'), requireEvent, monitorController.getTerminais);
 
 // Watchlist (Monitoramento de Alvos)
-router.get('/watchlist', requireEvent, monitorController.listWatchlist);
-router.post('/watchlist', requireEvent, monitorController.addToWatchlist);
-router.delete('/watchlist/:id', requireEvent, monitorController.removeFromWatchlist);
+// Watchlist é sigilosa (só Admin Master, como em /api/watchlist): estas rotas antigas estavam abertas a
+// qualquer usuário logado. O painel não as usa mais.
+router.get('/watchlist', requireAdminMaster, requireEvent, monitorController.listWatchlist);
+router.post('/watchlist', requireAdminMaster, requireEvent, monitorController.addToWatchlist);
+router.delete('/watchlist/:id', requireAdminMaster, requireEvent, monitorController.removeFromWatchlist);
 
 module.exports = router;
