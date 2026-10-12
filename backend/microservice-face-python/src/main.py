@@ -23,7 +23,16 @@ from loguru import logger
 # Na RTX 5060 com onnxruntime-directml: ~52 ms por quadro contra ~620 ms na CPU, mesmos embeddings.
 IA_GPU = os.getenv("IA_GPU", "auto").lower()
 IA_FPS = max(1.0, float(os.getenv("IA_FPS", "10")))                       # análises de IA por segundo, por câmera
-IA_CAMERA_OCIOSA_S = max(15, int(os.getenv("IA_CAMERA_OCIOSA_S", "60")))  # sem uso por esse tempo → câmera desligada
+# Três níveis de economia por câmera:
+#  - sem ninguém assistindo há IA_SEM_ESPECTADOR_S → IA dorme (o vídeo segue conectado, leve)
+#  - com espectador, IA só analisa com movimento na cena; cena parada → 1 análise a cada IA_CENA_PARADA_S
+#  - sem nenhum uso há IA_CAMERA_OCIOSA_S → desconecta o vídeo (religa no próximo pedido)
+IA_SEM_ESPECTADOR_S = max(10, int(os.getenv("IA_SEM_ESPECTADOR_S", "60")))
+IA_CAMERA_OCIOSA_S = max(60, int(os.getenv("IA_CAMERA_OCIOSA_S", "600")))
+IA_MOVIMENTO = os.getenv("IA_MOVIMENTO", "on").lower() != "off"
+IA_MOVIMENTO_LIMIAR = float(os.getenv("IA_MOVIMENTO_LIMIAR", "0.004"))      # fração de pixels que mudou
+IA_MOVIMENTO_JANELA_S = float(os.getenv("IA_MOVIMENTO_JANELA_S", "3"))      # segue analisando por 3 s após o movimento
+IA_CENA_PARADA_S = float(os.getenv("IA_CENA_PARADA_S", "2"))                # pessoa parada na frente continua com quadrado
 if IA_GPU == "off":
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
@@ -168,8 +177,9 @@ class RTSPStreamReader:
         self.url = url
         self.cap = None
         self.latest_frame = None
-        self.latest_annotated_frame = None
+        self.frame_seq = 0             # sobe a cada quadro novo (o MJPEG só envia quadro novo)
         self.latest_results = []
+        self.results_time = 0.0
         self.running = False
         self.thread = None
         self.ai_thread = None
@@ -178,9 +188,32 @@ class RTSPStreamReader:
         self.last_frame_time = 0.0
         self.reconnect_count = 0
         self.ultimo_uso = time.time()  # último pedido de alguém (painel/API), não da própria IA
+        # Detecção de movimento (barata): média do fundo em 160x90 cinza
+        self._fundo = None
+        self.ultimo_movimento = time.time()
+        self.analises = 0              # contador para /api/engine/status
 
     def tocar(self):
         self.ultimo_uso = time.time()
+
+    def _detectar_movimento(self, frame):
+        pequeno = cv2.GaussianBlur(cv2.cvtColor(cv2.resize(frame, (160, 90)), cv2.COLOR_BGR2GRAY), (5, 5), 0)
+        if self._fundo is None:
+            self._fundo = pequeno.astype(np.float32)
+            return
+        diferenca = cv2.absdiff(pequeno, cv2.convertScaleAbs(self._fundo))
+        if float((diferenca > 25).mean()) > IA_MOVIMENTO_LIMIAR:
+            self.ultimo_movimento = time.time()
+        cv2.accumulateWeighted(pequeno, self._fundo, 0.05)
+
+    def ia_deve_analisar(self) -> bool:
+        """IA só com alguém assistindo e com movimento na cena (ou o batimento lento com cena parada)."""
+        agora = time.time()
+        if agora - self.ultimo_uso > IA_SEM_ESPECTADOR_S:
+            return False
+        if not IA_MOVIMENTO or agora - self.ultimo_movimento <= IA_MOVIMENTO_JANELA_S:
+            return True
+        return agora - self.results_time >= IA_CENA_PARADA_S
 
     def start(self):
         if self.running:
@@ -225,8 +258,12 @@ class RTSPStreamReader:
                     self.fps = 0.9 * self.fps + 0.1 * (1.0 / dt)
                 self.last_frame_time = now
 
+                if IA_MOVIMENTO and self.frame_seq % 2 == 0:
+                    self._detectar_movimento(frame)
+
                 with self.lock:
                     self.latest_frame = frame
+                    self.frame_seq += 1
 
             except Exception as e:
                 logger.error(f"Erro no loop RTSP: {e}")
@@ -241,15 +278,20 @@ class RTSPStreamReader:
         intervalo = 1.0 / IA_FPS
         while self.running:
             inicio = time.time()
+            if not self.ia_deve_analisar():
+                # Sem espectador ou cena parada: sem análise; os quadrados somem quando ficam velhos
+                time.sleep(0.1)
+                continue
             frame = self.get_frame()
             if frame is not None and face_app is not None:
                 try:
-                    annotated, results = process_and_annotate_frame(frame, fps=self.fps)
+                    results = analisar_quadro(frame)
                     with self.lock:
-                        self.latest_annotated_frame = annotated
                         self.latest_results = results
+                        self.results_time = time.time()
+                    self.analises += 1
                 except Exception as e:
-                    pass
+                    logger.debug(f"Falha na análise: {e}")
             # Alvo de IA_FPS análises/s por câmera, descontando o tempo da própria análise
             time.sleep(max(0.01, intervalo - (time.time() - inicio)))
 
@@ -260,13 +302,16 @@ class RTSPStreamReader:
             return None
 
     def get_annotated_frame(self) -> Optional[np.ndarray]:
+        """Quadro MAIS RECENTE da câmera com o HUD da última análise por cima: o vídeo anda na
+        velocidade da câmera, não na da IA (antes o vídeo só mudava quando a IA terminava)."""
         self.tocar()  # usado só por quem assiste (vídeo/snapshot); a IA usa get_frame
         with self.lock:
-            if self.latest_annotated_frame is not None:
-                return self.latest_annotated_frame.copy()
-            if self.latest_frame is not None:
-                return self.latest_frame.copy()
-            return None
+            if self.latest_frame is None:
+                return None
+            frame = self.latest_frame.copy()
+            # Análise com mais de IA_CENA_PARADA_S + 1 s não vale mais: sem quadrados "fantasmas"
+            results = self.latest_results if time.time() - self.results_time <= IA_CENA_PARADA_S + 1 else []
+        return desenhar_hud(frame, results, self.fps)
 
 # Instância padrão para a webcam do usuário
 DEFAULT_RTSP_URL = "rtsp://a2eventos:19022020@localhost:8554/live"
@@ -478,21 +523,16 @@ async def get_camera_snapshot(stream_url: str = DEFAULT_RTSP_URL, annotate: bool
     _, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, max(30, min(quality, 95))])
     return Response(content=jpeg.tobytes(), media_type="image/jpeg")
 
-def process_and_annotate_frame(frame: np.ndarray, threshold: float = 0.50, fps: float = 0.0):
-    """Detecta faces, compara com o banco de dados e renderiza HUD de rastreamento no frame"""
+def analisar_quadro(frame: np.ndarray, threshold: float = 0.50) -> List[Dict[str, Any]]:
+    """IA: detecta faces e identifica no índice FAISS. Não desenha nada (ver desenhar_hud)."""
     h, w, _ = frame.shape
     faces = []
     if face_app is not None:
         with model_lock:
             faces = face_app.get(frame)
-    detected_boxes = []
-    tracking_results = []
-
-    for face in faces:
-        x1, y1, x2, y2 = [int(v) for v in face.bbox]
-        detected_boxes.append([x1, y1, x2, y2])
-
+    detected_boxes = [[int(v) for v in face.bbox] for face in faces]
     tracked_map = tracker.update(detected_boxes)
+    tracking_results = []
 
     for face, box in zip(faces, detected_boxes):
         x1, y1, x2, y2 = box
@@ -500,7 +540,6 @@ def process_and_annotate_frame(frame: np.ndarray, threshold: float = 0.50, fps: 
 
         # 1. Filtro de Qualidade Facial (FQA - Face Quality Assessment)
         is_low_res = fw < 45 or fh < 45
-        is_low_conf = face.det_score < 0.40
 
         # Checagem de rotação/pose lateral (Yaw)
         pose_profile = False
@@ -534,7 +573,7 @@ def process_and_annotate_frame(frame: np.ndarray, threshold: float = 0.50, fps: 
                     if best_sim >= threshold:
                         best_match = known_persons[best_idx]
 
-        # Liveness Laplaciano do recorte da face
+        # Liveness Laplaciano do recorte da face (recorte do quadro limpo, sem HUD)
         face_crop = frame[max(0, y1):min(h, y2), max(0, x1):min(w, x2)]
         liveness_score = 0.0
         face_crop_b64 = None
@@ -551,7 +590,7 @@ def process_and_annotate_frame(frame: np.ndarray, threshold: float = 0.50, fps: 
                 track_id = tid
                 break
 
-        res_item = {
+        tracking_results.append({
             "track_id": track_id or 1,
             "bbox": [x1, y1, x2, y2],
             "det_score": round(float(face.det_score), 3),
@@ -570,23 +609,30 @@ def process_and_annotate_frame(frame: np.ndarray, threshold: float = 0.50, fps: 
                 "bloqueado": best_match["bloqueado"],
                 "foto_url": best_match.get("foto_url")
             } if best_match else None
-        }
-        tracking_results.append(res_item)
+        })
 
-        # RENDERIZAR HUD DE RASTREAMENTO NO FRAME
-        is_identified = best_match is not None
-        is_blocked = best_match and (best_match["bloqueado"] or best_match["status_acesso"] == "bloqueado")
+    return tracking_results
 
-        if is_blocked:
+
+def desenhar_hud(frame: np.ndarray, results: List[Dict[str, Any]], fps: float = 0.0) -> np.ndarray:
+    """Desenha os quadrados de rastreamento e o banner sobre o quadro (rápido: roda a cada quadro de vídeo)."""
+    h, w, _ = frame.shape
+    for r in results:
+        x1, y1, x2, y2 = r["bbox"]
+        fw, fh = x2 - x1, y2 - y1
+        mp = r.get("matched_person")
+        track_id = r.get("track_id")
+
+        if mp and (mp["bloqueado"] or mp["status_acesso"] == "bloqueado"):
             color = (0, 0, 255)  # Vermelho
-            status_text = f"ALERTA: {best_match['nome']} (BLOQUEADO)"
-        elif is_identified:
+            status_text = f"ALERTA: {mp['nome']} (BLOQUEADO)"
+        elif mp:
             color = (0, 255, 128)  # Verde Neon
-            status_text = f"{best_match['nome']} [{best_sim*100:.1f}%]"
-        elif pose_profile:
+            status_text = f"{mp['nome']} [{mp['similarity']*100:.1f}%]"
+        elif r["quality_status"] == "profile_view":
             color = (0, 165, 255)  # Laranja
             status_text = f"PERFIL LATERAL (ID #{track_id})"
-        elif is_low_res:
+        elif r["quality_status"] == "low_resolution":
             color = (180, 180, 180)  # Cinza
             status_text = f"DISTANTE (ID #{track_id})"
         else:
@@ -596,7 +642,6 @@ def process_and_annotate_frame(frame: np.ndarray, threshold: float = 0.50, fps: 
         # Caixa com cantos estilizados (Bracket Box)
         line_len = int(min(fw, fh) * 0.25)
         thick = 2
-        # Cantos
         cv2.line(frame, (x1, y1), (x1 + line_len, y1), color, thick)
         cv2.line(frame, (x1, y1), (x1, y1 + line_len), color, thick)
         cv2.line(frame, (x2, y1), (x2 - line_len, y1), color, thick)
@@ -614,16 +659,21 @@ def process_and_annotate_frame(frame: np.ndarray, threshold: float = 0.50, fps: 
         cv2.putText(frame, status_text, (x1 + 5, label_y - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 1, cv2.LINE_AA)
 
         # Informações biométricas adicionais
-        info_sub = f"Det: {face.det_score*100:.0f}% | Idade: {face.age} | Sexo: {'M' if face.gender==1 else 'F'}"
+        info_sub = f"Det: {r['det_score']*100:.0f}% | Idade: {r['age']} | Sexo: {r['gender']}"
         cv2.putText(frame, info_sub, (x1, y2 + 18), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (200, 200, 200), 1, cv2.LINE_AA)
 
     # Banner superior de telemetria
     cv2.rectangle(frame, (0, 0), (w, 36), (10, 15, 25), -1)
     cv2.line(frame, (0, 36), (w, 36), (0, 212, 255), 1)
-    cv2.putText(frame, f"A2 EVENTOS - RASTREAMENTO FACIAL ATIVO | FACES: {len(faces)} | FPS: {fps:.1f} | BASE: {len(known_persons)} PESSOAS",
+    cv2.putText(frame, f"A2 EVENTOS - RASTREAMENTO FACIAL ATIVO | FACES: {len(results)} | FPS: {fps:.1f} | BASE: {len(known_persons)} PESSOAS",
                 (15, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 212, 255), 1, cv2.LINE_AA)
+    return frame
 
-    return frame, tracking_results
+
+def process_and_annotate_frame(frame: np.ndarray, threshold: float = 0.50, fps: float = 0.0):
+    """Análise + HUD de uma vez (usado pelo /api/track/live)."""
+    results = analisar_quadro(frame, threshold)
+    return desenhar_hud(frame, results, fps), results
 
 @app.get("/api/track/live")
 def track_live_endpoint(stream_url: str = DEFAULT_RTSP_URL, threshold: float = 0.50):
@@ -656,16 +706,20 @@ def track_live_endpoint(stream_url: str = DEFAULT_RTSP_URL, threshold: float = 0
     }
 
 def mjpeg_generator(stream_url: str):
-    """Gerador contínuo de frames MJPEG com ultra-baixa latência (30 FPS em tempo real)"""
+    """MJPEG na velocidade da câmera (até ~30 fps): cada quadro novo sai com o HUD da última análise.
+    Só envia quando chega quadro novo (antes reenviava o mesmo quadro até a IA terminar)."""
     reader = get_or_create_stream(stream_url)
+    ultimo_seq = -1
     while True:
-        frame = reader.get_annotated_frame()
-        if frame is not None:
-            ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 72])
-            if ret:
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
-        time.sleep(0.033)  # ~30 FPS fluido sem latência acumulada
+        if reader.frame_seq != ultimo_seq:
+            ultimo_seq = reader.frame_seq
+            frame = reader.get_annotated_frame()
+            if frame is not None:
+                ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 72])
+                if ret:
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
+        time.sleep(0.033)  # teto de ~30 fps
 
 @app.get("/api/camera/stream")
 async def get_camera_stream(stream_url: str = DEFAULT_RTSP_URL):
@@ -684,7 +738,17 @@ def get_engine_status():
             else ("GPU (CUDA)" if "CUDAExecutionProvider" in active_providers else "CPU"),
         "ia_fps_por_camera": IA_FPS,
         "camera_ociosa_desliga_s": IA_CAMERA_OCIOSA_S,
+        "ia_dorme_sem_espectador_s": IA_SEM_ESPECTADOR_S,
+        "ia_por_movimento": IA_MOVIMENTO,
         "cameras_em_uso": len(active_streams),
+        "cameras": [{
+            "camera": url.split('@')[-1],
+            "video_fps": round(r.fps, 1),
+            "ia_ativa": r.ia_deve_analisar(),
+            "movimento_ha_s": round(time.time() - r.ultimo_movimento, 1),
+            "analises": r.analises,
+            "sem_uso_ha_s": round(time.time() - r.ultimo_uso, 1)
+        } for url, r in list(active_streams.items())],
         "active_providers": active_providers,
         "vector_search_engine": "FAISS IndexFlatIP (Sub-millisecond Search)",
         "registered_faces_indexed": len(known_persons),
