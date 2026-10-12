@@ -90,6 +90,24 @@ class AuthController {
             // nivel_acesso vem diretamente de perfis (admin_master | operador)
             const nivel = perfil?.nivel_acesso || 'operador';
 
+            // Papel no token (app_metadata.role) igual ao do perfil: o RLS do banco só reconhece o usuário
+            // por ele — operadores sem o papel viam listas vazias (eventos, logs) e não editavam cadastros.
+            // Conta antiga: grava o papel e entra de novo para a sessão já sair com ele.
+            let sessao = data.session;
+            if (nivel !== 'admin_master' && data.user.app_metadata?.role !== nivel) {
+                const { error: metaErr } = await supabase.auth.admin.updateUserById(data.user.id, {
+                    app_metadata: { ...data.user.app_metadata, role: nivel, nivel_acesso: nivel }
+                });
+                const novo = metaErr ? null : await supabasePublic.auth.signInWithPassword({ email, password });
+                if (novo && !novo.error) {
+                    await supabase.auth.admin.signOut(data.session?.access_token, 'local').catch(() => {});
+                    sessao = novo.data.session;
+                    logger.info(`🔑 Papel '${nivel}' gravado no token de ${email}`);
+                } else {
+                    logger.warn(`[Login] Não foi possível gravar o papel no token de ${email}: ${metaErr?.message || novo?.error?.message}`);
+                }
+            }
+
             // admin_master é o único perfil administrador (acesso total)
             const isAdminMaster = nivel === 'admin_master';
 
@@ -108,7 +126,7 @@ class AuthController {
 
             res.json({
                 success: true,
-                session: data.session,
+                session: sessao,
                 user: {
                     id: data.user.id,
                     email: data.user.email,
@@ -260,6 +278,8 @@ class AuthController {
             const { data, error } = await supabase.auth.admin.createUser({
                 email: normalizedEmail,
                 email_confirm: false,
+                // O RLS do banco reconhece o papel por app_metadata.role (sem ele o operador via listas vazias)
+                app_metadata: { role: 'operador', nivel_acesso: 'operador' },
                 user_metadata: {
                     nome_completo,
                     nivel_acesso: 'operador',

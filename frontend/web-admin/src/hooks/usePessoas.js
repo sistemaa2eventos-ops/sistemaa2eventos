@@ -270,7 +270,12 @@ export const usePessoas = () => {
         }
         if (selectedPessoa) {
           await api.put(`/pessoas/${selectedPessoa.id}`, payload);
-          if (selectedPessoa.status === 'PENDENTE' || selectedPessoa.status_acesso === 'pendente') {
+          const pendente = selectedPessoa.status === 'PENDENTE' || selectedPessoa.status_acesso === 'pendente';
+          // Operador edita o cadastro; aprovar/reprovar continua com o administrador
+          if (pendente && !isAdmin && ['completo', 'incorreto'].includes(payload.parecer_documentos)) {
+            enqueueSnackbar('Cadastro salvo. A aprovação é feita pelo administrador.', { variant: 'info' });
+          }
+          if (pendente && isAdmin) {
             if (payload.parecer_documentos === 'completo') {
               await api.patch(`/pessoas/${selectedPessoa.id}/status`, { status: 'autorizado' });
               enqueueSnackbar('Cadastro aprovado com sucesso!', { variant: 'success' });

@@ -169,7 +169,10 @@ class PessoaController {
     async update(req, res) {
         try {
             const { id } = req.params;
-            const supabaseClient = req.supabase || supabase;
+            // Como no create: cliente do servidor. A autorização já foi feita na rota (módulo Pessoas +
+            // evento permitido) e o update filtra por evento_id; o cliente com o token do operador
+            // esbarrava no RLS (token sem app_metadata.role) e não alterava nada.
+            const supabaseClient = supabase;
             const tenantId = req.tenantId || req.event?.id || null;
             if (!tenantId) return ApiResponse.error(res, 'Contexto de evento não encontrado.', 400);
 
