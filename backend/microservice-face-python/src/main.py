@@ -7,6 +7,7 @@ import time
 import base64
 import threading
 import json
+from collections import deque
 import urllib.request
 from typing import Optional, List, Dict, Any
 
@@ -33,6 +34,10 @@ IA_MOVIMENTO = os.getenv("IA_MOVIMENTO", "on").lower() != "off"
 IA_MOVIMENTO_LIMIAR = float(os.getenv("IA_MOVIMENTO_LIMIAR", "0.004"))      # fração de pixels que mudou
 IA_MOVIMENTO_JANELA_S = float(os.getenv("IA_MOVIMENTO_JANELA_S", "3"))      # segue analisando por 3 s após o movimento
 IA_CENA_PARADA_S = float(os.getenv("IA_CENA_PARADA_S", "2"))                # pessoa parada na frente continua com quadrado
+# Vigilância: câmeras do evento ficam ligadas e a IA roda com movimento mesmo sem ninguém assistindo;
+# quem for reconhecido vira detecção para o agente levar à nuvem (alertas com o painel fechado)
+IA_FPS_VIGILANCIA = max(1.0, float(os.getenv("IA_FPS_VIGILANCIA", "5")))
+VIGILANCIA_REPETIR_S = float(os.getenv("VIGILANCIA_REPETIR_S", "30"))       # mesma pessoa na mesma câmera: 1 detecção a cada 30 s
 if IA_GPU == "off":
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
@@ -192,6 +197,8 @@ class RTSPStreamReader:
         self._fundo = None
         self.ultimo_movimento = time.time()
         self.analises = 0              # contador para /api/engine/status
+        self.camera_id = None          # id em cameras_ip quando a câmera está sob vigilância
+        self.vigilancia = False
 
     def tocar(self):
         self.ultimo_uso = time.time()
@@ -206,14 +213,19 @@ class RTSPStreamReader:
             self.ultimo_movimento = time.time()
         cv2.accumulateWeighted(pequeno, self._fundo, 0.05)
 
+    def com_espectador(self) -> bool:
+        return time.time() - self.ultimo_uso <= IA_SEM_ESPECTADOR_S
+
     def ia_deve_analisar(self) -> bool:
-        """IA só com alguém assistindo e com movimento na cena (ou o batimento lento com cena parada)."""
+        """IA com movimento na cena, se alguém assiste OU a câmera está sob vigilância.
+        Cena parada: batimento lento só para quem assiste (pessoa parada continua com quadrado)."""
         agora = time.time()
-        if agora - self.ultimo_uso > IA_SEM_ESPECTADOR_S:
+        assistindo = self.com_espectador()
+        if not assistindo and not self.vigilancia:
             return False
         if not IA_MOVIMENTO or agora - self.ultimo_movimento <= IA_MOVIMENTO_JANELA_S:
             return True
-        return agora - self.results_time >= IA_CENA_PARADA_S
+        return assistindo and agora - self.results_time >= IA_CENA_PARADA_S
 
     def start(self):
         if self.running:
@@ -275,11 +287,10 @@ class RTSPStreamReader:
 
     def _ai_loop(self):
         """Worker desacoplado de IA: processa detecção/reconhecimento sem travar o vídeo"""
-        intervalo = 1.0 / IA_FPS
         while self.running:
             inicio = time.time()
             if not self.ia_deve_analisar():
-                # Sem espectador ou cena parada: sem análise; os quadrados somem quando ficam velhos
+                # Sem espectador nem vigilância, ou cena parada: sem análise; os quadrados somem quando ficam velhos
                 time.sleep(0.1)
                 continue
             frame = self.get_frame()
@@ -290,9 +301,12 @@ class RTSPStreamReader:
                         self.latest_results = results
                         self.results_time = time.time()
                     self.analises += 1
+                    if self.vigilancia and self.camera_id:
+                        registrar_deteccoes(self, frame, results)
                 except Exception as e:
                     logger.debug(f"Falha na análise: {e}")
-            # Alvo de IA_FPS análises/s por câmera, descontando o tempo da própria análise
+            # Alvo de análises/s por câmera (menor só em vigilância), descontando o tempo da própria análise
+            intervalo = 1.0 / (IA_FPS if self.com_espectador() else IA_FPS_VIGILANCIA)
             time.sleep(max(0.01, intervalo - (time.time() - inicio)))
 
     def get_frame(self) -> Optional[np.ndarray]:
@@ -318,15 +332,62 @@ DEFAULT_RTSP_URL = "rtsp://a2eventos:19022020@localhost:8554/live"
 active_streams: Dict[str, RTSPStreamReader] = {}
 streams_lock = threading.Lock()
 
-def get_or_create_stream(url: str = DEFAULT_RTSP_URL) -> RTSPStreamReader:
+def get_or_create_stream(url: str = DEFAULT_RTSP_URL, tocar: bool = True) -> RTSPStreamReader:
+    """tocar=False: uso interno (vigilância) que não conta como alguém assistindo."""
     with streams_lock:
         reader = active_streams.get(url)
         if reader is None:
             reader = RTSPStreamReader(url)
+            if not tocar:
+                reader.ultimo_uso = 0.0
             reader.start()
             active_streams[url] = reader
-    reader.tocar()
+    if tocar:
+        reader.tocar()
     return reader
+
+# ==========================================================
+# VIGILÂNCIA: detecções de pessoas reconhecidas para o agente levar à nuvem
+# ==========================================================
+deteccoes: deque = deque(maxlen=200)
+deteccoes_lock = threading.Lock()
+deteccao_seq = 0
+_ultima_deteccao: Dict[str, float] = {}  # "camera_id:pessoa_id" → instante da última detecção enviada
+
+def registrar_deteccoes(reader: "RTSPStreamReader", frame: np.ndarray, results: List[Dict[str, Any]]):
+    """Guarda as pessoas reconhecidas (no máximo 1 vez a cada VIGILANCIA_REPETIR_S por câmera)."""
+    global deteccao_seq
+    agora = time.time()
+    novos = []
+    for r in results:
+        mp = r.get("matched_person")
+        if not mp:
+            continue
+        chave = f"{reader.camera_id}:{mp['id']}"
+        if agora - _ultima_deteccao.get(chave, 0) < VIGILANCIA_REPETIR_S:
+            continue
+        _ultima_deteccao[chave] = agora
+        novos.append(r)
+    if not novos:
+        return
+    if len(_ultima_deteccao) > 5000:
+        for k in [k for k, t in _ultima_deteccao.items() if agora - t > VIGILANCIA_REPETIR_S]:
+            del _ultima_deteccao[k]
+
+    quadro = desenhar_hud(frame.copy(), results, reader.fps)
+    if quadro.shape[1] > 960:
+        quadro = cv2.resize(quadro, (960, int(quadro.shape[0] * 960 / quadro.shape[1])), interpolation=cv2.INTER_AREA)
+    _, jpg = cv2.imencode('.jpg', quadro, [cv2.IMWRITE_JPEG_QUALITY, 70])
+    with deteccoes_lock:
+        deteccao_seq += 1
+        deteccoes.append({
+            "seq": deteccao_seq,
+            "camera_id": reader.camera_id,
+            "ts": agora,
+            "results": novos,
+            "annotated_frame_base64": base64.b64encode(jpg).decode('utf-8')
+        })
+    logger.info(f"👁️ Vigilância: {', '.join(r['matched_person']['nome'] for r in novos)} na câmera {reader.camera_id}")
 
 def _desligar_streams_ociosos():
     """Câmera sem ninguém usando há IA_CAMERA_OCIOSA_S para de ler vídeo e de rodar IA.
@@ -335,7 +396,8 @@ def _desligar_streams_ociosos():
         time.sleep(15)
         agora = time.time()
         with streams_lock:
-            ociosos = [(u, r) for u, r in active_streams.items() if agora - r.ultimo_uso > IA_CAMERA_OCIOSA_S]
+            # Câmera sob vigilância não desliga (ela que dispara os alertas com o painel fechado)
+            ociosos = [(u, r) for u, r in active_streams.items() if agora - r.ultimo_uso > IA_CAMERA_OCIOSA_S and not r.vigilancia]
             for url, _ in ociosos:
                 del active_streams[url]
         for url, reader in ociosos:
@@ -729,6 +791,31 @@ async def get_camera_stream(stream_url: str = DEFAULT_RTSP_URL):
         media_type="multipart/x-mixed-replace; boundary=frame"
     )
 
+class VigilanciaConfig(BaseModel):
+    cameras: List[Dict[str, str]] = []  # [{ "id": <cameras_ip.id>, "stream_url": "rtsp://..." }]
+
+@app.post("/api/vigilancia")
+def configurar_vigilancia(cfg: VigilanciaConfig):
+    """Câmeras do evento sob vigilância (enviado pelo agente/API, repetido periodicamente)."""
+    novas = {c["id"]: c["stream_url"] for c in cfg.cameras if c.get("id") and str(c.get("stream_url", "")).startswith("rtsp")}
+    urls = set(novas.values())
+    with streams_lock:
+        for url, r in active_streams.items():
+            if r.vigilancia and url not in urls:
+                r.vigilancia = False  # saiu da lista: volta às regras de câmera comum
+    for cid, url in novas.items():
+        r = get_or_create_stream(url, tocar=False)
+        r.camera_id = cid
+        r.vigilancia = True
+    return {"success": True, "cameras": len(novas)}
+
+@app.get("/api/vigilancia/deteccoes")
+def listar_deteccoes(desde: int = 0):
+    """Detecções com seq > desde. Se o motor reiniciou (seq atual < desde), o agente recomeça do zero."""
+    with deteccoes_lock:
+        novas = [d for d in deteccoes if d["seq"] > desde][:50]
+        return {"seq": deteccao_seq, "deteccoes": novas}
+
 @app.get("/api/engine/status")
 def get_engine_status():
     """Retorna o status detalhado do hardware de aceleracao e indice FAISS"""
@@ -747,7 +834,9 @@ def get_engine_status():
             "ia_ativa": r.ia_deve_analisar(),
             "movimento_ha_s": round(time.time() - r.ultimo_movimento, 1),
             "analises": r.analises,
-            "sem_uso_ha_s": round(time.time() - r.ultimo_uso, 1)
+            "sem_uso_ha_s": round(time.time() - r.ultimo_uso, 1),
+            "vigilancia": r.vigilancia,
+            "camera_id": r.camera_id
         } for url, r in list(active_streams.items())],
         "active_providers": active_providers,
         "vector_search_engine": "FAISS IndexFlatIP (Sub-millisecond Search)",

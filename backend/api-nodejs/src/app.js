@@ -256,6 +256,8 @@ server.listen(PORT, async () => {
         await websocketService.init(server);
         const agentService = require('./services/agentService');
         agentService.init(websocketService.io);
+        // Alertas das câmeras com o painel fechado (agente local ou motor no próprio servidor)
+        require('./modules/system/vigilancia.service').iniciar();
 
         await testConnection();
         await testPgConnection();

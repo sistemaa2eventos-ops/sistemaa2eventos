@@ -76,6 +76,117 @@ async function buscarImagemHttp(cam, rota, timeout) {
 const esperar = (ms) => new Promise(r => setTimeout(r, ms));
 const watchlistService = require('./watchlist.service');
 
+/**
+ * Alertas de quem a IA reconheceu numa câmera — usado pelo rastreamento do Monitor (/track) e pela
+ * vigilância (detecções enviadas pelo agente com o painel fechado). Mesmas regras e mesmas travas
+ * nos dois caminhos: pessoa bloqueada alerta no máximo 1x por minuto por câmera; watchlist só
+ * dispara de novo quando o rastreamento anterior terminou.
+ * Muta `results` (marca is_watchlist etc. para a resposta do /track).
+ * @param {'monitor'|'vigilancia'} origem
+ */
+async function processarDeteccoesCamera(cam, results, annotatedB64, { origem = 'monitor' } = {}) {
+    if (!Array.isArray(results) || results.length === 0) return;
+    const io = global.io || require('../../services/websocketService').io;
+    const eventoId = cam.evento_id;
+    const snapshotFrame = annotatedB64 ? `data:image/jpeg;base64,${annotatedB64}` : null;
+    const localizacaoEvento = cam.area?.nome_area
+        ? `${cam.area.nome_area} (Câmera: ${cam.nome})`
+        : (cam.nome || 'Ponto de Monitoramento');
+    const dispositivoInfo = {
+        id: cam.id,
+        nome: cam.nome,
+        tipo: 'camera_ip',
+        ip: cam.ip_address,
+        porta: cam.porta,
+        fabricante: cam.fabricante || 'RTSP'
+    };
+
+    for (const face of results) {
+        const mp = face.matched_person;
+        if (!mp) continue;
+        if (!mp.foto_url && mp.cpf) {
+            try {
+                const { data: pData } = await supabase.from('pessoas').select('foto_url').eq('cpf', mp.cpf).maybeSingle();
+                if (pData?.foto_url) mp.foto_url = pData.foto_url;
+            } catch (fErr) {
+                logger.warn(`[Câmera] Falha ao recuperar foto de perfil: ${fErr.message}`);
+            }
+        }
+        const faceCropImg = face.face_crop_base64 ? `data:image/jpeg;base64,${face.face_crop_base64}` : null;
+
+        // Detecção de câmera NÃO é passagem de acesso: não entra no feed nem nos contadores.
+        // Pessoa bloqueada vista pela câmera: alerta no máximo 1x por minuto por câmera.
+        const chaveAlerta = `${cam.id}:${mp.cpf || mp.id}`;
+        const ultimoAlerta = ALERTAS_CAMERA.get(chaveAlerta) || 0;
+        if (eventoId && mp.bloqueado && Date.now() - ultimoAlerta > 60000) {
+            ALERTAS_CAMERA.set(chaveAlerta, Date.now());
+            io?.to(`evento_${eventoId}`).emit('area_alert', {
+                pessoa_nome: mp.nome,
+                area_nome: cam.area?.nome_area || cam.nome,
+                dispositivo_nome: cam.nome,
+                localizacao: localizacaoEvento,
+                tipo: 'pessoa_bloqueada',
+                hora: new Date().toISOString()
+            });
+            // Fica registrado no sino mesmo sem ninguém com o painel aberto (1 por pessoa/câmera a cada 10 min)
+            require('./notificacao.service').criar([{
+                evento_id: eventoId,
+                tipo: 'CAMERA_PESSOA_BLOQUEADA',
+                severidade: 'critical',
+                titulo: `Pessoa bloqueada vista pela câmera: ${mp.nome}`,
+                mensagem: `${localizacaoEvento} · ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`,
+                referencia_tipo: 'pessoa',
+                referencia_id: mp.id,
+                chave_dedupe: `CAMERA_BLOQ:${cam.id}:${mp.id}:${Math.floor(Date.now() / 600000)}`
+            }]).catch(() => {});
+        }
+
+        // Checagem e disparo de alerta na Watchlist (Alvos Procurados / Monitorados)
+        if (mp.cpf && eventoId) {
+            try {
+                const monitorado = await watchlistService.verificarCPF(mp.cpf, eventoId);
+                if (monitorado) {
+                    mp.is_watchlist = true;
+                    mp.watchlist = monitorado;
+                    mp.foto_capturada = snapshotFrame;
+                    mp.face_crop = faceCropImg;
+                    mp.dispositivo = dispositivoInfo;
+                    mp.localizacao = localizacaoEvento;
+
+                    // TRAVA ANTI-LOOPING: Se o alerta já foi emitido e está em rastreamento ativo, NÃO reemitir!
+                    if (watchlistService.isAlertaAtivo(eventoId, mp.cpf)) {
+                        mp.em_rastreamento = true;
+                    } else {
+                        logger.warn(`🚨 [NOVO ALERTA] WATCHLIST DETECTADO PELA CÂMERA (${origem}): ${mp.nome} (CPF: ${mp.cpf}) na câmera '${cam.nome}' em '${localizacaoEvento}'`);
+
+                        // Disparo único multicanal com foto capturada, dispositivo e localização física
+                        watchlistService.registrarAlerta(monitorado, {
+                            pessoa_id: mp.id,
+                            nome: mp.nome,
+                            cpf: mp.cpf,
+                            foto_url: mp.foto_url,
+                            foto_capturada: snapshotFrame,
+                            face_crop: faceCropImg,
+                            evento_id: eventoId,
+                            tipo: 'camera_vigilancia',
+                            area_id: cam.area_id,
+                            area: cam.area?.nome_area || cam.nome,
+                            localizacao: localizacaoEvento,
+                            dispositivo_id: cam.id,
+                            dispositivo: dispositivoInfo,
+                            operador_nome: origem === 'vigilancia'
+                                ? 'Vigilância automática (IA InsightFace, painel fechado)'
+                                : 'Sistema de Visão Computacional (IA InsightFace)'
+                        }).catch(err => logger.error(`Falha ao registrar alerta da watchlist: ${err.message}`));
+                    }
+                }
+            } catch (wErr) {
+                logger.error(`Erro ao verificar watchlist na câmera: ${wErr.message}`);
+            }
+        }
+    }
+}
+
 // Credenciais nunca vão para o navegador: rtsp://user:senha@host → rtsp://user:***@host
 const mascararUrl = (url) => (typeof url === 'string' ? url.replace(/(\/\/[^:/@]+:)[^@/]*@/, '$1***@') : url);
 const ALERTAS_CAMERA = new Map(); // `${camId}:${cpf}` → último alerta de pessoa bloqueada (ms)
@@ -146,6 +257,7 @@ class CameraController {
                 .single();
 
             if (error) throw error;
+            require('./vigilancia.service').eventoAlterado(data.evento_id).catch(() => {}); // câmeras sob vigilância mudaram
             res.json({ success: true, data });
         } catch (error) {
             logger.error('Erro ao criar câmera:', error);
@@ -181,6 +293,7 @@ class CameraController {
 
             if (error) throw error;
             const { senha: _omit, ...segura } = data;
+            require('./vigilancia.service').eventoAlterado(data.evento_id).catch(() => {}); // câmeras sob vigilância mudaram
             res.json({ success: true, data: { ...segura, stream_url: mascararUrl(segura.stream_url), snapshot_url: mascararUrl(segura.snapshot_url) } });
         } catch (error) {
             logger.error('Erro ao atualizar câmera:', error);
@@ -200,6 +313,8 @@ class CameraController {
                 .eq('id', id);
 
             if (error) throw error;
+            const eventoDaCamera = req.event?.id || req.headers['x-evento-id'];
+            if (eventoDaCamera) require('./vigilancia.service').eventoAlterado(eventoDaCamera).catch(() => {}); // câmeras sob vigilância mudaram
             res.json({ success: true });
         } catch (error) {
             logger.error('Erro ao excluir câmera:', error);
@@ -442,105 +557,9 @@ class CameraController {
             }
             if (!trackResp.data) return semIa('Resposta inválida da IA');
 
-            // Se reconheceu alguém, emitir via WebSocket para o Monitor em tempo real
-            if (trackResp.data.success && trackResp.data.results && trackResp.data.results.length > 0) {
-                const io = (req.app && typeof req.app.get === 'function') ? req.app.get('io') : global.io;
-                const eventoId = cam.evento_id;
-
-                const snapshotFrame = trackResp.data.annotated_frame_base64 
-                    ? `data:image/jpeg;base64,${trackResp.data.annotated_frame_base64}` 
-                    : null;
-
-                const localizacaoEvento = cam.area?.nome_area
-                    ? `${cam.area.nome_area} (Câmera: ${cam.nome})`
-                    : (cam.nome || 'Ponto de Monitoramento');
-
-                const dispositivoInfo = {
-                    id: cam.id,
-                    nome: cam.nome,
-                    tipo: 'camera_ip',
-                    ip: cam.ip_address,
-                    porta: cam.porta,
-                    fabricante: cam.fabricante || 'RTSP'
-                };
-
-                for (const face of trackResp.data.results) {
-                    if (face.matched_person) {
-                        const mp = face.matched_person;
-                        if (!mp.foto_url && mp.cpf) {
-                            try {
-                                const { data: pData } = await supabase.from('pessoas').select('foto_url').eq('cpf', mp.cpf).maybeSingle();
-                                if (pData?.foto_url) mp.foto_url = pData.foto_url;
-                            } catch (fErr) {
-                                logger.warn(`[trackFace] Falha ao recuperar foto de perfil: ${fErr.message}`);
-                            }
-                        }
-                        const faceCropImg = face.face_crop_base64
-                            ? `data:image/jpeg;base64,${face.face_crop_base64}`
-                            : null;
-
-                        // Detecção de câmera NÃO é passagem de acesso: não entra no feed nem nos contadores
-                        // (antes cada varredura de 4,5 s gerava um "check-in" falso no Monitor).
-                        // Pessoa bloqueada vista pela câmera: alerta no máximo 1x por minuto por câmera.
-                        const chaveAlerta = `${cam.id}:${mp.cpf || mp.id}`;
-                        const ultimoAlerta = ALERTAS_CAMERA.get(chaveAlerta) || 0;
-                        if (io && eventoId && mp.bloqueado && Date.now() - ultimoAlerta > 60000) {
-                            ALERTAS_CAMERA.set(chaveAlerta, Date.now());
-                            {
-                                io.to(`evento_${eventoId}`).emit('area_alert', {
-                                    pessoa_nome: mp.nome,
-                                    area_nome: cam.area?.nome_area || cam.nome,
-                                    dispositivo_nome: cam.nome,
-                                    localizacao: localizacaoEvento,
-                                    tipo: 'pessoa_bloqueada',
-                                    hora: new Date().toISOString()
-                                });
-                            }
-                        }
-
-                        // Checagem e disparo de alerta na Watchlist (Alvos Procurados / Monitorados)
-                        if (mp.cpf && eventoId) {
-                            try {
-                                const monitorado = await watchlistService.verificarCPF(mp.cpf, eventoId);
-                                if (monitorado) {
-                                    mp.is_watchlist = true;
-                                    mp.watchlist = monitorado;
-                                    mp.foto_capturada = snapshotFrame;
-                                    mp.face_crop = faceCropImg;
-                                    mp.dispositivo = dispositivoInfo;
-                                    mp.localizacao = localizacaoEvento;
-
-                                    // TRAVA ANTI-LOOPING: Se o alerta já foi emitido e está em rastreamento ativo, NÃO reemitir!
-                                    if (watchlistService.isAlertaAtivo(eventoId, mp.cpf)) {
-                                        mp.em_rastreamento = true;
-                                    } else {
-                                        logger.warn(`🚨 [NOVO ALERTA] WATCHLIST DETECTADO PELA CÂMERA: ${mp.nome} (CPF: ${mp.cpf}) na câmera '${cam.nome}' em '${localizacaoEvento}'`);
-
-                                        // Disparo único multicanal com foto capturada, dispositivo e localização física
-                                        watchlistService.registrarAlerta(monitorado, {
-                                            pessoa_id: mp.id,
-                                            nome: mp.nome,
-                                            cpf: mp.cpf,
-                                            foto_url: mp.foto_url,
-                                            foto_capturada: snapshotFrame,
-                                            face_crop: faceCropImg,
-                                            evento_id: eventoId,
-                                            tipo: 'camera_vigilancia',
-                                            area_id: cam.area_id,
-                                            area: cam.area?.nome_area || cam.nome,
-                                            localizacao: localizacaoEvento,
-                                            dispositivo_id: cam.id,
-                                            dispositivo: dispositivoInfo,
-                                            operador_nome: 'Sistema de Visão Computacional (IA InsightFace)'
-                                        }).catch(err => logger.error(`Falha ao registrar alerta da watchlist: ${err.message}`));
-                                    }
-                                }
-                            } catch (wErr) {
-                                logger.error(`Erro ao verificar watchlist na câmera: ${wErr.message}`);
-                            }
-                        }
-                    }
-                }
+            // Quem a IA reconheceu: alertas (mesma função da vigilância com o painel fechado)
+            if (trackResp.data.success) {
+                await processarDeteccoesCamera(cam, trackResp.data.results, trackResp.data.annotated_frame_base64, { origem: 'monitor' });
             }
 
             const localizacaoEvento = cam.area?.nome_area
@@ -579,3 +598,6 @@ class CameraController {
 }
 
 module.exports = new CameraController();
+
+// Usado pela vigilância (detecções enviadas pelo agente ou buscadas no motor local)
+module.exports.processarDeteccoesCamera = processarDeteccoesCamera;

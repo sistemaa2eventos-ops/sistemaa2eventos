@@ -20,7 +20,7 @@ const VPS_URL = (process.env.VPS_URL || '').replace(/\/+$/, '');
 const AGENT_TOKEN = process.env.AGENT_TOKEN;
 const AGENT_NAME = process.env.AGENT_NAME || 'Agente Local';
 const IA_URL = (process.env.IA_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
-const VERSAO = '2.2.0';
+const VERSAO = '2.3.0';
 
 const log = (nivel, msg) => console.log(`[${new Date().toISOString()}] ${nivel.toUpperCase()} ${msg}`);
 
@@ -117,6 +117,13 @@ const handlers = {
         return { ativo: true };
     },
 
+    /** Câmeras do evento que o motor vigia sem ninguém assistindo (alertas com o painel fechado) */
+    async vigilancia_configurar({ cameras = [] }) {
+        vigilancia.cameras = cameras;
+        await aplicarVigilancia();
+        return { cameras: cameras.length };
+    },
+
     async video_parar({ streamId }) {
         const video = videos.get(streamId);
         if (video) video.parar = true;
@@ -174,6 +181,43 @@ async function enviarVideo(streamId, video, { stream_url, annotate, fps, max_wid
     videos.delete(streamId);
     log('info', `vídeo ${streamId} encerrado`);
 }
+
+// Vigilância: o servidor manda a lista de câmeras; o agente repassa ao motor (de novo a cada 30 s,
+// caso o motor reinicie) e leva à nuvem as pessoas que o motor reconhecer.
+const vigilancia = { cameras: null, desde: 0 };
+
+async function aplicarVigilancia() {
+    if (!vigilancia.cameras) return;
+    const res = await fetch(`${IA_URL}/api/vigilancia`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cameras: vigilancia.cameras }),
+        signal: AbortSignal.timeout(10000)
+    });
+    if (!res.ok) throw new Error(`motor respondeu HTTP ${res.status}`);
+}
+
+setInterval(() => aplicarVigilancia().catch(() => {}), 30000);
+
+let buscandoDeteccoes = false;
+setInterval(async () => {
+    if (buscandoDeteccoes || !vigilancia.cameras || !socket.connected) return;
+    buscandoDeteccoes = true;
+    try {
+        const res = await fetch(`${IA_URL}/api/vigilancia/deteccoes?desde=${vigilancia.desde}`, { signal: AbortSignal.timeout(5000) });
+        const { seq, deteccoes = [] } = await res.json();
+        if (seq < vigilancia.desde) { vigilancia.desde = 0; return; } // motor reiniciou: contagem recomeçou
+        for (const d of deteccoes) {
+            await socket.timeout(10000).emitWithAck('agent:deteccao', d);
+            vigilancia.desde = d.seq;
+            log('info', `vigilância: ${d.results.map(r => r.matched_person?.nome).join(', ')} (câmera ${d.camera_id}) → painel`);
+        }
+    } catch {
+        // motor desligado ou servidor sem resposta: tenta de novo no próximo segundo
+    } finally {
+        buscandoDeteccoes = false;
+    }
+}, 1000);
 
 // Namespace /agent do Socket.IO (o caminho HTTP continua o padrão /socket.io)
 const socket = io(`${VPS_URL}/agent`, {

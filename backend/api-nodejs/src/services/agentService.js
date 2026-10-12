@@ -53,6 +53,15 @@ class AgentService {
 
             socket.on('agent:ready', (info) => {
                 logger.info(`🤖 Agente ${nome} pronto (${info.name || nome}, v${info.version || '?'})`);
+                // Câmeras do evento que o motor local deve vigiar com o painel fechado
+                require('../modules/system/vigilancia.service').configurarAgente(agentId, socket.agentInfo.evento_id);
+            });
+
+            // Pessoa reconhecida pela vigilância (motor local, sem ninguém assistindo)
+            socket.on('agent:deteccao', (deteccao, ack) => {
+                if (typeof ack === 'function') ack();
+                require('../modules/system/vigilancia.service').receberDeteccao(socket.agentInfo.evento_id, deteccao)
+                    .catch(err => logger.error(`[Vigilância] detecção do agente ${nome}: ${err.message}`));
             });
 
             socket.on('agent:response', ({ requestId, success, data, error }) => {
