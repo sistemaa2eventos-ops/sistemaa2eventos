@@ -20,7 +20,7 @@ const VPS_URL = (process.env.VPS_URL || '').replace(/\/+$/, '');
 const AGENT_TOKEN = process.env.AGENT_TOKEN;
 const AGENT_NAME = process.env.AGENT_NAME || 'Agente Local';
 const IA_URL = (process.env.IA_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
-const VERSAO = '2.1.0';
+const VERSAO = '2.2.0';
 
 const log = (nivel, msg) => console.log(`[${new Date().toISOString()}] ${nivel.toUpperCase()} ${msg}`);
 
@@ -100,6 +100,29 @@ const handlers = {
         return { status: res.status, ok: res.ok, json: await res.json().catch(() => null) };
     },
 
+    /**
+     * Vídeo ao vivo para o painel na nuvem: envia quadros sem esperar pedido (antes: um pedido por
+     * quadro, ~4 fps). Repetir o comando renova o prazo; sem renovação por ttlMs, para sozinho.
+     */
+    async video_iniciar({ streamId, stream_url, annotate = true, fps = 12, max_width = 960, quality = 70, ttlMs = 30000 }) {
+        if (!streamId || !stream_url) throw new Error('streamId e stream_url são obrigatórios');
+        const atual = videos.get(streamId);
+        if (atual) {
+            atual.expiraEm = Date.now() + ttlMs;
+            return { ativo: true, renovado: true };
+        }
+        const video = { expiraEm: Date.now() + ttlMs, parar: false };
+        videos.set(streamId, video);
+        enviarVideo(streamId, video, { stream_url, annotate, fps, max_width, quality }).catch(err => log('error', `vídeo ${streamId}: ${err.message}`));
+        return { ativo: true };
+    },
+
+    async video_parar({ streamId }) {
+        const video = videos.get(streamId);
+        if (video) video.parar = true;
+        return { ativo: false };
+    },
+
     /** Imagem de câmera HTTP da rede local (snapshot CGI), com autenticação Digest ou Basic */
     async http({ url, user, password, timeoutMs = 5000 }) {
         const alvo = new URL(url);
@@ -123,6 +146,34 @@ const handlers = {
         }
     }
 };
+
+// Vídeos sendo enviados ao servidor: streamId → { expiraEm, parar }
+const videos = new Map();
+const esperar = (ms) => new Promise(r => setTimeout(r, ms));
+
+async function enviarVideo(streamId, video, { stream_url, annotate, fps, max_width, quality }) {
+    const intervalo = 1000 / Math.min(Math.max(fps, 1), 30);
+    const query = new URLSearchParams({ stream_url, annotate: String(annotate), max_width: String(max_width), quality: String(quality) });
+    log('info', `vídeo ${streamId} → painel (${fps} fps, ${max_width}px)`);
+    let falhas = 0;
+    while (!video.parar && Date.now() < video.expiraEm && socket.connected) {
+        const inicio = Date.now();
+        try {
+            const res = await fetch(`${IA_URL}/api/camera/snapshot?${query}`, { signal: AbortSignal.timeout(5000) });
+            const jpeg = Buffer.from(await res.arrayBuffer());
+            // Espera o servidor confirmar o quadro antes do próximo: se a internet do evento estiver
+            // lenta, a taxa cai sozinha em vez de acumular atraso
+            await socket.timeout(5000).emitWithAck('agent:video_quadro', { streamId, jpeg });
+            falhas = 0;
+        } catch (err) {
+            if (++falhas === 5) log('warn', `vídeo ${streamId}: ${err.message} (seguindo)`);
+            await esperar(500);
+        }
+        await esperar(Math.max(0, intervalo - (Date.now() - inicio)));
+    }
+    videos.delete(streamId);
+    log('info', `vídeo ${streamId} encerrado`);
+}
 
 // Namespace /agent do Socket.IO (o caminho HTTP continua o padrão /socket.io)
 const socket = io(`${VPS_URL}/agent`, {
@@ -151,8 +202,8 @@ socket.on('agent:command', async ({ requestId, command, payload }) => {
     try {
         const data = await handler(payload || {});
         socket.emit('agent:response', { requestId, success: true, data });
-        // IA e imagens de câmera chegam várias vezes por segundo: só os erros vão para o log
-        if (command !== 'ia' && command !== 'http') log('info',`${command} ${payload?.method || ''} ${payload?.config?.ip || ''}${(payload?.path || '').split('?')[0]} → ok (${Date.now() - inicio} ms)`);
+        // IA, imagens e renovação de vídeo chegam toda hora: só os erros vão para o log
+        if (!['ia', 'http', 'video_iniciar'].includes(command)) log('info',`${command} ${payload?.method || ''} ${payload?.config?.ip || ''}${(payload?.path || '').split('?')[0]} → ok (${Date.now() - inicio} ms)`);
     } catch (err) {
         socket.emit('agent:response', { requestId, success: false, error: err.message });
         log('error', `${command} ${payload?.config?.ip || payload?.path || ''} → ${err.message}`);

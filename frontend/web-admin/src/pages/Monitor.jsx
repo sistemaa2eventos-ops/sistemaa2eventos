@@ -2025,7 +2025,7 @@ const Monitor = () => {
                     minHeight: streamModalSize === 'fullscreen' ? '82vh' : '450px'
                 }}>
                     <img
-                        src={urlMidiaCamera(activeStreamCam.id, 'stream', { annotate: true, t: Date.now() })}
+                        src={urlMidiaCamera(activeStreamCam.id, 'stream', { annotate: true })}
                         alt={activeStreamCam.nome}
                         style={{
                             maxWidth: '100%',

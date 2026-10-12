@@ -69,10 +69,19 @@ class AgentService {
                 }
             });
 
+            // Quadros de vídeo ao vivo enviados pelo agente (ver services/videoRelay.js)
+            socket.on('agent:video_quadro', (msg, ack) => {
+                if (typeof ack === 'function') ack();
+                require('./videoRelay').receber(agentId, msg);
+            });
+
             socket.on('disconnect', () => {
                 logger.warn(`⚠️ Agente desconectado: ${nome}`);
                 // Só remove se ainda for a conexão vigente (o agente pode ter reconectado)
-                if (this.agents.get(agentId) === socket) this.agents.delete(agentId);
+                if (this.agents.get(agentId) === socket) {
+                    this.agents.delete(agentId);
+                    require('./videoRelay').agenteDesconectou(agentId);
+                }
             });
         });
 

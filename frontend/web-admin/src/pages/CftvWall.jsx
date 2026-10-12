@@ -504,9 +504,9 @@ const CftvWall = () => {
                                         transition: 'all 0.2s ease',
                                         '&:hover .cftv-overlay-controls': { opacity: 1 }
                                     }}>
-                                        {/* STREAM MJPEG AO VIVO COM IA */}
+                                        {/* STREAM MJPEG AO VIVO COM IA — endereço estável: o relógio re-renderiza a cada 1 s e um t novo reconectava o vídeo */}
                                         <img
-                                            src={urlMidiaCamera(cam.id, 'stream', { annotate: true, t: Date.now() })}
+                                            src={urlMidiaCamera(cam.id, 'stream', { annotate: true })}
                                             alt={cam.nome}
                                             style={{
                                                 width: '100%',

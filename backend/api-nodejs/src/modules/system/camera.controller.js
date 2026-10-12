@@ -11,7 +11,11 @@ const IA_URL_DIRETA = process.env.PYTHON_MICROSERVICE_URL
     || (process.env.NODE_ENV === 'production' ? null : 'http://localhost:8000');
 const MSG_IA_OFFLINE = 'Serviço de câmeras/IA do evento não está conectado';
 const PAUSA_IA_OFFLINE_MS = 20000;
-const QUADROS_POR_SEGUNDO_AGENTE = 4; // vídeo ao vivo repassado pelo agente (sai pela internet do evento)
+const QUADROS_POR_SEGUNDO_AGENTE = 4; // agente antigo: um pedido por quadro
+// Vídeo ao vivo enviado pelo agente 2.2+: ~45 KB por quadro em 960 px → 12 fps ≈ 4 Mbit/s de envio
+// por câmera aberta no painel (cai sozinho se a internet do evento não der conta)
+const VIDEO_FPS_AGENTE = Math.min(30, Math.max(1, parseInt(process.env.CAMERA_VIDEO_FPS, 10) || 12));
+const videoRelay = require('../../services/videoRelay');
 
 const rotaDaCamera = (cam) => {
     if (IA_URL_DIRETA) return { tipo: 'direto', url: IA_URL_DIRETA, chave: 'direto' };
@@ -316,7 +320,23 @@ class CameraController {
             const annotate = req.query.annotate !== 'false';
 
             if (rota.tipo === 'agente') {
-                // O agente responde comando a comando: o MJPEG é montado aqui com quadros reduzidos
+                // Agente 2.2+: envia os quadros sozinho na taxa pedida, um envio serve todos os espectadores
+                try {
+                    return await videoRelay.assistir({
+                        agentId: rota.agentId,
+                        streamId: `${cam.id}:${annotate ? 'ia' : 'cru'}`,
+                        params: { stream_url: streamUrl, annotate, fps: VIDEO_FPS_AGENTE, max_width: 960, quality: 70 },
+                        req, res
+                    });
+                } catch (err) {
+                    if (!/Comando desconhecido/.test(err.message)) {
+                        marcarIaIndisponivel(rota, 'getStream', err);
+                        return res.status(503).send(MSG_IA_OFFLINE);
+                    }
+                    // Agente antigo (sem 'video_iniciar'): modo pedido a pedido abaixo
+                }
+
+                // Agente antigo: um pedido por quadro, MJPEG montado aqui com quadros reduzidos
                 let ativo = true;
                 req.on('close', () => { ativo = false; });
                 const intervalo = 1000 / QUADROS_POR_SEGUNDO_AGENTE;
