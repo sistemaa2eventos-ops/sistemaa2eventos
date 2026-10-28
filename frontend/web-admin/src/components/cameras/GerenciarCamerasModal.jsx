@@ -3,7 +3,7 @@ import {
     Dialog, DialogTitle, DialogContent, DialogActions,
     Box, Typography, Button, IconButton, TextField,
     Grid, Stack, Chip, MenuItem, FormControl, InputLabel, Select,
-    CircularProgress, Tooltip
+    CircularProgress, Tooltip, Switch, FormControlLabel
 } from '@mui/material';
 import {
     Close as CloseIcon,
@@ -51,7 +51,11 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
                 protocolo: 'rtsp',
                 stream_url: 'rtsp://127.0.0.1:8554/live',
                 snapshot_url: '',
-                area_id: areas[0]?.id || ''
+                area_id: areas[0]?.id || '',
+                ia_ativa: true,
+                vigilancia_ativa: true,
+                prioridade: 1,
+                url_substream: ''
             });
         }
         setFormMode(true);
@@ -265,6 +269,56 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
                                         ))}
                                     </Select>
                                 </FormControl>
+                            </Grid>
+
+                            {/* IA FACIAL NESTA CÂMERA (mesmas opções de Configurações > IA facial) */}
+                            <Grid item xs={12}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 700, mt: 1 }}>Reconhecimento facial</Typography>
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                                <FormControlLabel
+                                    control={<Switch checked={editingCamera?.ia_ativa !== false}
+                                        onChange={(e) => setEditingCamera({ ...editingCamera, ia_ativa: e.target.checked })} />}
+                                    label="IA ligada"
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                                <Tooltip title="Reconhece e alerta mesmo com o painel fechado (usa o computador do evento o tempo todo)">
+                                    <FormControlLabel
+                                        control={<Switch checked={editingCamera?.vigilancia_ativa !== false && editingCamera?.ia_ativa !== false}
+                                            disabled={editingCamera?.ia_ativa === false}
+                                            onChange={(e) => setEditingCamera({ ...editingCamera, vigilancia_ativa: e.target.checked })} />}
+                                        label="Vigilância 24 h"
+                                    />
+                                </Tooltip>
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                                <FormControl fullWidth size="small">
+                                    <InputLabel sx={{ color: '#94A3B8' }}>Prioridade da IA</InputLabel>
+                                    <Select
+                                        value={editingCamera?.prioridade ?? 1}
+                                        label="Prioridade da IA"
+                                        onChange={(e) => setEditingCamera({ ...editingCamera, prioridade: e.target.value })}
+                                        sx={{ bgcolor: 'rgba(0,0,0,0.3)', color: '#FFFFFF' }}
+                                    >
+                                        <MenuItem value={0}>Baixa</MenuItem>
+                                        <MenuItem value={1}>Normal</MenuItem>
+                                        <MenuItem value={2}>Alta</MenuItem>
+                                        <MenuItem value={3}>Crítica (entrada principal)</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="Sub-stream (opcional)"
+                                    value={editingCamera?.url_substream || ''}
+                                    onChange={(e) => setEditingCamera({ ...editingCamera, url_substream: e.target.value })}
+                                    placeholder="rtsp://usuario:senha@192.168.1.100:554/cam/realmonitor?channel=1&subtype=1"
+                                    helperText="Vídeo em baixa resolução usado nas miniaturas e na vigilância. Vazio: deduzido automaticamente (Intelbras/Dahua e Hikvision)."
+                                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'rgba(0,0,0,0.3)', color: '#FFFFFF' } }}
+                                />
                             </Grid>
                         </Grid>
                     </Box>
