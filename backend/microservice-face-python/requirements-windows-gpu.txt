@@ -1,20 +1,18 @@
 # Motor de IA no servidor local Windows com placa de vídeo (DirectML: NVIDIA, AMD ou Intel).
-# Versões validadas em 11/10/2026 (RTX 5060): ~52 ms por quadro contra ~620 ms na CPU, mesmos embeddings.
+# Versões validadas em 28/10/2026 (RTX 5060): ~50 ms por análise contra ~620 ms na CPU.
 #
 #   python -m venv venv-ia
 #   venv-ia\Scripts\pip install -r requirements-windows-gpu.txt
 #   venv-ia\Scripts\pip uninstall -y onnxruntime          (o insightface puxa a versão só-CPU)
-#   venv-ia\Scripts\pip install --force-reinstall --no-deps onnxruntime-directml
+#   venv-ia\Scripts\pip install --force-reinstall --no-deps onnxruntime-directml==1.24.4
 #
-# O ligar-ia-facial.bat usa venv-ia primeiro. IA_GPU=off força a CPU.
-opencv-python<5
-numpy
-Pillow
+# O ligar-ia-facial.bat avisa se o onnxruntime só-CPU continuar instalado. IA_GPU=off força a CPU.
+opencv-python-headless==5.0.0.93
+numpy==2.4.6
 insightface==0.7.3
-faiss-cpu
-onnxruntime-directml
-fastapi
-uvicorn[standard]
-pydantic
-loguru
-scikit-learn
+faiss-cpu==1.15.1
+onnxruntime-directml==1.24.4
+fastapi==0.143.0
+uvicorn[standard]==0.54.0
+pydantic==2.14.1
+loguru==0.7.3

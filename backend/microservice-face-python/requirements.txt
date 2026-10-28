@@ -1,10 +1,10 @@
-opencv-python
-numpy
-Pillow
-insightface
-faiss-cpu
-onnxruntime
-fastapi
-uvicorn[standard]
-pydantic
-loguru
+# Motor de IA só na CPU (Docker/Linux). No Windows do evento com placa de vídeo use requirements-windows-gpu.txt.
+opencv-python-headless==5.0.0.93
+numpy==2.4.6
+insightface==0.7.3
+faiss-cpu==1.15.1
+onnxruntime==1.24.4
+fastapi==0.143.0
+uvicorn[standard]==0.54.0
+pydantic==2.14.1
+loguru==0.7.3

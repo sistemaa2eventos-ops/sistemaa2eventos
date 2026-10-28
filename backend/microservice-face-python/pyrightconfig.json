@@ -1,9 +1,7 @@
 {
-  "venvPath": "C:\\Users\\SD_Ad\\AppData\\Local\\Programs\\Python",
-  "venv": "Python311_Custom",
-  "pythonPath": "C:\\Users\\SD_Ad\\AppData\\Local\\Programs\\Python\\Python311_Custom\\python.exe",
+  "venvPath": ".",
+  "venv": "venv-ia",
   "extraPaths": [
-    "C:\\Users\\SD_Ad\\AppData\\Local\\Programs\\Python\\Python311_Custom\\Lib\\site-packages",
     "src"
   ]
 }
