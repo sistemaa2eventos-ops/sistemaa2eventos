@@ -162,12 +162,16 @@ if INSIGHTFACE_AVAILABLE and FaceAnalysis is not None:
     logger.info(f"✅ InsightFace carregado em {active_providers}.")
 
 model_lock = threading.Lock()
+# DirectML compila o detector para o tamanho preparado (640): qualquer outro falha ("Parâmetro incorreto").
+# Na GPU o detector a 640 custa ~17 ms, então o det_size do perfil só vale na CPU.
+DET_FIXO: Optional[int] = 640 if "DmlExecutionProvider" in active_providers else None
 
 
 def detectar(img: np.ndarray, det_size: int) -> List[Tuple[np.ndarray, float, np.ndarray]]:
     """Rostos do quadro: [(bbox x1,y1,x2,y2), det_score, 5 pontos]."""
     if det_model is None:
         return []
+    det_size = DET_FIXO or det_size
     with model_lock:
         bboxes, kpss = det_model.detect(img, input_size=(det_size, det_size), max_num=0, metric='default')
     if bboxes is None or len(bboxes) == 0:
@@ -988,7 +992,8 @@ def _escalonador():
             estatisticas["ocupacao"] = 0.95 * estatisticas["ocupacao"] + 0.05 * min(1.0, dt / orcamento)
             time.sleep(max(0.0, orcamento - dt))
         except Exception as e:
-            logger.warning(f"Falha na análise: {e}")
+            # Mensagens do onnxruntime no Windows vêm na página de código local (ex.: "Parâmetro"): repr não quebra
+            logger.warning(f"Falha na análise: {type(e).__name__}: {repr(e)[:300]}")
             time.sleep(0.2)
 
 
@@ -1321,6 +1326,7 @@ def get_engine_status():
         "active_providers": active_providers,
         "config": CFG,
         "ia": {
+            "det_size_efetivo": DET_FIXO or CFG["det_size"],
             "ms_por_analise": round(estatisticas["ia_ms"], 1),
             "ocupacao": round(estatisticas["ocupacao"], 2),
             "cameras_na_fila": estatisticas["fila"],
