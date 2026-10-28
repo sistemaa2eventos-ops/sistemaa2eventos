@@ -100,13 +100,16 @@ class VideoRelay {
         logger.info(`🎥 [Vídeo] ${streamId} encerrado (ninguém assistindo)`);
     }
 
-    /** Agente caiu: fecha os vídeos dele (o navegador tenta de novo e cai no aviso de IA offline) */
+    /**
+     * Agente caiu: derruba os vídeos dele. destroy (e não end): o <img> recebe erro e o painel reconecta
+     * sozinho quando o agente voltar; com end o navegador ficava parado no último quadro.
+     */
     agenteDesconectou(agentId) {
         for (const [streamId, st] of this.streams) {
             if (st.agentId !== agentId) continue;
             clearInterval(st.renovar);
             this.streams.delete(streamId);
-            for (const res of st.espectadores) res.end();
+            for (const res of st.espectadores) res.destroy();
         }
     }
 }

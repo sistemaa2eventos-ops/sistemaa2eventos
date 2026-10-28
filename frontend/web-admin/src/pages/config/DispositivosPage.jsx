@@ -67,6 +67,11 @@ export default function DispositivosPage() {
 
   // Snapshot dialog
   const [snapshotDialog, setSnapshotDialog] = useState({ open: false, url: null, nome: '' });
+  // Libera a imagem da memória ao fechar (createObjectURL fica preso até revogar)
+  const fecharSnapshot = () => setSnapshotDialog(prev => {
+    if (prev.url) URL.revokeObjectURL(prev.url);
+    return { open: false, url: null, nome: '' };
+  });
 
   // Test-connection dialog
   const [testDialog, setTestDialog] = useState({ open: false, result: null, testing: false });
@@ -791,7 +796,7 @@ export default function DispositivosPage() {
       </Dialog>
 
       {/* ── Dialog: Snapshot */}
-      <Dialog open={snapshotDialog.open} onClose={() => setSnapshotDialog({ open: false, url: null, nome: '' })} maxWidth="md">
+      <Dialog open={snapshotDialog.open} onClose={() => fecharSnapshot()} maxWidth="md">
         <DialogTitle sx={{ color: CYAN }}>Snapshot — {snapshotDialog.nome}</DialogTitle>
         <DialogContent>
           {snapshotDialog.url ? (
@@ -805,7 +810,7 @@ export default function DispositivosPage() {
           <Button
             href={snapshotDialog.url} download={`snapshot_${snapshotDialog.nome}.jpg`}
             sx={{ color: GREEN }}>Baixar</Button>
-          <Button variant="outlined" onClick={() => setSnapshotDialog({ open: false, url: null, nome: '' })} sx={botaoSecundario}>Fechar</Button>
+          <Button variant="outlined" onClick={() => fecharSnapshot()} sx={botaoSecundario}>Fechar</Button>
         </DialogActions>
       </Dialog>
 

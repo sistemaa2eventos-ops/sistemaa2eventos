@@ -43,6 +43,7 @@ const ConfigEtiquetas = lazy(() => import('./pages/config/ConfigEtiquetas'));
 const ConfigLeitorFacial = lazy(() => import('./pages/config/ConfigLeitorFacial'));
 
 const ConfigCameras = lazy(() => import('./pages/config/ConfigCameras'));
+const ConfigIAFacial = lazy(() => import('./pages/config/ConfigIAFacial'));
 const ConfigBancoDados = lazy(() => import('./pages/config/ConfigBancoDados'));
 const ConfigGeral = lazy(() => import('./pages/config/ConfigGeral'));
 const ConfigIdiomas = lazy(() => import('./pages/config/ConfigIdiomas'));
@@ -177,6 +178,7 @@ const AppContent = () => {
           <Route path="/config/etiquetas" element={<ProtectedRoute role="admin_master"><ConfigEtiquetas /></ProtectedRoute>} />
           <Route path="/config/dispositivos" element={<ProtectedRoute role="admin_master"><DispositivosPage /></ProtectedRoute>} />
           <Route path="/config/cameras" element={<ProtectedRoute role="admin_master"><ConfigCameras /></ProtectedRoute>} />
+          <Route path="/config/ia-facial" element={<ProtectedRoute role="admin_master"><ConfigIAFacial /></ProtectedRoute>} />
           <Route path="/config/banco-dados" element={<ProtectedRoute role="admin_master"><ConfigBancoDados /></ProtectedRoute>} />
           <Route path="/config/credenciamento" element={<ProtectedRoute role="admin_master"><ConfigCredenciamento /></ProtectedRoute>} />
           <Route path="/config/areas" element={<ProtectedRoute role="admin_master"><ConfigAreas /></ProtectedRoute>} />

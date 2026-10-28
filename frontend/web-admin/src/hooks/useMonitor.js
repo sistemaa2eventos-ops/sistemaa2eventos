@@ -3,6 +3,11 @@ import { useSnackbar } from 'notistack';
 import { useSearchParams } from 'react-router-dom';
 import { usarConexao } from '../services/realtime';
 import api from '../services/api';
+import { tocarAlerta, criarFiltroAlertas } from '../utils/alertSound';
+import { useIaConfig } from './useIaConfig';
+
+const MAX_HISTORICO_ALERTAS = 20;
+const cpfLimpo = (cpf) => String(cpf || '').replace(/\D/g, '');
 
 /**
  * useMonitor: Hook de inteligência para a tela de monitoramento em tempo real.
@@ -44,7 +49,6 @@ export const useMonitor = ({ isAdminMaster = false } = {}) => {
         empresas: []
     });
     const [loading, setLoading] = useState(true);
-    const [tick, setTick] = useState(0);
     // Conexão em tempo real: 'conectando' | 'conectado' | 'reconectando' | 'offline'
     const [conexao, setConexao] = useState('conectando');
     const conexaoRef = useRef('conectando');
@@ -68,28 +72,27 @@ export const useMonitor = ({ isAdminMaster = false } = {}) => {
     const [isTracking, setIsTracking] = useState(false);
     const [activeAlert, setActiveAlert] = useState(null);
     const [activeAreaAlert, setActiveAreaAlert] = useState(null);
+    // Últimos alertas recebidos (o alerta na tela é um só; os anteriores ficam aqui)
+    const [historicoAlertas, setHistoricoAlertas] = useState([]);
 
-    // Bipe suave de mensagem/notificação discreta (sem sirene estridente)
-    const playDiscreetNotificationSound = useCallback(() => {
-        try {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(659.25, ctx.currentTime); // E5
-            osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1); // A5
-            gain.gain.setValueAtTime(0.08, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.32);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start();
-            osc.stop(ctx.currentTime + 0.32);
-        } catch (e) {
-            // áudio desabilitado no navegador
-        }
+    // Configuração do painel (som, intervalo de repetição): lida pelos handlers do socket via ref
+    const { config: iaConfig } = useIaConfig();
+    const painelRef = useRef(iaConfig.painel);
+    painelRef.current = iaConfig.painel;
+    const filtroAlertasRef = useRef(criarFiltroAlertas());
+    const timersAlertaRef = useRef({ area: null, watchlist: null });
+
+    // Bipe suave de mensagem/notificação discreta (sem sirene estridente); respeita "silenciar"
+    const playAlarmSound = useCallback(() => {
+        if (painelRef.current?.som_alerta === false) return;
+        tocarAlerta('discreto');
     }, []);
 
-    const playAlarmSound = playDiscreetNotificationSound;
+    /** Some sozinho depois de `ms`, mas só se ainda for o mesmo alerta (antes um timer velho apagava o novo) */
+    const agendarFimAlerta = (tipo, setter, id, ms) => {
+        clearTimeout(timersAlertaRef.current[tipo]);
+        timersAlertaRef.current[tipo] = setTimeout(() => setter(prev => (prev?.id === id ? null : prev)), ms);
+    };
 
     // States - System Health
     const [sysStatus, setSysStatus] = useState(null);
@@ -345,6 +348,7 @@ export const useMonitor = ({ isAdminMaster = false } = {}) => {
                 motivo
             });
             setActiveAlert(null);
+            filtroAlertasRef.current.esquecer(`wl:${cpfLimpo(cpf)}`); // se aparecer de novo, alerta na hora
             enqueueSnackbar('Rastreamento concluído! Alvo localizado pela equipe.', { variant: 'success' });
             return true;
         } catch (e) {
@@ -380,22 +384,28 @@ export const useMonitor = ({ isAdminMaster = false } = {}) => {
         });
 
         socket.on('area_alert', (alert) => {
+            const repetirS = painelRef.current?.alerta_repetir_s || 30;
+            const chave = `area:${alert.tipo}:${alert.pessoa_nome}:${alert.area_nome}`;
+            if (!filtroAlertasRef.current.novo(chave, repetirS)) return;
             playAlarmSound();
+            const id = Math.random().toString(36);
             setActiveAreaAlert({
-                id: Math.random().toString(36),
+                id,
                 pessoa_nome: alert.pessoa_nome || 'Indivíduo Não Autorizado',
                 pessoa_foto: alert.pessoa_foto,
                 area_nome: alert.area_nome || 'Área Restrita',
                 tipo: alert.tipo || 'tentativa_area_restrita',
                 timestamp: alert.hora || new Date().toISOString()
             });
-            setTimeout(() => setActiveAreaAlert(null), 12000);
+            agendarFimAlerta('area', setActiveAreaAlert, id, 12000);
         });
 
         socket.on('watchlist_alert', (alert) => {
             if (!isAdminMaster) return; // só chega à sala do Admin Master; proteção extra
-            playAlarmSound();
             const pessoa = alert.pessoa || {};
+            // Mesmo alvo de novo dentro do intervalo (outra câmera, outra tela): atualiza sem tocar de novo
+            const repetido = !filtroAlertasRef.current.novo(`wl:${cpfLimpo(pessoa.cpf || alert.cpf) || alert.alerta_id}`, painelRef.current?.alerta_repetir_s || 30);
+            if (!repetido) playAlarmSound();
             const formattedAlert = {
                 id: alert.alerta_id || Math.random().toString(36),
                 target_name: pessoa.nome || alert.target_name || 'Alvo em Monitoramento',
@@ -421,8 +431,9 @@ export const useMonitor = ({ isAdminMaster = false } = {}) => {
                 watchlist: alert.watchlist || { motivo: 'Alvo procurado na Watchlist', nivel_alerta: 'alto' }
             };
             setActiveAlert(formattedAlert);
+            if (!repetido) setHistoricoAlertas(prev => [formattedAlert, ...prev].slice(0, MAX_HISTORICO_ALERTAS));
             // Duração estendida para a equipe de segurança intervir
-            setTimeout(() => setActiveAlert(null), 45000);
+            agendarFimAlerta('watchlist', setActiveAlert, formattedAlert.id, 45000);
         });
 
         socket.on('watchlist_alert_concluido', (data) => {
@@ -439,8 +450,11 @@ export const useMonitor = ({ isAdminMaster = false } = {}) => {
             });
         });
 
+        const timersAlerta = timersAlertaRef.current;
         return () => {
             if (statsTimerRef.current) clearTimeout(statsTimerRef.current);
+            clearTimeout(timersAlerta.area);
+            clearTimeout(timersAlerta.watchlist);
             setConexao('offline');
             socket.liberar();
         };
@@ -490,7 +504,8 @@ export const useMonitor = ({ isAdminMaster = false } = {}) => {
             if (Date.now() - ultimaCarga >= intervalo) recarregar();
         }, 15000);
         const terminalInterval = setInterval(() => { if (!document.hidden) fetchTerminais(); }, 60000);
-        const tickTimer = setInterval(() => { if (!document.hidden) setTick(t => t + 1); }, 5000);
+        // Status das câmeras (online/offline) muda sem ninguém recarregar a tela
+        const camerasInterval = setInterval(() => { if (!document.hidden) fetchCameras(); }, 60000);
         const aoVoltar = () => {
             if (!document.hidden && Date.now() - ultimaCarga > 15000) {
                 recarregar();
@@ -502,7 +517,7 @@ export const useMonitor = ({ isAdminMaster = false } = {}) => {
         return () => {
             clearInterval(interval);
             clearInterval(terminalInterval);
-            clearInterval(tickTimer);
+            clearInterval(camerasInterval);
             document.removeEventListener('visibilitychange', aoVoltar);
         };
     }, [fetchData, fetchCameras, fetchWatchlist, fetchContatos, fetchTerminais, fetchConfig]);
@@ -531,8 +546,9 @@ export const useMonitor = ({ isAdminMaster = false } = {}) => {
     return {
         logs: logsFiltrados,
         allLogs: logs,
-        stats, loading, tick,
+        stats, loading,
         cameras, setCameras, fetchCameras, fetchWatchlist,
+        historicoAlertas,
         terminais, areas, dispositivosLista,
         selectedCameras, setSelectedCameras,
         watchlist, contatos, fetchContatos, addContato, removeContato,

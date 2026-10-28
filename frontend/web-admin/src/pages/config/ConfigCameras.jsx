@@ -34,6 +34,8 @@ const ConfigCameras = () => {
     const [cameras, setCameras] = useState([]);
     const [areas, setAreas] = useState([]);
     const [loadingCameras, setLoadingCameras] = useState(true);
+    // Prévia renovada só ao recarregar a lista (antes cada tecla digitada no cadastro baixava todas de novo)
+    const [previewStamp, setPreviewStamp] = useState(() => Date.now());
 
     // Dialog de Câmera (Criar / Editar)
     const [cameraModalOpen, setCameraModalOpen] = useState(false);
@@ -54,6 +56,7 @@ const ConfigCameras = () => {
             setLoadingCameras(true);
             const resp = await api.get('/cameras', { params: { evento_id: eventoId } });
             setCameras(resp.data.data || []);
+            setPreviewStamp(Date.now());
         } catch (err) {
             enqueueSnackbar('Erro ao carregar câmeras IP.', { variant: 'error' });
         } finally {
@@ -307,7 +310,7 @@ const ConfigCameras = () => {
                                             {/* Preview de Imagem / Snapshot */}
                                             <Box sx={{ position: 'relative', width: '100%', height: 180, bgcolor: '#000000', overflow: 'hidden' }}>
                                                 <img
-                                                    src={urlMidiaCamera(cam.id, 'snapshot', { t: Date.now() })}
+                                                    src={urlMidiaCamera(cam.id, 'snapshot', { t: previewStamp, qualidade: 'mini' })}
                                                     alt={cam.nome}
                                                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                                     onError={(e) => {

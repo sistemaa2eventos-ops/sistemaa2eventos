@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box, Typography, Grid, Stack, Avatar, Tabs, Tab,
   IconButton, TextField, MenuItem, Select, FormControl,
@@ -31,7 +31,9 @@ import {
   DesktopWindows as DesktopWindowsIcon,
   PhotoCamera as PhotoCameraIcon,
   VisibilityOff as VisibilityOffIcon,
-  Dvr as DvrIcon
+  Dvr as DvrIcon,
+  VolumeUp as SomIcon, VolumeOff as SemSomIcon,
+  Face as RostoIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { format } from 'date-fns';
@@ -46,6 +48,9 @@ import PessoaFoto from '../components/common/PessoaFoto';
 import { useMonitor } from '../hooks/useMonitor';
 import { useAuth } from '../contexts/AuthContext';
 import GerenciarCamerasModal from '../components/cameras/GerenciarCamerasModal';
+import CameraVideo from '../components/cameras/CameraVideo';
+import { useIaConfig, useIaStatus, statusDaCamera, NOMES_PERFIL } from '../hooks/useIaConfig';
+import { useSomAlertas } from '../utils/alertSound';
 import KpiCards from '../components/monitor/KpiCards';
 import AbaSaude from '../components/monitor/AbaSaude';
 
@@ -99,8 +104,8 @@ const Monitor = () => {
   const [activeTab, setActiveTab] = useState('feed');
 
   const {
-    logs, stats, loading, tick, areas, dispositivosLista, terminais,
-    cameras, fetchCameras, fetchWatchlist,
+    logs, stats, loading, areas, dispositivosLista, terminais,
+    cameras, fetchCameras, fetchWatchlist, historicoAlertas,
     watchlist, contatos, addContato, removeContato,
     desbloquearAlvo, deixarDeMonitorar, exportarParticipantes, baixarModeloCSV,
     activeAlert, setActiveAlert,
@@ -131,9 +136,10 @@ const Monitor = () => {
   // Modal executivo discreto de ocorrência da Watchlist (apenas admin_master)
   const [openSecretAlertModal, setOpenSecretAlertModal] = useState(false);
 
-  // Bloqueio de loops: controle de requisições de escaneamento e alvos já notificados
-  const isScanningRef = useRef(false);
-  const notifiedTargetsRef = useRef(new Set());
+  // Vídeo e IA: limites do perfil (Configurações > IA facial) e status do motor do evento
+  const { config: iaConfig } = useIaConfig();
+  const { status: iaStatus, erro: iaErro } = useIaStatus(activeTab === 'cameras');
+  const [somAtivo, setSomAtivo] = useSomAlertas();
 
   // Seleção de Câmeras para Exibição no Mosaico CFTV
   const [openSelectCamerasDialog, setOpenSelectCamerasDialog] = useState(false);
@@ -207,11 +213,12 @@ const Monitor = () => {
     return localStorage.getItem('monitor_camera_live_in_grid') === 'true';
   });
 
-  // Scanner Automático de IA & Vigilância da Watchlist
-  const [aiSurveillance] = useState(true);
-  const [isScanning, setIsScanning] = useState(false);
-  const [lastScanInfo, setLastScanInfo] = useState(null);
+  // Câmera que gerou o último alerta fica destacada por 30 s (alertas chegam pelo tempo real)
   const [alertCameras, setAlertCameras] = useState({}); // { [camId]: timestamp }
+  useEffect(() => {
+    const camId = activeAlert?.dispositivo?.id;
+    if (camId) setAlertCameras(prev => ({ ...prev, [camId]: Date.now() }));
+  }, [activeAlert?.id, activeAlert?.dispositivo?.id]);
 
   // Controles do Dialog Ao Vivo
   const [streamModalSize, setStreamModalSize] = useState('lg'); // 'md', 'lg', 'xl', 'fullscreen'
@@ -298,108 +305,6 @@ const Monitor = () => {
     // Depende só de cpf/foto: com o objeto inteiro, cada atualização da foto dispararia de novo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeAlert?.pessoa?.cpf, activeAlert?.pessoa?.foto_url]);
-
-  // Ciclo Automático de Scanner de IA para detecção em tempo real de alvos
-  useEffect(() => {
-    if (!aiSurveillance || !isAdminMaster || cameras.length === 0) return;
-
-    const scanInterval = setInterval(async () => {
-      // Evitar requisições sobrepostas e não varrer com a aba do navegador oculta
-      if (isScanningRef.current || document.hidden) return;
-
-      // Priorizar a câmera que está aberta em stream ou a primeira câmera online
-      const targetCam = activeStreamCam || cameras.find(c => c.status === 'online') || cameras[0];
-      if (!targetCam || !targetCam.id) return;
-
-      try {
-        isScanningRef.current = true;
-        setIsScanning(true);
-        const resp = await api.get(`/cameras/${targetCam.id}/track`, {
-          params: { threshold: 0.48 },
-          timeout: 10000,
-          hideDefaultError: true
-        });
-
-        if (resp.data?.success && Array.isArray(resp.data.results)) {
-          setLastScanInfo({
-            camName: targetCam.nome,
-            camId: targetCam.id,
-            facesCount: resp.data.faces_detected || resp.data.results.length,
-            time: new Date().toLocaleTimeString()
-          });
-
-          // SIGILO ABSOLUTO: Se o operador logado NÃO for admin_master, ignora completamente alertas de watchlist
-          if (isAdminMaster) {
-            for (const item of resp.data.results) {
-              const mp = item.matched_person;
-              if (mp && (mp.is_watchlist || mp.watchlist || mp.bloqueado)) {
-                const cpfLimpo = String(mp.cpf || '').replace(/\D/g, '');
-
-                // Se o alvo já está sob rastreamento ativo ou já foi notificado, não repetir som nem duplicar ocorrência
-                if (mp.em_rastreamento || (cpfLimpo && notifiedTargetsRef.current.has(cpfLimpo))) {
-                  setAlertCameras(prev => ({ ...prev, [targetCam.id]: Date.now() }));
-                  break;
-                }
-
-                if (cpfLimpo) {
-                  notifiedTargetsRef.current.add(cpfLimpo);
-                }
-
-                // Toca bipe suave e discreto de mensagem/notificação (nunca sirene estridente)
-                playAlarmSound?.();
-                setAlertCameras(prev => ({ ...prev, [targetCam.id]: Date.now() }));
-
-                setActiveAlert({
-                  id: `alert_${Date.now()}_${targetCam.id}`,
-                  target_name: mp.nome,
-                  pessoa: {
-                    nome: mp.nome,
-                    cpf: mp.cpf,
-                    foto_url: mp.foto_url,
-                    bloqueado: mp.bloqueado,
-                    funcao: mp.funcao || mp.tipo,
-                    categoria: mp.categoria,
-                    pulseira: mp.pulseira
-                  },
-                  location: targetCam.nome,
-                  timestamp: new Date().toISOString(),
-                  metodo: 'Vigilância IA Facial (Câmera IP)',
-                  watchlist: mp.watchlist || {
-                    motivo: mp.bloqueado ? 'Acesso Proibido / Bloqueado no Sistema' : 'Alvo em Monitoramento (Watchlist)',
-                    nivel_alerta: 'CRÍTICO'
-                  },
-                  foto_capturada: resp.data?.annotated_frame_base64 || item.annotated_frame_base64 || mp.foto_capturada || null,
-                  face_crop: item.face_crop_base64 || mp.face_crop || null,
-                  snapshot_url: resp.data?.snapshot_url || mp.snapshot_url || null,
-                  dispositivo: resp.data?.dispositivo || {
-                    id: targetCam.id,
-                    nome: targetCam.nome,
-                    ip: targetCam.ip_address,
-                    porta: targetCam.porta,
-                    fabricante: targetCam.fabricante
-                  },
-                  localizacao: resp.data?.localizacao || {
-                    nome_area: targetCam.area?.nome_area || targetCam.area_nome || 'Área Principal',
-                    setor: targetCam.area?.setor || 'Geral',
-                    localizacao: targetCam.area?.localizacao || targetCam.nome,
-                    camera_nome: targetCam.nome
-                  }
-                });
-                break;
-              }
-            }
-          }
-        }
-      } catch (err) {
-        // Conexão temporária com a câmera ocupada ou timeout silencioso
-      } finally {
-        isScanningRef.current = false;
-        setIsScanning(false);
-      }
-    }, 4500);
-
-    return () => clearInterval(scanInterval);
-  }, [aiSurveillance, cameras, activeStreamCam, playAlarmSound, setActiveAlert, isAdminMaster]);
 
   // Aba Saúde: carrega ao entrar e atualiza a cada 15 s enquanto estiver aberta
   const [saudeAtualizadaEm, setSaudeAtualizadaEm] = useState(null);
@@ -1049,10 +954,6 @@ const Monitor = () => {
             startIcon={<CheckCircleIcon />}
             onClick={async () => {
               const cpf = activeAlert?.pessoa?.cpf;
-              if (cpf) {
-                const cpfLimpo = String(cpf).replace(/\D/g, '');
-                notifiedTargetsRef.current.delete(cpfLimpo);
-              }
               await concluirRastreamento(cpf);
               setOpenSecretAlertModal(false);
               setActiveAlert(null);
@@ -1545,18 +1446,22 @@ const Monitor = () => {
                             <DvrIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
                             Central de monitoramento CFTV
                         </Typography>
-                        <Chip
-                            icon={<DotIcon sx={{ fontSize: 10, color: isScanning ? '#FFB800 !important' : '#00FF88 !important' }} />}
-                            label={isScanning ? "IA processando..." : "Vigilância por IA ativa"}
-                            size="small"
-                            sx={{
-                                bgcolor: isScanning ? 'rgba(255, 184, 0, 0.12)' : 'rgba(0, 255, 136, 0.12)',
-                                color: isScanning ? '#FFB800' : '#00FF88',
-                                border: '1px solid currentColor',
-                                fontWeight: 700,
-                                fontSize: '0.75rem'
-                            }}
-                        />
+                        {(() => {
+                            const cor = iaErro ? '#FF3366' : iaStatus ? (iaStatus.hardware_acceleration === 'CPU' ? '#FFB800' : '#00FF88') : '#94A3B8';
+                            const rotulo = iaErro ? 'IA do evento offline'
+                                : iaStatus ? `Vigilância por IA ativa • ${iaStatus.hardware_acceleration}`
+                                : 'Verificando IA...';
+                            return (
+                                <Tooltip title={iaErro || (iaStatus?.hardware_acceleration === 'CPU' ? 'A IA está rodando sem placa de vídeo: reconhecimento mais lento' : '')}>
+                                    <Chip
+                                        icon={<DotIcon sx={{ fontSize: 10, color: `${cor} !important` }} />}
+                                        label={rotulo}
+                                        size="small"
+                                        sx={{ bgcolor: `${cor}1F`, color: cor, border: '1px solid currentColor', fontWeight: 700, fontSize: '0.75rem' }}
+                                    />
+                                </Tooltip>
+                            );
+                        })()}
                         <Chip
                             label={`${displayedCameras.length} de ${cameras.length} câmeras no mosaico`}
                             size="small"
@@ -1570,8 +1475,9 @@ const Monitor = () => {
                         />
                     </Stack>
                     <Typography variant="caption" color="text.secondary">
-                        Stream IP / RTSP • Detecção Facial SCRFD • Rastreamento ArcFace 512-D
-                        {lastScanInfo && ` • Último Scan: ${lastScanInfo.camName} (${lastScanInfo.facesCount} face(s) às ${lastScanInfo.time})`}
+                        {iaStatus
+                            ? `Perfil ${NOMES_PERFIL[iaConfig.perfil] || iaConfig.perfil} • ${(iaStatus.cameras || []).filter(c => c.conectada).length} câmera(s) com vídeo • ${(iaStatus.cameras || []).reduce((n, c) => n + (c.rostos || 0), 0)} rosto(s) agora • ${iaStatus.ia?.ms_por_analise ?? 0} ms por análise • ${iaStatus.registered_faces_indexed ?? 0} pessoa(s) na base`
+                            : 'Stream IP / RTSP • Detecção facial SCRFD • Reconhecimento ArcFace 512-D'}
                     </Typography>
                 </Box>
             </Stack>
@@ -1699,6 +1605,23 @@ const Monitor = () => {
                         Video wall
                     </Button>
 
+                    {/* SOM DOS ALERTAS */}
+                    <Tooltip title={somAtivo ? 'Silenciar alertas' : 'Ativar som dos alertas'}>
+                        <IconButton
+                            size="small"
+                            onClick={() => setSomAtivo(!somAtivo)}
+                            sx={{
+                                height: 32,
+                                width: 32,
+                                border: '1px solid rgba(255,255,255,0.18)',
+                                color: somAtivo ? '#00FF88' : '#FF3366',
+                                borderRadius: 1.5
+                            }}
+                        >
+                            {somAtivo ? <SomIcon sx={{ fontSize: 16 }} /> : <SemSomIcon sx={{ fontSize: 16 }} />}
+                        </IconButton>
+                    </Tooltip>
+
                     {/* ATUALIZAR GRID */}
                     <Tooltip title="Atualizar câmeras">
                         <IconButton
@@ -1756,8 +1679,11 @@ const Monitor = () => {
             ) : (
                 /* GRADE DE CÂMERAS CFTV PROFISSIONAL 16:9 NATIVO COM OSD */
                 <Grid container spacing={2}>
-                    {displayedCameras.map(cam => {
+                    {displayedCameras.map((cam, indice) => {
                         const isAlertActive = alertCameras[cam.id] && (Date.now() - alertCameras[cam.id] < 30000);
+                        // Vídeo ao vivo até o limite do perfil; as demais em snapshot (não sobrecarrega a internet do evento)
+                        const aoVivo = liveStreamInGrid && indice < (iaConfig.painel?.max_streams_ao_vivo || 9);
+                        const stCam = statusDaCamera(iaStatus, cam.id);
                         const colProps = gridColumns === '4'
                             ? { xs: 12, sm: 6, md: 4, lg: 3 }
                             : gridColumns === '3'
@@ -1823,33 +1749,34 @@ const Monitor = () => {
                                         }}
                                         onClick={() => setActiveStreamCam(cam)}
                                     >
-                                        <img 
-                                            src={
-                                                liveStreamInGrid
-                                                    ? urlMidiaCamera(cam.id, 'stream', { annotate: true })
-                                                    : urlMidiaCamera(cam.id, 'snapshot', { t: tick })
-                                            } 
-                                            style={{
-                                                width: '100%',
-                                                height: '100%',
-                                                objectFit: 'cover',
-                                                display: 'block'
-                                            }}
-                                            onError={(e) => { e.target.src = '/assets/cam_offline.png'; }}
+                                        <CameraVideo
+                                            camId={cam.id}
                                             alt={cam.nome}
+                                            modo={aoVivo ? 'stream' : 'snapshot'}
+                                            qualidade="mini"
+                                            pausado={activeStreamCam?.id === cam.id}
+                                            textoPausado="Aberta em tela grande"
                                         />
 
-                                        {/* OSD: AO VIVO & RELÓGIO (CANTO SUPERIOR ESQUERDO) */}
+                                        {/* OSD: MODO, FPS REAL E ROSTOS NA CENA (CANTO SUPERIOR ESQUERDO) */}
                                         <Box sx={{
                                             position: 'absolute', top: 8, left: 8,
                                             bgcolor: 'rgba(0,0,0,0.75)', px: 0.8, py: 0.3, borderRadius: 1,
                                             display: 'flex', alignItems: 'center', gap: 0.6,
                                             border: '1px solid rgba(255,255,255,0.1)'
                                         }}>
-                                            <DotIcon sx={{ fontSize: 9, color: cam.status === 'online' ? '#00FF88' : '#94A3B8' }} />
+                                            <DotIcon sx={{ fontSize: 9, color: (stCam ? stCam.conectada : cam.status === 'online') ? '#00FF88' : '#94A3B8' }} />
                                             <Typography variant="caption" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.75rem', color: '#FFFFFF', fontWeight: 700 }}>
-                                                {liveStreamInGrid ? 'STREAM' : 'REC'} • {new Date().toLocaleTimeString()}
+                                                {aoVivo ? 'AO VIVO' : 'SNAPSHOT'}{stCam?.conectada ? ` • ${Math.round(stCam.video_fps)} fps` : ''}
                                             </Typography>
+                                            {stCam?.rostos > 0 && (
+                                                <>
+                                                    <RostoIcon sx={{ fontSize: 12, color: '#00D4FF', ml: 0.4 }} />
+                                                    <Typography variant="caption" sx={{ fontSize: '0.75rem', color: '#00D4FF', fontWeight: 700 }}>
+                                                        {stCam.rostos}
+                                                    </Typography>
+                                                </>
+                                            )}
                                         </Box>
 
                                         {/* OSD: IP DA CÂMERA (CANTO INFERIOR ESQUERDO COM GRADIENTE) */}
@@ -1910,6 +1837,35 @@ const Monitor = () => {
                         );
                     })}
                 </Grid>
+            )}
+
+            {/* ÚLTIMOS ALERTAS DA IA (o alerta na tela é um só; os anteriores ficam aqui) */}
+            {isAdminMaster && historicoAlertas.length > 0 && (
+                <GlassCard sx={{ mt: 2, p: 2 }}>
+                    <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <AlarmIcon sx={{ fontSize: 18, color: '#FF3366' }} /> Últimos alertas das câmeras
+                    </Typography>
+                    <Stack spacing={0.5}>
+                        {historicoAlertas.map(a => (
+                            <Stack
+                                key={a.id}
+                                direction="row"
+                                spacing={1.5}
+                                alignItems="center"
+                                onClick={() => { setActiveAlert(a); setOpenSecretAlertModal(true); }}
+                                sx={{ cursor: 'pointer', p: 0.75, borderRadius: 1, '&:hover': { bgcolor: 'rgba(255,255,255,0.04)' } }}
+                            >
+                                <Typography variant="caption" sx={{ color: 'text.secondary', minWidth: 64 }}>
+                                    {new Date(a.timestamp).toLocaleTimeString()}
+                                </Typography>
+                                <Typography variant="body2" fontWeight={700} noWrap sx={{ flex: 1 }}>{a.pessoa?.nome}</Typography>
+                                <Typography variant="caption" noWrap sx={{ color: 'text.secondary', maxWidth: '45%' }}>
+                                    {a.dispositivo?.nome || a.location}
+                                </Typography>
+                            </Stack>
+                        ))}
+                    </Stack>
+                </GlassCard>
             )}
           </Box>
       )}
@@ -2022,27 +1978,18 @@ const Monitor = () => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    minHeight: streamModalSize === 'fullscreen' ? '82vh' : '450px'
+                    height: streamModalSize === 'fullscreen' ? '82vh' : '62vh'
                 }}>
-                    <img
-                        src={urlMidiaCamera(activeStreamCam.id, 'stream', { annotate: true })}
+                    <CameraVideo
+                        camId={activeStreamCam.id}
                         alt={activeStreamCam.nome}
-                        style={{
-                            maxWidth: '100%',
-                            maxHeight: streamModalSize === 'fullscreen' ? '85vh' : '70vh',
+                        modo="stream"
+                        qualidade="foco"
+                        fit="contain"
+                        imgStyle={{
                             transform: `scale(${streamZoom / 100})`,
                             transformOrigin: 'center center',
-                            transition: 'transform 0.15s ease',
-                            objectFit: 'contain',
-                            display: 'block'
-                        }}
-                        onError={(e) => {
-                            if (!e.target.dataset.fallbackTried) {
-                                e.target.dataset.fallbackTried = 'true';
-                                e.target.src = urlMidiaCamera(activeStreamCam.id, 'snapshot', { t: Date.now() });
-                            } else {
-                                e.target.src = '/assets/cam_offline.png';
-                            }
+                            transition: 'transform 0.15s ease'
                         }}
                     />
                 </Box>
@@ -2054,12 +2001,20 @@ const Monitor = () => {
                 <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Inter", sans-serif' }}>
                     {activeStreamCam?.stream_url || `${activeStreamCam?.ip_address}:${activeStreamCam?.porta}`}
                 </Typography>
-                <Chip
-                    icon={<DotIcon sx={{ fontSize: 9, color: '#00FF88 !important' }} />}
-                    label="Stream ao vivo • ultra-baixa latência"
-                    size="small"
-                    sx={{ bgcolor: 'rgba(0, 255, 136, 0.1)', color: '#00FF88', fontWeight: 700, fontSize: '0.75rem' }}
-                />
+                {(() => {
+                    const st = statusDaCamera(iaStatus, activeStreamCam?.id);
+                    const fpsVideo = iaConfig.video?.foco?.fps;
+                    return (
+                        <Chip
+                            icon={<DotIcon sx={{ fontSize: 9, color: '#00FF88 !important' }} />}
+                            label={st
+                                ? `Ao vivo • até ${fpsVideo} fps • câmera ${Math.round(st.video_fps)} fps • IA ${st.ia_fps_alvo}/s${st.rostos ? ` • ${st.rostos} rosto(s)` : ''}`
+                                : `Ao vivo • até ${fpsVideo} fps`}
+                            size="small"
+                            sx={{ bgcolor: 'rgba(0, 255, 136, 0.1)', color: '#00FF88', fontWeight: 700, fontSize: '0.75rem' }}
+                        />
+                    );
+                })()}
             </Stack>
             <Stack direction="row" spacing={1}>
                 <Button

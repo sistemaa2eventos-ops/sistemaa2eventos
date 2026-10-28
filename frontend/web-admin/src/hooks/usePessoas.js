@@ -254,18 +254,32 @@ export const usePessoas = () => {
         payload.fase_showday = payload.fases_acesso?.includes('evento') || false;
         payload.fase_desmontagem = payload.fases_acesso?.includes('desmontagem') || false;
 
-        if (payload.foto_url && payload.foto_url.startsWith('data:image') && payload.cpf) {
-          try {
-            const { data: urlData } = await api.post('/pessoas/generate-upload-url', { cpf: payload.cpf });
-            if (urlData.success && urlData.uploadUrl) {
-              const base64Data = payload.foto_url.split(',')[1];
-              const arr = new Uint8Array(atob(base64Data).split('').map(c => c.charCodeAt(0)));
-              const blob = new Blob([arr], { type: 'image/jpeg' });
-              const uploadRes = await fetch(urlData.uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
-              if (uploadRes.ok) payload.foto_url = urlData.publicUrl || urlData.path;
+        // A biometria facial (câmeras e leitores) só é gerada de foto enviada ao armazenamento: foto que
+        // ficasse em base64 no cadastro nunca era reconhecida, e o erro era engolido em silêncio
+        if (payload.foto_url && payload.foto_url.startsWith('data:image')) {
+          if (!payload.cpf) {
+            enqueueSnackbar('Informe o CPF para enviar a foto: sem ele a pessoa não terá reconhecimento facial.', { variant: 'warning' });
+          } else {
+            let enviada = false;
+            try {
+              const { data: urlData } = await api.post('/pessoas/generate-upload-url', { cpf: payload.cpf });
+              if (urlData.success && urlData.uploadUrl) {
+                const base64Data = payload.foto_url.split(',')[1];
+                const arr = new Uint8Array(atob(base64Data).split('').map(c => c.charCodeAt(0)));
+                const blob = new Blob([arr], { type: 'image/jpeg' });
+                const uploadRes = await fetch(urlData.uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
+                if (uploadRes.ok) {
+                  payload.foto_url = urlData.publicUrl || urlData.path;
+                  enviada = true;
+                }
+              }
+            } catch {
+              enviada = false;
             }
-          } catch (e) {
-            // Silenciar erro em produção
+            if (!enviada) {
+              enqueueSnackbar('Não foi possível enviar a foto. Verifique a conexão e salve de novo.', { variant: 'error' });
+              return;
+            }
           }
         }
         if (selectedPessoa) {

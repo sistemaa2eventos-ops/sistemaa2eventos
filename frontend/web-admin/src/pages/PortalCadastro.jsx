@@ -8,6 +8,7 @@ import {
 import { PhotoCamera, CloudUpload } from '@mui/icons-material';
 import PessoaFoto from '../components/common/PessoaFoto';
 import api from '../services/api';
+import { FaceValidator, reduzirFoto } from '../utils/FaceValidator';
 
 const PortalCadastro = () => {
     const [searchParams] = useSearchParams();
@@ -69,11 +70,33 @@ const PortalCadastro = () => {
         });
     };
 
+    // Foto do rosto: conferida (um rosto, nítido, grande o bastante) e reduzida antes de enviar.
+    // Foto ruim gera biometria que não reconhece a pessoa nas câmeras e nos leitores.
+    const [avaliandoFoto, setAvaliandoFoto] = useState(false);
+    const [problemasFoto, setProblemasFoto] = useState([]);
     const handlePhotoUpload = async (e) => {
         const file = e.target.files[0];
-        if (file) {
+        e.target.value = '';
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            setProblemasFoto(['Envie uma imagem (JPG ou PNG).']);
+            return;
+        }
+        setAvaliandoFoto(true);
+        setProblemasFoto([]);
+        try {
             const b64 = await handleBase64(file);
-            setFormData(prev => ({ ...prev, foto_base64: b64 }));
+            const resultado = await FaceValidator.validate(b64);
+            if (!resultado.isValid || !resultado.croppedBase64) {
+                setProblemasFoto(resultado.errors?.length ? resultado.errors : ['Rosto não reconhecido na foto.']);
+                return;
+            }
+            const reduzida = await reduzirFoto(resultado.croppedBase64);
+            setFormData(prev => ({ ...prev, foto_base64: reduzida }));
+        } catch {
+            setProblemasFoto(['Não foi possível ler a foto. Tente outra imagem.']);
+        } finally {
+            setAvaliandoFoto(false);
         }
     };
 
@@ -198,11 +221,17 @@ const PortalCadastro = () => {
                                 variant="outlined" 
                                 startIcon={<PhotoCamera />} 
                                 onClick={() => fileInputRef.current.click()}
+                                disabled={avaliandoFoto}
                                 sx={{ color: '#00D4FF', borderColor: '#00D4FF', '&:hover': { bgcolor: 'rgba(0,212,255,0.1)' } }}
                             >
-                                Tirar ou fazer upload de foto
+                                {avaliandoFoto ? 'Conferindo a foto...' : 'Tirar ou fazer upload de foto'}
                             </Button>
-                            <Typography variant="caption" sx={{ mt: 1, color: 'text.secondary' }}>* Rosto legível sem óculos escuros.</Typography>
+                            <Typography variant="caption" sx={{ mt: 1, color: 'text.secondary' }}>* Só você na foto, de frente, rosto nítido e sem óculos escuros.</Typography>
+                            {problemasFoto.length > 0 && (
+                                <Alert severity="warning" sx={{ mt: 1.5, width: '100%' }}>
+                                    {problemasFoto.map(p => <div key={p}>{p}</div>)}
+                                </Alert>
+                            )}
                         </Box>
                         
                         <Divider sx={{ my: 4, borderColor: 'rgba(255,255,255,0.05)' }} />

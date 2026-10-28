@@ -19,15 +19,31 @@ import { useSnackbar } from 'notistack';
 import api from '../services/api';
 import { urlMidiaCamera } from '../utils/cameraMedia';
 import PessoaFoto from '../components/common/PessoaFoto';
+import CameraVideo from '../components/cameras/CameraVideo';
 import { usarConexao } from '../services/realtime';
 import { useAuth } from '../contexts/AuthContext';
+import { useIaConfig, useIaStatus, statusDaCamera } from '../hooks/useIaConfig';
+import { tocarAlerta, useSomAlertas, criarFiltroAlertas } from '../utils/alertSound';
 
 import { comoRotulo } from '../utils/formatadores';
+
+/** Relógio isolado: antes o relógio re-renderizava a parede inteira a cada segundo */
+const Relogio = () => {
+    const [hora, setHora] = useState(() => new Date().toLocaleTimeString());
+    useEffect(() => {
+        const timer = setInterval(() => setHora(new Date().toLocaleTimeString()), 1000);
+        return () => clearInterval(timer);
+    }, []);
+    return hora;
+};
+
 const CftvWall = () => {
     const { enqueueSnackbar } = useSnackbar();
     const { user } = useAuth();
-    // Varredura de IA alerta sobre watchlist (sigilosa): só Admin Master, como no Monitor
+    // Alertas da watchlist (sigilosos): só Admin Master, como no Monitor
     const isAdminMaster = user?.nivel_acesso === 'admin_master';
+    const { config: iaConfig } = useIaConfig();
+    const { status: iaStatus } = useIaStatus(true);
     const [searchParams] = useSearchParams();
     const eventoId = searchParams.get('evento_id') || localStorage.getItem('active_evento_id');
 
@@ -47,24 +63,16 @@ const CftvWall = () => {
     });
 
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [soundEnabled, setSoundEnabled] = useState(true);
+    const [soundEnabled, setSoundEnabled] = useSomAlertas();
     const [openSelectModal, setOpenSelectModal] = useState(false);
     const [focusedCamId, setFocusedCamId] = useState(null);
-    const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString());
 
-    // Alertas e Rastreamento em Tempo Real
+    // Alertas em tempo real (vigilância do motor de IA do evento → servidor → socket)
     const [activeAlert, setActiveAlert] = useState(null);
     const [alertCameras, setAlertCameras] = useState({}); // { [camId]: timestamp }
-    const notifiedTargetsRef = useRef(new Set());
-    const isScanningRef = useRef(false);
-
-    // Relógio OSD em tempo real
-    useEffect(() => {
-        const timer = setInterval(() => {
-            setCurrentTime(new Date().toLocaleTimeString());
-        }, 1000);
-        return () => clearInterval(timer);
-    }, []);
+    const filtroAlertasRef = useRef(criarFiltroAlertas());
+    const painelRef = useRef(iaConfig.painel);
+    painelRef.current = iaConfig.painel;
 
     // Carregar Câmeras do Evento
     const fetchCameras = useCallback(async () => {
@@ -117,26 +125,11 @@ const CftvWall = () => {
         localStorage.setItem('cftv_selected_cameras_ids', JSON.stringify([]));
     };
 
-    // Áudio Sirene
+    // Sirene (respeita "silenciar" e o som desligado em Configurações > IA facial)
     const playAlarmSound = useCallback(() => {
-        if (!soundEnabled) return;
-        try {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(850, ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(420, ctx.currentTime + 0.35);
-            gain.gain.setValueAtTime(0.18, ctx.currentTime);
-            gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.35);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start();
-            osc.stop(ctx.currentTime + 0.35);
-        } catch {
-            // áudio indisponível
-        }
-    }, [soundEnabled]);
+        if (painelRef.current?.som_alerta === false) return;
+        tocarAlerta('sirene');
+    }, []);
 
     // Alternar Tela Cheia
     const toggleFullscreen = () => {
@@ -152,7 +145,7 @@ const CftvWall = () => {
         if (!eventoId || !cpf) return;
         try {
             const cpfLimpo = String(cpf).replace(/\D/g, '');
-            notifiedTargetsRef.current.delete(cpfLimpo);
+            filtroAlertasRef.current.esquecer(`wl:${cpfLimpo}`); // se aparecer de novo, alerta na hora
             await api.post('/watchlist/concluir-rastreamento', {
                 evento_id: eventoId,
                 cpf: cpfLimpo,
@@ -175,8 +168,12 @@ const CftvWall = () => {
         socket.entrarEvento(eventoId);
 
         socket.on('watchlist_alert', (alert) => {
-            playAlarmSound();
+            if (!isAdminMaster) return; // só chega à sala do Admin Master; proteção extra
             const pessoa = alert.pessoa || {};
+            const cpf = String(pessoa.cpf || alert.cpf || '').replace(/\D/g, '');
+            // Mesmo alvo de novo dentro do intervalo: atualiza a tela sem tocar a sirene outra vez
+            if (filtroAlertasRef.current.novo(`wl:${cpf || alert.alerta_id}`, painelRef.current?.alerta_repetir_s || 30)) playAlarmSound();
+            if (alert.dispositivo?.id) setAlertCameras(prev => ({ ...prev, [alert.dispositivo.id]: Date.now() }));
             setActiveAlert({
                 id: alert.alerta_id || Math.random().toString(36),
                 target_name: pessoa.nome || alert.target_name || 'Alvo em Monitoramento',
@@ -214,95 +211,7 @@ const CftvWall = () => {
         });
 
         return () => socket.liberar();
-    }, [eventoId, playAlarmSound]);
-
-    // Ciclo de IA para Varredura Automática das Câmeras Ativas
-    useEffect(() => {
-        if (!isAdminMaster || cameras.length === 0) return;
-
-        const scanInterval = setInterval(async () => {
-            // Sem varredura sobreposta nem com a aba do navegador escondida
-            if (isScanningRef.current || document.hidden) return;
-
-            const visibleCams = cameras.filter(c => selectedCameraIds.includes(c.id));
-            if (visibleCams.length === 0) return;
-
-            // Focar na câmera com foco ou na primeira visível
-            const targetCam = (focusedCamId && cameras.find(c => c.id === focusedCamId)) || visibleCams[0];
-            if (!targetCam || !targetCam.id) return;
-
-            try {
-                isScanningRef.current = true;
-                const resp = await api.get(`/cameras/${targetCam.id}/track`, {
-                    params: { threshold: 0.48 },
-                    timeout: 10000,
-                    hideDefaultError: true
-                });
-
-                if (resp.data?.success && Array.isArray(resp.data.results)) {
-                    for (const item of resp.data.results) {
-                        const mp = item.matched_person;
-                        if (mp && (mp.is_watchlist || mp.watchlist || mp.bloqueado)) {
-                            const cpfLimpo = String(mp.cpf || '').replace(/\D/g, '');
-
-                            if (mp.em_rastreamento || (cpfLimpo && notifiedTargetsRef.current.has(cpfLimpo))) {
-                                setAlertCameras(prev => ({ ...prev, [targetCam.id]: Date.now() }));
-                                break;
-                            }
-
-                            if (cpfLimpo) notifiedTargetsRef.current.add(cpfLimpo);
-                            playAlarmSound();
-                            setAlertCameras(prev => ({ ...prev, [targetCam.id]: Date.now() }));
-
-                            const snapshotB64 = resp.data.annotated_frame_base64
-                                ? `data:image/jpeg;base64,${resp.data.annotated_frame_base64}`
-                                : null;
-                            const faceCropB64 = item.face_crop_base64
-                                ? `data:image/jpeg;base64,${item.face_crop_base64}`
-                                : null;
-
-                            const camAreaNome = targetCam.area?.nome_area || resp.data.camera?.area;
-                            const locFinal = camAreaNome
-                                ? `${camAreaNome} (Câmera: ${targetCam.nome})`
-                                : targetCam.nome;
-
-                            setActiveAlert({
-                                id: `alert_${Date.now()}_${targetCam.id}`,
-                                target_name: mp.nome,
-                                pessoa: {
-                                    nome: mp.nome,
-                                    cpf: mp.cpf,
-                                    foto_url: mp.foto_url,
-                                    funcao: mp.funcao,
-                                    numero_pulseira: mp.numero_pulseira
-                                },
-                                foto_capturada: snapshotB64,
-                                face_crop: faceCropB64,
-                                dispositivo: {
-                                    id: targetCam.id,
-                                    nome: targetCam.nome,
-                                    ip: targetCam.ip_address,
-                                    porta: targetCam.porta,
-                                    fabricante: targetCam.fabricante
-                                },
-                                location: locFinal,
-                                localizacao: locFinal,
-                                timestamp: new Date().toISOString(),
-                                watchlist: mp.watchlist || { motivo: 'Alvo em monitoramento ativo na Watchlist', nivel_alerta: 'CRÍTICO' }
-                            });
-                            break;
-                        }
-                    }
-                }
-            } catch {
-                // Silencioso
-            } finally {
-                isScanningRef.current = false;
-            }
-        }, 4500);
-
-        return () => clearInterval(scanInterval);
-    }, [cameras, selectedCameraIds, focusedCamId, playAlarmSound, isAdminMaster]);
+    }, [eventoId, playAlarmSound, isAdminMaster]);
 
     // Filtrar Câmeras Ativas para o Mosaico
     const displayedCameras = useMemo(() => {
@@ -382,7 +291,7 @@ const CftvWall = () => {
                     bgcolor: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.1)',
                     fontFamily: '"Inter", sans-serif', fontWeight: 700, fontSize: '1rem', color: '#00FF88', letterSpacing: 2
                 }}>
-                    {currentTime}
+                    <Relogio />
                 </Box>
 
                 {/* Lado Direito: Controles do Mosaico */}
@@ -488,8 +397,13 @@ const CftvWall = () => {
                     </Box>
                 ) : (
                     <Grid container spacing={0.8} sx={{ height: '100%' }}>
-                        {displayedCameras.map((cam, _idx) => {
+                        {displayedCameras.map((cam, indice) => {
                             const isAlarming = alertCameras[cam.id] && (Date.now() - alertCameras[cam.id] < 12000);
+                            // Câmera sozinha na tela: stream principal (nítido); mosaico: sub-stream (leve).
+                            // Acima do limite do perfil, as câmeras ficam em snapshot.
+                            const sozinha = !!focusedCamId || layout === '1x1';
+                            const aoVivo = sozinha || indice < (iaConfig.painel?.max_streams_ao_vivo || 9);
+                            const stCam = statusDaCamera(iaStatus, cam.id);
                             return (
                                 <Grid item key={cam.id} xs={gridConfig.xs} sm={gridConfig.sm} md={gridConfig.md} lg={gridConfig.lg}>
                                     <Box sx={{
@@ -504,24 +418,12 @@ const CftvWall = () => {
                                         transition: 'all 0.2s ease',
                                         '&:hover .cftv-overlay-controls': { opacity: 1 }
                                     }}>
-                                        {/* STREAM MJPEG AO VIVO COM IA — endereço estável: o relógio re-renderiza a cada 1 s e um t novo reconectava o vídeo */}
-                                        <img
-                                            src={urlMidiaCamera(cam.id, 'stream', { annotate: true })}
+                                        {/* VÍDEO AO VIVO COM IA: pausa fora da tela/aba escondida e reconecta sozinho */}
+                                        <CameraVideo
+                                            camId={cam.id}
                                             alt={cam.nome}
-                                            style={{
-                                                width: '100%',
-                                                height: '100%',
-                                                objectFit: 'cover',
-                                                display: 'block'
-                                            }}
-                                            onError={(e) => {
-                                                if (!e.target.dataset.fallbackTried) {
-                                                    e.target.dataset.fallbackTried = 'true';
-                                                    e.target.src = urlMidiaCamera(cam.id, 'snapshot', { t: Date.now() });
-                                                } else {
-                                                    e.target.src = '/assets/cam_offline.png';
-                                                }
-                                            }}
+                                            modo={aoVivo ? 'stream' : 'snapshot'}
+                                            qualidade={sozinha ? 'foco' : 'mini'}
                                         />
 
                                         {/* OSD SUPERIOR: NOME DA CÂMERA, REC/LIVE E ÁREA */}
@@ -585,7 +487,8 @@ const CftvWall = () => {
                                             <Typography variant="caption" sx={{
                                                 fontFamily: '"Inter", sans-serif', fontSize: '0.75rem', color: '#00FF88', fontWeight: 700
                                             }}>
-                                                30 FPS • {currentTime}
+                                                {stCam?.conectada ? `${Math.round(stCam.video_fps)} fps` : (aoVivo ? 'AO VIVO' : 'SNAPSHOT')}
+                                                {stCam?.rostos ? ` • ${stCam.rostos} rosto(s)` : ''}
                                             </Typography>
                                         </Box>
 
@@ -818,7 +721,7 @@ const CftvWall = () => {
                                 size="small"
                                 fullWidth
                                 startIcon={<SoundIcon />}
-                                onClick={playAlarmSound}
+                                onClick={() => tocarAlerta('sirene', true)}
                                 sx={{ bgcolor: '#FFFFFF', color: '#FF3366', fontWeight: 700, fontSize: '0.75rem' }}
                             >
                                 Sirene

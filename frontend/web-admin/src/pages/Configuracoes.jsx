@@ -22,7 +22,8 @@ import {
     Security as SecurityIcon,
     Schedule as CronIcon,
     Extension as IntegrIcon,
-    Description as DocIcon
+    Description as DocIcon,
+    FaceRetouchingNatural as IaIcon
 } from '@mui/icons-material';
 import { useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/common/PageHeader';
@@ -40,6 +41,7 @@ const ConfigSeguranca = lazy(() => import('./config/ConfigSeguranca'));
 const ConfigCron = lazy(() => import('./config/ConfigCron'));
 const ConfigIntegracoes = lazy(() => import('./config/ConfigIntegracoes')); // Nova
 const ConfigDocumentos = lazy(() => import('./config/ConfigDocumentos'));
+const ConfigIAFacial = lazy(() => import('./config/ConfigIAFacial'));
 
 const StyledTabs = styled(Tabs)(({ theme }) => ({
     borderRight: `1px solid ${theme.palette.divider}`,
@@ -89,7 +91,7 @@ const TabPanel = (props) => {
 
 const TAB_MAP = [
     'geral', 'evento', 'checkin', 'credenciamento', 'areas', 
-    'terminais', 'alertas', 'webhooks', 'seguranca', 'automacao', 'integracoes', 'documentos'
+    'terminais', 'alertas', 'webhooks', 'seguranca', 'automacao', 'integracoes', 'documentos', 'ia-facial'
 ];
 
 const Configuracoes = () => {
@@ -126,6 +128,7 @@ const Configuracoes = () => {
         { label: 'Automação', icon: <CronIcon /> },
         { label: 'Integr.', icon: <IntegrIcon /> },
         { label: 'Documentos', icon: <DocIcon /> },
+        { label: 'IA facial', icon: <IaIcon /> },
     ];
 
     return (
@@ -197,6 +200,7 @@ const Configuracoes = () => {
                         <TabPanel value={value} index={9}><ConfigCron /></TabPanel>
                         <TabPanel value={value} index={10}><ConfigIntegracoes /></TabPanel>
                         <TabPanel value={value} index={11}><ConfigDocumentos /></TabPanel>
+                        <TabPanel value={value} index={12}><ConfigIAFacial /></TabPanel>
                     </Suspense>
                 </Box>
             </Paper>

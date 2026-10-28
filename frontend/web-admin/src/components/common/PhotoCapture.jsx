@@ -115,6 +115,17 @@ const FaceMask = ({ active }) => (
     </Box>
 );
 
+// Critérios conferidos pelo FaceValidator (só aparecem os que foram medidos)
+const CRITERIOS = [
+    ['faceDetected', 'Rosto detectado'],
+    ['singleFace', 'Só uma pessoa na foto'],
+    ['faceSize', 'Rosto grande o bastante'],
+    ['sharpness', 'Foto nítida'],
+    ['centered', 'Rosto centralizado'],
+    ['contrast', 'Contraste adequado'],
+    ['illumination', 'Iluminação adequada'],
+];
+
 /* ────────────────────────────────────────────────
    Item de checklist de validação
    ──────────────────────────────────────────────── */
@@ -190,12 +201,17 @@ const VerificationDialog = ({ image, result, onSave, onRetry }) => (
                         Critérios de qualidade
                     </Typography>
 
-                    <ChecklistItem label="Rosto detectado" passed={result?.checklist?.faceDetected} />
-                    <ChecklistItem label="Olhos visíveis" passed={result?.checklist?.eyeQuality} />
-                    <ChecklistItem label="Expressão neutra" passed={result?.checklist?.neutralExpression} />
-                    <ChecklistItem label="Contraste adequado" passed={result?.checklist?.contrast} />
-                    <ChecklistItem label="Iluminação uniforme" passed={result?.checklist?.illumination} />
-                    <ChecklistItem label="Rosto centralizado" passed={result?.checklist?.centered} />
+                    {CRITERIOS.filter(([chave]) => result?.checklist?.[chave] !== undefined).map(([chave, label]) => (
+                        <ChecklistItem key={chave} label={label} passed={result.checklist[chave]} />
+                    ))}
+
+                    {result?.errors?.length > 0 && (
+                        <Box sx={{ mt: 1, mb: 1 }}>
+                            {result.errors.map(e => (
+                                <Typography key={e} variant="caption" sx={{ display: 'block', color: '#FF8A80' }}>• {e}</Typography>
+                            ))}
+                        </Box>
+                    )}
 
                     <Box sx={{
                         mt: 2, p: 1.5,
@@ -204,7 +220,7 @@ const VerificationDialog = ({ image, result, onSave, onRetry }) => (
                         borderRadius: 1.5,
                     }}>
                         <Typography variant="caption" sx={{ color: 'text.disabled', lineHeight: 1.5 }}>
-                            A verificação é assistida. A aceitação final ocorre nos terminais biométricos.
+                            Foto ruim gera biometria ruim: a pessoa deixa de ser reconhecida pelas câmeras e pelos leitores.
                         </Typography>
                     </Box>
                 </Grid>
@@ -225,6 +241,7 @@ const VerificationDialog = ({ image, result, onSave, onRetry }) => (
                 variant="contained"
                 onClick={onSave}
                 color="primary"
+                disabled={!result?.isValid}
             >
                 Usar esta foto
             </Button>
