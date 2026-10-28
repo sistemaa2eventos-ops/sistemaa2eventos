@@ -328,6 +328,9 @@ socketVideo.on('connect', () => { avisouVideo = false; log('info', 'Canal de ví
 socketVideo.on('connect_error', (err) => {
     if (!avisouVideo) log('warn', `Canal de vídeo separado indisponível (${err.message}); vídeo segue pela conexão principal`);
     avisouVideo = true;
+    // Recusa do servidor (ex.: versão antiga sem /agent-video) não é retentada pelo socket.io:
+    // tenta de novo a cada 30 s, para o canal voltar sozinho depois de um deploy
+    if (!socketVideo.active) setTimeout(() => { if (!socketVideo.connected) socketVideo.connect(); }, 30000);
 });
 
 socket.on('connect', () => {
