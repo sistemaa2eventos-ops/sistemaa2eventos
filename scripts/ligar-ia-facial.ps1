@@ -195,8 +195,6 @@ function Iniciar-Motor {
     $script:ProcMotor = Start-Process -FilePath $script:Python -ArgumentList '-I', 'src\main.py' `
         -WorkingDirectory $DirMotor -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput $saida -RedirectStandardError $erros
-    # Prioridade acima do normal: navegador/OBS abertos no mesmo PC não atrasam o reconhecimento
-    try { $script:ProcMotor.PriorityClass = 'AboveNormal' } catch {}
 
     $limite = (Get-Date).AddSeconds($EsperaCargaModelo)
     while ((Get-Date) -lt $limite) {
@@ -206,7 +204,13 @@ function Iniciar-Motor {
             Get-Content $erros -Tail 8 -ErrorAction SilentlyContinue | ForEach-Object { Escrever "      $_" 'DarkRed' }
             return $false
         }
-        if (Saude-Motor) { Mostrar-Motor; return $true }
+        if (Saude-Motor) {
+            # Prioridade acima do normal: navegador/OBS abertos no mesmo PC não atrasam o reconhecimento.
+            # No processo que atende a porta: o python.exe do venv é só um lançador do Python real.
+            try { (Get-Process -Id (Pid-NaPorta $PortaMotor)).PriorityClass = 'AboveNormal' } catch {}
+            Mostrar-Motor
+            return $true
+        }
     }
     Escrever "[2/3] Motor de IA: não respondeu em $EsperaCargaModelo s. Veja $saida" 'Red'
     return $false

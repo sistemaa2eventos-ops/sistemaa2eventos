@@ -557,7 +557,10 @@ class Camera:
         if not (foco or mini or self.vigilancia):
             return None
         fps = CFG["ia_fps_foco"] if foco else (CFG["ia_fps_mini"] if mini else CFG["ia_fps_vigilancia"])
-        if CFG["movimento"] and agora - self.ultimo_movimento > CFG["movimento_janela_s"]:
+        # Rosto na cena e alguém assistindo: pessoa parada (olhando o celular) mexe pouco a imagem, mas o
+        # quadrado precisa acompanhar; sem isso caía para 1 análise a cada 2 s e o quadrado piscava
+        rosto_na_tela = (foco or mini) and bool(self.results) and agora - self.results_time < 5
+        if CFG["movimento"] and not rosto_na_tela and agora - self.ultimo_movimento > CFG["movimento_janela_s"]:
             # Cena parada: só quem está assistindo mantém um batimento lento (pessoa parada segue com quadrado)
             return max(1.0 / fps, CFG["cena_parada_s"]) if (foco or mini) else None
         return 1.0 / fps
@@ -1100,6 +1103,17 @@ def placeholder(largura: int = 960) -> bytes:
     return _PLACEHOLDER[largura]
 
 
+def url_da_camera(stream_url: str, camera_id: str = "") -> str:
+    """camera_id (de cameras_ip, conhecido pela vigilância) no lugar da URL: a credencial da câmera não
+    precisa trafegar na consulta."""
+    if camera_id:
+        for cam in list(cameras.values()):
+            if cam.camera_id == camera_id:
+                return cam.url
+        raise HTTPException(status_code=404, detail="Câmera não está na lista do motor")
+    return stream_url
+
+
 class ExtractRequest(BaseModel):
     image_base64: str
     skip_liveness: bool = False
@@ -1151,8 +1165,9 @@ def extract_face(req: ExtractRequest):
 
 
 @app.get("/api/camera/test")
-def test_camera_connection(stream_url: str = DEFAULT_RTSP_URL):
+def test_camera_connection(stream_url: str = DEFAULT_RTSP_URL, camera_id: str = ""):
     """A câmera manda vídeo? Espera até 6 s pelo primeiro quadro (antes respondia offline na 1ª chamada)."""
+    stream_url = url_da_camera(stream_url, camera_id)
     lt = leitor_para(stream_url, "foco", uso=False)
     lt.ultimo_uso = time.time()
     fim = time.time() + 6
@@ -1163,9 +1178,10 @@ def test_camera_connection(stream_url: str = DEFAULT_RTSP_URL):
 
 @app.get("/api/camera/snapshot")
 def get_camera_snapshot(stream_url: str = DEFAULT_RTSP_URL, annotate: bool = False, max_width: int = 0,
-                        quality: int = 85, qualidade: str = "foco", apos_seq: int = -1):
+                        quality: int = 85, qualidade: str = "foco", apos_seq: int = -1, camera_id: str = ""):
     """Quadro atual em JPEG. qualidade=mini usa o sub-stream; apos_seq devolve 204 se o quadro não mudou
     (o agente não reenvia quadro repetido). Cabeçalhos X-Frame-Seq e X-Frame-Age-Ms."""
+    stream_url = url_da_camera(stream_url, camera_id)
     lt = leitor_para(stream_url, "mini" if qualidade == "mini" else "foco")
     _, seq, _ = lt.pegar()
     if apos_seq >= 0 and seq == apos_seq and seq > 0:
@@ -1178,8 +1194,9 @@ def get_camera_snapshot(stream_url: str = DEFAULT_RTSP_URL, annotate: bool = Fal
 
 
 @app.get("/api/track/live")
-def track_live_endpoint(stream_url: str = DEFAULT_RTSP_URL, threshold: float = 0.0):
+def track_live_endpoint(stream_url: str = DEFAULT_RTSP_URL, threshold: float = 0.0, camera_id: str = ""):
     """Últimos resultados da IA desta câmera (não roda uma análise extra) e o quadro anotado reduzido."""
+    stream_url = url_da_camera(stream_url, camera_id)
     lt = leitor_para(stream_url, "foco")
     cam = lt.cam
     results = cam.resultados_validos()
@@ -1198,9 +1215,10 @@ def track_live_endpoint(stream_url: str = DEFAULT_RTSP_URL, threshold: float = 0
 
 @app.get("/api/camera/stream")
 async def get_camera_stream(request: Request, stream_url: str = DEFAULT_RTSP_URL, annotate: bool = True,
-                            qualidade: str = "foco", max_width: int = 0, quality: int = 72):
+                            qualidade: str = "foco", max_width: int = 0, quality: int = 72, camera_id: str = ""):
     """MJPEG direto para <img> (API no próprio servidor do evento). Assíncrono: não prende thread e
     termina quando o navegador fecha."""
+    stream_url = url_da_camera(stream_url, camera_id)
     lt = leitor_para(stream_url, "mini" if qualidade == "mini" else "foco")
     largura, q = max(0, min(max_width, 3840)), max(30, min(quality, 95))
 
