@@ -158,8 +158,8 @@ services:
         limits:
           memory: 512M
 
-# Câmeras com IA (camera-service, ai_worker) rodam no PC local do evento, não na VPS:
-# as câmeras ficam na rede local do evento. Ver docker-compose.evento.yml.
+# Câmeras com IA rodam no PC local do evento, não na VPS (as câmeras ficam na rede local do evento):
+# motor backend/microservice-face-python + agente backend/agent-local, ligados por scripts/ligar-ia-facial.bat.
 
 networks:
   a2_net:
