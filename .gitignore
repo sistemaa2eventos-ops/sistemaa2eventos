@@ -118,3 +118,5 @@ codigo_completo.txt
 test_jwt_integrity.js
 test-login.js
 test-users-endpoint.js
+# Gerado por ligar-ia-facial.bat instalar-autostart (caminhos desta máquina)
+scripts/iniciar-ia-oculto.vbs

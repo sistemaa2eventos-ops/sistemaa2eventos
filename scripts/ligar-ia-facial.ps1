@@ -1,14 +1,17 @@
-﻿<#
+<#
   NZT Intelligent Control System — liga os motores da IA de rastreamento facial
   no servidor local do evento e fica vigiando (religa o que cair).
 
-  Uso:  ligar-ia-facial.bat          liga tudo e vigia
-        ligar-ia-facial.bat parar    desliga motor de IA e agente local
+  Uso:  ligar-ia-facial.bat                     liga tudo e vigia
+        ligar-ia-facial.bat parar               desliga vigia, motor de IA e agente local
+        ligar-ia-facial.bat instalar-autostart  ativa inicialização automática no login do Windows
+        ligar-ia-facial.bat remover-autostart   remove inicialização automática
 
   Peças:
-    1. Câmera      OBS com servidor RTSP em localhost:8554 (vídeo que a IA analisa)
+    1. Câmera      OBS com servidor RTSP em localhost:8554 ou leitura direta da Webcam USB (fallback automático)
     2. Motor de IA backend/microservice-face-python (porta 8000): InsightFace + FAISS,
-                   carrega os rostos do Supabase; é ele que o painel chama (/api/track/live)
+                   carrega os rostos do Supabase, lê as câmeras e reconhece quem passa
+                   (perfil e ajustes vêm do painel: Configurações > IA facial)
     3. Agente local backend/agent-local: conexão de saída com o servidor na nuvem; leva ao painel
                    a IA facial, as câmeras e os leitores faciais da rede do evento
                    (só sobe se backend/agent-local/.env tiver AGENT_TOKEN)
@@ -27,9 +30,13 @@ $IntervaloVigia = 15      # segundos entre verificações
 $FalhasParaReiniciar = 4  # verificações seguidas sem resposta antes de reiniciar o motor
 $EsperaCargaModelo = 180  # segundos para o InsightFace carregar
 
-$Host.UI.RawUI.WindowTitle = 'NZT - IA de rastreamento facial'
+try { $Host.UI.RawUI.WindowTitle = 'NZT - IA de rastreamento facial' } catch {}
 New-Item -ItemType Directory -Force $DirLogs | Out-Null
 $LogVigia = Join-Path $DirLogs ("vigia-{0:yyyyMMdd}.log" -f (Get-Date))
+# Logs com mais de 7 dias saem (cada reinício do motor cria um arquivo novo)
+Get-ChildItem $DirLogs -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-7) } |
+    Remove-Item -Force -ErrorAction SilentlyContinue
 
 function Escrever([string]$msg, [string]$cor = 'Gray') {
     $linha = "[{0:HH:mm:ss}] {1}" -f (Get-Date), $msg
@@ -59,12 +66,10 @@ function Saude-Motor {
 }
 
 # Python que consegue rodar o motor (numpy/faiss/insightface íntegros).
-# venv-ia: com placa de vídeo (DirectML, ver requirements-windows-gpu.txt). Reserva: o do camera-service (só CPU).
-# Os venvs da raiz e o "venv" do microservice estão com numpy corrompido.
+# venv-ia: com placa de vídeo (DirectML, ver requirements-windows-gpu.txt). Os demais são reserva.
 function Achar-Python {
     $candidatos = @(
         (Join-Path $DirMotor 'venv-ia\Scripts\python.exe'),
-        (Join-Path $Raiz 'camera-service\venv\Scripts\python.exe'),
         (Join-Path $DirMotor 'venv\Scripts\python.exe'),
         (Join-Path $Raiz 'venv\Scripts\python.exe')
     )
@@ -77,16 +82,59 @@ function Achar-Python {
     return $null
 }
 
+# ---------------------------------------------------------------- autostart
+if ($Acao -eq 'instalar-autostart') {
+    $startup = [Environment]::GetFolderPath('Startup')
+    $atalho  = Join-Path $startup 'NZT-IA-Facial.lnk'
+    $vbs     = Join-Path $PSScriptRoot 'iniciar-ia-oculto.vbs'
+    $conteudoVbs = @"
+Set WshShell = CreateObject("WScript.Shell")
+WshShell.CurrentDirectory = "$Raiz"
+WshShell.Run "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ""$PSCommandPath""", 0, False
+"@
+    [System.IO.File]::WriteAllText($vbs, $conteudoVbs, [System.Text.Encoding]::ASCII)
+    $wsh     = New-Object -ComObject WScript.Shell
+    $lnk     = $wsh.CreateShortcut($atalho)
+    $lnk.TargetPath       = 'wscript.exe'
+    $lnk.Arguments        = "`"$vbs`""
+    $lnk.WorkingDirectory = $Raiz
+    $lnk.Description      = 'NZT Intelligent Control System - IA de rastreamento facial e Agente Local'
+    $lnk.Save()
+    Escrever "Inicialização automática ativada em: $atalho" 'Green'
+    exit 0
+}
+if ($Acao -eq 'remover-autostart') {
+    $atalho = Join-Path ([Environment]::GetFolderPath('Startup')) 'NZT-IA-Facial.lnk'
+    if (Test-Path $atalho) { Remove-Item $atalho -Force; Escrever 'Inicialização automática removida.' 'Yellow' }
+    else { Escrever 'Inicialização automática não estava instalada.' 'Gray' }
+    exit 0
+}
+
+function Outros-Vigias {
+    $meusPids = @($PID)
+    $atual = Get-CimInstance Win32_Process -Filter "ProcessId=$PID" -ErrorAction SilentlyContinue
+    if ($atual -and $atual.ParentProcessId) { $meusPids += [int]$atual.ParentProcessId }
+    Get-CimInstance Win32_Process -Filter "Name='powershell.exe' or Name='pwsh.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.ProcessId -notin $meusPids -and $_.CommandLine -match 'ligar-ia-facial\.ps1' }
+}
+
 # ---------------------------------------------------------------- parar
 if ($Acao -eq 'parar') {
+    Outros-Vigias | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; Escrever "Vigia desligado (PID $($_.ProcessId))." 'Yellow' }
     $p = Pid-NaPorta $PortaMotor
     if ($p) { Stop-Process -Id $p -Force; Escrever "Motor de IA desligado (PID $p)." 'Yellow' }
     else { Escrever 'Motor de IA já estava desligado.' }
-    Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+    Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
         Where-Object { $_.CommandLine -match 'agent\.js' } |
         ForEach-Object { Stop-Process -Id $_.ProcessId -Force; Escrever "Agente local desligado (PID $($_.ProcessId))." 'Yellow' }
-    Escrever 'Observação: a janela de vigia, se aberta, religaria tudo; feche-a antes.' 'DarkGray'
     exit 0
+}
+
+# Evitar duas instâncias do vigia rodando ao mesmo tempo
+$outroVigia = Outros-Vigias | Select-Object -First 1
+if ($outroVigia -and $Acao -ne 'unico') {
+    Escrever "Vigia já está em execução (PID $($outroVigia.ProcessId)). Garantindo que os serviços estejam ativos..." 'Cyan'
+    $Acao = 'unico'
 }
 
 Write-Host ''
@@ -97,15 +145,15 @@ Write-Host ''
 
 # ---------------------------------------------------------------- 1. câmera
 function Garantir-Camera {
-    if (Pid-NaPorta $PortaCamera) { Escrever "[1/3] Câmera: vídeo disponível em localhost:$PortaCamera." 'Green'; return }
+    if (Pid-NaPorta $PortaCamera) { Escrever "[1/3] Câmera: vídeo RTSP disponível em localhost:$PortaCamera." 'Green'; return }
     $obs = 'C:\Program Files\obs-studio\bin\64bit\obs64.exe'
     if (Test-Path $obs) {
         Escrever '[1/3] Câmera: abrindo o OBS (servidor RTSP)...' 'Yellow'
         Start-Process -FilePath $obs -WorkingDirectory (Split-Path $obs) -ArgumentList '--minimize-to-tray' -WindowStyle Minimized
-        for ($i = 0; $i -lt 20 -and -not (Pid-NaPorta $PortaCamera); $i++) { Start-Sleep 1 }
+        for ($i = 0; $i -lt 15 -and -not (Pid-NaPorta $PortaCamera); $i++) { Start-Sleep 1 }
     }
-    if (Pid-NaPorta $PortaCamera) { Escrever "[1/3] Câmera: vídeo disponível em localhost:$PortaCamera." 'Green' }
-    else { Escrever "[1/3] Câmera: nada em localhost:$PortaCamera. No OBS, ligue o servidor RTSP (Ferramentas > RTSP Server). O motor sobe mesmo assim e as câmeras IP cadastradas no painel continuam funcionando." 'Yellow' }
+    if (Pid-NaPorta $PortaCamera) { Escrever "[1/3] Câmera: vídeo RTSP disponível em localhost:$PortaCamera." 'Green' }
+    else { Escrever "[1/3] Câmera: RTSP em localhost:$PortaCamera indisponível; o Motor de IA usará leitura direta da Webcam USB (fallback automático)." 'Cyan' }
 }
 
 # ---------------------------------------------------------------- 2. motor de IA
@@ -115,8 +163,15 @@ $script:ProcMotor = $null
 function Iniciar-Motor {
     if (-not $script:Python) { $script:Python = Achar-Python }
     if (-not $script:Python) {
-        Escrever '[2/3] Motor de IA: nenhum Python com as bibliotecas da IA. Rode: camera-service\venv\Scripts\pip install -r backend\microservice-face-python\requirements.txt' 'Red'
+        Escrever '[2/3] Motor de IA: nenhum Python com as bibliotecas da IA. Siga backend\microservice-face-python\requirements-windows-gpu.txt (cria o venv-ia).' 'Red'
         return $false
+    }
+    # onnxruntime só-CPU instalado junto com o DirectML: a IA pode cair na CPU (12x mais lenta)
+    $ErrorActionPreference = 'Continue'
+    $pacotes = & $script:Python -I -c "import importlib.metadata as m; print(' '.join(sorted(d.metadata['Name'].lower() for d in m.distributions() if d.metadata['Name'] and d.metadata['Name'].lower().startswith('onnxruntime'))))" 2>$null
+    $ErrorActionPreference = 'Stop'
+    if ("$pacotes" -match '(^| )onnxruntime( |$)' -and "$pacotes" -match 'onnxruntime-directml') {
+        Escrever '      Atenção: "onnxruntime" (só CPU) está instalado junto com o "onnxruntime-directml". Rode: venv-ia\Scripts\pip uninstall -y onnxruntime  e depois  venv-ia\Scripts\pip install --force-reinstall --no-deps onnxruntime-directml==1.24.4' 'Yellow'
     }
 
     # Credenciais: .env do microservice; o que faltar vem do .env do backend
@@ -131,14 +186,17 @@ function Iniciar-Motor {
     }
     $env:PYTHONUNBUFFERED = '1'
     $env:PYTHONIOENCODING = 'utf-8'
+    Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue
 
     $carimbo = '{0:yyyyMMdd-HHmmss}' -f (Get-Date)
     $saida = Join-Path $DirLogs "motor-$carimbo.log"
     $erros = Join-Path $DirLogs "motor-$carimbo-erros.log"
     Escrever "[2/3] Motor de IA: iniciando (carregar o modelo leva até 1-2 min)..." 'Yellow'
-    $script:ProcMotor = Start-Process -FilePath $script:Python -ArgumentList 'src\main.py' `
+    $script:ProcMotor = Start-Process -FilePath $script:Python -ArgumentList '-I', 'src\main.py' `
         -WorkingDirectory $DirMotor -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput $saida -RedirectStandardError $erros
+    # Prioridade acima do normal: navegador/OBS abertos no mesmo PC não atrasam o reconhecimento
+    try { $script:ProcMotor.PriorityClass = 'AboveNormal' } catch {}
 
     $limite = (Get-Date).AddSeconds($EsperaCargaModelo)
     while ((Get-Date) -lt $limite) {
@@ -148,7 +206,7 @@ function Iniciar-Motor {
             Get-Content $erros -Tail 8 -ErrorAction SilentlyContinue | ForEach-Object { Escrever "      $_" 'DarkRed' }
             return $false
         }
-        if (Saude-Motor) { Start-Sleep 5; Mostrar-Motor; return $true }  # 5 s para a câmera padrão conectar
+        if (Saude-Motor) { Mostrar-Motor; return $true }
     }
     Escrever "[2/3] Motor de IA: não respondeu em $EsperaCargaModelo s. Veja $saida" 'Red'
     return $false
@@ -160,8 +218,8 @@ function Mostrar-Motor {
     $faiss = $null
     try { $faiss = Invoke-RestMethod "http://127.0.0.1:$PortaMotor/api/engine/status" -TimeoutSec 5 } catch {}
     $hw = if ($faiss -and $faiss.hardware_acceleration) { $faiss.hardware_acceleration } else { 'CPU' }
-    Escrever ("[2/3] Motor de IA: LIGADO em http://localhost:{0}  |  {1}  |  {2} rostos indexados  |  câmera padrão {3} ({4} fps)" -f `
-        $PortaMotor, $hw, $s.registered_persons, $(if ($s.rtsp_connected) { 'conectada' } else { 'sem sinal' }), $s.rtsp_fps) 'Green'
+    Escrever ("[2/3] Motor de IA: LIGADO em http://localhost:{0}  |  {1}  |  perfil {2}  |  {3} rostos indexados  |  {4}/{5} câmera(s) com vídeo" -f `
+        $PortaMotor, $hw, $s.perfil, $s.registered_persons, $s.cameras_com_video, $s.cameras_em_uso) 'Green'
     if ($s.engine -ne 'insightface_onnx') { Escrever '      Atenção: InsightFace não carregou; o motor está em modo simulado.' 'Red' }
     if ($hw -eq 'CPU') { Escrever '      Atenção: IA rodando na CPU (lenta). Veja backend\microservice-face-python\requirements-windows-gpu.txt para usar a placa de vídeo.' 'Yellow' }
     if ($faiss -and $faiss.faiss_total_vectors -eq 0) { Escrever '      Atenção: nenhum rosto no índice. Confira a chave do Supabase e se há pessoas com biometria.' 'Yellow' }
@@ -223,9 +281,13 @@ Garantir-Camera
 Garantir-Motor
 Garantir-Agente
 
+if ($Acao -eq 'unico') {
+    exit 0
+}
+
 Write-Host ''
 Escrever "Vigia ativo: verifica a cada $IntervaloVigia s e religa o que cair. Mantenha esta janela aberta durante o evento." 'Cyan'
-Escrever "Logs em $DirLogs   |   Para desligar: feche esta janela e rode 'ligar-ia-facial.bat parar'." 'DarkGray'
+Escrever "Logs em $DirLogs   |   Para desligar: rode 'ligar-ia-facial.bat parar'." 'DarkGray'
 Write-Host ''
 
 $falhas = 0
