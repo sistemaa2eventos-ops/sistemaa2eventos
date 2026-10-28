@@ -347,6 +347,7 @@ const ConfigIAFacial = () => {
                                         <TableRow>
                                             <TableCell>Câmera</TableCell>
                                             <TableCell>Agora</TableCell>
+                                            <TableCell align="center">Ativa</TableCell>
                                             <TableCell align="center">IA</TableCell>
                                             <TableCell align="center">Vigilância 24 h</TableCell>
                                             <TableCell>Prioridade</TableCell>
@@ -355,15 +356,18 @@ const ConfigIAFacial = () => {
                                     </TableHead>
                                     <TableBody>
                                         {cameras.map(cam => {
-                                            const st = statusDaCamera(status, cam.id);
+                                            const isDesativada = cam.status === 'desativada' || cam.status === 'inativa';
+                                            const st = isDesativada ? null : statusDaCamera(status, cam.id);
                                             return (
-                                                <TableRow key={cam.id}>
+                                                <TableRow key={cam.id} sx={{ opacity: isDesativada ? 0.65 : 1 }}>
                                                     <TableCell>
                                                         <Typography variant="body2" fontWeight={700}>{cam.nome}</Typography>
                                                         <Typography variant="caption" color="text.secondary">{cam.area?.nome_area || cam.ip_address}</Typography>
                                                     </TableCell>
                                                     <TableCell>
-                                                        {st ? (
+                                                        {isDesativada ? (
+                                                            <Chip label="Desativada" size="small" color="warning" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700 }} />
+                                                        ) : st ? (
                                                             <Typography variant="caption">
                                                                 {st.conectada ? `${Math.round(st.video_fps)} fps` : 'sem vídeo'}
                                                                 {st.ia_analisando ? ` • IA ${st.ia_fps_alvo}/s` : ' • IA em espera'}
@@ -373,16 +377,20 @@ const ConfigIAFacial = () => {
                                                         ) : <Typography variant="caption" color="text.secondary">—</Typography>}
                                                     </TableCell>
                                                     <TableCell align="center">
-                                                        <Switch size="small" checked={cam.ia_ativa !== false} disabled={salvandoCam === cam.id}
+                                                        <Switch size="small" color="success" checked={!isDesativada} disabled={salvandoCam === cam.id}
+                                                            onChange={e => salvarCamera(cam, { status: e.target.checked ? 'offline' : 'desativada' })} />
+                                                    </TableCell>
+                                                    <TableCell align="center">
+                                                        <Switch size="small" checked={cam.ia_ativa !== false && !isDesativada} disabled={salvandoCam === cam.id || isDesativada}
                                                             onChange={e => salvarCamera(cam, { ia_ativa: e.target.checked })} />
                                                     </TableCell>
                                                     <TableCell align="center">
-                                                        <Switch size="small" checked={cam.vigilancia_ativa !== false && cam.ia_ativa !== false}
-                                                            disabled={salvandoCam === cam.id || cam.ia_ativa === false}
+                                                        <Switch size="small" checked={cam.vigilancia_ativa !== false && cam.ia_ativa !== false && !isDesativada}
+                                                            disabled={salvandoCam === cam.id || cam.ia_ativa === false || isDesativada}
                                                             onChange={e => salvarCamera(cam, { vigilancia_ativa: e.target.checked })} />
                                                     </TableCell>
                                                     <TableCell>
-                                                        <Select size="small" value={cam.prioridade ?? 1} disabled={salvandoCam === cam.id}
+                                                        <Select size="small" value={cam.prioridade ?? 1} disabled={salvandoCam === cam.id || isDesativada}
                                                             onChange={e => salvarCamera(cam, { prioridade: e.target.value })}>
                                                             <MenuItem value={0}>Baixa</MenuItem>
                                                             <MenuItem value={1}>Normal</MenuItem>
@@ -393,6 +401,7 @@ const ConfigIAFacial = () => {
                                                     <TableCell sx={{ minWidth: 260 }}>
                                                         <TextField
                                                             size="small" fullWidth placeholder="rtsp://... (deduzido)"
+                                                            disabled={isDesativada}
                                                             defaultValue={cam.url_substream || ''}
                                                             onBlur={e => {
                                                                 const v = e.target.value.trim();
@@ -404,7 +413,7 @@ const ConfigIAFacial = () => {
                                             );
                                         })}
                                         {cameras.length === 0 && (
-                                            <TableRow><TableCell colSpan={6}><Typography variant="body2" color="text.secondary">Nenhuma câmera cadastrada neste evento.</Typography></TableCell></TableRow>
+                                            <TableRow><TableCell colSpan={7}><Typography variant="body2" color="text.secondary">Nenhuma câmera cadastrada neste evento.</Typography></TableCell></TableRow>
                                         )}
                                     </TableBody>
                                 </Table>

@@ -152,26 +152,26 @@ export const ModalCredenciamento = ({
             fullWidth
             PaperProps={{
                 sx: {
-                    maxHeight: '90vh',
+                    maxHeight: '92dvh',
                     overflowY: 'auto',
                     '&::-webkit-scrollbar': { width: '6px' },
                     '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0, 212, 255, 0.25)', borderRadius: '10px' }
-                    }
+                }
             }}
         >
-            <DialogContent sx={{ p: { xs: 2.5, md: 4 } }}>
+            <DialogContent sx={{ p: { xs: 1.25, sm: 2.5, md: 3.5 } }}>
                 <GlassCard
                     sx={{
-                        p: { xs: 2.5, md: 3.5 },
+                        p: { xs: 1.75, sm: 2.5, md: 3.5 },
                         borderRadius: 1.5,
                         border: '1px solid rgba(255, 255, 255, 0.08)',
                         background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, rgba(0, 212, 255, 0.03) 100%)'
                     }}
                 >
                     {/* Top bar do modal */}
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: { xs: 1.75, sm: 3 } }}>
                         <Stack direction="row" spacing={1.5} alignItems="center">
-                            <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: '2px', fontSize: '0.8125rem' }}>
+                            <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: { xs: '1px', sm: '2px' }, fontSize: { xs: '0.75rem', sm: '0.8125rem' } }}>
                                 Estação de credenciamento e acesso
                             </Typography>
                         </Stack>
@@ -182,14 +182,14 @@ export const ModalCredenciamento = ({
                     </Box>
 
                     {/* Conteúdo Principal */}
-                    <Grid container spacing={3.5} alignItems="flex-start">
+                    <Grid container spacing={{ xs: 2, sm: 3.5 }} alignItems="flex-start">
                         {/* Coluna da Foto & Status */}
                         <Grid item xs={12} sm={4} sx={{ textAlign: 'center' }}>
-                            <Box sx={{ position: 'relative', display: 'inline-block', mb: 2 }}>
+                            <Box sx={{ position: 'relative', display: 'inline-block', mb: 1.5 }}>
                                 <PessoaFoto
                                     src={pessoa.foto_url}
                                     nome={pessoa.nome_completo || pessoa.nome}
-                                    width={160}
+                                    width={130}
                                     borderRadius="16px"
                                     accentColor="#00D4FF"
                                     borderWidth="3px"
@@ -248,7 +248,7 @@ export const ModalCredenciamento = ({
                                         startIcon={<DocIcon fontSize="small" />}
                                         onClick={handleCarregarDocs}
                                         sx={{
-                                            mt: 1,
+                                            mt: 0.5,
                                             fontSize: '0.75rem',
                                             color: '#00D4FF',
                                             borderColor: 'rgba(0, 212, 255, 0.4)',
@@ -268,29 +268,29 @@ export const ModalCredenciamento = ({
 
                         {/* Coluna dos Dados e Input Universal de Pulseira */}
                         <Grid item xs={12} sm={8}>
-                            <Box mb={2.5}>
-                                <Typography variant="h4" fontWeight={700} color="#FFFFFF" sx={{ letterSpacing: '0.5px', lineHeight: 1.2 }}>
+                            <Box mb={2}>
+                                <Typography fontWeight={700} color="#FFFFFF" sx={{ fontSize: { xs: '1.2rem', sm: '1.65rem' }, letterSpacing: '0.3px', lineHeight: 1.2, textAlign: { xs: 'center', sm: 'left' } }}>
                                     {pessoa.nome_completo || pessoa.nome}
                                 </Typography>
 
-                                <Stack spacing={1} mt={1.5}>
-                                    <Typography variant="body1" sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.85, color: '#FFFFFF' }}>
-                                        <BadgeIcon sx={{ color: '#00D4FF', fontSize: 20 }} /> 
+                                <Stack spacing={0.85} mt={1.25}>
+                                    <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.85, color: '#FFFFFF' }}>
+                                        <BadgeIcon sx={{ color: '#00D4FF', fontSize: 18 }} /> 
                                         <strong>CPF:</strong> {pessoa.cpf || 'Não cadastrado'}
                                     </Typography>
-                                    <Typography variant="body1" sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.85, color: '#FFFFFF' }}>
-                                        <CompanyIcon sx={{ color: '#00D4FF', fontSize: 20 }} /> 
+                                    <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.85, color: '#FFFFFF' }}>
+                                        <CompanyIcon sx={{ color: '#00D4FF', fontSize: 18 }} /> 
                                         <strong>Empresa:</strong> {pessoa.empresas?.nome || pessoa.empresa_nome || 'Pessoa Física / Avulso'}
                                     </Typography>
-                                    <Typography variant="body1" sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.85, color: '#FFFFFF' }}>
-                                        <BadgeIcon sx={{ color: '#00D4FF', fontSize: 20 }} /> 
+                                    <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.85, color: '#FFFFFF' }}>
+                                        <BadgeIcon sx={{ color: '#00D4FF', fontSize: 18 }} /> 
                                         <strong>Função:</strong> {pessoa.funcao || pessoa.cargo || 'Colaborador'}
                                     </Typography>
                                 </Stack>
                             </Box>
 
                             {/* Áreas Autorizadas */}
-                            <Box mb={2.5}>
+                            <Box mb={2}>
                                 <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.5)', fontWeight: 700, letterSpacing: '1px' }}>
                                     Áreas autorizadas:
                                 </Typography>
@@ -299,11 +299,11 @@ export const ModalCredenciamento = ({
                                 </Box>
                             </Box>
 
-                            <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.08)', my: 2 }} />
+                            <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.08)', my: 1.75 }} />
 
                             {/* Campo de Atribuição de Pulseira Universal */}
-                            <Box sx={{ mt: 2 }}>
-                                <Grid container spacing={2} alignItems="center">
+                            <Box sx={{ mt: 1.5 }}>
+                                <Grid container spacing={1.5} alignItems="center">
                                     {pulseiraTypes.length > 1 && (
                                         <Grid item xs={12} sm={4}>
                                             <FormControl fullWidth size="small">
@@ -354,18 +354,18 @@ export const ModalCredenciamento = ({
                     </Grid>
 
                     {/* Rodapé de Ações */}
-                    <Box sx={{ mt: 4, pt: 2.5, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                        <Grid container spacing={2}>
+                    <Box sx={{ mt: { xs: 2.5, sm: 4 }, pt: 2, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                        <Grid container spacing={1.5}>
                             <Grid item xs={12} sm={7}>
                                 <NeonButton
                                     fullWidth
                                     neonColor="#00FF88"
                                     onClick={() => handleConfirmar()}
                                     disabled={loading}
-                                    sx={{ height: 56, fontSize: '1rem', fontWeight: 700, borderRadius: 1.5 }}
+                                    sx={{ height: { xs: 48, sm: 56 }, fontSize: { xs: '0.875rem', sm: '1rem' }, fontWeight: 700, borderRadius: 1.5 }}
                                 >
-                                    <LoginIcon sx={{ mr: 1, fontSize: 24 }} />
-                                    {numeroPulseira ? 'Vincular pulseira & autorizar (enter)' : 'Confirmar entrada sem pulseira (enter)'}
+                                    <LoginIcon sx={{ mr: 1, fontSize: 22 }} />
+                                    {numeroPulseira ? 'Vincular pulseira & autorizar' : 'Confirmar entrada sem pulseira'}
                                     {loading && <CircularProgress size={20} sx={{ ml: 2, color: '#000000' }} />}
                                 </NeonButton>
                             </Grid>
@@ -377,9 +377,9 @@ export const ModalCredenciamento = ({
                                         neonColor="#00D4FF"
                                         onClick={onOpenQrScanner}
                                         disabled={loading}
-                                        sx={{ height: 56, fontSize: '0.875rem', borderRadius: 1.5 }}
+                                        sx={{ height: { xs: 46, sm: 56 }, fontSize: '0.8125rem', borderRadius: 1.5 }}
                                     >
-                                        <QrIcon sx={{ mr: 0.5, fontSize: 22 }} /> QR cam
+                                        <QrIcon sx={{ mr: 0.5, fontSize: 20 }} /> QR cam
                                     </NeonButton>
                                 </Grid>
                             )}
@@ -390,9 +390,9 @@ export const ModalCredenciamento = ({
                                     neonColor="rgba(255, 255, 255, 0.4)"
                                     onClick={onClose}
                                     disabled={loading}
-                                    sx={{ height: 56, fontSize: '0.875rem', borderRadius: 1.5 }}
+                                    sx={{ height: { xs: 46, sm: 56 }, fontSize: '0.8125rem', borderRadius: 1.5 }}
                                 >
-                                    <CloseIcon sx={{ mr: 0.5, fontSize: 20 }} /> Cancelar (esc)
+                                    <CloseIcon sx={{ mr: 0.5, fontSize: 18 }} /> Cancelar
                                 </NeonButton>
                             </Grid>
                         </Grid>

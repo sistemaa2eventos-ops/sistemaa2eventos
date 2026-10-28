@@ -432,6 +432,9 @@ class CameraController {
             const { id } = req.params;
             const { data: cam } = await supabase.from('cameras_ip').select('*').eq('id', id).single();
             if (!cam) return res.status(404).send('Camera Not Found');
+            if (cam.status === 'desativada' || cam.status === 'inativa') {
+                return res.status(423).send('Câmera desativada');
+            }
 
             const isRtsp = cam.protocolo === 'rtsp' || (cam.stream_url && cam.stream_url.startsWith('rtsp://'));
             rota = rotaDaCamera(cam);
@@ -478,6 +481,9 @@ class CameraController {
             const { id } = req.params;
             const { data: cam } = await supabase.from('cameras_ip').select('*').eq('id', id).single();
             if (!cam) return res.status(404).send('Camera Not Found');
+            if (cam.status === 'desativada' || cam.status === 'inativa') {
+                return res.status(423).send('Câmera desativada');
+            }
 
             rota = rotaDaCamera(cam);
             if (!iaDisponivel(rota)) return res.status(503).send(MSG_IA_OFFLINE);
@@ -596,6 +602,9 @@ class CameraController {
                 logger.error(`[trackFace] Erro ao buscar câmera no banco: ${camErr.message}`);
             }
             if (!cam) return res.status(404).json({ error: 'Câmera não encontrada' });
+            if (cam.status === 'desativada' || cam.status === 'inativa' || cam.ia_ativa === false) {
+                return res.json({ success: false, error: 'Câmera ou IA desativada', results: [], camera: { id: cam.id, nome: cam.nome } });
+            }
 
             // Serviço de IA fora do ar: responde na hora em vez de tentar (e logar) a cada varredura
             const rota = rotaDaCamera(cam);

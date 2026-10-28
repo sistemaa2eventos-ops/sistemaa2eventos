@@ -22,6 +22,7 @@ import { DataGrid, GridToolbarContainer, GridToolbarExport } from '@mui/x-data-g
 import { useAudit } from '../hooks/useAudit';
 import { format } from 'date-fns';
 import GlassCard from '../components/common/GlassCard';
+import PageHeader from '../components/common/PageHeader';
 import { styled } from '@mui/material/styles';
 
 const StyledDataGrid = styled(DataGrid)(() => ({
@@ -70,7 +71,8 @@ const AuditLogs = () => {
         {
             field: 'created_at',
             headerName: 'Data/Hora',
-            width: 180,
+            width: 165,
+            minWidth: 150,
             renderCell: (params) => (
                 <Typography variant="body2" sx={{ fontWeight: 600, color: '#00D4FF', fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem' }}>
                     {format(new Date(params.value), 'dd/MM/yy HH:mm:ss')}
@@ -81,14 +83,15 @@ const AuditLogs = () => {
             field: 'usuario_nome',
             headerName: 'Operador',
             flex: 1,
+            minWidth: 180,
             renderCell: (params) => (
                 <Stack direction="row" spacing={1.5} alignItems="center">
                     <Avatar sx={{ width: 24, height: 24, fontSize: '0.75rem', bgcolor: 'secondary.main' }}>
                         {params.value?.charAt(0) || 'U'}
                     </Avatar>
-                    <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 700 }}>{params.value || 'Sistema'}</Typography>
-                        <Typography variant="caption" sx={{ opacity: 0.7 }}>{params.row.usuario_email}</Typography>
+                    <Box sx={{ minWidth: 0 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>{params.value || 'Sistema'}</Typography>
+                        <Typography variant="caption" sx={{ opacity: 0.7 }} noWrap display="block">{params.row.usuario_email}</Typography>
                     </Box>
                 </Stack>
             )
@@ -97,6 +100,7 @@ const AuditLogs = () => {
             field: 'recurso',
             headerName: 'Módulo',
             width: 130,
+            minWidth: 120,
             renderCell: (params) => (
                 <Chip
                     label={params.value}
@@ -110,12 +114,13 @@ const AuditLogs = () => {
             field: 'acao',
             headerName: 'Ação Executada',
             flex: 1,
+            minWidth: 180,
             renderCell: (params) => (
-                <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: getActionColor(params.value) }}>
+                <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: getActionColor(params.value) }} noWrap>
                         {params.value?.replace(/_/g, ' ')}
                     </Typography>
-                    <Typography variant="caption" sx={{ display: 'block', opacity: 0.6, fontSize: '0.75rem' }}>
+                    <Typography variant="caption" sx={{ display: 'block', opacity: 0.6, fontSize: '0.75rem' }} noWrap>
                         ID Target: {params.row.recurso_id?.substring(0, 8)}...
                     </Typography>
                 </Box>
@@ -125,9 +130,10 @@ const AuditLogs = () => {
             field: 'detalhes',
             headerName: 'Detalhes',
             flex: 1,
+            minWidth: 200,
             renderCell: (params) => (
                 <Tooltip title={JSON.stringify(params.value, null, 2)} arrow>
-                    <Typography variant="caption" noWrap sx={{ cursor: 'help', opacity: 0.8, maxWidth: 200 }}>
+                    <Typography variant="caption" noWrap sx={{ cursor: 'help', opacity: 0.8, maxWidth: 220 }}>
                         {JSON.stringify(params.value)}
                     </Typography>
                 </Tooltip>
@@ -139,34 +145,21 @@ const AuditLogs = () => {
         return (
             <Box p={4} textAlign="center">
                 <SecurityIcon sx={{ fontSize: 80, color: 'rgba(255,255,255,0.1)', mb: 2 }} />
-                <Typography variant="h4" color="textSecondary">Selecione um console A2 Eventos / NZT para acessar a auditoria.</Typography>
+                <Typography variant="h5" color="textSecondary">Selecione um console A2 Eventos / NZT para acessar a auditoria.</Typography>
             </Box>
         );
     }
 
     return (
-        <Box sx={{ p: { xs: 2, md: 3 }, position: 'relative', overflowX: 'hidden' }}>
+        <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 }, position: 'relative', overflowX: 'hidden' }}>
             {/* Header Security Label */}
-            <Box mb={3} display="flex" flexDirection={{ xs: 'column', md: 'row' }} gap={2} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }}>
-                <Box>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ xs: 'flex-start', sm: 'center' }} mb={0.5}>
-                        <HistoryIcon sx={{ color: '#00D4FF', fontSize: 32 }} />
-                        <Typography
-                            variant="h4"
-                            sx={{
-                                fontWeight: 700,
-                                fontFamily: '"Space Grotesk", sans-serif',
-                                letterSpacing: '-0.02em',
-                                color: '#FFFFFF'
-                            }}
-                        >
-                            Logs de auditoria
-                        </Typography>
-                    </Stack>
-                    <Typography variant="body2" color="textSecondary" sx={{ ml: { xs: 0, sm: 5.5 } }}>
-                        Trilha de transparência operacional e histórico de ações administrativas.
-                    </Typography>
-                </Box>
+            <Box mb={{ xs: 2, sm: 3 }} display="flex" flexDirection={{ xs: 'column', sm: 'row' }} gap={1.5} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }}>
+                <PageHeader
+                    title="Logs de auditoria"
+                    subtitle="Trilha de transparência operacional e histórico de ações administrativas."
+                    icon={<HistoryIcon sx={{ color: '#00D4FF', fontSize: 32 }} />}
+                    sx={{ mb: 0 }}
+                />
                 <Chip
                     icon={<SecurityIcon sx={{ color: '#00FF88 !important' }} />}
                     label="Ambiente monitorado"
@@ -182,11 +175,12 @@ const AuditLogs = () => {
             </Box>
 
             {/* Filters Section */}
-            <GlassCard sx={{ mb: 3, p: 3 }}>
-                <Grid container spacing={3} alignItems="center">
-                    <Grid item xs={12} sm={3}>
+            <GlassCard sx={{ mb: 2.5, p: { xs: 2, sm: 3 } }}>
+                <Grid container spacing={2} alignItems="center">
+                    <Grid item xs={12} sm={4}>
                         <TextField
                             fullWidth
+                            size="small"
                             select
                             label="Filtrar por módulo"
                             value={filters.recurso}
@@ -200,9 +194,10 @@ const AuditLogs = () => {
                             <MenuItem value="CHECKIN">Operacional</MenuItem>
                         </TextField>
                     </Grid>
-                    <Grid item xs={12} sm={3}>
+                    <Grid item xs={6} sm={3.5}>
                         <TextField
                             fullWidth
+                            size="small"
                             label="Data início"
                             type="date"
                             InputLabelProps={{ shrink: true }}
@@ -210,9 +205,10 @@ const AuditLogs = () => {
                             onChange={(e) => handleFilterChange({ data_inicio: e.target.value })}
                         />
                     </Grid>
-                    <Grid item xs={12} sm={3}>
+                    <Grid item xs={6} sm={3.5}>
                         <TextField
                             fullWidth
+                            size="small"
                             label="Data fim"
                             type="date"
                             InputLabelProps={{ shrink: true }}
@@ -220,26 +216,27 @@ const AuditLogs = () => {
                             onChange={(e) => handleFilterChange({ data_fim: e.target.value })}
                         />
                     </Grid>
-                    <Grid item xs={12} sm={3}>
+                    <Grid item xs={12} sm={1} sx={{ display: 'flex', justifyContent: { xs: 'flex-end', sm: 'center' } }}>
                         <IconButton
                             onClick={() => fetchLogs(1)}
+                            title="Atualizar logs"
                             sx={{
-                                width: 56,
-                                height: 56,
+                                width: 40,
+                                height: 40,
                                 background: 'linear-gradient(135deg, #00D4FF 0%, #00FF88 100%)',
                                 color: '#000000',
                                 boxShadow: '0 0 15px rgba(0, 212, 255, 0.3)',
                                 '&:hover': { transform: 'scale(1.05)' }
                             }}
                         >
-                            <RefreshIcon />
+                            <RefreshIcon fontSize="small" />
                         </IconButton>
                     </Grid>
                 </Grid>
             </GlassCard>
 
             {/* Data Grid Section */}
-            <GlassCard sx={{ height: 600, position: 'relative' }}>
+            <GlassCard sx={{ height: { xs: 480, sm: 600 }, position: 'relative' }}>
                 {loading && <LinearProgress color="secondary" sx={{ position: 'absolute', top: 0, left: 0, right: 0 }} />}
                 <StyledDataGrid
                     rows={logs}
@@ -249,7 +246,7 @@ const AuditLogs = () => {
                     disableSelectionOnClick
                     components={{
                         Toolbar: () => (
-                            <GridToolbarContainer sx={{ p: 2, justifyContent: 'flex-end' }}>
+                            <GridToolbarContainer sx={{ p: 1.5, justifyContent: 'flex-end' }}>
                                 <GridToolbarExport
                                     sx={{
                                         color: '#00D4FF',
@@ -265,9 +262,10 @@ const AuditLogs = () => {
                 />
 
                 {/* Custom Pagination */}
-                <Box p={2} display="flex" justifyContent="center">
-                    <Stack spacing={2} alignItems="center">
+                <Box p={1.5} display="flex" justifyContent="center">
+                    <Stack spacing={1} alignItems="center">
                         <Pagination
+                            size="small"
                             count={pagination.pages}
                             page={pagination.page}
                             onChange={(e, value) => fetchLogs(value)}

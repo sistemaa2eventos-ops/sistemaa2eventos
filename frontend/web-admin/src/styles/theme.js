@@ -158,24 +158,60 @@ const theme = createTheme({
         },
         MuiDialog: {
             styleOverrides: {
-                paper: {
+                paper: ({ theme: t }) => ({
                     backgroundColor: cores.superficie,
                     border: `1px solid ${cores.borda}`,
                     borderRadius: raios.cartao,
                     boxShadow: sombras.modal,
+                    [t.breakpoints.down('sm')]: {
+                        margin: 12,
+                        width: 'calc(100% - 24px)',
+                        maxHeight: 'calc(100dvh - 24px)',
+                    },
+                }),
+                paperFullScreen: {
+                    margin: '0 !important',
+                    width: '100% !important',
+                    maxHeight: '100dvh !important',
+                    borderRadius: 0,
                 },
             },
         },
         MuiDialogTitle: {
             styleOverrides: {
-                root: { fontFamily: fontes.titulo, fontSize: tamanhos.xl, fontWeight: 700, padding: '20px 24px 12px' },
+                root: ({ theme: t }) => ({
+                    fontFamily: fontes.titulo,
+                    fontSize: tamanhos.xl,
+                    fontWeight: 700,
+                    padding: '20px 24px 12px',
+                    [t.breakpoints.down('sm')]: {
+                        fontSize: tamanhos.lg,
+                        padding: '14px 16px 10px',
+                    },
+                }),
             },
         },
         MuiDialogContent: {
-            styleOverrides: { root: { padding: '12px 24px' } },
+            styleOverrides: {
+                root: ({ theme: t }) => ({
+                    padding: '12px 24px',
+                    [t.breakpoints.down('sm')]: {
+                        padding: '10px 16px',
+                    },
+                }),
+            },
         },
         MuiDialogActions: {
-            styleOverrides: { root: { padding: '12px 24px 20px', gap: 8 } },
+            styleOverrides: {
+                root: ({ theme: t }) => ({
+                    padding: '12px 24px 20px',
+                    gap: 8,
+                    flexWrap: 'wrap',
+                    [t.breakpoints.down('sm')]: {
+                        padding: '10px 16px 14px',
+                    },
+                }),
+            },
         },
         MuiTooltip: {
             styleOverrides: {
@@ -193,7 +229,17 @@ const theme = createTheme({
         },
         MuiTab: {
             styleOverrides: {
-                root: { textTransform: 'none', fontWeight: 600, fontSize: tamanhos.md, minHeight: 44 },
+                root: ({ theme: t }) => ({
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    fontSize: tamanhos.md,
+                    minHeight: 44,
+                    [t.breakpoints.down('sm')]: {
+                        fontSize: tamanhos.sm,
+                        minHeight: 40,
+                        padding: '6px 12px',
+                    },
+                }),
             },
         },
         MuiTabs: {

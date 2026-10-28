@@ -33,7 +33,8 @@ import {
   VisibilityOff as VisibilityOffIcon,
   Dvr as DvrIcon,
   VolumeUp as SomIcon, VolumeOff as SemSomIcon,
-  Face as RostoIcon
+  Face as RostoIcon,
+  PowerSettingsNew as PowerIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { format } from 'date-fns';
@@ -64,9 +65,13 @@ const SELO_CONEXAO = {
   offline: { label: 'Sem conexão', cor: '#FF3366' }
 };
 
-const LogItem = styled(Box, { shouldForwardProp: (p) => !['tipo', 'monitorado'].includes(p) })(({ tipo, monitorado }) => ({
+const LogItem = styled(Box, { shouldForwardProp: (p) => !['tipo', 'monitorado'].includes(p) })(({ theme, tipo, monitorado }) => ({
     // styled() não entende os atalhos do sx (p, gap: 2): valores em px
-    display: 'flex', alignItems: 'center', padding: '12px 16px', gap: '16px',
+    display: 'flex', alignItems: 'center', padding: '12px 16px', gap: '14px',
+    [theme.breakpoints.down('sm')]: {
+        padding: '10px 12px',
+        gap: '10px',
+    },
     borderBottom: '1px solid rgba(148,163,184,0.08)',
     borderLeft: `3px solid ${
         monitorado ? '#FFB800' : 
@@ -391,8 +396,62 @@ const Monitor = () => {
     try {
         const resp = await api.post(`/cameras/${id}/testar`);
         setTestResults(prev => ({ ...prev, [id]: resp.data.online ? 'online' : 'offline' }));
+        fetchCameras();
     } catch (err) {
         setTestResults(prev => ({ ...prev, [id]: 'offline' }));
+    }
+  };
+
+  const [togglingCamId, setTogglingCamId] = useState(null);
+  const [togglingAllCams, setTogglingAllCams] = useState(false);
+  const temCameraAtiva = useMemo(() => cameras.some(c => c.status !== 'desativada' && c.status !== 'inativa'), [cameras]);
+
+  const handleToggleCameraStatus = async (cam) => {
+    const isDesativada = cam.status === 'desativada' || cam.status === 'inativa';
+    const novoStatus = isDesativada ? 'offline' : 'desativada';
+    try {
+      setTogglingCamId(cam.id);
+      if (!isDesativada && activeStreamCam?.id === cam.id) {
+        setActiveStreamCam(null);
+      }
+      await api.put(`/cameras/${cam.id}`, { status: novoStatus });
+      setTestResults(prev => {
+        const copy = { ...prev };
+        delete copy[cam.id];
+        return copy;
+      });
+      await fetchCameras();
+      if (isDesativada) {
+        enqueueSnackbar(`Câmera "${cam.nome}" ativada!`, { variant: 'success' });
+        handleTestCamera(cam.id);
+      } else {
+        enqueueSnackbar(`Câmera "${cam.nome}" desativada.`, { variant: 'warning' });
+      }
+    } catch (err) {
+      enqueueSnackbar('Erro ao alterar status da câmera.', { variant: 'error' });
+    } finally {
+      setTogglingCamId(null);
+    }
+  };
+
+  const handleToggleAllCameras = async () => {
+    if (cameras.length === 0) return;
+    const desativar = temCameraAtiva;
+    try {
+      setTogglingAllCams(true);
+      if (desativar) setActiveStreamCam(null);
+      const novoStatus = desativar ? 'desativada' : 'offline';
+      await Promise.all(cameras.map(c => api.put(`/cameras/${c.id}`, { status: novoStatus })));
+      setTestResults({});
+      await fetchCameras();
+      enqueueSnackbar(
+        desativar ? 'Todas as câmeras foram desativadas.' : 'Todas as câmeras foram reativadas!',
+        { variant: desativar ? 'warning' : 'success' }
+      );
+    } catch (err) {
+      enqueueSnackbar('Erro ao alterar status das câmeras.', { variant: 'error' });
+    } finally {
+      setTogglingAllCams(false);
     }
   };
 
@@ -431,10 +490,13 @@ const Monitor = () => {
         </Tooltip>
       </Box>
 
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: { xs: 2, sm: 3 } }}>
         <Tabs 
           value={activeTab} 
           onChange={(e, v) => setActiveTab(v)} 
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
           textColor="inherit" 
           TabIndicatorProps={{ style: { backgroundColor: '#00D4FF' } }}
         >
@@ -581,20 +643,20 @@ const Monitor = () => {
           </Stack>
         </DialogTitle>
 
-        <DialogContent sx={{ p: 2.5 }}>
+        <DialogContent sx={{ p: { xs: 1.5, sm: 2.5 } }}>
           {/* COMPARATIVO FOTO OFICIAL VS SNAPSHOT GRAVADO NO STORAGE */}
           <Box sx={{
-            p: 2.5,
+            p: { xs: 1.5, sm: 2.5 },
             borderRadius: 1.5,
             bgcolor: 'rgba(0,0,0,0.65)',
             border: '1px solid rgba(255,255,255,0.08)',
             boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-            mb: 2.5
+            mb: 2
           }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-              <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 0.8 }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1} mb={1.5}>
+              <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: 0.5, display: 'flex', alignItems: 'center', gap: 0.8 }}>
                 <SecurityIcon sx={{ fontSize: 16, color: '#00D4FF' }} />
-                Comprovação biométrica de reconhecimento facial
+                Comprovação biométrica facial
               </Typography>
               <Chip
                 label="Correspondência confirmada"
@@ -604,7 +666,7 @@ const Monitor = () => {
                   color: '#00FF88',
                   border: '1px solid rgba(0, 230, 118, 0.4)',
                   fontWeight: 700,
-                  fontSize: '0.75rem'
+                  fontSize: '0.72rem'
                 }}
               />
             </Stack>
@@ -614,7 +676,7 @@ const Monitor = () => {
               flexDirection: { xs: 'column', md: 'row' },
               alignItems: 'stretch',
               justifyContent: 'center',
-              gap: 2.5,
+              gap: { xs: 1.5, md: 2.5 },
               width: '100%'
             }}>
               {/* PAINEL 1: FOTO DO REGISTRO CADASTRADO (PROPORÇÃO BIOMÉTRICA RETRATO 3:4 - ZERO CORTE) */}
@@ -626,7 +688,7 @@ const Monitor = () => {
               }}>
                 <Box sx={{
                   width: '100%',
-                  height: 290,
+                  height: { xs: 200, sm: 290 },
                   borderRadius: 1.5,
                   overflow: 'hidden',
                   border: '2px solid #00D4FF',
@@ -654,7 +716,7 @@ const Monitor = () => {
                     <PessoaFoto
                       src={activeAlert?.pessoa?.foto_url}
                       nome={activeAlert?.target_name || activeAlert?.pessoa?.nome}
-                      width={140}
+                      width={120}
                       borderRadius="12px"
                     />
                   )}
@@ -674,7 +736,7 @@ const Monitor = () => {
                     gap: 0.6
                   }}>
                     <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#00D4FF', boxShadow: '0 0 6px #00D4FF' }} />
-                    <Typography variant="caption" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.75rem', color: '#00D4FF', fontWeight: 700 }}>
+                    <Typography variant="caption" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.72rem', color: '#00D4FF', fontWeight: 700 }}>
                       ID BIOMÉTRICO (3:4)
                     </Typography>
                   </Box>
@@ -695,7 +757,7 @@ const Monitor = () => {
                       size="small"
                       sx={{
                         height: 22,
-                        fontSize: '0.75rem',
+                        fontSize: '0.72rem',
                         fontWeight: 700,
                         bgcolor: '#00D4FF',
                         color: '#000000',
@@ -704,7 +766,7 @@ const Monitor = () => {
                     />
                   </Box>
                 </Box>
-                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', mt: 0.8, textAlign: 'center', fontSize: '0.75rem', fontWeight: 600 }}>
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', mt: 0.5, textAlign: 'center', fontSize: '0.72rem', fontWeight: 600 }}>
                   Foto oficial de perfil (sem cortes)
                 </Typography>
               </Box>
@@ -718,7 +780,7 @@ const Monitor = () => {
               }}>
                 <Box sx={{
                   width: '100%',
-                  height: 290,
+                  height: { xs: 200, sm: 290 },
                   borderRadius: 1.5,
                   overflow: 'hidden',
                   border: '2px solid #FFB800',
@@ -929,7 +991,7 @@ const Monitor = () => {
           </Box>
         </DialogContent>
 
-        <DialogActions sx={{ p: 2.5, borderTop: '1px solid rgba(255,255,255,0.08)', gap: 1 }}>
+        <DialogActions sx={{ p: { xs: 1.5, sm: 2.5 }, borderTop: '1px solid rgba(255,255,255,0.08)', gap: 1, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {cameras.length > 0 && (
             <Button
               variant="outlined"
@@ -941,7 +1003,7 @@ const Monitor = () => {
                 setOpenSecretAlertModal(false);
                 setActiveAlert(null);
               }}
-              sx={{ borderColor: '#00D4FF', color: '#00D4FF', fontWeight: 700 }}
+              sx={{ borderColor: '#00D4FF', color: '#00D4FF', fontWeight: 700, flex: { xs: '1 1 100%', sm: '0 0 auto' } }}
             >
               Ver câmera ao vivo
             </Button>
@@ -962,6 +1024,7 @@ const Monitor = () => {
               bgcolor: '#00FF88',
               color: '#000000',
               fontWeight: 700,
+              flex: { xs: '1 1 auto', sm: '0 0 auto' },
               boxShadow: '0 4px 14px rgba(0, 230, 118, 0.4)',
               '&:hover': { bgcolor: '#00FF88', color: '#000000' }
             }}
@@ -969,13 +1032,15 @@ const Monitor = () => {
             Concluir rastreamento
           </Button>
 
-          <Button variant="outlined"
-           
+          <Button
+            variant="outlined"
             size="small"
             onClick={() => {
               setOpenSecretAlertModal(false);
               setActiveAlert(null);
-            }} sx={botaoSecundario}>
+            }}
+            sx={{ ...botaoSecundario, flex: { xs: '0 0 auto', sm: '0 0 auto' } }}
+          >
             Fechar
           </Button>
         </DialogActions>
@@ -985,86 +1050,89 @@ const Monitor = () => {
       {activeAreaAlert && (
           <Fade in={!!activeAreaAlert}>
              <Box sx={{ 
-                 position: 'fixed', top: activeAlert ? 240 : 40, right: 40, width: 450, zIndex: 9999,
+                 position: 'fixed',
+                 top: activeAlert ? { xs: 190, sm: 240 } : { xs: 68, sm: 40 },
+                 right: { xs: 12, sm: 40 },
+                 width: { xs: 'calc(100vw - 24px)', sm: 450 },
+                 zIndex: 9999,
                  background: 'linear-gradient(135deg, rgba(255, 30, 86, 0.96) 0%, rgba(180, 0, 40, 0.98) 100%)',
                  color: '#FFFFFF', borderRadius: 1.5,
-                 p: 3, boxShadow: '0 20px 50px rgba(255,0,80,0.4)', border: '2px solid #FF3366',
+                 p: { xs: 2, sm: 3 }, boxShadow: '0 20px 50px rgba(255,0,80,0.4)', border: '2px solid #FF3366',
                  backdropFilter: 'blur(10px)'
              }}>
-                 <Stack direction="row" spacing={2} justifyContent="space-between" alignItems="center">
+                 <Stack direction="row" spacing={1.5} justifyContent="space-between" alignItems="center">
                     <Stack direction="row" spacing={1} alignItems="center">
-                        <ShieldIcon sx={{ fontSize: 36, color: '#FFFFFF' }} />
-                        <Typography variant="h6" fontWeight={700} letterSpacing={0.5}>Acesso não autorizado!</Typography>
+                        <ShieldIcon sx={{ fontSize: { xs: 28, sm: 36 }, color: '#FFFFFF' }} />
+                        <Typography variant="h6" fontWeight={700} letterSpacing={0.5} sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>Acesso não autorizado!</Typography>
                     </Stack>
                     <IconButton onClick={() => setActiveAreaAlert(null)} size="small" sx={{ color: '#FFFFFF' }}><CloseIcon /></IconButton>
                  </Stack>
 
-                 <Stack direction="row" spacing={2.5} mt={2.5} alignItems="center">
+                 <Stack direction="row" spacing={2} mt={2} alignItems="center">
                     <PessoaFoto
                         src={activeAreaAlert?.pessoa_foto}
                         nome={activeAreaAlert?.pessoa_nome}
-                        width={75}
+                        width={64}
                         borderRadius="10px"
                         accentColor="#FF3366"
                         borderWidth="2px"
                     />
-                    <Box>
-                        <Typography variant="h5" fontWeight={700}>{activeAreaAlert?.pessoa_nome || 'Indivíduo Não Autorizado'}</Typography>
+                    <Box sx={{ minWidth: 0 }}>
+                        <Typography fontWeight={700} sx={{ fontSize: { xs: '1.1rem', sm: '1.4rem' }, lineHeight: 1.2 }}>{activeAreaAlert?.pessoa_nome || 'Indivíduo Não Autorizado'}</Typography>
                         <Chip label="Área restrita" sx={{ mt: 0.5, bgcolor: '#FFFFFF', color: '#FF3366', fontWeight: 700, height: 22 }} />
                     </Box>
                  </Stack>
-                 <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.25)' }} />
+                 <Divider sx={{ my: 1.5, borderColor: 'rgba(255,255,255,0.25)' }} />
                  <Typography variant="body2"><b>Área tentada:</b> {activeAreaAlert?.area_nome || 'Restrita'}</Typography>
-                 <Typography variant="caption" sx={{ mt: 1, display: 'block', opacity: 0.8 }}>Horário: {formatLocalTime(activeAreaAlert?.timestamp)}</Typography>
+                 <Typography variant="caption" sx={{ mt: 0.75, display: 'block', opacity: 0.8 }}>Horário: {formatLocalTime(activeAreaAlert?.timestamp)}</Typography>
              </Box>
           </Fade>
       )}
 
-
-
-      {/* INDICADORES DO DIA (fuso local) */}
-      <KpiCards stats={stats} />
-
-      {/* CARROSSEL / SELETOR DE ÁREAS EM TEMPO REAL COM FILTRO DE 1 CLIQUE */}
-      {stats.areas && stats.areas.length > 0 && (
-          <Box sx={{ mb: 3 }}>
-              <Typography variant="caption" fontWeight={700} color="#94A3B8" sx={{ letterSpacing: 1, mb: 1, display: 'block' }}>
-                  Filtrar por área
-              </Typography>
-              <Stack direction="row" spacing={1.5} sx={{ overflowX: 'auto', pb: 1 }}>
-                  <Chip
-                      clickable
-                      onClick={() => setFiltros(f => ({ ...f, area_id: '' }))}
-                      label="Todas as áreas"
-                      variant={filtros.area_id === '' ? 'filled' : 'outlined'}
-                      color={filtros.area_id === '' ? 'primary' : 'default'}
-                      sx={{ fontWeight: 700, px: 1 }}
-                  />
-                  {stats.areas.map(area => {
-                      const isSelected = filtros.area_id === area.id;
-                      return (
-                          <Chip
-                              key={area.id}
-                              clickable
-                              onClick={() => setFiltros(f => ({ ...f, area_id: isSelected ? '' : area.id }))}
-                              icon={<AreaIcon sx={{ fontSize: 16 }} />}
-                              label={`${area.nome || area.nome_area} (${area.total_acessos_hoje || 0})${area.total_negados_hoje > 0 ? ` ${area.total_negados_hoje}` : ''}`}
-                              color={isSelected ? 'info' : area.total_negados_hoje > 0 ? 'error' : 'default'}
-                              variant={isSelected ? 'filled' : 'outlined'}
-                              sx={{
-                                  fontWeight: 700,
-                                  borderColor: isSelected ? '#00D4FF' : area.total_negados_hoje > 0 ? '#FF3366' : 'rgba(255,255,255,0.15)',
-                                  boxShadow: isSelected ? '0 0 10px rgba(0,212,255,0.4)' : 'none'
-                              }}
-                          />
-                      );
-                  })}
-              </Stack>
-          </Box>
-      )}
-
-      {/* ABA 0: FEED AO VIVO */}
+      {/* ABA 0: FEED AO VIVO (KPIs e Filtro de Área exclusivos desta aba) */}
       {activeTab === 'feed' && (
+        <>
+          {/* INDICADORES DO DIA (fuso local) */}
+          <KpiCards stats={stats} />
+
+          {/* CARROSSEL / SELETOR DE ÁREAS EM TEMPO REAL COM FILTRO DE 1 CLIQUE */}
+          {stats.areas && stats.areas.length > 0 && (
+              <Box sx={{ mb: 2.5 }}>
+                  <Typography variant="caption" fontWeight={700} color="#94A3B8" sx={{ letterSpacing: 1, mb: 1, display: 'block' }}>
+                      Filtrar por área
+                  </Typography>
+                  <Stack direction="row" spacing={1.25} sx={{ overflowX: 'auto', pb: 1 }}>
+                      <Chip
+                          clickable
+                          onClick={() => setFiltros(f => ({ ...f, area_id: '' }))}
+                          label="Todas as áreas"
+                          variant={filtros.area_id === '' ? 'filled' : 'outlined'}
+                          color={filtros.area_id === '' ? 'primary' : 'default'}
+                          sx={{ fontWeight: 700, px: 1 }}
+                      />
+                      {stats.areas.map(area => {
+                          const isSelected = filtros.area_id === area.id;
+                          return (
+                              <Chip
+                                  key={area.id}
+                                  clickable
+                                  onClick={() => setFiltros(f => ({ ...f, area_id: isSelected ? '' : area.id }))}
+                                  icon={<AreaIcon sx={{ fontSize: 16 }} />}
+                                  label={`${area.nome || area.nome_area} (${area.total_acessos_hoje || 0})${area.total_negados_hoje > 0 ? ` ${area.total_negados_hoje}` : ''}`}
+                                  color={isSelected ? 'info' : area.total_negados_hoje > 0 ? 'error' : 'default'}
+                                  variant={isSelected ? 'filled' : 'outlined'}
+                                  sx={{
+                                      fontWeight: 700,
+                                      borderColor: isSelected ? '#00D4FF' : area.total_negados_hoje > 0 ? '#FF3366' : 'rgba(255,255,255,0.15)',
+                                      boxShadow: isSelected ? '0 0 10px rgba(0,212,255,0.4)' : 'none'
+                                  }}
+                              />
+                          );
+                      })}
+                  </Stack>
+              </Box>
+          )}
+
         <Grid container spacing={3}>
             <Grid item xs={12}>
                 <GlassCard sx={{ 
@@ -1172,42 +1240,43 @@ const Monitor = () => {
                                     <PessoaFoto
                                         src={log.pessoas?.foto_url}
                                         nome={log.pessoas?.nome_completo || log.pessoas?.nome || log.pessoa_nome}
-                                        width={48}
+                                        width={44}
                                         borderRadius="8px"
                                         accentColor={isNegado ? '#FF3366' : isWatchlist ? '#FFB800' : isFiscalizacao ? '#00D4FF' : log.tipo === 'checkin' ? '#00FF88' : '#FF8800'}
                                     />
-                                    <Box sx={{ flex: 1 }}>
-                                        <Typography component="div" variant="body1" fontWeight={700} color={isWatchlist ? '#FFB800' : '#FFFFFF'}>
+                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                        <Typography component="div" variant="body2" fontWeight={700} color={isWatchlist ? '#FFB800' : '#FFFFFF'} noWrap sx={{ fontSize: { xs: '0.875rem', sm: '0.9375rem' } }}>
                                             {log.pessoas?.nome_completo || log.pessoas?.nome || log.pessoa_nome || 'Anônimo'}
-                                            {isWatchlist && <Chip label="Monitorado" size="small" sx={{ ml: 1, bgcolor: '#FFB800', color: '#000000', fontWeight: 700, height: 20 }} />}
+                                            {isWatchlist && <Chip label="Monitorado" size="small" sx={{ ml: 1, bgcolor: '#FFB800', color: '#000000', fontWeight: 700, height: 18, fontSize: '0.6875rem' }} />}
                                         </Typography>
-                                        <Stack direction="row" spacing={2}>
-                                            <Typography variant="caption" color="text.secondary">{log.area_nome || 'Sem área'}</Typography>
-                                            <Typography variant="caption" color="text.secondary">Leitor: {log.dispositivos_acesso?.nome || log.dispositivo_nome || (/^[0-9a-f]{8}-/i.test(log.dispositivo_id || '') ? 'Leitor' : log.dispositivo_id) || 'Fiscal Portátil'}</Typography>
+                                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 0, sm: 2 }}>
+                                            <Typography variant="caption" color="text.secondary" noWrap>{log.area_nome || 'Sem área'}</Typography>
+                                            <Typography variant="caption" color="text.secondary" noWrap>Leitor: {log.dispositivos_acesso?.nome || log.dispositivo_nome || (/^[0-9a-f]{8}-/i.test(log.dispositivo_id || '') ? 'Leitor' : log.dispositivo_id) || 'Fiscal Portátil'}</Typography>
                                         </Stack>
                                     </Box>
-                                    <Box sx={{ textAlign: 'right', minWidth: 120, flexShrink: 0 }}>
-                                        <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center">
-                                            {isNegado ? <BlockIcon sx={{ color: '#FF3366', fontSize: 18 }} /> : 
-                                             isFiscalizacao ? <SecurityIcon sx={{ color: '#00D4FF', fontSize: 18 }} /> :
-                                             log.tipo === 'checkin' ? <LoginIcon sx={{ color: '#00FF88', fontSize: 18 }} /> : 
-                                             <CheckoutIcon sx={{ color: '#FF8800', fontSize: 18 }} />}
+                                    <Box sx={{ textAlign: 'right', minWidth: { xs: 78, sm: 120 }, flexShrink: 0 }}>
+                                        <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center">
+                                            {isNegado ? <BlockIcon sx={{ color: '#FF3366', fontSize: 16 }} /> : 
+                                             isFiscalizacao ? <SecurityIcon sx={{ color: '#00D4FF', fontSize: 16 }} /> :
+                                             log.tipo === 'checkin' ? <LoginIcon sx={{ color: '#00FF88', fontSize: 16 }} /> : 
+                                             <CheckoutIcon sx={{ color: '#FF8800', fontSize: 16 }} />}
                                             <Typography
-                                                variant="subtitle2"
+                                                variant="caption"
                                                 fontWeight={700}
+                                                sx={{ fontSize: { xs: '0.75rem', sm: '0.8125rem' } }}
                                                 color={
                                                     isNegado ? '#FF3366' : 
                                                     isFiscalizacao ? '#00D4FF' :
                                                     log.tipo === 'checkin' ? '#00FF88' : '#FF8800'
                                                 }
                                             >
-                                                {isNegado ? 'Negado' : isFiscalizacao ? 'Fiscalização' : log.tipo === 'checkin' ? 'Entrada' : 'Saída'}
+                                                {isNegado ? 'Negado' : isFiscalizacao ? 'Fiscaliz.' : log.tipo === 'checkin' ? 'Entrada' : 'Saída'}
                                             </Typography>
                                         </Stack>
-                                        <Typography variant="caption" color="text.secondary">
+                                        <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
                                             {formatLocalTime(log.created_at)}
                                         </Typography>
-                                        {isNegado && <Typography variant="caption" display="block" color="#FF3366" sx={{ maxWidth: 260 }}>{log.observacao}</Typography>}
+                                        {isNegado && <Typography variant="caption" display="block" color="#FF3366" noWrap sx={{ maxWidth: { xs: 110, sm: 260 } }}>{log.observacao}</Typography>}
                                     </Box>
                                 </LogItem>
                             );
@@ -1216,12 +1285,58 @@ const Monitor = () => {
                 </GlassCard>
             </Grid>
         </Grid>
+        </>
       )}
 
       {/* ABA 1: TERMINAIS */}
       {activeTab === 'terminais' && (
-          <GlassCard sx={{ p: 0 }}>
+          <GlassCard sx={{ p: { xs: 1.5, sm: 0 } }}>
+              {/* VISÃO MOBILE (CARDS) */}
+              <Stack spacing={1.25} sx={{ display: { xs: 'flex', sm: 'none' } }}>
+                  {terminais.length === 0 && (
+                      <Box sx={{ py: 4, textAlign: 'center' }}>
+                          <Typography variant="body2" color="text.secondary">
+                              Nenhum leitor ou terminal cadastrado neste evento.
+                          </Typography>
+                      </Box>
+                  )}
+                  {terminais.map(t => (
+                      <Box
+                          key={t.id}
+                          sx={{
+                              p: 1.5,
+                              borderRadius: 1.5,
+                              bgcolor: 'rgba(255,255,255,0.03)',
+                              border: '1px solid rgba(255,255,255,0.08)'
+                          }}
+                      >
+                          <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1} mb={0.75}>
+                              <Typography variant="subtitle2" fontWeight={700} color="#FFFFFF" noWrap>
+                                  {t.nome}
+                              </Typography>
+                              <Chip
+                                  label={comoRotulo(t.status)}
+                                  size="small"
+                                  color={t.status === 'online' ? 'success' : 'error'}
+                                  sx={{ fontWeight: 700, height: 20, fontSize: '0.72rem' }}
+                              />
+                          </Stack>
+                          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap mb={0.5}>
+                              <Chip label={comoRotulo(t.tipo)} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.7rem' }} />
+                              <Typography variant="caption" color="text.secondary">
+                                  Área: <b style={{ color: '#E2E8F0' }}>{t.evento_areas?.nome_area || t.evento_areas?.nome || 'Sem área'}</b>
+                              </Typography>
+                          </Stack>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: '0.72rem' }}>
+                              Último contato: {t.ultimo_ping ? format(new Date(t.ultimo_ping), 'dd/MM HH:mm:ss') : 'Nunca conectado'}
+                          </Typography>
+                      </Box>
+                  ))}
+              </Stack>
+
+              {/* VISÃO DESKTOP (TABELA) */}
               <TableContainer component={Paper} sx={{ 
+                  display: { xs: 'none', sm: 'block' },
                   background: 'transparent',
                   overflowX: 'auto',
                   '&::-webkit-scrollbar': { height: 6 },
@@ -1261,33 +1376,106 @@ const Monitor = () => {
 
       {/* ABA 2: WATCHLIST (ADMIN_MASTER ONLY) */}
       {activeTab === 'watchlist' && isAdminMaster && (
-          <Grid container spacing={3}>
+          <Grid container spacing={2.5}>
               <Grid item xs={12} md={8}>
-                  <GlassCard sx={{ p: 3 }}>
-                      <Stack direction="column" gap={2} mb={3}>
+                  <GlassCard sx={{ p: { xs: 2, sm: 3 } }}>
+                      <Stack direction="column" gap={2} mb={2.5}>
                         <Box>
-                            <Typography variant="h6" fontWeight={700}>Alvos em monitoramento (watchlist)</Typography>
+                            <Typography variant="h6" fontWeight={700} sx={{ fontSize: { xs: '1.05rem', sm: '1.25rem' } }}>Alvos em monitoramento (watchlist)</Typography>
                             <Typography variant="caption" color="text.secondary">
                                 Pessoas procuradas ou em atenção especial. Disparam alarmes ao passar em catracas, check-ins ou câmeras.
                             </Typography>
                         </Box>
-                        <Stack direction="row" useFlexGap flexWrap="wrap" gap={1} alignItems="flex-start" sx={{ flexShrink: 0 }}>
-                            <Button variant="outlined" component="label" startIcon={<UploadIcon />} sx={botaoSecundario}>
+                        <Stack direction="row" useFlexGap flexWrap="wrap" gap={1} alignItems="center">
+                            <Button variant="outlined" component="label" size="small" startIcon={<UploadIcon />} sx={{ ...botaoSecundario, flex: { xs: '1 1 calc(50% - 4px)', sm: '0 0 auto' } }}>
                                 Importar CSV
                                 <input type="file" hidden accept=".csv" onChange={handleUploadCSV} />
                             </Button>
-                            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={baixarModeloCSV} sx={botaoSecundario}>
+                            <Button variant="outlined" size="small" startIcon={<DownloadIcon />} onClick={baixarModeloCSV} sx={{ ...botaoSecundario, flex: { xs: '1 1 calc(50% - 4px)', sm: '0 0 auto' } }}>
                                 Modelo CSV
                             </Button>
-                            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExportCSV} sx={botaoSecundario}>
-                                Exportar participantes
+                            <Button variant="outlined" size="small" startIcon={<DownloadIcon />} onClick={handleExportCSV} sx={{ ...botaoSecundario, flex: { xs: '1 1 calc(50% - 4px)', sm: '0 0 auto' } }}>
+                                Exportar base
                             </Button>
-                            <NeonButton startIcon={<PersonAddIcon />} onClick={() => setOpenTargetDialog(true)} sx={{ whiteSpace: 'nowrap' }}>
+                            <NeonButton size="small" startIcon={<PersonAddIcon />} onClick={() => setOpenTargetDialog(true)} sx={{ whiteSpace: 'nowrap', flex: { xs: '1 1 calc(50% - 4px)', sm: '0 0 auto' } }}>
                                 Novo alvo
                             </NeonButton>
                         </Stack>
                       </Stack>
+
+                      {/* VISÃO MOBILE (CARDS DA WATCHLIST) */}
+                      <Stack spacing={1.5} sx={{ display: { xs: 'flex', sm: 'none' } }}>
+                          {watchlist.length === 0 ? (
+                              <Box sx={{ textAlign: 'center', py: 3, color: 'text.secondary' }}>
+                                  <Typography variant="body2">Nenhum CPF cadastrado na lista de alvos monitorados.</Typography>
+                              </Box>
+                          ) : (
+                              watchlist.map(w => (
+                                  <Box
+                                      key={w.id}
+                                      sx={{
+                                          p: 1.5,
+                                          borderRadius: 1.5,
+                                          bgcolor: 'rgba(255, 184, 0, 0.04)',
+                                          border: '1px solid rgba(255, 184, 0, 0.25)'
+                                      }}
+                                  >
+                                      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1} mb={0.5}>
+                                          <Box sx={{ minWidth: 0 }}>
+                                              <Typography variant="subtitle2" fontWeight={700} color="#FFFFFF" noWrap>
+                                                  {w.nome || 'Alvo Monitorado'}
+                                              </Typography>
+                                              <Typography variant="caption" sx={{ fontFamily: '"Inter", sans-serif', color: '#FFB800', fontWeight: 700 }}>
+                                                  CPF: {w.cpf}
+                                              </Typography>
+                                          </Box>
+                                          <Chip
+                                              label={comoRotulo(w.nivel_alerta || 'alto')}
+                                              size="small"
+                                              color={w.nivel_alerta === 'critico' ? 'error' : w.nivel_alerta === 'alto' ? 'warning' : 'info'}
+                                              sx={{ fontWeight: 700, height: 20, fontSize: '0.7rem' }}
+                                          />
+                                      </Stack>
+                                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.25 }}>
+                                          {w.motivo || 'Monitoramento Policial / Restrição'}
+                                      </Typography>
+                                      <Stack direction="row" spacing={1}>
+                                          <Button
+                                              fullWidth
+                                              variant="outlined"
+                                              size="small"
+                                              startIcon={<VisibilityOffIcon fontSize="small" />}
+                                              onClick={() => handleOpenDeixarMonitorar(w)}
+                                              sx={{
+                                                  fontSize: '0.72rem',
+                                                  fontWeight: 700,
+                                                  borderColor: '#00D4FF',
+                                                  color: '#00D4FF',
+                                                  py: 0.5
+                                              }}
+                                          >
+                                              Localizado
+                                          </Button>
+                                          <Button
+                                              fullWidth
+                                              variant="contained"
+                                              color="success"
+                                              size="small"
+                                              startIcon={<CheckCircleIcon fontSize="small" />}
+                                              onClick={() => handleOpenUnblock(w)}
+                                              sx={{ fontSize: '0.72rem', fontWeight: 700, py: 0.5 }}
+                                          >
+                                              Desbloquear
+                                          </Button>
+                                      </Stack>
+                                  </Box>
+                              ))
+                          )}
+                      </Stack>
+
+                      {/* VISÃO DESKTOP (TABELA DA WATCHLIST) */}
                       <TableContainer sx={{ 
+                          display: { xs: 'none', sm: 'block' },
                           overflowX: 'auto',
                           '&::-webkit-scrollbar': { height: 6 },
                           '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255, 184, 0, 0.2)', borderRadius: 1.5 }
@@ -1367,7 +1555,7 @@ const Monitor = () => {
               </Grid>
 
               <Grid item xs={12} md={4}>
-                  <GlassCard sx={{ p: 3 }}>
+                  <GlassCard sx={{ p: { xs: 2, sm: 3 } }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                           <Box>
                               <Typography variant="h6" fontWeight={700}>Notificações externas</Typography>
@@ -1439,17 +1627,17 @@ const Monitor = () => {
       {activeTab === 'cameras' && (
           <Box>
             {/* CABEÇALHO DA CENTRAL CFTV */}
-            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} gap={2} mb={2.5}>
-                <Box>
-                    <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
-                        <Typography variant="h5" fontWeight={700} sx={{ letterSpacing: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <DvrIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
+            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} gap={1.5} mb={2}>
+                <Box sx={{ width: '100%' }}>
+                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.5 }}>
+                        <Typography variant="h5" fontWeight={700} sx={{ fontSize: { xs: '1.1rem', sm: '1.35rem' }, letterSpacing: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <DvrIcon sx={{ color: '#00D4FF', fontSize: { xs: 22, sm: 28 } }} />
                             Central de monitoramento CFTV
                         </Typography>
                         {(() => {
                             const cor = iaErro ? '#FF3366' : iaStatus ? (iaStatus.hardware_acceleration === 'CPU' ? '#FFB800' : '#00FF88') : '#94A3B8';
-                            const rotulo = iaErro ? 'IA do evento offline'
-                                : iaStatus ? `Vigilância por IA ativa • ${iaStatus.hardware_acceleration}`
+                            const rotulo = iaErro ? 'IA offline'
+                                : iaStatus ? `IA ativa • ${iaStatus.hardware_acceleration}`
                                 : 'Verificando IA...';
                             return (
                                 <Tooltip title={iaErro || (iaStatus?.hardware_acceleration === 'CPU' ? 'A IA está rodando sem placa de vídeo: reconhecimento mais lento' : '')}>
@@ -1457,48 +1645,49 @@ const Monitor = () => {
                                         icon={<DotIcon sx={{ fontSize: 10, color: `${cor} !important` }} />}
                                         label={rotulo}
                                         size="small"
-                                        sx={{ bgcolor: `${cor}1F`, color: cor, border: '1px solid currentColor', fontWeight: 700, fontSize: '0.75rem' }}
+                                        sx={{ bgcolor: `${cor}1F`, color: cor, border: '1px solid currentColor', fontWeight: 700, fontSize: '0.72rem', height: 22 }}
                                     />
                                 </Tooltip>
                             );
                         })()}
                         <Chip
-                            label={`${displayedCameras.length} de ${cameras.length} câmeras no mosaico`}
+                            label={`${displayedCameras.length}/${cameras.length} no mosaico`}
                             size="small"
                             sx={{
                                 bgcolor: 'rgba(0, 212, 255, 0.12)',
                                 color: '#00D4FF',
                                 border: '1px solid rgba(0, 212, 255, 0.3)',
                                 fontWeight: 700,
-                                fontSize: '0.75rem'
+                                fontSize: '0.72rem',
+                                height: 22
                             }}
                         />
                     </Stack>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.4 }}>
                         {iaStatus
-                            ? `Perfil ${NOMES_PERFIL[iaConfig.perfil] || iaConfig.perfil} • ${(iaStatus.cameras || []).filter(c => c.conectada).length} câmera(s) com vídeo • ${(iaStatus.cameras || []).reduce((n, c) => n + (c.rostos || 0), 0)} rosto(s) agora • ${iaStatus.ia?.ms_por_analise ?? 0} ms por análise • ${iaStatus.registered_faces_indexed ?? 0} pessoa(s) na base`
+                            ? `Perfil ${NOMES_PERFIL[iaConfig.perfil] || iaConfig.perfil} • ${(iaStatus.cameras || []).filter(c => c.conectada).length} com vídeo • ${(iaStatus.cameras || []).reduce((n, c) => n + (c.rostos || 0), 0)} rosto(s) • ${iaStatus.ia?.ms_por_analise ?? 0} ms • ${iaStatus.registered_faces_indexed ?? 0} na base`
                             : 'Stream IP / RTSP • Detecção facial SCRFD • Reconhecimento ArcFace 512-D'}
                     </Typography>
                 </Box>
             </Stack>
 
-            {/* BARRA DE FERRAMENTAS CFTV (COMPACTA, BOTÕES PEQUENOS, SEM QUADRO PESADO) */}
+            {/* BARRA DE FERRAMENTAS CFTV RESPONSIVA */}
             <Box sx={{ 
                 display: 'flex', 
-                alignItems: 'center', 
+                flexDirection: { xs: 'column', md: 'row' },
+                alignItems: { xs: 'stretch', md: 'center' }, 
                 justifyContent: 'space-between', 
-                flexWrap: 'wrap', 
                 gap: 1, 
                 mb: 2
             }}>
                 {/* BOTÕES DE GERENCIAMENTO E SELEÇÃO */}
-                <Stack direction="row" spacing={1} alignItems="center">
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
                     <Button
                         variant="contained"
                         size="small"
                         startIcon={<SettingsIcon sx={{ fontSize: 16 }} />}
                         onClick={() => setOpenGerenciarCamerasModal(true)}
-                        sx={{ height: 32, whiteSpace: 'nowrap' }}
+                        sx={{ height: 34, whiteSpace: 'nowrap', flex: { xs: '1 1 auto', sm: '0 0 auto' }, fontSize: '0.75rem' }}
                     >
                         Gerenciar câmeras
                     </Button>
@@ -1508,16 +1697,56 @@ const Monitor = () => {
                         size="small"
                         startIcon={<GridViewIcon sx={{ fontSize: 16 }} />}
                         onClick={() => setOpenSelectCamerasDialog(true)}
-                        sx={{ ...botaoSecundario, height: 32, minHeight: 32 }}
+                        sx={{ ...botaoSecundario, height: 34, minHeight: 34, flex: { xs: '1 1 auto', sm: '0 0 auto' }, fontSize: '0.75rem' }}
                     >
-                        Selecionar câmeras ({displayedCameras.length})
+                        Mosaico ({displayedCameras.length})
                     </Button>
+
+                    {cameras.length > 0 && (
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            color={temCameraAtiva ? 'warning' : 'success'}
+                            startIcon={togglingAllCams ? <CircularProgress size={14} color="inherit" /> : <PowerIcon sx={{ fontSize: 16 }} />}
+                            onClick={handleToggleAllCameras}
+                            disabled={togglingAllCams}
+                            sx={{ height: 34, minHeight: 34, fontWeight: 700, fontSize: '0.75rem', whiteSpace: 'nowrap', flex: { xs: '1 1 auto', sm: '0 0 auto' } }}
+                        >
+                            {temCameraAtiva ? 'Desativar todas' : 'Ativar todas'}
+                        </Button>
+                    )}
                 </Stack>
 
                 {/* CONTROLES DE GRADE, MODO, VIDEO WALL E ATUALIZAR */}
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ overflowX: 'auto' }}>
-                    {/* SELETOR DE COLUNAS DA GRADE */}
-                    <ButtonGroup size="small" variant="outlined" sx={{ height: 32, borderColor: 'rgba(255,255,255,0.15)' }}>
+                <Stack direction="row" spacing={1} alignItems="center" justifyContent={{ xs: 'space-between', md: 'flex-end' }} sx={{ overflowX: 'auto' }}>
+                    {/* SELETOR DE COLUNAS MOBILE (1x1 ou 2x2) */}
+                    <ButtonGroup size="small" variant="outlined" sx={{ height: 32, borderColor: 'rgba(255,255,255,0.15)', display: { xs: 'inline-flex', md: 'none' } }}>
+                        {[
+                            { id: '1', label: '1x1', active: gridColumns !== '2' },
+                            { id: '2', label: '2x2', active: gridColumns === '2' }
+                        ].map(({ id, label, active }) => (
+                            <Button
+                                key={id}
+                                onClick={() => handleColsChange(id)}
+                                sx={{
+                                    height: 32,
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    px: 1.25,
+                                    minWidth: 44,
+                                    bgcolor: active ? '#00D4FF' : 'transparent',
+                                    color: active ? '#000000' : '#94A3B8',
+                                    borderColor: 'rgba(255,255,255,0.15)',
+                                    '&:hover': { bgcolor: active ? '#00D4FF' : 'rgba(255,255,255,0.05)' }
+                                }}
+                            >
+                                {label}
+                            </Button>
+                        ))}
+                    </ButtonGroup>
+
+                    {/* SELETOR DE COLUNAS DESKTOP */}
+                    <ButtonGroup size="small" variant="outlined" sx={{ height: 32, borderColor: 'rgba(255,255,255,0.15)', display: { xs: 'none', md: 'inline-flex' } }}>
                         {[
                             { id: '4', label: '4 câmeras' },
                             { id: '3', label: '3 câmeras' },
@@ -1587,6 +1816,7 @@ const Monitor = () => {
                         startIcon={<DesktopWindowsIcon sx={{ fontSize: 16 }} />}
                         onClick={handleOpenVideoWallPopup}
                         sx={{
+                            display: { xs: 'none', sm: 'inline-flex' },
                             height: 32,
                             borderColor: 'rgba(0, 255, 136, 0.5)',
                             color: '#00FF88',
@@ -1605,54 +1835,56 @@ const Monitor = () => {
                         Video wall
                     </Button>
 
-                    {/* SOM DOS ALERTAS */}
-                    <Tooltip title={somAtivo ? 'Silenciar alertas' : 'Ativar som dos alertas'}>
-                        <IconButton
-                            size="small"
-                            onClick={() => setSomAtivo(!somAtivo)}
-                            sx={{
-                                height: 32,
-                                width: 32,
-                                border: '1px solid rgba(255,255,255,0.18)',
-                                color: somAtivo ? '#00FF88' : '#FF3366',
-                                borderRadius: 1.5
-                            }}
-                        >
-                            {somAtivo ? <SomIcon sx={{ fontSize: 16 }} /> : <SemSomIcon sx={{ fontSize: 16 }} />}
-                        </IconButton>
-                    </Tooltip>
+                    <Stack direction="row" spacing={0.75} alignItems="center">
+                        {/* SOM DOS ALERTAS */}
+                        <Tooltip title={somAtivo ? 'Silenciar alertas' : 'Ativar som dos alertas'}>
+                            <IconButton
+                                size="small"
+                                onClick={() => setSomAtivo(!somAtivo)}
+                                sx={{
+                                    height: 32,
+                                    width: 32,
+                                    border: '1px solid rgba(255,255,255,0.18)',
+                                    color: somAtivo ? '#00FF88' : '#FF3366',
+                                    borderRadius: 1.5
+                                }}
+                            >
+                                {somAtivo ? <SomIcon sx={{ fontSize: 16 }} /> : <SemSomIcon sx={{ fontSize: 16 }} />}
+                            </IconButton>
+                        </Tooltip>
 
-                    {/* ATUALIZAR GRID */}
-                    <Tooltip title="Atualizar câmeras">
-                        <IconButton
-                            size="small"
-                            onClick={fetchCameras}
-                            sx={{
-                                height: 32,
-                                width: 32,
-                                border: '1px solid rgba(255,255,255,0.18)',
-                                color: '#00D4FF',
-                                borderRadius: 1.5,
-                                '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.1)', borderColor: '#00D4FF' }
-                            }}
-                        >
-                            <RefreshIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                    </Tooltip>
+                        {/* ATUALIZAR GRID */}
+                        <Tooltip title="Atualizar câmeras">
+                            <IconButton
+                                size="small"
+                                onClick={fetchCameras}
+                                sx={{
+                                    height: 32,
+                                    width: 32,
+                                    border: '1px solid rgba(255,255,255,0.18)',
+                                    color: '#00D4FF',
+                                    borderRadius: 1.5,
+                                    '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.1)', borderColor: '#00D4FF' }
+                                }}
+                            >
+                                <RefreshIcon sx={{ fontSize: 16 }} />
+                            </IconButton>
+                        </Tooltip>
+                    </Stack>
                 </Stack>
             </Box>
 
             {/* SE NENHUMA CÂMERA CADASTRADA OU SELECIONADA */}
             {displayedCameras.length === 0 ? (
-                <GlassCard sx={{ p: 5, textAlign: 'center', border: '1px dashed rgba(0, 212, 255, 0.3)' }}>
-                    <CameraIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2, opacity: 0.5 }} />
-                    <Typography variant="h6" fontWeight={700} color="#FFFFFF" gutterBottom>
+                <GlassCard sx={{ p: { xs: 3, sm: 5 }, textAlign: 'center', border: '1px dashed rgba(0, 212, 255, 0.3)' }}>
+                    <CameraIcon sx={{ fontSize: 52, color: 'text.secondary', mb: 1.5, opacity: 0.5 }} />
+                    <Typography variant="h6" fontWeight={700} color="#FFFFFF" gutterBottom sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
                         {cameras.length === 0 ? 'Nenhuma câmera IP cadastrada no sistema' : 'Nenhuma câmera selecionada no mosaico'}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 520, mx: 'auto', mb: 3 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 520, mx: 'auto', mb: 2.5 }}>
                         {cameras.length === 0
                             ? 'Cadastre câmeras RTSP ou IPs da rede para iniciar a vigilância e monitoramento biométrico.'
-                            : 'Você filtrou ou desmarcou as câmeras. Clique no botão abaixo para escolher quais exibir.'}
+                            : 'Você filtrou ou desmarcou as câmeras. Toque no botão abaixo para escolher quais exibir.'}
                     </Typography>
                     <Stack direction="row" spacing={2} justifyContent="center">
                         {cameras.length > 0 ? (
@@ -1678,18 +1910,21 @@ const Monitor = () => {
                 </GlassCard>
             ) : (
                 /* GRADE DE CÂMERAS CFTV PROFISSIONAL 16:9 NATIVO COM OSD */
-                <Grid container spacing={2}>
+                <Grid container spacing={{ xs: 1.25, sm: 2 }}>
                     {displayedCameras.map((cam, indice) => {
-                        const isAlertActive = alertCameras[cam.id] && (Date.now() - alertCameras[cam.id] < 30000);
+                        const isDesativada = cam.status === 'desativada' || cam.status === 'inativa';
+                        const isToggling = togglingCamId === cam.id;
+                        const isAlertActive = !isDesativada && alertCameras[cam.id] && (Date.now() - alertCameras[cam.id] < 30000);
                         // Vídeo ao vivo até o limite do perfil; as demais em snapshot (não sobrecarrega a internet do evento)
-                        const aoVivo = liveStreamInGrid && indice < (iaConfig.painel?.max_streams_ao_vivo || 9);
-                        const stCam = statusDaCamera(iaStatus, cam.id);
+                        const aoVivo = !isDesativada && liveStreamInGrid && indice < (iaConfig.painel?.max_streams_ao_vivo || 9);
+                        const stCam = isDesativada ? null : statusDaCamera(iaStatus, cam.id);
+                        const isCompactMobile = gridColumns === '2';
                         const colProps = gridColumns === '4'
                             ? { xs: 12, sm: 6, md: 4, lg: 3 }
                             : gridColumns === '3'
                             ? { xs: 12, sm: 6, md: 6, lg: 4 }
                             : gridColumns === '2'
-                            ? { xs: 12, md: 6, lg: 6 }
+                            ? { xs: 6, sm: 6, md: 6, lg: 6 }
                             : { xs: 12, lg: 12 };
 
                         return (
@@ -1698,7 +1933,12 @@ const Monitor = () => {
                                     p: 0,
                                     overflow: 'hidden',
                                     transition: 'all 0.3s ease',
-                                    border: isAlertActive ? '2px solid #FF3366' : '1px solid rgba(0, 212, 255, 0.2)',
+                                    opacity: isDesativada ? 0.72 : 1,
+                                    border: isAlertActive
+                                        ? '2px solid #FF3366'
+                                        : isDesativada
+                                            ? '1px dashed rgba(255, 184, 0, 0.35)'
+                                            : '1px solid rgba(0, 212, 255, 0.2)',
                                     bgcolor: '#050B18',
                                     boxShadow: isAlertActive ? '0 0 30px rgba(255, 30, 86, 0.7)' : '0 10px 25px rgba(0,0,0,0.6)',
                                     display: 'flex',
@@ -1706,31 +1946,32 @@ const Monitor = () => {
                                 }}>
                                     {/* CABEÇALHO DO CARD DA CÂMERA */}
                                     <Box sx={{
-                                        px: 1.5, py: 1,
+                                        px: { xs: isCompactMobile ? 1 : 1.5, sm: 1.5 },
+                                        py: { xs: isCompactMobile ? 0.75 : 1, sm: 1 },
                                         display: 'flex',
                                         justifyContent: 'space-between',
                                         alignItems: 'center',
                                         background: 'rgba(10, 15, 26, 0.95)',
                                         borderBottom: '1px solid rgba(255,255,255,0.06)'
                                     }}>
-                                        <Stack direction="row" spacing={1} alignItems="center" sx={{ overflow: 'hidden', flex: 1, mr: 1 }}>
-                                            <CameraIcon sx={{ fontSize: 16, color: '#00D4FF', flexShrink: 0 }} />
-                                            <Typography variant="subtitle2" fontWeight={700} noWrap sx={{ fontSize: '0.8125rem', color: '#FFFFFF' }}>
+                                        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ overflow: 'hidden', flex: 1, mr: 0.75 }}>
+                                            <CameraIcon sx={{ fontSize: 15, color: isDesativada ? '#FFB800' : '#00D4FF', flexShrink: 0 }} />
+                                            <Typography variant="subtitle2" fontWeight={700} noWrap sx={{ fontSize: { xs: isCompactMobile ? '0.75rem' : '0.8125rem', sm: '0.8125rem' }, color: '#FFFFFF' }}>
                                                 {cam.nome}
                                             </Typography>
                                             {cam.area?.nome_area && (
                                                 <Chip
                                                     label={cam.area.nome_area}
                                                     size="small"
-                                                    sx={{ height: 18, fontSize: '0.75rem', bgcolor: 'rgba(255,255,255,0.08)', color: '#94A3B8', fontWeight: 700 }}
+                                                    sx={{ display: { xs: isCompactMobile ? 'none' : 'inline-flex', sm: 'inline-flex' }, height: 18, fontSize: '0.7rem', bgcolor: 'rgba(255,255,255,0.08)', color: '#94A3B8', fontWeight: 700 }}
                                                 />
                                             )}
                                         </Stack>
                                         <Chip
-                                            label={comoRotulo(cam.status) || 'Offline'}
+                                            label={isDesativada ? 'Pausada' : (comoRotulo(cam.status) || 'Offline')}
                                             size="small"
-                                            color={cam.status === 'online' ? 'success' : 'error'}
-                                            sx={{ height: 20, fontSize: '0.75rem', fontWeight: 700 }}
+                                            color={isDesativada ? 'warning' : cam.status === 'online' ? 'success' : 'error'}
+                                            sx={{ height: 18, fontSize: '0.68rem', fontWeight: 700, '& .MuiChip-label': { px: 0.75 } }}
                                         />
                                     </Box>
 
@@ -1741,38 +1982,38 @@ const Monitor = () => {
                                             width: '100%',
                                             aspectRatio: '16/9',
                                             bgcolor: '#000000',
-                                            cursor: 'pointer',
+                                            cursor: isDesativada ? 'default' : 'pointer',
                                             overflow: 'hidden',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center'
                                         }}
-                                        onClick={() => setActiveStreamCam(cam)}
+                                        onClick={() => { if (!isDesativada) setActiveStreamCam(cam); }}
                                     >
                                         <CameraVideo
                                             camId={cam.id}
                                             alt={cam.nome}
                                             modo={aoVivo ? 'stream' : 'snapshot'}
                                             qualidade="mini"
-                                            pausado={activeStreamCam?.id === cam.id}
-                                            textoPausado="Aberta em tela grande"
+                                            pausado={isDesativada || activeStreamCam?.id === cam.id}
+                                            textoPausado={isDesativada ? 'Câmera desativada' : 'Aberta em tela grande'}
                                         />
 
                                         {/* OSD: MODO, FPS REAL E ROSTOS NA CENA (CANTO SUPERIOR ESQUERDO) */}
                                         <Box sx={{
-                                            position: 'absolute', top: 8, left: 8,
-                                            bgcolor: 'rgba(0,0,0,0.75)', px: 0.8, py: 0.3, borderRadius: 1,
-                                            display: 'flex', alignItems: 'center', gap: 0.6,
+                                            position: 'absolute', top: 6, left: 6,
+                                            bgcolor: 'rgba(0,0,0,0.75)', px: 0.7, py: 0.2, borderRadius: 1,
+                                            display: 'flex', alignItems: 'center', gap: 0.5,
                                             border: '1px solid rgba(255,255,255,0.1)'
                                         }}>
-                                            <DotIcon sx={{ fontSize: 9, color: (stCam ? stCam.conectada : cam.status === 'online') ? '#00FF88' : '#94A3B8' }} />
-                                            <Typography variant="caption" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.75rem', color: '#FFFFFF', fontWeight: 700 }}>
-                                                {aoVivo ? 'AO VIVO' : 'SNAPSHOT'}{stCam?.conectada ? ` • ${Math.round(stCam.video_fps)} fps` : ''}
+                                            <DotIcon sx={{ fontSize: 8, color: isDesativada ? '#FFB800' : (stCam ? stCam.conectada : cam.status === 'online') ? '#00FF88' : '#94A3B8' }} />
+                                            <Typography variant="caption" sx={{ fontFamily: '"Inter", sans-serif', fontSize: { xs: isCompactMobile ? '0.65rem' : '0.72rem', sm: '0.75rem' }, color: '#FFFFFF', fontWeight: 700 }}>
+                                                {isDesativada ? 'PAUSADA' : `${aoVivo ? 'AO VIVO' : 'SNAP'}${stCam?.conectada ? ` • ${Math.round(stCam.video_fps)} fps` : ''}`}
                                             </Typography>
                                             {stCam?.rostos > 0 && (
                                                 <>
-                                                    <RostoIcon sx={{ fontSize: 12, color: '#00D4FF', ml: 0.4 }} />
-                                                    <Typography variant="caption" sx={{ fontSize: '0.75rem', color: '#00D4FF', fontWeight: 700 }}>
+                                                    <RostoIcon sx={{ fontSize: 11, color: '#00D4FF', ml: 0.3 }} />
+                                                    <Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#00D4FF', fontWeight: 700 }}>
                                                         {stCam.rostos}
                                                     </Typography>
                                                 </>
@@ -1783,52 +2024,87 @@ const Monitor = () => {
                                         <Box sx={{
                                             position: 'absolute', bottom: 0, left: 0, right: 0,
                                             background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)',
-                                            px: 1.2, pb: 0.8, pt: 2,
+                                            px: 1, pb: 0.6, pt: 1.5,
                                             display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end'
                                         }}>
-                                            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', fontFamily: '"Inter", sans-serif', fontSize: '0.75rem' }}>
+                                            <Typography variant="caption" noWrap sx={{ color: 'rgba(255,255,255,0.7)', fontFamily: '"Inter", sans-serif', fontSize: { xs: isCompactMobile ? '0.62rem' : '0.72rem', sm: '0.75rem' }, mr: 0.5 }}>
                                                 {cam.ip_address ? `${cam.ip_address}:${cam.porta || 554}` : (cam.fabricante || 'RTSP')}
                                             </Typography>
 
-                                            <Box sx={{
-                                                bgcolor: 'rgba(0, 212, 255, 0.2)',
-                                                border: '1px solid rgba(0, 212, 255, 0.4)',
-                                                borderRadius: 1,
-                                                px: 0.8, py: 0.2,
-                                                display: 'flex', alignItems: 'center', gap: 0.4
-                                            }}>
-                                                <FullscreenIcon sx={{ fontSize: 13, color: '#00D4FF' }} />
-                                                <Typography variant="caption" sx={{ fontSize: '0.75rem', color: '#00D4FF', fontWeight: 700 }}>
-                                                    Ao vivo
-                                                </Typography>
-                                            </Box>
+                                            {!isDesativada && (
+                                                <Box sx={{
+                                                    bgcolor: 'rgba(0, 212, 255, 0.2)',
+                                                    border: '1px solid rgba(0, 212, 255, 0.4)',
+                                                    borderRadius: 1,
+                                                    px: 0.6, py: 0.15,
+                                                    display: 'flex', alignItems: 'center', gap: 0.3,
+                                                    flexShrink: 0
+                                                }}>
+                                                    <FullscreenIcon sx={{ fontSize: 12, color: '#00D4FF' }} />
+                                                    <Typography variant="caption" sx={{ display: { xs: isCompactMobile ? 'none' : 'inline', sm: 'inline' }, fontSize: '0.7rem', color: '#00D4FF', fontWeight: 700 }}>
+                                                        Expandir
+                                                    </Typography>
+                                                </Box>
+                                            )}
                                         </Box>
                                     </Box>
 
                                     {/* BARRA DE AÇÕES DO CARD */}
-                                    <Box sx={{ p: 1, display: 'flex', gap: 1, alignItems: 'center', bgcolor: 'rgba(0,0,0,0.6)', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                                        <Button
-                                            size="small" fullWidth variant="outlined"
-                                            startIcon={<CameraIcon sx={{ fontSize: 16 }} />}
-                                            onClick={() => setActiveStreamCam(cam)}
-                                            sx={{ ...botaoSecundario, height: 32, minHeight: 32 }}
-                                        >
-                                            Ao vivo
-                                        </Button>
-                                        <Button
-                                            size="small" fullWidth variant="outlined"
-                                            disabled={testResults[cam.id] === 'testing'}
-                                            onClick={() => handleTestCamera(cam.id)}
-                                            sx={{ ...botaoSecundario, height: 32, minHeight: 32 }}
-                                        >
-                                            {testResults[cam.id] === 'testing' ? <CircularProgress size={14} /> : 'Testar'}
-                                        </Button>
-                                        {testResults[cam.id] && testResults[cam.id] !== 'testing' && (
+                                    <Box sx={{ p: { xs: isCompactMobile ? 0.75 : 1, sm: 1 }, display: 'flex', gap: 0.75, alignItems: 'center', bgcolor: 'rgba(0,0,0,0.6)', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                                        {isDesativada ? (
+                                            <Button
+                                                size="small" fullWidth variant="contained" color="success"
+                                                startIcon={isToggling ? <CircularProgress size={14} color="inherit" /> : <PowerIcon sx={{ fontSize: 15 }} />}
+                                                disabled={isToggling}
+                                                onClick={() => handleToggleCameraStatus(cam)}
+                                                sx={{ height: 30, minHeight: 30, fontWeight: 700, fontSize: '0.72rem', px: 1 }}
+                                            >
+                                                Ativar
+                                            </Button>
+                                        ) : (
+                                            <>
+                                                <Button
+                                                    size="small" fullWidth variant="outlined"
+                                                    startIcon={<CameraIcon sx={{ fontSize: 15, display: { xs: isCompactMobile ? 'none' : 'inline-flex', sm: 'inline-flex' } }} />}
+                                                    onClick={() => setActiveStreamCam(cam)}
+                                                    sx={{ ...botaoSecundario, height: 30, minHeight: 30, fontSize: '0.72rem', px: 1 }}
+                                                >
+                                                    Ao vivo
+                                                </Button>
+                                                <Button
+                                                    size="small" fullWidth variant="outlined"
+                                                    disabled={testResults[cam.id] === 'testing'}
+                                                    onClick={() => handleTestCamera(cam.id)}
+                                                    sx={{ ...botaoSecundario, height: 30, minHeight: 30, fontSize: '0.72rem', px: 1, display: { xs: isCompactMobile ? 'none' : 'inline-flex', sm: 'inline-flex' } }}
+                                                >
+                                                    {testResults[cam.id] === 'testing' ? <CircularProgress size={14} /> : 'Testar'}
+                                                </Button>
+                                                <Tooltip title="Desativar câmera (pausar vídeo e IA)">
+                                                    <IconButton
+                                                        size="small"
+                                                        disabled={isToggling}
+                                                        onClick={() => handleToggleCameraStatus(cam)}
+                                                        sx={{
+                                                            height: 30,
+                                                            width: 30,
+                                                            flexShrink: 0,
+                                                            color: '#FFB800',
+                                                            border: '1px solid rgba(255, 184, 0, 0.35)',
+                                                            borderRadius: 1.5,
+                                                            '&:hover': { bgcolor: 'rgba(255, 184, 0, 0.15)' }
+                                                        }}
+                                                    >
+                                                        {isToggling ? <CircularProgress size={14} color="inherit" /> : <PowerIcon sx={{ fontSize: 15 }} />}
+                                                    </IconButton>
+                                                </Tooltip>
+                                            </>
+                                        )}
+                                        {!isDesativada && testResults[cam.id] && testResults[cam.id] !== 'testing' && (
                                             <Chip
                                                 size="small"
                                                 label={testResults[cam.id] === 'online' ? 'Online' : 'Offline'}
                                                 color={testResults[cam.id] === 'online' ? 'success' : 'error'}
-                                                sx={{ height: 26, fontSize: '0.75rem', fontWeight: 700 }}
+                                                sx={{ display: { xs: isCompactMobile ? 'none' : 'inline-flex', sm: 'inline-flex' }, height: 24, fontSize: '0.7rem', fontWeight: 700 }}
                                             />
                                         )}
                                     </Box>
@@ -1891,27 +2167,36 @@ const Monitor = () => {
         fullWidth
         fullScreen={streamModalSize === 'fullscreen'}
       >
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <Stack direction="row" spacing={1.5} alignItems="center">
-                <CameraIcon sx={{ fontSize: 28 }} />
-                <Box>
-                    <Typography variant="h6" fontWeight={700} color="#FFFFFF">
+        <DialogTitle sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 1,
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            py: { xs: 1.25, sm: 1.5 },
+            px: { xs: 1.5, sm: 2.5 },
+            borderBottom: '1px solid rgba(255,255,255,0.06)'
+        }}>
+            <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0, flex: '1 1 180px' }}>
+                <CameraIcon sx={{ fontSize: { xs: 22, sm: 26 }, color: '#00D4FF', flexShrink: 0 }} />
+                <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="h6" fontWeight={700} color="#FFFFFF" noWrap sx={{ fontSize: { xs: '0.95rem', sm: '1.15rem' }, lineHeight: 1.2 }}>
                         {activeStreamCam?.nome || 'Transmissão ao vivo'}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                        Stream IP / RTSP • Detecção SCRFD e Rastreamento Facial ArcFace 512-D • Baixa Latência
+                    <Typography variant="caption" color="text.secondary" noWrap sx={{ display: { xs: 'none', sm: 'block' } }}>
+                        Stream IP / RTSP • Detecção SCRFD e Rastreamento Facial ArcFace 512-D
                     </Typography>
                 </Box>
             </Stack>
 
-            <Stack direction="row" spacing={1.5} alignItems="center">
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: 'auto' }}>
                 {/* CONTROLES DE ZOOM DA IMAGEM */}
-                <ButtonGroup size="small" variant="outlined" sx={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                <ButtonGroup size="small" variant="outlined" sx={{ borderColor: 'rgba(255,255,255,0.12)', height: 30 }}>
                     <Tooltip title="Diminuir zoom">
                         <IconButton
                             size="small"
                             onClick={() => setStreamZoom(z => Math.max(80, z - 15))}
-                            sx={{ color: '#94A3B8', '&:hover': { } }}
+                            sx={{ color: '#94A3B8', width: 28, height: 30 }}
                         >
                             <ZoomOutIcon fontSize="small" />
                         </IconButton>
@@ -1919,7 +2204,7 @@ const Monitor = () => {
                     <Button 
                         size="small" 
                         onClick={() => setStreamZoom(100)} 
-                        sx={{ fontSize: '0.75rem', fontWeight: 700, px: 1 }}
+                        sx={{ fontSize: '0.72rem', fontWeight: 700, px: 1, minWidth: 44, height: 30 }}
                     >
                         {streamZoom}%
                     </Button>
@@ -1927,21 +2212,22 @@ const Monitor = () => {
                         <IconButton
                             size="small"
                             onClick={() => setStreamZoom(z => Math.min(220, z + 15))}
-                            sx={{ color: '#94A3B8', '&:hover': { } }}
+                            sx={{ color: '#94A3B8', width: 28, height: 30 }}
                         >
                             <ZoomInIcon fontSize="small" />
                         </IconButton>
                     </Tooltip>
                 </ButtonGroup>
 
-                {/* CONTROLES DE TAMANHO DA JANELA */}
-                <ButtonGroup size="small" variant="outlined" sx={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                {/* CONTROLES DE TAMANHO DA JANELA (MD/LG/XL apenas em Desktop; Tela Cheia sempre disponível) */}
+                <ButtonGroup size="small" variant="outlined" sx={{ borderColor: 'rgba(255,255,255,0.12)', height: 30 }}>
                     {['md', 'lg', 'xl'].map(sz => (
                         <Button
                             key={sz}
                             onClick={() => setStreamModalSize(sz)}
                             sx={{
-                                fontSize: '0.75rem', fontWeight: 700,
+                                display: { xs: 'none', md: 'inline-flex' },
+                                fontSize: '0.72rem', fontWeight: 700, height: 30,
                                 bgcolor: streamModalSize === sz ? '#00D4FF' : 'transparent',
                                 color: streamModalSize === sz ? '#000000' : '#94A3B8'
                             }}
@@ -1949,11 +2235,11 @@ const Monitor = () => {
                             {sz.toUpperCase()}
                         </Button>
                     ))}
-                    <Tooltip title={streamModalSize === 'fullscreen' ? "Restaurar Janela" : "Tela Cheia"}>
+                    <Tooltip title={streamModalSize === 'fullscreen' ? "Restaurar janela" : "Tela cheia"}>
                         <IconButton
                             size="small"
                             onClick={() => setStreamModalSize(s => s === 'fullscreen' ? 'md' : 'fullscreen')}
-                            sx={{ color: streamModalSize === 'fullscreen' ? '#00D4FF' : '#94A3B8' }}
+                            sx={{ color: streamModalSize === 'fullscreen' ? '#00D4FF' : '#94A3B8', width: 30, height: 30 }}
                         >
                             {streamModalSize === 'fullscreen' ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
                         </IconButton>
@@ -1966,7 +2252,7 @@ const Monitor = () => {
             </Stack>
         </DialogTitle>
 
-        <DialogContent sx={{ p: 2, overflow: 'auto', bgcolor: '#000000' }}>
+        <DialogContent sx={{ p: { xs: 1, sm: 2 }, overflow: 'auto', bgcolor: '#000000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {activeStreamCam && (
                 <Box sx={{
                     position: 'relative',
@@ -1978,7 +2264,9 @@ const Monitor = () => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    height: streamModalSize === 'fullscreen' ? '82vh' : '62vh'
+                    aspectRatio: streamModalSize === 'fullscreen' ? 'unset' : { xs: '16/9', sm: 'unset' },
+                    height: streamModalSize === 'fullscreen' ? { xs: 'calc(100dvh - 155px)', sm: '82vh' } : { xs: 'auto', sm: '62vh' },
+                    minHeight: { xs: 210, sm: 360 }
                 }}>
                     <CameraVideo
                         camId={activeStreamCam.id}
@@ -1996,9 +2284,17 @@ const Monitor = () => {
             )}
         </DialogContent>
 
-        <DialogActions sx={{ px: 3, pb: 2, justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            <Stack direction="row" spacing={2} alignItems="center">
-                <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Inter", sans-serif' }}>
+        <DialogActions sx={{
+            px: { xs: 1.5, sm: 3 },
+            py: { xs: 1.25, sm: 2 },
+            flexDirection: { xs: 'column', sm: 'row' },
+            alignItems: { xs: 'stretch', sm: 'center' },
+            justifyContent: 'space-between',
+            gap: 1.25,
+            borderTop: '1px solid rgba(255,255,255,0.06)'
+        }}>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ minWidth: 0 }}>
+                <Typography variant="caption" color="text.secondary" noWrap sx={{ fontFamily: '"Inter", sans-serif', maxWidth: '100%' }}>
                     {activeStreamCam?.stream_url || `${activeStreamCam?.ip_address}:${activeStreamCam?.porta}`}
                 </Typography>
                 {(() => {
@@ -2008,30 +2304,32 @@ const Monitor = () => {
                         <Chip
                             icon={<DotIcon sx={{ fontSize: 9, color: '#00FF88 !important' }} />}
                             label={st
-                                ? `Ao vivo • até ${fpsVideo} fps • câmera ${Math.round(st.video_fps)} fps • IA ${st.ia_fps_alvo}/s${st.rostos ? ` • ${st.rostos} rosto(s)` : ''}`
+                                ? `Ao vivo • ${Math.round(st.video_fps)} fps • IA ${st.ia_fps_alvo}/s${st.rostos ? ` • ${st.rostos} rosto(s)` : ''}`
                                 : `Ao vivo • até ${fpsVideo} fps`}
                             size="small"
-                            sx={{ bgcolor: 'rgba(0, 255, 136, 0.1)', color: '#00FF88', fontWeight: 700, fontSize: '0.75rem' }}
+                            sx={{ bgcolor: 'rgba(0, 255, 136, 0.1)', color: '#00FF88', fontWeight: 700, fontSize: '0.72rem', height: 22 }}
                         />
                     );
                 })()}
             </Stack>
-            <Stack direction="row" spacing={1}>
-                <Button
-                    variant="outlined"
-                    color="warning"
-                    size="small"
-                    startIcon={<AlarmIcon />}
-                    onClick={handleTriggerTestAlert}
-                    sx={{ fontWeight: 700 }}
-                >
-                    Testar alerta
-                </Button>
+            <Stack direction="row" spacing={1} sx={{ width: { xs: '100%', sm: 'auto' } }}>
+                {isAdminMaster && (
+                    <Button
+                        variant="outlined"
+                        color="warning"
+                        size="small"
+                        startIcon={<AlarmIcon />}
+                        onClick={handleTriggerTestAlert}
+                        sx={{ fontWeight: 700, flex: { xs: 1, sm: 'initial' }, whiteSpace: 'nowrap' }}
+                    >
+                        Testar alerta
+                    </Button>
+                )}
                 <Button
                     variant="outlined"
                     size="small"
                     onClick={() => { setActiveStreamCam(null); setStreamZoom(100); }}
-                    sx={{ borderColor: '#00D4FF', color: '#00D4FF', fontWeight: 700 }}
+                    sx={{ borderColor: '#00D4FF', color: '#00D4FF', fontWeight: 700, flex: { xs: 1, sm: 'initial' }, whiteSpace: 'nowrap' }}
                 >
                     Fechar janela
                 </Button>
@@ -2048,48 +2346,48 @@ const Monitor = () => {
           PaperProps={{
               sx: {
                   maxHeight: '90vh'
-                    }
+              }
           }}
       >
           <DialogTitle sx={{ pb: 1, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
               <Stack direction="row" spacing={1.5} alignItems="center">
-                  <GridViewIcon sx={{ fontSize: 26 }} />
-                  <Box>
-                      <Typography variant="h6" fontWeight={700} color="#FFFFFF">
+                  <GridViewIcon sx={{ fontSize: 24, color: '#00D4FF', flexShrink: 0 }} />
+                  <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="h6" fontWeight={700} color="#FFFFFF" noWrap sx={{ fontSize: { xs: '1rem', sm: '1.15rem' } }}>
                           Selecionar câmeras no mosaico
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                          Escolha quais câmeras cadastradas no sistema serão exibidas nesta tela
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                          Escolha quais câmeras serão exibidas nesta tela
                       </Typography>
                   </Box>
               </Stack>
           </DialogTitle>
 
-          <DialogContent sx={{ p: 2, overflowY: 'auto' }}>
+          <DialogContent sx={{ p: { xs: 1.5, sm: 2 }, overflowY: 'auto' }}>
               {/* BARRA DE AÇÕES RÁPIDAS: MARCAR / DESMARCAR TODAS */}
-              <Stack direction="row" justifyContent="space-between" alignItems="center" my={1.5}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" useFlexGap gap={1} my={1}>
                   <Stack direction="row" spacing={1}>
                       <Button 
                           size="small" 
                           variant="outlined" 
                           onClick={handleSelectAllCameras}
-                          sx={{ fontSize: '0.75rem', borderColor: 'rgba(255,255,255,0.2)', color: '#00D4FF' }}
+                          sx={{ fontSize: '0.72rem', borderColor: 'rgba(255,255,255,0.2)', color: '#00D4FF' }}
                       >
-                          MARCAR TODAS ({cameras.length})
+                          Marcar todas ({cameras.length})
                       </Button>
                       <Button 
                           size="small" 
                           variant="outlined" 
                           onClick={handleClearSelectedCameras}
-                          sx={{ fontSize: '0.75rem', borderColor: 'rgba(255,255,255,0.2)', color: '#94A3B8' }}
+                          sx={{ fontSize: '0.72rem', borderColor: 'rgba(255,255,255,0.2)', color: '#94A3B8' }}
                       >
-                          Limpar seleção
+                          Limpar
                       </Button>
                   </Stack>
                   <Chip
-                      label={`${selectedCameraIds.length === 0 ? 'Exibindo Todas (' + cameras.length + ')' : selectedCameraIds.length + ' Selecionada(s)'}`}
+                      label={`${selectedCameraIds.length === 0 ? 'Exibindo todas (' + cameras.length + ')' : selectedCameraIds.length + ' selecionada(s)'}`}
                       size="small"
-                      sx={{ bgcolor: 'rgba(0, 212, 255, 0.1)', color: '#00D4FF', fontWeight: 700, fontSize: '0.75rem' }}
+                      sx={{ bgcolor: 'rgba(0, 212, 255, 0.1)', color: '#00D4FF', fontWeight: 700, fontSize: '0.72rem' }}
                   />
               </Stack>
 
@@ -2101,7 +2399,7 @@ const Monitor = () => {
                           Nenhuma câmera cadastrada no sistema.
                       </Typography>
                       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-                          As câmeras devem ser configuradas primeiro na página de Configurações.
+                          As câmeras devem ser configuradas primeiro.
                       </Typography>
                       <Button
                           variant="contained"
@@ -2114,7 +2412,7 @@ const Monitor = () => {
                       </Button>
                   </Box>
               ) : (
-                  <List sx={{ maxHeight: 380, overflow: 'auto', p: 0 }}>
+                  <List sx={{ maxHeight: { xs: '48vh', sm: 380 }, overflow: 'auto', p: 0 }}>
                       {cameras.map(cam => {
                           const isChecked = selectedCameraIds.length === 0 || selectedCameraIds.includes(cam.id);
                           return (
@@ -2129,7 +2427,7 @@ const Monitor = () => {
                                   }}
                               >
                                   <ListItemButton onClick={() => handleToggleSelectCamera(cam.id)} dense>
-                                      <ListItemIcon sx={{ minWidth: 38 }}>
+                                      <ListItemIcon sx={{ minWidth: 36 }}>
                                           <Checkbox
                                               edge="start"
                                               checked={isChecked}
@@ -2140,7 +2438,7 @@ const Monitor = () => {
                                       </ListItemIcon>
                                       <ListItemText
                                           primary={
-                                              <Stack direction="row" spacing={1} alignItems="center">
+                                              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                                                   <Typography variant="subtitle2" fontWeight={700} color="#FFFFFF">
                                                       {cam.nome}
                                                   </Typography>
@@ -2148,12 +2446,12 @@ const Monitor = () => {
                                                       label={comoRotulo(cam.status) || 'Offline'}
                                                       size="small"
                                                       color={cam.status === 'online' ? 'success' : 'default'}
-                                                      sx={{ height: 18, fontSize: '0.75rem', fontWeight: 700 }}
+                                                      sx={{ height: 18, fontSize: '0.7rem', fontWeight: 700 }}
                                                   />
                                               </Stack>
                                           }
                                           secondary={
-                                              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', display: 'block' }}>
+                                              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', display: 'block', wordBreak: 'break-word' }}>
                                                   {cam.fabricante} • {cam.ip_address}:{cam.porta} 
                                                   {cam.area?.nome_area ? ` • Área: ${cam.area.nome_area}` : ''}
                                               </Typography>
@@ -2168,15 +2466,16 @@ const Monitor = () => {
 
               {/* ATALHO PARA GERENCIAR CÂMERAS */}
               <Box sx={{ mt: 2, p: 1.5, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.1)' }}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} spacing={1}>
                       <Typography variant="caption" color="text.secondary">
                           Precisa cadastrar, editar IP ou testar uma nova câmera?
                       </Typography>
                       <Button
                           size="small"
+                          variant="outlined"
                           startIcon={<SettingsIcon sx={{ fontSize: 16 }} />}
                           onClick={() => { setOpenSelectCamerasDialog(false); setOpenGerenciarCamerasModal(true); }}
-                          sx={{ fontSize: '0.75rem', color: '#00D4FF', fontWeight: 700 }}
+                          sx={{ fontSize: '0.75rem', borderColor: 'rgba(0, 212, 255, 0.35)', color: '#00D4FF', fontWeight: 700, whiteSpace: 'nowrap' }}
                       >
                           Gerenciar câmeras
                       </Button>
@@ -2184,9 +2483,12 @@ const Monitor = () => {
               </Box>
           </DialogContent>
 
-          <DialogActions sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-              <Button variant="outlined" 
-                  onClick={() => setOpenSelectCamerasDialog(false)} sx={botaoSecundario}>
+          <DialogActions sx={{ p: { xs: 1.5, sm: 2 }, borderTop: '1px solid rgba(255,255,255,0.08)', gap: 1 }}>
+              <Button
+                  variant="outlined" 
+                  onClick={() => setOpenSelectCamerasDialog(false)}
+                  sx={{ ...botaoSecundario, flex: { xs: 1, sm: 'initial' } }}
+              >
                   Cancelar
               </Button>
               <Button 
@@ -2195,7 +2497,7 @@ const Monitor = () => {
                       setOpenSelectCamerasDialog(false);
                       enqueueSnackbar('Mosaico CFTV atualizado!', { variant: 'success' });
                   }}
-                  sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700, '&:hover': { bgcolor: '#00D4FF' } }}
+                  sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700, flex: { xs: 1, sm: 'initial' }, '&:hover': { bgcolor: '#00D4FF' } }}
               >
                   Aplicar mosaico
               </Button>

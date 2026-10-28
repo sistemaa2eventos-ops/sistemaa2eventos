@@ -262,7 +262,7 @@ const Fiscalizacao = () => {
     return (
         <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 }, maxWidth: '100%', overflowX: 'hidden' }}>
             {/* Header da Página */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: { xs: 2, sm: 3 }, flexWrap: 'wrap', gap: 1.5 }}>
                 <PageHeader
                     title="Fiscalização de áreas"
                     subtitle="Valide pulseiras e credenciais nas portarias e áreas internas."
@@ -270,7 +270,7 @@ const Fiscalizacao = () => {
                     sx={{ mb: 0 }}
                 />
 
-                <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
+                <Stack direction="row" spacing={1.25} alignItems="center" flexWrap="wrap">
                     {/* Status do Posto */}
                     <Chip
                         label="Posto ativo"
@@ -281,7 +281,7 @@ const Fiscalizacao = () => {
                             bgcolor: 'rgba(0, 255, 136, 0.1)',
                             color: '#00FF88',
                             border: '1px solid rgba(0, 255, 136, 0.3)',
-                            height: 38,
+                            height: 36,
                             borderRadius: '10px'
                         }}
                     />
@@ -294,8 +294,8 @@ const Fiscalizacao = () => {
                                 color: soundEnabled ? '#00FF88' : '#94A3B8',
                                 bgcolor: 'rgba(255,255,255,0.05)',
                                 border: '1px solid rgba(255,255,255,0.1)',
-                                height: 38,
-                                width: 38,
+                                height: 36,
+                                width: 36,
                                 '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
                             }}
                         >
@@ -311,8 +311,8 @@ const Fiscalizacao = () => {
                                 color: '#00D4FF',
                                 bgcolor: 'rgba(0,212,255,0.08)',
                                 border: '1px solid rgba(0,212,255,0.25)',
-                                height: 38,
-                                width: 38,
+                                height: 36,
+                                width: 36,
                                 '&:hover': { bgcolor: 'rgba(0,212,255,0.18)' }
                             }}
                         >
@@ -326,14 +326,14 @@ const Fiscalizacao = () => {
             <Grid container spacing={{ xs: 1.5, sm: 2, md: 2.5 }} sx={{ mb: { xs: 2, sm: 2.5, md: 3 } }}>
                 <Grid item xs={12} md={5}>
                     <GlassCard sx={{ p: { xs: 1.5, sm: 2 }, display: 'flex', alignItems: 'center', gap: 1.5, height: '100%' }}>
-                        <AreaIcon sx={{ color: '#00D4FF', fontSize: { xs: 26, sm: 32 } }} />
+                        <AreaIcon sx={{ color: '#00D4FF', fontSize: { xs: 24, sm: 32 } }} />
                         <FormControl fullWidth size="small">
                             <InputLabel sx={{ color: '#00D4FF', fontWeight: 700, fontFamily: '"Space Grotesk", sans-serif', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
-                                POSTO DE FISCALIZAÇÃO (ÁREA SOB SEU CONTROLE)
+                                POSTO DE FISCALIZAÇÃO
                             </InputLabel>
                             <Select
                                 value={areas.some(a => a.id === selectedAreaId) ? selectedAreaId : ''}
-                                label="Posto de fiscalização (área sob seu controle)"
+                                label="Posto de fiscalização"
                                 onChange={handleAreaChange}
                                 sx={{
                                     bgcolor: 'rgba(0,0,0,0.4)',
@@ -345,7 +345,7 @@ const Fiscalizacao = () => {
                                     '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 212, 255, 0.4)' }
                                 }}
                             >
-                                <MenuItem value=""><em>Todas as áreas (fiscalização geral de portaria)</em></MenuItem>
+                                <MenuItem value=""><em>Todas as áreas (portaria geral)</em></MenuItem>
                                 {areas.map(a => (
                                     <MenuItem key={a.id} value={a.id}>
                                         {a.nome_area} {a.capacidade_maxima ? `(Capacidade: ${a.capacidade_maxima})` : ''}
@@ -357,14 +357,14 @@ const Fiscalizacao = () => {
                 </Grid>
 
                 <Grid item xs={12} md={7}>
-                    <Grid container spacing={2}>
-                        <Grid item xs={12} sm={4}>
+                    <Grid container spacing={{ xs: 1.25, sm: 2 }}>
+                        <Grid item xs={4}>
                             <KpiCard titulo="Fiscalizados" valor={stats.total} icone={<KpiFiscalizadosIcon />} />
                         </Grid>
-                        <Grid item xs={6} sm={4}>
+                        <Grid item xs={4}>
                             <KpiCard titulo="Liberados" valor={stats.liberados} icone={<KpiLiberadosIcon />} cor={cores.sucesso} />
                         </Grid>
-                        <Grid item xs={6} sm={4}>
+                        <Grid item xs={4}>
                             <KpiCard titulo="Negados" valor={stats.negados} icone={<KpiNegadosIcon />} cor={cores.erro} />
                         </Grid>
                     </Grid>
@@ -372,8 +372,8 @@ const Fiscalizacao = () => {
             </Grid>
 
             {/* Bloco de Entrada: Leitor Universal e Busca Rápida por Nome */}
-            <GlassCard sx={{ p: { xs: 2, sm: 2.5 }, mb: { xs: 2, sm: 2.5, md: 3 } }}>
-                <Grid container spacing={2} alignItems="flex-end">
+            <GlassCard sx={{ p: { xs: 1.75, sm: 2.5 }, mb: { xs: 2, sm: 2.5, md: 3 } }}>
+                <Grid container spacing={{ xs: 1.5, sm: 2 }} alignItems="flex-end">
                     {/* Leitor de Pulseira / RFID / Barcode */}
                     <Grid item xs={12} md={8}>
                         <UniversalPulseiraInput
@@ -396,8 +396,8 @@ const Fiscalizacao = () => {
                                 neonColor={cameraActive ? '#FF3366' : '#00D4FF'}
                                 onClick={() => setCameraActive(!cameraActive)}
                                 sx={{ 
-                                    height: 58, 
-                                    minHeight: 58,
+                                    height: { xs: 48, sm: 58 }, 
+                                    minHeight: { xs: 48, sm: 58 },
                                     fontSize: '0.875rem',
                                     fontWeight: 700,
                                     borderRadius: '12px'
@@ -411,8 +411,8 @@ const Fiscalizacao = () => {
 
                     {/* Busca por Nome do Participante */}
                     <Grid item xs={12}>
-                        <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)', my: 1.5 }} />
-                        <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: '0.8px', display: 'block', mb: 1, fontSize: '0.75rem' }}>
+                        <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)', my: 1 }} />
+                        <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: '0.6px', display: 'block', mb: 1, fontSize: '0.75rem' }}>
                             Ou busque pelo nome do participante (controladores internos & portaria):
                         </Typography>
                         <Autocomplete
@@ -476,7 +476,7 @@ const Fiscalizacao = () => {
 
                 {/* Scanner de Câmera Embutido se Ativo */}
                 {cameraActive && (
-                    <Box sx={{ mt: 2.5, p: 2, bgcolor: 'rgba(0,0,0,0.7)', borderRadius: 1.5, textAlign: 'center', border: '1px solid rgba(0,212,255,0.3)' }}>
+                    <Box sx={{ mt: 2, p: 1.5, bgcolor: 'rgba(0,0,0,0.7)', borderRadius: 1.5, textAlign: 'center', border: '1px solid rgba(0,212,255,0.3)' }}>
                         <Typography variant="caption" sx={{ color: '#00D4FF', display: 'block', mb: 1, fontWeight: 700 }}>
                             Aponte a câmera para o QR Code da pulseira ou crachá
                         </Typography>
@@ -489,7 +489,7 @@ const Fiscalizacao = () => {
             {resultado ? (
                 <GlassCard
                     sx={{
-                        p: { xs: 3, md: 4 },
+                        p: { xs: 2, sm: 3, md: 4 },
                         border: '2px solid',
                         borderColor: resultado.autorizado ? '#00FF88' : '#FF3366',
                         boxShadow: resultado.autorizado ? '0 0 40px rgba(0,255,136,0.25)' : '0 0 40px rgba(255,51,102,0.25)',
@@ -505,23 +505,24 @@ const Fiscalizacao = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: 1.5,
-                        py: 2,
-                        px: 3,
-                        mb: 3.5,
+                        gap: 1.25,
+                        py: { xs: 1.25, sm: 2 },
+                        px: { xs: 1.5, sm: 3 },
+                        mb: { xs: 2, sm: 3.5 },
                         borderRadius: 1.5,
                         bgcolor: resultado.autorizado ? 'rgba(0,255,136,0.15)' : 'rgba(255,51,102,0.15)',
                         border: '1.5px solid',
                         borderColor: resultado.autorizado ? '#00FF88' : '#FF3366'
                     }}>
                         {resultado.autorizado ? (
-                            <SuccessIcon sx={{ color: '#00FF88', fontSize: 38 }} />
+                            <SuccessIcon sx={{ color: '#00FF88', fontSize: { xs: 28, sm: 38 } }} />
                         ) : (
-                            <ErrorIcon sx={{ color: '#FF3366', fontSize: 38 }} />
+                            <ErrorIcon sx={{ color: '#FF3366', fontSize: { xs: 28, sm: 38 } }} />
                         )}
-                        <Typography variant="h5" sx={{
+                        <Typography sx={{
                             fontWeight: 700,
-                            letterSpacing: '1px',
+                            fontSize: { xs: '1.1rem', sm: '1.5rem' },
+                            letterSpacing: '0.75px',
                             textAlign: 'center',
                             color: resultado.autorizado ? '#00FF88' : '#FF3366',
                             fontFamily: '"Space Grotesk", sans-serif'
@@ -532,7 +533,7 @@ const Fiscalizacao = () => {
 
                     {/* Informações do Participante */}
                     {resultado.pessoa && (
-                        <Grid container spacing={{ xs: 2.5, sm: 3, md: 3.5 }} alignItems="center">
+                        <Grid container spacing={{ xs: 2, sm: 3, md: 3.5 }} alignItems="center">
                             {/* Miniatura / Foto Grande do Participante com Clique */}
                             <Grid item xs={12} sm={4} md={3.5} sx={{ textAlign: 'center' }}>
                                 <Tooltip title="Clique na miniatura para ver a ficha completa com check-in e áreas autorizadas">
@@ -551,7 +552,7 @@ const Fiscalizacao = () => {
                                         <PessoaFoto
                                             src={resultado.pessoa.foto_url}
                                             nome={resultado.pessoa.nome_completo}
-                                            width={isMobile ? 120 : 160}
+                                            width={isMobile ? 110 : 160}
                                             borderRadius="16px"
                                             accentColor={resultado.autorizado ? '#00FF88' : '#FF3366'}
                                             borderWidth="3px"
@@ -559,15 +560,15 @@ const Fiscalizacao = () => {
                                     </Box>
                                 </Tooltip>
 
-                                <Box sx={{ mt: 1.5 }}>
+                                <Box sx={{ mt: 1.25 }}>
                                     <Button
                                         variant="outlined"
                                         size="small"
                                         startIcon={<ViewDetailsIcon sx={{ fontSize: 18 }} />}
                                         onClick={() => setCardPessoaModal(resultado.pessoa)}
                                         sx={{
-                                            height: 38,
-                                            minHeight: 38,
+                                            height: 36,
+                                            minHeight: 36,
                                             color: '#00D4FF',
                                             borderColor: 'rgba(0, 212, 255, 0.4)',
                                             fontWeight: 700,
@@ -580,18 +581,15 @@ const Fiscalizacao = () => {
                                         Ver ficha completa
                                     </Button>
                                 </Box>
-                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'block', mt: 0.5, fontSize: '0.75rem' }}>
-                                    (Ou clique diretamente na foto)
-                                </Typography>
                             </Grid>
 
                             {/* Ficha Rápida no Posto */}
                             <Grid item xs={12} sm={8} md={8.5}>
-                                <Typography sx={{ color: '#FFFFFF', fontWeight: 700, fontFamily: '"Space Grotesk", sans-serif', fontSize: { xs: '1.25rem', sm: '1.5rem', md: '2rem' }, lineHeight: 1.2, mb: 0.8 }}>
+                                <Typography sx={{ color: '#FFFFFF', fontWeight: 700, fontFamily: '"Space Grotesk", sans-serif', fontSize: { xs: '1.2rem', sm: '1.5rem', md: '2rem' }, lineHeight: 1.2, mb: 0.8, textAlign: { xs: 'center', sm: 'left' } }}>
                                     {resultado.pessoa.nome_completo}
                                 </Typography>
 
-                                <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 1, mb: 2 }}>
+                                <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent={{ xs: 'center', sm: 'flex-start' }} sx={{ gap: 1, mb: 1.5 }}>
                                     <Chip
                                         icon={<BadgeIcon sx={{ fontSize: 16 }} />}
                                         label={resultado.pessoa.funcao || 'Participante'}
@@ -606,41 +604,41 @@ const Fiscalizacao = () => {
                                     )}
                                 </Stack>
 
-                                <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)', my: 2 }} />
+                                <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)', my: 1.5 }} />
 
                                 {/* Detalhes: Pulseira, Check-in, Status de Acesso e Áreas */}
-                                <Grid container spacing={2}>
+                                <Grid container spacing={1.5}>
                                     {/* Número da Pulseira */}
-                                    <Grid item xs={12} sm={6}>
+                                    <Grid item xs={6}>
                                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                             <PulseiraIcon sx={{ fontSize: 14, color: '#00D4FF' }} />
-                                            Número da pulseira / RFID
+                                            Pulseira / RFID
                                         </Typography>
-                                        <Typography variant="body1" sx={{ color: '#00D4FF', fontWeight: 700, fontFamily: '"Inter", sans-serif' }}>
-                                            {resultado.pessoa.numero_pulseira || 'Sem pulseira vinculada'}
+                                        <Typography variant="body2" sx={{ color: '#00D4FF', fontWeight: 700, fontFamily: '"Inter", sans-serif' }}>
+                                            {resultado.pessoa.numero_pulseira || 'Sem pulseira'}
                                         </Typography>
                                     </Grid>
 
                                     {/* Horário de Check-in */}
-                                    <Grid item xs={12} sm={6}>
+                                    <Grid item xs={6}>
                                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                             <AccessTimeIcon sx={{ fontSize: 14, color: '#00FF88' }} />
-                                            Horário de check-in no evento
+                                            Check-in no evento
                                         </Typography>
-                                        <Typography variant="body1" sx={{ color: resultado.pessoa.horario_checkin ? '#00FF88' : '#FFB800', fontWeight: 700, fontFamily: '"Inter", sans-serif' }}>
+                                        <Typography variant="body2" sx={{ color: resultado.pessoa.horario_checkin ? '#00FF88' : '#FFB800', fontWeight: 700, fontFamily: '"Inter", sans-serif' }}>
                                             {resultado.pessoa.horario_checkin
-                                                ? `${formatarHora(resultado.pessoa.horario_checkin)} (${resultado.pessoa.area_checkin || 'Portaria'})`
-                                                : 'Pendente de Entrada na Portaria'}
+                                                ? `${formatarHora(resultado.pessoa.horario_checkin)}`
+                                                : 'Pendente'}
                                         </Typography>
                                     </Grid>
 
                                     {/* Status do Acesso */}
-                                    <Grid item xs={12} sm={6}>
+                                    <Grid item xs={6}>
                                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>
                                             Status de acesso
                                         </Typography>
                                         <Chip
-                                            label={resultado.pessoa.bloqueado ? 'BLOQUEADO' : (resultado.autorizado ? 'LIBERADO / REGULAR' : 'NÃO AUTORIZADO')}
+                                            label={resultado.pessoa.bloqueado ? 'BLOQUEADO' : (resultado.autorizado ? 'LIBERADO' : 'NÃO AUTORIZADO')}
                                             size="small"
                                             sx={{
                                                 bgcolor: resultado.pessoa.bloqueado ? 'rgba(255,51,102,0.2)' : (resultado.autorizado ? 'rgba(0,255,136,0.2)' : 'rgba(255,184,0,0.2)'),
@@ -652,12 +650,12 @@ const Fiscalizacao = () => {
                                     </Grid>
 
                                     {/* Posto Atual */}
-                                    <Grid item xs={12} sm={6}>
+                                    <Grid item xs={6}>
                                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>
                                             Posto fiscalizado
                                         </Typography>
                                         <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 700, mt: 0.5 }}>
-                                            {areaAtual?.nome_area || 'Fiscalização Geral de Portaria'}
+                                            {areaAtual?.nome_area || 'Portaria Geral'}
                                         </Typography>
                                     </Grid>
 
@@ -697,12 +695,12 @@ const Fiscalizacao = () => {
                     )}
                 </GlassCard>
             ) : (
-                <GlassCard sx={{ p: 6, textAlign: 'center', bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 1.5 }}>
-                    <PortariaIcon sx={{ fontSize: 68, color: '#00D4FF', opacity: 0.35, mb: 2 }} />
-                    <Typography variant="h5" sx={{ color: '#FFFFFF', fontWeight: 700, fontFamily: '"Space Grotesk", sans-serif' }}>
+                <GlassCard sx={{ p: { xs: 3, sm: 6 }, textAlign: 'center', bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 1.5 }}>
+                    <PortariaIcon sx={{ fontSize: { xs: 48, sm: 68 }, color: '#00D4FF', opacity: 0.35, mb: 1.5 }} />
+                    <Typography variant="h6" sx={{ color: '#FFFFFF', fontWeight: 700, fontFamily: '"Space Grotesk", sans-serif', fontSize: { xs: '1.1rem', sm: '1.5rem' } }}>
                         Posto de fiscalização pronto para leitura
                     </Typography>
-                    <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.55)', maxWidth: 540, mx: 'auto', mt: 1.5 }}>
+                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.55)', maxWidth: 540, mx: 'auto', mt: 1 }}>
                         Aproxime a pulseira RFID, escaneie o QR Code ou busque o participante pelo nome para validar o acesso na portaria e áreas internas do evento.
                     </Typography>
                 </GlassCard>

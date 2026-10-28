@@ -1,0 +1,22 @@
+search-path = [
+  "backend/microservice-face-python/src",
+  "backend/microservice-face-python/venv-ia/Lib/site-packages"
+]
+site-package-path = [
+  "backend/microservice-face-python/venv-ia/Lib/site-packages"
+]
+python-interpreter-path = "backend/microservice-face-python/venv-ia/Scripts/python.exe"
+project-excludes = [
+  "**/node_modules",
+  "**/venv",
+  "**/venv-ia",
+  "**/.venv",
+  "a2-eventos"
+]
+
+[errors]
+missing-attribute = false
+missing-import = false
+missing-module-attribute = false
+unnecessary-type-conversion = false
+

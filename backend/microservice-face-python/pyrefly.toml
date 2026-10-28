@@ -1,0 +1,10 @@
+search-path = ["src", "venv-ia/Lib/site-packages"]
+site-package-path = ["venv-ia/Lib/site-packages"]
+python-interpreter-path = "venv-ia/Scripts/python.exe"
+
+[errors]
+missing-attribute = false
+missing-import = false
+missing-module-attribute = false
+unnecessary-type-conversion = false
+

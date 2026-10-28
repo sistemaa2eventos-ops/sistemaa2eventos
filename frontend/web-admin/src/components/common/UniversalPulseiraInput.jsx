@@ -37,9 +37,12 @@ export const UniversalPulseiraInput = ({
     const [origemLeitura, setOrigemLeitura] = useState(null); // 'barcode' | 'manual' | null
     const [pulseAnimation, setPulseAnimation] = useState(false);
 
-    // Auto-focus agressivo e persistente para linha de atendimento
+    // No celular/touch, evita abrir o teclado virtual automaticamente sem o operador tocar no campo
     useEffect(() => {
-        if (autoFocus && inputRef.current && !disabled) {
+        const isTouchMobile = typeof window !== 'undefined' && (
+            window.innerWidth < 768 || window.matchMedia?.('(pointer: coarse)').matches
+        );
+        if (autoFocus && !isTouchMobile && inputRef.current && !disabled) {
             const timer = setTimeout(() => {
                 inputRef.current?.focus();
                 inputRef.current?.select();
@@ -111,13 +114,13 @@ export const UniversalPulseiraInput = ({
     return (
         <Box sx={{ width: '100%' }}>
             {/* Rótulo superior limpo e destacado - Sem sobreposição de texto */}
-            <Box sx={{ mb: 1.2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 0.5 }}>
                 <Typography
                     variant="caption"
                     sx={{
                         color: accentColor,
                         fontWeight: 700,
-                        fontSize: '0.875rem',
+                        fontSize: { xs: '0.8125rem', sm: '0.875rem' },
                         display: 'flex',
                         alignItems: 'center',
                         gap: 0.8
@@ -167,7 +170,7 @@ export const UniversalPulseiraInput = ({
                                     color: origemLeitura === 'barcode' ? '#00FF88' : accentColor
                                 }}
                             >
-                                <BarcodeIcon sx={{ fontSize: 26 }} />
+                                <BarcodeIcon sx={{ fontSize: { xs: 22, sm: 26 } }} />
                                 {origemLeitura === 'barcode' && (
                                     <Tooltip title="Leitura ultra-rápida via código de barras">
                                         <FlashIcon sx={{ fontSize: 16, color: '#00FF88' }} />
@@ -217,14 +220,14 @@ export const UniversalPulseiraInput = ({
                     '& .MuiOutlinedInput-root': {
                         bgcolor: 'rgba(0, 0, 0, 0.35)',
                         color: '#FFFFFF',
-                        fontSize: '1.25rem',
+                        fontSize: { xs: '1rem', sm: '1.25rem' },
                         fontWeight: 700,
-                        letterSpacing: '1.5px',
+                        letterSpacing: { xs: '0.75px', sm: '1.5px' },
                         fontFamily: '"Inter", sans-serif',
                         borderRadius: 1.5,
-                        height: 58,
+                        height: { xs: 48, sm: 58 },
                         // O código digitado fica grande; o texto de ajuda, menor (antes saía cortado)
-                        '& input::placeholder': { fontSize: '0.9375rem', fontWeight: 500, letterSpacing: 0, opacity: 0.6 },
+                        '& input::placeholder': { fontSize: { xs: '0.8125rem', sm: '0.9375rem' }, fontWeight: 500, letterSpacing: 0, opacity: 0.6 },
                         transition: 'all 0.25s ease',
                         boxShadow: pulseAnimation 
                             ? '0 0 25px rgba(0, 255, 136, 0.6)' 
@@ -246,9 +249,9 @@ export const UniversalPulseiraInput = ({
             />
 
             {/* Sub-informações e instrução de confirmação */}
-            <Stack direction="row" justifyContent="space-between" alignItems="center" mt={1} px={0.5}>
-                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.55)', display: 'flex', alignItems: 'center', gap: 0.6 }}>
-                    <KeyboardIcon sx={{ fontSize: 15, color: 'rgba(255,255,255,0.4)' }} /> 
+            <Stack direction="row" justifyContent="space-between" alignItems="center" mt={0.85} px={0.5}>
+                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.55)', display: 'flex', alignItems: 'center', gap: 0.6, fontSize: '0.75rem', lineHeight: 1.3 }}>
+                    <KeyboardIcon sx={{ fontSize: 15, color: 'rgba(255,255,255,0.4)', flexShrink: 0 }} /> 
                     {helperText || 'Pressione Enter ↵ após bipe ou digitação para confirmar'}
                 </Typography>
             </Stack>

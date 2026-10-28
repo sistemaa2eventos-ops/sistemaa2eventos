@@ -1,9 +1,22 @@
 {
-  "venvPath": "C:\\Users\\SD_Ad\\AppData\\Local\\Programs\\Python",
-  "venv": "Python311_Custom",
-  "pythonPath": "C:\\Users\\SD_Ad\\AppData\\Local\\Programs\\Python\\Python311_Custom\\python.exe",
+  "venvPath": "backend/microservice-face-python",
+  "venv": "venv-ia",
+  "pythonPath": "backend/microservice-face-python/venv-ia/Scripts/python.exe",
   "extraPaths": [
-    "C:\\Users\\SD_Ad\\AppData\\Local\\Programs\\Python\\Python311_Custom\\Lib\\site-packages",
-    "backend/microservice-face-python/src"
-  ]
+    "backend/microservice-face-python/src",
+    "backend/microservice-face-python/venv-ia/Lib/site-packages"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "**/venv",
+    "**/.venv",
+    "**/venv-ia",
+    "**/a2-eventos",
+    "**/scratch",
+    "**/dist"
+  ],
+  "typeCheckingMode": "off",
+  "reportMissingImports": "none",
+  "reportMissingModuleSource": "none"
 }

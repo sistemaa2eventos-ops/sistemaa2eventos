@@ -109,11 +109,17 @@ const DataTable = ({
 
   const isSelected = (id) => selected.indexOf(id) !== -1;
 
-  // Mobile Render (Stacked Cards)
+  // Mobile Render (Stacked Cards organizados com cabeçalho e barra de ações)
   if (isMobile) {
+    const photoCol = columns.find((c) => c.id === 'foto_url' || c.id === 'avatar');
+    const actionCol = columns.find((c) => c.id === 'acoes' || c.id === 'actions');
+    const dataCols = columns.filter((c) => c !== photoCol && c !== actionCol);
+    const titleCol = dataCols[0];
+    const bodyCols = dataCols.slice(1);
+
     return (
       <Box sx={{ width: '100%', ...sx }}>
-        <Stack spacing={2} sx={{ mb: 2 }}>
+        <Stack spacing={1.5} sx={{ mb: 1.5 }}>
           {paginatedData.length === 0 ? (
             <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
               <Typography variant="body2" color="text.secondary">Nenhum registro encontrado</Typography>
@@ -123,33 +129,97 @@ const DataTable = ({
               <Card
                 key={row.id || index}
                 variant="outlined"
-                sx={{ bgcolor: isSelected(row.id) ? 'rgba(0, 212, 255, 0.05)' : 'rgba(255,255,255,0.02)', borderColor: isSelected(row.id) ? '#00D4FF' : 'rgba(255,255,255,0.1)' }}
+                sx={{
+                  bgcolor: isSelected(row.id) ? 'rgba(0, 212, 255, 0.05)' : 'rgba(255,255,255,0.02)',
+                  borderColor: isSelected(row.id) ? '#00D4FF' : 'rgba(255,255,255,0.1)',
+                  borderRadius: 2
+                }}
                 onDoubleClick={onRowDoubleClick ? () => onRowDoubleClick(row) : undefined}
               >
-                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                  {checkboxSelection && (
-                    <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-                      <Checkbox
-                        checked={isSelected(row.id)}
-                        onChange={(event) => handleSelectOne(event, row.id)}
-                        sx={{ color: 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: '#00D4FF' } }}
-                      />
-                    </Box>
-                  )}
-                  <Stack spacing={1}>
-                    {columns.map((column, colIndex) => (
-                      <Box key={column.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: colIndex !== columns.length - 1 ? '1px dashed rgba(255,255,255,0.05)' : 'none', pb: colIndex !== columns.length - 1 ? 1 : 0 }}>
-                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, mr: 2, minWidth: '40%' }}>
-                          {column.label}
-                        </Typography>
-                        <Box sx={{ flex: 1, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {typeof column.format === 'function' ? column.format(row[column.id], row) : (
-                            <Typography variant="body2" sx={{ fontWeight: 500 }}>{row[column.id]}</Typography>
+                <CardContent sx={{ p: 1.75, '&:last-child': { pb: 1.75 } }}>
+                  {/* Cabeçalho do Card (Checkbox + Foto + Coluna Principal) */}
+                  {(checkboxSelection || photoCol || titleCol) && (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1.25,
+                        pb: bodyCols.length > 0 ? 1.25 : 0,
+                        mb: bodyCols.length > 0 ? 1.25 : 0,
+                        borderBottom: bodyCols.length > 0 ? '1px solid rgba(255,255,255,0.08)' : 'none'
+                      }}
+                    >
+                      {checkboxSelection && (
+                        <Checkbox
+                          size="small"
+                          checked={isSelected(row.id)}
+                          onChange={(event) => handleSelectOne(event, row.id)}
+                          sx={{ p: 0.5, color: 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: '#00D4FF' } }}
+                        />
+                      )}
+                      {photoCol && (
+                        <Box sx={{ flexShrink: 0 }}>
+                          {typeof photoCol.format === 'function' ? photoCol.format(row[photoCol.id], row) : null}
+                        </Box>
+                      )}
+                      {titleCol && (
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          {typeof titleCol.format === 'function' ? (
+                            titleCol.format(row[titleCol.id], row)
+                          ) : (
+                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#FFFFFF' }} noWrap>
+                              {row[titleCol.id]}
+                            </Typography>
                           )}
                         </Box>
-                      </Box>
-                    ))}
-                  </Stack>
+                      )}
+                    </Box>
+                  )}
+
+                  {/* Corpo do Card (Demais Colunas) */}
+                  {bodyCols.length > 0 && (
+                    <Stack spacing={0.85}>
+                      {bodyCols.map((column, colIndex) => (
+                        <Box
+                          key={column.id}
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: 1.5,
+                            borderBottom: colIndex !== bodyCols.length - 1 ? '1px dashed rgba(255,255,255,0.05)' : 'none',
+                            pb: colIndex !== bodyCols.length - 1 ? 0.85 : 0
+                          }}
+                        >
+                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, flexShrink: 0 }}>
+                            {column.label}
+                          </Typography>
+                          <Box sx={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'flex-end', textAlign: 'right' }}>
+                            {typeof column.format === 'function' ? column.format(row[column.id], row) : (
+                              <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>{row[column.id]}</Typography>
+                            )}
+                          </Box>
+                        </Box>
+                      ))}
+                    </Stack>
+                  )}
+
+                  {/* Rodapé de Ações */}
+                  {actionCol && (
+                    <Box
+                      sx={{
+                        mt: 1.25,
+                        pt: 1,
+                        borderTop: '1px solid rgba(255,255,255,0.08)',
+                        display: 'flex',
+                        justifyContent: 'flex-end',
+                        alignItems: 'center',
+                        '& .MuiStack-root': { width: '100%', justifyContent: 'space-around' }
+                      }}
+                    >
+                      {typeof actionCol.format === 'function' ? actionCol.format(row[actionCol.id], row) : row[actionCol.id]}
+                    </Box>
+                  )}
                 </CardContent>
               </Card>
             ))
@@ -163,8 +233,13 @@ const DataTable = ({
           page={activePage}
           onPageChange={handlePageChange}
           onRowsPerPageChange={handleRowsPerPageChange}
-          labelRowsPerPage="Itens por pág"
-          sx={{ borderTop: 'none', '.MuiToolbar-root': { pl: 0, pr: 0 }, '.MuiTablePagination-selectLabel, .MuiTablePagination-select, .MuiTablePagination-selectIcon': { display: 'none' } }}
+          labelRowsPerPage="Itens"
+          sx={{
+            borderTop: 'none',
+            '.MuiToolbar-root': { pl: 0, pr: 0, minHeight: 44, justifyContent: 'center' },
+            '.MuiTablePagination-spacer': { display: 'none' },
+            '.MuiTablePagination-selectLabel, .MuiTablePagination-select, .MuiTablePagination-selectIcon': { display: 'none' }
+          }}
         />
       </Box>
     );

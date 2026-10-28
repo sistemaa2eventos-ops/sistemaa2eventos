@@ -3,13 +3,13 @@ import {
     Box, Typography, Grid, TextField, Button, Chip, Stack, MenuItem,
     IconButton, CircularProgress, Dialog, DialogTitle, DialogContent,
     DialogActions, FormControl, InputLabel, Select,
-    Tabs, Tab
+    Tabs, Tab, Switch, FormControlLabel, Tooltip
 } from '@mui/material';
 import {
-    Save as SaveIcon, Videocam as CameraIcon, MeetingRoom as DoorIcon,
-    Add as AddIcon, Delete as DeleteIcon, Refresh as RefreshIcon,
-    OpenInNew as OpenInNewIcon, Shield as ShieldIcon,
-    Tune as TuneIcon
+    Save as SaveIcon, Videocam as CameraIcon, VideocamOff as VideocamOffIcon,
+    MeetingRoom as DoorIcon, Add as AddIcon, Delete as DeleteIcon,
+    Refresh as RefreshIcon, OpenInNew as OpenInNewIcon, Shield as ShieldIcon,
+    Tune as TuneIcon, PowerSettingsNew as PowerIcon, Face as FaceIcon
 } from '@mui/icons-material';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
@@ -43,6 +43,8 @@ const ConfigCameras = () => {
     const [savingCamera, setSavingCamera] = useState(false);
     const [testingId, setTestingId] = useState(null);
     const [testResults, setTestResults] = useState({});
+    const [togglingId, setTogglingId] = useState(null);
+    const [togglingAll, setTogglingAll] = useState(false);
 
     // Catracas e Edge Devices
     const [dispositivos, setDispositivos] = useState([]);
@@ -120,7 +122,11 @@ const ConfigCameras = () => {
                 protocolo: 'rtsp',
                 stream_url: 'rtsp://127.0.0.1:8554/live',
                 snapshot_url: '',
-                area_id: areas[0]?.id || ''
+                area_id: areas[0]?.id || '',
+                ia_ativa: true,
+                vigilancia_ativa: true,
+                prioridade: 1,
+                url_substream: ''
             });
         }
         setCameraModalOpen(true);
@@ -183,6 +189,7 @@ const ConfigCameras = () => {
             const resp = await api.post(`/cameras/${id}/testar`);
             const isOnline = resp.data?.online;
             setTestResults(prev => ({ ...prev, [id]: isOnline ? 'online' : 'offline' }));
+            setCameras(prev => prev.map(c => c.id === id ? { ...c, status: isOnline ? 'online' : 'offline' } : c));
             enqueueSnackbar(
                 isOnline ? 'Câmera online e acessível na rede!' : 'Câmera offline ou inacessível no IP/porta informado.',
                 { variant: isOnline ? 'success' : 'warning' }
@@ -192,6 +199,82 @@ const ConfigCameras = () => {
             enqueueSnackbar('Falha ao comunicar com a câmera.', { variant: 'error' });
         } finally {
             setTestingId(null);
+        }
+    };
+
+    // Ativar / Desativar Câmera Individualmente (Sem Excluir)
+    const handleToggleCameraStatus = async (cam) => {
+        const isDesativada = cam.status === 'desativada' || cam.status === 'inativa';
+        const novoStatus = isDesativada ? 'offline' : 'desativada';
+        try {
+            setTogglingId(cam.id);
+            await api.put(`/cameras/${cam.id}`, { status: novoStatus });
+            setTestResults(prev => {
+                const copy = { ...prev };
+                delete copy[cam.id];
+                return copy;
+            });
+            setCameras(prev => prev.map(c => c.id === cam.id ? { ...c, status: novoStatus } : c));
+            if (isDesativada) {
+                enqueueSnackbar(`Câmera "${cam.nome}" reativada! Testando sinal...`, { variant: 'info' });
+                handleTestCamera(cam.id);
+            } else {
+                enqueueSnackbar(`Câmera "${cam.nome}" desativada. Vídeo e IA pausados.`, { variant: 'warning' });
+            }
+        } catch (err) {
+            enqueueSnackbar('Erro ao alterar status da câmera.', { variant: 'error' });
+        } finally {
+            setTogglingId(null);
+        }
+    };
+
+    // Ativar / Pausar apenas a IA Facial da câmera
+    const handleToggleCameraIa = async (cam) => {
+        const novaIa = cam.ia_ativa === false;
+        try {
+            setTogglingId(cam.id);
+            setCameras(prev => prev.map(c => c.id === cam.id ? { ...c, ia_ativa: novaIa } : c));
+            await api.put(`/cameras/${cam.id}`, { ia_ativa: novaIa });
+            enqueueSnackbar(
+                novaIa ? `Reconhecimento facial ativado em "${cam.nome}".` : `Reconhecimento facial pausado em "${cam.nome}".`,
+                { variant: novaIa ? 'success' : 'info' }
+            );
+        } catch (err) {
+            setCameras(prev => prev.map(c => c.id === cam.id ? { ...c, ia_ativa: !novaIa } : c));
+            enqueueSnackbar('Erro ao atualizar IA da câmera.', { variant: 'error' });
+        } finally {
+            setTogglingId(null);
+        }
+    };
+
+    // Desativar / Ativar Todas as Câmeras do Evento
+    const temCameraAtiva = cameras.some(c => c.status !== 'desativada' && c.status !== 'inativa');
+    const handleToggleAllCameras = async () => {
+        if (cameras.length === 0) return;
+        const desativar = temCameraAtiva;
+        if (desativar) {
+            const ok = await confirmar({
+                titulo: 'Desativar todas as câmeras',
+                mensagem: `Deseja pausar todas as ${cameras.length} câmera(s) deste evento? As conexões de vídeo e IA serão encerradas imediatamente, mantendo os cadastros salvos.`,
+                textoConfirmar: 'Desativar todas'
+            });
+            if (!ok) return;
+        }
+        try {
+            setTogglingAll(true);
+            const novoStatus = desativar ? 'desativada' : 'offline';
+            await Promise.all(cameras.map(c => api.put(`/cameras/${c.id}`, { status: novoStatus })));
+            setTestResults({});
+            setCameras(prev => prev.map(c => ({ ...c, status: novoStatus })));
+            enqueueSnackbar(
+                desativar ? 'Todas as câmeras foram desativadas.' : 'Todas as câmeras foram reativadas!',
+                { variant: desativar ? 'warning' : 'success' }
+            );
+        } catch (err) {
+            enqueueSnackbar('Erro ao alterar status das câmeras.', { variant: 'error' });
+            fetchCameras();
+        } finally {
+            setTogglingAll(false);
         }
     };
 
@@ -250,7 +333,20 @@ const ConfigCameras = () => {
                         <Tab icon={<DoorIcon sx={{ mr: 1 }} />} iconPosition="start" label={`Catracas e controladoras (${dispositivos.length})`} />
                     </Tabs>
 
-                    <Stack direction="row" spacing={1.5}>
+                    <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
+                        {activeTab === 0 && cameras.length > 0 && (
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                color={temCameraAtiva ? 'warning' : 'success'}
+                                startIcon={togglingAll ? <CircularProgress size={14} color="inherit" /> : <PowerIcon />}
+                                onClick={handleToggleAllCameras}
+                                disabled={togglingAll}
+                                sx={{ fontWeight: 700 }}
+                            >
+                                {temCameraAtiva ? 'Desativar todas' : 'Ativar todas'}
+                            </Button>
+                        )}
                         <Button
                             variant="outlined"
                             size="small"
@@ -297,35 +393,54 @@ const ConfigCameras = () => {
                     ) : (
                         <Grid container spacing={3}>
                             {cameras.map((cam) => {
-                                const status = testResults[cam.id] || cam.status || 'unknown';
+                                const isDesativada = cam.status === 'desativada' || cam.status === 'inativa';
+                                const status = isDesativada ? 'desativada' : (testResults[cam.id] || cam.status || 'unknown');
                                 const isTesting = testingId === cam.id;
+                                const isToggling = togglingId === cam.id;
                                 return (
                                     <Grid item xs={12} sm={6} lg={4} key={cam.id}>
                                         <GlassCard sx={{
                                             overflow: 'hidden',
-                                            border: status === 'online' ? '1px solid rgba(0, 255, 136, 0.3)' : '1px solid rgba(255,255,255,0.08)',
+                                            opacity: isDesativada ? 0.72 : 1,
+                                            border: isDesativada
+                                                ? '1px dashed rgba(255, 184, 0, 0.35)'
+                                                : status === 'online'
+                                                    ? '1px solid rgba(0, 255, 136, 0.3)'
+                                                    : '1px solid rgba(255,255,255,0.08)',
                                             transition: 'all 0.3s ease',
                                             '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 8px 30px rgba(0,0,0,0.5)' }
                                         }}>
                                             {/* Preview de Imagem / Snapshot */}
-                                            <Box sx={{ position: 'relative', width: '100%', height: 180, bgcolor: '#000000', overflow: 'hidden' }}>
-                                                <img
-                                                    src={urlMidiaCamera(cam.id, 'snapshot', { t: previewStamp, qualidade: 'mini' })}
-                                                    alt={cam.nome}
-                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                    onError={(e) => {
-                                                        e.target.style.display = 'none';
-                                                    }}
-                                                />
+                                            <Box sx={{ position: 'relative', width: '100%', height: 180, bgcolor: '#050B18', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                {!isDesativada ? (
+                                                    <img
+                                                        src={urlMidiaCamera(cam.id, 'snapshot', { t: previewStamp, qualidade: 'mini' })}
+                                                        alt={cam.nome}
+                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                        onError={(e) => {
+                                                            e.target.style.display = 'none';
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <Stack alignItems="center" spacing={0.8} sx={{ color: 'rgba(255,255,255,0.45)', p: 2, textAlign: 'center' }}>
+                                                        <VideocamOffIcon sx={{ fontSize: 38, color: '#FFB800' }} />
+                                                        <Typography variant="caption" fontWeight={700} sx={{ color: '#FFB800' }}>
+                                                            Câmera desativada
+                                                        </Typography>
+                                                        <Typography variant="caption" sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.45)' }}>
+                                                            Conexão RTSP e IA pausadas
+                                                        </Typography>
+                                                    </Stack>
+                                                )}
                                                 {/* Overlay de Status */}
                                                 <Box sx={{
                                                     position: 'absolute', top: 10, left: 10, right: 10,
                                                     display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                                                 }}>
                                                     <Chip
-                                                        label={status === 'online' ? 'Online' : status === 'offline' ? 'Offline' : 'CÂMERA IP'}
+                                                        label={isDesativada ? 'Desativada' : status === 'online' ? 'Online' : status === 'offline' ? 'Offline' : 'Câmera IP'}
                                                         size="small"
-                                                        color={status === 'online' ? 'success' : status === 'offline' ? 'error' : 'default'}
+                                                        color={isDesativada ? 'warning' : status === 'online' ? 'success' : status === 'offline' ? 'error' : 'default'}
                                                         sx={{ fontWeight: 700, fontSize: '0.75rem' }}
                                                     />
                                                     <Chip
@@ -349,9 +464,29 @@ const ConfigCameras = () => {
 
                                             {/* Informações da Câmera */}
                                             <Box sx={{ p: 2.5 }}>
-                                                <Typography variant="h6" fontWeight={700} noWrap sx={{ color: '#FFFFFF' }}>
-                                                    {cam.nome}
-                                                </Typography>
+                                                <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                                                    <Typography variant="h6" fontWeight={700} noWrap sx={{ color: '#FFFFFF', flex: 1 }}>
+                                                        {cam.nome}
+                                                    </Typography>
+                                                    <Tooltip title={cam.ia_ativa === false ? 'Reconhecimento facial desligado nesta câmera (clique para ligar)' : 'Reconhecimento facial ativo (clique para pausar só a IA)'}>
+                                                        <Chip
+                                                            icon={<FaceIcon sx={{ fontSize: 14 }} />}
+                                                            label={cam.ia_ativa === false ? 'IA pausada' : 'IA ativa'}
+                                                            size="small"
+                                                            onClick={() => handleToggleCameraIa(cam)}
+                                                            disabled={isToggling || isDesativada}
+                                                            sx={{
+                                                                cursor: 'pointer',
+                                                                fontWeight: 700,
+                                                                fontSize: '0.7rem',
+                                                                bgcolor: cam.ia_ativa === false ? 'rgba(255,255,255,0.06)' : 'rgba(0, 212, 255, 0.14)',
+                                                                color: cam.ia_ativa === false ? '#94A3B8' : '#00D4FF',
+                                                                border: '1px solid currentColor'
+                                                            }}
+                                                        />
+                                                    </Tooltip>
+                                                </Stack>
+
                                                 <Typography variant="body2" color="text.secondary" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem', mt: 0.5 }}>
                                                     {cam.ip_address}:{cam.porta} • {cam.protocolo?.toUpperCase() || 'RTSP'}
                                                 </Typography>
@@ -363,16 +498,30 @@ const ConfigCameras = () => {
                                                 {/* Ações */}
                                                 <Stack direction="row" spacing={1} mt={2.5}>
                                                     <Button
-                                                        variant="outlined"
+                                                        variant={isDesativada ? 'contained' : 'outlined'}
+                                                        color={isDesativada ? 'success' : 'warning'}
                                                         size="small"
                                                         fullWidth
-                                                        startIcon={isTesting ? <CircularProgress size={14} color="inherit" /> : <RefreshIcon />}
-                                                        onClick={() => handleTestCamera(cam.id)}
-                                                        disabled={isTesting}
+                                                        startIcon={isToggling ? <CircularProgress size={14} color="inherit" /> : <PowerIcon />}
+                                                        onClick={() => handleToggleCameraStatus(cam)}
+                                                        disabled={isToggling}
                                                         sx={{ fontSize: '0.75rem', fontWeight: 700 }}
                                                     >
-                                                        Testar
+                                                        {isDesativada ? 'Ativar' : 'Desativar'}
                                                     </Button>
+                                                    {!isDesativada && (
+                                                        <Button
+                                                            variant="outlined"
+                                                            size="small"
+                                                            fullWidth
+                                                            startIcon={isTesting ? <CircularProgress size={14} color="inherit" /> : <RefreshIcon />}
+                                                            onClick={() => handleTestCamera(cam.id)}
+                                                            disabled={isTesting}
+                                                            sx={{ fontSize: '0.75rem', fontWeight: 700 }}
+                                                        >
+                                                            Testar
+                                                        </Button>
+                                                    )}
                                                     <Button
                                                         variant="outlined"
                                                         size="small"
@@ -632,6 +781,49 @@ const ConfigCameras = () => {
                             onChange={(e) => setEditingCamera({ ...editingCamera, stream_url: e.target.value })}
                             helperText="Deixe em branco para o sistema compor automaticamente a URL com base no IP e fabricante."
                         />
+
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700, pt: 0.5 }}>
+                            Status e reconhecimento facial
+                        </Typography>
+                        <Grid container spacing={2} alignItems="center">
+                            <Grid item xs={12} sm={4}>
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            checked={editingCamera?.status !== 'desativada' && editingCamera?.status !== 'inativa'}
+                                            onChange={(e) => setEditingCamera({
+                                                ...editingCamera,
+                                                status: e.target.checked ? 'offline' : 'desativada'
+                                            })}
+                                        />
+                                    }
+                                    label="Câmera ativa"
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            checked={editingCamera?.ia_ativa !== false}
+                                            onChange={(e) => setEditingCamera({ ...editingCamera, ia_ativa: e.target.checked })}
+                                        />
+                                    }
+                                    label="IA ligada"
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            checked={editingCamera?.vigilancia_ativa !== false && editingCamera?.ia_ativa !== false}
+                                            disabled={editingCamera?.ia_ativa === false}
+                                            onChange={(e) => setEditingCamera({ ...editingCamera, vigilancia_ativa: e.target.checked })}
+                                        />
+                                    }
+                                    label="Vigilância 24 h"
+                                />
+                            </Grid>
+                        </Grid>
                     </Stack>
                 </DialogContent>
                 <DialogActions sx={{ p: 2.5, borderTop: '1px solid rgba(255,255,255,0.08)' }}>

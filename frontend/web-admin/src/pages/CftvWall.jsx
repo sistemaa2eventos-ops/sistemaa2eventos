@@ -225,8 +225,8 @@ const CftvWall = () => {
     // Calcular Colunas de Grade pelo Layout
     const getGridConfig = () => {
         if (focusedCamId || layout === '1x1') return { xs: 12, sm: 12, md: 12, lg: 12, height: 'calc(100vh - 70px)' };
-        if (layout === '2x2') return { xs: 12, sm: 6, md: 6, lg: 6, height: 'calc(50vh - 40px)' };
-        if (layout === '3x3') return { xs: 12, sm: 6, md: 4, lg: 4, height: 'calc(33.3vh - 28px)' };
+        if (layout === '2x2') return { xs: 6, sm: 6, md: 6, lg: 6, height: 'calc(50vh - 40px)' };
+        if (layout === '3x3') return { xs: 6, sm: 6, md: 4, lg: 4, height: 'calc(33.3vh - 28px)' };
         if (layout === '4x4') return { xs: 6, sm: 4, md: 3, lg: 3, height: 'calc(25vh - 22px)' };
         return { xs: 12, sm: 6, md: 6, lg: 6, height: 'calc(50vh - 40px)' };
     };
@@ -236,7 +236,7 @@ const CftvWall = () => {
     return (
         <Box sx={{
             width: '100vw',
-            height: '100vh',
+            height: '100dvh',
             bgcolor: '#050B18',
             color: '#FFFFFF',
             overflow: 'hidden',
@@ -246,47 +246,51 @@ const CftvWall = () => {
         }}>
             {/* HEADER DO CFTV / VIDEO WALL */}
             <Box sx={{
-                height: 52,
-                px: 2,
+                minHeight: { xs: 48, md: 52 },
+                py: { xs: 0.75, md: 0 },
+                px: { xs: 1.25, md: 2 },
                 bgcolor: '#0A1628',
                 borderBottom: '1px solid rgba(0, 212, 255, 0.2)',
                 display: 'flex',
+                flexWrap: 'wrap',
+                gap: 1,
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 zIndex: 100
             }}>
                 {/* Lado Esquerdo: Identificação e Status */}
-                <Stack direction="row" spacing={2} alignItems="center">
+                <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0 }}>
                     <Stack direction="row" spacing={1} alignItems="center">
                         <Box sx={{
-                            width: 10, height: 10, borderRadius: '50%', bgcolor: '#00FF88',
+                            width: 9, height: 9, borderRadius: '50%', bgcolor: '#00FF88', flexShrink: 0,
                             boxShadow: '0 0 10px #00FF88', animation: 'cftvPulse 1.5s infinite alternate',
                             '@keyframes cftvPulse': { '0%': { opacity: 0.4 }, '100%': { opacity: 1 } }
                         }} />
-                        <Typography variant="subtitle2" fontWeight={700} letterSpacing={1} sx={{ color: '#00D4FF' }}>
-                            A2 CFTV command wall
+                        <Typography variant="subtitle2" fontWeight={700} noWrap letterSpacing={0.5} sx={{ color: '#00D4FF', fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
+                            A2 CFTV Wall
                         </Typography>
                     </Stack>
 
                     <Chip
-                        label={`${displayedCameras.length} CÂMERAS NO MOSAICO`}
+                        label={`${displayedCameras.length} câmeras`}
                         size="small"
-                        sx={{ bgcolor: 'rgba(0, 212, 255, 0.1)', color: '#00D4FF', fontWeight: 700, fontSize: '0.75rem' }}
+                        sx={{ bgcolor: 'rgba(0, 212, 255, 0.1)', color: '#00D4FF', fontWeight: 700, fontSize: '0.7rem', height: 22 }}
                     />
 
                     {focusedCamId && (
                         <Chip
-                            label="MODO FOCO (1x1)"
+                            label="Foco (1x1)"
                             size="small"
                             onDelete={() => setFocusedCamId(null)}
                             color="warning"
-                            sx={{ fontWeight: 700, fontSize: '0.75rem' }}
+                            sx={{ fontWeight: 700, fontSize: '0.7rem', height: 22 }}
                         />
                     )}
                 </Stack>
 
-                {/* Centro: Relógio OSD de Alta Precisão */}
+                {/* Centro: Relógio OSD de Alta Precisão (oculto em xs para economizar espaço) */}
                 <Box sx={{
+                    display: { xs: 'none', md: 'block' },
                     px: 2, py: 0.4, borderRadius: 1.5,
                     bgcolor: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.1)',
                     fontFamily: '"Inter", sans-serif', fontWeight: 700, fontSize: '1rem', color: '#00FF88', letterSpacing: 2
@@ -295,7 +299,7 @@ const CftvWall = () => {
                 </Box>
 
                 {/* Lado Direito: Controles do Mosaico */}
-                <Stack direction="row" spacing={1} alignItems="center">
+                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ ml: 'auto' }}>
                     {/* Botões de Layout */}
                     <Tooltip title="Layout 1x1 (foco único)">
                         <IconButton
@@ -307,7 +311,7 @@ const CftvWall = () => {
                         </IconButton>
                     </Tooltip>
 
-                    <Tooltip title="Layout 2x2 (4 câmeras)">
+                    <Tooltip title="Layout 2x2 (2 colunas)">
                         <IconButton
                             size="small"
                             onClick={() => { setFocusedCamId(null); handleLayoutChange('2x2'); }}
@@ -321,7 +325,7 @@ const CftvWall = () => {
                         <IconButton
                             size="small"
                             onClick={() => { setFocusedCamId(null); handleLayoutChange('3x3'); }}
-                            sx={{ color: layout === '3x3' ? '#00D4FF' : 'rgba(255,255,255,0.6)', bgcolor: layout === '3x3' ? 'rgba(0,212,255,0.15)' : 'transparent' }}
+                            sx={{ display: { xs: 'none', sm: 'inline-flex' }, color: layout === '3x3' ? '#00D4FF' : 'rgba(255,255,255,0.6)', bgcolor: layout === '3x3' ? 'rgba(0,212,255,0.15)' : 'transparent' }}
                         >
                             <Grid3x3Icon fontSize="small" />
                         </IconButton>
@@ -331,7 +335,7 @@ const CftvWall = () => {
                         <IconButton
                             size="small"
                             onClick={() => { setFocusedCamId(null); handleLayoutChange('4x4'); }}
-                            sx={{ color: layout === '4x4' ? '#00D4FF' : 'rgba(255,255,255,0.6)', bgcolor: layout === '4x4' ? 'rgba(0,212,255,0.15)' : 'transparent' }}
+                            sx={{ display: { xs: 'none', sm: 'inline-flex' }, color: layout === '4x4' ? '#00D4FF' : 'rgba(255,255,255,0.6)', bgcolor: layout === '4x4' ? 'rgba(0,212,255,0.15)' : 'transparent' }}
                         >
                             <Grid4x4Icon fontSize="small" />
                         </IconButton>
@@ -341,11 +345,11 @@ const CftvWall = () => {
                     <Button
                         variant="outlined"
                         size="small"
-                        startIcon={<TuneIcon />}
+                        startIcon={<TuneIcon sx={{ fontSize: 16 }} />}
                         onClick={() => setOpenSelectModal(true)}
-                        sx={{ borderColor: 'rgba(255,255,255,0.2)', color: '#FFFFFF', fontSize: '0.75rem', fontWeight: 700, ml: 1 }}
+                        sx={{ borderColor: 'rgba(255,255,255,0.2)', color: '#FFFFFF', fontSize: '0.72rem', fontWeight: 700, px: 1, height: 28, minHeight: 28 }}
                     >
-                        Selecionar câmeras
+                        <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Selecionar </Box>Câmeras
                     </Button>
 
                     {/* Silenciar / Ativar Áudio */}
@@ -366,7 +370,7 @@ const CftvWall = () => {
                             onClick={toggleFullscreen}
                             sx={{ color: '#00D4FF' }}
                         >
-                            {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+                            {isFullscreen ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
                         </IconButton>
                     </Tooltip>
                 </Stack>
@@ -377,9 +381,9 @@ const CftvWall = () => {
                 {displayedCameras.length === 0 ? (
                     <Box sx={{
                         height: '100%', display: 'flex', flexDirection: 'column',
-                        alignItems: 'center', justifyContent: 'center', textAlign: 'center'
+                        alignItems: 'center', justifyContent: 'center', textAlign: 'center', p: 2
                     }}>
-                        <CameraIcon sx={{ fontSize: 72, color: 'rgba(255,255,255,0.15)', mb: 2 }} />
+                        <CameraIcon sx={{ fontSize: 64, color: 'rgba(255,255,255,0.15)', mb: 2 }} />
                         <Typography variant="h6" fontWeight={700} color="text.secondary">
                             Nenhuma câmera selecionada no mosaico
                         </Typography>
@@ -396,77 +400,85 @@ const CftvWall = () => {
                         </Button>
                     </Box>
                 ) : (
-                    <Grid container spacing={0.8} sx={{ height: '100%' }}>
+                    <Grid container spacing={0.8} sx={{ height: { xs: 'auto', md: '100%' } }}>
                         {displayedCameras.map((cam, indice) => {
-                            const isAlarming = alertCameras[cam.id] && (Date.now() - alertCameras[cam.id] < 12000);
-                            // Câmera sozinha na tela: stream principal (nítido); mosaico: sub-stream (leve).
-                            // Acima do limite do perfil, as câmeras ficam em snapshot.
+                            const isDesativada = cam.status === 'desativada' || cam.status === 'inativa';
+                            const isAlarming = !isDesativada && alertCameras[cam.id] && (Date.now() - alertCameras[cam.id] < 12000);
                             const sozinha = !!focusedCamId || layout === '1x1';
-                            const aoVivo = sozinha || indice < (iaConfig.painel?.max_streams_ao_vivo || 9);
-                            const stCam = statusDaCamera(iaStatus, cam.id);
+                            const aoVivo = !isDesativada && (sozinha || indice < (iaConfig.painel?.max_streams_ao_vivo || 9));
+                            const stCam = isDesativada ? null : statusDaCamera(iaStatus, cam.id);
                             return (
                                 <Grid item key={cam.id} xs={gridConfig.xs} sm={gridConfig.sm} md={gridConfig.md} lg={gridConfig.lg}>
-                                    <Box sx={{
-                                        position: 'relative',
-                                        width: '100%',
-                                        height: gridConfig.height,
-                                        bgcolor: '#050B18',
-                                        borderRadius: 1.5,
-                                        overflow: 'hidden',
-                                        border: isAlarming ? '3px solid #FF3366' : '1px solid rgba(255,255,255,0.08)',
-                                        boxShadow: isAlarming ? '0 0 25px rgba(255, 0, 85, 0.8)' : 'none',
-                                        transition: 'all 0.2s ease',
-                                        '&:hover .cftv-overlay-controls': { opacity: 1 }
-                                    }}>
+                                    <Box
+                                        onClick={() => {
+                                            if (window.innerWidth < 900) {
+                                                setFocusedCamId(focusedCamId === cam.id ? null : cam.id);
+                                            }
+                                        }}
+                                        sx={{
+                                            position: 'relative',
+                                            width: '100%',
+                                            aspectRatio: { xs: '16/9', md: 'unset' },
+                                            height: { xs: 'auto', md: gridConfig.height },
+                                            bgcolor: '#050B18',
+                                            borderRadius: 1.5,
+                                            overflow: 'hidden',
+                                            border: isAlarming ? '3px solid #FF3366' : '1px solid rgba(255,255,255,0.08)',
+                                            boxShadow: isAlarming ? '0 0 25px rgba(255, 0, 85, 0.8)' : 'none',
+                                            transition: 'all 0.2s ease',
+                                            '&:hover .cftv-overlay-controls': { opacity: 1 }
+                                        }}
+                                    >
                                         {/* VÍDEO AO VIVO COM IA: pausa fora da tela/aba escondida e reconecta sozinho */}
                                         <CameraVideo
                                             camId={cam.id}
                                             alt={cam.nome}
                                             modo={aoVivo ? 'stream' : 'snapshot'}
                                             qualidade={sozinha ? 'foco' : 'mini'}
+                                            pausado={isDesativada}
+                                            textoPausado="Câmera desativada"
                                         />
 
                                         {/* OSD SUPERIOR: NOME DA CÂMERA, REC/LIVE E ÁREA */}
                                         <Box sx={{
                                             position: 'absolute', top: 0, left: 0, right: 0,
-                                            p: 1, background: 'linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%)',
-                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                                            p: { xs: 0.6, sm: 1 }, background: 'linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%)',
+                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 0.5
                                         }}>
-                                            <Stack direction="row" spacing={1} alignItems="center">
-                                                {/* Indicador REC / LIVE */}
+                                            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0 }}>
                                                 <Box sx={{
-                                                    display: 'flex', alignItems: 'center', gap: 0.5,
-                                                    bgcolor: 'rgba(0,0,0,0.7)', px: 0.8, py: 0.2, borderRadius: 1,
+                                                    display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0,
+                                                    bgcolor: 'rgba(0,0,0,0.7)', px: 0.6, py: 0.2, borderRadius: 1,
                                                     border: '1px solid rgba(255,255,255,0.1)'
                                                 }}>
-                                                    <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: '#FF3366' }} />
-                                                    <Typography variant="caption" fontWeight={700} sx={{ fontSize: '0.75rem', color: '#FF3366' }}>
+                                                    <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#FF3366' }} />
+                                                    <Typography variant="caption" fontWeight={700} sx={{ fontSize: '0.68rem', color: '#FF3366' }}>
                                                         REC
                                                     </Typography>
                                                 </Box>
 
                                                 <Typography variant="body2" fontWeight={700} noWrap sx={{
-                                                    color: '#FFFFFF', fontSize: '0.8125rem', textShadow: '0 1px 3px rgba(0,0,0,0.9)'
+                                                    color: '#FFFFFF', fontSize: { xs: '0.72rem', sm: '0.8125rem' }, textShadow: '0 1px 3px rgba(0,0,0,0.9)'
                                                 }}>
                                                     {cam.nome}
                                                 </Typography>
                                             </Stack>
 
-                                            <Stack direction="row" spacing={0.8} alignItems="center">
+                                            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0 }}>
                                                 {cam.area?.nome_area && (
                                                     <Chip
-                                                        icon={<ShieldIcon sx={{ fontSize: 11, color: '#FFFFFF !important' }} />}
+                                                        icon={<ShieldIcon sx={{ fontSize: 10, color: '#FFFFFF !important' }} />}
                                                         label={cam.area.nome_area}
                                                         size="small"
-                                                        sx={{ bgcolor: 'rgba(0, 212, 255, 0.25)', color: '#FFFFFF', fontWeight: 700, fontSize: '0.75rem', height: 20 }}
+                                                        sx={{ display: { xs: 'none', sm: 'inline-flex' }, bgcolor: 'rgba(0, 212, 255, 0.25)', color: '#FFFFFF', fontWeight: 700, fontSize: '0.7rem', height: 20 }}
                                                     />
                                                 )}
                                                 {isAlarming && (
                                                     <Chip
-                                                        label="Alvo detectado!"
+                                                        label="Alvo!"
                                                         size="small"
                                                         color="error"
-                                                        sx={{ fontWeight: 700, fontSize: '0.75rem', height: 20, animation: 'blink 0.8s infinite' }}
+                                                        sx={{ fontWeight: 700, fontSize: '0.7rem', height: 20, animation: 'blink 0.8s infinite' }}
                                                     />
                                                 )}
                                             </Stack>
@@ -475,33 +487,33 @@ const CftvWall = () => {
                                         {/* OSD INFERIOR: IP, FPS E RELÓGIO DA CÂMERA */}
                                         <Box sx={{
                                             position: 'absolute', bottom: 0, left: 0, right: 0,
-                                            p: 0.8, background: 'linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%)',
+                                            p: { xs: 0.6, sm: 0.8 }, background: 'linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%)',
                                             display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                                         }}>
-                                            <Typography variant="caption" sx={{
-                                                fontFamily: '"Inter", sans-serif', fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)'
+                                            <Typography variant="caption" noWrap sx={{
+                                                fontFamily: '"Inter", sans-serif', fontSize: { xs: '0.65rem', sm: '0.75rem' }, color: 'rgba(255,255,255,0.7)', mr: 1
                                             }}>
-                                                {cam.ip_address}:{cam.porta} • {cam.protocolo?.toUpperCase() || 'RTSP'}
+                                                {cam.ip_address}:{cam.porta}
                                             </Typography>
 
-                                            <Typography variant="caption" sx={{
-                                                fontFamily: '"Inter", sans-serif', fontSize: '0.75rem', color: '#00FF88', fontWeight: 700
+                                            <Typography variant="caption" noWrap sx={{
+                                                fontFamily: '"Inter", sans-serif', fontSize: { xs: '0.65rem', sm: '0.75rem' }, color: '#00FF88', fontWeight: 700, flexShrink: 0
                                             }}>
-                                                {stCam?.conectada ? `${Math.round(stCam.video_fps)} fps` : (aoVivo ? 'AO VIVO' : 'SNAPSHOT')}
-                                                {stCam?.rostos ? ` • ${stCam.rostos} rosto(s)` : ''}
+                                                {stCam?.conectada ? `${Math.round(stCam.video_fps)} fps` : (aoVivo ? 'AO VIVO' : 'SNAP')}
+                                                {stCam?.rostos ? ` • ${stCam.rostos}` : ''}
                                             </Typography>
                                         </Box>
 
                                         {/* CONTROLES OVERLAY AO PASSAR O MOUSE */}
                                         <Box className="cftv-overlay-controls" sx={{
                                             position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-                                            opacity: 0, transition: 'opacity 0.2s ease', display: 'flex', gap: 1,
+                                            opacity: 0, transition: 'opacity 0.2s ease', display: { xs: 'none', md: 'flex' }, gap: 1,
                                             bgcolor: 'rgba(0,0,0,0.6)', p: 1, borderRadius: 1.5, backdropFilter: 'blur(4px)'
                                         }}>
                                             <Tooltip title="Focar nesta câmera (1x1)">
                                                 <IconButton
                                                     size="small"
-                                                    onClick={() => setFocusedCamId(focusedCamId === cam.id ? null : cam.id)}
+                                                    onClick={(e) => { e.stopPropagation(); setFocusedCamId(focusedCamId === cam.id ? null : cam.id); }}
                                                     sx={{ color: '#00D4FF', bgcolor: 'rgba(0,212,255,0.2)' }}
                                                 >
                                                     <Grid1x1Icon />
@@ -510,7 +522,7 @@ const CftvWall = () => {
                                             <Tooltip title="Capturar snapshot">
                                                 <IconButton
                                                     size="small"
-                                                    onClick={() => window.open(urlMidiaCamera(cam.id, 'snapshot'), '_blank')}
+                                                    onClick={(e) => { e.stopPropagation(); window.open(urlMidiaCamera(cam.id, 'snapshot'), '_blank'); }}
                                                     sx={{ color: '#FFFFFF', bgcolor: 'rgba(255,255,255,0.2)' }}
                                                 >
                                                     <SnapshotIcon />
@@ -537,10 +549,10 @@ const CftvWall = () => {
                 </DialogTitle>
                 <DialogContent>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Marque quais câmeras você deseja exibir na tela deste monitor. As câmeras são cadastradas na aba de Configurações.
+                        Marque quais câmeras você deseja exibir na tela deste monitor.
                     </Typography>
 
-                    <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+                    <Stack direction="row" spacing={1} sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
                         <Button size="small" variant="outlined" onClick={selectAllCameras}>
                             Selecionar todas
                         </Button>
@@ -575,7 +587,7 @@ const CftvWall = () => {
                     </FormGroup>
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={() => setOpenSelectModal(false)} variant="contained" sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700 }}>
+                    <Button onClick={() => setOpenSelectModal(false)} variant="contained" fullWidth sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700 }}>
                         Aplicar ao mosaico
                     </Button>
                 </DialogActions>
@@ -585,9 +597,15 @@ const CftvWall = () => {
             {activeAlert && (
                 <Fade in={!!activeAlert}>
                     <Box sx={{
-                        position: 'fixed', top: 32, right: 32, width: { xs: '92vw', sm: 520 }, zIndex: 999999,
+                        position: 'fixed',
+                        top: { xs: 12, sm: 32 },
+                        right: { xs: 12, sm: 32 },
+                        width: { xs: 'calc(100vw - 24px)', sm: 520 },
+                        maxHeight: 'calc(100dvh - 24px)',
+                        overflowY: 'auto',
+                        zIndex: 999999,
                         background: 'linear-gradient(135deg, rgba(220, 20, 60, 0.98) 0%, rgba(139, 0, 0, 0.98) 100%)',
-                        color: '#FFFFFF', borderRadius: 1.5, p: 3,
+                        color: '#FFFFFF', borderRadius: 1.5, p: { xs: 2, sm: 3 },
                         boxShadow: '0 0 60px rgba(255, 30, 86, 0.9), 0 25px 50px rgba(0,0,0,0.9)',
                         border: '2px solid #FF3366',
                         animation: 'cftvAlertPulse 1.2s infinite alternate',
@@ -596,11 +614,11 @@ const CftvWall = () => {
                             '100%': { borderColor: '#FF3366', boxShadow: '0 0 70px rgba(255, 0, 80, 1)' }
                         }
                     }}>
-                        <Stack direction="row" spacing={2} justifyContent="space-between" alignItems="center">
-                            <Stack direction="row" spacing={1.5} alignItems="center">
-                                <AlarmIcon sx={{ fontSize: 36, color: '#FFFFFF' }} />
-                                <Box>
-                                    <Typography variant="h6" fontWeight={700} letterSpacing={0.5} sx={{ color: '#FFFFFF' }}>
+                        <Stack direction="row" spacing={1.5} justifyContent="space-between" alignItems="center">
+                            <Stack direction="row" spacing={1.2} alignItems="center" sx={{ minWidth: 0 }}>
+                                <AlarmIcon sx={{ fontSize: { xs: 28, sm: 36 }, color: '#FFFFFF', flexShrink: 0 }} />
+                                <Box sx={{ minWidth: 0 }}>
+                                    <Typography variant="h6" fontWeight={700} letterSpacing={0.5} sx={{ color: '#FFFFFF', fontSize: { xs: '1rem', sm: '1.25rem' } }}>
                                         Alvo identificado na watchlist!
                                     </Typography>
                                     <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.9)', fontWeight: 700 }}>
@@ -614,11 +632,11 @@ const CftvWall = () => {
                         </Stack>
 
                         {/* COMPARATIVO VISUAL: FOTO CADASTRADA VS FOTO CAPTURADA PELA CÂMERA */}
-                        <Box sx={{ mt: 2.5, p: 1.5, borderRadius: 1.5, bgcolor: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.15)' }}>
+                        <Box sx={{ mt: 2, p: 1.5, borderRadius: 1.5, bgcolor: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.15)' }}>
                             <Typography variant="caption" fontWeight={700} sx={{ color: '#00D4FF', letterSpacing: 1, display: 'block', mb: 1 }}>
                                 Comparativo biométrico facial
                             </Typography>
-                            <Grid container spacing={2} alignItems="center">
+                            <Grid container spacing={1.5} alignItems="center">
                                 {/* Foto Cadastrada */}
                                 <Grid item xs={6} sx={{ textAlign: 'center' }}>
                                     <Typography variant="caption" sx={{ display: 'block', mb: 0.5, fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>
@@ -628,7 +646,7 @@ const CftvWall = () => {
                                         <PessoaFoto
                                             src={activeAlert?.pessoa?.foto_url}
                                             nome={activeAlert?.pessoa?.nome}
-                                            width={110}
+                                            width={96}
                                             borderRadius="10px"
                                             accentColor="#00D4FF"
                                             borderWidth="2px"
@@ -639,10 +657,10 @@ const CftvWall = () => {
                                 {/* Foto Capturada no Local */}
                                 <Grid item xs={6} sx={{ textAlign: 'center' }}>
                                     <Typography variant="caption" sx={{ display: 'block', mb: 0.5, fontWeight: 700, color: '#FF3366' }}>
-                                        Foto capturada na câmera
+                                        Foto capturada
                                     </Typography>
                                     <Box sx={{
-                                        width: 110, height: 110, mx: 'auto', borderRadius: '10px',
+                                        width: 96, height: 96, mx: 'auto', borderRadius: '10px',
                                         overflow: 'hidden', bgcolor: '#000000', border: '2px solid #FF3366',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center'
                                     }}>
@@ -653,7 +671,7 @@ const CftvWall = () => {
                                                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                             />
                                         ) : (
-                                            <CameraIcon sx={{ fontSize: 40, color: 'rgba(255,255,255,0.3)' }} />
+                                            <CameraIcon sx={{ fontSize: 36, color: 'rgba(255,255,255,0.3)' }} />
                                         )}
                                     </Box>
                                 </Grid>
@@ -661,8 +679,8 @@ const CftvWall = () => {
                         </Box>
 
                         {/* DADOS DA PESSOA */}
-                        <Box sx={{ mt: 2 }}>
-                            <Typography variant="h5" fontWeight={700} sx={{ color: '#FFFFFF' }}>
+                        <Box sx={{ mt: 1.5 }}>
+                            <Typography variant="h6" fontWeight={700} sx={{ color: '#FFFFFF', fontSize: { xs: '1.1rem', sm: '1.35rem' } }}>
                                 {activeAlert?.target_name || activeAlert?.pessoa?.nome}
                             </Typography>
                             <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontWeight: 700 }}>
@@ -671,28 +689,28 @@ const CftvWall = () => {
                             <Chip
                                 label={comoRotulo(activeAlert?.watchlist?.nivel_alerta) || 'Crítico / alto risco'}
                                 size="small"
-                                sx={{ mt: 1, bgcolor: '#FFFFFF', color: '#FF3366', fontWeight: 700, fontSize: '0.75rem' }}
+                                sx={{ mt: 0.75, bgcolor: '#FFFFFF', color: '#FF3366', fontWeight: 700, fontSize: '0.75rem' }}
                             />
                         </Box>
 
                         {/* DISPOSITIVO QUE IDENTIFICOU & LOCALIZAÇÃO DENTRO DO EVENTO */}
-                        <Box sx={{ mt: 2, p: 1.5, borderRadius: 1.5, bgcolor: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                            <Typography variant="body2" sx={{ fontSize: '0.8125rem' }}>
+                        <Box sx={{ mt: 1.5, p: 1.25, borderRadius: 1.5, bgcolor: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                            <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
                                 <b>Dispositivo:</b> {activeAlert?.dispositivo?.nome || activeAlert?.location || 'Câmera IP'} ({activeAlert?.dispositivo?.ip || 'Rede'})
                             </Typography>
-                            <Typography variant="body2" sx={{ fontSize: '0.8125rem', mt: 0.4 }}>
+                            <Typography variant="body2" sx={{ fontSize: '0.8rem', mt: 0.3 }}>
                                 <b>Local no evento:</b> {activeAlert?.localizacao || activeAlert?.location || 'Área Principal'}
                             </Typography>
-                            <Typography variant="body2" sx={{ fontSize: '0.8125rem', mt: 0.4 }}>
+                            <Typography variant="body2" sx={{ fontSize: '0.8rem', mt: 0.3 }}>
                                 <b>Motivo:</b> {activeAlert?.watchlist?.motivo || 'Alvo em monitoramento de segurança.'}
                             </Typography>
-                            <Typography variant="caption" sx={{ mt: 0.8, display: 'block', opacity: 0.8 }}>
+                            <Typography variant="caption" sx={{ mt: 0.6, display: 'block', opacity: 0.8 }}>
                                 Horário: {activeAlert?.timestamp ? new Date(activeAlert.timestamp).toLocaleTimeString() : 'Agora'} • IA ArcFace 512-D
                             </Typography>
                         </Box>
 
                         {/* AÇÃO PRINCIPAL: ALVO LOCALIZADO */}
-                        <Box sx={{ mt: 2.5 }}>
+                        <Box sx={{ mt: 2 }}>
                             <Button
                                 variant="contained"
                                 color="success"
@@ -704,18 +722,18 @@ const CftvWall = () => {
                                     bgcolor: '#00FF88',
                                     color: '#000000',
                                     fontWeight: 700,
-                                    fontSize: '0.875rem',
+                                    fontSize: '0.82rem',
                                     letterSpacing: '0.5px',
-                                    py: 1.2,
+                                    py: 1.1,
                                     boxShadow: '0 4px 20px rgba(0, 230, 118, 0.5)',
                                     '&:hover': { bgcolor: '#00FF88', color: '#000000' }
                                 }}
                             >
-                                Alvo localizado (concluir rastreamento)
+                                Alvo localizado (concluir)
                             </Button>
                         </Box>
 
-                        <Stack direction="row" spacing={1.5} mt={1.5}>
+                        <Stack direction="row" spacing={1.5} mt={1.25}>
                             <Button
                                 variant="contained"
                                 size="small"

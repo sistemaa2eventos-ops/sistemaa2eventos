@@ -19,7 +19,7 @@ module.exports = {
             version: 'detect'
         }
     },
-    ignorePatterns: ['dist/', 'node_modules/'],
+    ignorePatterns: ['dist/', 'node_modules/', 'public/'],
     rules: {
         'no-unused-vars': ['error', {
             'argsIgnorePattern': '^_',

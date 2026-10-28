@@ -18,23 +18,25 @@ const logger = require('../../services/logger');
 const IA_URL_DIRETA = process.env.PYTHON_MICROSERVICE_URL || null;
 const RECONFIGURAR_MS = 5 * 60 * 1000;
 
-/** Câmeras RTSP do evento com as opções de IA de cada uma (IA ligada, vigilância 24 h, prioridade, sub-stream) */
+/** Câmeras RTSP ativas do evento com as opções de IA de cada uma (IA ligada, vigilância 24 h, prioridade, sub-stream) */
 async function camerasDoEvento(eventoId) {
     const consultar = (campos) => supabase.from('cameras_ip').select(campos).eq('evento_id', eventoId).like('stream_url', 'rtsp%');
-    let { data, error } = await consultar('id, nome, stream_url, ia_ativa, vigilancia_ativa, prioridade, url_substream');
+    let { data, error } = await consultar('id, nome, status, stream_url, ia_ativa, vigilancia_ativa, prioridade, url_substream');
     if (error && (error.code === '42703' || /column/i.test(error.message))) {
-        ({ data, error } = await consultar('id, nome, stream_url')); // banco sem a migration 20261028
+        ({ data, error } = await consultar('id, nome, status, stream_url')); // banco sem a migration 20261028
     }
     if (error) throw error;
-    return (data || []).map(c => ({
-        id: c.id,
-        nome: c.nome,
-        stream_url: c.stream_url,
-        ia_ativa: c.ia_ativa !== false,
-        vigilancia_ativa: c.vigilancia_ativa !== false,
-        prioridade: c.prioridade ?? 1,
-        url_substream: c.url_substream || null
-    }));
+    return (data || [])
+        .filter(c => c.status !== 'desativada' && c.status !== 'inativa')
+        .map(c => ({
+            id: c.id,
+            nome: c.nome,
+            stream_url: c.stream_url,
+            ia_ativa: c.ia_ativa !== false,
+            vigilancia_ativa: c.vigilancia_ativa !== false,
+            prioridade: c.prioridade ?? 1,
+            url_substream: c.url_substream || null
+        }));
 }
 
 /** Envia ao agente a lista de câmeras do evento dele (agente antigo, sem o comando, é ignorado) */
@@ -72,7 +74,7 @@ async function receberDeteccao(eventoIdDoAgente, deteccao, { local = false } = {
     const { data: cam } = await supabase.from('cameras_ip')
         .select('*, area:evento_areas(id, nome_area)')
         .eq('id', deteccao.camera_id).maybeSingle();
-    if (!cam) return;
+    if (!cam || cam.status === 'desativada' || cam.status === 'inativa' || cam.ia_ativa === false) return;
     if (!local && cam.evento_id !== eventoIdDoAgente) {
         logger.warn(`[Vigilância] detecção de câmera de outro evento ignorada (câmera ${cam.id})`);
         return;

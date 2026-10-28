@@ -48,8 +48,8 @@ const playCheckoutSound = (type) => {
     }
 };
 
-const BotaoSaida = styled(Button)(() => ({
-    height: 52,
+const BotaoSaida = styled(Button)(({ theme }) => ({
+    height: 50,
     fontSize: '1rem',
     fontWeight: 700,
     textTransform: 'none',
@@ -57,6 +57,10 @@ const BotaoSaida = styled(Button)(() => ({
     background: COR,
     color: '#000000',
     boxShadow: 'none',
+    [theme.breakpoints.down('sm')]: {
+        height: 46,
+        fontSize: '0.9375rem'
+    },
     '&:hover': { background: COR, filter: 'brightness(1.1)', boxShadow: 'none' },
     '&:focus-visible': { outline: `2px solid ${COR}`, outlineOffset: 2 },
     '&.Mui-disabled': { background: tom(COR, 0.3), color: 'rgba(255,255,255,0.7)' }
@@ -158,7 +162,7 @@ const Checkout = () => {
         overflowX: 'hidden',
         // No desktop a tela cabe na janela: só a lista rola
         height: { lg: '100vh' },
-        minHeight: modoQuiosque ? '100vh' : 'auto',
+        minHeight: modoQuiosque ? '100dvh' : 'auto',
         display: 'flex', flexDirection: 'column',
         position: 'relative'
     }}>
@@ -182,11 +186,11 @@ const Checkout = () => {
           onToggleQuiosque={toggleQuiosque}
       />
 
-      <Grid container spacing={2} sx={{ flex: 1, minHeight: 0 }}>
+      <Grid container spacing={{ xs: 1.5, sm: 2 }} sx={{ flex: 1, minHeight: 0 }}>
 
         {/* BAIXA: leitor, confirmação e resumo juntos no topo */}
         <Grid item xs={12} lg={4}>
-            <GlassCard sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <GlassCard sx={{ p: { xs: 1.75, sm: 2.5 }, display: 'flex', flexDirection: 'column', gap: { xs: 1.5, sm: 2 } }}>
                 <UniversalPulseiraInput
                     value={pulseiraValue}
                     onChange={setPulseiraValue}
@@ -203,15 +207,15 @@ const Checkout = () => {
                     Registrar saída
                 </BotaoSaida>
 
-                <Stack spacing={0.75} sx={{ pt: 1.5, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <Stack spacing={0.75} sx={{ pt: 1.25, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                     <LinhaResumo rotulo="Saídas registradas" valor={checkoutLogs.length} cor={COR} />
                 </Stack>
             </GlassCard>
         </Grid>
 
         {/* SAÍDAS EM TEMPO REAL */}
-        <Grid item xs={12} lg={8} sx={{ height: { xs: '75vh', lg: '100%' } }}>
-            <GlassCard sx={{ p: 2.5, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <Grid item xs={12} lg={8} sx={{ height: { xs: 'auto', lg: '100%' }, minHeight: { xs: 360, lg: 0 } }}>
+            <GlassCard sx={{ p: { xs: 1.75, sm: 2.5 }, height: '100%', maxHeight: { xs: 520, lg: 'none' }, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                 <RecentAccessList
                     logs={checkoutLogs}
                     title="Saídas"
@@ -232,13 +236,13 @@ const Checkout = () => {
           <FeedbackOverlay status={checkinResult}>
               <Zoom in={!!checkinResult}>
                   <Box sx={{ textAlign: 'center', p: 2 }}>
-                      {checkinResult === 'sucesso' ? <CheckoutIcon sx={{ fontSize: 100, color: COR }} /> : <WarningIcon sx={{ fontSize: 100, color: funcao.negado }} />}
-                      <Typography variant="h4" fontWeight={700} mt={2}>
+                      {checkinResult === 'sucesso' ? <CheckoutIcon sx={{ fontSize: { xs: 76, sm: 100 }, color: COR }} /> : <WarningIcon sx={{ fontSize: { xs: 76, sm: 100 }, color: funcao.negado }} />}
+                      <Typography fontWeight={700} mt={2} sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
                           {checkinResult === 'sucesso' ? 'Saída registrada' : 'Saída negada'}
                       </Typography>
                       <Typography variant="body1" sx={{ opacity: 0.9, mt: 1 }}>{resultMessage}</Typography>
                       {checkinResult === 'sucesso' && (
-                          <Typography variant="h5" sx={{ mt: 2, opacity: 0.6, fontFamily: '"Inter", sans-serif', letterSpacing: 1.5 }}>
+                          <Typography variant="h6" sx={{ mt: 1.5, opacity: 0.6, fontFamily: '"Inter", sans-serif', letterSpacing: 1.5 }}>
                               {currentTime} • {timezoneLabel}
                           </Typography>
                       )}

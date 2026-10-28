@@ -48,15 +48,15 @@ const RecentAccessList = ({
           display: 'flex',
           alignItems: 'center',
           flexWrap: 'wrap',
-          gap: 1.5,
+          gap: 1.25,
           mb: 1.5,
-          pb: 1.5,
+          pb: 1.25,
           borderBottom: '1px solid rgba(255,255,255,0.08)'
         }}
       >
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ flex: 1, minWidth: 220 }}>
-          <IconComponent sx={{ color: accentColor, fontSize: 24 }} />
-          <Typography variant="h6" fontWeight={700} color="#FFFFFF">
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ flex: 1, minWidth: 160 }}>
+          <IconComponent sx={{ color: accentColor, fontSize: 22 }} />
+          <Typography variant="h6" fontWeight={700} color="#FFFFFF" sx={{ fontSize: { xs: '1rem', sm: '1.0625rem' } }}>
             {title}
           </Typography>
           <Chip
@@ -76,10 +76,10 @@ const RecentAccessList = ({
           placeholder="Filtrar nome, CPF, pulseira"
           value={filterText}
           onChange={(e) => setFilterText(e.target.value)}
-          sx={{ width: { xs: "100%", sm: 250 } }}
+          sx={{ width: { xs: '100%', sm: 240 } }}
           InputProps={{
-            startAdornment: <SearchIcon sx={{ color: 'rgba(255,255,255,0.4)', mr: 1, fontSize: 20 }} />,
-            sx: { bgcolor: 'rgba(0,0,0,0.25)', borderRadius: 1.5, color: '#FFFFFF', fontSize: '0.875rem' }
+            startAdornment: <SearchIcon sx={{ color: 'rgba(255,255,255,0.4)', mr: 1, fontSize: 18 }} />,
+            sx: { bgcolor: 'rgba(0,0,0,0.25)', borderRadius: 1.5, color: '#FFFFFF', fontSize: '0.8125rem', height: 36 }
           }}
         />
         {acoes}
@@ -103,13 +103,13 @@ const RecentAccessList = ({
                 key={log.id || index}
                 onClick={() => onSelect && onSelect(log)}
                 sx={{
-                  px: 1.5,
+                  px: { xs: 1.25, sm: 1.5 },
                   py: 1,
                   bgcolor: isFirst ? `${accentColor}14` : 'rgba(255, 255, 255, 0.02)',
                   borderRadius: 1.5,
                   border: isFirst ? `1px solid ${accentColor}80` : '1px solid rgba(255, 255, 255, 0.06)',
                   display: 'flex',
-                  gap: 1.5,
+                  gap: { xs: 1.15, sm: 1.5 },
                   alignItems: 'center',
                   cursor: onSelect ? 'pointer' : 'default',
                   transition: 'background-color 0.15s ease, border-color 0.15s ease',
@@ -119,7 +119,7 @@ const RecentAccessList = ({
                 <PessoaFoto
                   src={fotoUrl}
                   nome={nome}
-                  width={44}
+                  width={42}
                   borderRadius="10px"
                   accentColor={accentColor}
                   borderWidth="1px"
@@ -130,26 +130,31 @@ const RecentAccessList = ({
                 />
 
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
-                    <Typography variant="subtitle1" fontWeight={700} color="#FFFFFF" noWrap>
+                  <Stack direction="row" alignItems="center" spacing={0.75} sx={{ minWidth: 0 }}>
+                    <Typography variant="subtitle2" fontWeight={700} color="#FFFFFF" noWrap sx={{ fontSize: { xs: '0.875rem', sm: '0.9375rem' } }}>
                       {nome}
                     </Typography>
                     {isFirst && (
                       <Chip
                         label={firstLabel}
                         size="small"
-                        sx={{ bgcolor: accentColor, color: '#000000', fontWeight: 700, height: 20, flexShrink: 0 }}
+                        sx={{ bgcolor: accentColor, color: '#000000', fontWeight: 700, height: 18, fontSize: '0.6875rem', flexShrink: 0, display: { xs: 'none', sm: 'inline-flex' } }}
                       />
                     )}
                   </Stack>
-                  <Typography variant="body2" noWrap sx={{ display: 'flex', alignItems: 'center', gap: 0.6, color: 'rgba(255,255,255,0.7)' }}>
-                    <CompanyIcon sx={{ fontSize: 16, color: accentColor }} />
+                  <Typography variant="caption" noWrap sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem' }}>
+                    <CompanyIcon sx={{ fontSize: 14, color: accentColor, flexShrink: 0 }} />
                     {empresa}{funcao ? ` · ${funcao}` : ''}
                   </Typography>
+                  {pulseira && (
+                    <Typography variant="caption" sx={{ display: { xs: 'inline-block', sm: 'none' }, color: accentColor, fontWeight: 700, fontSize: '0.7rem', mt: 0.25 }}>
+                      Pulseira #{pulseira}
+                    </Typography>
+                  )}
                 </Box>
 
                 {pulseira && (
-                  <Box sx={{ textAlign: 'center', px: 1.25, py: 0.5, bgcolor: 'rgba(0,0,0,0.35)', borderRadius: 1, border: `1px solid ${accentColor}30`, flexShrink: 0 }}>
+                  <Box sx={{ display: { xs: 'none', sm: 'block' }, textAlign: 'center', px: 1.25, py: 0.5, bgcolor: 'rgba(0,0,0,0.35)', borderRadius: 1, border: `1px solid ${accentColor}30`, flexShrink: 0 }}>
                     <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', display: 'block', lineHeight: 1.2 }}>
                       Pulseira
                     </Typography>
@@ -159,11 +164,11 @@ const RecentAccessList = ({
                   </Box>
                 )}
 
-                <Box sx={{ textAlign: 'right', minWidth: 72, flexShrink: 0 }}>
-                  <Typography variant="subtitle1" fontWeight={700} color="#FFFFFF" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                <Box sx={{ textAlign: 'right', minWidth: { xs: 52, sm: 72 }, flexShrink: 0 }}>
+                  <Typography variant="body2" fontWeight={700} color="#FFFFFF" sx={{ fontVariantNumeric: 'tabular-nums', fontSize: { xs: '0.8125rem', sm: '0.9375rem' } }}>
                     {hora}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: accentColor, fontWeight: 600 }}>
+                  <Typography variant="caption" sx={{ color: accentColor, fontWeight: 600, fontSize: '0.7rem' }}>
                     {badgeLabel}
                   </Typography>
                 </Box>
@@ -172,8 +177,8 @@ const RecentAccessList = ({
           })}
 
           {filteredLogs.length === 0 && (
-            <Box sx={{ textAlign: 'center', py: 6, px: 2, opacity: 0.6 }}>
-              <IconComponent sx={{ fontSize: 48, mb: 1, color: accentColor }} />
+            <Box sx={{ textAlign: 'center', py: 5, px: 2, opacity: 0.6 }}>
+              <IconComponent sx={{ fontSize: 44, mb: 1, color: accentColor }} />
               <Typography variant="subtitle1" fontWeight={700} color="#FFFFFF">
                 {filterText ? `Nada encontrado para "${filterText}"` : emptyTitle}
               </Typography>

@@ -32,8 +32,8 @@ const FeedbackOverlay = styled(Box, { shouldForwardProp: (p) => p !== 'status' }
 const NumeroTurno = ({ rotulo, valor, cor, dica }) => {
   const conteudo = (
     <Box sx={{ flex: 1, px: 1.5, py: 1, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.03)' }}>
-      <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>{rotulo}</Typography>
-      <Typography variant="h5" fontWeight={700} sx={{ color: cor, fontVariantNumeric: 'tabular-nums' }}>{valor}</Typography>
+      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', display: 'block' }}>{rotulo}</Typography>
+      <Typography variant="h6" fontWeight={700} sx={{ color: cor, fontVariantNumeric: 'tabular-nums' }}>{valor}</Typography>
     </Box>
   );
   return dica ? <Tooltip title={dica}>{conteudo}</Tooltip> : conteudo;
@@ -110,7 +110,7 @@ const Checkin = () => {
         overflowX: 'hidden',
         // No desktop a tela cabe na janela: só as listas rolam
         height: { lg: '100vh' },
-        minHeight: modoQuiosque ? '100vh' : 'auto',
+        minHeight: modoQuiosque ? '100dvh' : 'auto',
         display: 'flex', flexDirection: 'column',
         position: 'relative'
     }}>
@@ -134,11 +134,11 @@ const Checkin = () => {
           onToggleQuiosque={toggleQuiosque}
       />
 
-      <Grid container spacing={2} sx={{ flex: 1, minHeight: 0 }}>
+      <Grid container spacing={{ xs: 1.5, sm: 2 }} sx={{ flex: 1, minHeight: 0 }}>
 
         {/* OPERAÇÃO: leitor, busca e números do turno */}
         <Grid item xs={12} lg={4} sx={{ height: { lg: '100%' } }}>
-            <GlassCard sx={{ p: 2.5, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <GlassCard sx={{ p: { xs: 1.75, sm: 2.5 }, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                 <UniversalPulseiraInput
                     value={barcodeValue}
                     onChange={setBarcodeValue}
@@ -157,9 +157,9 @@ const Checkin = () => {
                     autoFocus={!modoQuiosque}
                 />
 
-                <Box sx={{ display: 'flex', alignItems: 'center', my: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', my: { xs: 1.5, sm: 2 } }}>
                     <Box sx={{ flex: 1, height: '1px', bgcolor: 'rgba(255,255,255,0.1)' }} />
-                    <Typography variant="body2" sx={{ px: 1.5, color: 'rgba(255,255,255,0.55)' }}>
+                    <Typography variant="caption" sx={{ px: 1.25, color: 'rgba(255,255,255,0.55)', textAlign: 'center' }}>
                         ou procure pelo nome para vincular pulseira
                     </Typography>
                     <Box sx={{ flex: 1, height: '1px', bgcolor: 'rgba(255,255,255,0.1)' }} />
@@ -173,11 +173,11 @@ const Checkin = () => {
                     inputProps={{ 'aria-label': 'Procurar participante por nome ou CPF' }}
                     InputProps={{
                         startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />,
-                        sx: { borderRadius: 1.5, height: 48, fontSize: '1rem', bgcolor: 'rgba(255,255,255,0.03)' }
+                        sx: { borderRadius: 1.5, height: { xs: 44, sm: 48 }, fontSize: { xs: '0.9375rem', sm: '1rem' }, bgcolor: 'rgba(255,255,255,0.03)' }
                     }}
                 />
 
-                <Box sx={{ mt: 1.5, flex: 1, overflowY: 'auto', minHeight: { xs: 180, lg: 0 } }}>
+                <Box sx={{ mt: 1.5, flex: 1, overflowY: 'auto', minHeight: { xs: searchResults.length > 0 ? 180 : 0, lg: 0 }, maxHeight: { xs: 280, lg: 'none' } }}>
                     {searchResults.length > 0 ? (
                         <List disablePadding>
                             {searchResults.map(p => (
@@ -187,7 +187,7 @@ const Checkin = () => {
                                     sx={{
                                         borderRadius: 1.5,
                                         mb: 1,
-                                        p: 1.25,
+                                        p: 1.15,
                                         border: '1px solid rgba(255,255,255,0.06)',
                                         bgcolor: 'rgba(255,255,255,0.02)',
                                         '&:hover': {
@@ -208,15 +208,15 @@ const Checkin = () => {
                                     <ListItemText
                                         primary={p.nome}
                                         secondary={[p.cpf || 'Sem CPF', p.empresa_nome].filter(Boolean).join(' – ')}
-                                        primaryTypographyProps={{ fontWeight: 700, fontSize: '0.9375rem', noWrap: true }}
-                                        secondaryTypographyProps={{ fontSize: '0.8125rem', noWrap: true }}
+                                        primaryTypographyProps={{ fontWeight: 700, fontSize: '0.9rem', noWrap: true }}
+                                        secondaryTypographyProps={{ fontSize: '0.78rem', noWrap: true }}
                                     />
                                 </ListItemButton>
                             ))}
                         </List>
                     ) : (
                         searchQuery.length >= 3 && !loading && (
-                            <Typography variant="body2" sx={{ textAlign: 'center', opacity: 0.6, mt: 3 }}>
+                            <Typography variant="body2" sx={{ textAlign: 'center', opacity: 0.6, my: 2 }}>
                                 Ninguém encontrado para &quot;{searchQuery}&quot;.
                             </Typography>
                         )
@@ -239,8 +239,8 @@ const Checkin = () => {
         </Grid>
 
         {/* REGISTROS EM TEMPO REAL */}
-        <Grid item xs={12} lg={8} sx={{ height: { xs: '75vh', lg: '100%' } }}>
-            <GlassCard sx={{ p: 2.5, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <Grid item xs={12} lg={8} sx={{ height: { xs: 'auto', lg: '100%' }, minHeight: { xs: 360, lg: 0 } }}>
+            <GlassCard sx={{ p: { xs: 1.75, sm: 2.5 }, height: '100%', maxHeight: { xs: 520, lg: 'none' }, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                 <RecentAccessList
                     logs={recentLogs}
                     title="Entradas"
@@ -260,14 +260,14 @@ const Checkin = () => {
       {checkinResult && (
           <FeedbackOverlay status={checkinResult}>
               <Zoom in={!!checkinResult}>
-                  <Box sx={{ textAlign: 'center' }}>
-                      {checkinResult === 'sucesso' ? <SuccessIcon sx={{ fontSize: 130, color: '#00FF88' }} /> : <ErrorIcon sx={{ fontSize: 130, color: '#FF3366' }} />}
-                      <Typography variant="h3" fontWeight={700} mt={2}>
+                  <Box sx={{ textAlign: 'center', p: 2 }}>
+                      {checkinResult === 'sucesso' ? <SuccessIcon sx={{ fontSize: { xs: 84, sm: 130 }, color: '#00FF88' }} /> : <ErrorIcon sx={{ fontSize: { xs: 84, sm: 130 }, color: '#FF3366' }} />}
+                      <Typography fontWeight={700} mt={2} sx={{ fontSize: { xs: '1.65rem', sm: '2.5rem' } }}>
                           {checkinResult === 'sucesso' ? 'Entrada liberada' : 'Entrada negada'}
                       </Typography>
-                      <Typography variant="h6" sx={{ opacity: 0.8 }}>{resultMessage}</Typography>
+                      <Typography variant="h6" sx={{ opacity: 0.85, fontSize: { xs: '1rem', sm: '1.25rem' } }}>{resultMessage}</Typography>
                       {checkinResult === 'sucesso' && (
-                          <Typography variant="h5" sx={{ mt: 2, opacity: 0.6, fontFamily: '"Inter", sans-serif', letterSpacing: 1.5 }}>
+                          <Typography variant="h6" sx={{ mt: 1.5, opacity: 0.6, fontFamily: '"Inter", sans-serif', letterSpacing: 1.5 }}>
                               {currentTime} • {timezoneLabel}
                           </Typography>
                       )}

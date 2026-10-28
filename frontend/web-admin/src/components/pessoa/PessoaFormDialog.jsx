@@ -54,13 +54,13 @@ const PessoaFormDialog = ({
       fullScreen={isMobile}
       PaperProps={{
         sx: {
-          minHeight: isMobile ? '100%' : '80vh',
-          maxHeight: isMobile ? '100%' : '90vh',
-          height: isMobile ? '100%' : '88vh',
+          minHeight: isMobile ? '100dvh' : '80vh',
+          maxHeight: isMobile ? '100dvh' : '90vh',
+          height: isMobile ? '100dvh' : '88vh',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden'
-                    }
+        }
       }}
     >
       <TituloModal
@@ -69,38 +69,39 @@ const PessoaFormDialog = ({
         desabilitarFechar={saving}
       />
       
-      <DialogContent sx={{ p: 0, flex: '1 1 auto', display: 'flex', minHeight: 0, overflow: 'hidden' }}>
-        <Grid container sx={{ flex: 1, height: '100%', minHeight: 0 }}>
+      <DialogContent sx={{ p: 0, flex: '1 1 auto', display: 'flex', minHeight: 0, overflowY: { xs: 'auto', md: 'hidden' }, overflowX: 'hidden' }}>
+        <Grid container sx={{ flex: 1, height: { xs: 'auto', md: '100%' }, minHeight: 0 }}>
           <Grid item xs={12} md={activeStep === 1 ? 4 : 5} sx={{
-            borderRight: isMobile ? 'none' : '1px solid rgba(255, 255, 255, 0.05)',
-            p: activeStep === 1 ? 2.5 : 4, 
+            borderRight: { xs: 'none', md: '1px solid rgba(255, 255, 255, 0.05)' },
+            borderBottom: { xs: '1px solid rgba(255, 255, 255, 0.08)', md: 'none' },
+            p: { xs: 2, sm: 2.5, md: activeStep === 1 ? 2.5 : 4 }, 
             display: 'flex', 
             flexDirection: 'column', 
             bgcolor: 'rgba(0,0,0,0.2)',
-            overflowY: 'auto', 
+            overflowY: { xs: 'visible', md: 'auto' }, 
             minHeight: 0, 
-            height: '100%',
+            height: { xs: 'auto', md: '100%' },
             '&::-webkit-scrollbar': { width: '6px' },
             '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.3)', borderRadius: '10px' }
           }}>
             {activeStep === 0 && (
               !isEmpresa ? (
                 <>
-                  <Box sx={{ mb: 3, textAlign: 'center' }}>
+                  <Box sx={{ mb: { xs: 1.5, md: 3 }, textAlign: 'center' }}>
                     <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: 2 }}>Identificação biométrica</Typography>
                   </Box>
                   <PhotoCapture
                     onPhotoCaptured={(url) => setFormData({ ...formData, foto_url: url })}
                     initialPhoto={formData.foto_url}
                   />
-                  <Box sx={{ mt: 'auto', pt: 3 }}>
+                  <Box sx={{ mt: { xs: 1.5, md: 'auto' }, pt: { xs: 1, md: 3 } }}>
                     <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center', display: 'block', fontStyle: 'italic' }}>
                       A qualidade do enquadramento garante a velocidade de identificação nos terminais.
                     </Typography>
                   </Box>
                 </>
               ) : (
-                <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
+                <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', p: { xs: 2, md: 4 } }}>
                   <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>
                     A coleta biométrica será realizada pelo próprio colaborador via link seguro de convite.
                   </Typography>
@@ -224,9 +225,9 @@ const PessoaFormDialog = ({
             )}
 
             {activeStep === 2 && (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                 <Box sx={{ 
-                  p: 2, 
+                  p: 1.5, 
                   borderRadius: 1.5, 
                   bgcolor: 'rgba(0, 212, 255, 0.04)', 
                   border: '1px solid rgba(0, 212, 255, 0.15)',
@@ -235,14 +236,14 @@ const PessoaFormDialog = ({
                   gap: 1.5 
                 }}>
                   {formData.foto_url && (
-                    <Box component="img" src={formData.foto_url} alt="Foto" sx={{ width: 56, height: 56, borderRadius: 1.5, objectFit: 'cover', border: '2px solid #00D4FF' }} />
+                    <Box component="img" src={formData.foto_url} alt="Foto" sx={{ width: 52, height: 52, borderRadius: 1.5, objectFit: 'cover', border: '2px solid #00D4FF' }} />
                   )}
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{formData.nome_completo}</Typography>
                     <Typography variant="caption" sx={{ color: '#00FF88', fontWeight: 700 }}>{formData.funcao || 'Colaborador'}</Typography>
                   </Box>
                 </Box>
-                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontStyle: 'italic', mt: 2 }}>
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontStyle: 'italic' }}>
                   Verifique a conformidade de segurança e audite a documentação obrigatória anexada.
                 </Typography>
               </Box>
@@ -250,11 +251,11 @@ const PessoaFormDialog = ({
 
           </Grid>
 
-          <Grid item xs={12} md={activeStep === 1 ? 8 : 7} sx={{ p: { xs: 2.5, md: 3 }, pr: { xs: 2, md: 2.5 }, height: '100%', maxHeight: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0, '&::-webkit-scrollbar': { width: '6px' }, '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.4)', borderRadius: '10px' }, '&::-webkit-scrollbar-track': { background: 'rgba(255,255,255,0.02)' } }}>
+          <Grid item xs={12} md={activeStep === 1 ? 8 : 7} sx={{ p: { xs: 2, sm: 2.5, md: 3 }, pr: { xs: 2, md: 2.5 }, height: { xs: 'auto', md: '100%' }, maxHeight: { xs: 'none', md: '100%' }, overflowY: { xs: 'visible', md: 'auto' }, display: 'flex', flexDirection: 'column', minHeight: 0, '&::-webkit-scrollbar': { width: '6px' }, '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.4)', borderRadius: '10px' }, '&::-webkit-scrollbar-track': { background: 'rgba(255,255,255,0.02)' } }}>
             <Box sx={{ pr: { xs: 0, md: 0.5 }, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               {!isEmpresa && (
               <Stepper activeStep={activeStep} alternativeLabel sx={{
-                mb: 2.5,
+                mb: { xs: 2, sm: 2.5 },
                 '& .MuiStepConnector-line': { borderColor: 'rgba(255,255,255,0.05)' },
                 '& .MuiStepIcon-root': {
                   color: 'rgba(255,255,255,0.05)',
@@ -265,7 +266,7 @@ const PessoaFormDialog = ({
                   '& .MuiStepIcon-text': { fill: '#FFFFFF', fontWeight: 700 }
                 },
                 '& .MuiStepLabel-label': {
-                  color: 'rgba(255,255,255,0.3) !important', fontSize: '0.75rem', fontWeight: 600, mt: 1,
+                  color: 'rgba(255,255,255,0.3) !important', fontSize: { xs: '0.7rem', sm: '0.75rem' }, fontWeight: 600, mt: 0.75,
                   '&.Mui-active': { color: '#FFFFFF !important' },
                   '&.Mui-completed': { color: 'rgba(255,255,255,0.6) !important' }
                 }
@@ -279,7 +280,7 @@ const PessoaFormDialog = ({
 
             <Box sx={{ flex: 1 }}>
               {activeStep === 0 && (
-                <Grid container spacing={2.5}>
+                <Grid container spacing={{ xs: 1.75, sm: 2.5 }}>
                   <Grid item xs={12} md={isEmpresa ? 12 : 8}>
                     <TextField label="Nome completo" fullWidth required value={formData.nome_completo} onChange={(e) => setFormData({ ...formData, nome_completo: e.target.value })} />
                   </Grid>
@@ -293,31 +294,31 @@ const PessoaFormDialog = ({
                       </FormControl>
                     </Grid>
                   )}
-                  <Grid item xs={12} md={isEmpresa ? 6 : 4}>
+                  <Grid item xs={12} sm={6} md={isEmpresa ? 6 : 4}>
                     <TextField label="CPF" fullWidth required value={formData.cpf} onChange={(e) => setFormData({ ...formData, cpf: e.target.value })} />
                   </Grid>
-                  <Grid item xs={12} md={isEmpresa ? 6 : 8}>
+                  <Grid item xs={12} sm={6} md={isEmpresa ? 6 : 8}>
                     <TextField label="E-mail" fullWidth required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
                   </Grid>
-                  <Grid item xs={12} md={isEmpresa ? 12 : 6}>
+                  <Grid item xs={12} sm={6} md={isEmpresa ? 12 : 6}>
                     <TextField label="Função" fullWidth required value={formData.funcao} onChange={(e) => setFormData({ ...formData, funcao: e.target.value })} />
                   </Grid>
 
                   {!isEmpresa && (
                     <>
-                      <Grid item xs={12} md={6}>
+                      <Grid item xs={12} sm={6}>
                         <TextField label="Nome no crachá" fullWidth placeholder="Nome no crachá" value={formData.nome_credencial} onChange={(e) => setFormData({ ...formData, nome_credencial: e.target.value })} />
                       </Grid>
-                      <Grid item xs={12} md={6}>
+                      <Grid item xs={12} sm={6}>
                         <TextField label="Passaporte (estrangeiros)" fullWidth value={formData.passaporte} onChange={(e) => setFormData({ ...formData, passaporte: e.target.value })} />
                       </Grid>
-                      <Grid item xs={12} md={6}>
+                      <Grid item xs={12} sm={6}>
                         <TextField label="Telefone" fullWidth value={formData.telefone} onChange={(e) => setFormData({ ...formData, telefone: e.target.value })} />
                       </Grid>
-                      <Grid item xs={12} md={6}>
+                      <Grid item xs={12} sm={6}>
                         <TextField label="Data de nascimento" type="date" fullWidth InputLabelProps={{ shrink: true }} value={formData.data_nascimento} onChange={(e) => setFormData({ ...formData, data_nascimento: e.target.value })} />
                       </Grid>
-                      <Grid item xs={12} md={6}>
+                      <Grid item xs={12} sm={6}>
                         <TextField label="Nome da mãe" fullWidth required value={formData.nome_mae} onChange={(e) => setFormData({ ...formData, nome_mae: e.target.value })} />
                       </Grid>
                       <Grid item xs={12}>
@@ -333,7 +334,7 @@ const PessoaFormDialog = ({
 
 
               {activeStep === 1 && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', height: { xs: 'auto', md: '100%' }, minHeight: 0 }}>
                   {/* Cabeçalho da seção com ações */}
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
                     <Box>
@@ -404,7 +405,7 @@ const PessoaFormDialog = ({
                       minHeight: 0,
                       border: '1px solid rgba(0, 212, 255, 0.2)',
                       borderRadius: 1.5,
-                      p: 2,
+                      p: { xs: 1.5, sm: 2 },
                       bgcolor: 'rgba(0,0,0,0.25)',
                       overflowY: 'auto',
                       display: 'flex',
@@ -517,19 +518,19 @@ const PessoaFormDialog = ({
               )}
 
               {activeStep === 2 && (
-                <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <Box sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                   <Box>
                     <Typography variant="subtitle2" sx={{ color: '#FF3366', mb: 1, fontWeight: 700 }}>Verificação de risco operacional</Typography>
-                    <Divider sx={{ mb: 2, borderColor: 'rgba(255,51,102,0.2)' }} />
+                    <Divider sx={{ mb: 1.5, borderColor: 'rgba(255,51,102,0.2)' }} />
                     <FormGroup row>
                       <FormControlLabel control={<Checkbox checked={formData.trabalho_area_tecnica} onChange={(e) => setFormData({ ...formData, trabalho_area_tecnica: e.target.checked })} sx={{ color: 'rgba(255,51,102,0.3)', '&.Mui-checked': { color: '#FF3366' } }} />} label={<Typography variant="body2">Trabalhará em área técnica confinada</Typography>} />
                       <FormControlLabel control={<Checkbox checked={formData.trabalho_altura} onChange={(e) => setFormData({ ...formData, trabalho_altura: e.target.checked })} sx={{ color: 'rgba(255,184,0,0.3)', '&.Mui-checked': { color: '#FFB800' } }} />} label={<Typography variant="body2">Executará trabalho em altura</Typography>} />
                     </FormGroup>
                   </Box>
 
-                  <Box sx={{ mt: 2 }}>
+                  <Box sx={{ mt: 1 }}>
                     <Typography variant="subtitle2" sx={{ color: '#00D4FF', mb: 1, fontWeight: 700 }}>DOCUMENTAÇÃO PESSOAL ECM (NRs, ASO, seguros)</Typography>
-                    <Divider sx={{ mb: 2, borderColor: 'rgba(0,212,255,0.2)' }} />
+                    <Divider sx={{ mb: 1.5, borderColor: 'rgba(0,212,255,0.2)' }} />
                     {!selectedPessoa ? (
                       <Box sx={{ textAlign: 'center', py: 4 }}>
                         <CircularProgress size={24} sx={{ color: '#00D4FF', mb: 2 }} />
@@ -537,31 +538,31 @@ const PessoaFormDialog = ({
                       </Box>
                     ) : (
                       <Box>
-                        <Stack spacing={2} sx={{ mb: 3 }}>
+                        <Stack spacing={1.5} sx={{ mb: 2.5 }}>
                           {documentos.length === 0 ? (
                             <Typography variant="body2" color="text.secondary">Nenhum arquivo anexado a este colaborador ainda.</Typography>
                           ) : (
                             documentos.map(doc => (
-                              <Box key={doc.id} sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 1.5, border: '1px solid rgba(0, 212, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                  <FileIcon sx={{ color: '#00D4FF' }} />
-                                  <Box sx={{ textAlign: 'left' }}>
-                                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{doc.titulo}</Typography>
-                                    <Typography variant="caption" color="text.secondary">{doc.tipo_doc} • Upload {new Date(doc.data_inclusao).toLocaleDateString()}</Typography>
+                              <Box key={doc.id} sx={{ p: 1.5, bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 1.5, border: '1px solid rgba(0, 212, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+                                  <FileIcon sx={{ color: '#00D4FF', flexShrink: 0 }} />
+                                  <Box sx={{ textAlign: 'left', minWidth: 0 }}>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }} noWrap>{doc.titulo}</Typography>
+                                    <Typography variant="caption" color="text.secondary" noWrap display="block">{doc.tipo_doc} • Upload {new Date(doc.data_inclusao).toLocaleDateString()}</Typography>
                                   </Box>
                                 </Box>
-                                <Box>
+                                <Box sx={{ flexShrink: 0 }}>
                                   {doc.status === 'aprovado' && <CheckCircleIcon sx={{ color: '#00FF88' }} titleAccess="Aprovado" />}
                                   {doc.status === 'rejeitado' && <CancelIcon sx={{ color: '#FF3366' }} titleAccess="Rejeitado" />}
-                                  {doc.status === 'pendente' && <Typography variant="caption" sx={{ color: '#FFB800', border: '1px solid', px: 1, borderRadius: 1 }}>Pendente auditoria</Typography>}
+                                  {doc.status === 'pendente' && <Typography variant="caption" sx={{ color: '#FFB800', border: '1px solid', px: 1, borderRadius: 1 }}>Pendente</Typography>}
                                 </Box>
                               </Box>
                             ))
                           )}
                         </Stack>
                         <Box sx={{ p: 2, border: '1px dashed rgba(0,212,255,0.3)', borderRadius: 1.5, textAlign: 'center' }}>
-                          <Typography variant="body2" sx={{ color: '#00D4FF', mb: 2, fontWeight: 700 }}>Inserir novo documento</Typography>
-                          <Stack direction="row" spacing={2} justifyContent="center">
+                          <Typography variant="body2" sx={{ color: '#00D4FF', mb: 1.5, fontWeight: 700 }}>Inserir novo documento</Typography>
+                          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="center">
                             <Button variant="outlined" startIcon={<UploadIcon />} onClick={() => { const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*,application/pdf'; input.onchange = (e) => handleUploadECM(selectedPessoa.id, e.target.files[0]); input.click(); }} sx={{ borderColor: 'rgba(0,212,255,0.3)', color: '#00D4FF' }}>Arquivo / scanner</Button>
                             <Button variant="outlined" startIcon={<CameraIcon />} onClick={() => handleOpenWebcamECM(selectedPessoa.id)} sx={{ borderColor: 'rgba(123,47,190,0.5)', color: '#7B2FBE' }}>Foto webcam</Button>
                           </Stack>
@@ -579,7 +580,7 @@ const PessoaFormDialog = ({
       
       <DialogActions sx={{ p: { xs: 1.5, sm: 2.5 }, px: { xs: 2, sm: 4, md: 5 }, justifyContent: 'space-between', borderTop: '1px solid rgba(255, 255, 255, 0.05)', bgcolor: 'rgba(10, 25, 41, 0.5)' }}>
         <Button variant="outlined" onClick={onClose} disabled={saving} sx={botaoSecundario}>Cancelar</Button>
-        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
           {activeStep > 0 && !isEmpresa && <Button variant="outlined" onClick={() => setActiveStep(prev => prev - 1)} sx={botaoSecundario}>Voltar</Button>}
           {isEmpresa ? (
             <NeonButton onClick={handleSave} loading={saving} sx={{ height: 38, minHeight: 38 }}>Enviar convite</NeonButton>

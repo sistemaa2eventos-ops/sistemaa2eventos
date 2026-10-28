@@ -22,33 +22,50 @@ const KpiCard = ({ titulo, valor, icone, cor = cores.primaria, rodape, progresso
     <GlassCard
         onClick={onClick}
         sx={{
-            p: 2,
+            p: { xs: 1.5, sm: 2 },
             height: '100%',
             borderColor: ativo ? cor : undefined,
             ...sx
         }}
     >
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1.5 }}>
-            <Box sx={{ minWidth: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: { xs: 1, sm: 1.5 } }}>
+            <Box sx={{ minWidth: 0, flex: 1 }}>
                 <Typography
                     component="div"
-                    sx={{ color: cores.textoSecundario, fontSize: tamanhos.xs, fontWeight: 600, lineHeight: 1.35 }}
+                    sx={{ color: cores.textoSecundario, fontSize: tamanhos.xs, fontWeight: 600, lineHeight: 1.3 }}
                 >
                     {titulo}
                 </Typography>
                 <Typography
                     component="div"
-                    sx={{ color: cores.textoForte, fontFamily: fontes.titulo, fontSize: valorCompacto ? tamanhos.xl : tamanhos.display, fontWeight: 700, lineHeight: valorCompacto ? 1.6 : 1.15, mt: 0.5, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}
+                    sx={{
+                        color: cores.textoForte,
+                        fontFamily: fontes.titulo,
+                        fontSize: valorCompacto
+                            ? { xs: tamanhos.lg, sm: tamanhos.xl }
+                            : { xs: '1.5rem', sm: tamanhos.display },
+                        fontWeight: 700,
+                        lineHeight: valorCompacto ? 1.5 : 1.15,
+                        mt: 0.5,
+                        fontVariantNumeric: 'tabular-nums',
+                        whiteSpace: 'nowrap'
+                    }}
                 >
                     {valor}
                 </Typography>
             </Box>
             {icone && (
                 <Box sx={{
-                    flexShrink: 0, width: 36, height: 36, borderRadius: '8px',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    bgcolor: tom(cor, 0.12), color: cor,
-                    '& svg': { fontSize: 20 }
+                    flexShrink: 0,
+                    width: { xs: 30, sm: 36 },
+                    height: { xs: 30, sm: 36 },
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    bgcolor: tom(cor, 0.12),
+                    color: cor,
+                    '& svg': { fontSize: { xs: 17, sm: 20 } }
                 }}>
                     {icone}
                 </Box>
@@ -58,11 +75,11 @@ const KpiCard = ({ titulo, valor, icone, cor = cores.primaria, rodape, progresso
             <LinearProgress
                 variant="determinate"
                 value={Math.max(0, Math.min(100, progresso))}
-                sx={{ mt: 1.25, height: 4, borderRadius: 2, bgcolor: 'rgba(148,163,184,0.12)', '& .MuiLinearProgress-bar': { bgcolor: cor } }}
+                sx={{ mt: 1, height: 4, borderRadius: 2, bgcolor: 'rgba(148,163,184,0.12)', '& .MuiLinearProgress-bar': { bgcolor: cor } }}
             />
         )}
         {rodape && (
-            <Typography component="div" sx={{ color: cores.textoSecundario, fontSize: tamanhos.xs, mt: 0.75 }}>
+            <Typography component="div" sx={{ color: cores.textoSecundario, fontSize: tamanhos.xs, mt: 0.6, lineHeight: 1.3 }}>
                 {rodape}
             </Typography>
         )}
