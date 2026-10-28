@@ -9,6 +9,13 @@ const upload = multer();
 // Middleware base — watchlist é sigilosa: somente Admin Master
 router.use(authenticate, requireAdminMaster, requireEvent);
 
+// Qualquer alteração na watchlist vale na hora para a IA das câmeras (consulta por CPF fica em cache 30 s)
+const watchlistService = require('./watchlist.service');
+router.use((req, res, next) => {
+    if (req.method !== 'GET') watchlistService.cacheCpf.clear();
+    next();
+});
+
 // Rotas de CPFs
 router.get('/', checkPermission('monitor', 'leitura'), watchlistController.list);
 router.get('/template-csv', watchlistController.downloadTemplateCSV);

@@ -4,10 +4,23 @@ const axios = require('axios');
 const emailService = require('../../services/emailService');
 const websocketService = require('../../services/websocketService');
 
+const CACHE_CPF_MS = 30000;
+
 class WatchlistService {
     constructor() {
         // Map em memória para trava anti-looping: chave `${evento_id}_${cpfLimpo}`
         this.alvosEmRastreamento = new Map();
+        // Consulta da watchlist por CPF: a IA reconhece a mesma pessoa várias vezes por minuto
+        this.cacheCpf = new Map(); // cpfLimpo → { item, ate }
+    }
+
+    /**
+     * Rastreamento esquecido (alerta dispensado sem "Concluir") expira sozinho após o prazo do painel
+     * (Configurações > IA facial): antes aquela pessoa nunca mais alertava até reiniciar o servidor.
+     */
+    _expirado(registro) {
+        const minutos = require('./iaConfig.service').atual().painel.rastreamento_expira_min;
+        return Date.now() - new Date(registro.hora_inicio).getTime() > minutos * 60000;
     }
 
     /**
@@ -19,6 +32,10 @@ class WatchlistService {
         const chave = `${evento_id}_${cpfLimpo}`;
         const ativo = this.alvosEmRastreamento.get(chave);
         if (!ativo) return false;
+        if (this._expirado(ativo)) {
+            this.alvosEmRastreamento.delete(chave);
+            return false;
+        }
 
         if (ativo.status === 'em_rastreamento') {
             ativo.ultima_leitura = new Date();
@@ -107,6 +124,7 @@ class WatchlistService {
                 .upsert(registros, { onConflict: 'evento_id,cpf' });
 
             if (error) throw error;
+            this.cacheCpf.clear();
 
             // 2. SIGILO OPERACIONAL: Alvos monitorados na Watchlist NÃO são bloqueados na tabela pessoas
             // para permitir rastreamento sigiloso sem alertar o indivíduo nos leitores/catracas.
@@ -125,7 +143,9 @@ class WatchlistService {
     async verificarCPF(cpf, evento_id) {
         if (!cpf) return null;
         const cpfLimpo = String(cpf).replace(/\D/g, '');
-        
+        const emCache = this.cacheCpf.get(cpfLimpo);
+        if (emCache && Date.now() < emCache.ate) return emCache.item;
+
         try {
             // Regra Global: Procura por qualquer CPF ativo na Watchlist em qualquer evento
             const { data, error } = await supabase
@@ -137,7 +157,10 @@ class WatchlistService {
                 .limit(1);
 
             if (error) throw error;
-            return (data && data.length > 0) ? data[0] : null;
+            const item = (data && data.length > 0) ? data[0] : null;
+            if (this.cacheCpf.size > 5000) this.cacheCpf.clear();
+            this.cacheCpf.set(cpfLimpo, { item, ate: Date.now() + CACHE_CPF_MS });
+            return item;
         } catch (error) {
             logger.error(`Erro ao verificar CPF ${cpfLimpo} na watchlist:`, error);
             return null;
@@ -158,7 +181,8 @@ class WatchlistService {
             // Se este alvo já foi identificado e está em rastreamento ativo, NÃO reemitir!
             if (this.alvosEmRastreamento.has(chave)) {
                 const existente = this.alvosEmRastreamento.get(chave);
-                if (existente && existente.status === 'em_rastreamento') {
+                if (existente && this._expirado(existente)) this.alvosEmRastreamento.delete(chave);
+                else if (existente && existente.status === 'em_rastreamento') {
                     existente.ultima_leitura = new Date();
                     return { success: true, duplicado: true, status: 'em_rastreamento', alerta_id: existente.alertaId };
                 }

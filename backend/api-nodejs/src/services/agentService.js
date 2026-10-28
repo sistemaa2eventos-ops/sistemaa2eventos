@@ -21,7 +21,7 @@ class AgentService {
     init(io) {
         const ns = io.of('/agent');
 
-        ns.use(async (socket, next) => {
+        const autenticar = async (socket, next) => {
             const token = socket.handshake.auth?.token;
             if (!token) return next(new Error('Token de agente ausente'));
 
@@ -41,6 +41,19 @@ class AgentService {
             socket.agentInfo = data;
             socket.agentToken = token;
             next();
+        };
+        ns.use(autenticar);
+
+        // Vídeo ao vivo numa conexão separada do agente (2.4+): quadros grandes não atrasam os comandos
+        // dos leitores faciais nem o batimento da conexão principal
+        const nsVideo = io.of('/agent-video');
+        nsVideo.use(autenticar);
+        nsVideo.on('connection', (socket) => {
+            const agentId = socket.agentInfo.id;
+            socket.on('agent:video_quadro', (msg, ack) => {
+                if (typeof ack === 'function') ack();
+                require('./videoRelay').receber(agentId, msg);
+            });
         });
 
         ns.on('connection', (socket) => {
@@ -53,7 +66,8 @@ class AgentService {
 
             socket.on('agent:ready', (info) => {
                 logger.info(`🤖 Agente ${nome} pronto (${info.name || nome}, v${info.version || '?'})`);
-                // Câmeras do evento que o motor local deve vigiar com o painel fechado
+                // Perfil da IA e câmeras do evento que o motor local deve vigiar com o painel fechado
+                require('../modules/system/iaConfig.service').aplicarNoAgente(agentId).catch(() => {});
                 require('../modules/system/vigilancia.service').configurarAgente(agentId, socket.agentInfo.evento_id);
             });
 
@@ -91,6 +105,13 @@ class AgentService {
                     this.agents.delete(agentId);
                     require('./videoRelay').agenteDesconectou(agentId);
                 }
+                // Chamadas feitas por esta conexão não terão resposta: falham já, sem esperar o timeout
+                for (const [requestId, pending] of this.pending) {
+                    if (pending.socket !== socket) continue;
+                    clearTimeout(pending.timer);
+                    this.pending.delete(requestId);
+                    pending.reject(new Error(`Agente ${nome} desconectou`));
+                }
             });
         });
 
@@ -113,7 +134,7 @@ class AgentService {
                 reject(new Error(`Timeout aguardando resposta do agente para ${command}`));
             }, timeoutMs);
 
-            this.pending.set(requestId, { resolve, reject, timer });
+            this.pending.set(requestId, { resolve, reject, timer, socket });
             socket.emit('agent:command', { requestId, command, payload });
         });
     }

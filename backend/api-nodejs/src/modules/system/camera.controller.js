@@ -12,10 +12,11 @@ const IA_URL_DIRETA = process.env.PYTHON_MICROSERVICE_URL
 const MSG_IA_OFFLINE = 'Serviço de câmeras/IA do evento não está conectado';
 const PAUSA_IA_OFFLINE_MS = 20000;
 const QUADROS_POR_SEGUNDO_AGENTE = 4; // agente antigo: um pedido por quadro
-// Vídeo ao vivo enviado pelo agente 2.2+: ~45 KB por quadro em 960 px → 12 fps ≈ 4 Mbit/s de envio
-// por câmera aberta no painel (cai sozinho se a internet do evento não der conta)
-const VIDEO_FPS_AGENTE = Math.min(30, Math.max(1, parseInt(process.env.CAMERA_VIDEO_FPS, 10) || 12));
+// Vídeo ao vivo enviado pelo agente: fps, largura e qualidade vêm do perfil (Configurações > IA facial).
+// Miniatura (sub-stream, ~480 px) ≈ 15-25 KB por quadro; tela grande (~1280 px) ≈ 60-90 KB.
 const videoRelay = require('../../services/videoRelay');
+const iaConfig = require('./iaConfig.service');
+const qualidadeDe = (req) => (req.query.qualidade === 'mini' ? 'mini' : 'foco');
 
 const rotaDaCamera = (cam) => {
     if (IA_URL_DIRETA) return { tipo: 'direto', url: IA_URL_DIRETA, chave: 'direto' };
@@ -119,6 +120,7 @@ async function processarDeteccoesCamera(cam, results, annotatedB64, { origem = '
         const chaveAlerta = `${cam.id}:${mp.cpf || mp.id}`;
         const ultimoAlerta = ALERTAS_CAMERA.get(chaveAlerta) || 0;
         if (eventoId && mp.bloqueado && Date.now() - ultimoAlerta > 60000) {
+            podarAlertasCamera();
             ALERTAS_CAMERA.set(chaveAlerta, Date.now());
             io?.to(`evento_${eventoId}`).emit('area_alert', {
                 pessoa_nome: mp.nome,
@@ -190,9 +192,54 @@ async function processarDeteccoesCamera(cam, results, annotatedB64, { origem = '
 // Credenciais nunca vão para o navegador: rtsp://user:senha@host → rtsp://user:***@host
 const mascararUrl = (url) => (typeof url === 'string' ? url.replace(/(\/\/[^:/@]+:)[^@/]*@/, '$1***@') : url);
 const ALERTAS_CAMERA = new Map(); // `${camId}:${cpf}` → último alerta de pessoa bloqueada (ms)
-const CAMPOS_EDITAVEIS = ['nome', 'area_id', 'fabricante', 'stream_url', 'snapshot_url', 'protocolo', 'ip_address', 'porta', 'usuario', 'senha', 'status'];
+// Opções de IA por câmera (migration 20261028_cameras_ia_opcoes.sql)
+const CAMPOS_IA = ['ia_ativa', 'vigilancia_ativa', 'prioridade', 'url_substream'];
+const CAMPOS_EDITAVEIS = ['nome', 'area_id', 'fabricante', 'stream_url', 'snapshot_url', 'protocolo', 'ip_address', 'porta', 'usuario', 'senha', 'status', ...CAMPOS_IA];
+const URLS_MASCARADAS = ['stream_url', 'snapshot_url', 'url_substream'];
+// Banco ainda sem a migration: grava sem as colunas novas em vez de falhar o cadastro inteiro
+const colunaInexistente = (error) => error?.code === '42703' || error?.code === 'PGRST204';
+const semCamposIa = (dados) => Object.fromEntries(Object.entries(dados).filter(([k]) => !CAMPOS_IA.includes(k)));
+
+function podarAlertasCamera() {
+    if (ALERTAS_CAMERA.size < 500) return;
+    const limite = Date.now() - 10 * 60000;
+    for (const [chave, ts] of ALERTAS_CAMERA) if (ts < limite) ALERTAS_CAMERA.delete(chave);
+}
 
 class CameraController {
+    /**
+     * Configuração da IA facial e do vídeo (perfil, ajustes, vídeo, painel). Leitura para quem usa o
+     * Monitor (o painel precisa do limite de vídeos e do som); alteração só Admin Master.
+     */
+    async getIaConfig(req, res) {
+        try {
+            res.json({ success: true, data: await iaConfig.obter(), perfis: iaConfig.PERFIS });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
+    async salvarIaConfig(req, res) {
+        try {
+            const data = await iaConfig.salvar(req.body || {}, req.user);
+            logger.info(`⚙️ [IA config] perfil ${data.perfil} salvo por ${req.user?.email || req.user?.id}`);
+            res.json({ success: true, data });
+        } catch (error) {
+            logger.error(`[IA config] erro ao salvar: ${error.message}`);
+            res.status(500).json({ error: 'Erro ao salvar a configuração da IA' });
+        }
+    }
+
+    /** Status do motor de IA do evento: GPU/CPU, fps e IA por câmera, rostos indexados */
+    async iaStatus(req, res) {
+        try {
+            const evento_id = req.event?.id || req.headers['x-evento-id'];
+            res.json({ success: true, data: await iaConfig.status(evento_id) });
+        } catch (error) {
+            res.status(error.status || 503).json({ success: false, error: error.message || MSG_IA_OFFLINE });
+        }
+    }
+
     /**
      * Listar Câmeras do Evento
      */
@@ -212,6 +259,7 @@ class CameraController {
                 ...cam,
                 stream_url: mascararUrl(cam.stream_url),
                 snapshot_url: mascararUrl(cam.snapshot_url),
+                url_substream: mascararUrl(cam.url_substream),
                 tem_senha: !!senha
             }));
             res.json({ success: true, data: seguras });
@@ -250,11 +298,9 @@ class CameraController {
                 }
             }
 
-            const { data, error } = await supabase
-                .from('cameras_ip')
-                .insert([{ ...cameraData, evento_id }])
-                .select()
-                .single();
+            const inserir = (dados) => supabase.from('cameras_ip').insert([{ ...dados, evento_id }]).select().single();
+            let { data, error } = await inserir(cameraData);
+            if (colunaInexistente(error)) ({ data, error } = await inserir(semCamposIa(cameraData)));
 
             if (error) throw error;
             require('./vigilancia.service').eventoAlterado(data.evento_id).catch(() => {}); // câmeras sob vigilância mudaram
@@ -279,22 +325,20 @@ class CameraController {
                 if (req.body[campo] !== undefined) updateData[campo] = req.body[campo];
             }
             if (!updateData.senha) delete updateData.senha;
-            for (const campo of ['stream_url', 'snapshot_url']) {
+            for (const campo of URLS_MASCARADAS) {
                 if (typeof updateData[campo] === 'string' && updateData[campo].includes(':***@')) delete updateData[campo];
             }
+            if (updateData.prioridade !== undefined) updateData.prioridade = Math.min(3, Math.max(0, parseInt(updateData.prioridade, 10) || 0));
+            if (updateData.url_substream === '') updateData.url_substream = null;
 
-            const { data, error } = await supabase
-                .from('cameras_ip')
-                .update(updateData)
-                .eq('id', id)
-                .eq('evento_id', evento_id)
-                .select()
-                .single();
+            const atualizar = (dados) => supabase.from('cameras_ip').update(dados).eq('id', id).eq('evento_id', evento_id).select().single();
+            let { data, error } = await atualizar(updateData);
+            if (colunaInexistente(error)) ({ data, error } = await atualizar(semCamposIa(updateData)));
 
             if (error) throw error;
             const { senha: _omit, ...segura } = data;
             require('./vigilancia.service').eventoAlterado(data.evento_id).catch(() => {}); // câmeras sob vigilância mudaram
-            res.json({ success: true, data: { ...segura, stream_url: mascararUrl(segura.stream_url), snapshot_url: mascararUrl(segura.snapshot_url) } });
+            res.json({ success: true, data: { ...segura, stream_url: mascararUrl(segura.stream_url), snapshot_url: mascararUrl(segura.snapshot_url), url_substream: mascararUrl(segura.url_substream) } });
         } catch (error) {
             logger.error('Erro ao atualizar câmera:', error);
             res.status(500).json({ error: 'Erro ao atualizar' });
@@ -394,9 +438,15 @@ class CameraController {
 
             if (isRtsp) {
                 if (!iaDisponivel(rota)) return res.status(503).send(MSG_IA_OFFLINE);
+                // Miniatura por padrão (sub-stream, reduzida): a grade em modo "Snapshots" não precisa de 1080p
+                const qualidade = req.query.qualidade === 'foco' ? 'foco' : 'mini';
+                const { video } = await iaConfig.obter();
                 const { data } = await chamarIa(rota, '/api/camera/snapshot', {
                     stream_url: cam.stream_url || cam.snapshot_url,
-                    annotate: req.query.annotate !== 'false'
+                    annotate: req.query.annotate !== 'false',
+                    qualidade,
+                    max_width: video[qualidade].max_width,
+                    quality: video[qualidade].quality
                 }, { binary: true, timeout: 6000 });
 
                 res.set('Content-Type', 'image/jpeg');
@@ -433,14 +483,17 @@ class CameraController {
             if (!iaDisponivel(rota)) return res.status(503).send(MSG_IA_OFFLINE);
             const streamUrl = cam.stream_url || cam.snapshot_url;
             const annotate = req.query.annotate !== 'false';
+            // mini: miniatura na grade (sub-stream, leve) · foco: tela grande (stream principal)
+            const qualidade = qualidadeDe(req);
+            const formato = (await iaConfig.obter()).video[qualidade];
 
             if (rota.tipo === 'agente') {
                 // Agente 2.2+: envia os quadros sozinho na taxa pedida, um envio serve todos os espectadores
                 try {
                     return await videoRelay.assistir({
                         agentId: rota.agentId,
-                        streamId: `${cam.id}:${annotate ? 'ia' : 'cru'}`,
-                        params: { stream_url: streamUrl, annotate, fps: VIDEO_FPS_AGENTE, max_width: 960, quality: 70 },
+                        streamId: `${cam.id}:${qualidade}${annotate ? '' : ':cru'}`,
+                        params: { stream_url: streamUrl, annotate, qualidade, ...formato },
                         req, res
                     });
                 } catch (err) {
@@ -460,7 +513,7 @@ class CameraController {
                     const inicio = Date.now();
                     try {
                         const { data } = await chamarIa(rota, '/api/camera/snapshot',
-                            { stream_url: streamUrl, annotate, max_width: 960, quality: 70 },
+                            { stream_url: streamUrl, annotate, qualidade, max_width: formato.max_width, quality: formato.quality },
                             { binary: true, timeout: 5000 });
                         if (!ativo) break;
                         if (primeiro) {
@@ -468,7 +521,8 @@ class CameraController {
                                 'Content-Type': 'multipart/x-mixed-replace; boundary=frame',
                                 'Cache-Control': 'no-cache, no-store, must-revalidate',
                                 'Connection': 'close',
-                                'Pragma': 'no-cache'
+                                'Pragma': 'no-cache',
+                                'X-Accel-Buffering': 'no'
                             });
                             primeiro = false;
                         }
@@ -490,7 +544,7 @@ class CameraController {
             const response = await axios({
                 method: 'get',
                 url: `${rota.url}/api/camera/stream`,
-                params: { stream_url: streamUrl, annotate },
+                params: { stream_url: streamUrl, annotate, qualidade, max_width: formato.max_width, quality: formato.quality },
                 responseType: 'stream',
                 timeout: 0
             });
@@ -499,7 +553,13 @@ class CameraController {
             res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
             res.set('Connection', 'close');
             res.set('Pragma', 'no-cache');
+            res.set('X-Accel-Buffering', 'no');
 
+            // Motor reiniciou no meio do vídeo: encerra a resposta (o painel reconecta) em vez de derrubar a API
+            response.data.on('error', (err) => {
+                logger.debug(`[getStream] vídeo direto interrompido: ${err.message}`);
+                res.end();
+            });
             response.data.pipe(res);
 
             req.on('close', () => {

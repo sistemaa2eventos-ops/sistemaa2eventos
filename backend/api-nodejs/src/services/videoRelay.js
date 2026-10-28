@@ -29,23 +29,32 @@ class VideoRelay {
      */
     async assistir({ agentId, streamId, params, req, res }) {
         const agentService = require('./agentService');
-        let st = this.streams.get(streamId);
-        if (!st) {
-            st = { agentId, espectadores: new Set(), ultimo: null, renovar: null };
-            const comando = () => agentService.sendCommand(agentId, 'video_iniciar', { streamId, ...params, ttlMs: RENOVAR_MS * 3 }, 5000);
-            st.pronto = comando();
-            this.streams.set(streamId, st);
-            try {
+        let st;
+        // Repete se o vídeo foi encerrado enquanto este espectador esperava a confirmação do agente
+        // (outro espectador fechou): antes ficava preso a um vídeo que já não existia, com a tela preta
+        for (let tentativa = 0; tentativa < 3; tentativa++) {
+            st = this.streams.get(streamId);
+            if (!st) {
+                st = { agentId, espectadores: new Set(), ultimo: null, renovar: null, params };
+                // A renovação leva os parâmetros atuais: mudar fps/qualidade no painel vale na hora
+                const comando = () => agentService.sendCommand(agentId, 'video_iniciar', { streamId, ...st.params, ttlMs: RENOVAR_MS * 3 }, 5000);
+                st.pronto = comando();
+                this.streams.set(streamId, st);
+                try {
+                    await st.pronto;
+                } catch (err) {
+                    if (this.streams.get(streamId) === st) this.streams.delete(streamId);
+                    throw err;
+                }
+                st.renovar = setInterval(() => comando().catch(err => logger.debug(`[Vídeo] renovação ${streamId}: ${err.message}`)), RENOVAR_MS);
+                logger.info(`🎥 [Vídeo] ${streamId} ao vivo pelo agente (${params.fps} fps, ${params.max_width}px)`);
+            } else {
                 await st.pronto;
-            } catch (err) {
-                this.streams.delete(streamId);
-                throw err;
             }
-            st.renovar = setInterval(() => comando().catch(err => logger.debug(`[Vídeo] renovação ${streamId}: ${err.message}`)), RENOVAR_MS);
-            logger.info(`🎥 [Vídeo] ${streamId} ao vivo pelo agente (${params.fps} fps)`);
-        } else {
-            await st.pronto;
+            if (this.streams.get(streamId) === st) break;
         }
+        if (this.streams.get(streamId) !== st) throw new Error('Vídeo encerrado durante a abertura');
+        st.params = params;
 
         // Fechou a tela enquanto o agente confirmava: não fica vídeo ligado sem ninguém
         if (req.destroyed || res.writableEnded) {
@@ -57,7 +66,9 @@ class VideoRelay {
             'Content-Type': 'multipart/x-mixed-replace; boundary=frame',
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Connection': 'close',
-            'Pragma': 'no-cache'
+            'Pragma': 'no-cache',
+            // Sem buffer no nginx: espectador lento perde quadros em vez de acumular atraso
+            'X-Accel-Buffering': 'no'
         });
         st.espectadores.add(res);
         if (st.ultimo) this._escrever(res, st.ultimo); // imagem na hora para quem chega depois

@@ -71,7 +71,6 @@ const messageRoutes = require('./modules/system/message.routes');
 const lgpdRoutes = require('./modules/system/lgpd.routes');
 const watchlistRoutes = require('./modules/system/watchlist.routes');
 const cameraRoutes = require('./modules/system/camera.routes');
-const cameraWebhookRoutes = require('./modules/camera/camera-webhook.routes');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -217,7 +216,6 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/lgpd', lgpdRoutes);
 app.use('/api/watchlist', watchlistRoutes);
 app.use('/api/cameras', cameraRoutes);
-app.use('/api/camera', cameraWebhookRoutes); // Camera Service webhooks
 app.use('/public', rateLimiter.public, publicRoutes);
 app.use('/api/public', rateLimiter.public, publicRoutes); // FIX I-10: rate limiter dedicado para rotas públicas
 

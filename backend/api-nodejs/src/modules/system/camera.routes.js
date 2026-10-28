@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const cameraController = require('./camera.controller');
-const { authenticate, checkPermission } = require('../../middleware/auth');
+const { authenticate, checkPermission, requireAdminMaster } = require('../../middleware/auth');
 const { requireEvent } = require('../../middleware/eventMiddleware');
 
 // Snapshot e Stream: exigem login. Tags <img> enviam o token na URL (?token=...),
@@ -9,8 +9,14 @@ const { requireEvent } = require('../../middleware/eventMiddleware');
 router.get('/:id/snapshot', authenticate, cameraController.getSnapshot);
 router.get('/:id/stream', authenticate, cameraController.getStream);
 
+// Configuração da IA facial (global, não depende do evento)
+router.get('/ia-config', authenticate, cameraController.getIaConfig);
+router.put('/ia-config', authenticate, requireAdminMaster, cameraController.salvarIaConfig);
+
 // Middleware base para rotas protegidas
 router.use(authenticate, requireEvent);
+
+router.get('/ia-status', checkPermission('monitor', 'leitura'), cameraController.iaStatus);
 
 router.get('/:id/track', checkPermission('monitor', 'leitura'), cameraController.trackFace);
 router.post('/:id/track', checkPermission('monitor', 'leitura'), cameraController.trackFace);

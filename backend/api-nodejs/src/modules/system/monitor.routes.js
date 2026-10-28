@@ -26,7 +26,8 @@ router.get('/terminais', checkPermission('monitor', 'leitura'), requireEvent, mo
 // Watchlist é sigilosa (só Admin Master, como em /api/watchlist): estas rotas antigas estavam abertas a
 // qualquer usuário logado. O painel não as usa mais.
 router.get('/watchlist', requireAdminMaster, requireEvent, monitorController.listWatchlist);
-router.post('/watchlist', requireAdminMaster, requireEvent, monitorController.addToWatchlist);
-router.delete('/watchlist/:id', requireAdminMaster, requireEvent, monitorController.removeFromWatchlist);
+const limparCacheWatchlist = (req, res, next) => { require('./watchlist.service').cacheCpf.clear(); next(); };
+router.post('/watchlist', requireAdminMaster, requireEvent, limparCacheWatchlist, monitorController.addToWatchlist);
+router.delete('/watchlist/:id', requireAdminMaster, requireEvent, limparCacheWatchlist, monitorController.removeFromWatchlist);
 
 module.exports = router;
