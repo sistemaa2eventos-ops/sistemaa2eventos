@@ -44,7 +44,7 @@ function Escrever([string]$msg, [string]$cor = 'Gray') {
     Add-Content -Path $LogVigia -Value $linha -Encoding UTF8
 }
 
-function Ler-Env([string]$arquivo) {
+function Read-ArquivoEnv([string]$arquivo) {
     $vars = @{}
     if (Test-Path $arquivo) {
         foreach ($l in Get-Content $arquivo -Encoding UTF8) {
@@ -56,18 +56,18 @@ function Ler-Env([string]$arquivo) {
     return $vars
 }
 
-function Pid-NaPorta([int]$porta) {
+function Get-PidNaPorta([int]$porta) {
     $c = Get-NetTCPConnection -LocalPort $porta -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($c) { return [int]$c.OwningProcess } else { return $null }
 }
 
-function Saude-Motor {
+function Get-SaudeMotor {
     try { return Invoke-RestMethod -Uri $UrlSaude -TimeoutSec 5 } catch { return $null }
 }
 
 # Python que consegue rodar o motor (numpy/faiss/insightface íntegros).
 # venv-ia: com placa de vídeo (DirectML, ver requirements-windows-gpu.txt). Os demais são reserva.
-function Achar-Python {
+function Find-PythonIA {
     $candidatos = @(
         (Join-Path $DirMotor 'venv-ia\Scripts\python.exe'),
         (Join-Path $DirMotor 'venv\Scripts\python.exe'),
@@ -110,7 +110,7 @@ if ($Acao -eq 'remover-autostart') {
     exit 0
 }
 
-function Outros-Vigias {
+function Get-OutrosVigias {
     $meusPids = @($PID)
     $atual = Get-CimInstance Win32_Process -Filter "ProcessId=$PID" -ErrorAction SilentlyContinue
     if ($atual -and $atual.ParentProcessId) { $meusPids += [int]$atual.ParentProcessId }
@@ -120,8 +120,8 @@ function Outros-Vigias {
 
 # ---------------------------------------------------------------- parar
 if ($Acao -eq 'parar') {
-    Outros-Vigias | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; Escrever "Vigia desligado (PID $($_.ProcessId))." 'Yellow' }
-    $p = Pid-NaPorta $PortaMotor
+    Get-OutrosVigias | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; Escrever "Vigia desligado (PID $($_.ProcessId))." 'Yellow' }
+    $p = Get-PidNaPorta $PortaMotor
     if ($p) { Stop-Process -Id $p -Force; Escrever "Motor de IA desligado (PID $p)." 'Yellow' }
     else { Escrever 'Motor de IA já estava desligado.' }
     Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
@@ -131,7 +131,7 @@ if ($Acao -eq 'parar') {
 }
 
 # Evitar duas instâncias do vigia rodando ao mesmo tempo
-$outroVigia = Outros-Vigias | Select-Object -First 1
+$outroVigia = Get-OutrosVigias | Select-Object -First 1
 if ($outroVigia -and $Acao -ne 'unico') {
     Escrever "Vigia já está em execução (PID $($outroVigia.ProcessId)). Garantindo que os serviços estejam ativos..." 'Cyan'
     $Acao = 'unico'
@@ -144,15 +144,15 @@ Write-Host '  ==========================================================' -Foreg
 Write-Host ''
 
 # ---------------------------------------------------------------- 1. câmera
-function Garantir-Camera {
-    if (Pid-NaPorta $PortaCamera) { Escrever "[1/3] Câmera: vídeo RTSP disponível em localhost:$PortaCamera." 'Green'; return }
+function Confirm-Camera {
+    if (Get-PidNaPorta $PortaCamera) { Escrever "[1/3] Câmera: vídeo RTSP disponível em localhost:$PortaCamera." 'Green'; return }
     $obs = 'C:\Program Files\obs-studio\bin\64bit\obs64.exe'
     if (Test-Path $obs) {
         Escrever '[1/3] Câmera: abrindo o OBS (servidor RTSP)...' 'Yellow'
         Start-Process -FilePath $obs -WorkingDirectory (Split-Path $obs) -ArgumentList '--minimize-to-tray' -WindowStyle Minimized
-        for ($i = 0; $i -lt 15 -and -not (Pid-NaPorta $PortaCamera); $i++) { Start-Sleep 1 }
+        for ($i = 0; $i -lt 15 -and -not (Get-PidNaPorta $PortaCamera); $i++) { Start-Sleep 1 }
     }
-    if (Pid-NaPorta $PortaCamera) { Escrever "[1/3] Câmera: vídeo RTSP disponível em localhost:$PortaCamera." 'Green' }
+    if (Get-PidNaPorta $PortaCamera) { Escrever "[1/3] Câmera: vídeo RTSP disponível em localhost:$PortaCamera." 'Green' }
     else { Escrever "[1/3] Câmera: RTSP em localhost:$PortaCamera indisponível; o Motor de IA usará leitura direta da Webcam USB (fallback automático)." 'Cyan' }
 }
 
@@ -160,8 +160,8 @@ function Garantir-Camera {
 $script:Python = $null
 $script:ProcMotor = $null
 
-function Iniciar-Motor {
-    if (-not $script:Python) { $script:Python = Achar-Python }
+function Start-Motor {
+    if (-not $script:Python) { $script:Python = Find-PythonIA }
     if (-not $script:Python) {
         Escrever '[2/3] Motor de IA: nenhum Python com as bibliotecas da IA. Siga backend\microservice-face-python\requirements-windows-gpu.txt (cria o venv-ia).' 'Red'
         return $false
@@ -175,8 +175,8 @@ function Iniciar-Motor {
     }
 
     # Credenciais: .env do microservice; o que faltar vem do .env do backend
-    $envMotor = Ler-Env (Join-Path $DirMotor '.env')
-    $envApi   = Ler-Env (Join-Path $Raiz 'backend\api-nodejs\.env')
+    $envMotor = Read-ArquivoEnv (Join-Path $DirMotor '.env')
+    $envApi   = Read-ArquivoEnv (Join-Path $Raiz 'backend\api-nodejs\.env')
     foreach ($k in 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY') {
         $v = if ($envMotor[$k]) { $envMotor[$k] } else { $envApi[$k] }
         if ($v) { Set-Item "env:$k" $v }
@@ -204,11 +204,11 @@ function Iniciar-Motor {
             Get-Content $erros -Tail 8 -ErrorAction SilentlyContinue | ForEach-Object { Escrever "      $_" 'DarkRed' }
             return $false
         }
-        if (Saude-Motor) {
+        if (Get-SaudeMotor) {
             # Prioridade acima do normal: navegador/OBS abertos no mesmo PC não atrasam o reconhecimento.
             # No processo que atende a porta: o python.exe do venv é só um lançador do Python real.
-            try { (Get-Process -Id (Pid-NaPorta $PortaMotor)).PriorityClass = 'AboveNormal' } catch {}
-            Mostrar-Motor
+            try { (Get-Process -Id (Get-PidNaPorta $PortaMotor)).PriorityClass = 'AboveNormal' } catch {}
+            Show-Motor
             return $true
         }
     }
@@ -216,8 +216,8 @@ function Iniciar-Motor {
     return $false
 }
 
-function Mostrar-Motor {
-    $s = Saude-Motor
+function Show-Motor {
+    $s = Get-SaudeMotor
     if (-not $s) { return }
     $faiss = $null
     try { $faiss = Invoke-RestMethod "http://127.0.0.1:$PortaMotor/api/engine/status" -TimeoutSec 5 } catch {}
@@ -229,9 +229,9 @@ function Mostrar-Motor {
     if ($faiss -and $faiss.faiss_total_vectors -eq 0) { Escrever '      Atenção: nenhum rosto no índice. Confira a chave do Supabase e se há pessoas com biometria.' 'Yellow' }
 }
 
-function Garantir-Motor {
-    if (Saude-Motor) { Escrever '[2/3] Motor de IA: já estava ligado, mantendo.' 'Green'; Mostrar-Motor; return }
-    $ocupante = Pid-NaPorta $PortaMotor
+function Confirm-Motor {
+    if (Get-SaudeMotor) { Escrever '[2/3] Motor de IA: já estava ligado, mantendo.' 'Green'; Show-Motor; return }
+    $ocupante = Get-PidNaPorta $PortaMotor
     if ($ocupante) {
         $nome = (Get-Process -Id $ocupante -ErrorAction SilentlyContinue).ProcessName
         if ($nome -ne 'python') {
@@ -241,18 +241,18 @@ function Garantir-Motor {
         Escrever "[2/3] Motor de IA: processo travado na porta $PortaMotor (PID $ocupante), reiniciando." 'Yellow'
         Stop-Process -Id $ocupante -Force; Start-Sleep 2
     }
-    [void](Iniciar-Motor)
+    [void](Start-Motor)
 }
 
 # ---------------------------------------------------------------- 3. agente local
 $script:ProcAgente = $null
 $script:AgenteAtivo = $false
 
-function Agente-Rodando {
+function Test-AgenteRodando {
     [bool](Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object { $_.CommandLine -match 'agent\.js' })
 }
 
-function Iniciar-Agente {
+function Start-Agente {
     $carimbo = '{0:yyyyMMdd-HHmmss}' -f (Get-Date)
     $script:ProcAgente = Start-Process -FilePath 'node' -ArgumentList 'src\agent.js' -WorkingDirectory $DirAgente `
         -WindowStyle Hidden -PassThru `
@@ -260,8 +260,8 @@ function Iniciar-Agente {
         -RedirectStandardError (Join-Path $DirLogs "agente-$carimbo-erros.log")
 }
 
-function Garantir-Agente {
-    $envAgente = Ler-Env (Join-Path $DirAgente '.env')
+function Confirm-Agente {
+    $envAgente = Read-ArquivoEnv (Join-Path $DirAgente '.env')
     if (-not $envAgente['AGENT_TOKEN']) {
         Escrever '[3/3] Agente local: não configurado, então o painel na nuvem NÃO enxerga a IA nem as câmeras. Para ativar: copie backend\agent-local\.env.example para .env e cole o token gerado no painel (Configurações > Dispositivos > Agentes locais).' 'Red'
         return
@@ -273,17 +273,17 @@ function Garantir-Agente {
         Push-Location $DirAgente; try { npm ci --omit=dev 2>&1 | Out-Null } finally { Pop-Location }
     }
     $script:AgenteAtivo = $true
-    if (Agente-Rodando) { Escrever '[3/3] Agente local: já estava ligado, mantendo.' 'Green'; return }
-    Iniciar-Agente
+    if (Test-AgenteRodando) { Escrever '[3/3] Agente local: já estava ligado, mantendo.' 'Green'; return }
+    Start-Agente
     Start-Sleep 3
     if ($script:ProcAgente.HasExited) { Escrever "[3/3] Agente local: fechou ao iniciar (código $($script:ProcAgente.ExitCode)). Veja logs\ia-facial\agente-*-erros.log" 'Red' }
     else { Escrever "[3/3] Agente local: LIGADO, levando IA, câmeras e leitores ao painel em $($envAgente['VPS_URL'])." 'Green' }
 }
 
 # ---------------------------------------------------------------- execução
-Garantir-Camera
-Garantir-Motor
-Garantir-Agente
+Confirm-Camera
+Confirm-Motor
+Confirm-Agente
 
 if ($Acao -eq 'unico') {
     exit 0
@@ -298,21 +298,21 @@ $falhas = 0
 while ($true) {
     Start-Sleep $IntervaloVigia
 
-    if (Saude-Motor) {
+    if (Get-SaudeMotor) {
         if ($falhas -gt 0) { Escrever 'Motor de IA voltou a responder.' 'Green' }
         $falhas = 0
     } else {
         $falhas++
         Escrever "Motor de IA sem resposta ($falhas/$FalhasParaReiniciar)." 'Yellow'
-        if ($falhas -ge $FalhasParaReiniciar -or -not (Pid-NaPorta $PortaMotor)) {
+        if ($falhas -ge $FalhasParaReiniciar -or -not (Get-PidNaPorta $PortaMotor)) {
             Escrever 'Reiniciando o motor de IA...' 'Yellow'
             $falhas = 0
-            Garantir-Motor
+            Confirm-Motor
         }
     }
 
-    if ($script:AgenteAtivo -and -not (Agente-Rodando)) {
+    if ($script:AgenteAtivo -and -not (Test-AgenteRodando)) {
         Escrever 'Agente local caiu, religando...' 'Yellow'
-        Iniciar-Agente
+        Start-Agente
     }
 }
