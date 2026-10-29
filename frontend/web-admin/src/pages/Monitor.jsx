@@ -2372,6 +2372,32 @@ const Monitor = () => {
                                 </IconButton>
                             </ButtonGroup>
 
+                            {/* Alternador Tela Cheia / Janela (apenas Desktop) */}
+                            {!isMobile && (
+                                <Tooltip title={streamModalSize === 'fullscreen' ? "Modo janela" : "Tela cheia"}>
+                                    <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            resetPlayerControlsTimer();
+                                            setStreamModalSize(s => s === 'fullscreen' ? 'lg' : 'fullscreen');
+                                        }}
+                                        sx={{
+                                            color: streamModalSize === 'fullscreen' ? '#00D4FF' : '#E2E8F0',
+                                            bgcolor: 'rgba(0, 0, 0, 0.55)',
+                                            backdropFilter: 'blur(8px)',
+                                            border: '1px solid rgba(255,255,255,0.18)',
+                                            width: 34,
+                                            height: 34,
+                                            borderRadius: 2,
+                                            '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.2)', borderColor: '#00D4FF' }
+                                        }}
+                                    >
+                                        {streamModalSize === 'fullscreen' ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
+                                    </IconButton>
+                                </Tooltip>
+                            )}
+
                             {/* Botão Fechar estilo YouTube */}
                             <IconButton
                                 onClick={(e) => { e.stopPropagation(); setActiveStreamCam(null); setStreamZoom(100); }}
