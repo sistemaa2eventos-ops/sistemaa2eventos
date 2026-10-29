@@ -15,6 +15,24 @@ window.addEventListener('unhandledrejection', (event) => {
     }
 }, true);
 
+// Migração de Service Worker: remove o /sw.js antigo (que ficou em cache no Cloudflare) e registra o /sw-v2.js
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', async () => {
+        try {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            for (const reg of registrations) {
+                const url = reg.active?.scriptURL || reg.installing?.scriptURL || reg.waiting?.scriptURL || '';
+                if (url.endsWith('/sw.js')) {
+                    await reg.unregister();
+                }
+            }
+            await navigator.serviceWorker.register('/sw-v2.js', { updateViaCache: 'none' });
+        } catch (err) {
+            console.warn('SW setup warning:', err);
+        }
+    });
+}
+
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'

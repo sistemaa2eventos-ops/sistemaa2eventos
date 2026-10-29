@@ -7,10 +7,17 @@ export default defineConfig({
         react(),
         VitePWA({
             registerType: 'autoUpdate',
+            injectRegister: false,
+            filename: 'sw-v2.js',
             includeAssets: ['favicon.ico', 'favicon-32x32.png', 'apple-touch-icon.png'],
             workbox: {
                 globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-                maximumFileSizeToCacheInBytes: 5 * 1024 * 1024
+                globIgnores: ['**/config.js', '**/sw*.js', '**/workbox-*.js'],
+                maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+                cleanupOutdatedCaches: true,
+                skipWaiting: true,
+                clientsClaim: true,
+                navigateFallbackDenylist: [/^\/api\//, /^\/socket\.io\//]
             },
             manifest: {
                 name: 'NZT Intelligent Control System',

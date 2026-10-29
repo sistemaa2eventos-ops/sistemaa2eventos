@@ -7,7 +7,8 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   CircularProgress, LinearProgress, Tooltip, Fade, Divider,
   ButtonGroup,
-  Checkbox, List, ListItem, ListItemButton, ListItemIcon, ListItemText
+  Checkbox, List, ListItem, ListItemButton, ListItemIcon, ListItemText,
+  useTheme, useMediaQuery
 } from '@mui/material';
 import { useSnackbar } from 'notistack';
 import {
@@ -91,6 +92,8 @@ const Monitor = () => {
   const { enqueueSnackbar } = useSnackbar();
   const { user } = useAuth();
   const isAdminMaster = user?.nivel_acesso === 'admin_master';
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   // Abas dinâmicas: 'watchlist' só existe para admin_master (sigilo total para operadores)
   const TABS_CONFIG = useMemo(() => {
@@ -2163,110 +2166,214 @@ const Monitor = () => {
       <Dialog 
         open={!!activeStreamCam} 
         onClose={() => { setActiveStreamCam(null); setStreamZoom(100); }} 
-        maxWidth={streamModalSize === 'fullscreen' ? false : streamModalSize} 
+        maxWidth={isMobile || streamModalSize === 'fullscreen' ? false : streamModalSize} 
         fullWidth
-        fullScreen={streamModalSize === 'fullscreen'}
+        fullScreen={isMobile || streamModalSize === 'fullscreen'}
+        PaperProps={{
+            sx: {
+                bgcolor: '#050B18',
+                backgroundImage: 'none',
+                m: { xs: 0, sm: streamModalSize === 'fullscreen' ? 0 : 2 },
+                width: '100%',
+                maxHeight: { xs: '100dvh', sm: streamModalSize === 'fullscreen' ? '100vh' : '92vh' },
+                height: { xs: '100dvh', sm: streamModalSize === 'fullscreen' ? '100vh' : 'auto' },
+                borderRadius: { xs: 0, sm: streamModalSize === 'fullscreen' ? 0 : 2.5 },
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+            }
+        }}
       >
         <DialogTitle sx={{
             display: 'flex',
-            flexWrap: 'wrap',
+            flexDirection: 'column',
             gap: 1,
-            justifyContent: 'space-between',
-            alignItems: 'center',
             py: { xs: 1.25, sm: 1.5 },
-            px: { xs: 1.5, sm: 2.5 },
-            borderBottom: '1px solid rgba(255,255,255,0.06)'
+            px: { xs: 1.75, sm: 2.5 },
+            bgcolor: '#0A1628',
+            borderBottom: '1px solid rgba(0, 212, 255, 0.16)',
+            flexShrink: 0
         }}>
-            <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0, flex: '1 1 180px' }}>
-                <CameraIcon sx={{ fontSize: { xs: 22, sm: 26 }, color: '#00D4FF', flexShrink: 0 }} />
-                <Box sx={{ minWidth: 0 }}>
-                    <Typography variant="h6" fontWeight={700} color="#FFFFFF" noWrap sx={{ fontSize: { xs: '0.95rem', sm: '1.15rem' }, lineHeight: 1.2 }}>
-                        {activeStreamCam?.nome || 'Transmissão ao vivo'}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" noWrap sx={{ display: { xs: 'none', sm: 'block' } }}>
-                        Stream IP / RTSP • Detecção SCRFD e Rastreamento Facial ArcFace 512-D
-                    </Typography>
-                </Box>
+            {/* LINHA 1: TÍTULO DA CÂMERA + CONTROLES DESKTOP + BOTÃO FECHAR */}
+            <Stack direction="row" spacing={1.25} alignItems="center" justifyContent="space-between" sx={{ width: '100%' }}>
+                <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0, flex: 1 }}>
+                    <Box sx={{
+                        width: { xs: 34, sm: 38 },
+                        height: { xs: 34, sm: 38 },
+                        borderRadius: 1.5,
+                        bgcolor: 'rgba(0, 212, 255, 0.12)',
+                        border: '1px solid rgba(0, 212, 255, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                    }}>
+                        <CameraIcon sx={{ fontSize: { xs: 20, sm: 22 }, color: '#00D4FF' }} />
+                    </Box>
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography variant="h6" fontWeight={700} color="#FFFFFF" noWrap sx={{ fontSize: { xs: '0.95rem', sm: '1.15rem' }, lineHeight: 1.25 }}>
+                            {activeStreamCam?.nome || 'Transmissão ao vivo'}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" noWrap sx={{ display: { xs: 'block', sm: 'block' }, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
+                            {activeStreamCam?.area?.nome_area
+                                ? `Área: ${activeStreamCam.area.nome_area} • Reconhecimento Facial IA`
+                                : 'Stream IP / RTSP • Reconhecimento Facial ArcFace'}
+                        </Typography>
+                    </Box>
+                </Stack>
+
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
+                    {/* CONTROLES DE ZOOM VISÍVEIS NA MESMA LINHA APENAS NO DESKTOP */}
+                    <ButtonGroup size="small" variant="outlined" sx={{ display: { xs: 'none', sm: 'inline-flex' }, borderColor: 'rgba(255,255,255,0.12)', height: 32 }}>
+                        <Tooltip title="Diminuir zoom">
+                            <IconButton
+                                size="small"
+                                onClick={() => setStreamZoom(z => Math.max(80, z - 15))}
+                                sx={{ color: '#94A3B8', width: 30, height: 32 }}
+                            >
+                                <ZoomOutIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                        <Button 
+                            size="small" 
+                            onClick={() => setStreamZoom(100)} 
+                            sx={{ fontSize: '0.72rem', fontWeight: 700, px: 1, minWidth: 46, height: 32 }}
+                        >
+                            {streamZoom}%
+                        </Button>
+                        <Tooltip title="Aumentar zoom">
+                            <IconButton
+                                size="small"
+                                onClick={() => setStreamZoom(z => Math.min(220, z + 15))}
+                                sx={{ color: '#94A3B8', width: 30, height: 32 }}
+                            >
+                                <ZoomInIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    </ButtonGroup>
+
+                    {/* CONTROLES DE TAMANHO DA JANELA (APENAS DESKTOP) */}
+                    <ButtonGroup size="small" variant="outlined" sx={{ display: { xs: 'none', sm: 'inline-flex' }, borderColor: 'rgba(255,255,255,0.12)', height: 32 }}>
+                        {['md', 'lg', 'xl'].map(sz => (
+                            <Button
+                                key={sz}
+                                onClick={() => setStreamModalSize(sz)}
+                                sx={{
+                                    display: { xs: 'none', md: 'inline-flex' },
+                                    fontSize: '0.72rem', fontWeight: 700, height: 32,
+                                    bgcolor: streamModalSize === sz ? '#00D4FF' : 'transparent',
+                                    color: streamModalSize === sz ? '#000000' : '#94A3B8'
+                                }}
+                            >
+                                {sz.toUpperCase()}
+                            </Button>
+                        ))}
+                        <Tooltip title={streamModalSize === 'fullscreen' ? "Restaurar janela" : "Tela cheia"}>
+                            <IconButton
+                                size="small"
+                                onClick={() => setStreamModalSize(s => s === 'fullscreen' ? 'md' : 'fullscreen')}
+                                sx={{ color: streamModalSize === 'fullscreen' ? '#00D4FF' : '#94A3B8', width: 32, height: 32 }}
+                            >
+                                {streamModalSize === 'fullscreen' ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
+                            </IconButton>
+                        </Tooltip>
+                    </ButtonGroup>
+
+                    <IconButton
+                        onClick={() => { setActiveStreamCam(null); setStreamZoom(100); }}
+                        size="small"
+                        sx={{
+                            color: '#FFFFFF',
+                            bgcolor: 'rgba(255,255,255,0.08)',
+                            border: '1px solid rgba(255,255,255,0.14)',
+                            width: 34,
+                            height: 34,
+                            '&:hover': { bgcolor: 'rgba(255, 51, 102, 0.25)', borderColor: '#FF3366' }
+                        }}
+                    >
+                        <CloseIcon fontSize="small" />
+                    </IconButton>
+                </Stack>
             </Stack>
 
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: 'auto' }}>
-                {/* CONTROLES DE ZOOM DA IMAGEM */}
-                <ButtonGroup size="small" variant="outlined" sx={{ borderColor: 'rgba(255,255,255,0.12)', height: 30 }}>
-                    <Tooltip title="Diminuir zoom">
-                        <IconButton
+            {/* LINHA 2 (EXCLUSIVA MOBILE): STATUS AO VIVO + CONTROLE DE ZOOM ORGANIZADOS */}
+            <Stack
+                direction="row"
+                spacing={1}
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ display: { xs: 'flex', sm: 'none' }, pt: 0.25 }}
+            >
+                {(() => {
+                    const st = statusDaCamera(iaStatus, activeStreamCam?.id);
+                    const fpsVideo = iaConfig.video?.foco?.fps;
+                    return (
+                        <Chip
+                            icon={<DotIcon sx={{ fontSize: 9, color: '#00FF88 !important' }} />}
+                            label={st
+                                ? `Ao vivo • ${Math.round(st.video_fps)} fps${st.rostos ? ` • ${st.rostos} rosto(s)` : ''}`
+                                : `Ao vivo • até ${fpsVideo} fps`}
                             size="small"
-                            onClick={() => setStreamZoom(z => Math.max(80, z - 15))}
-                            sx={{ color: '#94A3B8', width: 28, height: 30 }}
-                        >
-                            <ZoomOutIcon fontSize="small" />
-                        </IconButton>
-                    </Tooltip>
-                    <Button 
-                        size="small" 
-                        onClick={() => setStreamZoom(100)} 
-                        sx={{ fontSize: '0.72rem', fontWeight: 700, px: 1, minWidth: 44, height: 30 }}
+                            sx={{
+                                bgcolor: 'rgba(0, 255, 136, 0.12)',
+                                border: '1px solid rgba(0, 255, 136, 0.3)',
+                                color: '#00FF88',
+                                fontWeight: 700,
+                                fontSize: '0.72rem',
+                                height: 26
+                            }}
+                        />
+                    );
+                })()}
+
+                <ButtonGroup size="small" variant="outlined" sx={{ borderColor: 'rgba(255,255,255,0.16)', height: 28 }}>
+                    <IconButton
+                        size="small"
+                        onClick={() => setStreamZoom(z => Math.max(80, z - 15))}
+                        sx={{ color: '#E2E8F0', width: 28, height: 28 }}
+                    >
+                        <ZoomOutIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                    <Button
+                        size="small"
+                        onClick={() => setStreamZoom(100)}
+                        sx={{ fontSize: '0.72rem', fontWeight: 700, px: 1, minWidth: 44, height: 28, color: '#00D4FF' }}
                     >
                         {streamZoom}%
                     </Button>
-                    <Tooltip title="Aumentar zoom">
-                        <IconButton
-                            size="small"
-                            onClick={() => setStreamZoom(z => Math.min(220, z + 15))}
-                            sx={{ color: '#94A3B8', width: 28, height: 30 }}
-                        >
-                            <ZoomInIcon fontSize="small" />
-                        </IconButton>
-                    </Tooltip>
+                    <IconButton
+                        size="small"
+                        onClick={() => setStreamZoom(z => Math.min(220, z + 15))}
+                        sx={{ color: '#E2E8F0', width: 28, height: 28 }}
+                    >
+                        <ZoomInIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
                 </ButtonGroup>
-
-                {/* CONTROLES DE TAMANHO DA JANELA (MD/LG/XL apenas em Desktop; Tela Cheia sempre disponível) */}
-                <ButtonGroup size="small" variant="outlined" sx={{ borderColor: 'rgba(255,255,255,0.12)', height: 30 }}>
-                    {['md', 'lg', 'xl'].map(sz => (
-                        <Button
-                            key={sz}
-                            onClick={() => setStreamModalSize(sz)}
-                            sx={{
-                                display: { xs: 'none', md: 'inline-flex' },
-                                fontSize: '0.72rem', fontWeight: 700, height: 30,
-                                bgcolor: streamModalSize === sz ? '#00D4FF' : 'transparent',
-                                color: streamModalSize === sz ? '#000000' : '#94A3B8'
-                            }}
-                        >
-                            {sz.toUpperCase()}
-                        </Button>
-                    ))}
-                    <Tooltip title={streamModalSize === 'fullscreen' ? "Restaurar janela" : "Tela cheia"}>
-                        <IconButton
-                            size="small"
-                            onClick={() => setStreamModalSize(s => s === 'fullscreen' ? 'md' : 'fullscreen')}
-                            sx={{ color: streamModalSize === 'fullscreen' ? '#00D4FF' : '#94A3B8', width: 30, height: 30 }}
-                        >
-                            {streamModalSize === 'fullscreen' ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
-                        </IconButton>
-                    </Tooltip>
-                </ButtonGroup>
-
-                <IconButton onClick={() => { setActiveStreamCam(null); setStreamZoom(100); }} size="small" sx={{ color: '#94A3B8' }}>
-                    <CloseIcon />
-                </IconButton>
             </Stack>
         </DialogTitle>
 
-        <DialogContent sx={{ p: { xs: 1, sm: 2 }, overflow: 'auto', bgcolor: '#000000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <DialogContent sx={{
+            p: { xs: 0, sm: 2 },
+            flex: 1,
+            overflow: 'hidden',
+            bgcolor: '#000000',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+        }}>
             {activeStreamCam && (
                 <Box sx={{
                     position: 'relative',
                     width: '100%',
-                    borderRadius: 1.5,
+                    height: { xs: '100%', sm: streamModalSize === 'fullscreen' ? '82vh' : '62vh' },
+                    minHeight: { xs: 260, sm: 360 },
+                    borderRadius: { xs: 0, sm: 1.5 },
                     overflow: 'hidden',
                     bgcolor: '#000000',
-                    border: '1px solid rgba(255,255,255,0.1)',
+                    border: { xs: 'none', sm: '1px solid rgba(255,255,255,0.1)' },
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    aspectRatio: streamModalSize === 'fullscreen' ? 'unset' : { xs: '16/9', sm: 'unset' },
-                    height: streamModalSize === 'fullscreen' ? { xs: 'calc(100dvh - 155px)', sm: '82vh' } : { xs: 'auto', sm: '62vh' },
-                    minHeight: { xs: 210, sm: 360 }
+                    justifyContent: 'center'
                 }}>
                     <CameraVideo
                         camId={activeStreamCam.id}
@@ -2285,17 +2392,19 @@ const Monitor = () => {
         </DialogContent>
 
         <DialogActions sx={{
-            px: { xs: 1.5, sm: 3 },
-            py: { xs: 1.25, sm: 2 },
+            px: { xs: 1.75, sm: 3 },
+            py: { xs: 1.5, sm: 2 },
+            bgcolor: '#0A1628',
             flexDirection: { xs: 'column', sm: 'row' },
             alignItems: { xs: 'stretch', sm: 'center' },
             justifyContent: 'space-between',
             gap: 1.25,
-            borderTop: '1px solid rgba(255,255,255,0.06)'
+            borderTop: '1px solid rgba(255,255,255,0.08)',
+            flexShrink: 0
         }}>
-            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ minWidth: 0 }}>
-                <Typography variant="caption" color="text.secondary" noWrap sx={{ fontFamily: '"Inter", sans-serif', maxWidth: '100%' }}>
-                    {activeStreamCam?.stream_url || `${activeStreamCam?.ip_address}:${activeStreamCam?.porta}`}
+            <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ minWidth: 0, width: { xs: '100%', sm: 'auto' } }}>
+                <Typography variant="caption" color="text.secondary" noWrap sx={{ fontFamily: '"Inter", sans-serif', maxWidth: '100%', fontSize: '0.75rem' }}>
+                    {activeStreamCam?.stream_url || `${activeStreamCam?.ip_address || ''}:${activeStreamCam?.porta || 554}`}
                 </Typography>
                 {(() => {
                     const st = statusDaCamera(iaStatus, activeStreamCam?.id);
@@ -2307,31 +2416,48 @@ const Monitor = () => {
                                 ? `Ao vivo • ${Math.round(st.video_fps)} fps • IA ${st.ia_fps_alvo}/s${st.rostos ? ` • ${st.rostos} rosto(s)` : ''}`
                                 : `Ao vivo • até ${fpsVideo} fps`}
                             size="small"
-                            sx={{ bgcolor: 'rgba(0, 255, 136, 0.1)', color: '#00FF88', fontWeight: 700, fontSize: '0.72rem', height: 22 }}
+                            sx={{
+                                display: { xs: 'none', sm: 'inline-flex' },
+                                bgcolor: 'rgba(0, 255, 136, 0.1)',
+                                color: '#00FF88',
+                                fontWeight: 700,
+                                fontSize: '0.72rem',
+                                height: 22
+                            }}
                         />
                     );
                 })()}
             </Stack>
-            <Stack direction="row" spacing={1} sx={{ width: { xs: '100%', sm: 'auto' } }}>
+            <Stack direction="row" spacing={1.25} sx={{ width: { xs: '100%', sm: 'auto' } }}>
                 {isAdminMaster && (
                     <Button
                         variant="outlined"
                         color="warning"
-                        size="small"
+                        size="medium"
                         startIcon={<AlarmIcon />}
                         onClick={handleTriggerTestAlert}
-                        sx={{ fontWeight: 700, flex: { xs: 1, sm: 'initial' }, whiteSpace: 'nowrap' }}
+                        sx={{ fontWeight: 700, flex: { xs: 1, sm: 'initial' }, minHeight: { xs: 42, sm: 36 }, whiteSpace: 'nowrap' }}
                     >
                         Testar alerta
                     </Button>
                 )}
                 <Button
-                    variant="outlined"
-                    size="small"
+                    variant="contained"
+                    size="medium"
+                    startIcon={<FullscreenExitIcon />}
                     onClick={() => { setActiveStreamCam(null); setStreamZoom(100); }}
-                    sx={{ borderColor: '#00D4FF', color: '#00D4FF', fontWeight: 700, flex: { xs: 1, sm: 'initial' }, whiteSpace: 'nowrap' }}
+                    sx={{
+                        bgcolor: 'rgba(0, 212, 255, 0.16)',
+                        border: '1px solid #00D4FF',
+                        color: '#00D4FF',
+                        fontWeight: 700,
+                        flex: { xs: 1, sm: 'initial' },
+                        minHeight: { xs: 42, sm: 36 },
+                        whiteSpace: 'nowrap',
+                        '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.28)' }
+                    }}
                 >
-                    Fechar janela
+                    {isMobile || streamModalSize === 'fullscreen' ? 'Sair da tela cheia' : 'Fechar janela'}
                 </Button>
             </Stack>
         </DialogActions>
@@ -2773,10 +2899,12 @@ const Monitor = () => {
         onClose={() => setZoomSnapshotModal(false)}
         maxWidth="lg"
         fullWidth
+        fullScreen={isMobile}
         PaperProps={{
           sx: {
-            border: '2px solid #FFB800'
-                    }
+            border: isMobile ? 'none' : '2px solid #FFB800',
+            bgcolor: '#050B18'
+          }
         }}
       >
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>

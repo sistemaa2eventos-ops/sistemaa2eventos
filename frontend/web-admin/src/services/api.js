@@ -15,6 +15,7 @@ const api = axios.create({
   timeout: 15000,  // Aumentado de 10s para 15s (dispositivos WiFi podem ser lentos)
   headers: {
     'Content-Type': 'application/json',
+    'X-App-Version': '2026-10-28-v2',
   },
   withCredentials: true // Importante para CORS com cookies
 });
