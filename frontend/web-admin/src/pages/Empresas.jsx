@@ -355,9 +355,10 @@ const Empresas = () => {
         disableRestoreFocus
         PaperProps={{
           sx: {
-            minHeight: { xs: '100%', md: '80vh' },
-            maxHeight: { xs: '100%', md: '90vh' },
-            height: { xs: '100%', md: '88vh' },
+            // Abaixo de sm o tema já deixa o modal em tela cheia
+            minHeight: { md: '80dvh' },
+            maxHeight: { sm: 'calc(100dvh - 24px)', md: '90dvh' },
+            height: { sm: 'calc(100dvh - 24px)', md: '88dvh' },
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden'

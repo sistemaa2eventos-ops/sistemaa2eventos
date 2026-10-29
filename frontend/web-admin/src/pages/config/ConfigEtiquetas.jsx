@@ -216,9 +216,15 @@ const ConfigEtiquetas = () => {
 
                 {/* COLUNA DIREITA: CANVAS EDITOR */}
                 <Grid item xs={12} md={8}>
-                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '600px', p: 4, background: 'rgba(0,0,0,0.5)', borderRadius: 1.5, border: '1px dashed rgba(255,255,255,0.2)', overflow: 'auto' }}>
+                    <Typography variant="caption" sx={{ display: { xs: 'block', md: 'none' }, mb: 1, color: 'rgba(255,255,255,0.6)' }}>
+                        Arrastar e redimensionar os elementos funciona melhor no computador.
+                    </Typography>
+                    {/* margin auto (e não justifyContent) centraliza sem cortar a etiqueta quando ela é maior que a tela */}
+                    <Box sx={{ display: 'flex', minHeight: { xs: 0, md: '600px' }, p: { xs: 1.5, sm: 4 }, background: 'rgba(0,0,0,0.5)', borderRadius: 1.5, border: '1px dashed rgba(255,255,255,0.2)', overflow: 'auto' }}>
 
                         <Paper elevation={10} sx={{
+                            m: 'auto',
+                            flexShrink: 0,
                             width: config.width * scaleFactor,
                             height: config.height * scaleFactor,
                             backgroundColor: '#FFFFFF',

@@ -62,7 +62,7 @@ const NotificationBell = ({ color = '#00D4FF' }) => {
                 anchorEl={ancora}
                 onClose={() => setAncora(null)}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-                PaperProps={{ sx: { width: 380, maxHeight: 480, background: 'rgba(12,16,28,0.98)', border: '1px solid rgba(0,212,255,0.3)' } }}
+                PaperProps={{ sx: { width: 'min(380px, calc(100vw - 24px))', maxHeight: 'min(480px, calc(100dvh - 96px))', background: 'rgba(12,16,28,0.98)', border: '1px solid rgba(0,212,255,0.3)' } }}
             >
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ px: 2, py: 1.5 }}>
                     <Typography sx={{ color: '#FFFFFF', fontWeight: 700 }}>Notificações</Typography>

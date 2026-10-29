@@ -113,7 +113,7 @@ const ConfigIAFacial = () => {
     };
 
     if (!cfg) {
-        return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}><CircularProgress /></Box>;
+        return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50dvh' }}><CircularProgress /></Box>;
     }
 
     const avisos = [];
@@ -231,7 +231,7 @@ const ConfigIAFacial = () => {
                         {['mini', 'foco'].map(q => (
                             <Campo key={q} titulo={q === 'mini' ? 'Miniaturas do mosaico' : 'Câmera em tela grande'}
                                 ajuda={q === 'mini' ? 'Usa o sub-stream da câmera (resolução baixa).' : 'Usa o stream principal da câmera.'}>
-                                <Stack direction="row" spacing={2}>
+                                <Stack direction="row" spacing={2} useFlexGap flexWrap="wrap">
                                     <TextField size="small" type="number" label="Quadros/s" value={video[q]?.fps ?? ''} inputProps={{ min: 1, max: 30 }}
                                         onChange={e => setVideo(q, 'fps', Number(e.target.value))} sx={{ width: 110 }} />
                                     <TextField size="small" type="number" label="Largura (px)" value={video[q]?.max_width ?? ''} inputProps={{ min: 320, max: 1920, step: 160 }}

@@ -151,6 +151,7 @@ const ChecklistItem = ({ label, passed }) => (
 const VerificationDialog = ({ image, result, onSave, onRetry }) => (
     <Dialog
         open
+        onClose={onRetry}
         maxWidth="sm"
         fullWidth
     >

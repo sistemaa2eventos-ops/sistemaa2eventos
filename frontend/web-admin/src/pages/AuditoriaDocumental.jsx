@@ -499,7 +499,7 @@ const AuditoriaDocumental = () => {
                 fullWidth
                 PaperProps={{
                     sx: {
-                        minHeight: '80vh'
+                        minHeight: '80dvh'
                     }
                 }}
             >

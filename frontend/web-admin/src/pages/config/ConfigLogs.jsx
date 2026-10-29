@@ -125,7 +125,7 @@ const ConfigLogs = () => {
 
     if (loading) {
         return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50dvh' }}>
                 <CircularProgress color="primary" />
             </Box>
         );
@@ -198,7 +198,7 @@ const ConfigLogs = () => {
                             </Button>
                         </Box>
 
-                        <List sx={{ bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 1.5, maxHeight: '60vh', overflowY: 'auto' }}>
+                        <List sx={{ bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 1.5, maxHeight: '60dvh', overflowY: 'auto' }}>
                             {sysLogs.length === 0 && (
                                 <ListItem>
                                     <ListItemText primary="Nenhum registro encontrado." primaryTypographyProps={{ color: 'text.secondary', textAlign: 'center' }} />

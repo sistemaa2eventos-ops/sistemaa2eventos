@@ -199,7 +199,8 @@ const ConfigBancoDados = () => {
                 </DialogTitle>
                 <DialogContent dividers sx={{ borderColor: 'rgba(255,255,255,0.1)' }}>
                     {syncHistory.length > 0 ? (
-                        <Table size="small">
+                        <Box sx={{ overflowX: 'auto' }}>
+                        <Table size="small" sx={{ minWidth: 520 }}>
                             <TableHead>
                                 <TableRow>
                                     <TableCell sx={{ color: 'text.secondary', fontWeight: 700 }}>Data/hora</TableCell>
@@ -231,6 +232,7 @@ const ConfigBancoDados = () => {
                                 ))}
                             </TableBody>
                         </Table>
+                        </Box>
                     ) : (
                         <Box sx={{ py: 4, textAlign: 'center' }}>
                             <Typography variant="body2" sx={{ color: 'text.secondary' }}>

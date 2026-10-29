@@ -49,8 +49,8 @@ const EventFormDialog = ({
             fullWidth
             PaperProps={{
                 sx: {
-                    minHeight: { xs: '100%', md: '80vh' },
-                    maxHeight: { xs: '100%', md: '90vh' },
+                    minHeight: { md: '80dvh' },
+                    maxHeight: { sm: 'calc(100dvh - 24px)', md: '90dvh' },
                     display: 'flex',
                     flexDirection: 'column',
                     overflow: 'hidden'

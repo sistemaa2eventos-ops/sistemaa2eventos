@@ -29,7 +29,7 @@ class GlobalErrorBoundary extends React.Component {
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        minHeight: '100vh',
+                        minHeight: '100dvh',
                         bgcolor: '#050B18',
                         color: '#FFFFFF',
                         textAlign: 'center',

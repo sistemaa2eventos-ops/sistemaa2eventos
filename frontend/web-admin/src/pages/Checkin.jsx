@@ -84,7 +84,7 @@ const Checkin = () => {
         maxWidth: '100%',
         overflowX: 'hidden',
         // No desktop a tela cabe na janela: só as listas rolam
-        height: { lg: '100vh' },
+        height: { lg: '100dvh' },
         minHeight: modoQuiosque ? '100dvh' : 'auto',
         display: 'flex', flexDirection: 'column',
         position: 'relative'

@@ -8,8 +8,10 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
-    Stack
+    Stack,
+    IconButton
 } from '@mui/material';
+import { Close as CloseIcon } from '@mui/icons-material';
 import {
     Search as ZoomIcon,
     RestartAlt as ResetIcon
@@ -128,13 +130,19 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
             PaperProps={{
                 sx: {
                     backgroundSize: '24px 24px',
-                    overflow: 'hidden',
-                    mx: { xs: 1, sm: 2 }
+                    mx: { sm: 2 }
                     }
             }}
             disableEnforceFocus
         >
-            <DialogTitle sx={{ textAlign: 'center', pt: 6, pb: 2 }} component="div">
+            <IconButton
+                onClick={onClose}
+                aria-label="Fechar"
+                sx={{ position: 'absolute', top: 8, right: 8, zIndex: 2, color: 'rgba(255,255,255,0.7)' }}
+            >
+                <CloseIcon />
+            </IconButton>
+            <DialogTitle sx={{ textAlign: 'center', pt: { xs: 5, sm: 6 }, pb: { xs: 1, sm: 2 } }} component="div">
                 <Typography variant="h4" sx={{
                     color: '#FFFFFF',
                     fontFamily: '"Space Grotesk", sans-serif',
@@ -157,7 +165,9 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                overflow: 'hidden',
+                // No celular deitado a imagem + botões não cabem: o conteúdo rola
+                overflowY: 'auto',
+                overflowX: 'hidden',
                 py: 2
             }}>
                 <Box

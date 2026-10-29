@@ -17,6 +17,7 @@ import {
 import PessoaFoto from '../common/PessoaFoto';
 import { formatLocalDateTime } from '../../utils/dateUtils';
 import api from '../../services/api';
+import useFecharComVoltar from '../../hooks/useFecharComVoltar';
 
 const PessoaCardDialog = ({
   open,
@@ -27,6 +28,7 @@ const PessoaCardDialog = ({
 }) => {
   const [detalhesPessoa, setDetalhesPessoa] = useState(null);
   const [_loading, setLoading] = useState(false);
+  useFecharComVoltar(open, onClose);
 
   // Normalização preliminar com dados imediatos do log ou prop
   const pessoaBase = pessoaProp || log?.pessoas || (log?.pessoa_id ? { id: log.pessoa_id, nome: log.pessoa_nome } : null) || {};
@@ -91,7 +93,7 @@ const PessoaCardDialog = ({
       PaperProps={{
         sx: {
           color: '#FFFFFF',
-          maxHeight: '90vh',
+          maxHeight: { sm: '90dvh' },
           overflowY: 'auto',
           '&::-webkit-scrollbar': { width: 6 },
           '&::-webkit-scrollbar-thumb': { bgcolor: `${accentColor}40`, borderRadius: 1.5 }

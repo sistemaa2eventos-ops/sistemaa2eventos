@@ -266,7 +266,7 @@ const Pessoas = () => {
         maxWidth="md" 
         fullWidth
         PaperProps={{
-          sx: { maxHeight: '90vh' }
+          sx: { maxHeight: { sm: '90dvh' } }
         }}
       >
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -281,8 +281,8 @@ const Pessoas = () => {
                 <Typography variant="body2" color="text.secondary">Nenhum documento encontrado.</Typography>
               ) : (
                 documentos.map(doc => (
-                  <Box key={doc.id} sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box key={doc.id} sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
                       <FileIcon color="primary" />
                       <Box>
                         <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{doc.titulo}</Typography>
@@ -298,9 +298,9 @@ const Pessoas = () => {
               )}
             </Stack>
           </Box>
-          <Box sx={{ p: 3, border: '2px dashed rgba(0,212,255,0.2)', borderRadius: 1.5, textAlign: 'center' }}>
+          <Box sx={{ p: { xs: 2, sm: 3 }, border: '2px dashed rgba(0,212,255,0.2)', borderRadius: 1.5, textAlign: 'center' }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>Enviar novo documento</Typography>
-            <Stack direction="row" spacing={2} justifyContent="center">
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1.5, sm: 2 }} justifyContent="center">
               <Button variant="contained" startIcon={<UploadIcon />} onClick={() => { const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*,application/pdf'; input.onchange = (e) => handleUploadECM(selectedPessoaDocs.id, e.target.files[0]); input.click(); }} sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700, height: 38 }}>Arquivo / scanner</Button>
               <Button variant="contained" startIcon={<CameraIcon />} onClick={() => handleOpenWebcamECM(selectedPessoaDocs.id)} sx={{ bgcolor: '#7B2FBE', color: '#FFFFFF', fontWeight: 700, height: 38 }}>Foto webcam</Button>
             </Stack>
@@ -314,7 +314,7 @@ const Pessoas = () => {
         maxWidth="sm" 
         fullWidth
         PaperProps={{
-          sx: { maxHeight: '90vh' }
+          sx: { maxHeight: { sm: '90dvh' } }
         }}
       >
         <DialogTitle>Capturar foto do documento</DialogTitle>
@@ -333,7 +333,7 @@ const Pessoas = () => {
         fullWidth 
         fullScreen={isMobile}
         PaperProps={{
-          sx: { maxHeight: '90vh' }
+          sx: { maxHeight: { sm: '90dvh' } }
         }}
       >
         <DialogTitle sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 }}>Importação em lote</DialogTitle>
@@ -358,7 +358,7 @@ const Pessoas = () => {
         PaperProps={{
           sx: { 
             border: `1px solid ${isBlocking ? 'rgba(255,51,102,0.4)' : 'rgba(0,255,136,0.4)'}`, 
-            maxHeight: '90vh'
+            maxHeight: { sm: '90dvh' }
                     }
         }}
       >
@@ -410,14 +410,14 @@ const Pessoas = () => {
         maxWidth="xs" 
         fullWidth
         PaperProps={{
-          sx: { maxHeight: '90vh' }
+          sx: { maxHeight: { sm: '90dvh' } }
         }}
       >
         <DialogTitle sx={{ textAlign: 'center', fontWeight: 700 }}>ACRESCITAR CREDENCIAL: {qrPessoa?.nome}</DialogTitle>
         <DialogContent sx={{ textAlign: 'center', py: 4, overflowY: 'auto' }}>
           {qrLoading ? <CircularProgress sx={{ color: '#00FF88' }} /> : (
             <Box>
-              <img src={qrImage} alt="QR Code" style={{ maxWidth: '100%', maxHeight: '45vh', width: '250px', border: '8px solid #FFFFFF', borderRadius: '8px', objectFit: 'contain' }} />
+              <img src={qrImage} alt="QR Code" style={{ maxWidth: '100%', maxHeight: '45dvh', width: '250px', border: '8px solid #FFFFFF', borderRadius: '8px', objectFit: 'contain' }} />
               <Typography variant="caption" sx={{ display: 'block', mt: 2, color: 'text.secondary' }}>TOKEN SEGURO: {qrPessoa?.qr_code || 'Gerado via sistema'}</Typography>
             </Box>
           )}

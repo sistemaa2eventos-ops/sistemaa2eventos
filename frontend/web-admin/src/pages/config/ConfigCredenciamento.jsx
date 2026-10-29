@@ -83,7 +83,7 @@ const ConfigCredenciamento = () => {
 
     if (loading) {
         return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50dvh' }}>
                 <CircularProgress color="secondary" />
             </Box>
         );

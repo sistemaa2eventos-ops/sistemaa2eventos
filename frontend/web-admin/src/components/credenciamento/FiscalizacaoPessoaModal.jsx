@@ -132,7 +132,7 @@ const FiscalizacaoPessoaModal = ({
             PaperProps={{
                 sx: {
                     color: '#FFFFFF',
-                    maxHeight: '90vh',
+                    maxHeight: { sm: '90dvh' },
                     overflowY: 'auto',
                     '&::-webkit-scrollbar': { width: '6px' },
                     '&::-webkit-scrollbar-thumb': { bgcolor: `${corTema}55`, borderRadius: '10px' }

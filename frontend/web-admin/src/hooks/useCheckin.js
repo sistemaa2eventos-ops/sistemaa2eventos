@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { usarConexao } from '../services/realtime';
 import api from '../services/api';
 import localCheckinService from '../services/LocalCheckinService';
+import { entrarTelaCheia, sairTelaCheia, ouvirTelaCheia } from '../utils/telaCheia';
 
 /**
  * useCheckin: Hook de controle para a operação de recepção (NZT).
@@ -22,6 +23,7 @@ export const useCheckin = (defaultMode, options = {}) => {
 
     // States - Modo Quiosque
     const [modoQuiosque, setModoQuiosque] = useState(false);
+    const telaCheiaDoQuiosqueRef = useRef(false);
 
     // States - Configurações e Logs
     const [operationMode, setOperationMode] = useState(defaultMode || localStorage.getItem('nzt_op_mode') || 'auto');
@@ -248,17 +250,17 @@ export const useCheckin = (defaultMode, options = {}) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [eventoId, defaultMode, tocarBipeNotificacao]);
 
-    // Fullscreen Listener
-    useEffect(() => {
-        const handleFullscreenChange = () => {
-            if (!document.fullscreenElement) {
-                setModoQuiosque(false);
-                document.body.classList.remove('modo-quiosque');
-            }
-        };
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
-        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-    }, []);
+    // Quiosque: se o navegador sair da tela cheia (Esc, gesto de voltar), sai do quiosque junto
+    useEffect(() => ouvirTelaCheia((cheia) => {
+        if (!cheia && telaCheiaDoQuiosqueRef.current) {
+            telaCheiaDoQuiosqueRef.current = false;
+            setModoQuiosque(false);
+            document.body.classList.remove('modo-quiosque');
+        }
+    }), []);
+
+    // Sair da página com o quiosque ligado não pode deixar o menu escondido
+    useEffect(() => () => document.body.classList.remove('modo-quiosque'), []);
 
     // Lifecycle
     useEffect(() => {
@@ -517,17 +519,17 @@ export const useCheckin = (defaultMode, options = {}) => {
         }
     };
 
-    const toggleQuiosque = () => {
+    // No iPhone não há tela cheia do navegador: o quiosque só esconde menu e barra
+    const toggleQuiosque = async () => {
         if (!modoQuiosque) {
-            document.documentElement.requestFullscreen().then(() => {
-                setModoQuiosque(true);
-                document.body.classList.add('modo-quiosque');
-            }).catch(err => console.error('Erro Fullscreen:', err));
+            telaCheiaDoQuiosqueRef.current = await entrarTelaCheia();
+            setModoQuiosque(true);
+            document.body.classList.add('modo-quiosque');
         } else {
-            document.exitFullscreen().then(() => {
-                setModoQuiosque(false);
-                document.body.classList.remove('modo-quiosque');
-            }).catch(err => console.error('Erro Exit Fullscreen:', err));
+            telaCheiaDoQuiosqueRef.current = false;
+            setModoQuiosque(false);
+            document.body.classList.remove('modo-quiosque');
+            await sairTelaCheia();
         }
     };
 

@@ -61,7 +61,7 @@ const Dashboard = () => {
 
     if (loading) {
         return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60dvh' }}>
                 <CircularProgress sx={{ color: '#00D4FF' }} />
             </Box>
         );

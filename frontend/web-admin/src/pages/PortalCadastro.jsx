@@ -144,7 +144,7 @@ const PortalCadastro = () => {
 
     if (loading) {
         return (
-            <Box sx={{ minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', bgcolor: '#0A1628' }}>
+            <Box sx={{ minHeight: '100dvh', display: 'flex', justifyContent: 'center', alignItems: 'center', bgcolor: '#0A1628' }}>
                 <CircularProgress sx={{ color: '#00D4FF' }} />
             </Box>
         );
@@ -152,7 +152,7 @@ const PortalCadastro = () => {
 
     if (error && !empresaData) {
         return (
-            <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', bgcolor: '#0A1628', p: 3 }}>
+            <Box sx={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', bgcolor: '#0A1628', p: 3 }}>
                 <Paper sx={{ p: 5, borderRadius: 1.5, maxWidth: 500, textAlign: 'center', bgcolor: 'rgba(10, 22, 40, 0.9)', border: '1px solid rgba(255, 51, 102, 0.3)' }}>
                     <Typography variant="h5" color="#FF3366" sx={{ mb: 2, fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 }}>Acesso negado</Typography>
                     <Typography color="text.secondary">{error}</Typography>
@@ -163,7 +163,7 @@ const PortalCadastro = () => {
 
     if (success) {
         return (
-            <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', bgcolor: '#0A1628', p: 3 }}>
+            <Box sx={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', bgcolor: '#0A1628', p: 3 }}>
                 <Paper sx={{ p: 5, borderRadius: 1.5, maxWidth: 500, textAlign: 'center', bgcolor: 'rgba(10, 22, 40, 0.9)', border: '1px solid rgba(0, 255, 136, 0.3)' }}>
                     <Typography variant="h5" color="#00FF88" sx={{ mb: 2, fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 }}>Cadastro recebido</Typography>
                     <Typography color="text.secondary">{success}</Typography>
@@ -173,7 +173,7 @@ const PortalCadastro = () => {
     }
 
     return (
-        <Box sx={{ minHeight: '100vh', bgcolor: '#050B18', py: 6 }}>
+        <Box sx={{ minHeight: '100dvh', bgcolor: '#050B18', py: 6 }}>
             <Container maxWidth="md">
                 <Box sx={{ textAlign: 'center', mb: 5 }}>
                     <Typography variant="h3" sx={{ fontFamily: '"Space Grotesk", sans-serif', color: '#00D4FF', fontWeight: 700, letterSpacing: '2px', textShadow: '0 0 20px rgba(0,212,255,0.4)' }}>

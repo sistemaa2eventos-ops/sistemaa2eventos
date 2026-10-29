@@ -132,7 +132,7 @@ const Checkout = () => {
         maxWidth: '100%',
         overflowX: 'hidden',
         // No desktop a tela cabe na janela: só a lista rola
-        height: { lg: '100vh' },
+        height: { lg: '100dvh' },
         minHeight: modoQuiosque ? '100dvh' : 'auto',
         display: 'flex', flexDirection: 'column',
         position: 'relative'

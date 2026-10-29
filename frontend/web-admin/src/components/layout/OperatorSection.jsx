@@ -600,7 +600,7 @@ export const OperatorSection = () => {
                     sx: {
                         border: '2px solid rgba(255, 51, 102, 0.5)',
                         boxShadow: '0 20px 60px rgba(255, 51, 102, 0.3)',
-                        maxHeight: '90vh',
+                        maxHeight: { sm: '90dvh' },
                         overflowY: 'auto'
                     }
                 }}
@@ -732,7 +732,7 @@ export const OperatorSection = () => {
                 fullWidth
                 PaperProps={{
                     sx: {
-                        maxHeight: '90vh',
+                        maxHeight: { sm: '90dvh' },
                         overflowY: 'auto'
                     }
                 }}

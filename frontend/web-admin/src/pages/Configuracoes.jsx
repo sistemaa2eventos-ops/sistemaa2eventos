@@ -144,7 +144,7 @@ const Configuracoes = () => {
                     mt: 3, 
                     display: 'flex', 
                     flexDirection: isMobile ? 'column' : 'row',
-                    minHeight: '70vh',
+                    minHeight: '70dvh',
                     borderRadius: 1.5,
                     overflow: 'hidden',
                     border: `1px solid ${theme.palette.divider}`,

@@ -24,7 +24,7 @@ export const BotaoJanelaRegistros = ({ tipo, cor }) => (
       size="small"
       onClick={() => abrirJanelaRegistros(tipo)}
       aria-label="Abrir os registros numa janela separada"
-      sx={{ color: cor, border: `1px solid ${cor}50`, borderRadius: 1.5, display: { xs: 'none', sm: 'inline-flex' } }}
+      sx={{ color: cor, border: `1px solid ${cor}50`, borderRadius: 1.5, display: { xs: 'none', md: 'inline-flex' } }}
     >
       <JanelaIcon fontSize="small" />
     </IconButton>

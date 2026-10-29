@@ -25,7 +25,7 @@ const MainLayout = ({ children }) => {
     return (
         <Box sx={{ display: 'flex', minHeight: '100dvh', width: '100%' }}>
             {isMobile && (
-                <AppBar position="fixed" sx={{ 
+                <AppBar position="fixed" className="app-barra" sx={{ 
                     zIndex: (t) => t.zIndex.drawer + 1,
                     background: 'linear-gradient(90deg, #050B18 0%, #0A1628 100%)',
                     borderBottom: '1px solid rgba(0, 212, 255, 0.15)',
@@ -81,10 +81,14 @@ const MainLayout = ({ children }) => {
                 </AppBar>
             )}
 
-            <Sidebar open={isMobile ? mobileOpen : true} onClose={() => setMobileOpen(false)} />
+            {/* Classes usadas pelo modo quiosque (index.css) para esconder menu e barra */}
+            <Box className="app-menu" sx={{ display: 'contents' }}>
+                <Sidebar open={isMobile ? mobileOpen : true} onClose={() => setMobileOpen(false)} />
+            </Box>
 
             <Box 
                 component="main" 
+                className="app-conteudo"
                 sx={{ 
                     flexGrow: 1, 
                     bgcolor: 'background.default',

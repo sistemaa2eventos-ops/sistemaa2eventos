@@ -52,6 +52,7 @@ import { useAuth } from '../contexts/AuthContext';
 import GerenciarCamerasModal from '../components/cameras/GerenciarCamerasModal';
 import CameraVideo from '../components/cameras/CameraVideo';
 import { useIaConfig, useIaStatus, statusDaCamera, NOMES_PERFIL } from '../hooks/useIaConfig';
+import useFecharComVoltar from '../hooks/useFecharComVoltar';
 import { useSomAlertas } from '../utils/alertSound';
 import KpiCards from '../components/monitor/KpiCards';
 import AbaSaude from '../components/monitor/AbaSaude';
@@ -238,6 +239,8 @@ const Monitor = () => {
   // Modo Player YouTube para a Câmera Ao Vivo (Tela Cheia Total + Overlays Flutuantes)
   const [showPlayerControls, setShowPlayerControls] = useState(true);
   const playerControlsTimerRef = React.useRef(null);
+  // "Voltar" do celular fecha o player em vez de sair do Monitor
+  useFecharComVoltar(!!activeStreamCam, () => { setActiveStreamCam(null); setStreamZoom(100); });
 
   const resetPlayerControlsTimer = React.useCallback(() => {
     if (playerControlsTimerRef.current) clearTimeout(playerControlsTimerRef.current);
@@ -558,10 +561,11 @@ const Monitor = () => {
         <Fade in={!!activeAlert && !openSecretAlertModal}>
           <Box sx={{ 
             position: 'fixed', 
-            top: 24, 
-            right: 24, 
+            // No celular fica abaixo da barra do topo, com a mesma margem dos dois lados
+            top: { xs: 'calc(env(safe-area-inset-top, 0px) + 68px)', md: 24 }, 
+            right: { xs: 12, sm: 24 }, 
             zIndex: 99999, 
-            width: { xs: '92vw', sm: 420 },
+            width: { xs: 'calc(100% - 24px)', sm: 420 },
             bgcolor: '#0A1628', 
             borderRadius: 1.5,
             p: 2, 
@@ -648,7 +652,7 @@ const Monitor = () => {
           sx: {
             border: '1px solid #FFB800',
             boxShadow: '0 0 50px rgba(0,0,0,0.9), 0 0 30px rgba(255, 184, 0, 0.2)',
-            maxHeight: '90vh',
+            maxHeight: { sm: '90dvh' },
             overflowY: 'auto',
             '&::-webkit-scrollbar': { width: 6 },
             '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255, 184, 0, 0.2)', borderRadius: 1.5 }
@@ -1247,7 +1251,7 @@ const Monitor = () => {
 
                 <GlassCard sx={{ 
                     minHeight: { xs: 450, md: 520 }, 
-                    maxHeight: { xs: '70vh', md: 'calc(100vh - 280px)' }, 
+                    maxHeight: { xs: '70dvh', md: 'calc(100vh - 280px)' }, 
                     overflow: 'hidden', 
                     display: 'flex', 
                     flexDirection: 'column' 
@@ -2219,8 +2223,8 @@ const Monitor = () => {
                 backgroundImage: 'none',
                 m: { xs: 0, sm: (isMobileOrTablet || streamModalSize === 'fullscreen') ? 0 : 2 },
                 width: '100%',
-                maxHeight: { xs: '100dvh', sm: (isMobileOrTablet || streamModalSize === 'fullscreen') ? '100vh' : '92vh' },
-                height: { xs: '100dvh', sm: (isMobileOrTablet || streamModalSize === 'fullscreen') ? '100vh' : 'auto' },
+                maxHeight: { xs: '100dvh', sm: (isMobileOrTablet || streamModalSize === 'fullscreen') ? '100dvh' : '92dvh' },
+                height: { xs: '100dvh', sm: (isMobileOrTablet || streamModalSize === 'fullscreen') ? '100dvh' : 'auto' },
                 borderRadius: { xs: 0, sm: (isMobileOrTablet || streamModalSize === 'fullscreen') ? 0 : 2.5 },
                 display: 'flex',
                 flexDirection: 'column',
@@ -2264,6 +2268,30 @@ const Monitor = () => {
                 />
             )}
         </Box>
+
+        {/* Com os controles escondidos, o fechar continua no mesmo lugar: o player nunca fica sem saída */}
+        {!showPlayerControls && (
+            <IconButton
+                onClick={(e) => { e.stopPropagation(); setActiveStreamCam(null); setStreamZoom(100); }}
+                aria-label="Fechar câmera"
+                sx={{
+                    position: 'absolute',
+                    top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
+                    right: 'calc(env(safe-area-inset-right, 0px) + 14px)',
+                    zIndex: 21,
+                    width: 40,
+                    height: 40,
+                    borderRadius: 2,
+                    color: '#FFFFFF',
+                    bgcolor: 'rgba(0, 0, 0, 0.45)',
+                    border: '1px solid rgba(255, 255, 255, 0.25)',
+                    backdropFilter: 'blur(8px)',
+                    '&:hover': { bgcolor: 'rgba(255, 51, 102, 0.35)', borderColor: '#FF3366' }
+                }}
+            >
+                <CloseIcon fontSize="small" />
+            </IconButton>
+        )}
 
         {/* OVERLAYS FLUTUANTES ESTILO YOUTUBE (CABEÇALHO + RODAPÉ QUE APARECEM E SOMEM COM FADE) */}
         <Fade in={showPlayerControls} timeout={250}>
@@ -2378,6 +2406,7 @@ const Monitor = () => {
                             <IconButton
                                 onClick={(e) => { e.stopPropagation(); setActiveStreamCam(null); setStreamZoom(100); }}
                                 size="small"
+                                aria-label="Fechar câmera"
                                 sx={{
                                     color: '#FFFFFF',
                                     bgcolor: 'rgba(255, 255, 255, 0.15)',
@@ -2521,7 +2550,7 @@ const Monitor = () => {
           maxWidth="sm"
           PaperProps={{
               sx: {
-                  maxHeight: '90vh'
+                  maxHeight: { sm: '90dvh' }
               }
           }}
       >
@@ -2588,7 +2617,7 @@ const Monitor = () => {
                       </Button>
                   </Box>
               ) : (
-                  <List sx={{ maxHeight: { xs: '48vh', sm: 380 }, overflow: 'auto', p: 0 }}>
+                  <List sx={{ maxHeight: { xs: '48dvh', sm: 380 }, overflow: 'auto', p: 0 }}>
                       {cameras.map(cam => {
                           const isChecked = selectedCameraIds.length === 0 || selectedCameraIds.includes(cam.id);
                           return (
@@ -2687,7 +2716,7 @@ const Monitor = () => {
           fullWidth 
           maxWidth="xs"
           PaperProps={{
-              sx: { maxHeight: '90vh' }
+              sx: { maxHeight: { sm: '90dvh' } }
           }}
       >
           <DialogTitle sx={{ fontWeight: 700, color: '#FFB800' }}>Cadastrar alvo na watchlist</DialogTitle>
@@ -2755,7 +2784,7 @@ const Monitor = () => {
           fullWidth 
           maxWidth="xs"
           PaperProps={{
-              sx: { maxHeight: '90vh' }
+              sx: { maxHeight: { sm: '90dvh' } }
           }}
       >
           <DialogTitle sx={{ fontWeight: 700 }}>Novo contato de alerta</DialogTitle>
@@ -2973,7 +3002,7 @@ const Monitor = () => {
               alt="Perícia CFTV"
               style={{
                 maxWidth: '100%',
-                maxHeight: '82vh',
+                maxHeight: '82dvh',
                 objectFit: 'contain',
                 borderRadius: 1.5,
                 boxShadow: '0 0 30px rgba(0,0,0,0.8)'

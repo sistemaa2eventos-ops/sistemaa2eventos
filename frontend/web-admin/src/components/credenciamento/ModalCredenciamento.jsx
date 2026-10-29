@@ -22,6 +22,7 @@ import AuthorizedAreasChips from '../common/AuthorizedAreasChips';
 import UniversalPulseiraInput from '../common/UniversalPulseiraInput';
 import PessoaFoto from '../common/PessoaFoto';
 import LeitorQrCamera from '../common/LeitorQrCamera';
+import useFecharComVoltar from '../../hooks/useFecharComVoltar';
 import api from '../../services/api';
 import ListaDocumentos from '../documentos/ListaDocumentos';
 import { SITUACAO_DOCUMENTAL, MOTIVO_PENDENCIA } from '../documentos/documentosUtils';
@@ -40,6 +41,7 @@ export const ModalCredenciamento = ({
 }) => {
     const [numeroPulseira, setNumeroPulseira] = useState('');
     const [lendoCamera, setLendoCamera] = useState(false);
+    useFecharComVoltar(open, onClose);
     const [selectedTipoPulseira, setSelectedTipoPulseira] = useState('');
     const [erroValidacao, setErroValidacao] = useState('');
 
@@ -419,7 +421,7 @@ export const ModalCredenciamento = ({
                 fullWidth
                 PaperProps={{
                     sx: {
-                        maxHeight: '90vh'
+                        maxHeight: { sm: '90dvh' }
                     }
                 }}
             >

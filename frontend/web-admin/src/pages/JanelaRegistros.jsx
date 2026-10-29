@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Box, Typography } from '@mui/material';
-import { Login as EntradaIcon, Logout as SaidaIcon } from '@mui/icons-material';
-import { useSearchParams } from 'react-router-dom';
+import { Box, Button, Typography } from '@mui/material';
+import { Login as EntradaIcon, Logout as SaidaIcon, ArrowBack as VoltarIcon } from '@mui/icons-material';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { usarConexao } from '../services/realtime';
 import RecentAccessList from '../components/credenciamento/RecentAccessList';
@@ -14,6 +14,7 @@ import PessoaCardDialog from '../components/credenciamento/PessoaCardDialog';
  */
 const JanelaRegistros = () => {
   const [params] = useSearchParams();
+  const navigate = useNavigate();
   const tipo = params.get('tipo') === 'checkout' ? 'checkout' : 'checkin';
   const eventoId = localStorage.getItem('active_evento_id');
   const eventoNome = localStorage.getItem('active_evento_nome') || '';
@@ -53,8 +54,19 @@ const JanelaRegistros = () => {
     return () => { clearTimeout(timerRef.current); socket.liberar(); };
   }, [eventoId, tipo, carregar]);
 
+  // Aberta como janela separada: fecha. Aberta direto (celular, link): volta para a operação
+  const voltar = () => {
+    if (window.opener && !window.opener.closed) window.close();
+    else navigate(tipo === 'checkout' ? '/checkout' : '/checkin');
+  };
+
   return (
-    <Box sx={{ height: '100vh', p: 2, display: 'flex', flexDirection: 'column', bgcolor: 'background.default' }}>
+    <Box sx={{ height: '100dvh', p: 2, display: 'flex', flexDirection: 'column', gap: 1, bgcolor: 'background.default' }}>
+      <Box>
+        <Button startIcon={<VoltarIcon />} onClick={voltar} sx={{ minHeight: 40, textTransform: 'none', color: cor }}>
+          Voltar
+        </Button>
+      </Box>
       {!eventoId ? (
         <Typography sx={{ m: 'auto', opacity: 0.7 }}>
           Selecione um evento no painel e abra esta janela de novo.

@@ -43,7 +43,7 @@ const theme = createTheme({
             styleOverrides: {
                 body: {
                     background: cores.fundo,
-                    minHeight: '100vh',
+                    minHeight: '100dvh',
                 },
                 '::-webkit-scrollbar': { width: '8px', height: '8px' },
                 '::-webkit-scrollbar-track': { background: 'transparent' },
@@ -169,6 +169,19 @@ const theme = createTheme({
                         maxHeight: 'calc(100dvh - 24px)',
                     },
                 }),
+                // No celular, modais médios/grandes (formulários, detalhes) ocupam a tela toda;
+                // os pequenos (confirmações) continuam como janela
+                ...Object.fromEntries(['paperWidthMd', 'paperWidthLg', 'paperWidthXl'].map((chave) => [chave, ({ theme: t }) => ({
+                    [t.breakpoints.down('sm')]: {
+                        margin: 0,
+                        width: '100%',
+                        maxWidth: '100%',
+                        height: '100dvh',
+                        maxHeight: '100dvh',
+                        borderRadius: 0,
+                        border: 'none',
+                    },
+                })])),
                 paperFullScreen: {
                     margin: '0 !important',
                     width: '100% !important',

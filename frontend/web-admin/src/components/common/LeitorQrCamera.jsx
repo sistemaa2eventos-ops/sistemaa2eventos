@@ -4,6 +4,7 @@ import { Box, Button, CircularProgress, Dialog, DialogContent, Typography, useMe
 import { useTheme } from '@mui/material/styles';
 import { Cameraswitch as TrocarIcon } from '@mui/icons-material';
 import TituloModal from './TituloModal';
+import useFecharComVoltar from '../../hooks/useFecharComVoltar';
 
 // Mensagem que a pessoa entende para cada falha do getUserMedia
 const mensagemErro = (err) => {
@@ -104,6 +105,7 @@ const LeitorQrCamera = ({
     const celular = useMediaQuery(theme.breakpoints.down('md'));
     const [frontal, setFrontal] = useState(false);
     const [erro, setErro] = useState('');
+    useFecharComVoltar(open, onClose);
 
     useEffect(() => {
         if (open) setErro('');

@@ -25,7 +25,7 @@ import { styled } from '@mui/material/styles';
 import NeonButton from '../components/common/NeonButton';
 
 const LoginContainer = styled(Box)(() => ({
-    minHeight: '100vh',
+    minHeight: '100dvh',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',

@@ -1175,7 +1175,7 @@ const Veiculos = () => {
                 disableRestoreFocus
                 PaperProps={{
                     sx: {
-                        maxHeight: '90vh',
+                        maxHeight: { sm: '90dvh' },
                         display: 'flex',
                         flexDirection: 'column'
                     }
@@ -1282,7 +1282,7 @@ const Veiculos = () => {
                 fullWidth
                 PaperProps={{
                     sx: {
-                        maxHeight: '90vh',
+                        maxHeight: { sm: '90dvh' },
                         display: 'flex',
                         flexDirection: 'column'
                     }
@@ -1326,7 +1326,7 @@ const Veiculos = () => {
                 fullWidth
                 PaperProps={{
                     sx: {
-                        maxHeight: '90vh',
+                        maxHeight: { sm: '90dvh' },
                         display: 'flex',
                         flexDirection: 'column'
                     }
@@ -1422,7 +1422,7 @@ const Veiculos = () => {
                 fullWidth
                 PaperProps={{
                     sx: {
-                        maxHeight: '90vh'
+                        maxHeight: { sm: '90dvh' }
                     }
                 }}
             >
@@ -1659,7 +1659,7 @@ const Veiculos = () => {
                     >
                         <CancelIcon />
                     </IconButton>
-                    <Box component="img" src={previewFotoUrl} alt="Foto Ampliada" sx={{ maxWidth: '90vw', maxHeight: '85vh', borderRadius: '8px', border: '2px solid #00D4FF' }} />
+                    <Box component="img" src={previewFotoUrl} alt="Foto Ampliada" sx={{ maxWidth: '90vw', maxHeight: '85dvh', borderRadius: '8px', border: '2px solid #00D4FF' }} />
                 </Box>
             </Dialog>
         </Box>

@@ -74,7 +74,7 @@ const DefinirSenha = () => {
     );
 
     return (
-        <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at center, #0A1628 0%, #050B18 100%)' }}>
+        <Box sx={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at center, #0A1628 0%, #050B18 100%)' }}>
             <Container maxWidth="xs">
                 <Box sx={{
                     p: { xs: 4, sm: 5 }, textAlign: 'center', borderRadius: '12px',

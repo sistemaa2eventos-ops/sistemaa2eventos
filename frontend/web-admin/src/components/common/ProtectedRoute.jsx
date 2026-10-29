@@ -61,7 +61,7 @@ const AccessDenied = () => {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: '65vh',
+        minHeight: '65dvh',
         gap: 2.5,
         p: 3,
         textAlign: 'center'

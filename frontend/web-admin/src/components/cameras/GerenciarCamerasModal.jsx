@@ -431,7 +431,7 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
                                 </Typography>
                             </Box>
                         ) : (
-                            <Stack spacing={1.5} sx={{ maxHeight: { xs: '60vh', sm: 420 }, overflowY: 'auto', pr: 0.5 }}>
+                            <Stack spacing={1.5} sx={{ maxHeight: { xs: '60dvh', sm: 420 }, overflowY: 'auto', pr: 0.5 }}>
                                 {cameras.map((c) => {
                                     const test = testResults[c.id];
                                     const isTesting = testingId === c.id;

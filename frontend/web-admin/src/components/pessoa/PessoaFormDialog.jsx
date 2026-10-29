@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import PhotoCapture from '../common/PhotoCapture';
 import NeonButton from '../common/NeonButton';
 import TituloModal from '../common/TituloModal';
+import useFecharComVoltar from '../../hooks/useFecharComVoltar';
 
 import { botaoSecundario } from '../../styles/tokens';
 const PessoaFormDialog = ({
@@ -45,6 +46,7 @@ const PessoaFormDialog = ({
   isEmpresa = false
 }) => {
   const [activePhaseTab, setActivePhaseTab] = React.useState('todas');
+  useFecharComVoltar(open, onClose);
   return (
     <Dialog
       open={open}
@@ -54,9 +56,9 @@ const PessoaFormDialog = ({
       fullScreen={isMobile}
       PaperProps={{
         sx: {
-          minHeight: isMobile ? '100dvh' : '80vh',
-          maxHeight: isMobile ? '100dvh' : '90vh',
-          height: isMobile ? '100dvh' : '88vh',
+          minHeight: isMobile ? '100dvh' : '80dvh',
+          maxHeight: isMobile ? '100dvh' : '90dvh',
+          height: isMobile ? '100dvh' : '88dvh',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden'

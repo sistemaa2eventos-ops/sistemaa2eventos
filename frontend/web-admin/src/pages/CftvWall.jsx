@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
     Box, Typography, Grid, Stack, Button, IconButton, Chip,
-    Dialog, DialogTitle, DialogContent, DialogActions,
+    Dialog, DialogContent, DialogActions,
     Checkbox, FormControlLabel, FormGroup, Tooltip, Fade
 } from '@mui/material';
 import {
@@ -26,6 +26,8 @@ import { useIaConfig, useIaStatus, statusDaCamera } from '../hooks/useIaConfig';
 import { tocarAlerta, useSomAlertas, criarFiltroAlertas } from '../utils/alertSound';
 
 import { comoRotulo } from '../utils/formatadores';
+import TituloModal from '../components/common/TituloModal';
+import { entrarTelaCheia, sairTelaCheia, estaEmTelaCheia, ouvirTelaCheia, suportaTelaCheia } from '../utils/telaCheia';
 
 /** Relógio isolado: antes o relógio re-renderizava a parede inteira a cada segundo */
 const Relogio = () => {
@@ -141,12 +143,11 @@ const CftvWall = () => {
     }, []);
 
     // Alternar Tela Cheia
+    // O ícone acompanha o navegador (Esc e gesto de voltar também saem da tela cheia)
+    useEffect(() => ouvirTelaCheia(setIsFullscreen), []);
     const toggleFullscreen = () => {
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
-        } else {
-            document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
-        }
+        if (estaEmTelaCheia()) sairTelaCheia();
+        else entrarTelaCheia();
     };
 
     // Concluir Rastreamento
@@ -233,18 +234,18 @@ const CftvWall = () => {
 
     // Calcular Colunas de Grade pelo Layout
     const getGridConfig = () => {
-        if (focusedCamId || layout === '1x1') return { xs: 12, sm: 12, md: 12, lg: 12, height: 'calc(100vh - 70px)' };
-        if (layout === '2x2') return { xs: 6, sm: 6, md: 6, lg: 6, height: 'calc(50vh - 40px)' };
-        if (layout === '3x3') return { xs: 6, sm: 6, md: 4, lg: 4, height: 'calc(33.3vh - 28px)' };
-        if (layout === '4x4') return { xs: 6, sm: 4, md: 3, lg: 3, height: 'calc(25vh - 22px)' };
-        return { xs: 12, sm: 6, md: 6, lg: 6, height: 'calc(50vh - 40px)' };
+        if (focusedCamId || layout === '1x1') return { xs: 12, sm: 12, md: 12, lg: 12, height: 'calc(100dvh - 70px)' };
+        if (layout === '2x2') return { xs: 6, sm: 6, md: 6, lg: 6, height: 'calc(50dvh - 40px)' };
+        if (layout === '3x3') return { xs: 6, sm: 6, md: 4, lg: 4, height: 'calc(33.3dvh - 28px)' };
+        if (layout === '4x4') return { xs: 6, sm: 4, md: 3, lg: 3, height: 'calc(25dvh - 22px)' };
+        return { xs: 12, sm: 6, md: 6, lg: 6, height: 'calc(50dvh - 40px)' };
     };
 
     const gridConfig = getGridConfig();
 
     return (
         <Box sx={{
-            width: '100vw',
+            width: '100%',
             height: '100dvh',
             bgcolor: '#050B18',
             color: '#FFFFFF',
@@ -394,16 +395,19 @@ const CftvWall = () => {
                         </IconButton>
                     </Tooltip>
 
-                    {/* Tela Cheia */}
-                    <Tooltip title={isFullscreen ? 'Sair da Tela Cheia' : 'Modo Tela Cheia Total'}>
-                        <IconButton
-                            size="small"
-                            onClick={toggleFullscreen}
-                            sx={{ color: '#00D4FF' }}
-                        >
-                            {isFullscreen ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
-                        </IconButton>
-                    </Tooltip>
+                    {/* Tela Cheia (não existe no iPhone: lá o botão some) */}
+                    {suportaTelaCheia() && (
+                        <Tooltip title={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}>
+                            <IconButton
+                                size="small"
+                                onClick={toggleFullscreen}
+                                aria-label={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
+                                sx={{ color: '#00D4FF' }}
+                            >
+                                {isFullscreen ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
+                            </IconButton>
+                        </Tooltip>
+                    )}
                 </Stack>
             </Box>
 
@@ -575,9 +579,7 @@ const CftvWall = () => {
                 fullWidth
                 maxWidth="sm"
             >
-                <DialogTitle sx={{ fontWeight: 700 }}>
-                    Selecionar câmeras no mosaico
-                </DialogTitle>
+                <TituloModal titulo="Selecionar câmeras no mosaico" onFechar={() => setOpenSelectModal(false)} />
                 <DialogContent>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                         Marque quais câmeras você deseja exibir na tela deste monitor.

@@ -139,17 +139,21 @@ code, pre, .font-mono {
 }
 
 /* Modo Quiosque */
-body.modo-quiosque {
-  overflow: hidden;
+/* Só no computador a tela de operação cabe inteira; no celular ela precisa rolar */
+@media (min-width: 1200px) {
+  body.modo-quiosque {
+    overflow: hidden;
+  }
 }
 
-body.modo-quiosque .sidebar {
+body.modo-quiosque .app-menu,
+body.modo-quiosque .app-barra {
   display: none !important;
 }
 
-body.modo-quiosque .main-content {
-  margin-left: 0 !important;
+body.modo-quiosque .app-conteudo {
   width: 100% !important;
+  padding-top: 0 !important;
 }
 
 @keyframes fadeIn {

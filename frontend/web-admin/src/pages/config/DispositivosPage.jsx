@@ -565,8 +565,8 @@ export default function DispositivosPage() {
               Nenhum item pendente — todos os terminais sincronizados!
             </Alert>
           ) : (
-            <TableContainer component={Paper} sx={{ background: 'rgba(5,11,24,0.8)', borderRadius: 1.5 }}>
-              <Table size="small">
+            <TableContainer component={Paper} sx={{ background: 'rgba(5,11,24,0.8)', borderRadius: 1.5, overflowX: 'auto' }}>
+              <Table size="small" sx={{ minWidth: 640 }}>
                 <TableHead>
                   <TableRow sx={{ background: `${PURP}22` }}>
                     {['Dispositivo', 'Comando', 'Status', 'Tentativas', 'Erro', 'Ação'].map(h => (
