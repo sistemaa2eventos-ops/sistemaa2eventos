@@ -53,7 +53,7 @@ const Reports = () => {
 
         // Abas agregadas e logs
         dailyLogs, totalLogs, page, setPage,
-        reportArea, reportEmpresa, reportLeitor, reportFuncao, reportStatus,
+        reportArea, reportEmpresa, reportLeitor, reportFuncao, reportStatus, reportPonto,
         loadLogs, loadTab, handleExport, handleExportAbaPDF
     } = useReports();
 
@@ -306,6 +306,62 @@ const Reports = () => {
                     />
                 );
             }
+        },
+        {
+            id: 'tempo_liquido',
+            label: 'Horas líquidas',
+            width: 150,
+            align: 'center',
+            // soma de cada entrada→saída; intervalos (almoço, saídas no meio do turno) ficam de fora
+            format: (val, row) => {
+                const detalhes = [
+                    row.tempo_intervalo && row.tempo_intervalo !== '—' ? `Intervalos: ${row.tempo_intervalo}` : null,
+                    row.observacao || null
+                ].filter(Boolean).join(' • ');
+                return (
+                    <Box title={detalhes || undefined} sx={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', cursor: detalhes ? 'help' : 'default' }}>
+                        <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontWeight: 700, color: val && val !== '—' ? '#FFFFFF' : '#64748B' }}>
+                            {val && val !== '—' ? val : '—'}
+                        </Typography>
+                        {row.tempo_intervalo && row.tempo_intervalo !== '—' && (
+                            <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '0.6875rem' }}>
+                                intervalo {row.tempo_intervalo}
+                            </Typography>
+                        )}
+                        {row.inconsistencias > 0 && (
+                            <Typography variant="caption" sx={{ color: '#FF3366', fontSize: '0.6875rem' }}>
+                                marcação fora de ordem
+                            </Typography>
+                        )}
+                    </Box>
+                );
+            }
+        }
+    ];
+
+    // Aba Ponto: um turno por pessoa e dia (o dia é o da entrada)
+    const fmtHorario = (val) => val ? format(new Date(val), 'dd/MM HH:mm', { locale: ptBR }) : '—';
+    const fmtMin = (min) => min > 0 ? `${String(Math.floor(min / 60)).padStart(2, '0')}h ${String(min % 60).padStart(2, '0')}m` : '—';
+    const pontoColumns = [
+        { id: 'dia', label: 'Dia', width: 100, format: (val) => val ? val.split('-').reverse().join('/') : '—' },
+        { id: 'pessoa', label: 'Colaborador', width: 220 },
+        { id: 'empresa', label: 'Empresa', width: 180 },
+        { id: 'pulseira', label: 'Pulseira', width: 100, align: 'center', format: (val) => val || '—' },
+        { id: 'primeira_entrada', label: 'Primeira entrada', width: 130, align: 'center', format: fmtHorario },
+        { id: 'ultima_saida', label: 'Última saída', width: 130, align: 'center', format: fmtHorario },
+        { id: 'permanencia_minutos', label: 'Permanência', width: 120, align: 'center', format: fmtMin },
+        { id: 'intervalo_minutos', label: 'Intervalos', width: 110, align: 'center', format: fmtMin },
+        {
+            id: 'liquido_minutos', label: 'Horas líquidas', width: 130, align: 'center',
+            format: (val) => (
+                <Typography variant="body2" sx={{ fontWeight: 700, color: val > 0 ? '#00FF88' : '#64748B' }}>{fmtMin(val)}</Typography>
+            )
+        },
+        {
+            id: 'observacao', label: 'Observação', width: 230,
+            format: (val, row) => val ? (
+                <Typography variant="caption" sx={{ color: row.saida_nao_registrada || row.inconsistencias > 0 ? '#FF3366' : '#94A3B8' }}>{val}</Typography>
+            ) : '—'
         }
     ];
 
@@ -650,7 +706,14 @@ const Reports = () => {
                             <KpiCard titulo="Não compareceram" valor={totaisDiarios.total_ausentes || 0} icone={<KpiAusentesIcon />} cor={cores.textoSecundario} />
                         </Grid>
                         <Grid item xs={12} sm={4} md={2.4}>
-                            <KpiCard titulo="Tempo médio no evento" valor={totaisDiarios.tempo_medio_formatado || '00h 00m'} icone={<KpiTempoIcon />} cor={cores.secundariaClara} valorCompacto />
+                            <KpiCard
+                                titulo="Horas líquidas (média)"
+                                valor={totaisDiarios.tempo_medio_liquido_formatado || '00h 00m'}
+                                icone={<KpiTempoIcon />}
+                                cor={cores.secundariaClara}
+                                valorCompacto
+                                rodape={`Total ${totaisDiarios.horas_liquidas_formatado || '00h 00m'} • permanência média ${(totaisDiarios.tempo_medio_formatado || '00h 00m').slice(0, 7)}${totaisDiarios.total_a_conferir ? ` • ${totaisDiarios.total_a_conferir} a conferir` : ''}`}
+                            />
                         </Grid>
                     </Grid>
 
@@ -846,6 +909,7 @@ const Reports = () => {
                     sx={{ borderBottom: 1, borderColor: 'divider' }}
                 >
                     <Tab icon={<DailyIcon />} label="Relatório diário" value="diario" />
+                    <Tab icon={<TimeIcon />} label="Ponto" value="ponto" />
                     <Tab icon={<HistoryIcon />} label="Logs de acesso" value="logs" />
                     <Tab icon={<BadgeIcon />} label="Sessões de operador" value="sessoes" />
                     <Tab icon={<TableIcon />} label="Por área" value="area" />
@@ -861,6 +925,16 @@ const Reports = () => {
                         <DataTable
                             data={dailyConsolidado}
                             columns={diarioColumns}
+                            loading={loading}
+                            rowsPerPage={25}
+                        />
+                    )}
+
+                    {/* PONTO: turno por pessoa e dia, com horas líquidas */}
+                    {tab === 'ponto' && (
+                        <DataTable
+                            data={reportPonto}
+                            columns={pontoColumns}
                             loading={loading}
                             rowsPerPage={25}
                         />

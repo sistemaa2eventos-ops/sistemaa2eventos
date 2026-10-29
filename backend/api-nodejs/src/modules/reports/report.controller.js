@@ -74,6 +74,32 @@ const ehSaida = (l) => l.tipo === 'checkout' || l.tipo === 'saida';
 // Saída gravada pelo reset/fechamento de turno para quem ficou "dentro": não é horário real
 const ehSaidaForcada = (l) => l.observacao === 'CHECKOUT_FORCADO_CRON';
 
+/**
+ * Horas líquidas de um turno: soma de cada par entrada→saída (intervalos como almoço ficam de fora).
+ * logsTurno em ordem de horário, com .ms. fimAberto: até quando contar uma entrada ainda sem saída
+ * (turno em andamento); null = não contar.
+ * Marcações fora de ordem (duas entradas seguidas, saída sem entrada) viram "inconsistências":
+ * na entrada repetida vale a primeira, a saída sem entrada é ignorada.
+ */
+function somarPares(logsTurno, fimAberto = null) {
+    let aberto = null;
+    let liquidoMs = 0;
+    let inconsistencias = 0;
+    for (const l of logsTurno) {
+        if (ehEntrada(l)) {
+            if (aberto === null) aberto = l.ms;
+            else inconsistencias++;
+        } else if (ehSaida(l)) {
+            if (aberto === null) { inconsistencias++; continue; }
+            // saída do fechamento de turno não tem horário real: esse trecho não conta
+            if (!ehSaidaForcada(l)) liquidoMs += l.ms - aberto;
+            aberto = null;
+        }
+    }
+    if (aberto !== null && fimAberto !== null) liquidoMs += Math.max(0, fimAberto - aberto);
+    return { liquidoMs, inconsistencias };
+}
+
 /** Logs brutos → linhas da aba "Logs de acesso" (empresa e equipamento pelo nome, não pelo id) */
 async function formatarLogs(logs, evento_id) {
     const empIds = [...new Set((logs || []).map(l => l.pessoas?.empresa_id).filter(Boolean))];
@@ -596,10 +622,12 @@ class ReportController {
                         ultima_saida: null,
                         saida_nao_registrada: false,
                         entradas: 0,
-                        saidas: 0
+                        saidas: 0,
+                        marcacoes: []
                     };
                 }
                 const g = grouped[key];
+                g.marcacoes.push({ tipo: log.tipo, observacao: log.observacao, ms });
 
                 if (entrada) {
                     g.entradas++;
@@ -633,6 +661,15 @@ class ReportController {
                     const diffMs = g.ultima_saida - g.primeira_entrada;
                     totalHoras = Math.round((diffMs / 3600000) * 100) / 100; // 2 casas decimais
                 }
+                const pares = somarPares(g.marcacoes);
+                const emAberto = g.primeira_entrada !== null && (g.ultima_saida === null || g.ultima_saida < g.primeira_entrada);
+                const permanenciaMin = totalHoras !== null ? Math.round(totalHoras * 60) : 0;
+                const liquidoMin = totalHoras !== null ? Math.min(permanenciaMin, Math.round(pares.liquidoMs / 60000)) : 0;
+                const observacoes = [];
+                if (g.saida_nao_registrada) observacoes.push('Saída não registrada: conferir horas');
+                else if (emAberto) observacoes.push('Sem saída no período');
+                if (g.primeira_entrada === null) observacoes.push('Saída sem entrada no período');
+                if (pares.inconsistencias > 0) observacoes.push(`${pares.inconsistencias} marcação(ões) fora de ordem`);
 
                 return {
                     pessoa: g.pessoa,
@@ -641,13 +678,19 @@ class ReportController {
                     empresa: empMap[g.empresa_id] || 'Sem Empresa',
                     dia: g.dia,
                     primeira_entrada: g.primeira_entrada !== null ? new Date(g.primeira_entrada).toISOString() : null,
-                    ultima_saida: g.ultima_saida !== null ? new Date(g.ultima_saida).toISOString() : null,
+                    // horário da saída automática do fechamento não é real: não mostra
+                    ultima_saida: g.ultima_saida !== null && !g.saida_nao_registrada ? new Date(g.ultima_saida).toISOString() : null,
                     saida_nao_registrada: g.saida_nao_registrada,
                     total_horas: totalHoras,
+                    permanencia_minutos: permanenciaMin,
+                    intervalo_minutos: totalHoras !== null ? permanenciaMin - liquidoMin : 0,
+                    liquido_minutos: liquidoMin,
+                    inconsistencias: pares.inconsistencias,
+                    observacao: observacoes.join(' • '),
                     entradas: g.entradas,
                     saidas: g.saidas
                 };
-            }).sort((a, b) => a.dia.localeCompare(b.dia) || a.pessoa.localeCompare(b.pessoa));
+            }).sort((a, b) => a.dia.localeCompare(b.dia) || (a.pessoa || '').localeCompare(b.pessoa || ''));
 
             res.json({ success: true, total: data.length, data });
         } catch (error) {
@@ -818,6 +861,12 @@ class ReportController {
         return `${String(hours).padStart(2, '0')}h ${String(mins).padStart(2, '0')}m ${String(secs).padStart(2, '0')}s`;
     }
 
+    /** Minutos → "XXXh YYm" (somatórios passam de 99h) */
+    _formatarHorasMin(min) {
+        const m = Math.max(0, Math.round(min || 0));
+        return `${String(Math.floor(m / 60)).padStart(2, '0')}h ${String(m % 60).padStart(2, '0')}m`;
+    }
+
     /**
      * Resolve contexto de evento com fallback seguro para req.query e req.headers
      */
@@ -929,6 +978,7 @@ class ReportController {
             let totalAusentes = 0;
             let totalMinutosAcumulado = 0;
             let contagemComTempo = 0;
+            let totalLiquidoAcumulado = 0;
 
             const registros = (pessoas || []).map(p => {
                 const pLogs = logsPorPessoa[p.id] || [];
@@ -941,8 +991,12 @@ class ReportController {
 
                 let checkinAt = '—';
                 let checkoutAt = '—';
+                let checkinMs = null;
+                let checkoutMs = null;
                 let tempoPermanencia = '—';
-                let tempoMinutos = 0;
+                let tempoMinutos = 0;      // permanência bruta: 1ª entrada → saída final
+                let liquidoMinutos = 0;    // soma dos pares entrada→saída
+                let inconsistencias = 0;
                 let status = 'ausente';
                 let pulseiraDoTurno = '—';
                 let saidaNaoRegistrada = false;
@@ -956,6 +1010,7 @@ class ReportController {
                     const ultimaEntrada = entradasHoje[entradasHoje.length - 1];
 
                     checkinAt = this._formatarDataHora(primeiraEntrada.ms);
+                    checkinMs = primeiraEntrada.ms;
                     // A pulseira deve ser estritamente a do check-in realizado
                     pulseiraDoTurno = primeiraEntrada.numero_pulseira || (isHoje ? p.numero_pulseira : null) || '—';
 
@@ -964,6 +1019,13 @@ class ReportController {
                     const saidaDoDia = saidasHoje.filter(s => s.ms > ultimaEntrada.ms).pop();
                     const saidaFinal = saidaDoDia || saidasAmanha.find(s => s.ms > ultimaEntrada.ms
                         && (!proximaEntradaAmanha || s.ms < proximaEntradaAmanha.ms));
+
+                    const fimTurno = saidaFinal ? saidaFinal.ms : (isHoje ? now.getTime() : msFimDia);
+                    const pares = somarPares(
+                        pLogs.filter(l => (ehEntrada(l) || ehSaida(l)) && l.ms >= primeiraEntrada.ms && l.ms <= fimTurno),
+                        saidaFinal ? null : fimTurno
+                    );
+                    inconsistencias = pares.inconsistencias;
 
                     if (saidaFinal && ehSaidaForcada(saidaFinal)) {
                         // Ficou "dentro" até o fechamento de turno: não houve saída real.
@@ -976,19 +1038,22 @@ class ReportController {
                     } else if (saidaFinal) {
                         const ms = saidaFinal.ms - primeiraEntrada.ms;
                         checkoutAt = this._formatarDataHora(saidaFinal.ms);
+                        checkoutMs = saidaFinal.ms;
                         tempoPermanencia = this._formatarDuracaoMs(ms);
                         tempoMinutos = Math.max(0, Math.round(ms / 60000));
+                        liquidoMinutos = Math.min(tempoMinutos, Math.round(pares.liquidoMs / 60000));
                         status = 'finalizado';
                         totalFinalizados++;
                         totalMinutosAcumulado += tempoMinutos;
+                        totalLiquidoAcumulado += liquidoMinutos;
                         contagemComTempo++;
                     } else {
                         // Ainda presente no evento (em andamento) — fora da média até sair
                         checkoutAt = 'No evento';
-                        const refTime = isHoje ? now.getTime() : msFimDia;
-                        const ms = Math.max(0, refTime - primeiraEntrada.ms);
+                        const ms = Math.max(0, fimTurno - primeiraEntrada.ms);
                         tempoPermanencia = `Em andamento (${this._formatarDuracaoMs(ms)})`;
                         tempoMinutos = Math.max(0, Math.round(ms / 60000));
+                        liquidoMinutos = Math.min(tempoMinutos, Math.round(pares.liquidoMs / 60000));
                         status = 'presente';
                         totalPresentes++;
                     }
@@ -1006,9 +1071,11 @@ class ReportController {
                         turnoAnterior = true;
                         pulseiraDoTurno = entradaAnterior.numero_pulseira || (isHoje ? p.numero_pulseira : null) || '—';
                         checkinAt = this._formatarDataHora(entradaAnterior.ms);
+                        checkinMs = entradaAnterior.ms;
 
                         if (saidaHoje) {
                             checkoutAt = this._formatarDataHora(saidaHoje.ms);
+                            checkoutMs = saidaHoje.ms;
                             tempoPermanencia = 'Turno do dia anterior';
                             status = 'finalizado';
                             totalFinalizados++;
@@ -1028,6 +1095,13 @@ class ReportController {
                     }
                 }
 
+                const intervaloMinutos = turnoAnterior || saidaNaoRegistrada ? 0 : Math.max(0, tempoMinutos - liquidoMinutos);
+                const observacoes = [];
+                if (saidaNaoRegistrada) observacoes.push('Saída não registrada: conferir horas');
+                if (turnoAnterior) observacoes.push('Horas no relatório do dia da entrada');
+                if (status === 'presente') observacoes.push('Turno em andamento');
+                if (inconsistencias > 0) observacoes.push(`${inconsistencias} marcação(ões) fora de ordem`);
+
                 return {
                     id: p.id,
                     empresa_nome: empMap[p.empresa_id]?.nome || 'Sem Empresa',
@@ -1039,6 +1113,15 @@ class ReportController {
                     checkout_at: checkoutAt,
                     tempo_permanencia: tempoPermanencia,
                     tempo_minutos: tempoMinutos,
+                    liquido_minutos: liquidoMinutos,
+                    tempo_liquido: liquidoMinutos > 0 ? this._formatarHorasMin(liquidoMinutos) : '—',
+                    intervalo_minutos: intervaloMinutos,
+                    tempo_intervalo: intervaloMinutos > 0 ? this._formatarHorasMin(intervaloMinutos) : '—',
+                    inconsistencias,
+                    observacao: observacoes.join(' • '),
+                    // horários crus (ISO) para a planilha gravar data de verdade, não texto
+                    checkin_iso: checkinMs !== null ? new Date(checkinMs).toISOString() : null,
+                    checkout_iso: checkoutMs !== null ? new Date(checkoutMs).toISOString() : null,
                     saida_nao_registrada: saidaNaoRegistrada,
                     turno_anterior: turnoAnterior,
                     status
@@ -1058,6 +1141,7 @@ class ReportController {
 
             const mediaMinutos = contagemComTempo > 0 ? Math.round(totalMinutosAcumulado / contagemComTempo) : 0;
             const tempoMedioFmt = this._formatarDuracaoMs(mediaMinutos * 60000);
+            const mediaLiquida = contagemComTempo > 0 ? Math.round(totalLiquidoAcumulado / contagemComTempo) : 0;
 
             const totais = {
                 total_colaboradores: (pessoas || []).length,
@@ -1065,8 +1149,14 @@ class ReportController {
                 total_finalizados: totalFinalizados,
                 total_ausentes: totalAusentes,
                 total_checkins: totalPresentes + totalFinalizados,
+                total_a_conferir: registros.filter(r => r.saida_nao_registrada).length,
                 tempo_medio_minutos: mediaMinutos,
-                tempo_medio_formatado: tempoMedioFmt
+                tempo_medio_formatado: tempoMedioFmt,
+                // horas líquidas só de turnos encerrados com saída real
+                horas_liquidas_minutos: totalLiquidoAcumulado,
+                horas_liquidas_formatado: this._formatarHorasMin(totalLiquidoAcumulado),
+                tempo_medio_liquido_minutos: mediaLiquida,
+                tempo_medio_liquido_formatado: this._formatarHorasMin(mediaLiquida)
             };
 
             return { registros, totais, dataReferencia: dataRef };
@@ -1123,14 +1213,21 @@ class ReportController {
                         // média só de turnos encerrados com saída real (igual ao relatório ao vivo)
                         const comTempo = registros.filter(r => r.status === 'finalizado' && r.tempo_minutos > 0);
                         const mediaMin = comTempo.length ? Math.round(comTempo.reduce((a, r) => a + r.tempo_minutos, 0) / comTempo.length) : 0;
+                        const liquidoTotal = comTempo.reduce((a, r) => a + (r.liquido_minutos || 0), 0);
                         totais = {
                             total_colaboradores: registros.length || fechamento.total_colaboradores || 0,
                             total_presentes: contar('presente'),
                             total_finalizados: contar('finalizado'),
                             total_ausentes: contar('ausente'),
                             total_checkins: contar('presente') + contar('finalizado'),
+                            total_a_conferir: registros.filter(r => r.saida_nao_registrada).length,
                             tempo_medio_minutos: mediaMin,
-                            tempo_medio_formatado: this._formatarDuracaoMs(mediaMin * 60000)
+                            tempo_medio_formatado: this._formatarDuracaoMs(mediaMin * 60000),
+                            // arquivos gravados antes das horas líquidas não têm esse campo: ficam em 0
+                            horas_liquidas_minutos: liquidoTotal,
+                            horas_liquidas_formatado: this._formatarHorasMin(liquidoTotal),
+                            tempo_medio_liquido_minutos: comTempo.length ? Math.round(liquidoTotal / comTempo.length) : 0,
+                            tempo_medio_liquido_formatado: this._formatarHorasMin(comTempo.length ? liquidoTotal / comTempo.length : 0)
                         };
                         fechamentoInfo = {
                             id: fechamento.id,
@@ -1289,102 +1386,258 @@ class ReportController {
      * Planilha do relatório diário consolidado (usada no download e no envio automático por e-mail).
      */
     async gerarWorkbookRelatorioDiario(evento_id, evento_nome, dataRef, empresa_id = null) {
-            const { registros, totais } = await this.gerarDadosRelatorioDiarioConsolidado(evento_id, dataRef, empresa_id);
+        const { registros, totais } = await this.gerarDadosRelatorioDiarioConsolidado(evento_id, dataRef, empresa_id);
+        const [ano, mes, dia] = dataRef.split('-');
+        const dataBR = `${dia}/${mes}/${ano}`;
 
-            const workbook = new ExcelJS.Workbook();
-            workbook.creator = 'NZT Relatórios';
-            workbook.created = new Date();
+        const AZUL_ESCURO = 'FF0A1929';
+        const CINZA_ESCURO = 'FF1E293B';
+        const preencher = (argb) => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+        const CORES_STATUS = {
+            PRESENTE: ['FFFEF3C7', 'FF92400E'],
+            FINALIZADO: ['FFD1FAE5', 'FF065F46'],
+            'A CONFERIR': ['FFFEE2E2', 'FF991B1B'],
+            AUSENTE: ['FFF1F5F9', 'FF64748B']
+        };
+        // Duração em minutos → valor de hora do Excel (fração do dia), para somar com [h]:mm
+        const horasExcel = (min) => min / 1440;
+        const statusTexto = (r) => (r.saida_nao_registrada ? 'A CONFERIR' : (r.status || 'ausente').toUpperCase());
+        // Só turnos encerrados com saída real têm horas no dia (mesma regra dos totais da tela)
+        const temHoras = (r) => r.status === 'finalizado' && !r.saida_nao_registrada && !r.turno_anterior && r.tempo_minutos > 0;
 
-            const sheet = workbook.addWorksheet(`Relatório Diário ${dataRef}`);
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = 'NZT Relatórios';
+        workbook.created = new Date();
+        workbook.calcProperties = { fullCalcOnLoad: true };
 
-            // Título Superior
-            sheet.mergeCells('A1:I1');
-            const titleCell = sheet.getCell('A1');
-            titleCell.value = 'NZT RELATÓRIOS — FECHAMENTO DIÁRIO DE CONTROLE DE ACESSO';
-            titleCell.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
-            titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0A1929' } };
-            titleCell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
-            sheet.getRow(1).height = 32;
+        const cabecalho = (sheet, ultimaCol, titulo) => {
+            sheet.mergeCells(1, 1, 1, ultimaCol);
+            const t = sheet.getCell(1, 1);
+            t.value = titulo;
+            t.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+            t.fill = preencher(AZUL_ESCURO);
+            t.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+            sheet.getRow(1).height = 30;
 
-            // Subtítulo
-            sheet.mergeCells('A2:I2');
-            const subCell = sheet.getCell('A2');
-            subCell.value = `EVENTO: ${(evento_nome || '').toUpperCase()}  |  DATA REFERÊNCIA: ${dataRef}  |  EMISSÃO: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`;
-            subCell.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF94A3B8' } };
-            subCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
-            subCell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
-            sheet.getRow(2).height = 22;
+            sheet.mergeCells(2, 1, 2, ultimaCol);
+            const s = sheet.getCell(2, 1);
+            s.value = `EVENTO: ${(evento_nome || '').toUpperCase()}  |  DIA: ${dataBR}  |  EMISSÃO: ${new Date().toLocaleString('pt-BR', { timeZone: TIMEZONE })}`;
+            s.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF94A3B8' } };
+            s.fill = preencher('FF0F172A');
+            s.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+        };
+        const linhaTitulos = (sheet, numLinha, titulos) => {
+            const row = sheet.getRow(numLinha);
+            row.values = titulos;
+            row.height = 26;
+            row.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9.5 };
+            row.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+            titulos.forEach((_, i) => { row.getCell(i + 1).fill = preencher(CINZA_ESCURO); });
+        };
 
-            // Métricas (Linha 4)
-            sheet.getRow(4).values = [
-                'Total Colaboradores:', totais.total_colaboradores,
-                'Presentes:', totais.total_presentes,
-                'Finalizados:', totais.total_finalizados,
-                'Ausentes:', totais.total_ausentes,
-                'Tempo Médio:', totais.tempo_medio_formatado
-            ];
-            sheet.getRow(4).font = { bold: true, size: 9 };
+        // ------------------------------------------------------------------
+        // Aba 1: lista do dia
+        // ------------------------------------------------------------------
+        const NOME_ABA = 'Relatório Diário';
+        const sheet = workbook.addWorksheet(NOME_ABA);
+        const COLS = [
+            { titulo: 'EMPRESA', largura: 28 },
+            { titulo: 'NOME DO COLABORADOR', largura: 34 },
+            { titulo: 'CPF', largura: 16 },
+            { titulo: 'FUNÇÃO', largura: 22 },
+            { titulo: 'Nº PULSEIRA', largura: 12 },
+            { titulo: 'CHECK-IN (ENTRADA)', largura: 19 },
+            { titulo: 'CHECK-OUT (SAÍDA)', largura: 19 },
+            { titulo: 'PERMANÊNCIA', largura: 13 },
+            { titulo: 'INTERVALOS', largura: 12 },
+            { titulo: 'HORAS LÍQUIDAS', largura: 13 },
+            { titulo: 'STATUS', largura: 13 },
+            { titulo: 'OBSERVAÇÃO', largura: 42 }
+        ];
+        cabecalho(sheet, COLS.length, 'NZT RELATÓRIOS — FECHAMENTO DIÁRIO DE CONTROLE DE ACESSO');
 
-            // Cabeçalho da Tabela (Linha 6)
-            sheet.getRow(6).values = [
-                'EMPRESA',
-                'NOME DO COLABORADOR',
-                'CPF',
-                'FUNÇÃO',
-                'Nº PULSEIRA',
-                'CHECK-IN (ENTRADA)',
-                'CHECK-OUT (SAÍDA)',
-                'TEMPO DE PERMANÊNCIA',
-                'STATUS'
-            ];
-            sheet.getRow(6).height = 26;
-            sheet.getRow(6).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9.5 };
-            sheet.getRow(6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
-            sheet.getRow(6).alignment = { vertical: 'middle', horizontal: 'center' };
+        // Indicadores do dia (linhas 4 e 5)
+        const indicadores = [
+            ['CADASTRADOS', totais.total_colaboradores],
+            ['PRESENTES', totais.total_presentes],
+            ['FINALIZADOS', totais.total_finalizados],
+            ['AUSENTES', totais.total_ausentes],
+            ['A CONFERIR', totais.total_a_conferir || 0],
+            ['HORAS LÍQUIDAS', { horas: totais.horas_liquidas_minutos || 0 }],
+            ['MÉDIA LÍQUIDA', { horas: totais.tempo_medio_liquido_minutos || 0 }],
+            ['PERMANÊNCIA MÉDIA', { horas: totais.tempo_medio_minutos || 0 }]
+        ];
+        indicadores.forEach(([rotulo, valor], i) => {
+            const r = sheet.getCell(4, i + 1);
+            r.value = rotulo;
+            r.font = { bold: true, size: 8, color: { argb: 'FF64748B' } };
+            r.alignment = { horizontal: 'center' };
+            const v = sheet.getCell(5, i + 1);
+            if (valor && typeof valor === 'object') {
+                v.value = horasExcel(valor.horas);
+                v.numFmt = '[h]:mm';
+            } else {
+                v.value = valor || 0;
+            }
+            v.font = { bold: true, size: 13, color: { argb: AZUL_ESCURO } };
+            v.alignment = { horizontal: 'center' };
+            v.border = { bottom: { style: 'medium', color: { argb: 'FF00D4FF' } } };
+        });
 
-            // Largura das Colunas
-            sheet.columns = [
-                { width: 28 }, // Empresa
-                { width: 34 }, // Colaborador
-                { width: 18 }, // CPF
-                { width: 24 }, // Função
-                { width: 16 }, // Pulseira
-                { width: 22 }, // Checkin
-                { width: 22 }, // Checkout
-                { width: 24 }, // Permanência
-                { width: 16 }  // Status
-            ];
+        const LINHA_TITULOS = 7;
+        linhaTitulos(sheet, LINHA_TITULOS, COLS.map(c => c.titulo));
+        COLS.forEach((c, i) => { sheet.getColumn(i + 1).width = c.largura; });
 
-            let currentRow = 7;
-            registros.forEach((r, idx) => {
-                const row = sheet.addRow([
-                    r.empresa_nome,
-                    r.colaborador_nome,
-                    r.cpf,
-                    r.funcao,
-                    r.numero_pulseira,
-                    r.checkin_at,
-                    r.checkout_at,
-                    r.tempo_permanencia,
-                    r.status ? r.status.toUpperCase() : '—'
-                ]);
+        registros.forEach((r, idx) => {
+            const horas = temHoras(r);
+            const textoSaida = r.checkout_iso ? dataExcel(r.checkout_iso) : (r.checkout_at || '—');
+            const row = sheet.addRow([
+                r.empresa_nome,
+                r.colaborador_nome,
+                r.cpf,
+                r.funcao,
+                r.numero_pulseira,
+                r.checkin_iso ? dataExcel(r.checkin_iso) : '—',
+                textoSaida,
+                horas ? horasExcel(r.tempo_minutos) : (r.status === 'presente' ? 'Em andamento' : '—'),
+                horas ? horasExcel(r.intervalo_minutos || 0) : '—',
+                horas ? horasExcel(r.liquido_minutos || 0) : (r.saida_nao_registrada ? 'A conferir' : '—'),
+                statusTexto(r),
+                r.observacao || ''
+            ]);
 
-                if (idx % 2 === 0) {
-                    row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
-                }
+            if (idx % 2 === 0) row.eachCell({ includeEmpty: true }, (cell) => { cell.fill = preencher('FFF8FAFC'); });
+            row.alignment = { vertical: 'middle' };
+            [3, 5, 6, 7, 8, 9, 10, 11].forEach(c => { row.getCell(c).alignment = { horizontal: 'center', vertical: 'middle' }; });
+            row.getCell(6).numFmt = 'dd/mm/yyyy hh:mm';
+            row.getCell(7).numFmt = 'dd/mm/yyyy hh:mm';
+            [8, 9, 10].forEach(c => { row.getCell(c).numFmt = '[h]:mm'; });
+            row.getCell(10).font = { bold: true };
 
-                row.alignment = { vertical: 'middle' };
-                row.getCell(3).alignment = { horizontal: 'center' };
-                row.getCell(5).alignment = { horizontal: 'center' };
-                row.getCell(6).alignment = { horizontal: 'center' };
-                row.getCell(7).alignment = { horizontal: 'center' };
-                row.getCell(8).alignment = { horizontal: 'right' };
-                row.getCell(9).alignment = { horizontal: 'center' };
+            const [fundo, texto] = CORES_STATUS[statusTexto(r)] || CORES_STATUS.AUSENTE;
+            const cStatus = row.getCell(11);
+            cStatus.fill = preencher(fundo);
+            cStatus.font = { bold: true, size: 9, color: { argb: texto } };
+            if (r.saida_nao_registrada || r.inconsistencias > 0) row.getCell(12).font = { color: { argb: 'FF991B1B' } };
+        });
 
-                currentRow++;
+        // Linha de totais (SUBTOTAL acompanha o autofiltro: filtrou uma empresa, soma só ela)
+        const primeiraDados = LINHA_TITULOS + 1;
+        const ultimaDados = LINHA_TITULOS + registros.length;
+        if (registros.length > 0) {
+            const subtotal = (letra, funcao) => ({ formula: `SUBTOTAL(${funcao},${letra}${primeiraDados}:${letra}${ultimaDados})` });
+            const total = sheet.addRow([
+                'TOTAL', subtotal('B', 103), '', '', '', '', '',
+                subtotal('H', 109), subtotal('I', 109), subtotal('J', 109), '', ''
+            ]);
+            total.font = { bold: true };
+            total.getCell(2).numFmt = '0" colaboradores"';
+            [8, 9, 10].forEach(c => {
+                total.getCell(c).numFmt = '[h]:mm';
+                total.getCell(c).alignment = { horizontal: 'center' };
             });
+            total.eachCell({ includeEmpty: true }, (cell) => {
+                cell.border = { top: { style: 'thin' } };
+                cell.fill = preencher('FFE2E8F0');
+            });
+        }
 
-            return workbook;
+        const nota = sheet.addRow([]);
+        nota.getCell(1).value = 'Critérios: horas líquidas = soma de cada período entre uma entrada e a saída seguinte '
+            + '(intervalos como almoço ficam de fora). O turno pertence ao dia da entrada. Saída automática do '
+            + 'fechamento de turno fica "A conferir" e não soma horas.';
+        sheet.mergeCells(nota.number, 1, nota.number, COLS.length);
+        nota.getCell(1).font = { italic: true, size: 8, color: { argb: 'FF64748B' } };
+        nota.getCell(1).alignment = { wrapText: true };
+        nota.height = 24;
+
+        sheet.views = [{ state: 'frozen', ySplit: LINHA_TITULOS, xSplit: 2 }];
+        sheet.autoFilter = { from: { row: LINHA_TITULOS, column: 1 }, to: { row: LINHA_TITULOS, column: COLS.length } };
+        sheet.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 };
+        sheet.pageSetup.printTitlesRow = `${LINHA_TITULOS}:${LINHA_TITULOS}`;
+
+        // ------------------------------------------------------------------
+        // Aba 2: resumo por empresa (fórmulas apontando para a aba 1, com o valor já calculado)
+        // ------------------------------------------------------------------
+        const resumo = workbook.addWorksheet('Resumo por empresa');
+        const COLS_RESUMO = ['EMPRESA', 'CADASTRADOS', 'PRESENTES', 'FINALIZADOS', 'AUSENTES', 'A CONFERIR', 'HORAS LÍQUIDAS', 'MÉDIA LÍQUIDA POR TURNO'];
+        cabecalho(resumo, COLS_RESUMO.length, 'RESUMO POR EMPRESA');
+        linhaTitulos(resumo, 4, COLS_RESUMO);
+        [32, 13, 12, 13, 12, 12, 15, 16].forEach((w, i) => { resumo.getColumn(i + 1).width = w; });
+
+        const porEmpresa = {};
+        registros.forEach(r => {
+            const e = porEmpresa[r.empresa_nome] || (porEmpresa[r.empresa_nome] = { cad: 0, pres: 0, fin: 0, aus: 0, conf: 0, liq: 0, turnos: 0 });
+            const st = statusTexto(r);
+            e.cad++;
+            if (st === 'PRESENTE') e.pres++;
+            if (st === 'FINALIZADO') e.fin++;
+            if (st === 'AUSENTE') e.aus++;
+            if (st === 'A CONFERIR') e.conf++;
+            if (temHoras(r)) { e.liq += r.liquido_minutos || 0; e.turnos++; }
+        });
+
+        const ref = (col) => `'${NOME_ABA}'!$${col}$${primeiraDados}:$${col}$${Math.max(ultimaDados, primeiraDados)}`;
+        const empresas = Object.keys(porEmpresa).sort((a, b) => a.localeCompare(b));
+        empresas.forEach((nome, i) => {
+            const e = porEmpresa[nome];
+            const n = 5 + i;
+            const contarStatus = (st) => `COUNTIFS(${ref('A')},$A${n},${ref('K')},"${st}")`;
+            const row = resumo.addRow([
+                nome,
+                { formula: `COUNTIF(${ref('A')},$A${n})`, result: e.cad },
+                { formula: contarStatus('PRESENTE'), result: e.pres },
+                { formula: contarStatus('FINALIZADO'), result: e.fin },
+                { formula: contarStatus('AUSENTE'), result: e.aus },
+                { formula: contarStatus('A CONFERIR'), result: e.conf },
+                { formula: `SUMIFS(${ref('J')},${ref('A')},$A${n})`, result: horasExcel(e.liq) },
+                { formula: `IFERROR(G${n}/COUNTIFS(${ref('A')},$A${n},${ref('J')},">0"),0)`, result: e.turnos ? horasExcel(e.liq / e.turnos) : 0 }
+            ]);
+            for (let c = 2; c <= 8; c++) row.getCell(c).alignment = { horizontal: 'center' };
+            row.getCell(7).numFmt = '[h]:mm';
+            row.getCell(8).numFmt = '[h]:mm';
+            if (e.conf > 0) row.getCell(6).font = { bold: true, color: { argb: 'FF991B1B' } };
+            if (i % 2 === 0) row.eachCell({ includeEmpty: true }, (cell) => { cell.fill = preencher('FFF8FAFC'); });
+        });
+        if (empresas.length > 0) {
+            const ult = 4 + empresas.length;
+            const soma = (l) => ({ formula: `SUM(${l}5:${l}${ult})` });
+            const tot = resumo.addRow(['TOTAL', soma('B'), soma('C'), soma('D'), soma('E'), soma('F'), soma('G'),
+                { formula: `IFERROR(G${ult + 1}/COUNTIF(${ref('J')},">0"),0)` }]);
+            tot.font = { bold: true };
+            for (let c = 2; c <= 8; c++) tot.getCell(c).alignment = { horizontal: 'center' };
+            tot.getCell(7).numFmt = '[h]:mm';
+            tot.getCell(8).numFmt = '[h]:mm';
+            tot.eachCell({ includeEmpty: true }, (cell) => { cell.border = { top: { style: 'thin' } }; cell.fill = preencher('FFE2E8F0'); });
+        }
+        resumo.views = [{ state: 'frozen', ySplit: 4 }];
+
+        // ------------------------------------------------------------------
+        // Aba 3: ocorrências para conferir
+        // ------------------------------------------------------------------
+        const ocorr = workbook.addWorksheet('Ocorrências');
+        const COLS_OCORR = ['EMPRESA', 'COLABORADOR', 'CPF', 'Nº PULSEIRA', 'CHECK-IN', 'OCORRÊNCIA'];
+        cabecalho(ocorr, COLS_OCORR.length, 'OCORRÊNCIAS PARA CONFERIR');
+        linhaTitulos(ocorr, 4, COLS_OCORR);
+        [28, 34, 16, 12, 19, 55].forEach((w, i) => { ocorr.getColumn(i + 1).width = w; });
+
+        const ocorrencias = registros.filter(r => r.saida_nao_registrada || r.inconsistencias > 0);
+        if (ocorrencias.length === 0) {
+            ocorr.getCell(5, 1).value = 'Nenhuma ocorrência no dia.';
+            ocorr.getCell(5, 1).font = { italic: true, color: { argb: 'FF64748B' } };
+        }
+        ocorrencias.forEach(r => {
+            const motivos = [];
+            if (r.saida_nao_registrada) motivos.push('Saída não registrada: a pessoa não bateu a saída e o fechamento de turno encerrou o registro');
+            if (r.inconsistencias > 0) motivos.push(`${r.inconsistencias} marcação(ões) fora de ordem (entrada repetida ou saída sem entrada)`);
+            const row = ocorr.addRow([r.empresa_nome, r.colaborador_nome, r.cpf, r.numero_pulseira,
+                r.checkin_iso ? dataExcel(r.checkin_iso) : '—', motivos.join(' • ')]);
+            row.getCell(5).numFmt = 'dd/mm/yyyy hh:mm';
+            row.getCell(6).alignment = { wrapText: true, vertical: 'top' };
+        });
+        ocorr.views = [{ state: 'frozen', ySplit: 4 }];
+
+        return workbook;
     }
 
     /**
@@ -1456,6 +1709,23 @@ class ReportController {
                     if (error) throw error;
                     return formatarLogs(data, req.event.id);
                 }
+            },
+            ponto: {
+                titulo: 'Ponto por Pessoa e Dia',
+                colunas: [
+                    { id: 'dia', label: 'Dia', tipo: 'dia', align: 'center' },
+                    { id: 'pessoa', label: 'Colaborador' },
+                    { id: 'cpf', label: 'CPF' },
+                    { id: 'empresa', label: 'Empresa' },
+                    { id: 'pulseira', label: 'Pulseira', align: 'center' },
+                    { id: 'primeira_entrada', label: 'Primeira Entrada', tipo: 'data' },
+                    { id: 'ultima_saida', label: 'Última Saída', tipo: 'data' },
+                    { id: 'permanencia_minutos', label: 'Permanência', tipo: 'horas', align: 'center' },
+                    { id: 'intervalo_minutos', label: 'Intervalos', tipo: 'horas', align: 'center' },
+                    { id: 'liquido_minutos', label: 'Horas Líquidas', tipo: 'horas', align: 'center' },
+                    { id: 'observacao', label: 'Observação' }
+                ],
+                carregar: () => executar(this.pontoResumo)
             },
             area: {
                 titulo: 'Relatório de Fluxo por Área',
@@ -1539,7 +1809,11 @@ class ReportController {
 
             const linhas = dados.linhas.map(l => {
                 const out = { ...l };
-                dados.colunas.filter(c => c.tipo === 'data').forEach(c => { out[c.id] = this._formatarDataHora(l[c.id]); });
+                dados.colunas.forEach(c => {
+                    if (c.tipo === 'data') out[c.id] = l[c.id] ? this._formatarDataHora(l[c.id]) : '—';
+                    if (c.tipo === 'dia') out[c.id] = l[c.id] ? l[c.id].split('-').reverse().join('/') : '—';
+                    if (c.tipo === 'horas') out[c.id] = l[c.id] > 0 ? this._formatarHorasMin(l[c.id]) : '—';
+                });
                 return out;
             });
 
@@ -1605,31 +1879,41 @@ class ReportController {
             linhas.forEach((l, idx) => {
                 const row = sheet.addRow(colunas.map(c => {
                     const v = l[c.id];
-                    if (c.tipo === 'data') return dataExcel(v);
+                    if (c.tipo === 'data') return v ? dataExcel(v) : '—';
+                    if (c.tipo === 'dia') {
+                        const [a, m, d] = String(v || '').split('-').map(Number);
+                        return a ? new Date(Date.UTC(a, m - 1, d)) : '—';
+                    }
+                    // minutos → hora do Excel (fração do dia), soma com [h]:mm
+                    if (c.tipo === 'horas') return (Number(v) || 0) / 1440;
                     if (c.tipo === 'numero') return Number(v) || 0;
                     return v ?? '—';
                 }));
                 colunas.forEach((c, i) => {
                     const cell = row.getCell(i + 1);
                     if (c.tipo === 'data') cell.numFmt = 'dd/mm/yyyy hh:mm:ss';
+                    if (c.tipo === 'dia') cell.numFmt = 'dd/mm/yyyy';
+                    if (c.tipo === 'horas') cell.numFmt = '[h]:mm';
                     if (c.align) cell.alignment = { horizontal: c.align };
                     if (idx % 2 === 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
                 });
             });
 
             // Totais das colunas numéricas (SUBTOTAL respeita o autofiltro)
-            if (linhas.length > 0 && colunas.some(c => c.tipo === 'numero')) {
+            const somavel = (c) => c.tipo === 'numero' || c.tipo === 'horas';
+            if (linhas.length > 0 && colunas.some(somavel)) {
                 const primeira = 5;
                 const ultima = 4 + linhas.length;
                 const total = sheet.addRow(colunas.map((c, i) => {
                     if (i === 0) return 'TOTAL';
-                    if (c.tipo !== 'numero') return '';
+                    if (!somavel(c)) return '';
                     const letra = sheet.getColumn(i + 1).letter;
                     return { formula: `SUBTOTAL(109,${letra}${primeira}:${letra}${ultima})` };
                 }));
                 total.font = { bold: true };
                 colunas.forEach((c, i) => {
                     const cell = total.getCell(i + 1);
+                    if (c.tipo === 'horas') cell.numFmt = '[h]:mm';
                     if (c.align) cell.alignment = { horizontal: c.align };
                     cell.border = { top: { style: 'thin' } };
                 });
@@ -1637,7 +1921,9 @@ class ReportController {
 
             colunas.forEach((c, i) => {
                 const maior = Math.max(c.label.length, ...linhas.slice(0, 500).map(l => String(l[c.id] ?? '').length));
-                sheet.getColumn(i + 1).width = c.tipo === 'data' ? 20 : Math.min(45, Math.max(12, maior + 2));
+                sheet.getColumn(i + 1).width = c.tipo === 'data' ? 20
+                    : (c.tipo === 'horas' || c.tipo === 'dia') ? Math.max(13, c.label.length + 3)
+                    : Math.min(45, Math.max(12, maior + 2));
             });
             sheet.views = [{ state: 'frozen', ySplit: 4 }];
             sheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4, column: ultimaCol } };
