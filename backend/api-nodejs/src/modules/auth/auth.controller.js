@@ -1862,4 +1862,13 @@ class AuthController {
     }
 }
 
-module.exports = new AuthController();
+// As rotas passam os métodos soltos (router.post('/invite', ..., authController.invite)):
+// sem o bind, `this` fica undefined e os helpers this._xxx quebravam com 500.
+const authController = new AuthController();
+for (const nome of Object.getOwnPropertyNames(AuthController.prototype)) {
+    if (nome !== 'constructor' && typeof authController[nome] === 'function') {
+        authController[nome] = authController[nome].bind(authController);
+    }
+}
+
+module.exports = authController;
