@@ -6,6 +6,102 @@ const { getHojeLocal, getLimitesDiaLocalUTC, TIMEZONE } = require('../../utils/d
 // PostgREST limita a 1000 linhas: relatórios que somam em memória buscam todas as páginas
 const { buscarTodos, buscarPorIdsEmLotes } = require('../../utils/buscarTodos');
 
+// logs_acesso.created_at é UTC gravado sem fuso ("2026-10-11T21:59:40"): sempre ler como UTC
+const instante = (ts) => {
+    if (typeof ts === 'number') return ts;
+    if (!ts) return NaN;
+    return Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(ts) ? ts : `${ts}Z`);
+};
+// Horário devolvido ao painel com o "Z" (sem ele o navegador exibia a hora UTC como se fosse local)
+const isoUTC = (ts) => {
+    const ms = instante(ts);
+    return isNaN(ms) ? null : new Date(ms).toISOString();
+};
+
+const partesLocais = (ms) => {
+    const p = new Intl.DateTimeFormat('en-CA', {
+        timeZone: TIMEZONE, hourCycle: 'h23',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+    }).formatToParts(new Date(ms));
+    const get = (t) => parseInt(p.find(x => x.type === t).value, 10);
+    return { ano: get('year'), mes: get('month'), dia: get('day'), hora: get('hour'), min: get('minute'), seg: get('second') };
+};
+const diaLocal = (ms) => {
+    const { ano, mes, dia } = partesLocais(ms);
+    return `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+};
+const horaLocal = (ms) => partesLocais(ms).hora;
+// ExcelJS grava a data como UTC: monta com o relógio local para a célula mostrar a hora do evento
+const dataExcel = (ts) => {
+    const ms = instante(ts);
+    if (isNaN(ms)) return null;
+    const { ano, mes, dia, hora, min, seg } = partesLocais(ms);
+    return new Date(Date.UTC(ano, mes - 1, dia, hora, min, seg));
+};
+
+/**
+ * Limite do filtro de período em UTC. Aceita "YYYY-MM-DD" (dia inteiro), o horário local do
+ * datetime-local ("YYYY-MM-DDTHH:mm") ou ISO com fuso. Antes cada aba comparava de um jeito e
+ * o horário local ia direto contra o UTC do banco (3h de diferença).
+ */
+const limiteFiltro = (valor, fim = false) => {
+    if (!valor) return null;
+    const v = String(valor).trim();
+    if (/[zZ]|[+-]\d\d:?\d\d$/.test(v)) {
+        const ms = Date.parse(v);
+        return isNaN(ms) ? null : new Date(ms).toISOString();
+    }
+    const m = v.match(/^(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+    if (!m) return null;
+    const limites = getLimitesDiaLocalUTC(m[1]);
+    if (!m[2]) return fim ? limites.end : limites.start;
+    const deslocamento = ((parseInt(m[2], 10) * 60 + parseInt(m[3], 10)) * 60 + parseInt(m[4] || '0', 10)) * 1000;
+    // "até 23:59" inclui o minuto inteiro
+    const extra = fim ? (m[4] ? 999 : 59999) : 0;
+    return new Date(Date.parse(limites.start) + deslocamento + extra).toISOString();
+};
+const aplicarPeriodo = (query, { data_inicio, data_fim } = {}, coluna = 'created_at') => {
+    const inicio = limiteFiltro(data_inicio);
+    const fim = limiteFiltro(data_fim, true);
+    if (inicio) query = query.gte(coluna, inicio);
+    if (fim) query = query.lte(coluna, fim);
+    return query;
+};
+
+const ehEntrada = (l) => l.tipo === 'checkin' || l.tipo === 'entrada';
+const ehSaida = (l) => l.tipo === 'checkout' || l.tipo === 'saida';
+// Saída gravada pelo reset/fechamento de turno para quem ficou "dentro": não é horário real
+const ehSaidaForcada = (l) => l.observacao === 'CHECKOUT_FORCADO_CRON';
+
+/** Logs brutos → linhas da aba "Logs de acesso" (empresa e equipamento pelo nome, não pelo id) */
+async function formatarLogs(logs, evento_id) {
+    const empIds = [...new Set((logs || []).map(l => l.pessoas?.empresa_id).filter(Boolean))];
+    const [empRes, dispRes] = await Promise.all([
+        empIds.length > 0
+            ? buscarPorIdsEmLotes(empIds, (lote) => supabase.from('empresas').select('id, nome').in('id', lote))
+            : { data: [] },
+        supabase.from('dispositivos_acesso').select('id, nome, localizacao').eq('evento_id', evento_id)
+    ]);
+    const empMap = (empRes.data || []).reduce((acc, e) => { acc[e.id] = e.nome; return acc; }, {});
+    const dispMap = (dispRes.data || []).reduce((acc, d) => { acc[d.id] = d.nome || d.localizacao; return acc; }, {});
+
+    return (logs || []).map(log => ({
+        id: log.id,
+        tipo: log.tipo,
+        metodo: log.metodo,
+        dispositivo_id: log.dispositivo_id,
+        equipamento: dispMap[log.dispositivo_id] || (log.dispositivo_id ? 'Equipamento removido' : 'Painel / manual'),
+        confianca: log.confianca,
+        observacao: ehSaidaForcada(log) ? 'Saída automática do fechamento de turno' : log.observacao,
+        numero_pulseira: log.numero_pulseira || null,
+        horario: isoUTC(log.created_at),
+        pessoa: log.pessoas?.nome_completo || 'Desconhecido',
+        cpf: log.pessoas?.cpf,
+        empresa: empMap[log.pessoas?.empresa_id] || 'Sem Empresa'
+    }));
+}
+
 class ReportController {
     /**
      * Relatório Diário de Acessos
@@ -13,18 +109,17 @@ class ReportController {
      */
     async dailyReport(req, res) {
         try {
-            const { data_inicio, data_fim, empresa_id, page = 1, limit = 50 } = req.query;
+            const { empresa_id, page = 1, limit = 50 } = req.query;
             const evento_id = req.event.id;
             const from = (parseInt(page) - 1) * parseInt(limit);
 
             // Passo 1: Buscar logs de acesso brutos
             let query = supabase
                 .from('logs_acesso')
-                .select('id, tipo, metodo, dispositivo_id, confianca, observacao, created_at, pessoa_id, pessoas!inner(id, nome_completo, cpf, empresa_id)', { count: 'exact' })
+                .select('id, tipo, metodo, dispositivo_id, confianca, observacao, numero_pulseira, created_at, pessoa_id, pessoas!inner(id, nome_completo, cpf, empresa_id)', { count: 'exact' })
                 .eq('evento_id', evento_id);
 
-            if (data_inicio) query = query.gte('created_at', data_inicio);
-            if (data_fim) query = query.lte('created_at', data_fim);
+            query = aplicarPeriodo(query, req.query);
             if (empresa_id) query = query.eq('pessoas.empresa_id', empresa_id);
 
             const { data: logs, count, error } = await query
@@ -33,29 +128,7 @@ class ReportController {
 
             if (error) throw error;
 
-            // Passo 2: Buscar IDs de empresas para unificação (já temos os dados das pessoas no select original)
-            const empIds = [...new Set((logs || []).map(l => l.pessoas?.empresa_id).filter(id => id))];
-            const { data: empresasData } = empIds.length > 0
-                ? await supabase.from('empresas').select('id, nome').in('id', empIds)
-                : { data: [] };
-
-            const empMap = (empresasData || []).reduce((acc, e) => { acc[e.id] = e; return acc; }, {});
-
-            // Passo 3: Formatar resposta
-            const report = (logs || []).map(log => ({
-                id: log.id,
-                tipo: log.tipo,
-                metodo: log.metodo,
-                dispositivo_id: log.dispositivo_id,
-                confianca: log.confianca,
-                observacao: log.observacao,
-                horario: log.created_at,
-                pessoa: log.pessoas?.nome_completo || 'Desconhecido',
-                cpf: log.pessoas?.cpf,
-                empresa: empMap[log.pessoas?.empresa_id]?.nome || 'Sem Empresa'
-            }));
-
-            res.json({ success: true, total: count || 0, data: report });
+            res.json({ success: true, total: count || 0, data: await formatarLogs(logs, evento_id) });
         } catch (error) {
             logger.error('Erro ao gerar relatório diário:', {
                 message: error.message,
@@ -125,13 +198,10 @@ class ReportController {
 
             // Não há FK entre logs_acesso e dispositivos
             // Fazer query separadas e combinar manualmente
-            let logsQuery = supabase
+            const logsQuery = aplicarPeriodo(supabase
                 .from('logs_acesso')
                 .select('id, dispositivo_id, tipo, created_at')
-                .eq('evento_id', evento_id);
-
-            if (data_inicio) logsQuery = logsQuery.gte('created_at', data_inicio);
-            if (data_fim) logsQuery = logsQuery.lte('created_at', data_fim);
+                .eq('evento_id', evento_id), req.query);
 
             const { data: logs, error: logsError } = await buscarTodos(logsQuery);
             if (logsError) {
@@ -186,7 +256,8 @@ class ReportController {
                 if (log.tipo === 'checkin' || log.tipo === 'entrada') stats[key].entradas++;
                 if (log.tipo === 'checkout' || log.tipo === 'saida') stats[key].saidas++;
 
-                const hora = new Date(log.created_at).getHours();
+                // hora no fuso do evento (getHours() lia a hora UTC do banco como local: pico 3h adiantado)
+                const hora = horaLocal(instante(log.created_at));
                 stats[key].picos[hora] = (stats[key].picos[hora] || 0) + 1;
             });
 
@@ -218,7 +289,7 @@ class ReportController {
                     area: s.area,
                     entradas: s.entradas,
                     saidas: s.saidas,
-                    pico: picoHora ? `${picoHora[0]}:00` : '—'
+                    pico: picoHora ? `${String(picoHora[0]).padStart(2, '0')}:00` : '—'
                 };
             });
 
@@ -254,14 +325,12 @@ class ReportController {
                 return res.status(400).json({ error: 'data_fim deve estar em formato YYYY-MM-DD' });
             }
 
-            let query = supabase.from('logs_acesso').select('id, tipo, pessoas!inner(empresa_id, empresas(nome))').eq('evento_id', evento_id);
-            if (data_inicio) query = query.gte('created_at', new Date(data_inicio).toISOString());
-            if (data_fim) query = query.lte('created_at', new Date(data_fim).toISOString());
+            const query = aplicarPeriodo(supabase.from('logs_acesso').select('id, tipo, pessoas!inner(empresa_id, empresas(nome))').eq('evento_id', evento_id), req.query);
 
             const { data: logs, error } = await buscarTodos(query);
             if (error) throw error;
 
-            const { data: pessoasCount } = await buscarTodos(supabase.from('pessoas').select('id, empresa_id, status_acesso, empresas(nome)').eq('evento_id', evento_id));
+            const { data: pessoasCount } = await buscarTodos(supabase.from('pessoas').select('id, empresa_id, status_acesso, bloqueado, empresas(nome)').eq('evento_id', evento_id));
 
             const stats = {};
             // Contar todas as pessoas por empresa (independente de terem logs no período)
@@ -269,6 +338,9 @@ class ReportController {
                 const empNome = p.empresas?.nome || 'Sem Empresa';
                 if (!stats[empNome]) stats[empNome] = { empresa: empNome, pessoas: 0, entradas: 0, saidas: 0, bloqueados: 0, expulsos: 0 };
                 stats[empNome].pessoas++;
+                // situação atual do cadastro (antes as duas colunas ficavam sempre em 0)
+                if (p.status_acesso === 'expulso') stats[empNome].expulsos++;
+                else if (p.bloqueado || p.status_acesso === 'bloqueado') stats[empNome].bloqueados++;
             });
 
             logs.forEach(log => {
@@ -292,12 +364,9 @@ class ReportController {
 
     async porLeitor(req, res) {
         try {
-            const { data_inicio, data_fim } = req.query;
             const evento_id = req.event.id;
 
-            let query = supabase.from('logs_acesso').select('id, dispositivo_id, tipo, observacao').eq('evento_id', evento_id);
-            if (data_inicio) query = query.gte('created_at', data_inicio);
-            if (data_fim) query = query.lte('created_at', data_fim);
+            const query = aplicarPeriodo(supabase.from('logs_acesso').select('id, dispositivo_id, tipo, observacao').eq('evento_id', evento_id), req.query);
 
             const { data: logs, error } = await buscarTodos(query);
             if (error) throw error;
@@ -315,7 +384,8 @@ class ReportController {
                 if (log.tipo === 'checkin' || log.tipo === 'entrada') stats[key].entradas++;
                 else if (log.tipo === 'checkout' || log.tipo === 'saida') stats[key].saidas++;
 
-                if (log.observacao?.toLowerCase().includes('erro') || log.observacao?.toLowerCase().includes('negado')) stats[key].erros++;
+                const obs = log.observacao?.toLowerCase() || '';
+                if (log.tipo === 'negado' || obs.includes('erro') || obs.includes('negado')) stats[key].erros++;
             });
 
             res.json({ success: true, data: Object.values(stats) });
@@ -351,13 +421,10 @@ class ReportController {
             });
 
             // Buscar logs do período filtrado (data_inicio/data_fim ou hoje como padrão)
-            const inicioPadrao = getLimitesDiaLocalUTC().start;
-            let logsQuery = supabase
+            const logsQuery = aplicarPeriodo(supabase
                 .from('logs_acesso')
                 .select('id, tipo, pessoas!inner(funcao)')
-                .eq('evento_id', evento_id)
-                .gte('created_at', data_inicio || inicioPadrao);
-            if (data_fim) logsQuery = logsQuery.lte('created_at', data_fim);
+                .eq('evento_id', evento_id), { data_inicio: data_inicio || getHojeLocal(), data_fim });
             const { data: logsHoje } = await buscarTodos(logsQuery);
 
             (logsHoje || []).forEach(log => {
@@ -415,7 +482,7 @@ class ReportController {
      */
     async ponto(req, res) {
         try {
-            const { data_inicio, data_fim, pessoa_id, empresa_id, area_id, page = 1, limit = 100 } = req.query;
+            const { pessoa_id, empresa_id, area_id, page = 1, limit = 100 } = req.query;
             const evento_id = req.event.id;
             const from = (parseInt(page) - 1) * parseInt(limit);
 
@@ -423,15 +490,14 @@ class ReportController {
             let query = supabase
                 .from('logs_acesso')
                 .select(`
-                    id, tipo, metodo, area_id, numero_pulseira, created_at, pessoa_id,
+                    id, tipo, metodo, area_id, numero_pulseira, observacao, created_at, pessoa_id,
                     pessoas!inner(id, nome_completo, cpf, empresa_id, foto_url, numero_pulseira)
                 `, { count: 'exact' })
                 .eq('evento_id', evento_id)
-                .in('tipo', ['checkin', 'checkout'])
+                .in('tipo', ['checkin', 'checkout', 'entrada', 'saida'])
                 .order('created_at', { ascending: true });
 
-            if (data_inicio) query = query.gte('created_at', data_inicio);
-            if (data_fim) query = query.lte('created_at', data_fim);
+            query = aplicarPeriodo(query, req.query);
             if (pessoa_id) query = query.eq('pessoa_id', pessoa_id);
             if (empresa_id) query = query.eq('pessoas.empresa_id', empresa_id);
             if (area_id) query = query.eq('area_id', area_id);
@@ -460,7 +526,8 @@ class ReportController {
                 id: log.id,
                 tipo: log.tipo,
                 metodo: log.metodo,
-                horario: log.created_at,
+                horario: isoUTC(log.created_at),
+                saida_nao_registrada: ehSaidaForcada(log),
                 area: areaMap[log.area_id] || null,
                 area_id: log.area_id,
                 pulseira: log.numero_pulseira,
@@ -484,32 +551,37 @@ class ReportController {
      */
     async pontoResumo(req, res) {
         try {
-            const { data_inicio, data_fim, empresa_id, area_id } = req.query;
+            const { empresa_id, area_id } = req.query;
             const evento_id = req.event.id;
 
             // Buscar todos os logs de checkin/checkout do período
             let query = supabase
                 .from('logs_acesso')
                 .select(`
-                    id, tipo, area_id, created_at, pessoa_id,
+                    id, tipo, area_id, numero_pulseira, observacao, created_at, pessoa_id,
                     pessoas!inner(id, nome_completo, cpf, empresa_id, numero_pulseira)
                 `)
                 .eq('evento_id', evento_id)
-                .in('tipo', ['checkin', 'checkout'])
+                .in('tipo', ['checkin', 'checkout', 'entrada', 'saida'])
                 .order('created_at', { ascending: true });
 
-            if (data_inicio) query = query.gte('created_at', data_inicio);
-            if (data_fim) query = query.lte('created_at', data_fim);
+            query = aplicarPeriodo(query, req.query);
             if (empresa_id) query = query.eq('pessoas.empresa_id', empresa_id);
             if (area_id) query = query.eq('area_id', area_id);
 
             const { data: logs, error } = await buscarTodos(query);
             if (error) throw error;
 
-            // Agrupar por pessoa + dia
+            // Agrupar por pessoa + dia do TURNO: o dia é o da entrada (no fuso do evento), e a saída
+            // vai para o turno da última entrada. Antes o dia era o UTC do log: entrada às 22h caía no
+            // dia seguinte e a saída da madrugada abria um "dia" sem entrada.
             const grouped = {};
+            const diaDoTurno = {}; // pessoa_id → dia da última entrada vista
             (logs || []).forEach(log => {
-                const dia = log.created_at.split('T')[0];
+                const ms = instante(log.created_at);
+                const entrada = ehEntrada(log);
+                const dia = entrada || !diaDoTurno[log.pessoa_id] ? diaLocal(ms) : diaDoTurno[log.pessoa_id];
+                if (entrada) diaDoTurno[log.pessoa_id] = dia;
                 const key = `${log.pessoa_id}_${dia}`;
 
                 if (!grouped[key]) {
@@ -517,25 +589,30 @@ class ReportController {
                         pessoa_id: log.pessoa_id,
                         pessoa: log.pessoas?.nome_completo,
                         cpf: log.pessoas?.cpf,
-                        pulseira: log.pessoas?.numero_pulseira,
+                        pulseira: null,
                         empresa_id: log.pessoas?.empresa_id,
                         dia,
                         primeira_entrada: null,
                         ultima_saida: null,
+                        saida_nao_registrada: false,
                         entradas: 0,
                         saidas: 0
                     };
                 }
+                const g = grouped[key];
 
-                if (log.tipo === 'checkin') {
-                    grouped[key].entradas++;
-                    if (!grouped[key].primeira_entrada || log.created_at < grouped[key].primeira_entrada) {
-                        grouped[key].primeira_entrada = log.created_at;
+                if (entrada) {
+                    g.entradas++;
+                    if (g.primeira_entrada === null || ms < g.primeira_entrada) {
+                        g.primeira_entrada = ms;
+                        // pulseira usada naquele turno, não a que a pessoa tem hoje
+                        g.pulseira = log.numero_pulseira || g.pulseira;
                     }
-                } else if (log.tipo === 'checkout') {
-                    grouped[key].saidas++;
-                    if (!grouped[key].ultima_saida || log.created_at > grouped[key].ultima_saida) {
-                        grouped[key].ultima_saida = log.created_at;
+                } else {
+                    g.saidas++;
+                    if (g.ultima_saida === null || ms > g.ultima_saida) {
+                        g.ultima_saida = ms;
+                        g.saida_nao_registrada = ehSaidaForcada(log);
                     }
                 }
             });
@@ -548,10 +625,12 @@ class ReportController {
             const empMap = (empData || []).reduce((a, e) => { a[e.id] = e.nome; return a; }, {});
 
             // Calcular total de horas e formatar
-            const data = Object.values(grouped).map(g => {
+            // só a saída automática de um turno aberto antes do período não é um dia de trabalho
+            const data = Object.values(grouped).filter(g => g.entradas > 0 || !g.saida_nao_registrada).map(g => {
                 let totalHoras = null;
-                if (g.primeira_entrada && g.ultima_saida) {
-                    const diffMs = new Date(g.ultima_saida) - new Date(g.primeira_entrada);
+                // saída gravada pelo fechamento de turno não é horário real: horas ficam "a conferir"
+                if (g.primeira_entrada !== null && g.ultima_saida !== null && !g.saida_nao_registrada && g.ultima_saida > g.primeira_entrada) {
+                    const diffMs = g.ultima_saida - g.primeira_entrada;
                     totalHoras = Math.round((diffMs / 3600000) * 100) / 100; // 2 casas decimais
                 }
 
@@ -561,8 +640,9 @@ class ReportController {
                     pulseira: g.pulseira,
                     empresa: empMap[g.empresa_id] || 'Sem Empresa',
                     dia: g.dia,
-                    primeira_entrada: g.primeira_entrada,
-                    ultima_saida: g.ultima_saida,
+                    primeira_entrada: g.primeira_entrada !== null ? new Date(g.primeira_entrada).toISOString() : null,
+                    ultima_saida: g.ultima_saida !== null ? new Date(g.ultima_saida).toISOString() : null,
+                    saida_nao_registrada: g.saida_nao_registrada,
                     total_horas: totalHoras,
                     entradas: g.entradas,
                     saidas: g.saidas
@@ -776,11 +856,9 @@ class ReportController {
             const inicioDia = getLimitesDiaLocalUTC(dataRef).start;
             const fimDia = getLimitesDiaLocalUTC(dataRef).end;
             const fimAmanha = getLimitesDiaLocalUTC(amanhaStr).end;
-            const msInicioOntem = Date.parse(inicioOntem);
             const msInicioDia = Date.parse(inicioDia);
             const msFimDia = Date.parse(fimDia);
             const msFimAmanha = Date.parse(fimAmanha);
-            const msLog = (ts) => Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(ts) ? ts : `${ts}Z`);
 
             if (!evento_id) {
                 return {
@@ -826,7 +904,7 @@ class ReportController {
             // 3. Logs de acesso na janela expandida (ontem até amanhã para capturar viradas de turno)
             const { data: logs, error: lError } = await buscarTodos(supabase
                 .from('logs_acesso')
-                .select('id, pessoa_id, tipo, numero_pulseira, created_at')
+                .select('id, pessoa_id, tipo, numero_pulseira, observacao, created_at')
                 .eq('evento_id', evento_id)
                 .gte('created_at', inicioOntem)
                 .lte('created_at', fimAmanha)
@@ -839,7 +917,7 @@ class ReportController {
             (logs || []).forEach(log => {
                 if (!log.pessoa_id) return;
                 if (!logsPorPessoa[log.pessoa_id]) logsPorPessoa[log.pessoa_id] = [];
-                logsPorPessoa[log.pessoa_id].push({ ...log, ms: msLog(log.created_at) });
+                logsPorPessoa[log.pessoa_id].push({ ...log, ms: instante(log.created_at) });
             });
 
             const hojeStr = getHojeLocal();
@@ -856,12 +934,10 @@ class ReportController {
                 const pLogs = logsPorPessoa[p.id] || [];
 
                 // Entradas e saídas categorizadas por janela temporal
-                const ehEntrada = (l) => l.tipo === 'checkin' || l.tipo === 'entrada';
-                const ehSaida = (l) => l.tipo === 'checkout' || l.tipo === 'saida';
                 const entradasHoje = pLogs.filter(l => ehEntrada(l) && l.ms >= msInicioDia && l.ms <= msFimDia);
-                const entradasOntem = pLogs.filter(l => ehEntrada(l) && l.ms >= msInicioOntem && l.ms < msInicioDia);
                 const saidasHoje = pLogs.filter(l => ehSaida(l) && l.ms >= msInicioDia && l.ms <= msFimDia);
                 const saidasAmanha = pLogs.filter(l => ehSaida(l) && l.ms > msFimDia && l.ms <= msFimAmanha);
+                const proximaEntradaAmanha = pLogs.find(l => ehEntrada(l) && l.ms > msFimDia);
 
                 let checkinAt = '—';
                 let checkoutAt = '—';
@@ -869,32 +945,37 @@ class ReportController {
                 let tempoMinutos = 0;
                 let status = 'ausente';
                 let pulseiraDoTurno = '—';
+                let saidaNaoRegistrada = false;
+                let turnoAnterior = false;
 
                 if (entradasHoje.length > 0) {
-                    // CENÁRIO 1: Check-in realizado no dia de referência
-                    // Se houver múltiplas entradas, verificar se a última continuou para a madrugada ou está em andamento
-                    let checkinLog = entradasHoje[0];
-                    if (entradasHoje.length > 1) {
-                        const ultimaEntrada = entradasHoje[entradasHoje.length - 1];
-                        const saidasAposUltima = saidasHoje.filter(s => s.ms > ultimaEntrada.ms);
-                        if (saidasAposUltima.length === 0) {
-                            checkinLog = ultimaEntrada;
-                        }
-                    }
+                    // CENÁRIO 1: turno aberto no dia de referência. O turno começa na PRIMEIRA entrada
+                    // do dia (antes, com várias entradas e a última em aberto, começava na última e
+                    // perdia as horas da manhã) e termina na saída que fecha a última entrada.
+                    const primeiraEntrada = entradasHoje[0];
+                    const ultimaEntrada = entradasHoje[entradasHoje.length - 1];
 
-                    const checkinDate = new Date(checkinLog.ms);
-                    checkinAt = this._formatarDataHora(checkinLog.ms);
-                    
+                    checkinAt = this._formatarDataHora(primeiraEntrada.ms);
                     // A pulseira deve ser estritamente a do check-in realizado
-                    pulseiraDoTurno = checkinLog.numero_pulseira || (isHoje ? p.numero_pulseira : null) || '—';
+                    pulseiraDoTurno = primeiraEntrada.numero_pulseira || (isHoje ? p.numero_pulseira : null) || '—';
 
-                    // Procurar checkout no mesmo dia
-                    const saidasMesmoDia = saidasHoje.filter(s => new Date(s.ms) > checkinDate);
-                    if (saidasMesmoDia.length > 0) {
-                        const checkoutLog = saidasMesmoDia[saidasMesmoDia.length - 1];
-                        const checkoutDate = new Date(checkoutLog.ms);
-                        checkoutAt = this._formatarDataHora(checkoutLog.ms);
-                        const ms = checkoutDate.getTime() - checkinDate.getTime();
+                    // Saída no mesmo dia (a última depois da última entrada) ou, em turno que vira a
+                    // madrugada, a primeira saída do dia seguinte — desde que antes de uma nova entrada
+                    const saidaDoDia = saidasHoje.filter(s => s.ms > ultimaEntrada.ms).pop();
+                    const saidaFinal = saidaDoDia || saidasAmanha.find(s => s.ms > ultimaEntrada.ms
+                        && (!proximaEntradaAmanha || s.ms < proximaEntradaAmanha.ms));
+
+                    if (saidaFinal && ehSaidaForcada(saidaFinal)) {
+                        // Ficou "dentro" até o fechamento de turno: não houve saída real.
+                        // Não soma horas (antes contava até a hora do reset).
+                        checkoutAt = 'Não registrada';
+                        tempoPermanencia = 'Saída não registrada';
+                        status = 'finalizado';
+                        saidaNaoRegistrada = true;
+                        totalFinalizados++;
+                    } else if (saidaFinal) {
+                        const ms = saidaFinal.ms - primeiraEntrada.ms;
+                        checkoutAt = this._formatarDataHora(saidaFinal.ms);
                         tempoPermanencia = this._formatarDuracaoMs(ms);
                         tempoMinutos = Math.max(0, Math.round(ms / 60000));
                         status = 'finalizado';
@@ -902,80 +983,49 @@ class ReportController {
                         totalMinutosAcumulado += tempoMinutos;
                         contagemComTempo++;
                     } else {
-                        // Não saiu no mesmo dia: verificar se saiu no dia seguinte (Turno estendido / pernoite)
-                        const saidasDiaSeguinte = saidasAmanha.filter(s => new Date(s.ms) > checkinDate);
-                        if (saidasDiaSeguinte.length > 0) {
-                            const checkoutLog = saidasDiaSeguinte[0];
-                            const checkoutDate = new Date(checkoutLog.ms);
-                            checkoutAt = this._formatarDataHora(checkoutLog.ms);
-                            const ms = checkoutDate.getTime() - checkinDate.getTime();
-                            tempoPermanencia = this._formatarDuracaoMs(ms);
-                            tempoMinutos = Math.max(0, Math.round(ms / 60000));
-                            status = 'finalizado';
-                            totalFinalizados++;
-                            totalMinutosAcumulado += tempoMinutos;
-                            contagemComTempo++;
-                        } else {
-                            // Ainda presente no evento (em andamento)
-                            checkoutAt = 'No evento';
-                            const refTime = isHoje ? now : new Date(msFimDia);
-                            const ms = Math.max(0, refTime.getTime() - checkinDate.getTime());
-                            tempoPermanencia = `Em andamento (${this._formatarDuracaoMs(ms)})`;
-                            tempoMinutos = Math.max(0, Math.round(ms / 60000));
-                            status = 'presente';
-                            totalPresentes++;
-                            totalMinutosAcumulado += tempoMinutos;
-                            contagemComTempo++;
-                        }
-                    }
-                } else if (entradasOntem.length > 0 || (saidasHoje.length > 0 && pLogs.some(l => (l.tipo === 'checkin' || l.tipo === 'entrada') && l.ms < msInicioDia))) {
-                    // CENÁRIO 2: Entrou no dia anterior e permaneceu no evento (turno estendido com saída hoje ou ainda dentro)
-                    const checkinOntem = entradasOntem.length > 0 
-                        ? entradasOntem[entradasOntem.length - 1]
-                        : pLogs.filter(l => (l.tipo === 'checkin' || l.tipo === 'entrada') && l.ms < msInicioDia).pop();
-                        
-                    const checkinDate = new Date(checkinOntem.ms);
-                    const saidasOntem = pLogs.filter(l => (l.tipo === 'checkout' || l.tipo === 'saida') && new Date(l.ms) > checkinDate && l.ms < msInicioDia);
-
-                    // Só considera permanência se não saiu ontem OU se possui registro explícito de saída hoje
-                    if (saidasOntem.length === 0 || saidasHoje.length > 0) {
-                        pulseiraDoTurno = checkinOntem.numero_pulseira || (isHoje ? p.numero_pulseira : null) || '—';
-                        checkinAt = this._formatarDataHora(checkinOntem.ms);
-
-                        if (saidasHoje.length > 0) {
-                            // Deu checkout no dia de referência vindo do turno anterior
-                            const checkoutLog = saidasHoje[0];
-                            const checkoutDate = new Date(checkoutLog.ms);
-                            checkoutAt = this._formatarDataHora(checkoutLog.ms);
-                            const ms = checkoutDate.getTime() - checkinDate.getTime();
-                            tempoPermanencia = this._formatarDuracaoMs(ms);
-                            tempoMinutos = Math.max(0, Math.round(ms / 60000));
-                            status = 'finalizado';
-                            totalFinalizados++;
-                            totalMinutosAcumulado += tempoMinutos;
-                            contagemComTempo++;
-                        } else if (isHoje || p.status_acesso === 'checkin_feito' || p.status_acesso === 'entrada') {
-                            // Permanece dentro
-                            checkoutAt = 'No evento';
-                            const refTime = isHoje ? now : new Date(msFimDia);
-                            const ms = Math.max(0, refTime.getTime() - checkinDate.getTime());
-                            tempoPermanencia = `Em andamento (${this._formatarDuracaoMs(ms)})`;
-                            tempoMinutos = Math.max(0, Math.round(ms / 60000));
-                            status = 'presente';
-                            totalPresentes++;
-                            totalMinutosAcumulado += tempoMinutos;
-                            contagemComTempo++;
-                        } else {
-                            totalAusentes++;
-                        }
-                    } else {
-                        totalAusentes++;
+                        // Ainda presente no evento (em andamento) — fora da média até sair
+                        checkoutAt = 'No evento';
+                        const refTime = isHoje ? now.getTime() : msFimDia;
+                        const ms = Math.max(0, refTime - primeiraEntrada.ms);
+                        tempoPermanencia = `Em andamento (${this._formatarDuracaoMs(ms)})`;
+                        tempoMinutos = Math.max(0, Math.round(ms / 60000));
+                        status = 'presente';
+                        totalPresentes++;
                     }
                 } else {
-                    // CENÁRIO 3: Não compareceu no dia de referência (ausente)
-                    // A pulseira deve ser estritamente '—' pois não houve check-in no dia
-                    pulseiraDoTurno = '—';
-                    totalAusentes++;
+                    // CENÁRIO 2: entrou no dia anterior e o turno ainda não tinha fechado à meia-noite.
+                    // O turno pertence ao dia da ENTRADA: as horas já estão no relatório de ontem e aqui
+                    // não somam de novo (antes o mesmo turno contava nos dois dias).
+                    const entradaAnterior = pLogs.filter(l => ehEntrada(l) && l.ms < msInicioDia).pop();
+                    const fechouAntes = entradaAnterior && pLogs.some(l => ehSaida(l) && l.ms > entradaAnterior.ms && l.ms < msInicioDia);
+                    const saidaHoje = entradaAnterior && saidasHoje.find(s => s.ms > entradaAnterior.ms);
+                    const aindaDentro = isHoje || p.status_acesso === 'checkin_feito' || p.status_acesso === 'entrada';
+
+                    // saída forçada do fechamento não é presença no dia: segue como ausente
+                    if (entradaAnterior && !fechouAntes && ((saidaHoje && !ehSaidaForcada(saidaHoje)) || (!saidaHoje && aindaDentro))) {
+                        turnoAnterior = true;
+                        pulseiraDoTurno = entradaAnterior.numero_pulseira || (isHoje ? p.numero_pulseira : null) || '—';
+                        checkinAt = this._formatarDataHora(entradaAnterior.ms);
+
+                        if (saidaHoje) {
+                            checkoutAt = this._formatarDataHora(saidaHoje.ms);
+                            tempoPermanencia = 'Turno do dia anterior';
+                            status = 'finalizado';
+                            totalFinalizados++;
+                        } else {
+                            checkoutAt = 'No evento';
+                            const refTime = isHoje ? now.getTime() : msFimDia;
+                            const ms = Math.max(0, refTime - entradaAnterior.ms);
+                            tempoPermanencia = `Em andamento (${this._formatarDuracaoMs(ms)})`;
+                            tempoMinutos = Math.max(0, Math.round(ms / 60000));
+                            status = 'presente';
+                            totalPresentes++;
+                        }
+                    } else {
+                        // CENÁRIO 3: Não compareceu no dia de referência (ausente)
+                        // A pulseira deve ser estritamente '—' pois não houve check-in no dia
+                        totalAusentes++;
+                    }
                 }
 
                 return {
@@ -989,6 +1039,8 @@ class ReportController {
                     checkout_at: checkoutAt,
                     tempo_permanencia: tempoPermanencia,
                     tempo_minutos: tempoMinutos,
+                    saida_nao_registrada: saidaNaoRegistrada,
+                    turno_anterior: turnoAnterior,
                     status
                 };
             });
@@ -1068,7 +1120,8 @@ class ReportController {
                         // Totais saem da própria lista arquivada (antes "presentes" vinha fixo em 0
                         // enquanto a lista mostrava gente "No evento")
                         const contar = (st) => registros.filter(r => r.status === st).length;
-                        const comTempo = registros.filter(r => r.status !== 'ausente' && r.tempo_minutos > 0);
+                        // média só de turnos encerrados com saída real (igual ao relatório ao vivo)
+                        const comTempo = registros.filter(r => r.status === 'finalizado' && r.tempo_minutos > 0);
                         const mediaMin = comTempo.length ? Math.round(comTempo.reduce((a, r) => a + r.tempo_minutos, 0) / comTempo.length) : 0;
                         totais = {
                             total_colaboradores: registros.length || fechamento.total_colaboradores || 0,
@@ -1362,76 +1415,139 @@ class ReportController {
     }
 
     /**
+     * Linhas e colunas de uma aba agregada — mesma fonte para o PDF e o Excel
+     */
+    async _dadosAba(req, aba) {
+        // Executa o handler da aba sem passar pelo HTTP (o handler responde via res.json/res.status)
+        const executar = async (handler) => {
+            let resposta = null;
+            let codigo = 200;
+            const res = {
+                status(c) { codigo = c; return this; },
+                json(d) { resposta = d; }
+            };
+            await handler.call(this, req, res);
+            if (codigo >= 400) throw new Error(resposta?.error || 'Falha ao montar a aba');
+            return resposta?.data || [];
+        };
+
+        const abas = {
+            logs: {
+                titulo: 'Logs de Acesso',
+                colunas: [
+                    { id: 'horario', label: 'Horário', tipo: 'data' },
+                    { id: 'pessoa', label: 'Participante' },
+                    { id: 'cpf', label: 'CPF' },
+                    { id: 'empresa', label: 'Empresa' },
+                    { id: 'tipo', label: 'Tipo', align: 'center' },
+                    { id: 'metodo', label: 'Método', align: 'center' },
+                    { id: 'numero_pulseira', label: 'Pulseira', align: 'center' },
+                    { id: 'equipamento', label: 'Equipamento' },
+                    { id: 'observacao', label: 'Observação' }
+                ],
+                carregar: async () => {
+                    let query = supabase
+                        .from('logs_acesso')
+                        .select('id, tipo, metodo, dispositivo_id, confianca, observacao, numero_pulseira, created_at, pessoa_id, pessoas!inner(id, nome_completo, cpf, empresa_id)')
+                        .eq('evento_id', req.event.id);
+                    query = aplicarPeriodo(query, req.query);
+                    if (req.query.empresa_id) query = query.eq('pessoas.empresa_id', req.query.empresa_id);
+                    const { data, error } = await buscarTodos(query.order('created_at', { ascending: true }));
+                    if (error) throw error;
+                    return formatarLogs(data, req.event.id);
+                }
+            },
+            area: {
+                titulo: 'Relatório de Fluxo por Área',
+                colunas: [
+                    { id: 'area', label: 'Área / Localização' },
+                    { id: 'entradas', label: 'Entradas', align: 'center', tipo: 'numero' },
+                    { id: 'saidas', label: 'Saídas', align: 'center', tipo: 'numero' },
+                    { id: 'pico', label: 'Pico de Fluxo', align: 'center' }
+                ],
+                carregar: () => executar(this.porArea)
+            },
+            empresa: {
+                titulo: 'Relatório por Empresa',
+                colunas: [
+                    { id: 'empresa', label: 'Empresa' },
+                    { id: 'pessoas', label: 'Pessoas', align: 'center', tipo: 'numero' },
+                    { id: 'entradas', label: 'Entradas', align: 'center', tipo: 'numero' },
+                    { id: 'saidas', label: 'Saídas', align: 'center', tipo: 'numero' },
+                    { id: 'bloqueados', label: 'Bloqueados', align: 'center', tipo: 'numero' },
+                    { id: 'expulsos', label: 'Expulsos', align: 'center', tipo: 'numero' }
+                ],
+                carregar: () => executar(this.porEmpresa)
+            },
+            leitor: {
+                titulo: 'Relatório por Terminal e Leitor',
+                colunas: [
+                    { id: 'terminal', label: 'Terminal' },
+                    { id: 'localizacao', label: 'Localização' },
+                    { id: 'total', label: 'Total Leituras', align: 'center', tipo: 'numero' },
+                    { id: 'entradas', label: 'Entradas', align: 'center', tipo: 'numero' },
+                    { id: 'saidas', label: 'Saídas', align: 'center', tipo: 'numero' },
+                    { id: 'erros', label: 'Erros / Negados', align: 'center', tipo: 'numero' }
+                ],
+                carregar: () => executar(this.porLeitor)
+            },
+            funcao: {
+                titulo: 'Relatório por Função / Cargo',
+                colunas: [
+                    { id: 'funcao', label: 'Função / Cargo' },
+                    { id: 'total', label: 'Total Cadastrado', align: 'center', tipo: 'numero' },
+                    { id: 'presentes', label: 'Presentes Agora', align: 'center', tipo: 'numero' },
+                    { id: 'entradas_periodo', label: 'Entradas Período', align: 'center', tipo: 'numero' },
+                    { id: 'saidas_periodo', label: 'Saídas Período', align: 'center', tipo: 'numero' }
+                ],
+                carregar: () => executar(this.porFuncao)
+            },
+            status: {
+                titulo: 'Relatório por Status de Acesso',
+                colunas: [
+                    { id: 'status', label: 'Status' },
+                    { id: 'quantidade', label: 'Quantidade', align: 'center', tipo: 'numero' }
+                ],
+                carregar: () => executar(this.porStatus)
+            }
+        };
+
+        const def = abas[aba];
+        if (!def) return null;
+        return { titulo: def.titulo, colunas: def.colunas, linhas: await def.carregar() };
+    }
+
+    /** Texto do período filtrado, para o cabeçalho dos arquivos */
+    _textoPeriodo(query) {
+        const fmt = (iso) => iso ? this._formatarDataHora(iso).slice(0, 17) : null;
+        const ini = fmt(limiteFiltro(query.data_inicio));
+        const fim = fmt(limiteFiltro(query.data_fim, true));
+        if (!ini && !fim) return 'Todo o período';
+        return `Período: ${ini || 'início'} a ${fim || 'agora'}`;
+    }
+
+    /**
      * Exporta Qualquer Aba do Menu em PDF com layout padronizado
      */
     async exportarAbaPDF(req, res) {
         try {
-            const { id: evento_id, nome: evento_nome } = this._resolveEvento(req);
+            const { nome: evento_nome } = this._resolveEvento(req);
             const { aba = 'area' } = req.query;
 
-            let titulo = 'Relatório';
-            let colunas = [];
-            let linhas = [];
+            const dados = await this._dadosAba(req, aba);
+            if (!dados) return res.status(400).json({ error: 'Aba de relatório desconhecida.' });
 
-            if (aba === 'area') {
-                titulo = 'Relatório de Fluxo por Área';
-                colunas = [
-                    { id: 'area', label: 'Área / Localização' },
-                    { id: 'entradas', label: 'Entradas', align: 'center' },
-                    { id: 'saidas', label: 'Saídas', align: 'center' },
-                    { id: 'pico', label: 'Pico de Fluxo', align: 'center' }
-                ];
-                const mockRes = { json: (d) => { linhas = d.data || []; } };
-                await this.porArea(req, mockRes);
-            } else if (aba === 'empresa') {
-                titulo = 'Relatório por Empresa';
-                colunas = [
-                    { id: 'empresa', label: 'Empresa' },
-                    { id: 'pessoas', label: 'Pessoas', align: 'center' },
-                    { id: 'entradas', label: 'Entradas', align: 'center' },
-                    { id: 'saidas', label: 'Saídas', align: 'center' },
-                    { id: 'bloqueados', label: 'Bloqueados', align: 'center' },
-                    { id: 'expulsos', label: 'Expulsos', align: 'center' }
-                ];
-                const mockRes = { json: (d) => { linhas = d.data || []; } };
-                await this.porEmpresa(req, mockRes);
-            } else if (aba === 'leitor') {
-                titulo = 'Relatório por Terminal e Leitor';
-                colunas = [
-                    { id: 'terminal', label: 'Terminal' },
-                    { id: 'localizacao', label: 'Localização' },
-                    { id: 'total', label: 'Total Leituras', align: 'center' },
-                    { id: 'entradas', label: 'Entradas', align: 'center' },
-                    { id: 'saidas', label: 'Saídas', align: 'center' },
-                    { id: 'erros', label: 'Erros / Negados', align: 'center' }
-                ];
-                const mockRes = { json: (d) => { linhas = d.data || []; } };
-                await this.porLeitor(req, mockRes);
-            } else if (aba === 'funcao') {
-                titulo = 'Relatório por Função / Cargo';
-                colunas = [
-                    { id: 'funcao', label: 'Função / Cargo' },
-                    { id: 'total', label: 'Total Cadastrado', align: 'center' },
-                    { id: 'presentes', label: 'Presentes Hoje', align: 'center' },
-                    { id: 'entradas_periodo', label: 'Entradas Período', align: 'center' },
-                    { id: 'saidas_periodo', label: 'Saídas Período', align: 'center' }
-                ];
-                const mockRes = { json: (d) => { linhas = d.data || []; } };
-                await this.porFuncao(req, mockRes);
-            } else if (aba === 'status') {
-                titulo = 'Relatório por Status de Acesso';
-                colunas = [
-                    { id: 'status', label: 'Status' },
-                    { id: 'quantidade', label: 'Quantidade', align: 'center' }
-                ];
-                const mockRes = { json: (d) => { linhas = d.data || []; } };
-                await this.porStatus(req, mockRes);
-            }
+            const linhas = dados.linhas.map(l => {
+                const out = { ...l };
+                dados.colunas.filter(c => c.tipo === 'data').forEach(c => { out[c.id] = this._formatarDataHora(l[c.id]); });
+                return out;
+            });
 
             const pdfBuffer = await pdfService.generateAggregatedPDF({
-                titulo,
+                titulo: dados.titulo,
                 evento: { nome: evento_nome },
-                colunas,
+                subtitulo: this._textoPeriodo(req.query),
+                colunas: dados.colunas,
                 linhas
             });
 
@@ -1441,6 +1557,97 @@ class ReportController {
         } catch (error) {
             logger.error('Erro ao exportar aba em PDF:', error);
             res.status(500).json({ error: 'Falha ao exportar PDF da aba.' });
+        }
+    }
+
+    /**
+     * Exporta Qualquer Aba do Menu em Excel (antes o painel chamava rotas /excel/export-* que não existiam)
+     */
+    async exportarAbaXLSX(req, res) {
+        try {
+            const { nome: evento_nome } = this._resolveEvento(req);
+            const { aba = 'area' } = req.query;
+
+            const dados = await this._dadosAba(req, aba);
+            if (!dados) return res.status(400).json({ error: 'Aba de relatório desconhecida.' });
+            const { titulo, colunas, linhas } = dados;
+
+            const workbook = new ExcelJS.Workbook();
+            workbook.creator = 'NZT Relatórios';
+            workbook.created = new Date();
+            const sheet = workbook.addWorksheet(titulo.slice(0, 31));
+            const ultimaCol = colunas.length;
+
+            sheet.mergeCells(1, 1, 1, ultimaCol);
+            const titleCell = sheet.getCell(1, 1);
+            titleCell.value = `NZT RELATÓRIOS — ${titulo.toUpperCase()}`;
+            titleCell.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+            titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0A1929' } };
+            titleCell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+            sheet.getRow(1).height = 30;
+
+            sheet.mergeCells(2, 1, 2, ultimaCol);
+            const subCell = sheet.getCell(2, 1);
+            subCell.value = `EVENTO: ${(evento_nome || '').toUpperCase()}  |  ${this._textoPeriodo(req.query)}  |  EMISSÃO: ${new Date().toLocaleString('pt-BR', { timeZone: TIMEZONE })}`;
+            subCell.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF94A3B8' } };
+            subCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+            subCell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+
+            const header = sheet.getRow(4);
+            header.values = colunas.map(c => c.label.toUpperCase());
+            header.height = 24;
+            header.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9.5 };
+            header.alignment = { vertical: 'middle', horizontal: 'center' };
+            colunas.forEach((_, i) => {
+                header.getCell(i + 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+            });
+
+            linhas.forEach((l, idx) => {
+                const row = sheet.addRow(colunas.map(c => {
+                    const v = l[c.id];
+                    if (c.tipo === 'data') return dataExcel(v);
+                    if (c.tipo === 'numero') return Number(v) || 0;
+                    return v ?? '—';
+                }));
+                colunas.forEach((c, i) => {
+                    const cell = row.getCell(i + 1);
+                    if (c.tipo === 'data') cell.numFmt = 'dd/mm/yyyy hh:mm:ss';
+                    if (c.align) cell.alignment = { horizontal: c.align };
+                    if (idx % 2 === 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+                });
+            });
+
+            // Totais das colunas numéricas (SUBTOTAL respeita o autofiltro)
+            if (linhas.length > 0 && colunas.some(c => c.tipo === 'numero')) {
+                const primeira = 5;
+                const ultima = 4 + linhas.length;
+                const total = sheet.addRow(colunas.map((c, i) => {
+                    if (i === 0) return 'TOTAL';
+                    if (c.tipo !== 'numero') return '';
+                    const letra = sheet.getColumn(i + 1).letter;
+                    return { formula: `SUBTOTAL(109,${letra}${primeira}:${letra}${ultima})` };
+                }));
+                total.font = { bold: true };
+                colunas.forEach((c, i) => {
+                    const cell = total.getCell(i + 1);
+                    if (c.align) cell.alignment = { horizontal: c.align };
+                    cell.border = { top: { style: 'thin' } };
+                });
+            }
+
+            colunas.forEach((c, i) => {
+                const maior = Math.max(c.label.length, ...linhas.slice(0, 500).map(l => String(l[c.id] ?? '').length));
+                sheet.getColumn(i + 1).width = c.tipo === 'data' ? 20 : Math.min(45, Math.max(12, maior + 2));
+            });
+            sheet.views = [{ state: 'frozen', ySplit: 4 }];
+            sheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4, column: ultimaCol } };
+
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', `attachment; filename=relatorio_${aba}_${Date.now()}.xlsx`);
+            res.send(await workbook.xlsx.writeBuffer());
+        } catch (error) {
+            logger.error('Erro ao exportar aba em Excel:', error);
+            res.status(500).json({ error: 'Falha ao exportar Excel da aba.' });
         }
     }
 }

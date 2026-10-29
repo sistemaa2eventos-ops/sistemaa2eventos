@@ -267,35 +267,22 @@ export const useReports = () => {
         }
 
         try {
-            const routes = {
-                logs: '/excel/evento',
-                area: '/excel/export-area',
-                empresa: '/excel/export-empresa',
-                leitor: '/excel/export-leitor',
-                funcao: '/excel/export-funcao',
-                status: '/excel/export-status',
-                diario: '/excel/export/relatorio-diario',
-                ponto: '/excel/export/ponto'
-            };
-
-            if (!routes[type]) return;
-
-            const response = await api.get(routes[type], {
+            // antes cada aba apontava para uma rota /excel/export-* que não existia no backend
+            const response = await api.get('/reports/exportar-aba-xlsx', {
                 params: {
                     evento_id: eventoId,
+                    aba: type,
                     data_inicio: dateStart,
                     data_fim: dateEnd,
-                    empresa_id: empresaId || undefined,
-                    format
+                    empresa_id: empresaId || undefined
                 },
                 responseType: 'blob'
             });
 
-            const extension = format === 'csv' ? 'csv' : 'xlsx';
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `NZT_Relatorio_${type}_${Date.now()}.${extension}`);
+            link.setAttribute('download', `NZT_Relatorio_${type}_${Date.now()}.xlsx`);
             document.body.appendChild(link);
             link.click();
             link.remove();

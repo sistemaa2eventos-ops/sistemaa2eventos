@@ -30,5 +30,6 @@ router.get('/diario-consolidado/xlsx', checkPermission('relatorios', 'leitura'),
 router.get('/diario-consolidado/pdf',  checkPermission('relatorios', 'leitura'), (req, res) => reportController.exportarRelatorioDiarioPDF(req, res));
 router.get('/fechamentos-diarios',     checkPermission('relatorios', 'leitura'), (req, res) => reportController.listarFechamentosDiarios(req, res));
 router.get('/exportar-aba-pdf',        checkPermission('relatorios', 'leitura'), (req, res) => reportController.exportarAbaPDF(req, res));
+router.get('/exportar-aba-xlsx',       checkPermission('relatorios', 'leitura'), (req, res) => reportController.exportarAbaXLSX(req, res));
 
 module.exports = router;

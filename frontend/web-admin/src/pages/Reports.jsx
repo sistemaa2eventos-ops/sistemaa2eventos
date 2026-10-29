@@ -220,6 +220,22 @@ const Reports = () => {
             label: 'Check-out (saída)',
             width: 175,
             format: (val) => {
+                if (val === 'Não registrada') {
+                    return (
+                        <Chip
+                            label="Não registrada"
+                            size="small"
+                            title="A pessoa não bateu a saída; o fechamento de turno encerrou o registro"
+                            sx={{
+                                bgcolor: 'rgba(255, 51, 102, 0.12)',
+                                color: '#FF3366',
+                                fontWeight: 700,
+                                fontSize: '0.75rem',
+                                border: '1px solid rgba(255, 51, 102, 0.3)'
+                            }}
+                        />
+                    );
+                }
                 if (val === 'No evento') {
                     return (
                         <Chip
@@ -252,6 +268,26 @@ const Reports = () => {
             format: (val, _row) => {
                 if (!val || val === '—') {
                     return <Typography variant="caption" sx={{ color: '#64748B' }}>00h 00m</Typography>;
+                }
+                // sem horas no dia: saída não registrada (a conferir) ou turno contado no dia da entrada
+                if (val === 'Saída não registrada' || val === 'Turno do dia anterior') {
+                    const conferir = val === 'Saída não registrada';
+                    return (
+                        <Chip
+                            label={conferir ? 'A conferir' : 'Turno do dia anterior'}
+                            size="small"
+                            title={conferir
+                                ? 'Sem horário de saída real: as horas não entram no total nem na média'
+                                : 'As horas deste turno estão no relatório do dia da entrada'}
+                            sx={{
+                                bgcolor: conferir ? 'rgba(255, 51, 102, 0.12)' : 'rgba(148, 163, 184, 0.12)',
+                                color: conferir ? '#FF3366' : '#94A3B8',
+                                fontWeight: 700,
+                                fontSize: '0.75rem',
+                                border: `1px solid ${conferir ? 'rgba(255, 51, 102, 0.3)' : 'rgba(148, 163, 184, 0.3)'}`
+                            }}
+                        />
+                    );
                 }
                 const isAndamento = val.includes('Em andamento');
                 return (
@@ -305,7 +341,8 @@ const Reports = () => {
             )
         },
         { id: 'metodo', label: 'Método', width: 140 },
-        { id: 'dispositivo_id', label: 'Equipamento', width: 140 }
+        { id: 'numero_pulseira', label: 'Pulseira', width: 110, align: 'center', format: (val) => val || '—' },
+        { id: 'equipamento', label: 'Equipamento', width: 180 }
     ];
 
     // 3. Colunas: Por Área
@@ -352,7 +389,7 @@ const Reports = () => {
     const funcaoColumns = [
         { id: 'funcao', label: 'Função / cargo', width: 250 },
         { id: 'total', label: 'Total cadastrado', width: 150, align: 'center', type: 'number' },
-        { id: 'presentes', label: 'Presentes hoje', width: 140, align: 'center', type: 'number' },
+        { id: 'presentes', label: 'Presentes agora', width: 140, align: 'center', type: 'number' },
         { id: 'entradas_periodo', label: 'Entradas no período', width: 160, align: 'center', type: 'number' },
         { id: 'saidas_periodo', label: 'Saídas no período', width: 160, align: 'center', type: 'number' }
     ];
