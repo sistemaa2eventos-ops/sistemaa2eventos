@@ -6,7 +6,9 @@ const { body, validationResult } = require('express-validator');
 const validate = (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        const lista = errors.array();
+        // `error` é o campo que o painel exibe; `errors` mantém a lista completa
+        return res.status(400).json({ success: false, error: lista[0].msg, errors: lista });
     }
     next();
 };
@@ -49,9 +51,20 @@ const validateRegister = [
  * Regras de Registro de Funcionário
  */
 const validatePessoa = [
-    body('nome').trim().notEmpty().withMessage('Nome é obrigatório').escape(),
-    body('cpf').custom(value => {
-        if (!isValidCPF(value)) throw new Error('CPF inválido');
+    // O painel envia nome_completo; `nome` fica como alternativa (o service aceita os dois).
+    // Sem .escape(): ele reescreveria o valor gravado (D'Ávila virava D&#x27;Ávila)
+    body('nome_completo').custom((value, { req }) => {
+        const nome = value || req.body.nome;
+        if (typeof nome !== 'string' || !nome.trim()) throw new Error('Nome completo é obrigatório');
+        return true;
+    }),
+    // CPF é opcional quando há passaporte (estrangeiro); se vier preenchido, tem que ser válido
+    body('cpf').custom((value, { req }) => {
+        if (value) {
+            if (!isValidCPF(value)) throw new Error('CPF inválido');
+        } else if (!req.body.passaporte || !String(req.body.passaporte).trim()) {
+            throw new Error('Informe CPF ou passaporte');
+        }
         return true;
     }),
     body('empresa_id').optional({ nullable: true }).isUUID().withMessage('ID de empresa inválido'), // FIX I-02: visitantes podem não ter empresa
