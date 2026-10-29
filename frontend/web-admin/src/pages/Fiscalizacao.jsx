@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Box, Typography, Grid, Stack, TextField, CircularProgress,
     Chip, IconButton, Tooltip, FormControl, InputLabel, Select,
@@ -14,7 +13,6 @@ import {
     VolumeUp as SoundOnIcon,
     VolumeOff as SoundOffIcon,
     CameraAlt as CameraIcon,
-    Close as CloseIcon,
     PersonSearch as PersonSearchIcon,
     AccessTime as AccessTimeIcon,
     Badge as BadgeIcon,
@@ -25,6 +23,7 @@ import {
 } from '@mui/icons-material';
 import PageHeader from '../components/common/PageHeader';
 import GlassCard from '../components/common/GlassCard';
+import LeitorQrCamera from '../components/common/LeitorQrCamera';
 import KpiCard from '../components/common/KpiCard';
 import { cores } from '../styles/tokens';
 import { FactCheck as KpiFiscalizadosIcon, CheckCircle as KpiLiberadosIcon, Block as KpiNegadosIcon } from '@mui/icons-material';
@@ -68,7 +67,6 @@ const playFeedbackSound = (type, soundEnabled = true) => {
     }
 };
 
-const SCANNER_ID = 'reader-fiscalizacao-qr';
 
 const Fiscalizacao = () => {
     const { enqueueSnackbar } = useSnackbar();
@@ -90,7 +88,6 @@ const Fiscalizacao = () => {
 
     // Câmera Scanner QR
     const [cameraActive, setCameraActive] = useState(false);
-    const html5QrCodeRef = useRef(null);
 
     // Estatísticas da Sessão de Fiscalização
     const [stats, setStats] = useState({
@@ -216,32 +213,6 @@ const Fiscalizacao = () => {
         setBuscaNomeInput('');
         setBuscaNomeOptions([]);
     };
-
-    // 4. Câmera QR Code
-    useEffect(() => {
-        if (cameraActive) {
-            const qrScanner = new Html5Qrcode(SCANNER_ID);
-            html5QrCodeRef.current = qrScanner;
-
-            qrScanner.start(
-                { facingMode: 'environment' },
-                { fps: 10, qrbox: { width: 250, height: 250 } },
-                (decodedText) => {
-                    handleProcessarCodigo(decodedText, 'camera_qr');
-                },
-                () => {}
-            ).catch(err => {
-                enqueueSnackbar(`Câmera inacessível: ${err.message}`, { variant: 'warning' });
-                setCameraActive(false);
-            });
-
-            return () => {
-                if (qrScanner.isScanning) {
-                    qrScanner.stop().catch(() => {}).finally(() => qrScanner.clear());
-                }
-            };
-        }
-    }, [cameraActive, handleProcessarCodigo, enqueueSnackbar]);
 
     const areaAtual = areas.find(a => a.id === selectedAreaId);
 
@@ -393,8 +364,8 @@ const Fiscalizacao = () => {
                         <Box sx={{ mb: { xs: 0, md: '28px' } }}>
                             <NeonButton
                                 fullWidth
-                                neonColor={cameraActive ? '#FF3366' : '#00D4FF'}
-                                onClick={() => setCameraActive(!cameraActive)}
+                                neonColor="#00D4FF"
+                                onClick={() => setCameraActive(true)}
                                 sx={{ 
                                     height: { xs: 48, sm: 58 }, 
                                     minHeight: { xs: 48, sm: 58 },
@@ -403,8 +374,8 @@ const Fiscalizacao = () => {
                                     borderRadius: '12px'
                                 }}
                             >
-                                {cameraActive ? <CloseIcon sx={{ mr: 1 }} /> : <CameraIcon sx={{ mr: 1 }} />}
-                                {cameraActive ? 'Fechar Câmera' : 'Ler QR via Câmera'}
+                                <CameraIcon sx={{ mr: 1 }} />
+                                Ler pela câmera
                             </NeonButton>
                         </Box>
                     </Grid>
@@ -474,15 +445,11 @@ const Fiscalizacao = () => {
                     </Grid>
                 </Grid>
 
-                {/* Scanner de Câmera Embutido se Ativo */}
-                {cameraActive && (
-                    <Box sx={{ mt: 2, p: 1.5, bgcolor: 'rgba(0,0,0,0.7)', borderRadius: 1.5, textAlign: 'center', border: '1px solid rgba(0,212,255,0.3)' }}>
-                        <Typography variant="caption" sx={{ color: '#00D4FF', display: 'block', mb: 1, fontWeight: 700 }}>
-                            Aponte a câmera para o QR Code da pulseira ou crachá
-                        </Typography>
-                        <div id={SCANNER_ID} style={{ width: '100%', maxWidth: '360px', margin: '0 auto', borderRadius: 12, overflow: 'hidden' }} />
-                    </Box>
-                )}
+                <LeitorQrCamera
+                    open={cameraActive}
+                    onClose={() => setCameraActive(false)}
+                    onLeitura={(cod) => handleProcessarCodigo(cod, 'camera_qr')}
+                />
             </GlassCard>
 
             {/* CARD DE DECISÃO VISUAL (OCUPA A ÁREA PRINCIPAL SEM POLUIÇÃO DE PASSAGENS) */}

@@ -1,17 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import { Html5Qrcode } from "html5-qrcode";
+import React, { useState } from 'react';
 import {
   Box, Typography, Grid, TextField,
   List, ListItemText,
-  ListItemButton, Zoom, Tooltip
+  ListItemButton, Zoom, Tooltip, Button
 } from '@mui/material';
 import {
   QrCodeScanner as ScannerIcon,
-  CheckCircle as SuccessIcon, Cancel as ErrorIcon, Search as SearchIcon
+  CheckCircle as SuccessIcon, Cancel as ErrorIcon, Search as SearchIcon,
+  PhotoCamera as CameraIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 
 import GlassCard from '../components/common/GlassCard';
+import LeitorQrCamera from '../components/common/LeitorQrCamera';
 import UniversalPulseiraInput from '../components/common/UniversalPulseiraInput';
 import CabecalhoOperacao, { BotaoJanelaRegistros } from '../components/credenciamento/CabecalhoOperacao';
 import ModalCredenciamento from '../components/credenciamento/ModalCredenciamento';
@@ -41,7 +42,7 @@ const NumeroTurno = ({ rotulo, valor, cor, dica }) => {
 
 const Checkin = () => {
   const {
-    selectedPessoa, setSelectedPessoa, activeScanner, setActiveScanner,
+    selectedPessoa, setSelectedPessoa,
     checkinResult, resultMessage, loading, manualSaving,
     modoQuiosque, toggleQuiosque,
     searchQuery, handleSearch, searchResults,
@@ -63,6 +64,7 @@ const Checkin = () => {
 
   const [cardLog, setCardLog] = useState(null);
   const [barcodeValue, setBarcodeValue] = useState('');
+  const [lendoCamera, setLendoCamera] = useState(false);
 
   // Confirmação de credenciamento do modal (Fase 2)
   const handleConfirmarCredenciamento = ({ pessoa_id, numero_pulseira, tipo_pulseira_id }) => {
@@ -75,33 +77,6 @@ const Checkin = () => {
       performCheckin('manual', null, pessoa_id);
     }
   };
-
-  // QR Scanner Lifecycle
-  useEffect(() => {
-    let html5QrCode;
-    if (activeScanner) {
-      const startScanner = async () => {
-        try {
-          html5QrCode = new Html5Qrcode("reader-quiosque");
-          await html5QrCode.start(
-            { facingMode: "user" },
-            { fps: 10, qrbox: { width: 250, height: 250 } },
-            async (decodedText) => {
-              await html5QrCode.stop();
-              setActiveScanner(false);
-              performCheckin('qrcode', decodedText);
-            },
-            () => {}
-          );
-        } catch (err) {
-          console.error("Scanner fail:", err);
-          setActiveScanner(false);
-        }
-      };
-      setTimeout(startScanner, 100);
-    }
-    return () => { if (html5QrCode?.isScanning) html5QrCode.stop(); };
-  }, [activeScanner, performCheckin, setActiveScanner]);
 
   return (
     <Box sx={{
@@ -156,6 +131,18 @@ const Checkin = () => {
                     loading={loading}
                     autoFocus={!modoQuiosque}
                 />
+
+                {/* Sem leitor USB (celular/tablet): a câmera do aparelho lê o QR ou código de barras */}
+                <Button
+                    fullWidth
+                    variant="outlined"
+                    startIcon={<CameraIcon />}
+                    onClick={() => setLendoCamera(true)}
+                    disabled={loading}
+                    sx={{ mt: 1.5, minHeight: 44, textTransform: 'none', fontWeight: 600, borderColor: 'rgba(0,255,136,0.4)', color: '#00FF88' }}
+                >
+                    Ler pela câmera
+                </Button>
 
                 <Box sx={{ display: 'flex', alignItems: 'center', my: { xs: 1.5, sm: 2 } }}>
                     <Box sx={{ flex: 1, height: '1px', bgcolor: 'rgba(255,255,255,0.1)' }} />
@@ -285,7 +272,14 @@ const Checkin = () => {
           pulseiraTypes={pulseiraTypes}
           eventAreas={eventAreas}
           loading={manualSaving || loading}
-          onOpenQrScanner={() => setActiveScanner(true)}
+          permitirCamera
+      />
+
+      <LeitorQrCamera
+          open={lendoCamera}
+          onClose={() => setLendoCamera(false)}
+          titulo="Entrada pela câmera"
+          onLeitura={(cod) => executarLeituraRapida(cod, 'checkin', 'qrcode')}
       />
 
       {/* DIALOG DETALHADO DO CARD DO PARTICIPANTE */}

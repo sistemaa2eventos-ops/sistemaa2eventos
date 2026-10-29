@@ -15,7 +15,6 @@ export const useCheckin = (defaultMode, options = {}) => {
 
     // States - Fluxo de Atendimento
     const [selectedPessoa, setSelectedPessoa] = useState(null);
-    const [activeScanner, setActiveScanner] = useState(false);
     const [checkinResult, setCheckinResult] = useState(null); // 'sucesso' | 'negado' | null
     const [resultMessage, setResultMessage] = useState('');
     const [loading, setLoading] = useState(false);
@@ -548,7 +547,6 @@ export const useCheckin = (defaultMode, options = {}) => {
 
     return {
         selectedPessoa, setSelectedPessoa: handleSelectPessoa,
-        activeScanner, setActiveScanner,
         checkinResult, setCheckinResult,
         resultMessage, setResultMessage,
         loading, manualSaving,

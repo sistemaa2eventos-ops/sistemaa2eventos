@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Html5Qrcode } from "html5-qrcode";
 import {
   Box, Typography, Grid, Stack, Button, Zoom, Tooltip
 } from '@mui/material';
 import {
   Logout as LogoutIcon, ExitToApp as CheckoutIcon,
-  Warning as WarningIcon
+  Warning as WarningIcon, PhotoCamera as CameraIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 
 import GlassCard from '../components/common/GlassCard';
+import LeitorQrCamera from '../components/common/LeitorQrCamera';
 import UniversalPulseiraInput from '../components/common/UniversalPulseiraInput';
 import PessoaCardDialog from '../components/credenciamento/PessoaCardDialog';
 import RecentAccessList from '../components/credenciamento/RecentAccessList';
@@ -84,16 +84,12 @@ const FeedbackOverlay = styled(Box, { shouldForwardProp: (p) => p !== 'status' }
     backdropFilter: 'blur(8px)', animation: 'fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
 }));
 
-const SCANNER_ID = 'checkout-scanner-nzt';
-
 const Checkout = () => {
   const {
-    activeScanner, setActiveScanner,
     checkinResult, resultMessage, loading,
     modoQuiosque, toggleQuiosque,
     recentLogs,
     areaId, changeAreaId, eventAreas,
-    performCheckin,
     executarLeituraRapida,
     // Vínculo Facial
     sessaoAtiva,
@@ -108,6 +104,7 @@ const Checkout = () => {
 
   const [cardLog, setCardLog] = useState(null);
   const [pulseiraValue, setPulseiraValue] = useState('');
+  const [lendoCamera, setLendoCamera] = useState(false);
 
   useEffect(() => {
     if (checkinResult === 'sucesso') {
@@ -116,32 +113,6 @@ const Checkout = () => {
       playCheckoutSound('erro');
     }
   }, [checkinResult]);
-
-  // QR Scanner Lifecycle
-  useEffect(() => {
-    let html5QrCode;
-    if (activeScanner) {
-      const startScanner = async () => {
-        try {
-          html5QrCode = new Html5Qrcode(SCANNER_ID);
-          await html5QrCode.start(
-            { facingMode: "user" },
-            { fps: 10, qrbox: { width: 250, height: 250 } },
-            async (decodedText) => {
-              await html5QrCode.stop();
-              setActiveScanner(false);
-              performCheckin('qrcode', decodedText);
-            },
-            () => {}
-          );
-        } catch (_) {
-          setActiveScanner(false);
-        }
-      };
-      setTimeout(startScanner, 100);
-    }
-    return () => { if (html5QrCode?.isScanning) html5QrCode.stop(); };
-  }, [activeScanner, performCheckin, setActiveScanner]);
 
   const checkoutLogs = (recentLogs || []).filter(l => {
     return l.tipo === 'checkout' || l.metodo === 'checkout';
@@ -207,6 +178,18 @@ const Checkout = () => {
                     Registrar saída
                 </BotaoSaida>
 
+                {/* Sem leitor USB (celular/tablet): a câmera do aparelho lê o QR ou código de barras */}
+                <Button
+                    fullWidth
+                    variant="outlined"
+                    startIcon={<CameraIcon />}
+                    onClick={() => setLendoCamera(true)}
+                    disabled={loading}
+                    sx={{ minHeight: 44, textTransform: 'none', fontWeight: 600, borderColor: tom(COR, 0.4), color: COR }}
+                >
+                    Ler pela câmera
+                </Button>
+
                 <Stack spacing={0.75} sx={{ pt: 1.25, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                     <LinhaResumo rotulo="Saídas registradas" valor={checkoutLogs.length} cor={COR} />
                 </Stack>
@@ -250,6 +233,13 @@ const Checkout = () => {
               </Zoom>
           </FeedbackOverlay>
       )}
+
+      <LeitorQrCamera
+          open={lendoCamera}
+          onClose={() => setLendoCamera(false)}
+          titulo="Saída pela câmera"
+          onLeitura={(cod) => executarLeituraRapida(cod, 'checkout', 'qrcode')}
+      />
 
       {/* DIALOG DETALHADO DO CARD DO PARTICIPANTE */}
       <PessoaCardDialog

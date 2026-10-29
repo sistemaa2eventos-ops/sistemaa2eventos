@@ -21,6 +21,7 @@ import NeonButton from '../common/NeonButton';
 import AuthorizedAreasChips from '../common/AuthorizedAreasChips';
 import UniversalPulseiraInput from '../common/UniversalPulseiraInput';
 import PessoaFoto from '../common/PessoaFoto';
+import LeitorQrCamera from '../common/LeitorQrCamera';
 import api from '../../services/api';
 import ListaDocumentos from '../documentos/ListaDocumentos';
 import { SITUACAO_DOCUMENTAL, MOTIVO_PENDENCIA } from '../documentos/documentosUtils';
@@ -34,9 +35,11 @@ export const ModalCredenciamento = ({
     pulseiraTypes = [],
     eventAreas: _eventAreas = [],
     loading = false,
-    onOpenQrScanner
+    // Mostra o botão que lê o número da pulseira pela câmera do aparelho
+    permitirCamera = false
 }) => {
     const [numeroPulseira, setNumeroPulseira] = useState('');
+    const [lendoCamera, setLendoCamera] = useState(false);
     const [selectedTipoPulseira, setSelectedTipoPulseira] = useState('');
     const [erroValidacao, setErroValidacao] = useState('');
 
@@ -370,21 +373,21 @@ export const ModalCredenciamento = ({
                                 </NeonButton>
                             </Grid>
 
-                            {onOpenQrScanner && (
+                            {permitirCamera && (
                                 <Grid item xs={6} sm={2.5}>
                                     <NeonButton
                                         fullWidth
                                         neonColor="#00D4FF"
-                                        onClick={onOpenQrScanner}
+                                        onClick={() => setLendoCamera(true)}
                                         disabled={loading}
                                         sx={{ height: { xs: 46, sm: 56 }, fontSize: '0.8125rem', borderRadius: 1.5 }}
                                     >
-                                        <QrIcon sx={{ mr: 0.5, fontSize: 20 }} /> QR cam
+                                        <QrIcon sx={{ mr: 0.5, fontSize: 20 }} /> Câmera
                                     </NeonButton>
                                 </Grid>
                             )}
 
-                            <Grid item xs={onOpenQrScanner ? 6 : 12} sm={onOpenQrScanner ? 2.5 : 5}>
+                            <Grid item xs={permitirCamera ? 6 : 12} sm={permitirCamera ? 2.5 : 5}>
                                 <NeonButton
                                     fullWidth
                                     neonColor="rgba(255, 255, 255, 0.4)"
@@ -399,6 +402,14 @@ export const ModalCredenciamento = ({
                     </Box>
                 </GlassCard>
             </DialogContent>
+
+            <LeitorQrCamera
+                open={lendoCamera}
+                onClose={() => setLendoCamera(false)}
+                titulo="Pulseira pela câmera"
+                instrucao="Aponte a câmera para o código da pulseira que vai ser vinculada."
+                onLeitura={(cod) => { setNumeroPulseira(cod); setErroValidacao(''); }}
+            />
 
             {/* Sub-diálogo de Documentos Anexados do Colaborador */}
             <Dialog
