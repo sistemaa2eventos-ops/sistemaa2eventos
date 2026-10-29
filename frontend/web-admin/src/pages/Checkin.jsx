@@ -149,7 +149,7 @@ const Checkin = () => {
                     inputProps={{ 'aria-label': 'Procurar participante por nome ou CPF' }}
                     InputProps={{
                         startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />,
-                        sx: { borderRadius: 1.5, height: { xs: 44, sm: 48 }, fontSize: { xs: '0.9375rem', sm: '1rem' }, bgcolor: 'rgba(255,255,255,0.03)' }
+                        sx: { borderRadius: 1.5, height: { xs: 44, sm: 48 }, fontSize: '1rem', bgcolor: 'rgba(255,255,255,0.03)' }
                     }}
                 />
 

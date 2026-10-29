@@ -180,13 +180,9 @@ export const UniversalPulseiraInput = ({
                                                 disabled={disabled || loading}
                                                 aria-label="Ler pela câmera"
                                                 sx={{
-                                                    // Área de toque de 44px sem aumentar a caixa
-                                                    width: 44, height: 44, ml: -1,
-                                                    color: 'inherit',
-                                                    borderRadius: 1.25,
-                                                    bgcolor: `${accentColor}1A`,
-                                                    border: `1px solid ${accentColor}40`,
-                                                    '&:hover': { bgcolor: `${accentColor}33` }
+                                                    // Só o ícone; a área de toque de 44px fica invisível
+                                                    width: 44, height: 44, ml: -1.25,
+                                                    color: 'inherit'
                                                 }}
                                             >
                                                 <BarcodeIcon sx={{ fontSize: { xs: 22, sm: 26 } }} />
