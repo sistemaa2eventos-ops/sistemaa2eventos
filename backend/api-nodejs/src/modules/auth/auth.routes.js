@@ -24,15 +24,16 @@ router.use((req, res, next) => {
 // ROTAS PÚBLICAS
 // ============================================
 router.post('/login', rateLimiter.auth, validateLogin, authController.login);
-router.post('/register', rateLimiter.auth, validateRegister, authController.register);
 router.post('/forgot-password', rateLimiter.auth, (req, res) => authController.forgotPassword(req, res));
 router.post('/definir-senha', rateLimiter.auth, authController.definirSenha); // link do e-mail (convite / esqueci a senha)
 router.post('/refresh', rateLimiter.public, (req, res) => authController.refreshSession(req, res));
 
 // ============================================
-// ROTAS DE CONVITE (apenas admin_master)
+// ROTAS DE CONVITE E CRIAÇÃO DE OPERADORES (apenas admin_master)
 // ============================================
 router.post('/invite', authenticate, authorize('admin_master'), authController.invite); // FIX C-06: authorize ausente
+router.post('/register', authenticate, authorize('admin_master'), validateRegister, authController.register);
+router.post('/users/:userId/resend-invite', authenticate, authorize('admin_master'), authController.resendInvite);
 
 // ============================================
 // ROTAS PROTEGIDAS

@@ -38,6 +38,7 @@ export const DEFAULT_PERMISSIONS = {
 export const useUsuarios = () => {
     const { enqueueSnackbar } = useSnackbar();
     const [usuarios, setUsuarios] = useState([]);
+    const [orfaos, setOrfaos] = useState([]);
     const [eventos, setEventos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -48,6 +49,8 @@ export const useUsuarios = () => {
     const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
     const [openPasswordDialog, setOpenPasswordDialog] = useState(false);
     const [resetingPassword, setResetingPassword] = useState(false);
+    const [resendingId, setResendingId] = useState(null);
+    const [inviteLinkInfo, setInviteLinkInfo] = useState(null); // { email, nome, link, emailEnviado }
     const [selectedUser, setSelectedUser] = useState(null);
     const [_userToDelete, setUserToDelete] = useState(null);
     
@@ -56,6 +59,8 @@ export const useUsuarios = () => {
         email: '',
         nome_completo: '',
         telefone: '',
+        modo_ativacao: 'convite', // 'convite' | 'senha'
+        senha_inicial: '',
         nivel_acesso: 'operador',
         vinculo_tipo: 'global', // 'global' | 'especifico'
         eventos_permitidos: [], // array de IDs de eventos permitidos
@@ -94,6 +99,7 @@ export const useUsuarios = () => {
                 };
             });
             setUsuarios(users);
+            setOrfaos(response.data.orfaos || []);
         } catch (error) {
             console.error('Erro ao buscar usuários:', error);
         } finally {
@@ -106,7 +112,7 @@ export const useUsuarios = () => {
         loadEventos();
     }, [loadUsuarios, loadEventos]);
 
-    const handleOpenDialog = (user = null) => {
+    const handleOpenDialog = (user = null, prefillOrfao = null) => {
         if (user) {
             setSelectedUser(user);
             const vinculoTipo = user.vinculo_tipo || user.permissions?.vinculo_tipo || (user.evento_id ? 'especifico' : 'global');
@@ -125,6 +131,8 @@ export const useUsuarios = () => {
                 email: user.email || '',
                 nome_completo: user.nome_completo || '',
                 telefone: user.telefone || '',
+                modo_ativacao: 'convite',
+                senha_inicial: '',
                 nivel_acesso: user.nivel_acesso || 'operador',
                 vinculo_tipo: vinculoTipo,
                 eventos_permitidos: permitidos,
@@ -135,9 +143,11 @@ export const useUsuarios = () => {
         } else {
             setSelectedUser(null);
             setFormData({
-                email: '',
-                nome_completo: '',
-                telefone: '',
+                email: prefillOrfao?.email || '',
+                nome_completo: prefillOrfao?.nome_completo || '',
+                telefone: prefillOrfao?.telefone || '',
+                modo_ativacao: 'convite',
+                senha_inicial: '',
                 nivel_acesso: 'operador',
                 vinculo_tipo: 'global',
                 eventos_permitidos: [],
@@ -237,6 +247,13 @@ export const useUsuarios = () => {
                 return;
             }
 
+            if (!selectedUser && formData.modo_ativacao === 'senha') {
+                if (!formData.senha_inicial || formData.senha_inicial.trim().length < 6) {
+                    enqueueSnackbar('A senha inicial deve ter pelo menos 6 caracteres.', { variant: 'warning' });
+                    return;
+                }
+            }
+
             const payload = {
                 nome_completo: formData.nome_completo.trim(),
                 telefone: formData.telefone || null,
@@ -256,16 +273,45 @@ export const useUsuarios = () => {
                 await api.put(`/auth/users/${selectedUser.id}`, payload);
                 enqueueSnackbar('Operador atualizado com sucesso!', { variant: 'success' });
             } else {
-                await api.post('/auth/invite', {
+                const { data } = await api.post('/auth/invite', {
                     ...payload,
-                    email: formData.email.trim()
+                    email: formData.email.trim(),
+                    ...(formData.modo_ativacao === 'senha' ? { senha_inicial: formData.senha_inicial.trim() } : {})
                 });
-                enqueueSnackbar('Convite enviado com sucesso!', { variant: 'success' });
+                enqueueSnackbar(data?.message || 'Operador criado com sucesso!', { variant: 'success' });
+                if (data?.activation_link) {
+                    setInviteLinkInfo({
+                        email: formData.email.trim(),
+                        nome: formData.nome_completo.trim(),
+                        link: data.activation_link,
+                        emailEnviado: Boolean(data.email_enviado)
+                    });
+                }
             }
             setOpenDialog(false);
             loadUsuarios();
         } catch (error) {
             enqueueSnackbar(error.response?.data?.error || 'Erro ao salvar operador.', { variant: 'error' });
+        }
+    };
+
+    const handleResendInvite = async (user) => {
+        try {
+            setResendingId(user.id);
+            const { data } = await api.post(`/auth/users/${user.id}/resend-invite`);
+            enqueueSnackbar(data?.message || 'Convite reenviado!', { variant: data?.email_enviado ? 'success' : 'info' });
+            if (data?.activation_link) {
+                setInviteLinkInfo({
+                    email: user.email,
+                    nome: user.nome_completo || user.email,
+                    link: data.activation_link,
+                    emailEnviado: Boolean(data.email_enviado)
+                });
+            }
+        } catch (error) {
+            enqueueSnackbar(error.response?.data?.error || 'Erro ao reenviar convite.', { variant: 'error' });
+        } finally {
+            setResendingId(null);
         }
     };
 
@@ -317,8 +363,8 @@ export const useUsuarios = () => {
 
     const handleDeleteUser = async (userId) => {
         try {
-            await api.delete(`/auth/users/${userId}`);
-            enqueueSnackbar('Operador deletado com sucesso!', { variant: 'success' });
+            const { data } = await api.delete(`/auth/users/${userId}`);
+            enqueueSnackbar(data?.message || 'Operador deletado com sucesso!', { variant: 'success' });
             loadUsuarios();
         } catch (error) {
             enqueueSnackbar(error.response?.data?.error || 'Erro ao deletar operador.', { variant: 'error' });
@@ -326,18 +372,19 @@ export const useUsuarios = () => {
     };
 
     return {
-        usuarios, eventos, loading, search, setSearch,
+        usuarios, orfaos, eventos, loading, search, setSearch,
         page, setPage, totalCount: usuarios.length,
         openDialog, setOpenDialog,
         openDeleteConfirm, setOpenDeleteConfirm,
         openPasswordDialog, setOpenPasswordDialog,
-        resetingPassword,
+        resetingPassword, resendingId,
+        inviteLinkInfo, setInviteLinkInfo,
         selectedUser, setSelectedUser, formData, setFormData,
         userToDelete: selectedUser, setUserToDelete,
         toggleEventPermitido,
         updateEventPermission,
         copyPermissionsToAllEvents,
-        handleOpenDialog, handleSave, handleApprove, handleToggleStatus, handleResetPassword, handleDeleteUser,
+        handleOpenDialog, handleSave, handleResendInvite, handleApprove, handleToggleStatus, handleResetPassword, handleDeleteUser,
         MODULOS, DEFAULT_PERMISSIONS
     };
 };

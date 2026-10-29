@@ -168,9 +168,63 @@ class AuthController {
     }
 
     /**
-     * Criar convite para novo operador do painel
-     * Apenas admin_master pode criar operadores
-     * Permissões começam desligadas (tudo false) - admin_master ativa conforme precisa
+     * Lista todos os usuários do Supabase Auth (paginado)
+     */
+    async _listarTodosAuthUsers() {
+        const todos = [];
+        for (let page = 1; page <= 20; page++) {
+            const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 });
+            if (error || !data?.users) break;
+            todos.push(...data.users);
+            if (data.users.length < 1000) break;
+        }
+        return todos;
+    }
+
+    /**
+     * Busca um usuário no Supabase Auth pelo e-mail normalizado
+     */
+    async _buscarAuthUserPorEmail(normalizedEmail) {
+        const alvo = normalizeEmail(normalizedEmail);
+        const users = await this._listarTodosAuthUsers();
+        return users.find(u => normalizeEmail(u.email || '') === alvo) || null;
+    }
+
+    /**
+     * Gera link de ativação/definição de senha no Supabase Auth.
+     * Tenta 'invite' (usuários novos/não confirmados) e faz fallback para 'recovery'
+     * caso o e-mail já tenha sido confirmado anteriormente no Auth.
+     */
+    async _gerarLinkAtivacao(normalizedEmail) {
+        let { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+            type: 'invite',
+            email: normalizedEmail,
+            options: { redirectTo: URL_DEFINIR_SENHA }
+        });
+
+        if (linkError || !linkData?.properties?.action_link) {
+            const fallback = await supabase.auth.admin.generateLink({
+                type: 'recovery',
+                email: normalizedEmail,
+                options: { redirectTo: URL_DEFINIR_SENHA }
+            });
+            if (!fallback.error && fallback.data?.properties?.action_link) {
+                linkData = fallback.data;
+                linkError = null;
+            }
+        }
+
+        return {
+            activationLink: linkData?.properties?.action_link || null,
+            linkError
+        };
+    }
+
+    /**
+     * Criar convite para novo operador do painel (ou criar com senha inicial definida)
+     * Apenas admin_master pode criar operadores.
+     * Se o e-mail existir como conta órfã no Supabase Auth (sem registro em perfis),
+     * a conta é automaticamente recuperada e vinculada ao novo perfil.
      */
     async invite(req, res) {
         try {
@@ -180,7 +234,8 @@ class AuthController {
                 eventos_permitidos = [],
                 eventos_permissoes = {},
                 evento_id,
-                permissions
+                permissions,
+                senha_inicial
             } = req.body;
 
             // Só admin_master pode criar convites
@@ -199,6 +254,13 @@ class AuthController {
             if (!email || !nome_completo) {
                 return res.status(400).json({
                     error: 'Email e nome completo são obrigatórios.'
+                });
+            }
+
+            const senhaLimpa = typeof senha_inicial === 'string' && senha_inicial.trim() ? senha_inicial.trim() : null;
+            if (senhaLimpa && senhaLimpa.length < 6) {
+                return res.status(400).json({
+                    error: 'A senha inicial deve ter pelo menos 6 caracteres.'
                 });
             }
 
@@ -238,16 +300,18 @@ class AuthController {
                 }
             }
 
-            // Verificar se email já existe como operador
+            // Verificar se email já existe na tabela perfis (case-insensitive)
             const { data: existingEmail, error: emailCheckError } = await supabase
                 .from('perfis')
-                .select('id')
-                .eq('email', normalizedEmail)
+                .select('id, nome_completo, status')
+                .ilike('email', normalizedEmail)
                 .limit(1);
 
             if (!emailCheckError && existingEmail && existingEmail.length > 0) {
+                const existente = existingEmail[0];
                 return res.status(409).json({
-                    error: 'Este email já está cadastrado como operador.'
+                    error: `Este e-mail já está cadastrado para o operador "${existente.nome_completo || normalizedEmail}" (status: ${existente.status || 'ativo'}).`,
+                    code: 'EMAIL_ALREADY_EXISTS'
                 });
             }
 
@@ -274,47 +338,88 @@ class AuthController {
                 eventos_permissoes: eventos_permissoes || {}
             };
 
-            // 1. Criar usuário no Supabase Auth (sem enviar email automático)
+            const userMetadata = {
+                nome_completo: nome_completo.trim(),
+                nivel_acesso: 'operador',
+                evento_id: eventoIdFinal,
+                vinculo_tipo: isEspecifico ? 'especifico' : 'global',
+                eventos_permitidos: finalEventosPermitidos,
+                telefone: telefone ? telefone.replace(/[^\d]/g, '') : null
+            };
+
+            const appMetadata = {
+                role: 'operador',
+                nivel_acesso: 'operador',
+                senha_definida: Boolean(senhaLimpa)
+            };
+
+            // 1. Criar usuário no Supabase Auth (ou recuperar conta órfã se já existir no Auth sem perfil)
+            let authUser = null;
+            let reaproveitadoOrfao = false;
+
             const { data, error } = await supabase.auth.admin.createUser({
                 email: normalizedEmail,
-                email_confirm: false,
-                // O RLS do banco reconhece o papel por app_metadata.role (sem ele o operador via listas vazias)
-                app_metadata: { role: 'operador', nivel_acesso: 'operador' },
-                user_metadata: {
-                    nome_completo,
-                    nivel_acesso: 'operador',
-                    evento_id: eventoIdFinal,
-                    vinculo_tipo: isEspecifico ? 'especifico' : 'global',
-                    eventos_permitidos: finalEventosPermitidos,
-                    telefone: telefone ? telefone.replace(/[^\d]/g, '') : null
-                }
+                ...(senhaLimpa ? { password: senhaLimpa, email_confirm: true } : { email_confirm: false }),
+                app_metadata: appMetadata,
+                user_metadata: userMetadata
             });
 
             if (error) {
-                logger.error(`Erro ao criar usuário: ${error.message}`);
-                return res.status(400).json({
-                    error: error.message || 'Erro ao criar usuário'
-                });
-            }
+                const isAlreadyRegistered = /already been registered|already exists|email_exists/i.test(error.message || '') || error.code === 'email_exists';
+                if (isAlreadyRegistered) {
+                    const orfao = await this._buscarAuthUserPorEmail(normalizedEmail);
+                    if (orfao) {
+                        // Confirma que este ID realmente não possui perfil
+                        const { data: perfilPorId } = await supabase
+                            .from('perfis')
+                            .select('id, email, nome_completo')
+                            .eq('id', orfao.id)
+                            .maybeSingle();
 
-            // 2. Gerar link de ativação
-            const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
-                type: 'invite',
-                email: normalizedEmail,
-                options: {
-                    redirectTo: URL_DEFINIR_SENHA
+                        if (perfilPorId) {
+                            return res.status(409).json({
+                                error: `Este usuário já possui perfil cadastrado como "${perfilPorId.nome_completo || perfilPorId.email}".`,
+                                code: 'PROFILE_ALREADY_EXISTS'
+                            });
+                        }
+
+                        // Recupera e higieniza a conta órfã no Supabase Auth
+                        const { data: updatedAuth, error: updateAuthErr } = await supabase.auth.admin.updateUserById(orfao.id, {
+                            email: normalizedEmail,
+                            ...(senhaLimpa ? { password: senhaLimpa, email_confirm: true } : {}),
+                            ban_duration: 'none',
+                            app_metadata: appMetadata,
+                            user_metadata: userMetadata
+                        });
+
+                        if (updateAuthErr || !updatedAuth?.user) {
+                            logger.error(`Erro ao recuperar conta órfã no Auth (${normalizedEmail}): ${updateAuthErr?.message}`);
+                            return res.status(400).json({
+                                error: 'Erro ao recuperar registro anterior deste e-mail no servidor de autenticação.'
+                            });
+                        }
+
+                        authUser = updatedAuth.user;
+                        reaproveitadoOrfao = true;
+                        logger.info(`♻️ Conta órfã no Auth recuperada e vinculada para: ${normalizedEmail} (${authUser.id})`);
+                    }
                 }
-            });
 
-            if (linkError) {
-                logger.warn(`Erro ao gerar link de ativação: ${linkError.message}`);
+                if (!authUser) {
+                    logger.error(`Erro ao criar usuário (${normalizedEmail}): ${error.message}`);
+                    return res.status(400).json({
+                        error: 'Não foi possível criar o usuário no servidor de autenticação: ' + (error.message || 'Erro desconhecido')
+                    });
+                }
+            } else {
+                authUser = data.user;
             }
 
-            // 3. Criar perfil com dados completos
+            // 2. Criar perfil com dados completos (com rollback automático no Auth se falhar)
             const { error: perfilError } = await supabase
                 .from('perfis')
                 .insert({
-                    id: data.user.id,
+                    id: authUser.id,
                     email: normalizedEmail,
                     nome_completo: nome_completo.trim(),
                     telefone: telefone ? telefone.replace(/[^\d]/g, '') : null,
@@ -327,43 +432,130 @@ class AuthController {
                 });
 
             if (perfilError) {
-                logger.error(`Erro ao criar perfil: ${perfilError.message}`);
+                logger.error(`Erro ao criar perfil para ${normalizedEmail}: ${perfilError.message}`);
+                if (!reaproveitadoOrfao) {
+                    await supabase.auth.admin.deleteUser(authUser.id).catch(rbErr => {
+                        logger.error(`Falha no rollback do Auth user ${authUser.id}: ${rbErr.message}`);
+                    });
+                }
                 return res.status(400).json({
-                    error: 'Usuário criado no Supabase, mas houve erro ao salvar perfil.'
+                    error: 'Não foi possível salvar o perfil do operador. A operação foi desfeita para evitar inconsistências.'
                 });
             }
 
-            // 4. Enviar email de convite via SMTP customizado
-            const activationLink = linkData?.properties?.action_link;
-            if (activationLink) {
-                try {
-                    await emailService.sendOperatorInvite(normalizedEmail, nome_completo, activationLink);
-                } catch (emailError) {
-                    logger.error(`Erro ao enviar email de convite: ${emailError.message}`);
-                    // Não bloquear o fluxo se o email falhar - usuário foi criado
+            // 3. Se não foi definida senha inicial, gerar link de ativação e enviar e-mail
+            let activationLink = null;
+            let emailEnviado = false;
+            if (!senhaLimpa) {
+                const { activationLink: link, linkError } = await this._gerarLinkAtivacao(normalizedEmail);
+                activationLink = link;
+                if (linkError) {
+                    logger.warn(`Erro ao gerar link de ativação para ${normalizedEmail}: ${linkError.message}`);
+                }
+                if (activationLink) {
+                    try {
+                        await emailService.sendOperatorInvite(normalizedEmail, nome_completo.trim(), activationLink);
+                        emailEnviado = true;
+                    } catch (emailError) {
+                        logger.error(`Erro ao enviar email de convite para ${normalizedEmail}: ${emailError.message}`);
+                    }
                 }
             }
 
-            logger.info(`✅ Operador criado: ${normalizedEmail} (evento: ${evento_id}, status: pendente) por ${req.user.id}`);
+            logger.info(`✅ Operador criado: ${normalizedEmail} (id: ${authUser.id}, orfao_recuperado: ${reaproveitadoOrfao}, com_senha: ${Boolean(senhaLimpa)}) por ${req.user.id}`);
+
+            const msgSucesso = senhaLimpa
+                ? 'Operador criado com senha inicial definida! Ele já pode entrar no sistema.'
+                : (emailEnviado
+                    ? 'Operador criado e convite enviado por e-mail com sucesso!'
+                    : 'Operador criado! Não foi possível enviar o e-mail automaticamente — copie o link de ativação abaixo.');
 
             res.status(201).json({
                 success: true,
-                message: 'Operador criado com sucesso. Email de convite enviado. Aguarde que ele defina a senha e então aprove.',
+                message: msgSucesso,
+                conta_recuperada: reaproveitadoOrfao,
+                email_enviado: emailEnviado,
+                activation_link: activationLink,
                 user: {
-                    id: data.user.id,
+                    id: authUser.id,
                     email: normalizedEmail,
-                    nome_completo,
+                    nome_completo: nome_completo.trim(),
                     telefone: telefone ? formatPhone(telefone) : null,
                     nivel_acesso: 'operador',
-                    status: 'pendente',
+                    status: 'ativo',
                     permissions: finalPermissions,
-                    evento_id
+                    evento_id: eventoIdFinal
                 }
             });
 
         } catch (error) {
             logger.error('Erro ao criar operador:', error);
             res.status(500).json({ error: 'Erro interno ao criar operador' });
+        }
+    }
+
+    /**
+     * Reenviar convite / gerar novo link de ativação para um operador (admin_master)
+     */
+    async resendInvite(req, res) {
+        try {
+            const { userId } = req.params;
+            const isCallerAdminMaster = req.user?.nivel_acesso === 'admin_master';
+            if (!isCallerAdminMaster) {
+                return res.status(403).json({ error: 'Apenas admin_master pode reenviar convites.' });
+            }
+
+            const { data: perfil, error: perfilErr } = await supabase
+                .from('perfis')
+                .select('id, email, nome_completo, nivel_acesso')
+                .eq('id', userId)
+                .maybeSingle();
+
+            if (perfilErr || !perfil || !perfil.email) {
+                return res.status(404).json({ error: 'Operador não encontrado ou sem e-mail cadastrado.' });
+            }
+
+            const normalizedEmail = normalizeEmail(perfil.email);
+
+            // Libera a redefinição pelo link (senha_definida: false)
+            const { data: alvo } = await supabase.auth.admin.getUserById(userId);
+            await supabase.auth.admin.updateUserById(userId, {
+                app_metadata: {
+                    ...(alvo?.user?.app_metadata || {}),
+                    role: perfil.nivel_acesso || 'operador',
+                    nivel_acesso: perfil.nivel_acesso || 'operador',
+                    senha_definida: false
+                }
+            }).catch(e => logger.warn(`[resendInvite] Aviso ao atualizar app_metadata: ${e.message}`));
+
+            const { activationLink, linkError } = await this._gerarLinkAtivacao(normalizedEmail);
+            if (linkError || !activationLink) {
+                return res.status(400).json({
+                    error: 'Não foi possível gerar o link de ativação: ' + (linkError?.message || 'Erro desconhecido')
+                });
+            }
+
+            let emailEnviado = false;
+            try {
+                await emailService.sendOperatorInvite(normalizedEmail, perfil.nome_completo || normalizedEmail, activationLink);
+                emailEnviado = true;
+            } catch (emailErr) {
+                logger.warn(`[resendInvite] Falha no envio SMTP para ${normalizedEmail}: ${emailErr.message}`);
+            }
+
+            logger.info(`📧 Convite regenerado para ${normalizedEmail} (enviado=${emailEnviado}) por ${req.user.id}`);
+
+            res.json({
+                success: true,
+                email_enviado: emailEnviado,
+                activation_link: activationLink,
+                message: emailEnviado
+                    ? `Convite reenviado para ${normalizedEmail} com sucesso!`
+                    : `Link de acesso gerado! O servidor de e-mail não respondeu, mas você pode copiar o link.`
+            });
+        } catch (error) {
+            logger.error('Erro ao reenviar convite:', error);
+            res.status(500).json({ error: 'Erro interno ao reenviar convite' });
         }
     }
 
@@ -749,10 +941,13 @@ class AuthController {
 
                 logger.info(`[listUsers] ✅ Fallback sucesso: ${fallbackData?.length || 0} usuários retornados`);
 
-                // Aplicar busca em memória
+                // Aplicar busca em memória (nome, e-mail ou telefone)
                 const filtered = fallbackData.filter(user => {
+                    if (!searchTerm) return true;
                     const name = user.nome_completo?.toLowerCase() || '';
-                    return !searchTerm || name.includes(searchTerm);
+                    const mail = user.email?.toLowerCase() || '';
+                    const tel = user.telefone?.toLowerCase() || '';
+                    return name.includes(searchTerm) || mail.includes(searchTerm) || tel.includes(searchTerm);
                 });
 
                 const usersFallback = filtered.map(u => {
@@ -773,7 +968,8 @@ class AuthController {
                 return res.json({
                     success: true,
                     users: usersFallback,
-                    data: usersFallback
+                    data: usersFallback,
+                    orfaos: []
                 });
             }
 
@@ -784,17 +980,46 @@ class AuthController {
                 .eq('tipo', 'SENHA_SOLICITADA').is('lida_em', null);
             const pedidoSenha = new Map((pedidos || []).map(p => [p.referencia_id, p.created_at]));
 
+            // Para Admin Master, sincronizar estado de ativação com auth.users e identificar contas órfãs
+            let authPorId = new Map();
+            let orfaos = [];
+            if (isAdminMaster) {
+                try {
+                    const authUsers = await this._listarTodosAuthUsers();
+                    authPorId = new Map(authUsers.map(u => [u.id, u]));
+                    const idsEmPerfis = new Set((data || []).map(p => p.id));
+                    orfaos = authUsers
+                        .filter(u => !idsEmPerfis.has(u.id))
+                        .map(u => ({
+                            id: u.id,
+                            email: u.email || '',
+                            nome_completo: u.user_metadata?.nome_completo || '',
+                            telefone: u.user_metadata?.telefone ? formatPhone(u.user_metadata.telefone) : null,
+                            created_at: u.created_at,
+                            last_sign_in_at: u.last_sign_in_at || null,
+                            email_confirmado: Boolean(u.email_confirmed_at),
+                            role: u.app_metadata?.role || u.user_metadata?.nivel_acesso || 'operador'
+                        }));
+                } catch (authListErr) {
+                    logger.warn(`[listUsers] Falha ao consultar auth.users: ${authListErr.message}`);
+                }
+            }
+
             // Enriquecer dados e aplicar filtro de busca
             const enrichedUsers = data
                 .map(user => {
                     const vinculoTipo = user.permissions?.vinculo_tipo || (user.evento_id ? 'especifico' : 'global');
                     const permitidos = user.permissions?.eventos_permitidos || (user.evento_id ? [user.evento_id] : []);
                     const permissoesPorEvento = user.permissions?.eventos_permissoes || {};
+                    const authU = authPorId.get(user.id);
 
                     return {
                         ...user,
                         senha_solicitada_em: pedidoSenha.get(user.id) || null,
-                        email: user.email || '',
+                        senha_definida: authU ? Boolean(authU.app_metadata?.senha_definida || authU.last_sign_in_at) : true,
+                        email_confirmado: authU ? Boolean(authU.email_confirmed_at) : true,
+                        ultimo_login: authU?.last_sign_in_at || null,
+                        email: user.email || authU?.email || '',
                         telefone: user.telefone ? formatPhone(user.telefone) : null,
                         eventos: user.eventos?.[0] || (vinculoTipo === 'global' ? { nome: 'Todos os Eventos' } : { nome: 'Específico' }),
                         vinculo_tipo: vinculoTipo,
@@ -805,14 +1030,17 @@ class AuthController {
                 .filter(user => {
                     if (!searchTerm) return true;
                     const nameMatch = user.nome_completo?.toLowerCase().includes(searchTerm);
-                    return nameMatch;
+                    const emailMatch = user.email?.toLowerCase().includes(searchTerm);
+                    const phoneMatch = user.telefone?.toLowerCase().includes(searchTerm);
+                    return nameMatch || emailMatch || phoneMatch;
                 });
 
-            logger.info(`[listUsers] ✅ Após filtro de busca: ${enrichedUsers.length} usuários`);
+            logger.info(`[listUsers] ✅ Após filtro de busca: ${enrichedUsers.length} usuários (${orfaos.length} órfãos no Auth)`);
             res.json({
                 success: true,
                 users: enrichedUsers,
-                data: enrichedUsers
+                data: enrichedUsers,
+                orfaos
             });
 
         } catch (error) {
@@ -1097,17 +1325,14 @@ class AuthController {
                 });
             }
 
-            // --- AUTO-CURA SOBERANA (v19.0) ---
-            // Se o perfil não existir (ex: após Clean Ground), o UPSERT cria o registro físico.
+            // Atualiza apenas perfis existentes (nunca recria perfis deletados)
             const { error } = await supabase
                 .from('perfis')
-                .upsert({
-                    id: req.user.id,
+                .update({
                     evento_id,
-                    nome_completo: req.user.nome || req.user.email,
-                    nivel_acesso: req.user.role || 'operador',
                     updated_at: new Date()
-                }, { onConflict: 'id' });
+                })
+                .eq('id', req.user.id);
 
             if (error) throw error;
 
@@ -1265,7 +1490,7 @@ class AuthController {
     }
 
     /**
-     * Deletar usuário (operador)
+     * Deletar usuário (operador ou conta órfã no Auth)
      */
     async deleteUser(req, res) {
         try {
@@ -1279,32 +1504,64 @@ class AuthController {
                 });
             }
 
-            // Não permitir deletar admin_master
-            const { data: perfilData, error: perfilError } = await supabase
-                .from('perfis')
-                .select('nivel_acesso, email')
-                .eq('id', userId)
-                .single();
-
-            if (perfilError || !perfilData) {
-                return res.status(404).json({
-                    error: 'Usuário não encontrado.'
+            if (userId === req.user.id) {
+                return res.status(400).json({
+                    error: 'Você não pode deletar seu próprio usuário.'
                 });
             }
 
+            // Buscar no perfis (maybeSingle para permitir limpeza de contas órfãs do Auth)
+            const { data: perfilData, error: perfilError } = await supabase
+                .from('perfis')
+                .select('nivel_acesso, email, nome_completo')
+                .eq('id', userId)
+                .maybeSingle();
+
+            if (perfilError) {
+                throw perfilError;
+            }
+
+            // Caso 1: Conta órfã (existe no Supabase Auth, mas não possui linha em perfis)
+            if (!perfilData) {
+                const { data: authAlvo, error: getAuthErr } = await supabase.auth.admin.getUserById(userId);
+                if (getAuthErr || !authAlvo?.user) {
+                    return res.status(404).json({
+                        error: 'Usuário não encontrado.'
+                    });
+                }
+
+                const { error: delOrphanErr } = await supabase.auth.admin.deleteUser(userId);
+                if (delOrphanErr) {
+                    logger.error(`Erro ao remover conta órfã do Auth (${userId}): ${delOrphanErr.message}`);
+                    return res.status(500).json({
+                        error: 'Não foi possível remover a conta órfã do servidor de autenticação.'
+                    });
+                }
+
+                logger.info(`🧹 Conta órfã removida do Auth: ${authAlvo.user.email} (${userId}) por ${req.user.id}`);
+                return res.json({
+                    success: true,
+                    message: `Conta órfã (${authAlvo.user.email}) removida com sucesso.`
+                });
+            }
+
+            // Caso 2: Perfil regular — não permitir deletar admin_master
             if (perfilData.nivel_acesso === 'admin_master') {
                 return res.status(403).json({
                     error: 'Não é possível deletar um admin_master.'
                 });
             }
 
-            // Deletar do Supabase Auth
+            // 1. Deletar primeiro do Supabase Auth (evita deixar conta órfã se falhar)
             const { error: authError } = await supabase.auth.admin.deleteUser(userId);
-            if (authError) {
-                logger.warn(`Erro ao deletar usuário do Supabase Auth: ${authError.message}`);
+            if (authError && !/not found|user_not_found/i.test(authError.message || '')) {
+                logger.error(`Erro ao deletar usuário do Supabase Auth (${userId}): ${authError.message}`);
+                return res.status(500).json({
+                    error: 'Falha ao remover credencial no servidor de autenticação. Operação cancelada para evitar inconsistência.'
+                });
             }
 
-            // Deletar do perfis
+            // 2. Deletar do perfis
             const { error: deleteError } = await supabase
                 .from('perfis')
                 .delete()
@@ -1312,7 +1569,7 @@ class AuthController {
 
             if (deleteError) throw deleteError;
 
-            logger.info(`🗑️  Operador deletado: ${userId} por ${req.user.id}`);
+            logger.info(`🗑️  Operador deletado: ${perfilData.email || userId} por ${req.user.id}`);
 
             res.json({
                 success: true,
@@ -1326,11 +1583,14 @@ class AuthController {
     }
 
     /**
-     * Registro de novo usuário (cria usuário com senha definida)
-     * Usado pelo frontend Usuarios.jsx — cria usuário com senha definida.
+     * Registro de novo usuário com senha definida (restrito a admin_master)
      */
     async register(req, res) {
         try {
+            if (req.user?.nivel_acesso !== 'admin_master') {
+                return res.status(403).json({ error: 'Apenas admin_master pode registrar operadores.' });
+            }
+
             const {
                 email,
                 password,
@@ -1338,10 +1598,12 @@ class AuthController {
                 cpf,
                 nome_mae,
                 data_nascimento,
-                nivel_acesso = 'operador',
                 evento_id,
                 foto_url
             } = req.body;
+
+            // Nunca permitir escalação para admin_master por esta rota
+            const nivel_acesso = 'operador';
 
             if (!email || !password || !nome_completo || !cpf || !nome_mae || !data_nascimento) {
                 return res.status(400).json({
@@ -1349,11 +1611,14 @@ class AuthController {
                 });
             }
 
+            const normalizedEmail = normalizeEmail(email);
+
             // Criar usuário no Supabase Auth
             const { data, error } = await supabase.auth.admin.createUser({
-                email,
+                email: normalizedEmail,
                 password,
                 email_confirm: true,
+                app_metadata: { role: nivel_acesso, nivel_acesso, senha_definida: true },
                 user_metadata: {
                     nome_completo,
                     cpf,
@@ -1372,17 +1637,12 @@ class AuthController {
                 });
             }
 
-            // Injeta a role no app_metadata para validação segura via JWT
-            await supabase.auth.admin.updateUserById(data.user.id, {
-                app_metadata: { role: nivel_acesso }
-            });
-
-            // Cria o perfil (sem ele o login novo bloqueia o acesso por status pendente)
+            // Cria o perfil com rollback caso falhe
             const { error: perfilError } = await supabase
                 .from('perfis')
                 .insert({
                     id: data.user.id,
-                    email,
+                    email: normalizedEmail,
                     nome_completo,
                     cpf,
                     nome_mae,
@@ -1395,10 +1655,14 @@ class AuthController {
                 });
 
             if (perfilError) {
-                logger.warn(`Usuário criado sem perfil: ${perfilError.message}`);
+                logger.error(`Erro ao criar perfil em register (${normalizedEmail}): ${perfilError.message}`);
+                await supabase.auth.admin.deleteUser(data.user.id).catch(() => {});
+                return res.status(400).json({
+                    error: 'Não foi possível criar o perfil do usuário. Operação revertida.'
+                });
             }
 
-            logger.info(`✅ Usuário criado: ${email} (${nivel_acesso}) e Claims injetadas no JWT.`);
+            logger.info(`✅ Usuário criado: ${normalizedEmail} (${nivel_acesso}) por ${req.user.id}`);
 
             res.status(201).json({
                 success: true,

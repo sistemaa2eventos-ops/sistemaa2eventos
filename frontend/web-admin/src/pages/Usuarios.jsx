@@ -12,9 +12,11 @@ import {
     CheckCircle as AtivoIcon, HourglassEmpty as PendenteIcon, Cancel as InativoIcon,
     Check as ApproveIcon, Delete as DeleteIcon, Public as GlobalIcon,
     EventAvailable as EventIcon, ExpandMore as ExpandMoreIcon,
-    ContentCopy as CopyIcon, Shield as ShieldIcon
+    ContentCopy as CopyIcon, Shield as ShieldIcon, Send as SendIcon,
+    WarningAmber as WarningIcon, Key as KeyIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
+import { useSnackbar } from 'notistack';
 
 import GlassCard from '../components/common/GlassCard';
 import PageHeader from '../components/common/PageHeader';
@@ -45,19 +47,28 @@ const StatusChip = styled(Chip)(({ status }) => ({
  */
 const Usuarios = () => {
     const {
-        usuarios, eventos, loading, search, setSearch, page, setPage, totalCount,
+        usuarios, orfaos, eventos, loading, search, setSearch, page, setPage, totalCount,
         openDialog, setOpenDialog, openDeleteConfirm, setOpenDeleteConfirm,
         selectedUser, setSelectedUser, formData, setFormData,
         openPasswordDialog, setOpenPasswordDialog,
-        resetingPassword, handleResetPassword,
+        resetingPassword, resendingId,
+        inviteLinkInfo, setInviteLinkInfo,
+        handleResetPassword, handleResendInvite,
         updateEventPermission, copyPermissionsToAllEvents,
         handleOpenDialog, handleSave, handleApprove, handleToggleStatus, handleDeleteUser
     } = useUsuarios();
     const { user: currentUser } = useAuth();
+    const { enqueueSnackbar } = useSnackbar();
     const [newPassword, setNewPassword] = useState('');
     const [expandedAccordion, setExpandedAccordion] = useState(false);
 
     const isAdmin = currentUser?.nivel_acesso === 'admin_master';
+
+    const handleCopyLink = (link) => {
+        if (!link) return;
+        navigator.clipboard.writeText(link);
+        enqueueSnackbar('Link de ativação copiado para a área de transferência!', { variant: 'success' });
+    };
 
     // Helper para buscar nome de um evento pelo id
     const getEventoNome = (eventoId) => {
@@ -84,6 +95,13 @@ const Usuarios = () => {
                         <Typography variant="caption" color="text.secondary" display="flex" alignItems="center" gap={0.5}>
                             <EmailIcon sx={{ fontSize: 12 }} /> {row.email}
                         </Typography>
+                    )}
+                    {row.nivel_acesso !== 'admin_master' && row.senha_definida === false && (
+                        <Chip
+                            size="small"
+                            label="Aguardando definir senha"
+                            sx={{ mt: 0.5, height: 18, fontSize: '0.68rem', color: '#00D4FF', bgcolor: 'rgba(0,212,255,0.1)', border: '1px solid rgba(0,212,255,0.3)' }}
+                        />
                     )}
                 </Box>
             )
@@ -209,8 +227,20 @@ const Usuarios = () => {
                 const canManage = isAdmin && !isRowMaster;
 
                 return (
-                    <Stack direction="row" spacing={1} justifyContent="center">
-                        <Tooltip title={canManage ? "Resetar Senha" : "Privilégio Insuficiente"}>
+                    <Stack direction="row" spacing={0.5} justifyContent="center" alignItems="center">
+                        <Tooltip title={canManage ? "Reenviar convite / Obter link de acesso" : "Privilégio Insuficiente"}>
+                            <span>
+                                <IconButton
+                                    size="small"
+                                    disabled={!canManage || resendingId === row.id}
+                                    onClick={() => handleResendInvite(row)}
+                                    sx={{ color: '#00FF88' }}
+                                >
+                                    <SendIcon fontSize="small" />
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                        <Tooltip title={canManage ? "Definir / Resetar Senha" : "Privilégio Insuficiente"}>
                             <span>
                                 <IconButton size="small" disabled={!canManage} onClick={() => { setSelectedUser(row); setOpenPasswordDialog(true); }} sx={{ color: '#FFB800' }}><ResetIcon fontSize="small" /></IconButton>
                             </span>
@@ -253,6 +283,85 @@ const Usuarios = () => {
                 />
                 <NeonButton startIcon={<AddIcon />} onClick={() => handleOpenDialog()} sx={{ height: 40 }}>Novo operador</NeonButton>
             </Box>
+
+            {/* Alerta de contas órfãs no Supabase Auth (sem perfil na tabela perfis) */}
+            {isAdmin && orfaos.length > 0 && (
+                <Box sx={{
+                    mb: 3, p: 2, borderRadius: 2,
+                    background: 'rgba(255, 184, 0, 0.08)',
+                    border: '1px solid rgba(255, 184, 0, 0.35)'
+                }}>
+                    <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1.5 }}>
+                        <WarningIcon sx={{ color: '#FFB800', fontSize: 22 }} />
+                        <Box>
+                            <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#FFB800' }}>
+                                {orfaos.length} {orfaos.length === 1 ? 'conta incompleta encontrada' : 'contas incompletas encontradas'} no servidor de autenticação
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                                Estes e-mails possuem credencial antiga no Auth, mas estavam sem perfil ativo. Você pode concluir o cadastro como operador ou removê-los definitivamente.
+                            </Typography>
+                        </Box>
+                    </Stack>
+                    <Stack spacing={1}>
+                        {orfaos.map((orfao) => (
+                            <Box
+                                key={orfao.id}
+                                sx={{
+                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                    flexWrap: 'wrap', gap: 1, p: 1.25, borderRadius: 1.5,
+                                    background: 'rgba(10, 22, 40, 0.65)',
+                                    border: '1px solid rgba(255, 255, 255, 0.08)'
+                                }}
+                            >
+                                <Box>
+                                    <Typography variant="body2" fontWeight={700} color="#FFFFFF">
+                                        {orfao.email}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        {orfao.nome_completo ? `${orfao.nome_completo} • ` : ''}
+                                        Criado em {new Date(orfao.created_at).toLocaleDateString('pt-BR')}
+                                        {orfao.email_confirmado ? ' • E-mail confirmado' : ' • E-mail não confirmado'}
+                                    </Typography>
+                                </Box>
+                                <Stack direction="row" spacing={1}>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        startIcon={<AddIcon />}
+                                        onClick={() => handleOpenDialog(null, orfao)}
+                                        sx={{
+                                            color: '#00FF88',
+                                            borderColor: 'rgba(0, 255, 136, 0.4)',
+                                            textTransform: 'none',
+                                            fontWeight: 700,
+                                            '&:hover': { borderColor: '#00FF88', background: 'rgba(0, 255, 136, 0.1)' }
+                                        }}
+                                    >
+                                        Concluir cadastro
+                                    </Button>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        startIcon={<DeleteIcon />}
+                                        onClick={() => {
+                                            setSelectedUser({ id: orfao.id, nome_completo: orfao.email, email: orfao.email, isOrfao: true });
+                                            setOpenDeleteConfirm(true);
+                                        }}
+                                        sx={{
+                                            color: '#FF3366',
+                                            borderColor: 'rgba(255, 51, 102, 0.35)',
+                                            textTransform: 'none',
+                                            '&:hover': { borderColor: '#FF3366', background: 'rgba(255, 51, 102, 0.1)' }
+                                        }}
+                                    >
+                                        Remover registro
+                                    </Button>
+                                </Stack>
+                            </Box>
+                        ))}
+                    </Stack>
+                </Box>
+            )}
 
             <GlassCard glowColor="#FFB800" sx={{ p: { xs: 2, md: 3 } }}>
                 <TextField
@@ -316,6 +425,55 @@ const Usuarios = () => {
                             value={formData.telefone}
                             onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
                         />
+
+                        {/* MODO DE ATIVAÇÃO (somente ao criar novo operador) */}
+                        {!selectedUser && (
+                            <Box sx={{ p: 2.5, borderRadius: 1.5, background: 'rgba(10, 22, 40, 0.7)', border: '1px solid rgba(0, 255, 136, 0.25)' }}>
+                                <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#00FF88', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <KeyIcon sx={{ fontSize: 18 }} /> Como o operador vai definir a senha?
+                                </Typography>
+                                <RadioGroup
+                                    row
+                                    value={formData.modo_ativacao || 'convite'}
+                                    onChange={(e) => setFormData({ ...formData, modo_ativacao: e.target.value })}
+                                >
+                                    <FormControlLabel
+                                        value="convite"
+                                        control={<Radio sx={{ color: '#00FF88', '&.Mui-checked': { color: '#00FF88' } }} />}
+                                        label={
+                                            <Box>
+                                                <Typography variant="body2" fontWeight={700} color="#FFFFFF">Enviar convite por e-mail / link</Typography>
+                                                <Typography variant="caption" color="text.secondary">Envia o link para o próprio operador criar a senha (também permite copiar o link)</Typography>
+                                            </Box>
+                                        }
+                                        sx={{ mr: 4 }}
+                                    />
+                                    <FormControlLabel
+                                        value="senha"
+                                        control={<Radio sx={{ color: '#00FF88', '&.Mui-checked': { color: '#00FF88' } }} />}
+                                        label={
+                                            <Box>
+                                                <Typography variant="body2" fontWeight={700} color="#FFFFFF">Definir senha inicial agora</Typography>
+                                                <Typography variant="caption" color="text.secondary">Libera o acesso imediato sem precisar aguardar abertura de e-mail</Typography>
+                                            </Box>
+                                        }
+                                    />
+                                </RadioGroup>
+                                {formData.modo_ativacao === 'senha' && (
+                                    <TextField
+                                        label="Senha inicial do operador"
+                                        type="password"
+                                        fullWidth
+                                        required
+                                        placeholder="Mínimo de 6 caracteres"
+                                        value={formData.senha_inicial || ''}
+                                        onChange={(e) => setFormData({ ...formData, senha_inicial: e.target.value })}
+                                        helperText="O operador já poderá entrar imediatamente usando seu e-mail e esta senha."
+                                        sx={{ mt: 2 }}
+                                    />
+                                )}
+                            </Box>
+                        )}
 
                         {/* SELEÇÃO DO TIPO DE VÍNCULO */}
                         <Box sx={{ p: 2.5, borderRadius: 1.5, background: 'rgba(10, 22, 40, 0.7)', border: '1px solid rgba(0, 212, 255, 0.2)' }}>
@@ -531,13 +689,17 @@ const Usuarios = () => {
 
             {/* Modal de Exclusão de Operador */}
             <Dialog open={openDeleteConfirm} onClose={() => setOpenDeleteConfirm(false)} maxWidth="xs" fullWidth>
-                <DialogTitle sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, color: '#FF3366' }}>Deletar operador</DialogTitle>
+                <DialogTitle sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, color: '#FF3366' }}>
+                    {selectedUser?.isOrfao ? 'Remover conta órfã' : 'Deletar operador'}
+                </DialogTitle>
                 <DialogContent>
                     <Typography variant="body2" sx={{ mt: 2, mb: 2, color: 'text.primary' }}>
-                        Tem certeza que deseja deletar o operador <b>{selectedUser?.nome_completo}</b>?
+                        {selectedUser?.isOrfao
+                            ? <>Tem certeza que deseja remover o registro órfão <b>{selectedUser?.email || selectedUser?.nome_completo}</b> do servidor de autenticação?</>
+                            : <>Tem certeza que deseja deletar o operador <b>{selectedUser?.nome_completo}</b>?</>}
                     </Typography>
                     <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-                        Esta ação não pode ser desfeita. O operador perderá acesso a todos os eventos e credenciais do sistema.
+                        Esta ação não pode ser desfeita. O registro será removido tanto do painel quanto do servidor de autenticação.
                     </Typography>
                 </DialogContent>
                 <DialogActions sx={{ p: 3 }}>
@@ -551,6 +713,48 @@ const Usuarios = () => {
                     >
                         Confirmar exclusão
                     </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Modal com Link de Ativação para Cópia Rápida (WhatsApp / Direto) */}
+            <Dialog open={Boolean(inviteLinkInfo)} onClose={() => setInviteLinkInfo(null)} maxWidth="sm" fullWidth>
+                <TituloModal
+                    titulo="Link de ativação do operador"
+                    subtitulo={inviteLinkInfo?.email}
+                    onFechar={() => setInviteLinkInfo(null)}
+                />
+                <DialogContent sx={{ pt: 2.5 }}>
+                    <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
+                        {inviteLinkInfo?.emailEnviado
+                            ? 'O e-mail de convite foi enviado! Caso o operador demore para receber ou você queira enviar diretamente pelo WhatsApp, copie o link exclusivo abaixo:'
+                            : 'O operador foi criado! Copie o link exclusivo de ativação abaixo e envie ao operador para que ele defina sua senha:'}
+                    </Typography>
+                    <TextField
+                        fullWidth
+                        size="small"
+                        value={inviteLinkInfo?.link || ''}
+                        InputProps={{
+                            readOnly: true,
+                            endAdornment: (
+                                <InputAdornment position="end">
+                                    <Button
+                                        size="small"
+                                        startIcon={<CopyIcon />}
+                                        onClick={() => handleCopyLink(inviteLinkInfo?.link)}
+                                        sx={{ color: '#00D4FF', fontWeight: 700, textTransform: 'none' }}
+                                    >
+                                        Copiar link
+                                    </Button>
+                                </InputAdornment>
+                            )
+                        }}
+                    />
+                </DialogContent>
+                <DialogActions sx={{ p: 2.5 }}>
+                    <Button variant="outlined" onClick={() => setInviteLinkInfo(null)} sx={botaoSecundario}>Fechar</Button>
+                    <NeonButton startIcon={<CopyIcon />} onClick={() => handleCopyLink(inviteLinkInfo?.link)}>
+                        Copiar link de acesso
+                    </NeonButton>
                 </DialogActions>
             </Dialog>
         </Box>

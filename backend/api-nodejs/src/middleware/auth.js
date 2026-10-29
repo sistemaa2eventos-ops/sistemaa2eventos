@@ -99,11 +99,8 @@ async function authenticate(req, res, next) {
         }
 
         if (!role) {
-            // Leitura da app_metadata vindo do JWT (Priorizando nível de acesso injetado)
-            role = user.app_metadata?.nivel_acesso || user.app_metadata?.role || user.user_metadata?.nivel_acesso || 'operador';
-
-            // Fonte da verdade: perfis (papel, evento e PERMISSÕES dos módulos). Antes as permissões não
-            // eram lidas aqui: o operador chegava sem nenhuma e as liberadas pelo admin não valiam.
+            // Fonte única da verdade: perfis (papel, status, evento e PERMISSÕES dos módulos).
+            // Contas órfãs em auth.users sem registro em perfis não têm acesso à API.
             const { data } = await supabase
                 .from('perfis')
                 .select('nivel_acesso, evento_id, status, permissions')
@@ -111,17 +108,26 @@ async function authenticate(req, res, next) {
                 .maybeSingle();
             dbPerfil = data || null;
 
-            if (dbPerfil?.nivel_acesso) {
-                role = dbPerfil.nivel_acesso;
-            }
+            role = dbPerfil?.nivel_acesso || 'operador';
             statusPerfil = dbPerfil?.status || null;
 
             authCache.guardar(token, { user, role, statusPerfil, perfil: dbPerfil });
         }
 
-        // Usuário inativado não usa o sistema nem com sessão já aberta
+        // Sem perfil cadastrado no sistema (conta órfã no Auth): bloqueia o acesso
+        if (!dbPerfil) {
+            return res.status(403).json({
+                error: 'Conta sem perfil ativo no sistema. Entre em contato com o administrador.',
+                code: 'USER_NO_PROFILE'
+            });
+        }
+
+        // Usuário inativado ou pendente não usa o sistema nem com sessão já aberta
         if (statusPerfil === 'inativo') {
             return res.status(403).json({ error: 'Usuário inativo. Entre em contato com o administrador.', code: 'USER_INACTIVE' });
+        }
+        if (statusPerfil === 'pendente') {
+            return res.status(403).json({ error: 'Aguarde aprovação do administrador para acessar o sistema.', code: 'USER_PENDING' });
         }
 
         user.app_metadata = { ...user.app_metadata, nivel_acesso: role };
