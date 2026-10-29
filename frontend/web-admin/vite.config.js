@@ -12,12 +12,29 @@ export default defineConfig({
             includeAssets: ['favicon.ico', 'favicon-32x32.png', 'apple-touch-icon.png'],
             workbox: {
                 globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-                globIgnores: ['**/config.js', '**/sw*.js', '**/workbox-*.js'],
+                // Fora do pré-carregamento (~3 MB a menos na instalação, que é o que o celular baixa):
+                // modelo de rosto do cadastro (exige internet), avatares, ícones grandes do app e a
+                // Auditoria (só admin). Check-in, checkout e leitor de QR seguem pré-carregados (offline).
+                globIgnores: ['**/config.js', '**/sw*.js', '**/workbox-*.js',
+                    'face-api/**', 'avatars/**', 'pwa-*.png', 'assets/AuditLogs-*.js'],
                 maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
                 cleanupOutdatedCaches: true,
                 skipWaiting: true,
                 clientsClaim: true,
-                navigateFallbackDenylist: [/^\/api\//, /^\/socket\.io\//]
+                navigateFallbackDenylist: [/^\/api\//, /^\/socket\.io\//],
+                // O que ficou fora entra no cache na 1ª vez que for usado
+                runtimeCaching: [
+                    {
+                        urlPattern: ({ url }) => url.pathname.startsWith('/assets/'),
+                        handler: 'CacheFirst', // nome com hash: o arquivo nunca muda
+                        options: { cacheName: 'nzt-assets', expiration: { maxEntries: 80, maxAgeSeconds: 30 * 24 * 3600 } }
+                    },
+                    {
+                        urlPattern: ({ url }) => /^\/(face-api|avatars)\//.test(url.pathname),
+                        handler: 'StaleWhileRevalidate',
+                        options: { cacheName: 'nzt-recursos', expiration: { maxEntries: 60 } }
+                    }
+                ]
             },
             manifest: {
                 name: 'NZT Intelligent Control System',
@@ -65,7 +82,7 @@ export default defineConfig({
                     // Bibliotecas pesadas usadas só por algumas telas ficam fora do vendor:
                     // são baixadas junto com a tela que as usa (tabela avançada ~360 KB,
                     // leitor de QR ~330 KB, webcam, arrastar/redimensionar).
-                    if (/node_modules[\/](@mui[\/]x-data-grid|html5-qrcode|react-webcam|react-rnd|re-resizable|react-draggable)[\/]/.test(id)) {
+                    if (/node_modules[/\\](@mui[/\\]x-data-grid|html5-qrcode|react-webcam|react-rnd|re-resizable|react-draggable)[/\\]/.test(id)) {
                         return undefined;
                     }
                     return 'vendor';

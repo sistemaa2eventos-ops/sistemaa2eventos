@@ -231,6 +231,19 @@ const Monitor = () => {
     const camId = activeAlert?.dispositivo?.id;
     if (camId) setAlertCameras(prev => ({ ...prev, [camId]: Date.now() }));
   }, [activeAlert?.id, activeAlert?.dispositivo?.id]);
+  // Passados os 30 s o destaque sai sozinho (antes só sumia quando algo mais redesenhava a tela)
+  useEffect(() => {
+    const ids = Object.keys(alertCameras);
+    if (!ids.length) return undefined;
+    const maisAntigo = Math.min(...ids.map(id => alertCameras[id]));
+    const t = setTimeout(() => {
+      setAlertCameras(prev => Object.fromEntries(Object.entries(prev).filter(([, ts]) => Date.now() - ts < 30000)));
+    }, Math.max(0, maisAntigo + 30000 - Date.now()) + 50);
+    return () => clearTimeout(t);
+  }, [alertCameras]);
+
+  // CPFs monitorados num Set: o feed checava a lista inteira para cada uma das 100 linhas a cada render
+  const cpfsWatchlist = useMemo(() => new Set((watchlist || []).map(w => w.cpf).filter(Boolean)), [watchlist]);
 
   // Controles do Dialog Ao Vivo
   const [streamModalSize, setStreamModalSize] = useState('lg'); // 'md', 'lg', 'xl', 'fullscreen'
@@ -1280,7 +1293,7 @@ const Monitor = () => {
                         {logs.map((log, idx) => {
                             const isNegado = log.tipo === 'negado' || log.resultado === 'negado';
                             const isFiscalizacao = log.tipo === 'fiscalizacao';
-                            const isWatchlist = isAdminMaster && watchlist.some(w => w.cpf === log.pessoas?.cpf);
+                            const isWatchlist = isAdminMaster && !!log.pessoas?.cpf && cpfsWatchlist.has(log.pessoas.cpf);
                             return (
                                 <LogItem key={log.id || idx} tipo={isNegado ? 'negado' : log.tipo} monitorado={isWatchlist}>
                                     <PessoaFoto
@@ -2041,8 +2054,10 @@ const Monitor = () => {
                                             alt={cam.nome}
                                             modo={aoVivo ? 'stream' : 'snapshot'}
                                             qualidade="mini"
-                                            pausado={isDesativada || activeStreamCam?.id === cam.id}
-                                            textoPausado={isDesativada ? 'Câmera desativada' : 'Aberta em tela grande'}
+                                            // Com uma câmera em tela grande, a grade inteira pausa (as miniaturas atrás
+                                            // do player continuavam baixando vídeo e disputando a internet do evento)
+                                            pausado={isDesativada || !!activeStreamCam}
+                                            textoPausado={isDesativada ? 'Câmera desativada' : (activeStreamCam?.id === cam.id ? 'Aberta em tela grande' : 'Pausada enquanto outra está em tela grande')}
                                         />
 
                                         {/* OSD: MODO, FPS REAL E ROSTOS NA CENA (CANTO SUPERIOR ESQUERDO) */}

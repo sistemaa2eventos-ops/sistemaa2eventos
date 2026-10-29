@@ -365,22 +365,36 @@ export const useMonitor = ({ isAdminMaster = false } = {}) => {
         // Conexão compartilhada da aba (services/realtime.js)
         const socket = usarConexao();
         socket.entrarEvento(eventoId);
+        let jaConectou = socket.conectado;
         socket.on('connect', () => {
             setConexao('conectado');
             log('Conectado ao WebSocket do Monitor');
-            // Ao (re)conectar, sincroniza o que pode ter sido perdido
-            fetchData();
+            // Ao REconectar, sincroniza o que pode ter sido perdido (a 1ª carga já é feita ao abrir a tela)
+            if (jaConectou) fetchData();
+            jaConectou = true;
         });
         if (socket.conectado) setConexao('conectado'); // conexão já aberta por outra parte do painel
         socket.on('disconnect', () => setConexao('reconectando'));
         socket.on('connect_error', () => setConexao(prev => (prev === 'conectado' ? 'reconectando' : 'offline')));
         socket.onGerenciador('reconnect_attempt', () => setConexao('reconectando'));
 
+        // No pico (várias catracas) chegam vários acessos por segundo: junta e aplica a cada 400 ms,
+        // em vez de redesenhar o Monitor inteiro a cada passagem
+        let pendentes = [];
+        let timerLote = null;
+        const aplicarLote = () => {
+            timerLote = null;
+            const lote = pendentes;
+            pendentes = [];
+            const ids = new Set(lote.map(l => l.id));
+            setLogs(prev => [...lote.reverse(), ...prev.filter(l => !ids.has(l.id))].slice(0, 100));
+            agendarStats();
+        };
         socket.on('new_access', (newLog) => {
             // Feed na hora; contadores (presentes, áreas, negados) recalculados no servidor —
             // a soma local errava com credenciamento, troca de área e passagens repetidas.
-            setLogs(prev => [newLog, ...prev.filter(l => l.id !== newLog.id).slice(0, 99)]);
-            agendarStats();
+            pendentes = [...pendentes.filter(l => l.id !== newLog.id), newLog];
+            if (!timerLote) timerLote = setTimeout(aplicarLote, 400);
         });
 
         socket.on('area_alert', (alert) => {
@@ -453,6 +467,7 @@ export const useMonitor = ({ isAdminMaster = false } = {}) => {
         const timersAlerta = timersAlertaRef.current;
         return () => {
             if (statsTimerRef.current) clearTimeout(statsTimerRef.current);
+            clearTimeout(timerLote);
             clearTimeout(timersAlerta.area);
             clearTimeout(timersAlerta.watchlist);
             setConexao('offline');

@@ -70,6 +70,17 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // Leitura (GET) que falhou por rede ou por servidor momentaneamente fora (502/503/504, ex.:
+    // durante um deploy): tenta mais 1 vez após 1 s antes de mostrar erro. Gravações (POST etc.)
+    // não repetem aqui — o check-in já tem a fila offline com proteção contra duplicidade.
+    const cfg = error.config;
+    const semResposta = !error.response && error.code !== 'ECONNABORTED';
+    const servidorFora = [502, 503, 504].includes(error.response?.status);
+    if (cfg && (cfg.method || 'get').toLowerCase() === 'get' && !cfg._novaTentativa && (semResposta || servidorFora)) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      return api({ ...cfg, _novaTentativa: true });
+    }
+
     // Tratamento explicito do Rule 19: Timeout
     if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
       if (snackbarRef && !error.config?.hideDefaultError) {

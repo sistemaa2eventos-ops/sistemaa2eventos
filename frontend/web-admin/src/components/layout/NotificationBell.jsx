@@ -8,33 +8,57 @@ const COR = { critical: '#FF3366', warning: '#FFB800', info: '#00D4FF' };
 const INTERVALO_MS = 60000;
 
 /**
+ * Uma consulta só para todos os sinos da aba (o do celular e o do menu ficam montados juntos:
+ * eram duas consultas a cada minuto) e nenhuma com a aba escondida — atualiza ao voltar.
+ */
+const sinos = new Set(); // setters dos sinos montados
+let estado = { itens: [], naoLidas: 0 };
+let timer = null;
+
+async function carregarTodos() {
+    if (document.hidden) return;
+    try {
+        const resp = await api.get('/notificacoes', { params: { limit: 30 }, hideDefaultError: true });
+        estado = { itens: resp.data?.data || [], naoLidas: resp.data?.nao_lidas || 0 };
+        sinos.forEach(set => set(estado));
+    } catch {
+        /* sem evento ativo ou sem permissão: sino vazio */
+    }
+}
+
+const aoVoltarParaAba = () => { if (!document.hidden) carregarTodos(); };
+
+function inscrever(set) {
+    sinos.add(set);
+    set(estado);
+    if (sinos.size === 1) {
+        carregarTodos();
+        timer = setInterval(carregarTodos, INTERVALO_MS);
+        window.addEventListener('a2:notificacoes-atualizadas', carregarTodos);
+        document.addEventListener('visibilitychange', aoVoltarParaAba);
+    }
+    return () => {
+        sinos.delete(set);
+        if (sinos.size === 0) {
+            clearInterval(timer);
+            timer = null;
+            window.removeEventListener('a2:notificacoes-atualizadas', carregarTodos);
+            document.removeEventListener('visibilitychange', aoVoltarParaAba);
+        }
+    };
+}
+
+/**
  * Sino de notificações do evento (vencimento de documentos e outros avisos persistentes).
  */
 const NotificationBell = ({ color = '#00D4FF' }) => {
     const navigate = useNavigate();
     const [ancora, setAncora] = useState(null);
-    const [itens, setItens] = useState([]);
-    const [naoLidas, setNaoLidas] = useState(0);
+    const [{ itens, naoLidas }, setEstadoSino] = useState(estado);
 
-    const carregar = useCallback(async () => {
-        try {
-            const resp = await api.get('/notificacoes', { params: { limit: 30 }, hideDefaultError: true });
-            setItens(resp.data?.data || []);
-            setNaoLidas(resp.data?.nao_lidas || 0);
-        } catch {
-            /* sem evento ativo ou sem permissão: sino vazio */
-        }
-    }, []);
+    const carregar = useCallback(() => carregarTodos(), []);
 
-    useEffect(() => {
-        carregar();
-        const timer = setInterval(carregar, INTERVALO_MS);
-        window.addEventListener('a2:notificacoes-atualizadas', carregar);
-        return () => {
-            clearInterval(timer);
-            window.removeEventListener('a2:notificacoes-atualizadas', carregar);
-        };
-    }, [carregar]);
+    useEffect(() => inscrever(setEstadoSino), []);
 
     const marcarTodas = async () => {
         await api.patch('/notificacoes/lidas').catch(() => {});

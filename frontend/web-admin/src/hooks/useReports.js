@@ -188,6 +188,7 @@ export const useReports = () => {
             document.body.appendChild(link);
             link.click();
             link.remove();
+            setTimeout(() => window.URL.revokeObjectURL(url), 1000); // libera a memória do arquivo
             enqueueSnackbar('Planilha baixada com sucesso!', { variant: 'success' });
         } catch (error) {
             enqueueSnackbar('Falha ao exportar relatório diário XLSX.', { variant: 'error' });
@@ -216,6 +217,7 @@ export const useReports = () => {
             document.body.appendChild(link);
             link.click();
             link.remove();
+            setTimeout(() => window.URL.revokeObjectURL(url), 1000); // libera a memória do arquivo
             enqueueSnackbar('PDF baixado com sucesso!', { variant: 'success' });
         } catch (error) {
             enqueueSnackbar('Falha ao exportar relatório diário em PDF.', { variant: 'error' });
@@ -246,6 +248,7 @@ export const useReports = () => {
             document.body.appendChild(link);
             link.click();
             link.remove();
+            setTimeout(() => window.URL.revokeObjectURL(url), 1000); // libera a memória do arquivo
             enqueueSnackbar('PDF gerado com sucesso!', { variant: 'success' });
         } catch (error) {
             enqueueSnackbar('Falha ao gerar relatório PDF da aba.', { variant: 'error' });
@@ -296,6 +299,7 @@ export const useReports = () => {
             document.body.appendChild(link);
             link.click();
             link.remove();
+            setTimeout(() => window.URL.revokeObjectURL(url), 1000); // libera a memória do arquivo
         } catch (error) {
             enqueueSnackbar('Erro ao exportar arquivo.', { variant: 'error' });
         }
@@ -317,6 +321,7 @@ export const useReports = () => {
             document.body.appendChild(link);
             link.click();
             link.remove();
+            setTimeout(() => window.URL.revokeObjectURL(url), 1000); // libera a memória do arquivo
             enqueueSnackbar('Lista de Presença PDF gerada com sucesso!', { variant: 'success' });
         } catch (error) {
             enqueueSnackbar('Falha ao gerar PDF de presença.', { variant: 'error' });

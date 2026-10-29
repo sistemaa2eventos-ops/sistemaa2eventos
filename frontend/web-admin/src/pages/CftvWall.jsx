@@ -94,18 +94,25 @@ const CftvWall = () => {
             setCameras(camList);
 
             // Se ainda não houver seleção salva, selecionar todas as disponíveis
-            if (selectedCameraIds.length === 0 && camList.length > 0) {
-                const allIds = camList.map(c => c.id);
-                setSelectedCameraIds(allIds);
-                localStorage.setItem('cftv_selected_cameras_ids', JSON.stringify(allIds));
+            // (forma funcional: a seleção não é dependência, senão cada clique baixava a lista de novo)
+            if (camList.length > 0) {
+                setSelectedCameraIds(prev => {
+                    if (prev.length > 0) return prev;
+                    const allIds = camList.map(c => c.id);
+                    localStorage.setItem('cftv_selected_cameras_ids', JSON.stringify(allIds));
+                    return allIds;
+                });
             }
         } catch (err) {
             console.error('Erro ao buscar câmeras do CFTV:', err);
         }
-    }, [eventoId, selectedCameraIds.length]);
+    }, [eventoId]);
 
     useEffect(() => {
         fetchCameras();
+        // Status das câmeras (online/desativada) atualizado a cada minuto, como no Monitor; nada com a aba escondida
+        const t = setInterval(() => { if (!document.hidden) fetchCameras(); }, 60000);
+        return () => clearInterval(t);
     }, [fetchCameras]);
 
     // Salvar Layout

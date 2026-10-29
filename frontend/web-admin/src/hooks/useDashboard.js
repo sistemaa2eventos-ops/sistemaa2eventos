@@ -14,6 +14,7 @@ export const useDashboard = () => {
 
     const timeoutRef = useRef(null);
     const isMountedRef = useRef(true);
+    const atrasadoRef = useRef(false);
 
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -81,6 +82,8 @@ export const useDashboard = () => {
                 setLoading(false);
                 setRefreshing(false);
                 timeoutRef.current = setTimeout(() => {
+                    // Aba escondida: não consulta (16 consultas no servidor); atualiza ao voltar
+                    if (document.hidden) { atrasadoRef.current = true; return; }
                     loadDashboardData();
                 }, 60000);
             }
@@ -127,6 +130,18 @@ export const useDashboard = () => {
         window.addEventListener('refresh-global-data', handleGlobalRefresh);
         return () => window.removeEventListener('refresh-global-data', handleGlobalRefresh);
     }, [refresh]);
+
+    // Voltou para a aba com a atualização pendente: atualiza na hora
+    useEffect(() => {
+        const aoVoltar = () => {
+            if (!document.hidden && atrasadoRef.current) {
+                atrasadoRef.current = false;
+                loadDashboardData();
+            }
+        };
+        document.addEventListener('visibilitychange', aoVoltar);
+        return () => document.removeEventListener('visibilitychange', aoVoltar);
+    }, [loadDashboardData]);
 
     return {
         stats, empresasMetricas, terminaisLista, fluxData, recentCheckins, recentPessoas,

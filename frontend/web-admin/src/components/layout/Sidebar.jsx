@@ -151,6 +151,11 @@ const Sidebar = ({ open, onClose }) => {
         return () => window.removeEventListener('storage', handleStorageChange);
     }, []);
 
+    // changeActiveEvento é recriada a cada render do AuthContext: como dependência, refazia
+    // GET /eventos a cada mudança de estado de autenticação. Lida pela ref, o efeito roda por usuário.
+    const changeActiveEventoRef = React.useRef(changeActiveEvento);
+    changeActiveEventoRef.current = changeActiveEvento;
+
     React.useEffect(() => {
         let isSubscribed = true;
         const fetchEvents = async () => {
@@ -164,8 +169,8 @@ const Sidebar = ({ open, onClose }) => {
                     const salvoExiste = list.some((ev) => ev.id === currentActiveId);
                     if (!salvoExiste && list.length > 0) {
                         const first = list.find((ev) => ev.status === 'ativo') || list[0];
-                        if (changeActiveEvento) {
-                            changeActiveEvento(first.id, first.nome);
+                        if (changeActiveEventoRef.current) {
+                            changeActiveEventoRef.current(first.id, first.nome);
                         } else {
                             localStorage.setItem('active_evento_id', first.id);
                             localStorage.setItem('active_evento_nome', first.nome);
@@ -179,7 +184,7 @@ const Sidebar = ({ open, onClose }) => {
         };
         fetchEvents();
         return () => { isSubscribed = false; };
-    }, [user, changeActiveEvento]);
+    }, [user?.id]);
 
     const handleSubMenuToggle = (text, e) => {
         e.stopPropagation();

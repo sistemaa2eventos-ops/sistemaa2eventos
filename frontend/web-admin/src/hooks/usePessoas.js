@@ -539,6 +539,7 @@ export const usePessoas = () => {
         document.body.appendChild(link); 
         link.click(); 
         document.body.removeChild(link);
+        setTimeout(() => window.URL.revokeObjectURL(url), 1000); // libera a memória do arquivo
       } catch (error) { 
           enqueueSnackbar('Falha ao exportar registros.', { variant: 'error' }); 
       }
