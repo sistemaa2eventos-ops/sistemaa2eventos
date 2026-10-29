@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Backup diário do banco (Supabase/Postgres) na VPS.
+#
+# Instalação (uma vez, na VPS):
+#   1. Criar /root/.backup-banco.env (chmod 600) com:
+#        SUPABASE_DB_URL=postgresql://postgres.<ref>:<senha>@<host>:5432/postgres
+#      (Supabase → Project Settings → Database → Connection string, modo "Session")
+#      Opcional, cópia fora da VPS: RCLONE_DESTINO=r2:nzt-backups
+#   2. crontab -e →  30 3 * * * /root/Projeto_A2_Eventos/scripts/backup-banco.sh >> /var/log/backup-banco.log 2>&1
+#
+# Restaurar (teste em um banco vazio, nunca direto na produção):
+#   docker run --rm -v /root/backups/banco:/b postgres:17-alpine \
+#     pg_restore --no-owner --no-privileges -d "$DESTINO_DB_URL" /b/<arquivo>.dump
+
+set -euo pipefail
+
+ENV_FILE="${BACKUP_ENV_FILE:-/root/.backup-banco.env}"
+PASTA="${BACKUP_PASTA:-/root/backups/banco}"
+DIAS="${BACKUP_DIAS:-14}"
+
+# shellcheck disable=SC1090
+[ -f "$ENV_FILE" ] && source "$ENV_FILE"
+: "${SUPABASE_DB_URL:?Defina SUPABASE_DB_URL em $ENV_FILE}"
+
+mkdir -p "$PASTA"
+ARQUIVO="nzt_$(date +%Y%m%d_%H%M).dump"
+
+echo "[$(date '+%F %T')] Iniciando backup → $PASTA/$ARQUIVO"
+
+# Só o schema public (dados do sistema); auth/storage ficam com o próprio Supabase.
+# pg_dump do Postgres 17 lê bancos 15 e 17.
+docker run --rm -v "$PASTA":/b postgres:17-alpine \
+  pg_dump "$SUPABASE_DB_URL" --format=custom --no-owner --no-privileges \
+  --schema=public --file="/b/$ARQUIVO"
+
+# Arquivo vazio/truncado é falha, não backup
+TAMANHO=$(stat -c %s "$PASTA/$ARQUIVO")
+if [ "$TAMANHO" -lt 10240 ]; then
+  echo "[$(date '+%F %T')] ERRO: backup com apenas $TAMANHO bytes" >&2
+  exit 1
+fi
+
+# Confere se o arquivo é legível pelo pg_restore
+docker run --rm -v "$PASTA":/b postgres:17-alpine pg_restore --list "/b/$ARQUIVO" > /dev/null
+
+if [ -n "${RCLONE_DESTINO:-}" ] && command -v rclone > /dev/null; then
+  rclone copy "$PASTA/$ARQUIVO" "$RCLONE_DESTINO"
+fi
+
+find "$PASTA" -name 'nzt_*.dump' -mtime +"$DIAS" -delete
+echo "[$(date '+%F %T')] Backup ok ($((TAMANHO / 1024)) KB). Mantidos os últimos $DIAS dias."

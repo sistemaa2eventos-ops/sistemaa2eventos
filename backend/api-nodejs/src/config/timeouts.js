@@ -18,6 +18,12 @@ const TIMEOUT_CONFIG = {
   DEVICE_CONNECTION: 15000,
 
   /**
+   * Abrir relé / mensagem no display durante um acesso
+   * A pessoa está parada na catraca: falhar rápido e reverter é melhor que esperar 15 s
+   */
+  DEVICE_FEEDBACK: 5000,
+
+  /**
    * Timeout para snapshot da câmera
    * Dispositivos podem demorar para capturar e enviar imagem
    * 25 segundos: permite captura de qualidade alta

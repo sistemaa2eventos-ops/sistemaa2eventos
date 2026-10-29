@@ -44,14 +44,15 @@ export const UniversalPulseiraInput = ({
         const isTouchMobile = typeof window !== 'undefined' && (
             window.innerWidth < 768 || window.matchMedia?.('(pointer: coarse)').matches
         );
-        if (autoFocus && !isTouchMobile && inputRef.current && !disabled) {
+        // Também ao terminar uma leitura (loading → false): o próximo bip do leitor já cai no campo
+        if (autoFocus && !isTouchMobile && inputRef.current && !disabled && !loading) {
             const timer = setTimeout(() => {
                 inputRef.current?.focus();
                 inputRef.current?.select();
             }, 80);
             return () => clearTimeout(timer);
         }
-    }, [autoFocus, disabled]);
+    }, [autoFocus, disabled, loading]);
 
     // Identificar tipo de pulseira correspondente à faixa numérica
     const tipoPulseiraCorrespondente = useMemo(() => {
@@ -157,7 +158,9 @@ export const UniversalPulseiraInput = ({
                 value={value}
                 onChange={handleChange}
                 onKeyDown={handleKeyDown}
-                disabled={disabled || loading}
+                // Durante a leitura fica só leitura (não desabilitado): desabilitar tira o foco do campo
+                disabled={disabled}
+                inputProps={{ readOnly: loading, 'aria-busy': loading }}
                 placeholder={placeholder}
                 variant="outlined"
                 autoComplete="off"

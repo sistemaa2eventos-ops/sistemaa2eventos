@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { precisaRenovar, podeRenovar, renovarSessao, limparSessao } from './sessao';
 
 let snackbarRef = null;
 
@@ -21,7 +22,13 @@ const api = axios.create({
 });
 
 // Interceptor para adicionar token E evento ativo verificando session e em seguida localStorage
-api.interceptors.request.use((config) => {
+const ROTAS_SEM_RENOVACAO = ['/auth/login', '/auth/refresh', '/auth/logout'];
+const semRenovacao = (config) => ROTAS_SEM_RENOVACAO.some((r) => (config?.url || '').startsWith(r));
+
+api.interceptors.request.use(async (config) => {
+  // Token perto de vencer: renova antes (todas as requisições esperam a mesma renovação)
+  if (!semRenovacao(config) && precisaRenovar()) await renovarSessao();
+
   const token = sessionStorage.getItem('token') || localStorage.getItem('token');
 
   if (token && token !== 'undefined' && token !== 'null') {
@@ -57,7 +64,7 @@ api.interceptors.request.use((config) => {
 // Interceptor para tratar erros de resposta
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     // Silenciar erros de requisições canceladas (ex: navegação rápida)
     if (axios.isCancel(error)) {
       return Promise.reject(error);
@@ -74,8 +81,16 @@ api.interceptors.response.use(
     if (error.response) {
       const status = error.response.status;
 
+      // Token vencido: renova uma vez e repete a requisição antes de mandar para o login
+      if (status === 401 && !error.config?._renovado && !semRenovacao(error.config) && podeRenovar()) {
+        const renovou = await renovarSessao();
+        if (renovou) return api({ ...error.config, _renovado: true });
+        if (renovou === null) return Promise.reject(error); // sem rede: mantém a sessão
+      }
+
       if (status === 401) {
         console.error('Token inválido ou expirado, limpando sessão...');
+        limparSessao();
         sessionStorage.removeItem('token');
         sessionStorage.removeItem('user');
         sessionStorage.removeItem('active_evento_id');

@@ -44,7 +44,7 @@ const Checkin = () => {
     selectedPessoa, setSelectedPessoa,
     checkinResult, resultMessage, loading, manualSaving,
     modoQuiosque, toggleQuiosque,
-    searchQuery, handleSearch, searchResults,
+    searchQuery, handleSearch, searchResults, searchLoading,
     recentLogs, realtimeStats, offlineCount,
     areaId, changeAreaId, eventAreas, pulseiraTypes,
     performCheckin,
@@ -191,7 +191,7 @@ const Checkin = () => {
                             ))}
                         </List>
                     ) : (
-                        searchQuery.length >= 3 && !loading && (
+                        searchQuery.length >= 3 && !searchLoading && (
                             <Typography variant="body2" sx={{ textAlign: 'center', opacity: 0.6, my: 2 }}>
                                 Ninguém encontrado para &quot;{searchQuery}&quot;.
                             </Typography>

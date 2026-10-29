@@ -29,6 +29,9 @@ export const useCheckin = (defaultMode, options = {}) => {
     const [operationMode, setOperationMode] = useState(defaultMode || localStorage.getItem('nzt_op_mode') || 'auto');
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
+    const [searchLoading, setSearchLoading] = useState(false);
+    const searchTimerRef = useRef(null);
+    const searchAbortRef = useRef(null);
     const [eventModules, setEventModules] = useState([]);
     const [recentLogs, setRecentLogs] = useState([]);
     const [offlineCount, setOfflineCount] = useState(0);
@@ -70,6 +73,13 @@ export const useCheckin = (defaultMode, options = {}) => {
     const updateOfflineCount = useCallback(async () => {
         const count = await localCheckinService.getPendenteCount();
         setOfflineCount(count);
+    }, []);
+
+    // Contador de pendências acompanha a fila (inclusive quando ela sobe sozinha)
+    useEffect(() => {
+        const aoMudar = (e) => setOfflineCount(e.detail?.count ?? 0);
+        window.addEventListener('sync-status-changed', aoMudar);
+        return () => window.removeEventListener('sync-status-changed', aoMudar);
     }, []);
 
     const carregarSessaoAtiva = useCallback(async () => {
@@ -269,24 +279,36 @@ export const useCheckin = (defaultMode, options = {}) => {
     }, [loadInitialData, updateOfflineCount]);
 
     // Actions
-    const handleSearch = async (val) => {
+    // Busca com carregamento próprio (não trava o campo do leitor), espera 300 ms entre teclas
+    // e cancela a anterior: uma resposta lenta não sobrescreve um resultado mais novo.
+    const handleSearch = (val) => {
         setSearchQuery(val);
+        clearTimeout(searchTimerRef.current);
+        searchAbortRef.current?.abort();
         if (val.length < 3) {
             setSearchResults([]);
+            setSearchLoading(false);
             return;
         }
-        try {
-            setLoading(true);
-            const res = await api.get('/pessoas/search', { params: { q: val, evento_id: eventoId } });
-            if (res.data.success) {
-                setSearchResults(res.data.data);
+        setSearchLoading(true);
+        searchTimerRef.current = setTimeout(async () => {
+            const controller = new AbortController();
+            searchAbortRef.current = controller;
+            try {
+                const res = await api.get('/pessoas/search', { params: { q: val, evento_id: eventoId }, signal: controller.signal });
+                if (res.data.success) setSearchResults(res.data.data);
+            } catch (error) {
+                if (error.name !== 'CanceledError' && error.code !== 'ERR_CANCELED') console.error('Erro na busca:', error);
+            } finally {
+                if (searchAbortRef.current === controller) setSearchLoading(false);
             }
-        } catch (error) {
-            console.error('Erro na busca:', error);
-        } finally {
-            setLoading(false);
-        }
+        }, 300);
     };
+
+    useEffect(() => () => {
+        clearTimeout(searchTimerRef.current);
+        searchAbortRef.current?.abort();
+    }, []);
 
     const handleSelectPessoa = (pessoa) => {
         setSelectedPessoa(pessoa);
@@ -327,17 +349,39 @@ export const useCheckin = (defaultMode, options = {}) => {
         }
     };
 
+    // Acesso guardado no aparelho (servidor fora): libera a fila da recepção e avisa o operador
+    const mostrarSalvoOffline = (mensagem) => {
+        tocarBipeNotificacao();
+        setCheckinResult('sucesso');
+        setResultMessage(mensagem || 'Sem conexão: acesso salvo neste aparelho.');
+        updateOfflineCount();
+        clearTimeout(resetTimerRef.current);
+        resetTimerRef.current = setTimeout(() => {
+            setSelectedPessoa(null);
+            setCheckinResult(null);
+            setResultMessage('');
+            setSearchResults([]);
+            setSearchQuery('');
+        }, 3000);
+    };
+
     const executarLeituraRapida = async (codigo, tipoForcado = null, metodoForcado = 'barcode') => {
         if (!codigo || !eventoId) return { success: false, error: 'Código ou evento ausente' };
         const tipoFinal = tipoForcado || (defaultMode === 'checkout' ? 'checkout' : 'checkin');
         try {
             setLoading(true);
-            const res = await api.post('/access/leitor-rapido', {
+            // Pela fila offline: sem servidor, o acesso fica no aparelho e sobe sozinho depois
+            const res = await localCheckinService.enviar('/access/leitor-rapido', {
                 codigo,
                 tipo: tipoFinal,
                 area_id: areaId,
                 metodo: metodoForcado
-            });
+            }, 'leitor-rapido');
+
+            if (res.status === 'local') {
+                mostrarSalvoOffline(res.message);
+                return { success: true, offline: true };
+            }
 
             if (res.data?.success) {
                 const data = res.data.data;
@@ -421,11 +465,11 @@ export const useCheckin = (defaultMode, options = {}) => {
                 }
             } else if (metodo === 'pulseira') {
                 // CREDENCIAMENTO via BARCODE/PULSEIRA: endpoint que vincula áreas + auto check-in
-                res = await api.post(`/access/credenciar-pulseira`, {
+                res = await localCheckinService.enviar('/access/credenciar-pulseira', {
                     pessoa_id: targetPessoa.id,
                     numero_pulseira: extraValue,
                     area_id: areaId
-                });
+                }, 'credenciar-pulseira');
             } else {
                 // CHECK-IN MANUAL ou QRCODE
                 const payload = {
@@ -445,6 +489,11 @@ export const useCheckin = (defaultMode, options = {}) => {
             }
 
             const finalData = res.data?.data || res.data || res;
+
+            if (res.status === 'local') {
+                mostrarSalvoOffline(res.message);
+                return;
+            }
 
             if (res.status === 'erro_negocio' || (finalData && finalData.tipo === 'negado')) {
                 setCheckinResult('negado');
@@ -481,15 +530,20 @@ export const useCheckin = (defaultMode, options = {}) => {
     const handleLinkPulseiraAndCheckin = async (pessoaId, tipoPulseiraId, numeroPulseira) => {
         try {
             setManualSaving(true);
-            const res = await api.post('/access/credenciar-pulseira', {
+            const res = await localCheckinService.enviar('/access/credenciar-pulseira', {
                 pessoa_id: pessoaId,
                 tipo_pulseira_id: tipoPulseiraId,
                 numero_pulseira: numeroPulseira,
                 area_id: areaId,
                 dispositivoId: 'web-dashboard'
-            });
+            }, 'credenciar-pulseira');
 
-            if (res.data?.success || res.status === 200) {
+            if (res.status === 'local') {
+                mostrarSalvoOffline(res.message);
+                return true;
+            }
+
+            if (res.data?.success) {
                 setCheckinResult('sucesso');
                 setResultMessage('Pulseira vinculada e Entrada autorizada!');
             }
@@ -555,7 +609,7 @@ export const useCheckin = (defaultMode, options = {}) => {
         operationMode, changeOperationMode,
         modoQuiosque, toggleQuiosque,
         searchQuery, setSearchQuery, handleSearch,
-        searchResults, setSearchResults,
+        searchResults, setSearchResults, searchLoading,
         eventModules, rfidInputRef,
         recentLogs, offlineCount, realtimeStats,
         refreshLogs,

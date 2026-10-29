@@ -246,6 +246,19 @@ const PORT = process.env.PORT || 3001;
 const server = http.createServer(app);
 logger.info('🌐 Modulo: HTTP ativo (Terminação SSL gerada pelo Nginx / Reverse Proxy)');
 
+const { protegerProcesso } = require('./utils/processo');
+const encerrarProcesso = protegerProcesso({
+    nome: 'API',
+    server,
+    websocket: websocketService,
+    Sentry,
+    aoEncerrar: [
+        () => { for (const t of require('node-cron').getTasks().values()) t.stop(); },
+        () => { cloudSyncWorker.isRunning = false; },
+        () => require('./services/queue.service').getClient()?.quit(),
+    ]
+});
+
 server.listen(PORT, async () => {
     logger.info(`🚀 Servidor rodando na porta ${PORT}`);
 
@@ -256,14 +269,18 @@ server.listen(PORT, async () => {
         agentService.init(websocketService.io);
         // Alertas das câmeras com o painel fechado (agente local ou motor no próprio servidor)
         require('./modules/system/vigilancia.service').iniciar();
-
-        await testConnection();
-        await testPgConnection();
         syncScheduler.start();
         cloudSyncWorker.start();
         healthService.start();
         cronController.start();
     } catch (err) {
-        logger.error('❌ Erro no boot:', err.message);
+        // Sem WebSocket/rotinas a API parece saudável mas não funciona: sai para o Docker reiniciar
+        logger.error(`❌ Erro no boot, reiniciando: ${err.stack || err.message}`);
+        encerrarProcesso('erro no boot', 1);
+        return;
     }
+
+    // Testes de banco legados (MSSQL/edge desligados) só informam, não derrubam
+    await testConnection().catch(e => logger.warn(`Teste MSSQL: ${e.message}`));
+    await testPgConnection().catch(e => logger.warn(`Teste edge: ${e.message}`));
 });

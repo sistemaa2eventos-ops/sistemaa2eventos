@@ -5,6 +5,7 @@ const cacheService = require('../../services/cacheService');
 const ValidationService = require('./services/validation.service');
 const DatabaseService = require('./services/database.service');
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STATS_TTL_MS = 3000;
 const statsCache = new Map(); // evento_id -> { em, promessa }
 
@@ -61,7 +62,9 @@ class CheckinService {
             const validation = await ValidationService.validateAccessRules(evento_id, pessoa, tipoFinal, metodo, timestamp, accessData.confianca, area_id);
             
             // 4. Sucesso: Persistir no Banco de Dados
-            const logId = require('uuid').v4();
+            // sync_id do painel vira o id do log: o reenvio da fila offline (ou de um timeout que
+            // na verdade gravou) cai na duplicidade e não gera um segundo acesso.
+            const logId = UUID_RE.test(sync_id || '') ? sync_id : require('uuid').v4();
             const new_status = tipoFinal === 'checkin' ? 'checkin_feito' : 'checkout_feito'; // FIX C-09: 'presente'/'saiu' violavam CHECK constraint
 
             const result = await DatabaseService.registerAccessTransaction(

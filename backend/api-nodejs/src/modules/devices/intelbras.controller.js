@@ -2,6 +2,7 @@ const checkinService = require('../checkin/checkin.service');
 const logger = require('../../services/logger');
 const { supabase } = require('../../config/supabase');
 const websocketService = require('../../services/websocketService');
+const IntelbrasService = require('./intelbras.service');
 
 class IntelbrasController {
     /**
@@ -28,6 +29,10 @@ class IntelbrasController {
             if (eventData.Events && Array.isArray(eventData.Events)) events = eventData.Events;
             else if (eventData.Action && eventData.Code && eventData.Data) events = [eventData];
             else return res.json({ success: true });
+
+            // Relé e display rodam DEPOIS de responder: o leitor não fica esperando o hardware
+            // (o nginx corta em 15 s e o firmware pode reenviar o push → acesso em dobro).
+            const feedbacks = [];
 
             for (const event of events) {
                 const { Code, Data } = event;
@@ -187,12 +192,8 @@ class IntelbrasController {
 
                     if (isEstacaoExclusivaCredenciamento) {
                         if (deviceAuth) {
-                            try {
-                                const IntelbrasService = require('./intelbras.service');
-                                const service = new IntelbrasService(deviceAuth);
-                                const primeiroNome = (pessoa.nome_completo || pessoa.nome || '').split(' ')[0] || 'COLABORADOR';
-                                await service.displayMessage(`ACESSO LIBERADO\n${primeiroNome}`);
-                            } catch (_) {}
+                            const primeiroNome = (pessoa.nome_completo || pessoa.nome || '').split(' ')[0] || 'COLABORADOR';
+                            feedbacks.push(() => IntelbrasService.paraDispositivo(deviceAuth).displayMessage(`ACESSO LIBERADO\n${primeiroNome}`));
                         }
                         continue;
                     }
@@ -238,10 +239,9 @@ class IntelbrasController {
                         offline_timestamp: offlineTimestamp
                     });
 
-                    // 4. Feedback no Hardware (Relé e Display)
-                    if (deviceAuth) {
-                        const IntelbrasService = require('./intelbras.service');
-                        const service = new IntelbrasService(deviceAuth);
+                    // 4. Feedback no Hardware (Relé e Display), depois da resposta ao leitor
+                    if (deviceAuth) feedbacks.push(async () => {
+                        const service = IntelbrasService.paraDispositivo(deviceAuth);
 
                         const nomePessoa = pessoa.nome_completo || pessoa.nome || 'COLABORADOR';
                         const primeiroNome = nomePessoa.split(' ')[0] || 'COLABORADOR';
@@ -274,7 +274,7 @@ class IntelbrasController {
                             await service.displayMessage(`NEGADO: ${result.error || 'ERRO'}`);
                             logger.warn(`🛑 [Intelbras] Acesso Negado para ${nomePessoa}: ${result.error}`);
                         }
-                    }
+                    });
 
                 } catch (accessError) {
                     logger.error(`[Intelbras] Crítico ao processar registrarAcesso: ${accessError.message}`);
@@ -282,6 +282,10 @@ class IntelbrasController {
             }
 
             res.json({ success: true });
+
+            for (const feedback of feedbacks) {
+                await feedback().catch(e => logger.error(`[Intelbras] Falha no feedback do hardware: ${e.message}`));
+            }
         } catch (error) {
             logger.error('❌ [Intelbras] Erro ao processar push:', error);
             res.status(500).json({ error: 'Erro interno' });

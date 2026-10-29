@@ -1,3 +1,5 @@
+import { iniciarAtualizacaoAutomatica, acompanharServiceWorker } from './utils/atualizacaoApp';
+
 // Intercept browser extension errors to prevent console noise (harmless to application)
 window.addEventListener('error', (event) => {
     const message = event.message || '';
@@ -15,6 +17,9 @@ window.addEventListener('unhandledrejection', (event) => {
     }
 }, true);
 
+// Deploy novo com a aba aberta: recarrega sozinho (utils/atualizacaoApp.js)
+iniciarAtualizacaoAutomatica();
+
 // Migração de Service Worker: remove o /sw.js antigo (que ficou em cache no Cloudflare) e registra o /sw-v2.js
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
@@ -26,7 +31,8 @@ if ('serviceWorker' in navigator) {
                     await reg.unregister();
                 }
             }
-            await navigator.serviceWorker.register('/sw-v2.js', { updateViaCache: 'none' });
+            const registro = await navigator.serviceWorker.register('/sw-v2.js', { updateViaCache: 'none' });
+            acompanharServiceWorker(registro);
         } catch (err) {
             console.warn('SW setup warning:', err);
         }

@@ -44,32 +44,39 @@ class DatabaseService {
         
         let rpcResult = { success: true };
 
+        const numero_pulseira = pessoa?.numero_pulseira || payload?.numero_pulseira || null;
+        const log = {
+            id: logId, evento_id, pessoa_id, tipo, metodo,
+            dispositivo_id, confianca, foto_capturada, area_id,
+            numero_pulseira,
+            observacao: observacao || null,
+            created_at: timestamp.toISOString(),
+            created_by
+        };
+
+        let insertErr = null;
         try {
-            const numero_pulseira = pessoa?.numero_pulseira || payload?.numero_pulseira || null;
-            const { error: insertErr } = await supabase
-                .from('logs_acesso')
-                .insert([{
-                    id: logId, evento_id, pessoa_id, tipo, metodo,
-                    dispositivo_id, confianca, foto_capturada, area_id,
-                    numero_pulseira,
-                    observacao: observacao || null,
-                    created_at: timestamp.toISOString(),
-                    created_by
-                }]);
-
-            // Ignorar erro de duplicidade (ON CONFLICT equivalente)
-            if (insertErr && insertErr.code !== '23505') throw insertErr;
-            if (insertErr?.code === '23505') return { success: true, already_done: true };
-
-            if (pessoa.status_acesso !== new_status) {
-                await supabase
-                    .from('pessoas')
-                    .update({ status_acesso: new_status, atualizado_em: new Date().toISOString() })
-                    .eq('id', pessoa_id);
-            }
+            ({ error: insertErr } = await supabase.from('logs_acesso').insert([log]));
         } catch (error) {
-            if (error.code === '23505') return { success: true, already_done: true };
-            throw error;
+            insertErr = error; // timeout/rede
+        }
+
+        // Ignorar erro de duplicidade (ON CONFLICT equivalente)
+        if (insertErr?.code === '23505') return { success: true, already_done: true };
+
+        if (insertErr) {
+            // Plano B: acesso já validado não pode se perder porque o Supabase oscilou.
+            // O CloudSyncWorker regrava o log e aplica o status da pessoa quando ele voltar.
+            const naFila = await queueService.publishLogToCloud({ ...log, _status_pessoa: new_status });
+            if (!naFila) throw insertErr;
+            logger.error(`Log ${logId} não gravado no Supabase; foi para a fila de retentativa: ${insertErr.message}`);
+            rpcResult.na_fila = true;
+        } else if (pessoa.status_acesso !== new_status) {
+            const { error: statusErr } = await supabase
+                .from('pessoas')
+                .update({ status_acesso: new_status, atualizado_em: new Date().toISOString() })
+                .eq('id', pessoa_id);
+            if (statusErr) logger.error(`Falha ao atualizar status da pessoa ${pessoa_id} para ${new_status}: ${statusErr.message}`);
         }
 
         rpcResult.log_id = logId;
@@ -86,7 +93,7 @@ class DatabaseService {
         }
 
         // O log já foi gravado direto no Supabase acima; republicar no Redis só o regravava.
-        logger.info(`💾 Log ${logId} salvo.`);
+        logger.debug(`💾 Log ${logId} salvo.`);
 
         return rpcResult;
     }

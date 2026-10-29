@@ -5,6 +5,8 @@ const { TIMEOUT_CONFIG } = require('../../config/timeouts');
 const { getHwUserId } = require('./hwUserId');
 const { getNowLocal } = require('../../utils/dateUtils');
 
+const INSTANCIAS = new Map();
+
 class IntelbrasService extends AccessDevice {
     constructor(config) {
         super(config);
@@ -14,6 +16,23 @@ class IntelbrasService extends AccessDevice {
         this.pass = config.password_device || config.password || config.senha || process.env.INTELBRAS_DEFAULT_PASS || 'admin123';
         this.baseUrl = `http://${this.ip}:${this.port}`;
         this.digestClient = null;
+    }
+
+    /**
+     * Instância reaproveitada por leitor: mantém o cliente Digest (e o nonce),
+     * evitando a ida extra do desafio 401 a cada acesso.
+     */
+    static paraDispositivo(config) {
+        const chave = [config.id, config.ip_address || config.ip, config.porta || config.port,
+            config.user_device || config.user || config.usuario, config.password_device || config.password || config.senha,
+            config.agent_id].join('|');
+        let inst = INSTANCIAS.get(chave);
+        if (!inst) {
+            if (INSTANCIAS.size > 200) INSTANCIAS.clear();
+            inst = new IntelbrasService(config);
+            INSTANCIAS.set(chave, inst);
+        }
+        return inst;
     }
 
     async getDigestClient() {
@@ -108,9 +127,9 @@ class IntelbrasService extends AccessDevice {
     /**
      * Faz uma requisição GET autenticada com Digest Auth
      */
-    async _get(path, params = {}) {
+    async _get(path, params = {}, { timeoutMs = TIMEOUT_CONFIG.DEVICE_CONNECTION } = {}) {
         logger.debug('Intelbras GET request', { device_ip: this.ip, path, user: this.user, via_agente: !!this.config?.agent_id });
-        const r = await this._request('GET', path, params, null, null, { timeoutMs: TIMEOUT_CONFIG.DEVICE_CONNECTION });
+        const r = await this._request('GET', path, params, null, null, { timeoutMs });
         if (!r.ok) {
             // 400 é a resposta normal do firmware para "não encontrado" (ex.: _userExists)
             const log = r.status === 400 ? logger.debug : logger.error;
@@ -325,7 +344,7 @@ class IntelbrasService extends AccessDevice {
      */
     async displayMessage(text, duration = 3) {
         try {
-            logger.info('Displaying message on device', { device_ip: this.ip, message: text, duration_seconds: duration });
+            logger.debug('Displaying message on device', { device_ip: this.ip, message: text, duration_seconds: duration });
 
             // Dahua/Intelbras VSP (Video Station Protocol)
             // Muitos leitores Bio T aceitam overlay de texto via Log/Eventos
@@ -336,7 +355,8 @@ class IntelbrasService extends AccessDevice {
                 'VideoWidget[0].CustomText[0].Enable': 'true'
             };
 
-            await this._get('/cgi-bin/configManager.cgi', params);
+            // Mensagem é cosmética: não pode segurar o fluxo do acesso por 15 s
+            await this._get('/cgi-bin/configManager.cgi', params, { timeoutMs: TIMEOUT_CONFIG.DEVICE_FEEDBACK });
 
             // Se duracao > 0, agenda a limpeza
             if (duration > 0) {
@@ -417,7 +437,7 @@ class IntelbrasService extends AccessDevice {
             await this._get('/cgi-bin/accessControl.cgi', {
                 action: 'openDoor',
                 Channel: 1
-            });
+            }, { timeoutMs: TIMEOUT_CONFIG.DEVICE_FEEDBACK });
             return true;
         } catch (error) {
             logger.error({ err: error, device_ip: this.ip }, 'Failed to open door');

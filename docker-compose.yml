@@ -1,8 +1,16 @@
+# Sem limite, o log do Docker cresce para sempre e pode encher o disco da VPS
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
 services:
   # postgres_edge (banco local "Edge") removido em 2026-10-10: estava vazio e o backend grava tudo
   # direto no Supabase. Para voltar a usá-lo: recriar o serviço e definir EDGE_DB_ENABLED=true.
 
   redis:
+    logging: *logging
     image: redis:7-alpine
     container_name: a2_eventos_redis
     restart: unless-stopped
@@ -23,10 +31,12 @@ services:
           memory: 1G
 
   api:
+    logging: *logging
     build:
       context: ./backend/api-nodejs
     container_name: a2_eventos_api
     restart: unless-stopped
+    stop_grace_period: 30s
     ports:
       - "127.0.0.1:3001:3001" # acesso externo só pelo Nginx (gateway)
     depends_on:
@@ -55,13 +65,16 @@ services:
           memory: 512M
 
   api_intelbras:
+    logging: *logging
     build:
       context: ./backend/api-nodejs
     container_name: a2_eventos_api_intelbras
     restart: unless-stopped
     ports:
       - "127.0.0.1:3003:3002" # leitores chegam via Nginx (leitores.nzt.app.br)
-    command: npm run start:intelbras
+    # node direto (sem npm) para receber o SIGTERM e terminar os acessos em andamento
+    command: ["node", "src/intelbras-app.js"]
+    stop_grace_period: 30s
     depends_on:
       redis:
         condition: service_healthy
@@ -89,6 +102,7 @@ services:
           memory: 256M
 
   gateway:
+    logging: *logging
     build:
       context: ./gateway
     container_name: a2_eventos_gateway
@@ -110,6 +124,7 @@ services:
       - a2_net
 
   frontend:
+    logging: *logging
     build:
       context: ./frontend/web-admin
     container_name: a2_eventos_admin_web
@@ -134,6 +149,7 @@ services:
 
   # Portal público de cadastro (cadastro.nzt.app.br): empresas cadastram a equipe pelo link de convite
   cadastro:
+    logging: *logging
     build:
       context: ./frontend/public-web
     container_name: a2_eventos_portal

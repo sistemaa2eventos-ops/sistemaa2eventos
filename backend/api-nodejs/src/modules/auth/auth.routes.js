@@ -8,7 +8,7 @@ const authCache = require('../../services/authCache');
 
 // Alterações de usuário (papel, status, evento ativo, e-mail, logout...) limpam o cache de
 // validação de token na hora, para valerem já na próxima requisição.
-const ROTAS_SEM_INVALIDACAO = ['/login', '/register', '/forgot-password', '/definir-senha'];
+const ROTAS_SEM_INVALIDACAO = ['/login', '/register', '/forgot-password', '/definir-senha', '/refresh'];
 router.use((req, res, next) => {
     if (req.method === 'GET' || ROTAS_SEM_INVALIDACAO.includes(req.path)) return next();
     res.on('finish', () => {
@@ -27,6 +27,7 @@ router.post('/login', rateLimiter.auth, validateLogin, authController.login);
 router.post('/register', rateLimiter.auth, validateRegister, authController.register);
 router.post('/forgot-password', rateLimiter.auth, (req, res) => authController.forgotPassword(req, res));
 router.post('/definir-senha', rateLimiter.auth, authController.definirSenha); // link do e-mail (convite / esqueci a senha)
+router.post('/refresh', rateLimiter.public, (req, res) => authController.refreshSession(req, res));
 
 // ============================================
 // ROTAS DE CONVITE (apenas admin_master)

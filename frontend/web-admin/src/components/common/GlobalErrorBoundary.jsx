@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Typography, Button, Container } from '@mui/material';
 import { ErrorOutline as ErrorIcon } from '@mui/icons-material';
+import { ehErroDeVersao, recarregarUmaVez } from '../../utils/atualizacaoApp';
 
 class GlobalErrorBoundary extends React.Component {
     constructor(props) {
@@ -13,6 +14,8 @@ class GlobalErrorBoundary extends React.Component {
     }
 
     componentDidCatch(error, errorInfo) {
+        // Tela de versão antiga (deploy com a aba aberta): recarrega em vez de mostrar erro
+        if (ehErroDeVersao(error) && recarregarUmaVez()) return;
         console.error('🔴 Critical UI Crash:', error, errorInfo);
     }
 

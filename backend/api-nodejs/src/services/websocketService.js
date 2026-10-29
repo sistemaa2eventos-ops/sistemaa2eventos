@@ -40,6 +40,15 @@ class WebSocketService {
             try {
                 this.pubClient = createClient({ url: redisUrl });
                 this.subClient = this.pubClient.duplicate();
+                // Sem escuta de 'error', uma queda do Redis lança exceção e derruba o processo
+                let avisou = false;
+                for (const c of [this.pubClient, this.subClient]) {
+                    c.on('error', (err) => {
+                        if (!avisou) logger.warn(`⚠️ [WebSocket] Redis Pub/Sub indisponível (reconectando): ${err.message}`);
+                        avisou = true;
+                    });
+                    c.on('ready', () => { avisou = false; });
+                }
                 await Promise.all([this.pubClient.connect(), this.subClient.connect()]);
                 this.io.adapter(createAdapter(this.pubClient, this.subClient));
                 this.redisEnabled = true;

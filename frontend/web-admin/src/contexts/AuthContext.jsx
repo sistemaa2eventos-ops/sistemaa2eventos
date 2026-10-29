@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { authService } from '../services/auth';
 import api from '../services/api';
+import { guardarSessao, limparSessao } from '../services/sessao';
 
 const log = import.meta.env.DEV ? console.log : () => {};
 
@@ -66,6 +67,7 @@ const clearAuthStorage = () => {
     localStorage.removeItem(key);
     sessionStorage.removeItem(key);
   });
+  limparSessao();
 };
 
 const readStoredUser = () => {
@@ -232,7 +234,10 @@ export const AuthProvider = ({ children }) => {
 
         secondary.removeItem('token');
         secondary.removeItem('user');
+        limparSessao();
         if (payloadToken) primary.setItem('token', payloadToken);
+        // refresh_token + validade: o painel renova a sessão sozinho (services/sessao.js)
+        if (response.session) guardarSessao(response.session, primary);
         primary.setItem('user', JSON.stringify(finalUser));
 
         // Para outros cargos, vincula o evento ativo (produção)

@@ -67,16 +67,25 @@ app.use(errorHandler);
 // A porta do Worker será passada pelo docker-compose (ex: 3002)
 const PORT = process.env.PORT || 3002;
 
+const websocketService = require('./services/websocketService');
+const { protegerProcesso } = require('./utils/processo');
+protegerProcesso({
+    nome: 'INTELBRAS-WORKER',
+    server: httpServer,
+    websocket: websocketService,
+    Sentry,
+    aoEncerrar: [() => require('./services/queue.service').getClient()?.quit()]
+});
+
 httpServer.listen(PORT, async () => {
     logger.info(`🤖 [INTELBRAS-WORKER] Servidor Dedicado rodando na porta ${PORT}`);
-    
+
     // Testa apenas o banco, sem carregar cronjobs
-    await testConnection();
+    await testConnection().catch(e => logger.warn(`Teste MSSQL: ${e.message}`));
 
     // WebSocket com adaptador Redis: os eventos emitidos aqui (credenciamento_abrir,
     // new_access) chegam aos painéis conectados na API principal. Sem isso, em produção
     // (nginx envia /api/intelbras para este worker) o modal do credenciamento não abre.
-    const websocketService = require('./services/websocketService');
     await websocketService.init(httpServer);
     if (!websocketService.redisEnabled) {
         logger.warn('⚠️ [INTELBRAS-WORKER] WebSocket sem Redis: eventos em tempo real NÃO chegarão ao painel. Defina USE_REDIS=true e REDIS_HOST.');

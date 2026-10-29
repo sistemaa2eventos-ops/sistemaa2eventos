@@ -19,6 +19,14 @@ console.log(`📌 URL: ${process.env.SUPABASE_URL}`);
 console.log(`📌 Anon Key: ✅ carregada`);
 console.log(`📌 Service Role: ✅ carregada`);
 
+// Sem limite, uma chamada travada ao Supabase prendia o check-in por até ~5 min
+// (o leitor e o nginx desistem bem antes). Respeita um signal já informado.
+const SUPABASE_TIMEOUT_MS = parseInt(process.env.SUPABASE_TIMEOUT_MS || '10000', 10);
+const fetchComTimeout = (url, opcoes = {}) => fetch(url, {
+    ...opcoes,
+    signal: opcoes.signal || AbortSignal.timeout(SUPABASE_TIMEOUT_MS)
+});
+
 // ============================================
 // CLIENTE 1: Com service_role (para backend)
 // TEM ACESSO TOTAL - USAR COM CUIDADO!
@@ -34,7 +42,8 @@ const supabase = createClient(
         },
         db: {
             schema: 'public'
-        }
+        },
+        global: { fetch: fetchComTimeout }
     }
 );
 
@@ -49,7 +58,8 @@ const supabasePublic = createClient(
         auth: {
             autoRefreshToken: true,
             persistSession: true
-        }
+        },
+        global: { fetch: fetchComTimeout }
     }
 );
 
@@ -240,7 +250,8 @@ function createClientForUser(token) {
             global: {
                 headers: {
                     Authorization: `Bearer ${token}`
-                }
+                },
+                fetch: fetchComTimeout
             },
             auth: {
                 persistSession: false,

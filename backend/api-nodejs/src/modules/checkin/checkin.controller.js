@@ -570,7 +570,7 @@ class AccessController {
      */
     async leitorRapido(req, res) {
         try {
-            const { codigo, tipo = 'checkin', area_id, metodo = 'barcode' } = req.body;
+            const { codigo, tipo = 'checkin', area_id, metodo = 'barcode', sync_id, offline_timestamp } = req.body;
             const eventoId = req.event?.id || req.headers['x-evento-id'] || req.query.evento_id;
             const supabaseClient = req.supabase || supabase;
 
@@ -634,7 +634,8 @@ class AccessController {
                 metodo: metodo || 'barcode',
                 dispositivo_id: 'web-dashboard',
                 created_by: req.user?.id,
-                area_id: area_id || null
+                area_id: area_id || null,
+                sync_id, offline_timestamp
             });
 
             if (result.error) return ApiResponse.error(res, result.error, result.status || 400);
@@ -671,7 +672,7 @@ class AccessController {
     // ============================================
     async credenciarPulseira(req, res) {
         try {
-            const { pessoa_id, numero_pulseira, area_id } = req.body;
+            const { pessoa_id, numero_pulseira, area_id, sync_id, offline_timestamp } = req.body;
             const eventoId = req.event?.id;
             const supabaseClient = req.supabase || supabase;
 
@@ -717,7 +718,8 @@ class AccessController {
                     metodo: 'manual',
                     dispositivo_id: 'web-dashboard',
                     created_by: req.user?.id,
-                    area_id: area_id || null
+                    area_id: area_id || null,
+                    sync_id, offline_timestamp
                 });
 
                 if (result.error) return ApiResponse.error(res, result.error, result.status || 400);
@@ -828,6 +830,7 @@ class AccessController {
                 dispositivo_id: 'web-dashboard',
                 created_by: req.user?.id,
                 area_id: area_id || null,
+                sync_id, offline_timestamp,
                 // Marca o log para não contar no anti-passback dos leitores faciais
                 observacao: require('./services/validation.service').MARCADOR_CREDENCIAMENTO
             });

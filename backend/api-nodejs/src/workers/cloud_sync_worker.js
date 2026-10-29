@@ -105,14 +105,17 @@ class CloudSyncWorker {
         let logData = null;
         try {
             logData = JSON.parse(payloadMap.payload_json);
-            const cloudPayload = { ...logData };
-            delete cloudPayload.pessoas; // remover relações se houver
+            const { pessoas, _status_pessoa, ...cloudPayload } = logData; // remover relações e metadados
 
             const { error } = await supabase.from('logs_acesso').upsert(cloudPayload, {
                 onConflict: 'id',
                 ignoreDuplicates: true
             });
             if (error) throw error;
+
+            // Acesso liberado que caiu na fila: aplica também o status da pessoa
+            // (só se não houver acesso mais novo dela — senão desfaria uma saída posterior).
+            if (_status_pessoa && cloudPayload.pessoa_id) await this.aplicarStatusPessoa(cloudPayload, _status_pessoa);
 
             await this.client.xAck(queueService.UP_STREAM_KEY, queueService.CONSUMER_GROUP, id);
             logger.info(`✅ [CloudSyncWorker] Log ${logData.id} regravado no Supabase.`);
@@ -127,6 +130,24 @@ class CloudSyncWorker {
                 logger.warn(`⚠️ [CloudSyncWorker] Falha temporária no log (msg ${id}), nova tentativa em ~1 min: ${error.message}`);
             }
         }
+    }
+
+    async aplicarStatusPessoa(log, status) {
+        const { data: maisNovo, error: buscaErr } = await supabase
+            .from('logs_acesso')
+            .select('id')
+            .eq('pessoa_id', log.pessoa_id)
+            .neq('tipo', 'negado')
+            .gt('created_at', log.created_at)
+            .limit(1);
+        if (buscaErr) throw buscaErr;
+        if (maisNovo?.length) return;
+
+        const { error: statusErr } = await supabase
+            .from('pessoas')
+            .update({ status_acesso: status, atualizado_em: new Date().toISOString() })
+            .eq('id', log.pessoa_id);
+        if (statusErr) throw statusErr;
     }
 }
 

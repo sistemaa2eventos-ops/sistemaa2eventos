@@ -513,6 +513,44 @@ class AuthController {
     }
 
     /**
+     * Renova a sessão com o refresh_token (o painel chama antes de o token vencer
+     * ou ao receber 401), para o operador não cair no login no meio do turno.
+     */
+    async refreshSession(req, res) {
+        try {
+            const refreshToken = req.body?.refresh_token;
+            if (!refreshToken || typeof refreshToken !== 'string') {
+                return res.status(400).json({ error: 'refresh_token obrigatório' });
+            }
+
+            // Cliente sem sessão guardada: o supabasePublic persiste a do último uso
+            const { createClient } = require('@supabase/supabase-js');
+            const cliente = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+                auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+            });
+            const { data, error } = await cliente.auth.refreshSession({ refresh_token: refreshToken });
+            if (error || !data?.session) {
+                return res.status(401).json({ error: 'Sessão expirada. Entre novamente.' });
+            }
+
+            const { data: perfil } = await supabase
+                .from('perfis')
+                .select('status')
+                .eq('id', data.user.id)
+                .maybeSingle();
+            if (perfil?.status === 'inativo' || perfil?.status === 'pendente') {
+                await supabase.auth.admin.signOut(data.session.access_token, 'local').catch(() => {});
+                return res.status(403).json({ error: 'Usuário sem acesso ao sistema.' });
+            }
+
+            res.json({ success: true, session: data.session });
+        } catch (error) {
+            logger.error(`Erro ao renovar sessão: ${error.message}`);
+            res.status(500).json({ error: 'Erro ao renovar sessão' });
+        }
+    }
+
+    /**
      * Logout
      */
     async logout(req, res) {
