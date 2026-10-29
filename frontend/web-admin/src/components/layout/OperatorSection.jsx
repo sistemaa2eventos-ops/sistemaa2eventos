@@ -53,59 +53,34 @@ const TempoNoTurno = React.memo(({ loginKey, formato = 'curto' }) => {
 });
 TempoNoTurno.displayName = 'TempoNoTurno';
 
-// --- PALETA DE AVATARES TÁTICOS (SVG DATA URIS) ---
+// --- PALETA DE AVATARES EXPRESSIVOS (EMOJIS NZT) ---
 const TACTICAL_AVATARS = [
-    {
-        id: 'cyber_ops',
-        name: 'Central Ops',
-        color: '#00D4FF',
-        svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#050B18" stroke="#00D4FF" stroke-width="3"/><circle cx="50" cy="38" r="16" fill="#00D4FF" opacity="0.85"/><path d="M22 82 C22 64 35 56 50 56 C65 56 78 64 78 82 Z" fill="#00D4FF" opacity="0.75"/><circle cx="50" cy="38" r="6" fill="#050B18"/></svg>`
-    },
-    {
-        id: 'agente_tatico',
-        name: 'Agente Tático',
-        color: '#7B2FBE',
-        svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#050B18" stroke="#7B2FBE" stroke-width="3"/><polygon points="50,15 82,30 82,65 50,88 18,65 18,30" fill="none" stroke="#7B2FBE" stroke-width="4"/><circle cx="50" cy="42" r="12" fill="#7B2FBE" opacity="0.9"/><path d="M30 75 C35 60 65 60 70 75" stroke="#7B2FBE" stroke-width="5" stroke-linecap="round" fill="none"/></svg>`
-    },
-    {
-        id: 'fiscal_pista',
-        name: 'Fiscal de Pista',
-        color: '#00FF88',
-        svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#050B18" stroke="#00FF88" stroke-width="3"/><circle cx="50" cy="50" r="32" fill="none" stroke="#00FF88" stroke-width="2" stroke-dasharray="6,4"/><circle cx="50" cy="50" r="14" fill="#00FF88"/><line x1="50" y1="10" x2="50" y2="90" stroke="#00FF88" stroke-width="2"/><line x1="10" y1="50" x2="90" y2="50" stroke="#00FF88" stroke-width="2"/></svg>`
-    },
-    {
-        id: 'master_shield',
-        name: 'Master VIP',
-        color: '#FFB800',
-        svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#0A1628" stroke="#FFB800" stroke-width="3"/><polygon points="50,18 60,38 82,38 64,52 70,74 50,60 30,74 36,52 18,38 40,38" fill="#FFB800"/><circle cx="50" cy="50" r="10" fill="#0A1628"/></svg>`
-    },
-    {
-        id: 'sentinela_alfa',
-        name: 'Sentinela Alfa',
-        color: '#FF3366',
-        svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#0A1628" stroke="#FF3366" stroke-width="3"/><polygon points="50,20 75,75 25,75" fill="none" stroke="#FF3366" stroke-width="4"/><circle cx="50" cy="48" r="7" fill="#FF3366"/><rect x="47" y="60" width="6" height="6" fill="#FF3366"/></svg>`
-    },
-    {
-        id: 'bio_facial',
-        name: 'Visão Facial',
-        color: '#00D4FF',
-        svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#050B18" stroke="#00D4FF" stroke-width="3"/><rect x="25" y="25" width="50" height="50" rx="10" fill="none" stroke="#00D4FF" stroke-width="2"/><path d="M35 45 Q50 35 65 45" stroke="#00D4FF" stroke-width="3" fill="none"/><circle cx="40" cy="50" r="4" fill="#00D4FF"/><circle cx="60" cy="50" r="4" fill="#00D4FF"/><path d="M42 66 Q50 72 58 66" stroke="#00D4FF" stroke-width="3" fill="none"/></svg>`
-    },
-    {
-        id: 'auditor_chefe',
-        name: 'Auditor Chefe',
-        color: '#00D4FF',
-        svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#050B18" stroke="#00D4FF" stroke-width="3"/><circle cx="50" cy="40" r="15" fill="#00D4FF"/><path d="M25 80 C25 65 37 58 50 58 C63 58 75 65 75 80 Z" fill="#00D4FF"/><polyline points="42,50 48,56 60,42" fill="none" stroke="#050B18" stroke-width="3"/></svg>`
-    },
-    {
-        id: 'suporte_nzt',
-        name: 'Suporte Alfa',
-        color: '#A855F7',
-        svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#0A1628" stroke="#A855F7" stroke-width="3"/><circle cx="50" cy="50" r="28" fill="none" stroke="#A855F7" stroke-width="3"/><path d="M35 50 L45 50 L48 40 L52 60 L55 50 L65 50" fill="none" stroke="#A855F7" stroke-width="3" stroke-linecap="round"/></svg>`
-    }
+    // Linha 1
+    { id: 'super_feliz', name: 'Super Feliz', color: '#F47AA8', url: '/avatars/super_feliz.png' },
+    { id: 'tensao_maxima', name: 'Tensão', color: '#F5B027', url: '/avatars/tensao_maxima.png' },
+    { id: 'apreensivo', name: 'Apreensivo', color: '#68B342', url: '/avatars/apreensivo.png' },
+    { id: 'estrategista', name: 'Estrategista', color: '#3BA3D0', url: '/avatars/estrategista.png' },
+
+    // Linha 2
+    { id: 'em_choque', name: 'Em Choque', color: '#7E63A8', url: '/avatars/em_choque.png' },
+    { id: 'euforia', name: 'Euforia', color: '#F25C26', url: '/avatars/euforia.png' },
+    { id: 'traquinas', name: 'Traquinas', color: '#88CA56', url: '/avatars/traquinas.png' },
+    { id: 'cetico', name: 'Cético', color: '#2F7BBF', url: '/avatars/cetico.png' },
+
+    // Linha 3
+    { id: 'apaixonado', name: 'Apaixonado', color: '#CBBDD6', url: '/avatars/apaixonado.png' },
+    { id: 'furia_tatica', name: 'Fúria', color: '#DE2418', url: '/avatars/furia_tatica.png' },
+    { id: 'sentinela_frio', name: 'Calculista', color: '#1B8779', url: '/avatars/sentinela_frio.png' },
+    { id: 'sobrecarga', name: 'Sobrecarga', color: '#27387E', url: '/avatars/sobrecarga.png' },
+
+    // Linha 4
+    { id: 'malicioso', name: 'Maroto', color: '#C61E6F', url: '/avatars/malicioso.png' },
+    { id: 'piscadela', name: 'Piscadela', color: '#F5D84A', url: '/avatars/piscadela.png' },
+    { id: 'esgotado', name: 'Esgotado', color: '#3A3F47', url: '/avatars/esgotado.png' },
+    { id: 'olhar_fofo', name: 'Inocente', color: '#E5E7EB', url: '/avatars/olhar_fofo.png' }
 ].map(item => ({
     ...item,
-    dataUri: `data:image/svg+xml;utf8,${encodeURIComponent(item.svg)}`
+    dataUri: item.url
 }));
 
 // Efeito sonoro sintetizado via Web Audio API para alertas e chamados
@@ -518,7 +493,7 @@ export const OperatorSection = () => {
             {/* ========================================================================= */}
             {/* MODAL 1: SELETOR DE AVATAR & UPLOAD DE FOTO */}
             {/* ========================================================================= */}
-            <Dialog open={avatarModalOpen} onClose={() => setAvatarModalOpen(false)} maxWidth="xs" fullWidth>
+            <Dialog open={avatarModalOpen} onClose={() => setAvatarModalOpen(false)} maxWidth="sm" fullWidth>
                 <TituloModal
                     titulo="Foto do operador"
                     subtitulo="Escolha um avatar ou envie uma foto e enquadre no círculo."
@@ -532,24 +507,45 @@ export const OperatorSection = () => {
                     </Tabs>
 
                     {avatarTab === 'gallery' ? (
-                        <Grid container spacing={1.5}>
+                        <Grid container spacing={1.25}>
                             {TACTICAL_AVATARS.map((av) => {
                                 const isSelected = selectedAvatarUrl === av.dataUri;
                                 return (
-                                    <Grid item xs={4} key={av.id}>
+                                    <Grid item xs={3} sm={3} key={av.id}>
                                         <ButtonBase
                                             onClick={() => setSelectedAvatarUrl(av.dataUri)}
                                             aria-pressed={isSelected}
                                             sx={{
-                                                width: '100%', p: 1.25, borderRadius: 1.5, flexDirection: 'column',
-                                                bgcolor: isSelected ? tom(funcao.acao, 0.12) : 'rgba(255,255,255,0.03)',
+                                                width: '100%', p: { xs: 0.75, sm: 1 }, borderRadius: 1.5, flexDirection: 'column',
+                                                bgcolor: isSelected ? tom(funcao.acao, 0.14) : 'rgba(255,255,255,0.03)',
                                                 border: `1px solid ${isSelected ? funcao.acao : cores.borda}`,
-                                                '&:hover': { borderColor: funcao.acao },
+                                                boxShadow: isSelected ? `0 0 12px ${tom(funcao.acao, 0.35)}` : 'none',
+                                                transition: 'all 0.15s ease-in-out',
+                                                '&:hover': { borderColor: funcao.acao, bgcolor: tom(funcao.acao, 0.08) },
                                                 '&:focus-visible': { outline: `2px solid ${funcao.acao}`, outlineOffset: 2 }
                                             }}
                                         >
-                                            <Avatar src={av.dataUri} sx={{ width: 52, height: 52, mb: 0.75, bgcolor: cores.fundo }} />
-                                            <Typography sx={{ fontSize: tamanhos.xs, fontWeight: 600, color: cores.texto }} noWrap>
+                                            <Avatar
+                                                src={av.dataUri}
+                                                alt={av.name}
+                                                sx={{
+                                                    width: { xs: 46, sm: 54 },
+                                                    height: { xs: 46, sm: 54 },
+                                                    mb: 0.5,
+                                                    bgcolor: 'transparent',
+                                                    filter: isSelected ? 'drop-shadow(0 0 6px rgba(0,212,255,0.5))' : 'none'
+                                                }}
+                                            />
+                                            <Typography
+                                                sx={{
+                                                    fontSize: { xs: '0.65rem', sm: tamanhos.xs },
+                                                    fontWeight: 600,
+                                                    color: isSelected ? funcao.acao : cores.texto,
+                                                    textAlign: 'center',
+                                                    width: '100%'
+                                                }}
+                                                noWrap
+                                            >
                                                 {av.name}
                                             </Typography>
                                         </ButtonBase>
