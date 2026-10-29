@@ -4,13 +4,19 @@
 # Instalação (uma vez, na VPS):
 #   1. Criar /root/.backup-banco.env (chmod 600) com:
 #        SUPABASE_DB_URL=postgresql://postgres.<ref>:<senha>@<host>:5432/postgres
-#      (Supabase → Project Settings → Database → Connection string, modo "Session")
+#      (Supabase → botão Connect → Connection String → "Session pooler"; caracteres especiais
+#       da senha em formato de URL: # → %23, ! → %21, @ → %40, / → %2F)
 #      Opcional, cópia fora da VPS: RCLONE_DESTINO=r2:nzt-backups
-#   2. crontab -e →  30 3 * * * /root/Projeto_A2_Eventos/scripts/backup-banco.sh >> /var/log/backup-banco.log 2>&1
+#   2. crontab -e →  30 6 * * * /root/Projeto_A2_Eventos/scripts/backup-banco.sh >> /var/log/backup-banco.log 2>&1
+#      (a VPS está em UTC: 06:30 UTC = 03:30 em Brasília)
 #
-# Restaurar (teste em um banco vazio, nunca direto na produção):
+# O que entra: tabelas, dados, índices, funções e regras de acesso (RLS) do schema public.
+# O que NÃO entra: logins (auth.users, ficam com o Supabase) e arquivos do Storage (fotos/documentos).
+#
+# Restaurar (sempre num banco vazio primeiro, nunca direto por cima da produção):
 #   docker run --rm -v /root/backups/banco:/b postgres:17-alpine \
 #     pg_restore --no-owner --no-privileges -d "$DESTINO_DB_URL" /b/<arquivo>.dump
+# Testado em 29/10/2026: as 61 tabelas e as contagens de dados batem com a produção.
 
 set -euo pipefail
 
@@ -22,7 +28,10 @@ DIAS="${BACKUP_DIAS:-14}"
 [ -f "$ENV_FILE" ] && source "$ENV_FILE"
 : "${SUPABASE_DB_URL:?Defina SUPABASE_DB_URL em $ENV_FILE}"
 
+# O backup tem todos os dados (CPFs, fotos, rostos): só o root lê a pasta e os arquivos
+umask 077
 mkdir -p "$PASTA"
+chmod 700 "$PASTA"
 ARQUIVO="nzt_$(date +%Y%m%d_%H%M).dump"
 
 echo "[$(date '+%F %T')] Iniciando backup → $PASTA/$ARQUIVO"
