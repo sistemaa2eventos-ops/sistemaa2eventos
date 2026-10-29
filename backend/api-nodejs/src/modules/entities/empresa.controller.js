@@ -1,5 +1,24 @@
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
+const { normalizarFuncao } = require('./documentoRequisitos.service');
+
+/**
+ * Regra de remuneração padrão e regras por função ({ "FUNÇÃO": regra_id }), normalizadas.
+ * Só devolve o que veio no corpo (atualização parcial não apaga o que já existe).
+ */
+function camposRemuneracao({ regra_remuneracao_id, regras_por_funcao } = {}) {
+    const out = {};
+    if (regra_remuneracao_id !== undefined) out.regra_remuneracao_id = regra_remuneracao_id || null;
+    if (regras_por_funcao !== undefined) {
+        const limpo = {};
+        Object.entries(regras_por_funcao || {}).forEach(([funcao, regraId]) => {
+            const f = normalizarFuncao(funcao);
+            if (f && regraId) limpo[f] = regraId;
+        });
+        out.regras_por_funcao = limpo;
+    }
+    return out;
+}
 
 class EmpresaController {
     async list(req, res) {
@@ -64,6 +83,7 @@ class EmpresaController {
                     max_colaboradores: req.body.max_colaboradores || 0,
                     datas_presenca: req.body.datas_presenca || [],
                     observacao: req.body.observacao || '',
+                    ...camposRemuneracao(req.body),
                     registration_token: require('crypto').randomUUID(),
                     created_by: req.user?.id
                 }])
@@ -98,7 +118,7 @@ class EmpresaController {
     async update(req, res) {
         try {
             const { id } = req.params;
-            const updates = req.body;
+            const updates = { ...req.body, ...camposRemuneracao(req.body) };
             const { data, error } = await supabase
                 .from('empresas')
                 .update(updates)

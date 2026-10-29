@@ -24,6 +24,10 @@ router.get('/por-status',  checkPermission('relatorios', 'leitura'), reportContr
 router.get('/ponto',         checkPermission('relatorios', 'leitura'), reportController.ponto);
 router.get('/ponto-resumo',  checkPermission('relatorios', 'leitura'), reportController.pontoResumo);
 
+// Fechamento do período: diárias, horas extras e valores pela regra de remuneração da empresa/função
+router.get('/fechamento-periodo',      checkPermission('relatorios', 'leitura'), (req, res) => reportController.fechamentoPeriodo(req, res));
+router.get('/fechamento-periodo/xlsx', checkPermission('relatorios', 'leitura'), (req, res) => reportController.exportarFechamentoXLSX(req, res));
+
 // Relatórios Diários Consolidados (NZT Relatórios)
 router.get('/diario-consolidado',      checkPermission('relatorios', 'leitura'), (req, res) => reportController.relatorioDiarioConsolidado(req, res));
 router.get('/diario-consolidado/xlsx', checkPermission('relatorios', 'leitura'), (req, res) => reportController.exportarRelatorioDiarioXLSX(req, res));

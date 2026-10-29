@@ -5,6 +5,8 @@ const ExcelJS = require('exceljs');
 const { getHojeLocal, getLimitesDiaLocalUTC, TIMEZONE } = require('../../utils/dateUtils');
 // PostgREST limita a 1000 linhas: relatórios que somam em memória buscam todas as páginas
 const { buscarTodos, buscarPorIdsEmLotes } = require('../../utils/buscarTodos');
+const remuneracaoService = require('../remuneracao/remuneracao.service');
+const { calcularDia, regraDaPessoa } = remuneracaoService;
 
 // logs_acesso.created_at é UTC gravado sem fuso ("2026-10-11T21:59:40"): sempre ler como UTC
 const instante = (ts) => {
@@ -92,6 +94,93 @@ function marcacoesForaDeOrdem(logsTurno) {
         }
     }
     return inconsistencias;
+}
+
+/**
+ * Turnos por pessoa e dia a partir dos logs de entrada/saída (ordenados por horário).
+ * O dia do turno é o da entrada (no fuso do evento) e a saída vai para o turno da última
+ * entrada: turno que vira a madrugada fica inteiro no dia em que começou. As horas vão do
+ * primeiro check-in ao último check-out (em evento, saídas no meio do turno não descontam).
+ * Usado pelo Ponto e pelo fechamento de diárias, para os dois darem as mesmas horas.
+ */
+function montarTurnos(logs) {
+    const grupos = {};
+    const diaDoTurno = {}; // pessoa_id → dia da última entrada vista
+    (logs || []).forEach(log => {
+        const ms = instante(log.created_at);
+        const entrada = ehEntrada(log);
+        const dia = entrada || !diaDoTurno[log.pessoa_id] ? diaLocal(ms) : diaDoTurno[log.pessoa_id];
+        if (entrada) diaDoTurno[log.pessoa_id] = dia;
+        const key = `${log.pessoa_id}_${dia}`;
+
+        const g = grupos[key] || (grupos[key] = {
+            pessoa_id: log.pessoa_id,
+            pessoa: log.pessoas?.nome_completo,
+            cpf: log.pessoas?.cpf,
+            pulseira: null,
+            empresa_id: log.pessoas?.empresa_id,
+            dia,
+            primeira_entrada: null,
+            ultima_saida: null,
+            saida_nao_registrada: false,
+            entradas: 0,
+            saidas: 0,
+            marcacoes: []
+        });
+        g.marcacoes.push({ tipo: log.tipo, observacao: log.observacao, ms });
+
+        if (entrada) {
+            g.entradas++;
+            if (g.primeira_entrada === null || ms < g.primeira_entrada) {
+                g.primeira_entrada = ms;
+                // pulseira usada naquele turno, não a que a pessoa tem hoje
+                g.pulseira = log.numero_pulseira || g.pulseira;
+            }
+        } else {
+            g.saidas++;
+            if (g.ultima_saida === null || ms > g.ultima_saida) {
+                g.ultima_saida = ms;
+                g.saida_nao_registrada = ehSaidaForcada(log);
+            }
+        }
+    });
+
+    // só a saída automática de um turno aberto antes do período não é um dia de trabalho
+    return Object.values(grupos).filter(g => g.entradas > 0 || !g.saida_nao_registrada).map(g => {
+        let totalHoras = null;
+        // saída gravada pelo fechamento de turno não é horário real: horas ficam "a conferir"
+        if (g.primeira_entrada !== null && g.ultima_saida !== null && !g.saida_nao_registrada && g.ultima_saida > g.primeira_entrada) {
+            totalHoras = Math.round(((g.ultima_saida - g.primeira_entrada) / 3600000) * 100) / 100; // 2 casas
+        }
+        const inconsistencias = marcacoesForaDeOrdem(g.marcacoes);
+        const emAberto = g.primeira_entrada !== null && (g.ultima_saida === null || g.ultima_saida < g.primeira_entrada);
+        const observacoes = [];
+        if (g.saida_nao_registrada) observacoes.push('Saída não registrada: conferir horas');
+        else if (emAberto) observacoes.push('Sem saída no período');
+        if (g.primeira_entrada === null) observacoes.push('Saída sem entrada no período');
+        if (inconsistencias > 0) observacoes.push(`${inconsistencias} marcação(ões) fora de ordem`);
+
+        return {
+            pessoa_id: g.pessoa_id,
+            pessoa: g.pessoa,
+            cpf: g.cpf,
+            pulseira: g.pulseira,
+            empresa_id: g.empresa_id,
+            dia: g.dia,
+            primeira_entrada: g.primeira_entrada,
+            // horário da saída automática do fechamento não é real: não mostra
+            ultima_saida: g.ultima_saida !== null && !g.saida_nao_registrada ? g.ultima_saida : null,
+            saida_nao_registrada: g.saida_nao_registrada,
+            em_aberto: emAberto,
+            sem_entrada: g.primeira_entrada === null,
+            total_horas: totalHoras,
+            permanencia_minutos: totalHoras !== null ? Math.round(totalHoras * 60) : 0,
+            inconsistencias,
+            observacao: observacoes.join(' • '),
+            entradas: g.entradas,
+            saidas: g.saidas
+        };
+    });
 }
 
 /** Logs brutos → linhas da aba "Logs de acesso" (empresa e equipamento pelo nome, não pelo id) */
@@ -592,101 +681,406 @@ class ReportController {
             const { data: logs, error } = await buscarTodos(query);
             if (error) throw error;
 
-            // Agrupar por pessoa + dia do TURNO: o dia é o da entrada (no fuso do evento), e a saída
-            // vai para o turno da última entrada. Antes o dia era o UTC do log: entrada às 22h caía no
-            // dia seguinte e a saída da madrugada abria um "dia" sem entrada.
-            const grouped = {};
-            const diaDoTurno = {}; // pessoa_id → dia da última entrada vista
-            (logs || []).forEach(log => {
-                const ms = instante(log.created_at);
-                const entrada = ehEntrada(log);
-                const dia = entrada || !diaDoTurno[log.pessoa_id] ? diaLocal(ms) : diaDoTurno[log.pessoa_id];
-                if (entrada) diaDoTurno[log.pessoa_id] = dia;
-                const key = `${log.pessoa_id}_${dia}`;
-
-                if (!grouped[key]) {
-                    grouped[key] = {
-                        pessoa_id: log.pessoa_id,
-                        pessoa: log.pessoas?.nome_completo,
-                        cpf: log.pessoas?.cpf,
-                        pulseira: null,
-                        empresa_id: log.pessoas?.empresa_id,
-                        dia,
-                        primeira_entrada: null,
-                        ultima_saida: null,
-                        saida_nao_registrada: false,
-                        entradas: 0,
-                        saidas: 0,
-                        marcacoes: []
-                    };
-                }
-                const g = grouped[key];
-                g.marcacoes.push({ tipo: log.tipo, observacao: log.observacao, ms });
-
-                if (entrada) {
-                    g.entradas++;
-                    if (g.primeira_entrada === null || ms < g.primeira_entrada) {
-                        g.primeira_entrada = ms;
-                        // pulseira usada naquele turno, não a que a pessoa tem hoje
-                        g.pulseira = log.numero_pulseira || g.pulseira;
-                    }
-                } else {
-                    g.saidas++;
-                    if (g.ultima_saida === null || ms > g.ultima_saida) {
-                        g.ultima_saida = ms;
-                        g.saida_nao_registrada = ehSaidaForcada(log);
-                    }
-                }
-            });
+            const turnos = montarTurnos(logs);
 
             // Resolver nomes de empresas
-            const empIds = [...new Set(Object.values(grouped).map(g => g.empresa_id).filter(Boolean))];
+            const empIds = [...new Set(turnos.map(t => t.empresa_id).filter(Boolean))];
             const { data: empData } = empIds.length > 0
                 ? await supabase.from('empresas').select('id, nome').in('id', empIds)
                 : { data: [] };
             const empMap = (empData || []).reduce((a, e) => { a[e.id] = e.nome; return a; }, {});
 
-            // Calcular total de horas e formatar
-            // só a saída automática de um turno aberto antes do período não é um dia de trabalho
-            const data = Object.values(grouped).filter(g => g.entradas > 0 || !g.saida_nao_registrada).map(g => {
-                let totalHoras = null;
-                // saída gravada pelo fechamento de turno não é horário real: horas ficam "a conferir"
-                if (g.primeira_entrada !== null && g.ultima_saida !== null && !g.saida_nao_registrada && g.ultima_saida > g.primeira_entrada) {
-                    const diffMs = g.ultima_saida - g.primeira_entrada;
-                    totalHoras = Math.round((diffMs / 3600000) * 100) / 100; // 2 casas decimais
-                }
-                const inconsistencias = marcacoesForaDeOrdem(g.marcacoes);
-                const emAberto = g.primeira_entrada !== null && (g.ultima_saida === null || g.ultima_saida < g.primeira_entrada);
-                const permanenciaMin = totalHoras !== null ? Math.round(totalHoras * 60) : 0;
-                const observacoes = [];
-                if (g.saida_nao_registrada) observacoes.push('Saída não registrada: conferir horas');
-                else if (emAberto) observacoes.push('Sem saída no período');
-                if (g.primeira_entrada === null) observacoes.push('Saída sem entrada no período');
-                if (inconsistencias > 0) observacoes.push(`${inconsistencias} marcação(ões) fora de ordem`);
-
-                return {
-                    pessoa: g.pessoa,
-                    cpf: g.cpf,
-                    pulseira: g.pulseira,
-                    empresa: empMap[g.empresa_id] || 'Sem Empresa',
-                    dia: g.dia,
-                    primeira_entrada: g.primeira_entrada !== null ? new Date(g.primeira_entrada).toISOString() : null,
-                    // horário da saída automática do fechamento não é real: não mostra
-                    ultima_saida: g.ultima_saida !== null && !g.saida_nao_registrada ? new Date(g.ultima_saida).toISOString() : null,
-                    saida_nao_registrada: g.saida_nao_registrada,
-                    total_horas: totalHoras,
-                    permanencia_minutos: permanenciaMin,
-                    inconsistencias,
-                    observacao: observacoes.join(' • '),
-                    entradas: g.entradas,
-                    saidas: g.saidas
-                };
-            }).sort((a, b) => a.dia.localeCompare(b.dia) || (a.pessoa || '').localeCompare(b.pessoa || ''));
+            const isoOuNull = (ms) => ms !== null ? new Date(ms).toISOString() : null;
+            const data = turnos.map(t => ({
+                ...t,
+                empresa: empMap[t.empresa_id] || 'Sem Empresa',
+                primeira_entrada: isoOuNull(t.primeira_entrada),
+                ultima_saida: isoOuNull(t.ultima_saida)
+            })).sort((a, b) => a.dia.localeCompare(b.dia) || (a.pessoa || '').localeCompare(b.pessoa || ''));
 
             res.json({ success: true, total: data.length, data });
         } catch (error) {
             logger.error('Erro no resumo de ponto:', { message: error.message, code: error.code });
             res.status(500).json({ error: 'Erro ao processar resumo de ponto' });
+        }
+    }
+
+    /**
+     * Fechamento do período: diárias, horas extras e valores por pessoa e dia, pela regra de
+     * remuneração da função na empresa (ou a padrão da empresa).
+     * Códigos do dia: 1 diária, ½ meia, D dobra, 0 abaixo do mínimo, F falta (escalado e não veio),
+     * ? a conferir (sem saída real), A em andamento (hoje), S sem regra (horas contadas, sem valor).
+     */
+    async gerarDadosFechamento(evento_id, { data_inicio, data_fim, empresa_id } = {}) {
+        const hoje = getHojeLocal();
+        const inicio = (String(data_inicio || '').match(/^\d{4}-\d{2}-\d{2}/) || [hoje])[0];
+        const fim = (String(data_fim || '').match(/^\d{4}-\d{2}-\d{2}/) || [inicio])[0];
+        if (fim < inicio) throw Object.assign(new Error('A data final é anterior à inicial.'), { status: 400 });
+
+        const dias = [];
+        for (let d = new Date(`${inicio}T12:00:00Z`); d.toISOString().slice(0, 10) <= fim; d.setUTCDate(d.getUTCDate() + 1)) {
+            dias.push(d.toISOString().slice(0, 10));
+            if (dias.length > 62) throw Object.assign(new Error('Período máximo de 62 dias.'), { status: 400 });
+        }
+        const diaAntes = new Date(`${inicio}T12:00:00Z`); diaAntes.setUTCDate(diaAntes.getUTCDate() - 1);
+        const diaDepois = new Date(`${fim}T12:00:00Z`); diaDepois.setUTCDate(diaDepois.getUTCDate() + 1);
+
+        let pessoasQuery = supabase.from('pessoas')
+            .select('id, nome_completo, cpf, funcao, empresa_id, dias_acesso, dias_trabalho')
+            .eq('evento_id', evento_id);
+        if (empresa_id) pessoasQuery = pessoasQuery.eq('empresa_id', empresa_id);
+
+        // a janela pega o dia anterior (saída de turno aberto antes) e o seguinte (turno que vira a madrugada)
+        let logsQuery = supabase.from('logs_acesso')
+            .select('id, tipo, numero_pulseira, observacao, created_at, pessoa_id, pessoas!inner(id, nome_completo, cpf, empresa_id)')
+            .eq('evento_id', evento_id)
+            .in('tipo', ['checkin', 'checkout', 'entrada', 'saida'])
+            .order('created_at', { ascending: true });
+        logsQuery = aplicarPeriodo(logsQuery, {
+            data_inicio: diaAntes.toISOString().slice(0, 10),
+            data_fim: diaDepois.toISOString().slice(0, 10)
+        });
+        if (empresa_id) logsQuery = logsQuery.eq('pessoas.empresa_id', empresa_id);
+
+        const [pessoasRes, empresasRes, logsRes, regras] = await Promise.all([
+            buscarTodos(pessoasQuery.order('nome_completo')),
+            supabase.from('empresas').select('id, nome, regra_remuneracao_id, regras_por_funcao').eq('evento_id', evento_id),
+            buscarTodos(logsQuery),
+            remuneracaoService.listar(evento_id).catch((e) => {
+                logger.warn(`[Fechamento] Regras de remuneração indisponíveis: ${e.message}`);
+                return null;
+            })
+        ]);
+        if (pessoasRes.error) throw pessoasRes.error;
+        if (logsRes.error) throw logsRes.error;
+        // sem a migration, empresas.regra_remuneracao_id não existe: segue sem regras
+        let empresas = empresasRes.data;
+        if (empresasRes.error) {
+            const { data, error } = await supabase.from('empresas').select('id, nome').eq('evento_id', evento_id);
+            if (error) throw error;
+            empresas = data;
+        }
+
+        const regrasPorId = Object.fromEntries((regras || []).map(r => [r.id, r]));
+        const empMap = Object.fromEntries((empresas || []).map(e => [e.id, e]));
+        const turnosPorPessoa = {};
+        montarTurnos(logsRes.data).forEach(t => {
+            if (t.dia < inicio || t.dia > fim) return;
+            (turnosPorPessoa[t.pessoa_id] || (turnosPorPessoa[t.pessoa_id] = {}))[t.dia] = t;
+        });
+
+        const linhas = [];
+        for (const p of pessoasRes.data || []) {
+            const turnos = turnosPorPessoa[p.id] || {};
+            const escalados = Array.isArray(p.dias_acesso) && p.dias_acesso.length ? p.dias_acesso
+                : (Array.isArray(p.dias_trabalho) ? p.dias_trabalho : []);
+            const faltaNoDia = (d) => d < hoje && escalados.includes(d);
+            if (Object.keys(turnos).length === 0 && !dias.some(faltaNoDia)) continue;
+
+            const empresa = empMap[p.empresa_id];
+            const regra = regraDaPessoa(p, empresa, regrasPorId);
+            const tot = { dias_trabalhados: 0, faltas: 0, a_conferir: 0, minutos: 0, diarias: 0, extras_minutos: 0, valor_diarias: 0, valor_extras: 0, valor_total: 0 };
+            const porDia = {};
+
+            dias.forEach(d => {
+                const t = turnos[d];
+                if (!t) {
+                    if (faltaNoDia(d)) { porDia[d] = { codigo: 'F', minutos: 0 }; tot.faltas++; }
+                    return;
+                }
+                const base = { minutos: t.permanencia_minutos, checkin: t.primeira_entrada, checkout: t.ultima_saida, observacao: t.observacao, pulseira: t.pulseira };
+                if (t.em_aberto && d === hoje && !t.saida_nao_registrada) {
+                    porDia[d] = { ...base, codigo: 'A', observacao: 'Turno em andamento' };
+                    return;
+                }
+                if (t.total_horas === null) {
+                    porDia[d] = { ...base, codigo: '?', observacao: t.observacao || 'Sem horário de saída: conferir' };
+                    tot.a_conferir++;
+                    return;
+                }
+                tot.dias_trabalhados++;
+                tot.minutos += t.permanencia_minutos;
+                if (!regra) {
+                    porDia[d] = { ...base, codigo: 'S', observacao: [t.observacao, 'Empresa/função sem regra de remuneração'].filter(Boolean).join(' • ') };
+                    return;
+                }
+                const calc = calcularDia(t.permanencia_minutos, regra);
+                porDia[d] = { ...base, ...calc };
+                tot.diarias += calc.diarias;
+                tot.extras_minutos += calc.extras_minutos;
+                tot.valor_diarias += calc.valor_diarias;
+                tot.valor_extras += calc.valor_extras;
+                tot.valor_total += calc.valor_total;
+            });
+
+            const centavos = (v) => Math.round(v * 100) / 100;
+            linhas.push({
+                pessoa_id: p.id,
+                empresa_id: p.empresa_id,
+                empresa: empresa?.nome || 'Sem Empresa',
+                colaborador: p.nome_completo || 'Sem Nome',
+                cpf: this._formatarCPF(p.cpf),
+                funcao: p.funcao || '—',
+                regra_id: regra?.id || null,
+                regra: regra?.nome || null,
+                dias: porDia,
+                ...tot,
+                valor_diarias: centavos(tot.valor_diarias),
+                valor_extras: centavos(tot.valor_extras),
+                valor_total: centavos(tot.valor_total)
+            });
+        }
+        linhas.sort((a, b) => a.empresa.localeCompare(b.empresa) || a.colaborador.localeCompare(b.colaborador));
+
+        // Resumo por empresa
+        const resumo = {};
+        linhas.forEach(l => {
+            const r = resumo[l.empresa] || (resumo[l.empresa] = {
+                empresa: l.empresa,
+                regra_padrao: regrasPorId[empMap[l.empresa_id]?.regra_remuneracao_id]?.nome || null,
+                pessoas: 0, dias_trabalhados: 0, faltas: 0, a_conferir: 0, sem_regra: 0,
+                minutos: 0, diarias: 0, extras_minutos: 0, valor_diarias: 0, valor_extras: 0, valor_total: 0
+            });
+            r.pessoas++;
+            if (!l.regra && l.dias_trabalhados > 0) r.sem_regra++;
+            ['dias_trabalhados', 'faltas', 'a_conferir', 'minutos', 'diarias', 'extras_minutos', 'valor_diarias', 'valor_extras', 'valor_total']
+                .forEach(k => { r[k] += l[k]; });
+        });
+        const empresasResumo = Object.values(resumo).map(r => ({
+            ...r,
+            valor_diarias: Math.round(r.valor_diarias * 100) / 100,
+            valor_extras: Math.round(r.valor_extras * 100) / 100,
+            valor_total: Math.round(r.valor_total * 100) / 100
+        }));
+        const somar = (k) => empresasResumo.reduce((a, r) => a + r[k], 0);
+        const totais = {
+            pessoas: linhas.length,
+            dias_trabalhados: somar('dias_trabalhados'),
+            faltas: somar('faltas'),
+            a_conferir: somar('a_conferir'),
+            sem_regra: somar('sem_regra'),
+            minutos: somar('minutos'),
+            diarias: somar('diarias'),
+            extras_minutos: somar('extras_minutos'),
+            valor_diarias: Math.round(somar('valor_diarias') * 100) / 100,
+            valor_extras: Math.round(somar('valor_extras') * 100) / 100,
+            valor_total: Math.round(somar('valor_total') * 100) / 100
+        };
+
+        const avisos = [];
+        if (regras === null) avisos.push('Regras de remuneração indisponíveis: rode a migration 20261029_regras_remuneracao.sql. Horas contadas, sem valores.');
+        else if (totais.sem_regra > 0) avisos.push(`${totais.sem_regra} pessoa(s) trabalharam sem regra de remuneração definida (empresa ou função): horas contadas, sem valor.`);
+        if (totais.a_conferir > 0) avisos.push(`${totais.a_conferir} dia(s) a conferir (saída não registrada): não entram no cálculo.`);
+
+        return { inicio, fim, dias, linhas, empresas: empresasResumo, totais, regras: regras || [], avisos };
+    }
+
+    async fechamentoPeriodo(req, res) {
+        try {
+            const dados = await this.gerarDadosFechamento(req.event.id, req.query);
+            res.json({ success: true, ...dados });
+        } catch (error) {
+            logger.error('Erro no fechamento do período:', { message: error.message, code: error.code });
+            res.status(error.status || 500).json({ error: error.status ? error.message : 'Erro ao calcular o fechamento do período.' });
+        }
+    }
+
+    /** Planilha do fechamento: grade de dias, detalhe por dia, resumo por empresa e regras */
+    async exportarFechamentoXLSX(req, res) {
+        try {
+            const { nome: evento_nome } = this._resolveEvento(req);
+            const f = await this.gerarDadosFechamento(req.event.id, req.query);
+            const br = (d) => d.split('-').reverse().join('/');
+            const periodo = f.inicio === f.fim ? br(f.inicio) : `${br(f.inicio)} a ${br(f.fim)}`;
+
+            const preencher = (argb) => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+            const MOEDA = '"R$" #,##0.00';
+            const HORAS = '[h]:mm';
+            const CORES = {
+                '1': ['FFD1FAE5', 'FF065F46'], '½': ['FFFEF3C7', 'FF92400E'], 'D': ['FFDBEAFE', 'FF1E40AF'],
+                '0': ['FFF1F5F9', 'FF475569'], 'F': ['FFFEE2E2', 'FF991B1B'], '?': ['FFFFEDD5', 'FF9A3412'],
+                'A': ['FFFEF9C3', 'FF854D0E'], 'S': ['FFE2E8F0', 'FF334155']
+            };
+
+            const workbook = new ExcelJS.Workbook();
+            workbook.creator = 'NZT Relatórios';
+            workbook.created = new Date();
+            workbook.calcProperties = { fullCalcOnLoad: true };
+
+            const cabecalho = (sheet, ultimaCol, titulo) => {
+                sheet.mergeCells(1, 1, 1, ultimaCol);
+                const t = sheet.getCell(1, 1);
+                t.value = titulo;
+                t.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+                t.fill = preencher('FF0A1929');
+                t.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+                sheet.getRow(1).height = 30;
+                sheet.mergeCells(2, 1, 2, ultimaCol);
+                const s = sheet.getCell(2, 1);
+                s.value = `EVENTO: ${(evento_nome || '').toUpperCase()}  |  PERÍODO: ${periodo}  |  EMISSÃO: ${new Date().toLocaleString('pt-BR', { timeZone: TIMEZONE })}`;
+                s.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF94A3B8' } };
+                s.fill = preencher('FF0F172A');
+                s.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+            };
+            const titulos = (sheet, linha, nomes) => {
+                const row = sheet.getRow(linha);
+                row.values = nomes;
+                row.height = 28;
+                row.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9 };
+                row.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                nomes.forEach((_, i) => { row.getCell(i + 1).fill = preencher('FF1E293B'); });
+            };
+            const linhaTotal = (sheet, primeira, ultima, colunasSoma, formatos, colRotulo = 1) => {
+                const row = sheet.addRow([]);
+                row.getCell(colRotulo).value = 'TOTAL';
+                colunasSoma.forEach(c => {
+                    const letra = sheet.getColumn(c).letter;
+                    row.getCell(c).value = { formula: `SUBTOTAL(109,${letra}${primeira}:${letra}${ultima})` };
+                    if (formatos[c]) row.getCell(c).numFmt = formatos[c];
+                    row.getCell(c).alignment = { horizontal: 'center' };
+                });
+                row.font = { bold: true };
+                row.eachCell({ includeEmpty: true }, (cell) => { cell.border = { top: { style: 'thin' } }; cell.fill = preencher('FFE2E8F0'); });
+                return row;
+            };
+
+            // ---- Aba 1: grade do período -------------------------------------------------
+            const grade = workbook.addWorksheet('Fechamento');
+            const fixas = ['EMPRESA', 'COLABORADOR', 'CPF', 'FUNÇÃO', 'REGRA'];
+            const finais = ['DIAS TRAB.', 'FALTAS', 'A CONFERIR', 'DIÁRIAS', 'HORAS', 'HORAS EXTRAS', 'VALOR DIÁRIAS', 'VALOR EXTRAS', 'TOTAL'];
+            const nomes = [...fixas, ...f.dias.map(d => br(d).slice(0, 5)), ...finais];
+            cabecalho(grade, nomes.length, 'NZT RELATÓRIOS — FECHAMENTO DE DIÁRIAS DO PERÍODO');
+            titulos(grade, 4, nomes);
+            [26, 32, 15, 18, 22].forEach((w, i) => { grade.getColumn(i + 1).width = w; });
+            f.dias.forEach((_, i) => { grade.getColumn(fixas.length + i + 1).width = 6.5; });
+            const c0 = fixas.length + f.dias.length; // última coluna de dia
+            [9, 8, 10, 9, 9, 11, 14, 13, 14].forEach((w, i) => { grade.getColumn(c0 + i + 1).width = w; });
+            const fmtFinais = { [c0 + 4]: '0.0', [c0 + 5]: HORAS, [c0 + 6]: HORAS, [c0 + 7]: MOEDA, [c0 + 8]: MOEDA, [c0 + 9]: MOEDA };
+
+            f.linhas.forEach((l, idx) => {
+                const row = grade.addRow([
+                    l.empresa, l.colaborador, l.cpf, l.funcao, l.regra || 'SEM REGRA',
+                    ...f.dias.map(d => l.dias[d]?.codigo || ''),
+                    l.dias_trabalhados, l.faltas, l.a_conferir, l.diarias,
+                    l.minutos / 1440, l.extras_minutos / 1440, l.valor_diarias, l.valor_extras, l.valor_total
+                ]);
+                if (idx % 2 === 0) row.eachCell({ includeEmpty: true }, (cell) => { cell.fill = preencher('FFF8FAFC'); });
+                if (!l.regra) row.getCell(5).font = { color: { argb: 'FF991B1B' }, bold: true };
+                f.dias.forEach((d, i) => {
+                    const cell = row.getCell(fixas.length + i + 1);
+                    cell.alignment = { horizontal: 'center' };
+                    const cor = CORES[l.dias[d]?.codigo];
+                    if (cor) { cell.fill = preencher(cor[0]); cell.font = { bold: true, color: { argb: cor[1] } }; }
+                });
+                for (let c = c0 + 1; c <= c0 + 9; c++) {
+                    row.getCell(c).alignment = { horizontal: 'center' };
+                    if (fmtFinais[c]) row.getCell(c).numFmt = fmtFinais[c];
+                }
+                row.getCell(c0 + 9).font = { bold: true };
+            });
+            if (f.linhas.length > 0) {
+                linhaTotal(grade, 5, 4 + f.linhas.length, Array.from({ length: 9 }, (_, i) => c0 + i + 1), fmtFinais);
+            }
+            grade.addRow([]);
+            const legenda = grade.addRow(['Legenda: 1 = diária • ½ = meia diária • D = dobra • 0 = abaixo do mínimo de horas • F = falta (escalado e não veio) • '
+                + '? = a conferir (sem saída real, fora do cálculo) • A = em andamento • S = sem regra (horas contadas, sem valor). '
+                + 'Horas = do primeiro check-in ao último check-out do turno; o turno conta no dia da entrada.']);
+            grade.mergeCells(legenda.number, 1, legenda.number, nomes.length);
+            legenda.getCell(1).font = { italic: true, size: 8, color: { argb: 'FF64748B' } };
+            legenda.getCell(1).alignment = { wrapText: true };
+            legenda.height = 30;
+            f.avisos.forEach(a => {
+                const r = grade.addRow([`⚠ ${a}`]);
+                grade.mergeCells(r.number, 1, r.number, nomes.length);
+                r.getCell(1).font = { bold: true, size: 9, color: { argb: 'FF991B1B' } };
+            });
+            grade.views = [{ state: 'frozen', ySplit: 4, xSplit: 2 }];
+            grade.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4, column: nomes.length } };
+            grade.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9, printTitlesRow: '4:4' };
+
+            // ---- Aba 2: detalhe por dia ---------------------------------------------------
+            const det = workbook.addWorksheet('Detalhe por dia');
+            const nomesDet = ['DIA', 'EMPRESA', 'COLABORADOR', 'CPF', 'FUNÇÃO', 'REGRA', 'PULSEIRA', 'CHECK-IN', 'CHECK-OUT', 'HORAS',
+                'CÓDIGO', 'DIÁRIAS', 'HORAS EXTRAS', 'VALOR DIÁRIAS', 'VALOR EXTRAS', 'TOTAL', 'OBSERVAÇÃO'];
+            cabecalho(det, nomesDet.length, 'DETALHE POR DIA');
+            titulos(det, 4, nomesDet);
+            [11, 24, 30, 15, 18, 20, 10, 16, 16, 9, 8, 8, 10, 13, 12, 13, 40].forEach((w, i) => { det.getColumn(i + 1).width = w; });
+            let nDet = 0;
+            f.dias.forEach(d => f.linhas.forEach(l => {
+                const c = l.dias[d];
+                if (!c) return;
+                const [a, m, dd] = d.split('-').map(Number);
+                const temValor = c.diarias !== undefined;
+                const row = det.addRow([
+                    new Date(Date.UTC(a, m - 1, dd)), l.empresa, l.colaborador, l.cpf, l.funcao, l.regra || 'SEM REGRA', c.pulseira || '—',
+                    c.checkin ? dataExcel(c.checkin) : '—', c.checkout ? dataExcel(c.checkout) : '—',
+                    c.codigo === 'F' || c.codigo === '?' || c.codigo === 'A' ? '—' : c.minutos / 1440,
+                    c.codigo,
+                    temValor ? c.diarias : 0, temValor ? c.extras_minutos / 1440 : 0,
+                    temValor ? c.valor_diarias : 0, temValor ? c.valor_extras : 0, temValor ? c.valor_total : 0,
+                    c.codigo === 'F' ? 'Falta: escalado para o dia e sem registro' : (c.observacao || '')
+                ]);
+                nDet++;
+                row.getCell(1).numFmt = 'dd/mm/yyyy';
+                row.getCell(8).numFmt = 'dd/mm/yyyy hh:mm';
+                row.getCell(9).numFmt = 'dd/mm/yyyy hh:mm';
+                row.getCell(10).numFmt = HORAS;
+                row.getCell(12).numFmt = '0.0';
+                row.getCell(13).numFmt = HORAS;
+                [14, 15, 16].forEach(k => { row.getCell(k).numFmt = MOEDA; });
+                [1, 7, 8, 9, 10, 11, 12, 13].forEach(k => { row.getCell(k).alignment = { horizontal: 'center' }; });
+                const cor = CORES[c.codigo];
+                if (cor) { row.getCell(11).fill = preencher(cor[0]); row.getCell(11).font = { bold: true, color: { argb: cor[1] } }; }
+            }));
+            if (nDet > 0) linhaTotal(det, 5, 4 + nDet, [10, 12, 13, 14, 15, 16], { 10: HORAS, 12: '0.0', 13: HORAS, 14: MOEDA, 15: MOEDA, 16: MOEDA });
+            det.views = [{ state: 'frozen', ySplit: 4 }];
+            det.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4, column: nomesDet.length } };
+
+            // ---- Aba 3: resumo por empresa ------------------------------------------------
+            const res3 = workbook.addWorksheet('Resumo por empresa');
+            const nomesRes = ['EMPRESA', 'REGRA PADRÃO', 'PESSOAS', 'DIAS TRAB.', 'FALTAS', 'A CONFERIR', 'SEM REGRA', 'DIÁRIAS', 'HORAS', 'HORAS EXTRAS', 'VALOR DIÁRIAS', 'VALOR EXTRAS', 'TOTAL'];
+            cabecalho(res3, nomesRes.length, 'RESUMO POR EMPRESA');
+            titulos(res3, 4, nomesRes);
+            [30, 24, 9, 9, 8, 10, 10, 9, 10, 11, 14, 13, 15].forEach((w, i) => { res3.getColumn(i + 1).width = w; });
+            const fmtRes = { 8: '0.0', 9: HORAS, 10: HORAS, 11: MOEDA, 12: MOEDA, 13: MOEDA };
+            f.empresas.forEach(e => {
+                const row = res3.addRow([e.empresa, e.regra_padrao || 'SEM REGRA', e.pessoas, e.dias_trabalhados, e.faltas, e.a_conferir, e.sem_regra,
+                    e.diarias, e.minutos / 1440, e.extras_minutos / 1440, e.valor_diarias, e.valor_extras, e.valor_total]);
+                for (let c = 3; c <= 13; c++) {
+                    row.getCell(c).alignment = { horizontal: 'center' };
+                    if (fmtRes[c]) row.getCell(c).numFmt = fmtRes[c];
+                }
+                if (!e.regra_padrao) row.getCell(2).font = { color: { argb: 'FF991B1B' }, bold: true };
+                row.getCell(13).font = { bold: true };
+            });
+            if (f.empresas.length > 0) linhaTotal(res3, 5, 4 + f.empresas.length, [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], fmtRes);
+            res3.views = [{ state: 'frozen', ySplit: 4 }];
+
+            // ---- Aba 4: regras usadas -----------------------------------------------------
+            const reg = workbook.addWorksheet('Regras');
+            const nomesReg = ['REGRA', 'JORNADA', 'VALOR DIÁRIA', 'DIÁRIA A PARTIR DE', 'MEIA DIÁRIA', 'ACIMA DA JORNADA', 'TOLERÂNCIA', 'RESUMO'];
+            cabecalho(reg, nomesReg.length, 'REGRAS DE REMUNERAÇÃO DO EVENTO');
+            titulos(reg, 4, nomesReg);
+            [26, 10, 14, 14, 18, 30, 12, 60].forEach((w, i) => { reg.getColumn(i + 1).width = w; });
+            const modoTexto = (r) => r.excedente_modo === 'horas_extras'
+                ? (r.valor_hora_extra !== null && r.valor_hora_extra !== undefined ? `Horas extras (R$ ${Number(r.valor_hora_extra).toFixed(2)}/h)` : `Horas extras (+${Number(r.percentual_hora_extra)}%)`)
+                : r.excedente_modo === 'dobra' ? `Dobra acima de ${Number(r.horas_para_dobra) || Number(r.jornada_horas)}h` : 'Não paga';
+            f.regras.forEach(r => {
+                const row = reg.addRow([r.nome, `${Number(r.jornada_horas)}h`, Number(r.valor_diaria),
+                    Number(r.horas_minimas_diaria) > 0 ? `${Number(r.horas_minimas_diaria)}h` : 'qualquer presença',
+                    r.meia_diaria ? `a partir de ${Number(r.horas_minimas_meia)}h` : 'não', modoTexto(r),
+                    `${r.tolerancia_minutos} min`, r.descricao]);
+                row.getCell(3).numFmt = MOEDA;
+                if (!r.ativo) row.font = { color: { argb: 'FF94A3B8' }, italic: true };
+            });
+            if (f.regras.length === 0) reg.addRow(['Nenhuma regra cadastrada no evento.']);
+
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', `attachment; filename=fechamento_${f.inicio}_${f.fim}.xlsx`);
+            res.send(await workbook.xlsx.writeBuffer());
+        } catch (error) {
+            logger.error('Erro ao exportar fechamento do período:', error);
+            res.status(error.status || 500).json({ error: error.status ? error.message : 'Falha ao gerar a planilha do fechamento.' });
         }
     }
 

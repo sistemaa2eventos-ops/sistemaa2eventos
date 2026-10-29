@@ -47,6 +47,8 @@ export const useReports = () => {
     const [reportFuncao, setReportFuncao] = useState([]);
     const [reportStatus, setReportStatus] = useState([]);
     const [reportPonto, setReportPonto] = useState([]);
+    // Fechamento do período (diárias e horas extras pela regra da empresa/função)
+    const [fechamento, setFechamento] = useState(null);
 
     /**
      * Carrega Relatório Diário Consolidado
@@ -293,6 +295,52 @@ export const useReports = () => {
     };
 
     /**
+     * Fechamento do período: o filtro usa só a data (o período vai de dia a dia, inteiro)
+     */
+    const loadFechamento = useCallback(async () => {
+        if (!eventoId) return;
+        try {
+            setLoading(true);
+            const { data } = await api.get('/reports/fechamento-periodo', {
+                params: {
+                    evento_id: eventoId,
+                    data_inicio: dateStart.slice(0, 10),
+                    data_fim: dateEnd.slice(0, 10),
+                    empresa_id: empresaId || undefined
+                }
+            });
+            setFechamento(data?.success ? data : null);
+        } catch (error) {
+            setFechamento(null);
+            enqueueSnackbar(error.response?.data?.error || 'Erro ao calcular o fechamento do período.', { variant: 'error' });
+        } finally {
+            setLoading(false);
+        }
+    }, [eventoId, dateStart, dateEnd, empresaId, enqueueSnackbar]);
+
+    const handleExportFechamento = async () => {
+        try {
+            enqueueSnackbar('Gerando planilha do fechamento...', { variant: 'info' });
+            const inicio = dateStart.slice(0, 10);
+            const fim = dateEnd.slice(0, 10);
+            const response = await api.get('/reports/fechamento-periodo/xlsx', {
+                params: { evento_id: eventoId, data_inicio: inicio, data_fim: fim, empresa_id: empresaId || undefined },
+                responseType: 'blob'
+            });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `NZT_Fechamento_Diarias_${inicio}_a_${fim}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => window.URL.revokeObjectURL(url), 1000); // libera a memória do arquivo
+        } catch (error) {
+            enqueueSnackbar('Falha ao exportar o fechamento.', { variant: 'error' });
+        }
+    };
+
+    /**
      * Exportação de Lista de Presença PDF
      */
     const handleExportPDF = async () => {
@@ -331,6 +379,7 @@ export const useReports = () => {
         // Abas agregadas e logs
         dailyLogs, totalLogs, page, setPage: loadLogs,
         reportArea, reportEmpresa, reportLeitor, reportFuncao, reportStatus, reportPonto,
+        fechamento, loadFechamento, handleExportFechamento,
         loadLogs, loadTab, handleExport, handleExportPDF, handleExportAbaPDF,
         refresh: loadLogs
     };

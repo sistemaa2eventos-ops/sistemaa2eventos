@@ -30,7 +30,8 @@ import {
   Cancel as CancelIcon,
   WhatsApp as WhatsAppIcon,
   Email as EmailIcon,
-  Check as CheckIcon
+  Check as CheckIcon,
+  Tune as RegrasIcon
 } from '@mui/icons-material';
 import GlassCard from '../components/common/GlassCard';
 import PageHeader from '../components/common/PageHeader';
@@ -46,6 +47,9 @@ import { useConfirmacao } from '../contexts/ConfirmacaoContext';
 import TituloModal from '../components/common/TituloModal';
 import { acaoTabela, acaoTabelaPerigo, botaoSecundario } from '../styles/tokens';
 import { formatarCnpj } from '../utils/formatadores';
+import { useRemuneracao } from '../hooks/useRemuneracao';
+import RegrasRemuneracaoDialog from '../components/remuneracao/RegrasRemuneracaoDialog';
+import RemuneracaoEmpresa from '../components/remuneracao/RemuneracaoEmpresa';
 
 const Empresas = () => {
     const confirmar = useConfirmacao();
@@ -58,6 +62,12 @@ const Empresas = () => {
   const [openInviteDialog, setOpenInviteDialog] = useState(false);
   const [inviteResult, setInviteResult] = useState({ link: '', empresa: null });
   const [activePhaseTabEmpresa, setActivePhaseTabEmpresa] = useState('todas');
+  const [openRegras, setOpenRegras] = useState(false);
+  const remuneracao = useRemuneracao();
+  // Só manda os campos de remuneração quando a tabela existe (antes da migration o update falharia)
+  const camposRemuneracao = (empresa = {}) => remuneracao.disponivel
+    ? { regra_remuneracao_id: empresa.regra_remuneracao_id || null, regras_por_funcao: empresa.regras_por_funcao || {} }
+    : {};
 
   useEffect(() => {
     if (eventoIdParam && eventoIdParam !== 'undefined' && eventoIdParam !== 'null') {
@@ -276,7 +286,8 @@ const Empresas = () => {
         max_colaboradores: empresa.max_colaboradores || 50,
         datas_presenca: Array.isArray(empresa.datas_presenca) && empresa.datas_presenca.length > 0 
           ? empresa.datas_presenca 
-          : getAllEventDates()
+          : getAllEventDates(),
+        ...camposRemuneracao(empresa)
       });
       setOpenDialog(true);
       loadDocumentos(empresa.id);
@@ -296,7 +307,8 @@ const Empresas = () => {
         observacao: '',
         registration_token: '',
         max_colaboradores: 50,
-        datas_presenca: getAllEventDates()
+        datas_presenca: getAllEventDates(),
+        ...camposRemuneracao()
       });
       setOpenDialog(true);
   };
@@ -309,13 +321,14 @@ const Empresas = () => {
           subtitle={eventoIdParam ? `Filtrando empresas do evento: ${localStorage.getItem('active_evento_nome')}` : "Gerencie as entidades terceirizadas do ecossistema."}
           breadcrumbs={[{ text: 'Dashboard' }, { text: 'Empresas' }]}
         />
-        <NeonButton
-          startIcon={<AddIcon />}
-          onClick={handleNew}
-          sx={{ mt: { xs: 0, md: 2 }, width: { xs: '100%', md: 'auto' } }}
-        >
-          Nova empresa
-        </NeonButton>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: { xs: 0, md: 2 }, width: { xs: '100%', md: 'auto' } }}>
+          <Button variant="outlined" startIcon={<RegrasIcon />} onClick={() => setOpenRegras(true)} sx={botaoSecundario}>
+            Regras de remuneração
+          </Button>
+          <NeonButton startIcon={<AddIcon />} onClick={handleNew}>
+            Nova empresa
+          </NeonButton>
+        </Stack>
       </Box>
 
       <GlassCard glowColor="#00D4FF" sx={{ p: 3, mb: 3 }}>
@@ -428,6 +441,16 @@ const Empresas = () => {
                 </Grid>
               </Grid>
               <TextField label="Observações" fullWidth multiline rows={2} value={formData.observacao} onChange={(e) => setFormData({ ...formData, observacao: e.target.value })} />
+
+              <RemuneracaoEmpresa
+                formData={formData}
+                setFormData={setFormData}
+                regras={remuneracao.regras}
+                disponivel={remuneracao.disponivel}
+                empresaId={selectedEmpresa?.id}
+                carregarFuncoes={remuneracao.carregarFuncoes}
+                onGerenciar={() => setOpenRegras(true)}
+              />
 
               {activeEvent && formData && (
                 <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, mt: 1 }}>
@@ -785,6 +808,14 @@ const Empresas = () => {
             </Button>
         </DialogActions>
       </Dialog>
+      <RegrasRemuneracaoDialog
+        open={openRegras}
+        onClose={() => setOpenRegras(false)}
+        regras={remuneracao.regras}
+        disponivel={remuneracao.disponivel}
+        salvarRegra={remuneracao.salvarRegra}
+        excluirRegra={remuneracao.excluirRegra}
+      />
     </Box>
   );
 };

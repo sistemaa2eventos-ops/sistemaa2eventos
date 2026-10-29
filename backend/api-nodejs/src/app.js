@@ -206,6 +206,7 @@ app.use('/api/veiculos', veiculosRoutes);
 app.use('/api/documentos', documentosRoutes);
 app.use('/api/excel', excelRoutes);
 app.use('/api/notificacoes', require('./modules/system/notificacao.routes'));
+app.use('/api/remuneracao', require('./modules/remuneracao/remuneracao.routes'));
 app.use('/api/agentes', require('./modules/devices/agent.routes'));
 app.use('/api/portal/empresa', portalEmpresaRoutes);
 app.use('/api/portal/cliente', portalClienteRoutes);
