@@ -35,9 +35,7 @@ import {
   Dvr as DvrIcon,
   VolumeUp as SomIcon, VolumeOff as SemSomIcon,
   Face as RostoIcon,
-  PowerSettingsNew as PowerIcon,
-  CropFree as CropFreeIcon,
-  FitScreen as FitScreenIcon
+  PowerSettingsNew as PowerIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { format } from 'date-fns';
@@ -96,6 +94,9 @@ const Monitor = () => {
   const isAdminMaster = user?.nivel_acesso === 'admin_master';
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  // Detecção estável de mobile/tablet em qualquer orientação (largura <= 1024px OU altura de celular deitado <= 540px)
+  const isMobileOrTablet = useMediaQuery('(max-width: 1024px), (max-height: 540px)');
+  const isLandscape = useMediaQuery('(orientation: landscape)');
 
   // Abas dinâmicas: 'watchlist' só existe para admin_master (sigilo total para operadores)
   const TABS_CONFIG = useMemo(() => {
@@ -236,7 +237,6 @@ const Monitor = () => {
 
   // Modo Player YouTube para a Câmera Ao Vivo (Tela Cheia Total + Overlays Flutuantes)
   const [showPlayerControls, setShowPlayerControls] = useState(true);
-  const [streamFitMode, setStreamFitMode] = useState('cover'); // 'cover' = preenchimento total sem bordas laterais (padrão YouTube); 'contain' = proporção original
   const playerControlsTimerRef = React.useRef(null);
 
   const resetPlayerControlsTimer = React.useCallback(() => {
@@ -2204,19 +2204,24 @@ const Monitor = () => {
       {/* DIALOG DE TRANSMISSÃO AO VIVO ESTILO YOUTUBE (TELA CHEIA TOTAL COM CONTROLES FLUTUANTES) */}
       <Dialog 
         open={!!activeStreamCam} 
-        onClose={() => { setActiveStreamCam(null); setStreamZoom(100); }} 
-        maxWidth={isMobile || streamModalSize === 'fullscreen' ? false : streamModalSize} 
+        onClose={(event, reason) => {
+            // NUNCA fechar ao girar a tela ou ao clicar na área preta do player
+            if (reason === 'backdropClick') return;
+            setActiveStreamCam(null);
+            setStreamZoom(100);
+        }} 
+        maxWidth={isMobileOrTablet || streamModalSize === 'fullscreen' ? false : streamModalSize} 
         fullWidth
-        fullScreen={isMobile || streamModalSize === 'fullscreen'}
+        fullScreen={isMobileOrTablet || streamModalSize === 'fullscreen'}
         PaperProps={{
             sx: {
                 bgcolor: '#000000',
                 backgroundImage: 'none',
-                m: { xs: 0, sm: streamModalSize === 'fullscreen' ? 0 : 2 },
+                m: { xs: 0, sm: (isMobileOrTablet || streamModalSize === 'fullscreen') ? 0 : 2 },
                 width: '100%',
-                maxHeight: { xs: '100dvh', sm: streamModalSize === 'fullscreen' ? '100vh' : '92vh' },
-                height: { xs: '100dvh', sm: streamModalSize === 'fullscreen' ? '100vh' : 'auto' },
-                borderRadius: { xs: 0, sm: streamModalSize === 'fullscreen' ? 0 : 2.5 },
+                maxHeight: { xs: '100dvh', sm: (isMobileOrTablet || streamModalSize === 'fullscreen') ? '100vh' : '92vh' },
+                height: { xs: '100dvh', sm: (isMobileOrTablet || streamModalSize === 'fullscreen') ? '100vh' : 'auto' },
+                borderRadius: { xs: 0, sm: (isMobileOrTablet || streamModalSize === 'fullscreen') ? 0 : 2.5 },
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',
@@ -2224,7 +2229,7 @@ const Monitor = () => {
             }
         }}
       >
-        {/* ÁREA DE VÍDEO TOTAL (OCUPA 100% DA TELA SEM RECORTES) */}
+        {/* ÁREA DE VÍDEO TOTAL (OCUPA 100% DA TELA COM AJUSTE AUTOMÁTICO DE PROPORÇÃO) */}
         <Box 
             onClick={handleTogglePlayerControls}
             sx={{
@@ -2247,11 +2252,11 @@ const Monitor = () => {
                     alt={activeStreamCam.nome}
                     modo="stream"
                     qualidade="foco"
-                    fit={streamFitMode}
+                    fit={isLandscape ? 'cover' : 'contain'}
                     imgStyle={{
                         width: '100%',
                         height: '100%',
-                        objectFit: streamFitMode,
+                        objectFit: isLandscape ? 'cover' : 'contain',
                         transform: `scale(${streamZoom / 100})`,
                         transformOrigin: 'center center',
                         transition: 'transform 0.15s ease'
@@ -2316,37 +2321,8 @@ const Monitor = () => {
                             </Box>
                         </Stack>
 
-                        {/* Botões do Topo: Ajustar Proporção + Zoom + Fechar */}
+                        {/* Botões do Topo: Zoom + Alternador Janela/Full (Desktop) + Fechar */}
                         <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexShrink: 0 }}>
-                            {/* Alternador de Preenchimento (Preencher tela sem bordas vs Proporção original) */}
-                            <Tooltip title={streamFitMode === 'cover' ? "Preenchendo a tela (toque para proporção original)" : "Proporção original (toque para preencher sem bordas laterais)"}>
-                                <Button
-                                    size="small"
-                                    startIcon={streamFitMode === 'cover' ? <CropFreeIcon sx={{ fontSize: 16 }} /> : <FitScreenIcon sx={{ fontSize: 16 }} />}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        resetPlayerControlsTimer();
-                                        setStreamFitMode(m => m === 'cover' ? 'contain' : 'cover');
-                                    }}
-                                    sx={{
-                                        height: 32,
-                                        px: 1.25,
-                                        fontSize: '0.72rem',
-                                        fontWeight: 700,
-                                        bgcolor: streamFitMode === 'cover' ? 'rgba(0, 212, 255, 0.25)' : 'rgba(255, 255, 255, 0.12)',
-                                        color: streamFitMode === 'cover' ? '#00D4FF' : '#FFFFFF',
-                                        border: streamFitMode === 'cover' ? '1px solid #00D4FF' : '1px solid rgba(255, 255, 255, 0.2)',
-                                        backdropFilter: 'blur(8px)',
-                                        borderRadius: 2,
-                                        textTransform: 'none',
-                                        whiteSpace: 'nowrap',
-                                        '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.35)' }
-                                    }}
-                                >
-                                    {streamFitMode === 'cover' ? 'Preencher' : 'Ajustar'}
-                                </Button>
-                            </Tooltip>
-
                             {/* Controles de Zoom */}
                             <ButtonGroup size="small" sx={{ height: 32, bgcolor: 'rgba(0, 0, 0, 0.55)', backdropFilter: 'blur(8px)', borderRadius: 2, border: '1px solid rgba(255,255,255,0.18)' }}>
                                 <IconButton
@@ -2372,8 +2348,8 @@ const Monitor = () => {
                                 </IconButton>
                             </ButtonGroup>
 
-                            {/* Alternador Tela Cheia / Janela (apenas Desktop) */}
-                            {!isMobile && (
+                            {/* Alternador Tela Cheia / Janela (apenas Desktop Grande) */}
+                            {!isMobileOrTablet && (
                                 <Tooltip title={streamModalSize === 'fullscreen' ? "Modo janela" : "Tela cheia"}>
                                     <IconButton
                                         size="small"

@@ -12,9 +12,9 @@ import {
     Tune as TuneIcon, NotificationsActive as AlarmIcon,
     Close as CloseIcon, CameraAlt as SnapshotIcon,
     Shield as ShieldIcon, CheckCircle as CheckCircleIcon,
-    Videocam as CameraIcon
+    Videocam as CameraIcon, ArrowBack as ArrowBackIcon
 } from '@mui/icons-material';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import api from '../services/api';
 import { urlMidiaCamera } from '../utils/cameraMedia';
@@ -45,7 +45,16 @@ const CftvWall = () => {
     const { config: iaConfig } = useIaConfig();
     const { status: iaStatus } = useIaStatus(true);
     const [searchParams] = useSearchParams();
+    const navigate = useNavigate();
     const eventoId = searchParams.get('evento_id') || localStorage.getItem('active_evento_id');
+
+    const handleExitCftv = useCallback(() => {
+        if (window.opener && !window.opener.closed) {
+            window.close();
+        } else {
+            navigate('/monitor');
+        }
+    }, [navigate]);
 
     // Layout do Mosaico: '1x1', '2x2', '3x3', '4x4', '1+5'
     const [layout, setLayout] = useState(() => {
@@ -258,8 +267,30 @@ const CftvWall = () => {
                 justifyContent: 'space-between',
                 zIndex: 100
             }}>
-                {/* Lado Esquerdo: Identificação e Status */}
+                {/* Lado Esquerdo: Voltar + Identificação e Status */}
                 <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0 }}>
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<ArrowBackIcon sx={{ fontSize: 16 }} />}
+                        onClick={handleExitCftv}
+                        sx={{
+                            color: '#00D4FF',
+                            borderColor: 'rgba(0, 212, 255, 0.4)',
+                            fontWeight: 700,
+                            fontSize: { xs: '0.72rem', sm: '0.78rem' },
+                            height: 28,
+                            px: 1.25,
+                            textTransform: 'none',
+                            bgcolor: 'rgba(0, 212, 255, 0.08)',
+                            borderRadius: 1.5,
+                            whiteSpace: 'nowrap',
+                            '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.2)', borderColor: '#00D4FF' }
+                        }}
+                    >
+                        Voltar
+                    </Button>
+
                     <Stack direction="row" spacing={1} alignItems="center">
                         <Box sx={{
                             width: 9, height: 9, borderRadius: '50%', bgcolor: '#00FF88', flexShrink: 0,
