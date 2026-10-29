@@ -265,7 +265,7 @@ const Reports = () => {
             id: 'tempo_permanencia',
             label: 'Tempo de permanência',
             width: 200,
-            format: (val, _row) => {
+            format: (val, row) => {
                 if (!val || val === '—') {
                     return <Typography variant="caption" sx={{ color: '#64748B' }}>00h 00m</Typography>;
                 }
@@ -290,7 +290,7 @@ const Reports = () => {
                     );
                 }
                 const isAndamento = val.includes('Em andamento');
-                return (
+                const chip = (
                     <Chip
                         icon={<TimeIcon sx={{ fontSize: '13px !important', color: (isAndamento ? '#FFB800' : '#00FF88') + ' !important' }} />}
                         label={val}
@@ -305,34 +305,14 @@ const Reports = () => {
                         }}
                     />
                 );
-            }
-        },
-        {
-            id: 'tempo_liquido',
-            label: 'Horas líquidas',
-            width: 150,
-            align: 'center',
-            // soma de cada entrada→saída; intervalos (almoço, saídas no meio do turno) ficam de fora
-            format: (val, row) => {
-                const detalhes = [
-                    row.tempo_intervalo && row.tempo_intervalo !== '—' ? `Intervalos: ${row.tempo_intervalo}` : null,
-                    row.observacao || null
-                ].filter(Boolean).join(' • ');
+                if (!(row.inconsistencias > 0)) return chip;
+                // horas valem do check-in ao check-out; só avisa que há registro para conferir
                 return (
-                    <Box title={detalhes || undefined} sx={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', cursor: detalhes ? 'help' : 'default' }}>
-                        <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontWeight: 700, color: val && val !== '—' ? '#FFFFFF' : '#64748B' }}>
-                            {val && val !== '—' ? val : '—'}
+                    <Box title={row.observacao || undefined} sx={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.25 }}>
+                        {chip}
+                        <Typography variant="caption" sx={{ color: '#FF3366', fontSize: '0.6875rem' }}>
+                            marcação fora de ordem
                         </Typography>
-                        {row.tempo_intervalo && row.tempo_intervalo !== '—' && (
-                            <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '0.6875rem' }}>
-                                intervalo {row.tempo_intervalo}
-                            </Typography>
-                        )}
-                        {row.inconsistencias > 0 && (
-                            <Typography variant="caption" sx={{ color: '#FF3366', fontSize: '0.6875rem' }}>
-                                marcação fora de ordem
-                            </Typography>
-                        )}
                     </Box>
                 );
             }
@@ -349,10 +329,8 @@ const Reports = () => {
         { id: 'pulseira', label: 'Pulseira', width: 100, align: 'center', format: (val) => val || '—' },
         { id: 'primeira_entrada', label: 'Primeira entrada', width: 130, align: 'center', format: fmtHorario },
         { id: 'ultima_saida', label: 'Última saída', width: 130, align: 'center', format: fmtHorario },
-        { id: 'permanencia_minutos', label: 'Permanência', width: 120, align: 'center', format: fmtMin },
-        { id: 'intervalo_minutos', label: 'Intervalos', width: 110, align: 'center', format: fmtMin },
         {
-            id: 'liquido_minutos', label: 'Horas líquidas', width: 130, align: 'center',
+            id: 'permanencia_minutos', label: 'Horas trabalhadas', width: 140, align: 'center',
             format: (val) => (
                 <Typography variant="body2" sx={{ fontWeight: 700, color: val > 0 ? '#00FF88' : '#64748B' }}>{fmtMin(val)}</Typography>
             )
@@ -707,12 +685,12 @@ const Reports = () => {
                         </Grid>
                         <Grid item xs={12} sm={4} md={2.4}>
                             <KpiCard
-                                titulo="Horas líquidas (média)"
-                                valor={totaisDiarios.tempo_medio_liquido_formatado || '00h 00m'}
+                                titulo="Tempo médio no evento"
+                                valor={(totaisDiarios.tempo_medio_formatado || '00h 00m').slice(0, 7)}
                                 icone={<KpiTempoIcon />}
                                 cor={cores.secundariaClara}
                                 valorCompacto
-                                rodape={`Total ${totaisDiarios.horas_liquidas_formatado || '00h 00m'} • permanência média ${(totaisDiarios.tempo_medio_formatado || '00h 00m').slice(0, 7)}${totaisDiarios.total_a_conferir ? ` • ${totaisDiarios.total_a_conferir} a conferir` : ''}`}
+                                rodape={`Total ${totaisDiarios.horas_totais_formatado || '00h 00m'}${totaisDiarios.total_a_conferir ? ` • ${totaisDiarios.total_a_conferir} a conferir` : ''}`}
                             />
                         </Grid>
                     </Grid>
