@@ -16,7 +16,8 @@ class CacheService {
         };
 
         // Limpar cache expirado a cada minuto
-        setInterval(() => this.cleanExpired(), 60000);
+        // unref: o timer não segura o processo aberto no desligamento (SIGTERM) nem nos testes
+        setInterval(() => this.cleanExpired(), 60000).unref();
     }
 
     /**

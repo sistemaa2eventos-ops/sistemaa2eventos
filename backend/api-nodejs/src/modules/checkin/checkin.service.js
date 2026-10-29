@@ -194,33 +194,35 @@ class CheckinService {
     /**
      * B-02: Reverter Acesso em caso de Falha de Hardware (Rollback)
      */
-    async reverterAcesso(supabaseClient, { pessoa_id, log_id, motivo }) {
+    /**
+     * A porta não abriu: desfaz o acesso já gravado.
+     * @param {string} status_anterior status_acesso da pessoa antes deste acesso
+     */
+    async reverterAcesso(supabaseClient, { pessoa_id, log_id, motivo, status_anterior }) {
         try {
-            logger.warn(`♻️ [Rollback] Revertendo check-in para pessoa ${pessoa_id}. Motivo: ${motivo}`);
-            
-            // 1. Reverter Status da Pessoa
-            const { error: pErr } = await supabaseClient
-                .from('pessoas')
-                .update({ 
-                    status_acesso: 'checkout_feito', // FIX C-09: 'checkout' não faz parte do CHECK constraint
-                    last_access_at: null 
-                })
-                .eq('id', pessoa_id);
+            logger.warn(`♻️ [Rollback] Revertendo acesso da pessoa ${pessoa_id}. Motivo: ${motivo}`);
 
-            if (pErr) throw pErr;
-
-            // 2. Marcar log como FAILED ou Deletar
-            // Optamos por manter o log mas marcado como erro de hardware para auditoria
-            if (log_id) {
-                await supabaseClient
-                    .from('logs_acesso')
-                    .update({ 
-                        tipo: 'erro_hardware',
-                        observacao: motivo 
-                    })
-                    .eq('id', log_id);
+            // 1. Status volta ao de antes do acesso (antes: sempre 'checkout_feito', mesmo desfazendo
+            //    uma saída, e gravava a coluna inexistente last_access_at — a reversão sempre falhava)
+            if (status_anterior) {
+                const { error: pErr } = await supabaseClient
+                    .from('pessoas')
+                    .update({ status_acesso: status_anterior, atualizado_em: new Date().toISOString() })
+                    .eq('id', pessoa_id);
+                if (pErr) throw pErr;
             }
 
+            // 2. Mantém o registro para auditoria, como recusado: a pessoa não passou
+            //    (não conta como entrada/saída no anti-passback nem nos relatórios)
+            if (log_id) {
+                const { error: lErr } = await supabaseClient
+                    .from('logs_acesso')
+                    .update({ tipo: 'negado', observacao: `Falha de hardware: ${motivo}` })
+                    .eq('id', log_id);
+                if (lErr) throw lErr;
+            }
+
+            cacheService.invalidatePessoa(pessoa_id);
             return { success: true };
         } catch (error) {
             logger.error('Erro ao reverter acesso:', error.message);

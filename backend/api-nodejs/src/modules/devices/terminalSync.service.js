@@ -64,6 +64,19 @@ class TerminalSyncService {
 
             await supabase.from('dispositivos_acesso').update({ sync_status: 'sincronizando' }).eq('id', terminalId);
 
+            // Pessoas primeiro (todas, sem o corte de 1000; sem face_encoding) e áreas do evento
+            // de uma vez. Só depois limpa o terminal: falha na busca não deixa o leitor vazio.
+            const { buscarTodos } = require('../../utils/buscarTodos');
+            const { COLUNAS_PESSOA_ACESSO } = require('../checkin/services/colunasPessoa');
+            const { data: pessoas, error: fError } = await buscarTodos(supabase
+                .from('pessoas')
+                .select(COLUNAS_PESSOA_ACESSO)
+                .eq('evento_id', terminal.evento_id));
+
+            if (fError) throw fError;
+            const ctxAreas = await syncService._carregarContextoSync(terminal.evento_id);
+            if (!ctxAreas) throw new Error('Falha ao carregar as áreas do evento');
+
             // Direto ou via agente local (transporte escolhido pelo serviço do terminal)
             const directService = DeviceFactory.getDevice(terminal);
             if (reset && directService?.clearAllFaces) {
@@ -71,18 +84,11 @@ class TerminalSyncService {
                 logger.info(`🧹 Terminal ${terminal.nome} limpo antes da sincronização`);
             }
 
-            const { data: pessoas, error: fError } = await supabase
-                .from('pessoas')
-                .select('*')
-                .eq('evento_id', terminal.evento_id);
-
-            if (fError) throw fError;
-
             const enviar = [];
             const remover = [];
             for (const pessoa of pessoas) {
                 if (syncService._statusRemoveDosTerminais(pessoa)) { remover.push(pessoa); continue; }
-                const areaIds = await syncService._getPessoaAreaIds(pessoa);
+                const areaIds = await syncService._getPessoaAreaIds(pessoa, ctxAreas);
                 if (!syncService._terminalAceitaPessoa(terminal, areaIds)) { remover.push(pessoa); continue; }
                 if (pessoa.foto_url) enviar.push(pessoa);
             }

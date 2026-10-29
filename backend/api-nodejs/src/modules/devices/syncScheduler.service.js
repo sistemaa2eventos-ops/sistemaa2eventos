@@ -190,6 +190,19 @@ class SyncScheduler {
     }
 
     /**
+     * Sincronização manual sem prender a requisição (pode levar muito tempo com muitas
+     * pessoas e leitores: o navegador/nginx desistiam antes e o operador não sabia se rodou).
+     * @returns {{ iniciada: boolean, motivo?: string }}
+     */
+    iniciarSyncManual() {
+        if (this.isRunning || syncService.syncDiarioRodando) {
+            return { iniciada: false, motivo: 'Já existe uma sincronização em andamento' };
+        }
+        this.runManualSync().catch((error) => logger.error('❌ Erro na sincronização manual:', error));
+        return { iniciada: true };
+    }
+
+    /**
      * EXECUTAR SINCRONIZAÇÃO MANUAL
      */
     async runManualSync() {

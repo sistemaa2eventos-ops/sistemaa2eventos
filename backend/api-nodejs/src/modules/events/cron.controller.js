@@ -4,6 +4,8 @@ const logger = require('../../services/logger');
 const reportController = require('../reports/report.controller');
 const emailService = require('../../services/emailService');
 const { getHojeLocal, getNowLocal } = require('../../utils/dateUtils');
+const { buscarTodos } = require('../../utils/buscarTodos');
+const { emLotes, emParalelo } = require('../../utils/lotes');
 
 class CronController {
     constructor() {
@@ -78,9 +80,8 @@ class CronController {
 
         // Jobs fixos (não configuráveis pelo usuário) — Promise não awaited intencionalmente;
         // erros capturados internamente via try/catch em cada método.
-        cron.schedule('*/5 * * * *', () => {
-            this.autoCheckoutRoutine().catch(e => logger.error('[CRON] autoCheckoutRoutine falhou:', e));
-        });
+        // (autoCheckoutRoutine não é mais agendada: não tem tempo limite configurado e
+        //  saía na primeira linha a cada 5 min. A saída de quem fica dentro é no fechamento de turno.)
         // Vencimento de documentos: marca vencidos, reavalia pessoas e notifica o painel
         cron.schedule('0 7 * * *', () => {
             logger.info('🔄 [CRON] Verificação de vencimento de documentos...');
@@ -91,7 +92,12 @@ class CronController {
         // A cada minuto: expira liberações manuais e roda o fechamento de turno
         // de cada evento no seu horario_reset
         cron.schedule('* * * * *', () => {
-            this.tickMinuto().catch(e => logger.error('[CRON] tickMinuto falhou:', e));
+            // Um fechamento de turno grande passa de 1 min: não começa outro por cima
+            if (this._tickRodando) return;
+            this._tickRodando = true;
+            this.tickMinuto()
+                .catch(e => logger.error('[CRON] tickMinuto falhou:', e))
+                .finally(() => { this._tickRodando = false; });
         });
     }
 
@@ -231,11 +237,11 @@ class CronController {
      * ficava "presente" para sempre no relatório.
      */
     async _pessoasDentro(eventoId) {
-        const { buscarTodos } = require('../../utils/buscarTodos');
         const desde = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
         const [{ data: porStatus, error: e1 }, { data: logs, error: e2 }] = await Promise.all([
-            supabase.from('pessoas').select('id, status_acesso')
-                .eq('evento_id', eventoId).in('status_acesso', ['checkin_feito', 'checkout_feito']),
+            // todas (o PostgREST cortava em 1000 e o resto ficava com o status do dia anterior)
+            buscarTodos(supabase.from('pessoas').select('id, status_acesso')
+                .eq('evento_id', eventoId).in('status_acesso', ['checkin_feito', 'checkout_feito'])),
             buscarTodos(supabase.from('logs_acesso').select('pessoa_id, tipo, created_at')
                 .eq('evento_id', eventoId).in('tipo', ['checkin', 'checkout'])
                 .gte('created_at', desde).order('created_at', { ascending: false }))
@@ -270,24 +276,27 @@ class CronController {
             // 1. Saída forçada para quem ainda estava dentro (erro aqui interrompe: sem saída, o relatório mentiria)
             if (dentro.length > 0) {
                 const agora = new Date().toISOString();
-                const { error: logsErr } = await supabase.from('logs_acesso').insert(dentro.map(pessoa_id => ({
-                    pessoa_id,
-                    evento_id: eventoId,
-                    tipo: 'checkout',
-                    metodo: 'manual',
-                    observacao: 'CHECKOUT_FORCADO_CRON',
-                    created_at: agora
-                })));
-                if (logsErr) throw logsErr;
+                for (const lote of emLotes(dentro, 500)) {
+                    const { error: logsErr } = await supabase.from('logs_acesso').insert(lote.map(pessoa_id => ({
+                        pessoa_id,
+                        evento_id: eventoId,
+                        tipo: 'checkout',
+                        metodo: 'manual',
+                        observacao: 'CHECKOUT_FORCADO_CRON',
+                        created_at: agora
+                    })));
+                    if (logsErr) throw logsErr;
+                }
             }
 
             // 2. Status de entrada/saída volta a "autorizado" para o novo dia
             const pessoasIds = [...new Set([...statusParaZerar, ...dentro])];
-            if (statusParaZerar.length > 0) {
+            // em lotes: milhares de ids num .in() estouram o tamanho da URL
+            for (const lote of emLotes(statusParaZerar, 200)) {
                 const { error: updateErr } = await supabase
                     .from('pessoas')
                     .update({ status_acesso: 'autorizado', updated_at: new Date().toISOString() })
-                    .in('id', statusParaZerar);
+                    .in('id', lote);
                 if (updateErr) throw updateErr;
             }
 
@@ -295,10 +304,11 @@ class CronController {
             //     (quem tem pendência volta a "pendente" para o próximo turno)
             const documentoService = require('../entities/documento.service');
             const liberacaoManual = require('../entities/liberacaoManual.service');
-            for (const id of pessoasIds) {
+            //     5 pessoas por vez (antes uma atrás da outra: ~5 consultas cada)
+            await emParalelo(pessoasIds, 5, async (id) => {
                 await liberacaoManual.encerrar(id, 'fechamento de turno');
                 await documentoService.sincronizarStatusPessoa(null, id);
-            }
+            });
 
             // 3. Arquivar o fechamento do dia (o e-mail com a planilha sai no horário do relatório)
             if (arquivar) {

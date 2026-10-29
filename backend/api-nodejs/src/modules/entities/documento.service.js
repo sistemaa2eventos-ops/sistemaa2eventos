@@ -3,6 +3,8 @@ const logger = require('../../services/logger');
 const requisitos = require('./documentoRequisitos.service');
 const { normalizarFuncao, FUNCAO_PADRAO } = require('./documentoRequisitos.service');
 const { getHojeLocal } = require('../../utils/dateUtils');
+const { emParalelo } = require('../../utils/lotes');
+const { buscarTodos } = require('../../utils/buscarTodos');
 
 const STATUS_AUDITORIA = ['aprovado', 'reprovado', 'reenvio_solicitado'];
 const STATUS_EM_FILA = ['pendente', 'em_analise'];
@@ -158,9 +160,7 @@ class DocumentoService {
             const { data: afetados } = await supabaseClient.from('pessoa_documentos').select('pessoa_id').in('id', pesDocs);
             if (afetados) {
                 const uniqueIds = [...new Set(afetados.map(a => a.pessoa_id))];
-                for (const pId of uniqueIds) {
-                    await this.sincronizarStatusPessoa(supabaseClient, pId);
-                }
+                await emParalelo(uniqueIds, 5, (pId) => this.sincronizarStatusPessoa(supabaseClient, pId));
             }
         }
 
@@ -247,8 +247,10 @@ class DocumentoService {
 
     /** Recalcula todas as pessoas do evento (após mudar as regras). */
     async recalcularEvento(eventoId) {
-        const { data: pessoas } = await supabase.from('pessoas').select('id').eq('evento_id', eventoId);
-        for (const p of pessoas || []) await this.sincronizarStatusPessoa(null, p.id);
+        // todas (o corte de 1000 do PostgREST deixava o resto com a situação antiga), 5 por vez
+        const { data: pessoas, error } = await buscarTodos(supabase.from('pessoas').select('id').eq('evento_id', eventoId));
+        if (error) throw error;
+        await emParalelo(pessoas || [], 5, (p) => this.sincronizarStatusPessoa(null, p.id));
         logger.info(`🔄 [Documentos] Situação documental recalculada para ${pessoas?.length || 0} pessoas do evento ${eventoId}`);
     }
 

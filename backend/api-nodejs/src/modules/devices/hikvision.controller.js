@@ -79,8 +79,9 @@ class HikvisionController {
                     logger.error(`🚨 [Hikvision] FALHA CRÍTICA DE HARDWARE: ${hwError.message}. Iniciando ROLLBACK.`);
                     await checkinService.reverterAcesso(supabase, {
                         pessoa_id: pessoa.id,
-                        log_id: result.details?.id,
-                        motivo: `Falha técnica no hardware Hikvision: ${hwError.message}`
+                        log_id: result.details?.id || result.id,
+                        motivo: `Falha técnica no hardware Hikvision: ${hwError.message}`,
+                        status_anterior: pessoa.status_acesso
                     });
                 }
             }

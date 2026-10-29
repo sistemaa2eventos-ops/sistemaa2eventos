@@ -84,7 +84,7 @@ const ConfigCron = () => {
         try {
             setRunningSync(true);
             await api.post('/sync/run');
-            enqueueSnackbar('Sincronização manual executada!', { variant: 'success' });
+            enqueueSnackbar('Sincronização iniciada. Ela continua em segundo plano.', { variant: 'success' });
         } catch (err) {
             enqueueSnackbar(err.response?.data?.error || 'Erro ao executar sync.', { variant: 'error' });
         } finally {

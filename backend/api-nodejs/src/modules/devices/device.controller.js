@@ -777,15 +777,27 @@ class DeviceController {
     // Forçar reprocessamento da fila de um dispositivo
     async forceQueue(req, res) {
         try {
-            const syncScheduler = require('./syncScheduler.service');
+            const syncService = require('./sync.service');
+            const { id } = req.params;
 
             logger.info('Forcing queue reprocessing', {
+                device_id: id,
                 event_id: req.event?.id,
                 user_id: req.user?.id
             });
 
-            await syncScheduler.runManualSync();
-            res.json({ success: true, message: 'Fila reprocessada com sucesso.' });
+            // Antes rodava a sincronização completa de todos os leitores (horas) dentro da
+            // requisição. Agora: dá nova chance às pendências que esgotaram as tentativas
+            // deste leitor e processa a fila (no máx. 30 itens, rápido).
+            const { error: resetErr } = await supabase
+                .from('terminal_sync_queue')
+                .update({ status: 'pendente', attempt_count: 0 })
+                .eq('dispositivo_id', id)
+                .eq('status', 'erro');
+            if (resetErr) throw resetErr;
+
+            const resultado = await syncService.processTerminalQueue();
+            res.json({ success: true, message: 'Fila reprocessada com sucesso.', data: resultado });
         } catch (error) {
             logger.error(
                 { err: error, event_id: req.event?.id, user_id: req.user?.id },

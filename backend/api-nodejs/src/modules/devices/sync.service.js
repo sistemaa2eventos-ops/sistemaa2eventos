@@ -4,6 +4,8 @@ const logger = require('../../services/logger');
 const auditService = require('../../services/audit.service');
 const imageProcessor = require('../../utils/imageProcessor');
 const { getHwUserIdCandidates } = require('./hwUserId');
+const { buscarTodos } = require('../../utils/buscarTodos');
+const { COLUNAS_PESSOA_ACESSO } = require('../checkin/services/colunasPessoa');
 const EventEmitter = require('events');
 require('dotenv').config();
 
@@ -668,18 +670,34 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
                 return;
             }
 
+            // Só o que o leitor precisa (antes ia a pessoa inteira, com face_encoding)
+            const p = payload?.pessoa;
+            const payloadEnxuto = p
+                ? { ...payload, pessoa: { id: p.id, cpf: p.cpf, nome_completo: p.nome_completo, nome: p.nome, evento_id: p.evento_id, foto_url: p.foto_url } }
+                : payload;
+            const pessoaId = p?.id || null;
+
+            // O mesmo comando ainda pendente para a mesma pessoa/leitor é substituído pelo novo
+            // (leitor offline por horas acumulava um cadastro repetido a cada alteração)
+            if (pessoaId) {
+                await supabase.from('terminal_sync_queue').delete()
+                    .eq('dispositivo_id', dispositivoId).eq('tipo_comando', tipo)
+                    .eq('pessoa_id', pessoaId).in('status', ['pendente', 'erro']);
+            }
+
             const { error: insErr } = await supabase
                 .from('terminal_sync_queue')
                 .insert({
                     evento_id: eventoId,
                     dispositivo_id: dispositivoId,
                     tipo_comando: tipo,
-                    payload: JSON.stringify(payload),
+                    pessoa_id: pessoaId,
+                    payload: JSON.stringify(payloadEnxuto),
                     status: 'pendente'
                 });
 
             if (insErr) throw insErr;
-            logger.info(`📝 [SyncQueue] Comando ${tipo} agendado para dispositivo ${dispositivoId}`);
+            logger.debug(`📝 [SyncQueue] Comando ${tipo} agendado para dispositivo ${dispositivoId}`);
         } catch (error) {
             logger.error(`❌ Erro ao enfileirar comando para terminal: ${error.message}`);
         }
@@ -731,7 +749,7 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
                 .in('status', ['pendente', 'erro'])
                 .lt('attempt_count', 5)
                 .order('created_at', { ascending: true })
-                .limit(10);
+                .limit(30);
 
             if (qErr) throw qErr;
             if (!queue || queue.length === 0) {
@@ -743,7 +761,16 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
             const DeviceFactory = require('./adapters/DeviceFactory');
             let processed = 0;
 
+            // Leitores diferentes em paralelo; no mesmo leitor, um comando por vez (o firmware
+            // não aguenta cadastros simultâneos). Antes: 10 itens/min no total, um atrás do outro.
+            const porLeitor = new Map();
             for (const item of queue) {
+                if (!porLeitor.has(item.dispositivo_id)) porLeitor.set(item.dispositivo_id, []);
+                porLeitor.get(item.dispositivo_id).push(item);
+            }
+
+            await Promise.all([...porLeitor.values()].map(async (itens) => {
+            for (const item of itens) {
                 const d = item.dispositivos_acesso;
                 if (!d || d.status_online !== 'online') continue;
 
@@ -794,6 +821,7 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
                     logger.warn(`⚠️ [SyncQueue] Falha ao processar item ${item.id}: ${err.message}`);
                 }
             }
+            }));
 
             logger.info(`✅ [SyncQueue] ${processed} itens processados com sucesso`);
             return { processed };
@@ -819,8 +847,14 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
     /**
      * Áreas em que a pessoa pode entrar: cache na pessoa + vínculos diretos + áreas da pulseira.
      */
-    async _getPessoaAreaIds(pessoa) {
+    async _getPessoaAreaIds(pessoa, ctx = {}) {
         const areas = new Set(Array.isArray(pessoa.areas_autorizadas) ? pessoa.areas_autorizadas : []);
+        // Sincronização em lote (noturna): áreas já carregadas uma vez para o evento todo
+        if (ctx.areasPorPessoa && ctx.areasPorPulseira) {
+            (ctx.areasPorPessoa.get(pessoa.id) || []).forEach(a => areas.add(a));
+            if (pessoa.tipo_pulseira_id) (ctx.areasPorPulseira.get(pessoa.tipo_pulseira_id) || []).forEach(a => areas.add(a));
+            return areas;
+        }
         try {
             const { data: diretas } = await supabase
                 .from('pessoa_areas_acesso')
@@ -857,12 +891,13 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
      * Cadastra nos terminais da(s) área(s) dela e remove dos demais.
      * Terminal offline → comando vai para a fila.
      * @param {Object|string} pessoaOrId objeto pessoa ou UUID
+     * @param {Object} ctx opcional (lote): { terminais, areasPorPessoa, areasPorPulseira, fotoCache }
      */
-    async syncUserToAllDevices(pessoaOrId) {
+    async syncUserToAllDevices(pessoaOrId, ctx = {}) {
         try {
             let pessoa = pessoaOrId;
             if (typeof pessoaOrId === 'string') {
-                const { data } = await supabase.from('pessoas').select('*').eq('id', pessoaOrId).maybeSingle();
+                const { data } = await supabase.from('pessoas').select(COLUNAS_PESSOA_ACESSO).eq('id', pessoaOrId).maybeSingle();
                 pessoa = data;
             }
             if (!pessoa?.id) {
@@ -873,22 +908,22 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
             const nome = pessoa.nome_completo || pessoa.nome;
             if (this._statusRemoveDosTerminais(pessoa)) {
                 logger.info(`🔄 [Sync] ${nome} está ${pessoa.status_acesso}/bloqueado — removendo dos terminais.`);
-                return this.deleteUserFromAllDevices(pessoa, pessoa.evento_id);
+                return this.deleteUserFromAllDevices(pessoa, pessoa.evento_id, ctx);
             }
 
-            logger.info(`🔄 Auto-Sync: Processando ${nome} para terminais...`);
+            logger.debug(`🔄 Auto-Sync: Processando ${nome} para terminais...`);
 
-            const { data: terminais } = await supabase
+            const terminais = ctx.terminais || (await supabase
                 .from('dispositivos_acesso')
                 .select('*')
                 .eq('evento_id', pessoa.evento_id)
-                .eq('tipo', 'terminal_facial');
+                .eq('tipo', 'terminal_facial')).data;
 
             if (!terminais || terminais.length === 0) return;
 
             const DeviceFactory = require('./adapters/DeviceFactory');
             const fotoInput = pessoa.foto_url || pessoa.foto_base64_cache || pessoa.foto_base64_internal;
-            const areaIds = await this._getPessoaAreaIds(pessoa);
+            const areaIds = await this._getPessoaAreaIds(pessoa, ctx);
             const hwIds = getHwUserIdCandidates(pessoa);
             const resultado = { cadastrados: [], removidos: [], enfileirados: [], ignorados: [] };
 
@@ -947,7 +982,7 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
      * Chamado quando a pessoa é bloqueada, excluída ou perde o acesso.
      * @param {Object|string} pessoaOrId objeto pessoa (preferível: já tem o CPF) ou UUID
      */
-    async deleteUserFromAllDevices(pessoaOrId, eventoId) {
+    async deleteUserFromAllDevices(pessoaOrId, eventoId, ctx = {}) {
         try {
             let pessoa = typeof pessoaOrId === 'object' ? pessoaOrId : null;
             if (!pessoa) {
@@ -958,13 +993,15 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
             const hwIds = getHwUserIdCandidates(pessoa);
             if (hwIds.length === 0) return;
 
-            logger.info(`🗑️ Auto-Delete: Removendo ${pessoa.nome_completo || pessoa.id} (IDs ${hwIds.join(', ')}) dos terminais...`);
+            logger.debug(`🗑️ Auto-Delete: Removendo ${pessoa.nome_completo || pessoa.id} (IDs ${hwIds.join(', ')}) dos terminais...`);
 
-            const { data: terminais, error } = await supabase
-                .from('dispositivos_acesso')
-                .select('*')
-                .eq('evento_id', evento)
-                .eq('tipo', 'terminal_facial');
+            const { data: terminais, error } = ctx.terminais
+                ? { data: ctx.terminais, error: null }
+                : await supabase
+                    .from('dispositivos_acesso')
+                    .select('*')
+                    .eq('evento_id', evento)
+                    .eq('tipo', 'terminal_facial');
 
             if (error || !terminais || terminais.length === 0) {
                 logger.warn('⚠️ Nenhum terminal para remover usuário.');
@@ -1011,7 +1048,7 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
             // 1. Buscar dados da pessoa
             const { data: pessoa, error: pessoaError } = await supabase
                 .from('pessoas')
-                .select('id, nome_completo, cpf, evento_id, status_acesso, bloqueado, ativo, areas_autorizadas, tipo_pulseira_id, foto_base64_cache, foto_base64_internal, foto_url')
+                .select('id, nome_completo, cpf, evento_id, status_acesso, bloqueado, ativo, areas_autorizadas, tipo_pulseira_id, foto_url')
                 .eq('id', pessoaId)
                 .single();
 
@@ -1172,8 +1209,36 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
                 .update({ sync_status: 'sincronizando' })
                 .eq('id', dispositivoId);
 
-            // 3. Se online, limpar faces do dispositivo
             let cleaned = false;
+
+            // 4. Buscar pessoas com acesso a ESTA ÁREA específica
+            //    (as colunas foto_base64_* não existem: a consulta falhava sempre e o reset
+            //     apagava o leitor sem recadastrar ninguém; e passava de 1000 pessoas sem aviso)
+            const { data: pessoasAutorizadas, error: pessoasError } = await buscarTodos(supabase
+                .from('pessoas')
+                .select('id, nome_completo, cpf, evento_id, status_acesso, bloqueado, ativo, areas_autorizadas, tipo_pulseira_id, foto_url')
+                .eq('evento_id', dispositivo.evento_id));
+
+            if (pessoasError || !pessoasAutorizadas) {
+                logger.error(`❌ [DeviceReset] Falha ao buscar pessoas do evento: ${pessoasError?.message}`);
+                await supabase.from('dispositivos_acesso').update({ sync_status: 'erro' }).eq('id', dispositivoId);
+                return { success: false, cleaned, cadastrados: 0, error: 'Falha ao buscar as pessoas do evento' };
+            }
+
+            // Áreas do evento carregadas uma vez (antes: consultas por pessoa)
+            const ctxAreas = await this._carregarContextoSync(dispositivo.evento_id);
+
+            // 5. Filtrar apenas pessoas com acesso à área deste dispositivo
+            const pessoasComAcesso = [];
+            for (const p of pessoasAutorizadas) {
+                if (this._statusRemoveDosTerminais(p)) continue;
+                const areaSet = await this._getPessoaAreaIds(p, ctxAreas || {});
+                if (this._terminalAceitaPessoa(dispositivo, areaSet)) pessoasComAcesso.push(p);
+            }
+
+            logger.info(`👥 [DeviceReset] ${pessoasComAcesso.length} pessoas com acesso à área ${dispositivo.area_id}`);
+
+            // Só depois de ter a lista de quem recadastrar: limpar as faces do dispositivo
             if (dispositivo.status_online === 'online') {
                 try {
                     const service = DeviceFactory.getDevice(dispositivo);
@@ -1188,31 +1253,6 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
                 }
             }
 
-            // 4. Buscar pessoas com acesso a ESTA ÁREA específica
-            const { data: pessoasAutorizadas, error: pessoasError } = await supabase
-                .from('pessoas')
-                .select(`
-                    id, nome_completo, cpf, status_acesso, bloqueado, ativo, areas_autorizadas, tipo_pulseira_id,
-                    foto_base64_cache, foto_base64_internal, foto_url,
-                    pessoa_areas_acesso(area_id)
-                `)
-                .eq('evento_id', dispositivo.evento_id);
-
-            if (pessoasError || !pessoasAutorizadas) {
-                logger.warn(`⚠️ [DeviceReset] Nenhuma pessoa autorizada encontrada`);
-                return { success: true, cleaned, cadastrados: 0 };
-            }
-
-            // 5. Filtrar apenas pessoas com acesso à área deste dispositivo
-            const pessoasComAcesso = [];
-            for (const p of pessoasAutorizadas) {
-                if (this._statusRemoveDosTerminais(p)) continue;
-                const areaSet = await this._getPessoaAreaIds(p);
-                (p.pessoa_areas_acesso || []).forEach(a => areaSet.add(a.area_id));
-                if (this._terminalAceitaPessoa(dispositivo, areaSet)) pessoasComAcesso.push(p);
-            }
-
-            logger.info(`👥 [DeviceReset] ${pessoasComAcesso.length} pessoas com acesso à área ${dispositivo.area_id}`);
 
             // 6. Cadastrar pessoas no dispositivo
             let cadastrados = 0;
@@ -1287,12 +1327,12 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
         } catch (error) {
             logger.error(`❌ [DeviceReset] Erro crítico:`, error);
 
-            // Marcar dispositivo com erro
-            await supabase
+            // Marcar dispositivo com erro (a consulta do Supabase não tem .catch: devolve { error })
+            const { error: statusErr } = await supabase
                 .from('dispositivos_acesso')
                 .update({ sync_status: 'erro' })
-                .eq('id', dispositivoId)
-                .catch(e => logger.error('Falha ao atualizar status:', e));
+                .eq('id', dispositivoId);
+            if (statusErr) logger.error('Falha ao atualizar status:', statusErr);
 
             return { success: false, error: error.message };
         }
@@ -1309,7 +1349,7 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
             // 1. Buscar dados da pessoa
             const { data: pessoa } = await supabase
                 .from('pessoas')
-                .select('id, nome_completo, cpf, evento_id, status_acesso, bloqueado, ativo, foto_url, foto_base64_cache, foto_base64_internal')
+                .select('id, nome_completo, cpf, evento_id, status_acesso, bloqueado, ativo, foto_url')
                 .eq('id', pessoaId)
                 .single();
 
@@ -1419,6 +1459,24 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
      * de quem perdeu o direito de acesso hoje, enquanto envia quem ganhou as credenciais.
      */
     async runDailyAccessSync() {
+        // Uma por vez: a noturna (01:00), a manual e a "varredura de borda" disputavam os leitores
+        if (this._syncDiarioRodando) {
+            logger.warn('⚠️ [Nightly Sync] Já existe uma sincronização diária em andamento; ignorando nova chamada.');
+            return { ignorado: 'em_andamento' };
+        }
+        this._syncDiarioRodando = true;
+        try {
+            return await this._executarSyncDiario();
+        } finally {
+            this._syncDiarioRodando = false;
+        }
+    }
+
+    get syncDiarioRodando() {
+        return !!this._syncDiarioRodando;
+    }
+
+    async _executarSyncDiario() {
         try {
             logger.info('🌙 [Nightly Sync] Iniciando sincronização inteligente diária de catracas...');
             const startTime = Date.now();
@@ -1470,14 +1528,22 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
 
                 logger.info(`🚀 Processando Evento ${eventoId} - Montagem: ${isMontagem}, ShowDay: ${isShowday}, Desmontagem: ${isDesmontagem}`);
 
-                // Buscar pessoas (Somente não deletados logicamente)
-                const { data: pessoas, error: errPessoas } = await supabase
+                // Pessoas (não deletadas logicamente) — TODAS: o PostgREST cortava em 1000 sem avisar
+                // e quem passava disso nunca era renovado nem removido dos leitores
+                const { data: pessoas, error: errPessoas } = await buscarTodos(supabase
                     .from('pessoas')
-                    .select('*')
+                    .select(COLUNAS_PESSOA_ACESSO)
                     .eq('evento_id', eventoId)
-                    .neq('ativo', false);
+                    .or('ativo.is.null,ativo.eq.true'));
 
-                if (errPessoas || !pessoas) continue;
+                if (errPessoas || !pessoas) {
+                    logger.error(`❌ [Nightly Sync] Falha ao carregar pessoas do evento ${eventoId}: ${errPessoas?.message}`);
+                    continue;
+                }
+
+                // Leitores e áreas do evento carregados uma vez (antes: 2-3 consultas por pessoa)
+                const ctx = await this._carregarContextoSync(eventoId);
+                if (!ctx) continue;
 
                 // 4. Analisar cada pessoa e verificar acessos
                 for (const pessoa of pessoas) {
@@ -1523,13 +1589,13 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
                         }
 
                         logger.debug(`[Nightly Sync] Limpando acesso expirado/inativo: ${pessoa.nome_completo}`);
-                        await this.deleteUserFromAllDevices(pessoa, eventoId);
+                        await this.deleteUserFromAllDevices(pessoa, eventoId, ctx);
                         totalRemovidos++;
                     } else {
                         // Se for autorizada hoje, tem validação para sincronizar face
                         if (pessoa.foto_url || pessoa.foto_base64_cache || pessoa.foto_base64_internal) {
                            logger.debug(`[Nightly Sync] Renovando acesso válido de hoje: ${pessoa.nome_completo}`);
-                           await this.syncUserToAllDevices(pessoa);
+                           await this.syncUserToAllDevices(pessoa, ctx);
                            totalSincronizados++;
                         }
                     }
@@ -1540,10 +1606,45 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
 
             const duration = ((Date.now() - startTime) / 1000).toFixed(2);
             logger.info(`✅ [Nightly Sync] Finalizado em ${duration}s! Total Liberados (Hoje): ${totalSincronizados} | Limpos (Removidos): ${totalRemovidos}`);
+            return { sincronizados: totalSincronizados, removidos: totalRemovidos, duracao_s: Number(duration) };
 
         } catch (error) {
             logger.error('❌ [Nightly Sync] Erro crítico na rotina de madrugada:', error);
+            return { erro: error.message };
         }
+    }
+
+    /**
+     * Leitores faciais do evento e mapas de áreas (vínculo direto e por tipo de pulseira),
+     * para a sincronização em lote não consultar o banco a cada pessoa.
+     */
+    async _carregarContextoSync(eventoId) {
+        const [terminaisRes, diretasRes, pulseirasRes] = await Promise.all([
+            supabase.from('dispositivos_acesso').select('*').eq('evento_id', eventoId).eq('tipo', 'terminal_facial'),
+            buscarTodos(supabase.from('pessoa_areas_acesso').select('id, pessoa_id, area_id').eq('evento_id', eventoId)),
+            supabase.from('pulseira_areas_permitidas')
+                .select('pulseira_id, area_id, evento_tipos_pulseira!inner(evento_id)')
+                .eq('evento_tipos_pulseira.evento_id', eventoId)
+        ]);
+        const erro = terminaisRes.error || diretasRes.error || pulseirasRes.error;
+        if (erro) {
+            logger.error(`❌ [Nightly Sync] Falha ao carregar leitores/áreas do evento ${eventoId}: ${erro.message}`);
+            return null;
+        }
+
+        const agrupar = (linhas, chave) => {
+            const mapa = new Map();
+            for (const l of linhas || []) {
+                if (!mapa.has(l[chave])) mapa.set(l[chave], []);
+                mapa.get(l[chave]).push(l.area_id);
+            }
+            return mapa;
+        };
+        return {
+            terminais: terminaisRes.data || [],
+            areasPorPessoa: agrupar(diretasRes.data, 'pessoa_id'),
+            areasPorPulseira: agrupar(pulseirasRes.data, 'pulseira_id')
+        };
     }
 }
 

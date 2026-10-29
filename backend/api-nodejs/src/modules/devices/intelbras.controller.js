@@ -248,7 +248,8 @@ class IntelbrasController {
                                     await checkinService.reverterAcesso(supabase, {
                                         pessoa_id: pessoa.id,
                                         log_id: result.details?.id || result.id,
-                                        motivo: `Falha técnica no hardware: ${hwError.message}`
+                                        motivo: `Falha técnica no hardware: ${hwError.message}`,
+                                        status_anterior: pessoa.status_acesso
                                     });
 
                                     await service.displayMessage(`ERRO HARDWARE`);

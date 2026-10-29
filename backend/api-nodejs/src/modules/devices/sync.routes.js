@@ -12,30 +12,12 @@ const { authenticate, authorize, validateInternalApiKey } = require('../../middl
  * @desc    Executa sincronização manual
  * @access  Admin
  */
-router.post(['/run', '/force'], authenticate, authorize('admin'), async (req, res) => {
-    const startTime = Date.now();
-
-    try {
-        logger.info(`👤 Sincronização manual solicitada por: ${req.user.email}`);
-
-        const result = await syncScheduler.runManualSync();
-
-        const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-
-        res.json({
-            success: true,
-            message: 'Sincronização concluída',
-            duration: `${duration}s`,
-            data: result
-        });
-
-    } catch (error) {
-        logger.error('❌ Erro na sincronização manual:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
+router.post(['/run', '/force'], authenticate, authorize('admin'), (req, res) => {
+    logger.info(`👤 Sincronização manual solicitada por: ${req.user.email}`);
+    // Roda em segundo plano: com muitas pessoas leva mais que o tempo limite da requisição
+    const { iniciada, motivo } = syncScheduler.iniciarSyncManual();
+    if (!iniciada) return res.status(409).json({ success: false, error: motivo });
+    res.status(202).json({ success: true, message: 'Sincronização iniciada. Acompanhe o andamento pelo status dos leitores.' });
 });
 
 /**
@@ -43,15 +25,13 @@ router.post(['/run', '/force'], authenticate, authorize('admin'), async (req, re
  * @desc    Força varredura imediata nas catracas físicas (remove faces fora da agenda de hoje)
  * @access  Admin
  */
-router.post('/edge', authenticate, authorize('admin'), async (req, res) => {
-    try {
-        logger.info(`🛡️ Varredura de Borda (Edge Sync) manual solicitada por: ${req.user.email}`);
-        await syncService.runDailyAccessSync();
-        res.json({ success: true, message: 'Varredura de Borda concluída. Faces fora da agenda de hoje foram removidas das catracas.' });
-    } catch (error) {
-        logger.error('❌ Erro na varredura de borda:', error);
-        res.status(500).json({ success: false, error: error.message });
+router.post('/edge', authenticate, authorize('admin'), (req, res) => {
+    logger.info(`🛡️ Varredura de Borda (Edge Sync) manual solicitada por: ${req.user.email}`);
+    if (syncService.syncDiarioRodando || syncScheduler.isRunning) {
+        return res.status(409).json({ success: false, error: 'Já existe uma sincronização em andamento' });
     }
+    syncService.runDailyAccessSync().catch((error) => logger.error('❌ Erro na varredura de borda:', error));
+    res.status(202).json({ success: true, message: 'Varredura iniciada. Faces fora da agenda de hoje serão removidas das catracas.' });
 });
 
 /**

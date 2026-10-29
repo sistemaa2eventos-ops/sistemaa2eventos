@@ -41,6 +41,12 @@ class MonitorController {
                 return res.status(400).json({ error: 'Falta vincular evento ativo para carregar dashboard.' });
             }
 
+            // 16 consultas por montagem (incluindo todas as pessoas e logs do dia): cada painel
+            // aberto no Dashboard recalculava tudo. Agora vale 5 s para todos do mesmo evento.
+            const chaveCache = `dashboard_${evento_id}`;
+            const emCache = cacheService.get(chaveCache);
+            if (emCache) return res.json(emCache);
+
             // Buscar estatísticas em paralelo (os dois lotes rodam ao mesmo tempo)
             const lote1 = Promise.all([
                 // Total de empresas
@@ -268,7 +274,7 @@ class MonitorController {
                 });
             }
 
-            res.json({
+            const resposta = {
                 success: true,
                 data: {
                     cards: {
@@ -296,7 +302,9 @@ class MonitorController {
                         };
                     })
                 }
-            });
+            };
+            cacheService.set(chaveCache, resposta, 5000);
+            res.json(resposta);
 
         } catch (error) {
             logger.error('Erro no dashboard:', error);
@@ -738,6 +746,7 @@ class MonitorController {
             // hoje, logo abaixo — não o de ontem, que o fechamento automático já cuida.
             const cronController = require('../events/cron.controller');
             await cronController.resetTurnos(evento_id, { arquivar: false });
+            cacheService.delete(`dashboard_${evento_id}`); // o painel já mostra os números zerados
 
             // Gerar e salvar snapshot do relatório diário imediatamente ao clicar no reset diário
             let fechamentoResultado = null;
