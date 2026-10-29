@@ -184,9 +184,13 @@ const DataTable = ({
                           key={column.id}
                           sx={{
                             display: 'flex',
+                            // Valor largo (foto + nome, várias etiquetas) desce para a linha de baixo
+                            // em vez de transbordar por cima do rótulo
+                            flexWrap: 'wrap',
                             justifyContent: 'space-between',
                             alignItems: 'center',
-                            gap: 1.5,
+                            columnGap: 1.5,
+                            rowGap: 0.5,
                             borderBottom: colIndex !== bodyCols.length - 1 ? '1px dashed rgba(255,255,255,0.05)' : 'none',
                             pb: colIndex !== bodyCols.length - 1 ? 0.85 : 0
                           }}
@@ -194,7 +198,7 @@ const DataTable = ({
                           <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, flexShrink: 0 }}>
                             {column.label}
                           </Typography>
-                          <Box sx={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'flex-end', textAlign: 'right' }}>
+                          <Box sx={{ flex: '1 1 auto', maxWidth: '100%', display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 0.5, textAlign: 'right', '& > *': { maxWidth: '100%', minWidth: 0 } }}>
                             {typeof column.format === 'function' ? column.format(row[column.id], row) : (
                               <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>{row[column.id]}</Typography>
                             )}

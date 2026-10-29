@@ -6,7 +6,7 @@ import {
     Tabs, Tab, Switch, FormControlLabel, Tooltip
 } from '@mui/material';
 import {
-    Save as SaveIcon, Videocam as CameraIcon, VideocamOff as VideocamOffIcon,
+    Save as SaveIcon, Videocam as CameraIcon,
     MeetingRoom as DoorIcon, Add as AddIcon, Delete as DeleteIcon,
     Refresh as RefreshIcon, OpenInNew as OpenInNewIcon, Shield as ShieldIcon,
     Tune as TuneIcon, PowerSettingsNew as PowerIcon, Face as FaceIcon
@@ -14,7 +14,7 @@ import {
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import api from '../../services/api';
-import { urlMidiaCamera } from '../../utils/cameraMedia';
+import { useIaStatus, statusDaCamera } from '../../hooks/useIaConfig';
 import GlassCard from '../../components/common/GlassCard';
 import NeonButton from '../../components/common/NeonButton';
 import PageHeader from '../../components/common/PageHeader';
@@ -22,6 +22,34 @@ import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
 
 import { botaoSecundario } from '../../styles/tokens';
 const FABRICANTES = ['RTSP / OBS / Webcam', 'Intelbras', 'Hikvision', 'Genérica'];
+
+/**
+ * Situação de uma câmera em linguagem simples. Quando o motor de IA está acompanhando a câmera,
+ * vale o que ele vê agora (vídeo chegando ou não); senão, o último teste de rede.
+ */
+const situacaoCamera = (cam, status, isDesativada, st, iaErro) => {
+    if (isDesativada) {
+        return { cor: '#FFB800', titulo: 'Desativada', detalhe: 'Vídeo e reconhecimento facial pausados.', chips: [] };
+    }
+    if (st) {
+        const chips = [];
+        if (st.conectada) {
+            if (st.video_fps) chips.push(`${Math.round(st.video_fps)} quadros/s`);
+            const res = st.resolucao?.principal || st.resolucao?.sub;
+            if (res) chips.push(Array.isArray(res) ? res.join('×') : String(res));
+        }
+        if (cam.ia_ativa === false || st.ia_ativa === false) chips.push('IA pausada');
+        else if (st.ia_analisando) chips.push(st.rostos ? `IA analisando • ${st.rostos} rosto(s)` : 'IA analisando');
+        else chips.push('IA em espera (sem movimento)');
+        return st.conectada
+            ? { cor: '#00FF88', titulo: 'Online', detalhe: 'Recebendo vídeo agora.', chips }
+            : { cor: '#FF3366', titulo: 'Sem sinal', detalhe: 'O servidor do evento não está recebendo o vídeo desta câmera.', chips };
+    }
+    const semMotor = iaErro ? ['Servidor de IA do evento indisponível'] : [];
+    if (status === 'online') return { cor: '#00FF88', titulo: 'Online', detalhe: 'Respondeu ao último teste de rede.', chips: semMotor };
+    if (status === 'offline') return { cor: '#FF3366', titulo: 'Offline', detalhe: 'Não respondeu ao último teste de rede.', chips: semMotor };
+    return { cor: '#94A3B8', titulo: 'Não verificada', detalhe: 'Toque em Testar para checar a conexão.', chips: semMotor };
+};
 
 const ConfigCameras = () => {
     const confirmar = useConfirmacao();
@@ -35,7 +63,8 @@ const ConfigCameras = () => {
     const [areas, setAreas] = useState([]);
     const [loadingCameras, setLoadingCameras] = useState(true);
     // Prévia renovada só ao recarregar a lista (antes cada tecla digitada no cadastro baixava todas de novo)
-    const [previewStamp, setPreviewStamp] = useState(() => Date.now());
+    // Situação ao vivo de cada câmera (vídeo chegando, fps, IA), atualizada a cada 15 s
+    const { status: iaStatus, erro: iaErro } = useIaStatus(activeTab === 0, 15000);
 
     // Dialog de Câmera (Criar / Editar)
     const [cameraModalOpen, setCameraModalOpen] = useState(false);
@@ -58,7 +87,6 @@ const ConfigCameras = () => {
             setLoadingCameras(true);
             const resp = await api.get('/cameras', { params: { evento_id: eventoId } });
             setCameras(resp.data.data || []);
-            setPreviewStamp(Date.now());
         } catch (err) {
             enqueueSnackbar('Erro ao carregar câmeras IP.', { variant: 'error' });
         } finally {
@@ -410,57 +438,35 @@ const ConfigCameras = () => {
                                             transition: 'all 0.3s ease',
                                             '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 8px 30px rgba(0,0,0,0.5)' }
                                         }}>
-                                            {/* Preview de Imagem / Snapshot */}
-                                            <Box sx={{ position: 'relative', width: '100%', height: 180, bgcolor: '#050B18', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                {!isDesativada ? (
-                                                    <img
-                                                        src={urlMidiaCamera(cam.id, 'snapshot', { t: previewStamp, qualidade: 'mini' })}
-                                                        alt={cam.nome}
-                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                        onError={(e) => {
-                                                            e.target.style.display = 'none';
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <Stack alignItems="center" spacing={0.8} sx={{ color: 'rgba(255,255,255,0.45)', p: 2, textAlign: 'center' }}>
-                                                        <VideocamOffIcon sx={{ fontSize: 38, color: '#FFB800' }} />
-                                                        <Typography variant="caption" fontWeight={700} sx={{ color: '#FFB800' }}>
-                                                            Câmera desativada
-                                                        </Typography>
-                                                        <Typography variant="caption" sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.45)' }}>
-                                                            Conexão RTSP e IA pausadas
-                                                        </Typography>
-                                                    </Stack>
-                                                )}
-                                                {/* Overlay de Status */}
-                                                <Box sx={{
-                                                    position: 'absolute', top: 10, left: 10, right: 10,
-                                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                                                }}>
-                                                    <Chip
-                                                        label={isDesativada ? 'Desativada' : status === 'online' ? 'Online' : status === 'offline' ? 'Offline' : 'Câmera IP'}
-                                                        size="small"
-                                                        color={isDesativada ? 'warning' : status === 'online' ? 'success' : status === 'offline' ? 'error' : 'default'}
-                                                        sx={{ fontWeight: 700, fontSize: '0.75rem' }}
-                                                    />
-                                                    <Chip
-                                                        label={cam.fabricante || 'RTSP'}
-                                                        size="small"
-                                                        sx={{ bgcolor: 'rgba(0,0,0,0.7)', color: '#00D4FF', fontWeight: 700, fontSize: '0.75rem', border: '1px solid rgba(0,212,255,0.3)' }}
-                                                    />
-                                                </Box>
-
-                                                {cam.area?.nome_area && (
-                                                    <Box sx={{ position: 'absolute', bottom: 10, left: 10 }}>
-                                                        <Chip
-                                                            icon={<ShieldIcon sx={{ fontSize: 13, color: '#FFFFFF !important' }} />}
-                                                            label={`Área: ${cam.area.nome_area}`}
-                                                            size="small"
-                                                            sx={{ bgcolor: 'rgba(0,0,0,0.75)', color: '#FFFFFF', fontWeight: 700, fontSize: '0.75rem' }}
-                                                        />
+                                            {/* Situação da câmera (as imagens ficam no Monitoramento) */}
+                                            {(() => {
+                                                const sit = situacaoCamera(cam, status, isDesativada, statusDaCamera(iaStatus, cam.id), iaErro);
+                                                return (
+                                                    <Box sx={{ p: 2, borderBottom: '1px solid rgba(255,255,255,0.06)', bgcolor: `${sit.cor}0F` }}>
+                                                        <Stack direction="row" alignItems="center" spacing={1.25}>
+                                                            <Box sx={{ width: 12, height: 12, borderRadius: '50%', flexShrink: 0, bgcolor: sit.cor, boxShadow: `0 0 10px ${sit.cor}` }} />
+                                                            <Box sx={{ minWidth: 0 }}>
+                                                                <Typography fontWeight={700} sx={{ color: sit.cor, lineHeight: 1.25 }}>{sit.titulo}</Typography>
+                                                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', display: 'block' }}>{sit.detalhe}</Typography>
+                                                            </Box>
+                                                        </Stack>
+                                                        <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" sx={{ mt: 1.25 }}>
+                                                            {sit.chips.map((c) => (
+                                                                <Chip key={c} label={c} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.8)', fontWeight: 600, fontSize: '0.72rem' }} />
+                                                            ))}
+                                                            <Chip label={cam.fabricante || 'RTSP'} size="small" sx={{ bgcolor: 'rgba(0,0,0,0.4)', color: '#00D4FF', fontWeight: 700, fontSize: '0.72rem', border: '1px solid rgba(0,212,255,0.3)' }} />
+                                                            {cam.area?.nome_area && (
+                                                                <Chip
+                                                                    icon={<ShieldIcon sx={{ fontSize: 13, color: '#FFFFFF !important' }} />}
+                                                                    label={cam.area.nome_area}
+                                                                    size="small"
+                                                                    sx={{ bgcolor: 'rgba(0,0,0,0.4)', color: '#FFFFFF', fontWeight: 600, fontSize: '0.72rem' }}
+                                                                />
+                                                            )}
+                                                        </Stack>
                                                     </Box>
-                                                )}
-                                            </Box>
+                                                );
+                                            })()}
 
                                             {/* Informações da Câmera */}
                                             <Box sx={{ p: 2.5 }}>
@@ -496,7 +502,7 @@ const ConfigCameras = () => {
                                                 </Typography>
 
                                                 {/* Ações */}
-                                                <Stack direction="row" spacing={1} mt={2.5}>
+                                                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" mt={2.5} sx={{ '& .MuiButton-root': { flex: '1 1 30%', minWidth: 96 } }}>
                                                     <Button
                                                         variant={isDesativada ? 'contained' : 'outlined'}
                                                         color={isDesativada ? 'success' : 'warning'}

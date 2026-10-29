@@ -190,6 +190,32 @@ const theme = createTheme({
                 },
             },
         },
+        // Item de lista com controle à direita (select, switch): no celular o controle ficava
+        // por cima do texto; lá ele desce para a linha de baixo
+        MuiListItem: {
+            styleOverrides: {
+                root: ({ theme: t }) => ({
+                    [t.breakpoints.down('sm')]: {
+                        flexWrap: 'wrap',
+                        '&.MuiListItem-secondaryAction': { paddingRight: 0 },
+                    },
+                }),
+            },
+        },
+        MuiListItemSecondaryAction: {
+            styleOverrides: {
+                root: ({ theme: t }) => ({
+                    [t.breakpoints.down('sm')]: {
+                        position: 'static',
+                        transform: 'none',
+                        width: '100%',
+                        marginTop: 4,
+                        paddingBottom: 8,
+                        '& .MuiInputBase-root': { width: '100%' },
+                    },
+                }),
+            },
+        },
         MuiDialogTitle: {
             styleOverrides: {
                 root: ({ theme: t }) => ({

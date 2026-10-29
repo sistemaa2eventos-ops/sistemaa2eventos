@@ -282,22 +282,17 @@ const ConfigPulseiras = ({ embedded = false }) => {
     };
 
     return (
-        <Box sx={{ p: embedded ? 0 : 4, maxWidth: 1000, margin: '0 auto' }}>
+        <Box sx={{ p: embedded ? 0 : { xs: 1.5, sm: 2.5, md: 4 }, maxWidth: 1000, margin: '0 auto' }}>
             {!embedded && (
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
-                    <PageHeader
-                        title="Pulseiras"
-                        subtitle="Lotes de pulseiras, suas cores e as áreas que cada uma libera."
-                        breadcrumbs={[{ text: 'Configurações' }, { text: 'Matriz de pulseiras' }]}
-                    />
-                    <NeonButton
-                        startIcon={<AddIcon />}
-                        onClick={handleOpenDialog}
-                        sx={{ mt: 2 }}
-                    >
-                        Provisionar lote
-                    </NeonButton>
-                </Box>
+                <PageHeader
+                    title="Pulseiras"
+                    subtitle="Lotes de pulseiras, suas cores e as áreas que cada uma libera."
+                    action={
+                        <NeonButton startIcon={<AddIcon />} onClick={handleOpenDialog}>
+                            Provisionar lote
+                        </NeonButton>
+                    }
+                />
             )}
 
             {embedded && (

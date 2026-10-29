@@ -154,17 +154,16 @@ const ConfigAreas = () => {
     if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>;
 
     return (
-        <Box sx={{ p: { xs: 2, md: 4 } }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
-                <PageHeader
-                    title="Áreas"
-                    subtitle="Crie e gerencie as áreas de acesso do evento. Cada área pode ser associada a um ou mais leitores."
-                    breadcrumbs={[{ text: 'Configurações' }, { text: 'Áreas & zonas' }]}
-                />
-                <NeonButton startIcon={<AddIcon />} onClick={() => handleOpenDialog()} sx={{ mt: 2, flexShrink: 0 }}>
-                    Nova área
-                </NeonButton>
-            </Box>
+        <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 4 } }}>
+            <PageHeader
+                title="Áreas"
+                subtitle="Crie e gerencie as áreas de acesso do evento. Cada área pode ser associada a um ou mais leitores."
+                action={
+                    <NeonButton startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>
+                        Nova área
+                    </NeonButton>
+                }
+            />
 
             <Grid container spacing={3}>
                 <Grid item xs={12}>

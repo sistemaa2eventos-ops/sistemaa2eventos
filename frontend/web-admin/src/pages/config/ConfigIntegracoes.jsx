@@ -30,23 +30,26 @@ const ConfigIntegracoes = () => {
 
     const checkStatus = useCallback(async () => {
         try {
+            // Nomes que o validador de /verify-smtp exige (com smtp_* ele recusava com
+            // "Erro de validação" toda vez que a tela abria)
             const smtpParams = {
-                smtp_host: settings.smtp_host,
-                smtp_port: settings.smtp_port,
-                smtp_user: settings.smtp_user,
-                smtp_pass: settings.smtp_pass
+                host: settings.smtp_host,
+                port: settings.smtp_port,
+                user: settings.smtp_user,
+                pass: settings.smtp_pass
             };
             const smtpConfigured = Boolean(
-                smtpParams.smtp_host && smtpParams.smtp_port && smtpParams.smtp_user && smtpParams.smtp_pass
+                smtpParams.host && smtpParams.port && smtpParams.user && smtpParams.pass
             );
 
             const [db, smtp] = await Promise.all([
-                api.get('/settings/test-connection', { timeout: 5000 }).catch(error => {
+                api.get('/settings/test-connection', { timeout: 5000, hideDefaultError: true }).catch(error => {
                     console.error('Falha teste Supabase:', error);
                     return { data: { success: false, message: error.message } };
                 }),
                 smtpConfigured
-                    ? api.post('/settings/verify-smtp', smtpParams).catch(() => ({ data: { success: false } }))
+                    // Verificação de fundo: a falha vira o selo "Falha na conexão", sem aviso na tela
+                    ? api.post('/settings/verify-smtp', smtpParams, { hideDefaultError: true }).catch(() => ({ data: { success: false } }))
                     : Promise.resolve({ data: { success: false } })
             ]);
 

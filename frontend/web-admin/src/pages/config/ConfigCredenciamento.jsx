@@ -114,7 +114,10 @@ const ConfigCredenciamento = () => {
                                 onChange={(e, val) => setActiveTab(val)}
                                 textColor="primary"
                                 indicatorColor="primary"
-                                sx={{ '& .MuiTab-root': { color: 'rgba(255,255,255,0.5)', fontWeight: 700 } }}
+                                variant="scrollable"
+                                scrollButtons="auto"
+                                allowScrollButtonsMobile
+                                sx={{ maxWidth: '100%', '& .MuiTab-root': { color: 'rgba(255,255,255,0.5)', fontWeight: 700 } }}
                             >
                                 <Tab label="Participante" value="Participante" />
                                 <Tab label="Expositor" value="Expositor" />
@@ -122,7 +125,7 @@ const ConfigCredenciamento = () => {
                             </Tabs>
                         </Box>
 
-                        <Box sx={{ p: 3 }}>
+                        <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
                             <List sx={{ bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 1.5 }}>
                                 {currentFields.map((field) => (
                                     <ListItem
@@ -141,7 +144,8 @@ const ConfigCredenciamento = () => {
                                             primaryTypographyProps={{ color: '#FFFFFF', fontWeight: 600 }}
                                             secondaryTypographyProps={{ fontSize: '0.75rem' }}
                                         />
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                        {/* No celular os dois interruptores descem para baixo do nome do campo */}
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 2.5, sm: 4 }, pl: { xs: 5, sm: 0 } }}>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                                 <Typography variant="caption" color="text.secondary">Habilitado</Typography>
                                                 <Switch
