@@ -409,7 +409,6 @@ def reload_registered_faces() -> int:
 
 def aprender_vetor(pessoa_id: str, emb: np.ndarray):
     """Rosto confirmado com folga no CFTV: guarda o vetor (ângulo/luz reais da câmera) para a pessoa."""
-    global indice
     cad = cadastro_por_id.get(pessoa_id)
     if cad is None:
         return
@@ -418,8 +417,22 @@ def aprender_vetor(pessoa_id: str, emb: np.ndarray):
         if len(lista) >= APRENDIDOS_POR_PESSOA or any(float(np.dot(v, emb)) > 0.9 for v in lista):
             return
         lista.append(emb.copy())
-        atual = indice
-        indice = Indice(atual.pessoas, [cadastro_por_id[p["id"]] for p in atual.pessoas], aprendidos)
+        # Reconstruir o índice inteiro a cada rosto aprendido pesava na CPU (picos com muita gente
+        # passando): no máximo 1x a cada 20 s; o que ficar pendente o zelador aplica
+        _aprendizado["pendente"] = True
+        if time.time() - _aprendizado["ultimo"] >= 20:
+            _reconstruir_indice_com_aprendidos()
+
+
+_aprendizado = {"pendente": False, "ultimo": 0.0}
+
+
+def _reconstruir_indice_com_aprendidos():
+    """Chamar com aprendidos_lock. Troca o índice de uma vez (quem está lendo usa o anterior)."""
+    global indice
+    atual = indice
+    indice = Indice(atual.pessoas, [cadastro_por_id[p["id"]] for p in atual.pessoas], aprendidos)
+    _aprendizado.update(pendente=False, ultimo=time.time())
 
 
 def _loop_rostos():
@@ -797,6 +810,11 @@ def _leitor(url: str, cam: Camera, eh_sub: bool) -> Leitor:
         antigo = lt
     if antigo is not None and antigo.thread is not None:
         antigo.thread.join(timeout=6)  # conexão anterior terminando de fechar: evita 2 conexões à mesma câmera
+        if antigo.thread.is_alive():
+            # Travada num read() da câmera (o FFMPEG às vezes ignora o tempo limite): abrir outra aqui
+            # deixava duas conexões RTSP e uma thread perdida a cada tentativa. O próximo pedido tenta de novo.
+            logger.warning(f"⚠️ Conexão anterior ainda fechando, aguardando antes de reabrir: {url.split('@')[-1]}")
+            return antigo
     with streams_lock:
         lt = leitores.get(url)
         if lt is None or lt is antigo:
@@ -858,6 +876,16 @@ def _zelador():
                     lt.parar()
                 for u in [u for u, lt in leitores.items() if not lt.rodando and not lt.vivo()]:
                     del leitores[u]
+                # Câmera (url) sem leitor e sem uso há 1 h sai da memória (cada stream_url diferente
+                # pedido criava uma e nenhuma era removida); volta sozinha se for pedida de novo
+                em_uso = set(leitores)
+                for u in [u for u, c in cameras.items()
+                          if u not in em_uso and (c.url_sub() or u) not in em_uso
+                          and agora - max(c.uso_mini, c.uso_foco) > 3600]:
+                    del cameras[u]
+            if _aprendizado["pendente"]:
+                with aprendidos_lock:
+                    _reconstruir_indice_com_aprendidos()
             for u, _ in ociosos:
                 logger.info(f"💤 Vídeo sem uso há {CAMERA_OCIOSA_S}s, desligado: {u.split('@')[-1]}")
         except Exception as e:
@@ -1234,13 +1262,15 @@ async def get_camera_stream(request: Request, stream_url: str = DEFAULT_RTSP_URL
     """MJPEG direto para <img> (API no próprio servidor do evento). Assíncrono: não prende thread e
     termina quando o navegador fecha."""
     stream_url = url_da_camera(stream_url, camera_id)
-    lt = leitor_para(stream_url, "mini" if qualidade == "mini" else "foco")
+    # leitor_para pode esperar até 6 s a conexão anterior fechar: numa thread, para não travar o
+    # servidor inteiro (/health e os outros vídeos) enquanto isso
+    lt = await asyncio.to_thread(leitor_para, stream_url, "mini" if qualidade == "mini" else "foco")
     largura, q = max(0, min(max_width, 3840)), max(30, min(quality, 95))
 
     async def gerar():
         ultimo = -1
         while not await request.is_disconnected():
-            leitor_para(stream_url, "mini" if qualidade == "mini" else "foco")
+            await asyncio.to_thread(leitor_para, stream_url, "mini" if qualidade == "mini" else "foco")
             _, seq, _ = lt.pegar()
             if seq != ultimo:
                 dados, ultimo, _ = await asyncio.to_thread(lt.jpeg, annotate, largura, q)
@@ -1319,8 +1349,11 @@ def aplicar_config(req: ConfigIA):
     """Perfil e ajustes do painel (Configurações > IA facial), aplicados na hora."""
     global CFG
     with config_lock:
+        anterior = CFG
         CFG = montar_config(req.perfil or CFG["perfil"], req.ajustes)
-    logger.info(f"⚙️ Configuração da IA: perfil {CFG['perfil']}, {CFG['ia_fps_total']} análises/s, limiar {CFG['limiar']}")
+    # O agente reaplica a cada 30 s (caso o motor reinicie): só registra quando mudou
+    if CFG != anterior:
+        logger.info(f"⚙️ Configuração da IA: perfil {CFG['perfil']}, {CFG['ia_fps_total']} análises/s, limiar {CFG['limiar']}")
     garantir_vigilancia()
     return {"success": True, "config": CFG}
 
@@ -1382,4 +1415,6 @@ def get_engine_status():
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)
+    # Sem log por requisição: o agente consulta o motor a cada segundo (~86 mil linhas/dia) e as
+    # linhas gravavam a URL das câmeras com usuário e senha. Erros continuam no log.
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=False, access_log=False)

@@ -22,9 +22,13 @@ const VPS_URL = (process.env.VPS_URL || '').replace(/\/+$/, '');
 const AGENT_TOKEN = process.env.AGENT_TOKEN;
 const AGENT_NAME = process.env.AGENT_NAME || 'Agente Local';
 const IA_URL = (process.env.IA_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
-const VERSAO = '2.4.0';
+const VERSAO = '2.5.0';
 const ARQUIVO_ESTADO = path.join(__dirname, '..', '.estado.json');
-const DETECCAO_MAX_IDADE_S = 60; // detecção mais velha que isso não vira alerta (ex.: agente ficou fora do ar)
+// Detecções lidas do motor e ainda não entregues à nuvem (internet do evento caiu): ficam em
+// disco e sobem quando a conexão voltar. Cada uma leva a foto anotada, por isso o limite.
+const ARQUIVO_FILA = path.join(__dirname, '..', '.deteccoes-pendentes.json');
+const FILA_MAX = 300;
+const DETECCAO_MAX_IDADE_S = 60; // só na 1ª leitura após (re)iniciar: o motor guarda as últimas detecções
 const QUADROS_EM_VOO = 2;        // quadros enviados sem confirmação: a taxa não depende mais da distância até a nuvem
 
 const log = (nivel, msg) => console.log(`[${new Date().toISOString()}] ${nivel.toUpperCase()} ${msg}`);
@@ -37,7 +41,8 @@ if (!VPS_URL || !AGENT_TOKEN) {
 // Cliente Digest por leitor (reaproveita o nonce entre chamadas)
 const clientes = new Map();
 async function clienteDigest({ ip, port = 80, user = 'admin', password }) {
-    const chave = `${ip}:${port}:${user}`;
+    // a senha entra na chave: trocada no painel, o agente não fica preso na antiga até reiniciar
+    const chave = `${ip}:${port}:${user}:${password}`;
     if (!clientes.has(chave)) {
         const lib = await import('digest-fetch');
         const DigestFetch = lib.default || lib;
@@ -211,9 +216,14 @@ async function enviarVideo(streamId, video) {
             } else {
                 const jpeg = Buffer.from(await res.arrayBuffer());
                 seq = parseInt(res.headers.get('x-frame-seq') || '-1', 10);
-                const canal = canalVideo();
+                // Sem o canal de vídeo, o quadro é descartado: na conexão principal ele atrasava
+                // os comandos dos leitores faciais (abrir porta, cadastrar face)
+                if (!socketVideo.connected) {
+                    await esperar(500);
+                    continue;
+                }
                 emVoo++;
-                canal.timeout(5000).emitWithAck('agent:video_quadro', { streamId, jpeg })
+                socketVideo.timeout(5000).emitWithAck('agent:video_quadro', { streamId, jpeg })
                     .catch(() => {})
                     .finally(() => { emVoo--; });
             }
@@ -276,11 +286,52 @@ setInterval(() => {
     aplicarVigilancia().catch(() => {});
 }, 30000);
 
+const filaDeteccoes = lerFila();
+if (filaDeteccoes.length) log('info', `${filaDeteccoes.length} detecção(ões) de antes de reiniciar aguardando envio`);
+
+function lerFila() {
+    try {
+        const fila = JSON.parse(fs.readFileSync(ARQUIVO_FILA, 'utf8'));
+        return Array.isArray(fila) ? fila : [];
+    } catch {
+        return [];
+    }
+}
+
+function salvarFila() {
+    try {
+        if (filaDeteccoes.length) fs.writeFileSync(ARQUIVO_FILA, JSON.stringify(filaDeteccoes));
+        else if (fs.existsSync(ARQUIVO_FILA)) fs.unlinkSync(ARQUIVO_FILA);
+    } catch (err) {
+        log('warn', `não foi possível salvar ${ARQUIVO_FILA}: ${err.message}`);
+    }
+}
+
+/** Entrega à nuvem o que está na fila, na ordem; para no primeiro envio sem confirmação. */
+async function entregarFila() {
+    let enviadas = 0;
+    while (filaDeteccoes.length && socket.connected) {
+        const d = filaDeteccoes[0];
+        const atrasada = Date.now() / 1000 - d.ts > DETECCAO_MAX_IDADE_S;
+        try {
+            await socket.timeout(10000).emitWithAck('agent:deteccao', atrasada ? { ...d, atrasada: true } : d);
+        } catch {
+            break; // sem confirmação: fica na fila para a próxima rodada
+        }
+        filaDeteccoes.shift();
+        enviadas++;
+        log('info', `vigilância: ${d.results.map(r => r.matched_person?.nome).join(', ')} (câmera ${d.camera_id}) → painel${atrasada ? ' (atrasada)' : ''}`);
+    }
+    if (enviadas) salvarFila();
+}
+
 let buscandoDeteccoes = false;
 setInterval(async () => {
-    if (buscandoDeteccoes || !vigilancia.cameras || !socket.connected) return;
+    if (buscandoDeteccoes || !vigilancia.cameras) return;
     buscandoDeteccoes = true;
     try {
+        // Lê do motor mesmo sem internet: o motor guarda só as últimas detecções por pouco tempo,
+        // então elas vêm para a fila em disco do agente e sobem quando a conexão voltar
         const res = await fetch(`${IA_URL}/api/vigilancia/deteccoes?desde=${vigilancia.desde}&max_idade_s=${DETECCAO_MAX_IDADE_S}`,
             { signal: AbortSignal.timeout(5000) });
         const { seq, inicio, deteccoes = [] } = await res.json();
@@ -295,16 +346,26 @@ setInterval(async () => {
         }
         if (seq < vigilancia.desde) { vigilancia.desde = 0; salvarEstado(); return; } // motor antigo reiniciou
         for (const d of deteccoes) {
-            if (Date.now() / 1000 - d.ts > DETECCAO_MAX_IDADE_S) { vigilancia.desde = d.seq; continue; }
-            await socket.timeout(10000).emitWithAck('agent:deteccao', d);
             vigilancia.desde = d.seq;
-            log('info', `vigilância: ${d.results.map(r => r.matched_person?.nome).join(', ')} (câmera ${d.camera_id}) → painel`);
+            if (Date.now() / 1000 - d.ts > DETECCAO_MAX_IDADE_S) continue;
+            filaDeteccoes.push(d);
         }
-        if (deteccoes.length) salvarEstado();
+        if (filaDeteccoes.length > FILA_MAX) {
+            const descartadas = filaDeteccoes.splice(0, filaDeteccoes.length - FILA_MAX);
+            log('warn', `fila de detecções cheia: ${descartadas.length} mais antiga(s) descartada(s)`);
+        }
+        if (deteccoes.length) {
+            salvarEstado();
+            salvarFila();
+        }
     } catch {
-        // motor desligado ou servidor sem resposta: tenta de novo no próximo segundo
+        // motor desligado: tenta de novo no próximo segundo
     } finally {
-        buscandoDeteccoes = false;
+        try {
+            await entregarFila();
+        } finally {
+            buscandoDeteccoes = false;
+        }
     }
 }, 1000);
 
@@ -322,7 +383,6 @@ const socket = io(`${VPS_URL}/agent`, opcoesSocket);
 // Vídeo numa conexão própria: quadros grandes não atrasam os comandos dos leitores faciais nem o
 // batimento da conexão principal. Servidor antigo sem /agent-video: o vídeo segue pela principal.
 const socketVideo = io(`${VPS_URL}/agent-video`, { ...opcoesSocket, forceNew: true });
-const canalVideo = () => (socketVideo.connected ? socketVideo : socket);
 let avisouVideo = false;
 socketVideo.on('connect', () => { avisouVideo = false; log('info', 'Canal de vídeo separado conectado'); });
 socketVideo.on('connect_error', (err) => {
@@ -358,6 +418,16 @@ socket.on('agent:command', async ({ requestId, command, payload }) => {
     }
 });
 
-const encerrar = () => { salvarEstado(); socket.disconnect(); socketVideo.disconnect(); process.exit(0); };
+const encerrar = () => { salvarEstado(); salvarFila(); socket.disconnect(); socketVideo.disconnect(); process.exit(0); };
 process.on('SIGINT', encerrar);
 process.on('SIGTERM', encerrar);
+
+// Erro inesperado num comando não pode derrubar o agente (leitores e câmeras ficariam sem comando)
+process.on('unhandledRejection', (motivo) => log('error', `promessa rejeitada sem tratamento: ${motivo?.stack || motivo}`));
+process.on('uncaughtException', (err) => {
+    // estado incerto: registra, guarda a fila e sai — o vigia (ligar-ia-facial.ps1) religa o agente
+    log('error', `exceção não tratada, reiniciando: ${err?.stack || err}`);
+    salvarEstado();
+    salvarFila();
+    process.exit(1);
+});

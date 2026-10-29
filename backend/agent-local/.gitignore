@@ -1,3 +1,4 @@
 .env
 .estado.json
 node_modules/
+.deteccoes-pendentes.json
