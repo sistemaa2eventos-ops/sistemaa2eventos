@@ -24,6 +24,34 @@ import { cores, funcao, papeis, tom, tamanhos, botaoSecundario } from '../../sty
 import TituloModal from '../common/TituloModal';
 import NeonButton from '../common/NeonButton';
 import EnquadrarAvatar from '../common/EnquadrarAvatar';
+import { obterAudioContext } from '../../utils/alertSound';
+
+/**
+ * Tempo de turno com timer próprio: antes o contador de 1 s ficava no topo da seção
+ * e o menu lateral inteiro renderizava de novo a cada segundo, em todas as telas.
+ * `curto` ("1h05") só muda por minuto; `longo` ("01h 05m 12s") a cada segundo.
+ */
+const TempoNoTurno = React.memo(({ loginKey, formato = 'curto' }) => {
+    const calcular = () => {
+        const login = localStorage.getItem(loginKey);
+        const seg = login ? Math.max(0, Math.floor((Date.now() - new Date(login).getTime()) / 1000)) : 0;
+        const h = Math.floor(seg / 3600);
+        const m = Math.floor((seg % 3600) / 60);
+        const s = seg % 60;
+        return formato === 'longo'
+            ? `${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`
+            : (h > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${m} min`);
+    };
+    const [texto, setTexto] = useState(calcular);
+    useEffect(() => {
+        setTexto(calcular());
+        const id = setInterval(() => setTexto(calcular()), formato === 'longo' ? 1000 : 15000);
+        return () => clearInterval(id);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [loginKey, formato]);
+    return <>{texto}</>;
+});
+TempoNoTurno.displayName = 'TempoNoTurno';
 
 // --- PALETA DE AVATARES TÁTICOS (SVG DATA URIS) ---
 const TACTICAL_AVATARS = [
@@ -83,7 +111,8 @@ const TACTICAL_AVATARS = [
 // Efeito sonoro sintetizado via Web Audio API para alertas e chamados
 const playAlertSound = (type = 'panic') => {
     try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const audioCtx = obterAudioContext();
+        if (!audioCtx) return;
         if (type === 'panic') {
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
@@ -183,8 +212,6 @@ export const OperatorSection = () => {
     const [notesSavedAlert, setNotesSavedAlert] = useState(false);
 
     // Tempo Online & Login
-    const [onlineTimeFormatted, setOnlineTimeFormatted] = useState('00h 00m 00s');
-    const [tempoTurno, setTempoTurno] = useState('0 min');
     const [loginTimeFormatted, setLoginTimeFormatted] = useState('--:--:--');
 
     const opId = user?.id || 'default_op';
@@ -192,7 +219,7 @@ export const OperatorSection = () => {
     const notesKey = `nzt_operator_notes_${opId}`;
     const avatarKey = `nzt_operator_avatar_${opId}`;
 
-    // Inicialização do Horário de Login e Contador de Tempo Online
+    // Inicialização do Horário de Login (o contador do turno fica em <TempoNoTurno>)
     useEffect(() => {
         let loginIso = localStorage.getItem(loginKey);
         if (!loginIso) {
@@ -206,22 +233,6 @@ export const OperatorSection = () => {
         } catch {
             setLoginTimeFormatted('Agora');
         }
-
-        const updateClock = () => {
-            const currentLogin = localStorage.getItem(loginKey) || loginIso;
-            const diffSeconds = Math.max(0, Math.floor((Date.now() - new Date(currentLogin).getTime()) / 1000));
-            const h = Math.floor(diffSeconds / 3600);
-            const m = Math.floor((diffSeconds % 3600) / 60);
-            const s = diffSeconds % 60;
-            setOnlineTimeFormatted(
-                `${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`
-            );
-            setTempoTurno(h > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${m} min`);
-        };
-
-        updateClock();
-        const interval = setInterval(updateClock, 1000);
-        return () => clearInterval(interval);
     }, [loginKey]);
 
     // Carregar notas salvas
@@ -374,7 +385,7 @@ export const OperatorSection = () => {
                         </Typography>
                         <Tooltip title={`No turno desde ${loginTimeFormatted}`} placement="top">
                             <Typography sx={{ ml: 'auto', fontSize: tamanhos.xs, color: cores.textoSecundario, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                                {tempoTurno}
+                                <TempoNoTurno loginKey={loginKey} />
                             </Typography>
                         </Tooltip>
                     </Box>
@@ -439,7 +450,7 @@ export const OperatorSection = () => {
                         {user?.email}
                     </Typography>
                     <Typography variant="caption" sx={{ color: '#00D4FF', fontFamily: '"Inter", sans-serif' }}>
-                        No turno há {onlineTimeFormatted}
+                        No turno há <TempoNoTurno loginKey={loginKey} formato="longo" />
                     </Typography>
                 </Box>
 

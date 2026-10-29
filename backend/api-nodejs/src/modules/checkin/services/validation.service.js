@@ -8,12 +8,40 @@ const { getHojeLocal, getInicioHojeLocal, getLimitesDiaLocalUTC, TIMEZONE } = re
 const MARCADOR_CREDENCIAMENTO = 'CREDENCIAMENTO';
 const semCredenciamento = (query) => query.or(`observacao.is.null,observacao.neq.${MARCADOR_CREDENCIAMENTO}`);
 
+// Evento com o mesmo cache de 15 s do requireEvent (antes: 2 consultas a `eventos` por acesso)
+const buscarEventoCache = async (evento_id) => {
+    const { buscarEvento } = require('../../../middleware/eventMiddleware');
+    const { evento } = await buscarEvento(evento_id);
+    return evento;
+};
+
+const STATS_FRESCO_MS = 10000;
+const STATS_VELHO_MAX_MS = 5 * 60 * 1000;
+const statsValidacao = new Map(); // evento_id → { valor, em, atualizando }
+
+/** Último check-in/checkout da pessoa (na área). Usado pelo toggle e pelo anti-passback. */
+const buscarUltimoLog = async (pessoa_id, evento_id, area_id) => {
+    let query = supabase
+        .from('logs_acesso')
+        .select('tipo, created_at')
+        .eq('pessoa_id', pessoa_id)
+        .eq('evento_id', evento_id)
+        .in('tipo', ['checkin', 'checkout'])
+        .order('created_at', { ascending: false })
+        .limit(1);
+    if (area_id) query = query.eq('area_id', area_id);
+    // Entrega de pulseira no credenciamento não é passagem em leitor
+    query = semCredenciamento(query);
+    const { data } = await query.maybeSingle();
+    return data || null;
+};
+
 class ValidationService {
     async verificarFaseEvento(evento_id, pessoa, metodo = 'manual') {
         if (metodo === 'manual') return true;
         if (pessoa.status_acesso === 'checkin_feito') return true;
 
-        const { data: evento } = await supabase.from('eventos').select('*').eq('id', evento_id).single();
+        const evento = await buscarEventoCache(evento_id);
         if (!evento) return true;
 
         const datasMontagem = evento.datas_montagem || [];
@@ -30,7 +58,7 @@ class ValidationService {
 
         const hojeLiteral = getHojeLocal();
         
-        logger.info({
+        logger.debug({
             hojeLiteral,
             datasMontagem,
             datasEvento,
@@ -170,71 +198,61 @@ class ValidationService {
         };
     }
 
-    async isFirstAccessOfDay(pessoa_id, evento_id, area_id = null) {
-        const { start, end } = getLimitesDiaLocalUTC();
-
-        let query = supabase
-            .from('logs_acesso')
-            .select('id', { count: 'exact', head: true })
-            .eq('pessoa_id', pessoa_id)
-            .eq('evento_id', evento_id)
-            .in('tipo', ['checkin', 'checkout'])
-            .gte('created_at', start)
-            .lte('created_at', end);
-
-        if (area_id) query = query.eq('area_id', area_id);
-        query = semCredenciamento(query);
-
-        const { count, error } = await query;
-
-        if (error) {
-            logger.error(`Erro ao verificar primeiro acesso do dia para ${pessoa_id}:`, error);
-            return false;
-        }
-
-        return count === 0;
-    }
-
-    async determineSmartAccessType(pessoa_id, evento_id, requestedTipo = null, area_id = null) {
+    /**
+     * @param {Object} ctx  opcional: recebe `ultimoLog` para o anti-passback reaproveitar
+     *                     (era a mesma consulta feita duas vezes por acesso)
+     */
+    async determineSmartAccessType(pessoa_id, evento_id, requestedTipo = null, area_id = null, ctx = null) {
         // Se o tipo foi solicitado manualmente, respeita (ex: página de checkout força 'checkout')
         if (requestedTipo) return requestedTipo;
 
         // Uma única consulta: último log da área. Sem log hoje = primeiro acesso do dia = CHECK-IN;
         // com log hoje, alterna (toggle).
-        let query = supabase
-            .from('logs_acesso')
-            .select('tipo, created_at')
-            .eq('pessoa_id', pessoa_id)
-            .eq('evento_id', evento_id)
-            .in('tipo', ['checkin', 'checkout'])
-            .order('created_at', { ascending: false })
-            .limit(1);
-
-        if (area_id) query = query.eq('area_id', area_id);
-        query = semCredenciamento(query);
-
-        const { data: lastLog } = await query.maybeSingle();
+        const lastLog = await buscarUltimoLog(pessoa_id, evento_id, area_id);
+        if (ctx) ctx.ultimoLog = lastLog;
 
         const { start } = getLimitesDiaLocalUTC();
         const lastAt = lastLog ? new Date(/Z|[+-]\d{2}:\d{2}$/.test(lastLog.created_at) ? lastLog.created_at : `${lastLog.created_at}Z`) : null;
         if (!lastLog || lastAt < new Date(start)) {
-            logger.info(`✨ [SmartAccess] Primeiro acesso do dia para ${pessoa_id} (area: ${area_id || 'global'}). Forçando CHECK-IN.`);
+            logger.debug(`✨ [SmartAccess] Primeiro acesso do dia para ${pessoa_id} (area: ${area_id || 'global'}). Forçando CHECK-IN.`);
             return 'checkin';
         }
         return lastLog.tipo === 'checkout' ? 'checkin' : 'checkout';
     }
 
     /**
-     * Estatísticas para checagem de lotação/cota com cache de 10 s.
-     * Evita ~600 ms por passagem; o painel continua usando getRealtimeStatsInternal sem cache.
+     * Estatísticas para checagem de lotação/cota (10+ contagens no banco).
+     * Frescas por 10 s; depois disso devolve o valor anterior na hora e recalcula em
+     * segundo plano — a pessoa na catraca não espera a recontagem.
+     * Só a primeira passagem do evento (ou após 5 min parado) espera.
      */
     async _getStatsParaValidacao(evento_id) {
-        const cacheKey = `stats_validacao_${evento_id}`;
-        const cached = cacheService.get(cacheKey);
-        if (cached) return cached;
-        const stats = await this.getRealtimeStatsInternal(evento_id);
-        cacheService.set(cacheKey, stats, 10000);
-        return stats;
+        const item = statsValidacao.get(evento_id);
+        const idade = item?.valor ? Date.now() - item.em : Infinity;
+
+        const atualizar = () => {
+            const atual = statsValidacao.get(evento_id);
+            if (atual?.atualizando) return atual.atualizando;
+            const promessa = this.getRealtimeStatsInternal(evento_id)
+                .then((valor) => {
+                    statsValidacao.set(evento_id, { valor, em: Date.now(), atualizando: null });
+                    return valor;
+                })
+                .catch((e) => {
+                    const depois = statsValidacao.get(evento_id);
+                    if (depois) depois.atualizando = null;
+                    throw e;
+                });
+            statsValidacao.set(evento_id, { ...(atual || { valor: null, em: 0 }), atualizando: promessa });
+            return promessa;
+        };
+
+        if (idade < STATS_FRESCO_MS) return item.valor;
+        if (idade < STATS_VELHO_MAX_MS) {
+            atualizar().catch((e) => logger.warn(`[Validação] Falha ao atualizar estatísticas: ${e.message}`));
+            return item.valor;
+        }
+        return atualizar();
     }
 
     async getCheckinSettings(evento_id) {
@@ -253,7 +271,7 @@ class ValidationService {
         return settings;
     }
 
-    async validateAccessRules(evento_id, pessoa, tipo, metodo, timestamp, confianca, area_id = null) {
+    async validateAccessRules(evento_id, pessoa, tipo, metodo, timestamp, confianca, area_id = null, ctx = null) {
         // Operações manuais (admin web), pulseira e leitor de código de barras = decisão humana do operador
         const isHumanOperator = metodo === 'pulseira' || metodo === 'manual' || metodo === 'barcode';
 
@@ -271,9 +289,17 @@ class ValidationService {
             throw this._buildError('Cadastro Recusado');
         }
 
-        const [{ data: evento }, s] = await Promise.all([
-            supabase.from('eventos').select('min_face_score').eq('id', evento_id).single(),
-            this.getCheckinSettings(evento_id)
+        // Consultas independentes de uma vez: evento e configurações (em cache) e, na entrada,
+        // estatísticas de lotação e vínculos de empresa para a cota (antes: em sequência)
+        const ehEntrada = tipo === 'checkin';
+        const [evento, s, statsEntrada, vinculosEntrada] = await Promise.all([
+            buscarEventoCache(evento_id),
+            this.getCheckinSettings(evento_id),
+            ehEntrada ? this._getStatsParaValidacao(evento_id) : null,
+            ehEntrada
+                ? supabase.from('pessoa_evento_empresa').select('empresa_id')
+                    .eq('pessoa_id', pessoa.id).eq('evento_id', evento_id).eq('status_aprovacao', 'aprovado')
+                : { data: null }
         ]);
 
         const isFacial = metodo === 'facial' || metodo === 'face';
@@ -357,7 +383,7 @@ class ValidationService {
         // 4. Capacidade
         let quotaBypassed = false;
         if (tipo === 'checkin') {
-            const stats = await this._getStatsParaValidacao(evento_id);
+            const stats = statsEntrada;
             if (stats.presentes >= stats.capacidade && stats.capacidade > 0) {
                 // Operação humana (pulseira/manual) pode ultrapassar cota — operador decide
                 if (isHumanOperator) {
@@ -369,9 +395,7 @@ class ValidationService {
             }
 
             // Cota por empresa (vinculo aprovado em pessoa_evento_empresa)
-            const { data: vinculos } = await supabase
-                .from('pessoa_evento_empresa').select('empresa_id')
-                .eq('pessoa_id', pessoa.id).eq('evento_id', evento_id).eq('status_aprovacao', 'aprovado');
+            const vinculos = vinculosEntrada.data;
 
             if (vinculos && vinculos.length > 0) {
                 let hasAvailableQuota = false;
@@ -397,7 +421,8 @@ class ValidationService {
 
         // 5. Anti-passback (cooldown por área)
         if ((tipo === 'checkin' || tipo === 'checkout') && cooldown > 0) {
-            await this.validateAntiPassback(evento_id, pessoa.id, tipo, metodo, cooldown, area_id, timestamp);
+            await this.validateAntiPassback(evento_id, pessoa.id, tipo, metodo, cooldown, area_id, timestamp,
+                ctx && 'ultimoLog' in ctx ? ctx.ultimoLog : undefined);
         }
 
         return { quotaBypassed, cooldown, targetConfidence };
@@ -406,24 +431,12 @@ class ValidationService {
     /**
      * Validar anti-passback (evitar check-in/checkout duplo rápido)
      */
-    async validateAntiPassback(evento_id, pessoa_id, tipo, metodo, cooldownMinutos, area_id = null, timestamp = null) {
+    async validateAntiPassback(evento_id, pessoa_id, tipo, metodo, cooldownMinutos, area_id = null, timestamp = null, ultimoLog = undefined) {
         if (cooldownMinutos <= 0) return true;
 
-        let query = supabase
-            .from('logs_acesso')
-            .select('created_at, tipo')
-            .eq('pessoa_id', pessoa_id)
-            .eq('evento_id', evento_id)
-            .in('tipo', ['checkin', 'checkout'])
-            .order('created_at', { ascending: false })
-            .limit(1);
-
-        // Anti-passback por área: cooldown é por área, não global
-        if (area_id) query = query.eq('area_id', area_id);
-        // Entrega de pulseira no credenciamento não é passagem em leitor
-        query = semCredenciamento(query);
-
-        const { data: lastLog } = await query.maybeSingle();
+        // Anti-passback por área: cooldown é por área, não global.
+        // `ultimoLog` vem do determineSmartAccessType da mesma requisição, quando houve.
+        const lastLog = ultimoLog !== undefined ? ultimoLog : await buscarUltimoLog(pessoa_id, evento_id, area_id);
 
         if (!lastLog) return true;
 

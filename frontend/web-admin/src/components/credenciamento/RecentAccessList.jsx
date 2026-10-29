@@ -195,4 +195,4 @@ const RecentAccessList = ({
   );
 };
 
-export default RecentAccessList;
+export default React.memo(RecentAccessList);

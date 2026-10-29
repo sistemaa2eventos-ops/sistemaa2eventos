@@ -23,7 +23,7 @@ import {
 } from '@mui/icons-material';
 import PageHeader from '../components/common/PageHeader';
 import GlassCard from '../components/common/GlassCard';
-import LeitorQrCamera from '../components/common/LeitorQrCamera';
+import LeitorQrCamera from '../components/common/LeitorQrCameraSobDemanda';
 import KpiCard from '../components/common/KpiCard';
 import { cores } from '../styles/tokens';
 import { FactCheck as KpiFiscalizadosIcon, CheckCircle as KpiLiberadosIcon, Block as KpiNegadosIcon } from '@mui/icons-material';
@@ -33,12 +33,14 @@ import PessoaFoto from '../components/common/PessoaFoto';
 import FiscalizacaoPessoaModal from '../components/credenciamento/FiscalizacaoPessoaModal';
 import api from '../services/api';
 import { useSnackbar } from 'notistack';
+import { obterAudioContext } from '../utils/alertSound';
 
 // Sons sintetizados via Web Audio API (tons discretos e elegantes)
 const playFeedbackSound = (type, soundEnabled = true) => {
     if (!soundEnabled) return;
     try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const audioCtx = obterAudioContext();
+        if (!audioCtx) return;
         if (type === 'liberado') {
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();

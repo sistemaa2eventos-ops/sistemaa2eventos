@@ -76,6 +76,12 @@ if (process.env.NODE_ENV !== 'production') {
             winston.format.simple()
         )
     }));
+} else {
+    // Em produção, avisos e erros também no `docker logs` (os arquivos somem ao recriar o container)
+    logger.add(new winston.transports.Console({
+        level: 'warn',
+        format: winston.format.combine(winston.format.timestamp(), winston.format.json())
+    }));
 }
 
 // Normaliza chamadas no estilo pino e com detalhe em string, que o winston serializa

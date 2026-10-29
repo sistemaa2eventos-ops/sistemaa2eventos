@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSnackbar } from 'notistack';
 import api from '../services/api';
 
@@ -8,6 +8,13 @@ export const useEmpresas = (eventoIdParam) => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [search, setSearch] = useState('');
+    // Busca só 300 ms depois da última tecla (antes: 1 requisição por tecla)
+    const [buscaAtrasada, setBuscaAtrasada] = useState('');
+    const loadAbortRef = useRef(null);
+    useEffect(() => {
+        const t = setTimeout(() => setBuscaAtrasada(search), 300);
+        return () => clearTimeout(t);
+    }, [search]);
     const [page, setPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [total, setTotal] = useState(0);
@@ -47,25 +54,31 @@ export const useEmpresas = (eventoIdParam) => {
     }, [eventoIdParam, enqueueSnackbar]);
 
     const loadEmpresas = useCallback(async () => {
+        // Cancela a anterior: resposta lenta não sobrescreve a lista mais nova
+        loadAbortRef.current?.abort();
+        const controller = new AbortController();
+        loadAbortRef.current = controller;
         try {
             setLoading(true);
             const response = await api.get('/empresas', {
                 params: {
-                    search: search || undefined,
+                    search: buscaAtrasada || undefined,
                     evento_id: eventoIdParam || undefined,
                     page,
                     limit: rowsPerPage
                 },
+                signal: controller.signal
             });
             const data = response.data;
             setEmpresas(data.data || []);
             setTotal(data.total || data.count || data.data?.length || 0);
         } catch (error) {
+            if (error?.code === 'ERR_CANCELED') return;
             enqueueSnackbar('Erro ao carregar empresas.', { variant: 'error' });
         } finally {
-            setLoading(false);
+            if (loadAbortRef.current === controller) setLoading(false);
         }
-    }, [search, eventoIdParam, page, rowsPerPage, enqueueSnackbar]);
+    }, [buscaAtrasada, eventoIdParam, page, rowsPerPage, enqueueSnackbar]);
 
     const loadDocumentos = useCallback(async (empresaId) => {
         try {
@@ -78,8 +91,12 @@ export const useEmpresas = (eventoIdParam) => {
 
     useEffect(() => {
         loadEmpresas();
+    }, [loadEmpresas]);
+
+    // O evento ativo não muda com a busca/página (antes era buscado de novo a cada tecla)
+    useEffect(() => {
         fetchActiveEvent();
-    }, [loadEmpresas, fetchActiveEvent]);
+    }, [fetchActiveEvent]);
 
     const handleSave = async () => {
         try {

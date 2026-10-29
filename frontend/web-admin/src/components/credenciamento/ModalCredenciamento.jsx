@@ -20,7 +20,7 @@ import NeonButton from '../common/NeonButton';
 import AuthorizedAreasChips from '../common/AuthorizedAreasChips';
 import UniversalPulseiraInput from '../common/UniversalPulseiraInput';
 import PessoaFoto from '../common/PessoaFoto';
-import LeitorQrCamera from '../common/LeitorQrCamera';
+import LeitorQrCamera from '../common/LeitorQrCameraSobDemanda';
 import useFecharComVoltar from '../../hooks/useFecharComVoltar';
 import api from '../../services/api';
 import ListaDocumentos from '../documentos/ListaDocumentos';

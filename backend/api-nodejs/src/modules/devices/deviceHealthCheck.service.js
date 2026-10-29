@@ -181,14 +181,21 @@ class DeviceHealthCheckService {
             // Atualizar Supabase - Usamos update individual para evitar problemas com upsert e colunas obrigatórias
             if (updates.length > 0) {
                 let successUpdates = 0;
+                // Os pings levam até ~12 s: se o leitor mandou keepalive/push nesse meio-tempo,
+                // não grava "offline" por cima do sinal de vida mais novo
+                const limiteContato = new Date(Date.now() - 3 * 60 * 1000).toISOString();
                 for (const update of updates) {
-                    const { error: updateError } = await supabase
+                    let q = supabase
                         .from('dispositivos_acesso')
                         .update({
                             status_online: update.status_online,
                             ultimo_ping: update.ultimo_ping
                         })
                         .eq('id', update.id);
+                    if (update.status_online === 'offline') {
+                        q = q.or(`last_push_at.is.null,last_push_at.lt.${limiteContato}`);
+                    }
+                    const { error: updateError } = await q;
 
                     if (updateError) {
                         logger.error({ err: updateError, deviceId: update.id }, `[HealthCheck] Erro ao atualizar status do dispositivo ${update.id}: ${updateError.message}`);

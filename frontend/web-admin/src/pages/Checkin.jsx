@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   Box, Typography, Grid, TextField,
   List, ListItemText,
@@ -11,7 +11,7 @@ import {
 import { styled } from '@mui/material/styles';
 
 import GlassCard from '../components/common/GlassCard';
-import LeitorQrCamera from '../components/common/LeitorQrCamera';
+import LeitorQrCamera from '../components/common/LeitorQrCameraSobDemanda';
 import UniversalPulseiraInput from '../components/common/UniversalPulseiraInput';
 import CabecalhoOperacao, { BotaoJanelaRegistros } from '../components/credenciamento/CabecalhoOperacao';
 import ModalCredenciamento from '../components/credenciamento/ModalCredenciamento';
@@ -19,7 +19,7 @@ import PessoaFoto from '../components/common/PessoaFoto';
 import PessoaCardDialog from '../components/credenciamento/PessoaCardDialog';
 import RecentAccessList from '../components/credenciamento/RecentAccessList';
 import { useCheckin } from '../hooks/useCheckin';
-import { useSyncedClock } from '../hooks/useSyncedClock';
+import RelogioSincronizado from '../components/common/RelogioSincronizado';
 
 const FeedbackOverlay = styled(Box, { shouldForwardProp: (p) => p !== 'status' })(({ status }) => ({
     position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
@@ -59,9 +59,11 @@ const Checkin = () => {
     carregarDispositivosDisponiveis
   } = useCheckin(undefined, { logsTipo: 'checkin' });
 
-  const { currentTime, currentDate, timezoneLabel } = useSyncedClock();
 
   const [cardLog, setCardLog] = useState(null);
+  // Estáveis entre renderizações: a lista (memo) não redesenha as 50 linhas à toa
+  const abrirCardLog = useCallback((log) => setCardLog(log), []);
+  const acoesLista = useMemo(() => <BotaoJanelaRegistros tipo="checkin" cor="#00D4FF" />, []);
   const [barcodeValue, setBarcodeValue] = useState('');
   const [lendoCamera, setLendoCamera] = useState(false);
 
@@ -92,7 +94,7 @@ const Checkin = () => {
           titulo="Check-in"
           icone={<ScannerIcon />}
           cor="#00D4FF"
-          dataHora={`${currentDate} ${currentTime} (${timezoneLabel})`}
+          dataHora={<RelogioSincronizado />}
           estacao={{
               sessaoAtiva,
               dispositivos: dispositivosDisponiveis,
@@ -225,8 +227,8 @@ const Checkin = () => {
                     firstLabel="Última entrada"
                     emptyTitle="Nenhuma entrada registrada ainda"
                     emptySubtitle="Cada entrada aparece aqui na hora, com foto, empresa e pulseira."
-                    acoes={<BotaoJanelaRegistros tipo="checkin" cor="#00D4FF" />}
-                    onSelect={(log) => setCardLog(log)}
+                    acoes={acoesLista}
+                    onSelect={abrirCardLog}
                 />
             </GlassCard>
         </Grid>
@@ -244,7 +246,7 @@ const Checkin = () => {
                       <Typography variant="h6" sx={{ opacity: 0.85, fontSize: { xs: '1rem', sm: '1.25rem' } }}>{resultMessage}</Typography>
                       {checkinResult === 'sucesso' && (
                           <Typography variant="h6" sx={{ mt: 1.5, opacity: 0.6, fontFamily: '"Inter", sans-serif', letterSpacing: 1.5 }}>
-                              {currentTime} • {timezoneLabel}
+                              <RelogioSincronizado formato="hora" />
                           </Typography>
                       )}
                   </Box>

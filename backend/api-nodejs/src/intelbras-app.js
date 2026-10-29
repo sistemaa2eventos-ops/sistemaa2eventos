@@ -10,15 +10,11 @@ const { createServer } = require('http');
 dotenv.config();
 
 const Sentry = require("@sentry/node");
-const { nodeProfilingIntegration } = require("@sentry/profiling-node");
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN_BACKEND || "https://f69531af6f2fb198152abfc419c690bc@o4511978719346688.ingest.us.sentry.io/4511978757554176",
-  integrations: [
-    nodeProfilingIntegration(),
-  ],
-  tracesSampleRate: 1.0, 
-  profilesSampleRate: 1.0,
+  // Erros vão 100%; rastreio em 5% e sem profiling: este processo atende os leitores
+  tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_RATE || '0.05'),
 });
 
 const { testConnection } = require('./config/database');

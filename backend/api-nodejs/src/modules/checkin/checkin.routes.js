@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const accessController = require('./checkin.controller');
-const { authenticate, authorize, validateInternalApiKey } = require('../../middleware/auth');
+const { authenticate, authorize } = require('../../middleware/auth');
 const { requireEvent } = require('../../middleware/eventMiddleware');
 const rateLimiter = require('../../middleware/rateLimiter');
 
@@ -9,7 +9,6 @@ const rateLimiter = require('../../middleware/rateLimiter');
 // ROTAS PÚBLICAS (sem autenticação - para terminais)
 // ============================================
 // Check-in/out via terminal facial (API key interna)
-router.post('/facial', validateInternalApiKey, accessController.checkinFacial);
 
 // ============================================
 // Middleware para rotas autenticadas

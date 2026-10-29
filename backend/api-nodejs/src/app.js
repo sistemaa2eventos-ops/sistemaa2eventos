@@ -15,17 +15,16 @@ const ENV = validateEnvironment();
 
 // FIX 4.2: Sentry deve ser inicializado antes de qualquer outro módulo
 const Sentry = require('@sentry/node');
-const { nodeProfilingIntegration } = require('@sentry/profiling-node');
 const SENTRY_DSN = ENV.SENTRY_DSN || process.env.SENTRY_DSN_BACKEND || 'https://f69531af6f2fb198152abfc419c690bc@o4511978719346688.ingest.us.sentry.io/4511978757554176';
 if (SENTRY_DSN) {
     Sentry.init({
         dsn: SENTRY_DSN,
         environment: ENV.NODE_ENV,
-        tracesSampleRate: 1.0,
-        profilesSampleRate: 1.0,
+        // Erros vão 100%; rastreio de desempenho em 10% e sem profiling
+        // (com 100% custava CPU em toda requisição e estourava a cota no pico do evento)
+        tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_RATE || '0.1'),
         integrations: [
             Sentry.httpIntegration(),
-            nodeProfilingIntegration(),
         ],
     });
 }

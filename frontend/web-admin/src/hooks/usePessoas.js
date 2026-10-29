@@ -12,6 +12,8 @@ export const usePessoas = () => {
     const { enqueueSnackbar } = useSnackbar();
     const searchTimerRef = useRef(null);
     const searchRef = useRef('');
+    const fetchAbortRef = useRef(null);
+    const buscaMontadaRef = useRef(false);
     const pageRef = useRef(1);
 
     // Params
@@ -73,12 +75,17 @@ export const usePessoas = () => {
     const fetchPessoas = useCallback(async (customPage, customSearch) => {
       const p = customPage !== undefined ? customPage : pageRef.current;
       const s = customSearch !== undefined ? customSearch : searchRef.current;
+      // Cancela a busca anterior: uma resposta lenta não sobrescreve a lista mais nova
+      fetchAbortRef.current?.abort();
+      const controller = new AbortController();
+      fetchAbortRef.current = controller;
       try {
         setLoading(true);
         let response;
         if (s && s.trim().length >= 2) {
           response = await api.get('/pessoas/search', { 
-            params: { q: s.trim(), page: p, limit, status: statusFilter === 'TODOS' ? undefined : statusFilter } 
+            params: { q: s.trim(), page: p, limit, status: statusFilter === 'TODOS' ? undefined : statusFilter },
+            signal: controller.signal
           });
         } else {
           response = await api.get('/pessoas', { 
@@ -87,7 +94,8 @@ export const usePessoas = () => {
               page: p,
               limit,
               status: statusFilter === 'TODOS' ? undefined : statusFilter
-            }
+            },
+            signal: controller.signal
           });
         }
         
@@ -96,8 +104,11 @@ export const usePessoas = () => {
         setTotalPages(resData.pages || 1);
         setTotalCount(resData.total || 0);
       } catch (error) {
+        if (error?.code === 'ERR_CANCELED') return;
         enqueueSnackbar('Erro ao carregar lista de pessoas.', { variant: 'error' });
-      } finally { setLoading(false); }
+      } finally {
+        if (fetchAbortRef.current === controller) setLoading(false);
+      }
     }, [limit, statusFilter, eventoIdParam, enqueueSnackbar]);
 
     const loadPessoas = useCallback(() => {
@@ -136,6 +147,8 @@ export const usePessoas = () => {
     }, [loadInitialData]);
 
     useEffect(() => {
+      // Na montagem o efeito da página abaixo já carrega a lista (antes buscava 2x)
+      if (!buscaMontadaRef.current) { buscaMontadaRef.current = true; return undefined; }
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
       searchTimerRef.current = setTimeout(() => {
         setPage(1); // Reset page on search

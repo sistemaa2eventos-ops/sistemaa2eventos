@@ -67,6 +67,13 @@ const Veiculos = () => {
     
     // Paginação e Busca
     const [search, setSearch] = useState('');
+    // Busca só 300 ms depois da última tecla (antes: 1 requisição por tecla)
+    const [buscaAtrasada, setBuscaAtrasada] = useState('');
+    const loadAbortRef = useRef(null);
+    useEffect(() => {
+        const t = setTimeout(() => setBuscaAtrasada(search), 300);
+        return () => clearTimeout(t);
+    }, [search]);
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(25);
     const [totalCount, setTotalCount] = useState(0);
@@ -264,24 +271,30 @@ const Veiculos = () => {
 
     const loadVeiculos = useCallback(async () => {
         if (!eventoId) return;
+        // Cancela a anterior: resposta lenta não sobrescreve a lista mais nova
+        loadAbortRef.current?.abort();
+        const controller = new AbortController();
+        loadAbortRef.current = controller;
         try {
             setLoading(true);
             const response = await api.get('/veiculos', {
                 params: {
-                    busca: search || undefined,
+                    busca: buscaAtrasada || undefined,
                     page: page + 1,
                     limit: rowsPerPage,
                     evento_id: eventoId
                 },
+                signal: controller.signal
             });
             setVeiculos(response.data.data || []);
             setTotalCount(response.data.total || 0);
         } catch (error) {
+            if (error?.code === 'ERR_CANCELED') return;
             enqueueSnackbar('Falha ao sincronizar frota.', { variant: 'error' });
         } finally {
-            setLoading(false);
+            if (loadAbortRef.current === controller) setLoading(false);
         }
-    }, [search, page, rowsPerPage, eventoId, enqueueSnackbar]);
+    }, [buscaAtrasada, page, rowsPerPage, eventoId, enqueueSnackbar]);
 
     const loadPessoas = useCallback(async () => {
         if (!eventoId) return;

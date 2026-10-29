@@ -7,11 +7,11 @@ const webhookDispatcher = require('../../services/webhookDispatcher');
 const websocketService = require('../../services/websocketService'); // FIX C-02: import ausente causava ReferenceError em runtime
 const databaseService = require('./services/database.service');
 const watchlistService = require('../system/watchlist.service');
+const { COLUNAS_PESSOA_ACESSO } = require('./services/colunasPessoa');
 
 class AccessController {
     constructor() {
         this.checkout = this.checkout.bind(this);
-        this.processFaceRecognition = this.processFaceRecognition.bind(this);
         this.getLogs = this.getLogs.bind(this);
         this.getRealtimeStats = this.getRealtimeStats.bind(this);
         this.expulsar = this.expulsar.bind(this);
@@ -57,21 +57,6 @@ class AccessController {
                 'Error registering checkout'
             );
             return ApiResponse.error(res, 'Erro interno no servidor');
-        }
-    }
-
-    async processFaceRecognition(req, res) {
-        // FIX 4.4: Método em migração para pgvector (Fase 5.1)
-        // Recebe requisições mas retorna 501 até que o novo motor biométrico esteja ativo
-        // NÃO remover — rota já publicada em checkin.routes.js
-        try {
-            return ApiResponse.error(res, 'Reconhecimento facial em migração para motor de vetores. Use o terminal físico.', 501);
-        } catch (error) {
-            logger.error(
-                { err: error, event_id: req.event?.id },
-                'Error in face recognition processing'
-            );
-            return ApiResponse.error(res, 'Falha crítica no motor biométrico.');
         }
     }
 
@@ -351,7 +336,7 @@ class AccessController {
 
             const { data: pessoa, error: pessoaErr } = await supabaseClient
                 .from('pessoas')
-                .select('*, empresas(nome)')
+                .select(`${COLUNAS_PESSOA_ACESSO}, empresas(nome)`)
                 .eq('qr_code', qrCode)
                 .eq('evento_id', eventoId)
                 .single();
@@ -402,7 +387,7 @@ class AccessController {
             // Buscar pessoa
             const { data: pessoa, error: pessoaErr } = await supabaseClient
                 .from('pessoas')
-                .select('*, empresas(nome)')
+                .select(`${COLUNAS_PESSOA_ACESSO}, empresas(nome)`)
                 .eq('id', pessoa_id)
                 .eq('evento_id', eventoId)
                 .single();
@@ -504,7 +489,7 @@ class AccessController {
             // 1. Tentar buscar pessoa pela pulseira
             let { data: pessoa, error: pessoaErr } = await supabaseClient
                 .from('pessoas')
-                .select('*, empresas(nome)')
+                .select(`${COLUNAS_PESSOA_ACESSO}, empresas(nome)`)
                 .eq('numero_pulseira', safeCode)
                 .eq('evento_id', eventoId)
                 .maybeSingle();
@@ -524,7 +509,7 @@ class AccessController {
 
                 const { data: pAlt } = await supabaseClient
                     .from('pessoas')
-                    .select('*, empresas(nome)')
+                    .select(`${COLUNAS_PESSOA_ACESSO}, empresas(nome)`)
                     .eq('evento_id', eventoId)
                     .or(orConds.join(','))
                     .limit(1);
@@ -547,7 +532,9 @@ class AccessController {
                 metodo: pessoa.numero_pulseira === safeCode ? 'pulseira' : 'barcode',
                 dispositivo_id: 'web-dashboard',
                 created_by: req.user?.id,
-                area_id
+                area_id,
+                sync_id: req.body.sync_id,
+                offline_timestamp: req.body.offline_timestamp
             });
 
             if (result.error) return ApiResponse.error(res, result.error, result.status || 400);
@@ -584,7 +571,7 @@ class AccessController {
             // 1. Tentar buscar a pessoa por: numero_pulseira, cpf, qr_code ou id
             let query = supabaseClient
                 .from('pessoas')
-                .select('*, empresas(nome)')
+                .select(`${COLUNAS_PESSOA_ACESSO}, empresas(nome)`)
                 .eq('evento_id', eventoId);
 
             let orConds = [`numero_pulseira.eq.${cleanCode}`, `qr_code.eq.${cleanCode}`];
@@ -603,7 +590,7 @@ class AccessController {
             if (!pessoas || pessoas.length === 0) {
                 const { data: fallbackPessoas } = await supabaseClient
                     .from('pessoas')
-                    .select('*, empresas(nome)')
+                    .select(`${COLUNAS_PESSOA_ACESSO}, empresas(nome)`)
                     .eq('evento_id', eventoId)
                     .ilike('nome_completo', `%${cleanCode}%`)
                     .limit(1);
@@ -683,7 +670,7 @@ class AccessController {
             // 1. Buscar pessoa
             const { data: pessoa, error: pessoaErr } = await supabaseClient
                 .from('pessoas')
-                .select('*, empresas(nome)')
+                .select(`${COLUNAS_PESSOA_ACESSO}, empresas(nome)`)
                 .eq('id', pessoa_id)
                 .eq('evento_id', eventoId)
                 .single();
@@ -891,153 +878,6 @@ class AccessController {
                 'Error fetching bracelet'
             );
             return ApiResponse.error(res, 'Erro ao buscar');
-        }
-    }
-
-    // ============================================
-    // NOVO: CHECK-IN VIA FACIAL (para terminais)
-    // ============================================
-    async checkinFacial(req, res) {
-        try {
-            const { terminal_id, face_encoding, foto_capturada, confianca } = req.body;
-            const supabaseClient = req.supabase || supabase;
-
-            // Validar terminal (terminais_faciais não existe mais: tudo está em dispositivos_acesso)
-            let terminal = null;
-            {
-                const { data: dispositivo, error: dispErr } = await supabaseClient
-                    .from('dispositivos_acesso')
-                    .select('id, evento_id, nome, area_nome, modo, config')
-                    .eq('id', terminal_id)
-                    .eq('tipo', 'terminal_facial')
-                    .single();
-
-                if (!dispErr && dispositivo) {
-                    terminal = {
-                        id: dispositivo.id,
-                        evento_id: dispositivo.evento_id,
-                        nome: dispositivo.nome,
-                        area_nome: dispositivo.area_nome,
-                        modo: dispositivo.modo || 'ambos',
-                        ativo: true,
-                        biometric_confidence_min: dispositivo.config?.biometric_confidence_min
-                    };
-                }
-            }
-
-            if (!terminal) {
-                return res.status(404).json({ error: 'Terminal não encontrado' });
-            }
-
-            if (!terminal.ativo) {
-                return res.status(403).json({ error: 'Terminal inativo' });
-            }
-
-            const eventoId = terminal.evento_id;
-            const modo = terminal.modo;
-
-            // Buscar pessoa por face_encoding
-            const { data: pessoa, error: pessoaErr } = await supabaseClient
-                .from('pessoas')
-                .select('*, empresas(nome)')
-                .eq('face_encoding', face_encoding)
-                .eq('evento_id', eventoId)
-                .single();
-
-            if (pessoaErr || !pessoa) {
-                return res.status(404).json({ error: 'Pessoa não identificada' });
-            }
-
-            // Validar confiança
-            const minConfianca = terminal.biometric_confidence_min || 75;
-            let statusLog = 'autorizado';
-
-            if (confianca < 60) {
-                return res.status(403).json({ error: 'Acesso rejeitado - confiança insuficiente', confianca });
-            } else if (confianca < minConfianca) {
-                statusLog = 'confianca_baixa';
-            }
-
-            // Determinar tipo (checkin/checkout conforme modo)
-            let tipoAcesso = 'checkin';
-            const { data: ultimoLog } = await supabaseClient
-                .from('logs_acesso')
-                .select('tipo')
-                .eq('pessoa_id', pessoa.id)
-                .eq('evento_id', eventoId)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
-
-            const ultimoTipo = ultimoLog?.tipo;
-
-            if (modo === 'checkin') {
-                tipoAcesso = 'checkin';
-            } else if (modo === 'checkout') {
-                tipoAcesso = 'checkout';
-            } else {
-                // modo 'ambos' - Smart Access
-                tipoAcesso = (ultimoTipo === 'checkin') ? 'checkout' : 'checkin';
-            }
-
-            // Se modo não permite o tipo, rejeitar
-            if (modo === 'checkin' && tipoAcesso === 'checkout') {
-                return res.status(403).json({ error: 'Terminal configurado apenas para entrada' });
-            }
-            if (modo === 'checkout' && tipoAcesso === 'checkin') {
-                return res.status(403).json({ error: 'Terminal configurado apenas para saída' });
-            }
-
-            // Registrar log
-            const logData = {
-                evento_id: eventoId,
-                pessoa_id: pessoa.id,
-                tipo: tipoAcesso,
-                metodo: 'facial',
-                terminal_id,
-                status_log: statusLog,
-                confianca,
-                foto_capturada,
-                localizacao: terminal.area_nome || terminal.nome,
-                numero_pulseira: pessoa.numero_pulseira || null
-            };
-
-            await supabaseClient.from('logs_acesso').insert(logData);
-
-            // Atualizar status da pessoa
-            const novoStatus = tipoAcesso === 'checkin' ? 'checkin_feito' : 'checkout_feito';
-            await supabaseClient
-                .from('pessoas')
-                .update({ status_acesso: novoStatus, updated_at: new Date() })
-                .eq('id', pessoa.id);
-
-            // WebSocket
-            websocketService.emit('new_access', {
-                ...logData,
-                pessoa_nome: pessoa.nome_completo,
-                terminal_nome: terminal.nome,
-                area_nome: terminal.area_nome,
-                metodo: 'facial',
-                status_log: statusLog
-            }, eventoId);
-
-            return res.json({
-                success: true,
-                pessoa: {
-                    id: pessoa.id,
-                    nome: pessoa.nome_completo,
-                    foto_url: pessoa.foto_url
-                },
-                tipo: tipoAcesso,
-                status: statusLog,
-                confianca
-            });
-        } catch (error) {
-            logger.error(
-                { err: error, event_id: req.event?.id, method: 'facial' },
-                'Error in facial checkin'
-            );
-            return res.status(500).json({ error: 'Erro interno' });
         }
     }
 

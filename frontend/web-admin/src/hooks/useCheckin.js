@@ -4,6 +4,7 @@ import { usarConexao } from '../services/realtime';
 import api from '../services/api';
 import localCheckinService from '../services/LocalCheckinService';
 import { entrarTelaCheia, sairTelaCheia, ouvirTelaCheia } from '../utils/telaCheia';
+import { obterAudioContext } from '../utils/alertSound';
 
 /**
  * useCheckin: Hook de controle para a operação de recepção (NZT).
@@ -48,14 +49,14 @@ export const useCheckin = (defaultMode, options = {}) => {
     const rfidInputRef = useRef(null);
     const resetTimerRef = useRef(null);
     const refreshTimerRef = useRef(null);
+    const socketRef = useRef(null);
     // Valores atuais para os listeners do socket (registrados uma vez por evento)
     const latestRef = useRef({});
 
     const tocarBipeNotificacao = useCallback(() => {
         try {
-            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-            if (!AudioContextClass) return;
-            const audioCtx = new AudioContextClass();
+            const audioCtx = obterAudioContext();
+            if (!audioCtx) return;
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.type = 'sine';
@@ -200,8 +201,9 @@ export const useCheckin = (defaultMode, options = {}) => {
     const atualizarAposAcesso = useCallback(async () => {
         if (!eventoId) return;
         try {
+            // A linha do acesso chega pelo socket; sem conexão, busca a lista também
             const [, statsRes] = await Promise.all([
-                refreshLogs(),
+                socketRef.current?.conectado ? null : refreshLogs(),
                 api.get('/access/stats/realtime', { params: { evento_id: eventoId } })
             ]);
             setRealtimeStats(statsRes.data.data || null);
@@ -216,23 +218,33 @@ export const useCheckin = (defaultMode, options = {}) => {
 
         // Conexão compartilhada da aba (services/realtime.js)
         const socket = usarConexao();
+        socketRef.current = socket;
         socket.entrarEvento(eventoId);
 
         socket.on('new_access', (newLog) => {
             if (newLog.evento_id && newLog.evento_id !== eventoId) return;
             const targetTipo = logsTipo || (defaultMode === 'checkout' ? 'checkout' : null);
             if (targetTipo && newLog.tipo && newLog.tipo !== targetTipo) return;
+            const area = newLog.area_id && !newLog.area_nome
+                ? latestRef.current.eventAreas?.find(a => a.id === newLog.area_id)
+                : null;
+            const linha = area ? { ...newLog, area_nome: area.nome_area } : newLog;
             setRecentLogs(prev => {
-                const updated = [newLog, ...prev.filter(l => l.id !== newLog.id)];
+                const updated = [linha, ...prev.filter(l => l.id !== linha.id)];
                 return updated.slice(0, 50);
             });
 
-            // Agendar refresh para trazer foto e relações completas da API
+            // O servidor já manda a linha completa (foto, empresa, terminal): só os avisos
+            // antigos/incompletos (ex.: negado) ainda pedem a lista à API
+            if (newLog.completo) return;
             if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
             refreshTimerRef.current = setTimeout(() => {
                 refreshLogs();
             }, 600);
         });
+
+        // Voltou a conexão: acessos feitos enquanto ela estava caída não chegaram pelo socket
+        socket.onGerenciador('reconnect', () => refreshLogs());
 
         // 🎯 ABERTURA / IDENTIFICAÇÃO AUTOMÁTICA VIA LEITOR FACIAL (Fase 1)
         socket.on('credenciamento_abrir', (data) => {
@@ -256,7 +268,10 @@ export const useCheckin = (defaultMode, options = {}) => {
             setSessaoAtiva(novaSessao);
         });
 
-        return () => socket.liberar();
+        return () => {
+            socketRef.current = null;
+            socket.liberar();
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [eventoId, defaultMode, tocarBipeNotificacao]);
 
@@ -448,10 +463,10 @@ export const useCheckin = (defaultMode, options = {}) => {
             if (isCheckout) {
                 // OPERAÇÃO DE BAIXA / CHECKOUT
                 if (metodo === 'pulseira' || metodo === 'barcode') {
-                    res = await api.post('/access/pulseira/checkout', {
+                    res = await localCheckinService.enviar('/access/pulseira/checkout', {
                         numero_pulseira: extraValue || targetPessoa?.numero_pulseira || targetPessoa?.cpf || targetPessoa?.id,
                         area_id: areaId
-                    });
+                    }, 'pulseira-checkout');
                 } else {
                     const payload = {
                         pessoa_id: targetPessoa.id,
@@ -599,7 +614,7 @@ export const useCheckin = (defaultMode, options = {}) => {
         else localStorage.removeItem('nzt_area_id');
     };
 
-    latestRef.current = { operationMode, sessaoAtiva, handleSelectPessoa, executarLeituraRapida };
+    latestRef.current = { operationMode, sessaoAtiva, handleSelectPessoa, executarLeituraRapida, eventAreas };
 
     return {
         selectedPessoa, setSelectedPessoa: handleSelectPessoa,

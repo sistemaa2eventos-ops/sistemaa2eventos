@@ -47,10 +47,13 @@ const JanelaRegistros = () => {
       if (novo.evento_id && novo.evento_id !== eventoId) return;
       if (novo.tipo && novo.tipo !== tipo) return;
       setLogs((prev) => [novo, ...prev.filter((l) => l.id !== novo.id)].slice(0, 100));
-      // Traz foto e empresa completas logo depois
+      // Linha completa já vem do servidor; só aviso incompleto pede a lista de novo
+      if (novo.completo) return;
       clearTimeout(timerRef.current);
       timerRef.current = setTimeout(carregar, 600);
     });
+    // Acessos feitos com a conexão caída não chegaram pelo socket
+    socket.onGerenciador('reconnect', () => carregar());
     return () => { clearTimeout(timerRef.current); socket.liberar(); };
   }, [eventoId, tipo, carregar]);
 

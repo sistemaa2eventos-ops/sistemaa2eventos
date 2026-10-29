@@ -4,32 +4,13 @@ const websocketService = require('../../services/websocketService');
 const cacheService = require('../../services/cacheService');
 const ValidationService = require('./services/validation.service');
 const DatabaseService = require('./services/database.service');
+const { COLUNAS_PESSOA_ACESSO } = require('./services/colunasPessoa');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STATS_TTL_MS = 3000;
 const statsCache = new Map(); // evento_id -> { em, promessa }
 
 class CheckinService {
-    /**
-     * Verifica se um módulo específico está habilitado para o evento
-     */
-    async isModuleEnabled(supabaseClient, eventoId, moduleKey) {
-        try {
-            const { data, error } = await supabaseClient
-                .from('event_modules')
-                .select('is_enabled')
-                .eq('evento_id', eventoId)
-                .eq('module_key', moduleKey)
-                .single();
-
-            if (error || !data) return true; // Default behavior
-            return data.is_enabled;
-        } catch (error) {
-            logger.error(`Erro ao verificar módulo ${moduleKey}:`, error);
-            return true;
-        }
-    }
-
     /**
      * Registra um acesso (Check-in ou Check-out)
      * Implementa lógica Smart Access (Toggle/Primeiro do Dia) e Log Sempre.
@@ -45,7 +26,7 @@ class CheckinService {
         if (!pessoa) {
             const { data: pData } = await supabase
                 .from('pessoas')
-                .select('*, empresas(*)')
+                .select(`${COLUNAS_PESSOA_ACESSO}, empresas(*)`)
                 .eq('id', pessoa_id)
                 .single();
             pessoa = pData;
@@ -54,12 +35,13 @@ class CheckinService {
 
 
         // 2. Determinar tipo inteligente (Toggle ou Primeiro do Dia) — POR ÁREA
-        const tipoFinal = await ValidationService.determineSmartAccessType(pessoa_id, evento_id, accessData.tipo, area_id);
+        const ctxValidacao = {}; // último log da pessoa, reaproveitado no anti-passback
+        const tipoFinal = await ValidationService.determineSmartAccessType(pessoa_id, evento_id, accessData.tipo, area_id, ctxValidacao);
         const timestamp = offline_timestamp ? new Date(offline_timestamp) : new Date();
 
         // 3. Validar políticas de acesso
         try {
-            const validation = await ValidationService.validateAccessRules(evento_id, pessoa, tipoFinal, metodo, timestamp, accessData.confianca, area_id);
+            const validation = await ValidationService.validateAccessRules(evento_id, pessoa, tipoFinal, metodo, timestamp, accessData.confianca, area_id, ctxValidacao);
             
             // 4. Sucesso: Persistir no Banco de Dados
             // sync_id do painel vira o id do log: o reenvio da fila offline (ou de um timeout que
@@ -88,15 +70,26 @@ class CheckinService {
             const resultData = { id: logId, evento_id, pessoa_id, tipo: tipoFinal,
                                  metodo, dispositivo_id, created_at: timestamp };
 
-                // 5. Notificação via WebSocket
+            // 5. Notificação via WebSocket — linha completa (como a de GET /access/logs):
+            //    as estações inserem direto na lista, sem recarregar a lista inteira a cada acesso
             websocketService.emit('new_access', {
                 ...resultData,
                 pessoa_nome: pessoa.nome_completo,
-                pessoas: { id: pessoa.id, nome_completo: pessoa.nome_completo, cpf: pessoa.cpf, foto_url: pessoa.foto_url },
+                pessoas: {
+                    id: pessoa.id, nome_completo: pessoa.nome_completo, cpf: pessoa.cpf, foto_url: pessoa.foto_url,
+                    empresa_id: pessoa.empresa_id, empresas: pessoa.empresas?.nome ? { nome: pessoa.empresas.nome } : null,
+                    funcao: pessoa.funcao, numero_pulseira: pessoa.numero_pulseira
+                },
+                numero_pulseira: pessoa.numero_pulseira || null,
+                foto_capturada: accessData.foto_capturada || null,
+                observacao: accessData.observacao || null,
                 tipo_acesso: tipoFinal,
                 area_id: area_id || null,
                 area_nome: accessData.area_nome || null,
-                dispositivo_nome: accessData.dispositivo_nome || null
+                dispositivo_nome: accessData.dispositivo_nome
+                    || ({ 'web-dashboard': 'Painel (operador)', fiscalizacao: 'Fiscalização' })[dispositivo_id]
+                    || dispositivo_id || null,
+                completo: true
             }, evento_id);
 
             // 6. Integração Watchlist (Rastreamento de CPFs) — em segundo plano:
@@ -179,23 +172,6 @@ class CheckinService {
                 action: 'deny',
                 data: resultNegado.data 
             };
-        }
-    }
-
-    /**
-     * Processa reconhecimento facial (Integração com Motor Python)
-     */
-    async processFaceRecognition(supabaseClient, { faceBase64, eventoId, dispositivoId, sync_id }) {
-        try {
-            // Em um cenário real, chamamos o microservice-face-python aqui
-            // axios.post(PYTHON_URL, { image: faceBase64 })
-            logger.info(`👤 [FaceAuth] Processando biometria para evento ${eventoId} em ${dispositivoId}`);
-            
-            // Simulação de resposta do motor por enquanto
-            return { success: true, target_id: 'auto-identified' };
-        } catch (error) {
-            logger.error('Erro no processamento facial:', error);
-            return { success: false, error: 'Falha no motor biométrico' };
         }
     }
 

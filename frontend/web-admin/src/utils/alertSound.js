@@ -42,6 +42,19 @@ export const useSomAlertas = () => {
 };
 
 /**
+ * AudioContext único da aba, para qualquer bipe (check-in, checkout, fiscalização...).
+ * Criar um por bipe esgotava o limite do navegador (iOS/Chrome) e o som parava no meio do turno.
+ * @returns {AudioContext|null}
+ */
+export function obterAudioContext() {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    ctx = ctx || new Ctx();
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    return ctx;
+}
+
+/**
  * @param {'discreto'|'sirene'} tipo discreto: bipe suave (Monitor) · sirene: video wall
  * @param {boolean} forcar toca mesmo silenciado (botão "Sirene" do alerta)
  */

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   Box, Typography, Grid, Stack, Button, Zoom, Tooltip
 } from '@mui/material';
@@ -9,7 +9,7 @@ import {
 import { styled } from '@mui/material/styles';
 
 import GlassCard from '../components/common/GlassCard';
-import LeitorQrCamera from '../components/common/LeitorQrCamera';
+import LeitorQrCamera from '../components/common/LeitorQrCameraSobDemanda';
 import UniversalPulseiraInput from '../components/common/UniversalPulseiraInput';
 import PessoaCardDialog from '../components/credenciamento/PessoaCardDialog';
 import RecentAccessList from '../components/credenciamento/RecentAccessList';
@@ -19,11 +19,13 @@ import { funcao, tom } from '../styles/tokens';
 
 // Saída tem cor própria; vermelho fica só para acesso negado
 const COR = funcao.saida;
-import { useSyncedClock } from '../hooks/useSyncedClock';
+import RelogioSincronizado from '../components/common/RelogioSincronizado';
+import { obterAudioContext } from '../utils/alertSound';
 
 const playCheckoutSound = (type) => {
     try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const audioCtx = obterAudioContext();
+        if (!audioCtx) return;
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.connect(gain);
@@ -100,9 +102,11 @@ const Checkout = () => {
     carregarDispositivosDisponiveis
   } = useCheckin('checkout', { logsTipo: 'checkout' });
 
-  const { currentTime, currentDate, timezoneLabel } = useSyncedClock();
 
   const [cardLog, setCardLog] = useState(null);
+  // Estáveis entre renderizações: a lista (memo) não redesenha as linhas à toa
+  const abrirCardLog = useCallback((log) => setCardLog(log), []);
+  const acoesLista = useMemo(() => <BotaoJanelaRegistros tipo="checkout" cor={COR} />, []);
   const [pulseiraValue, setPulseiraValue] = useState('');
   const [lendoCamera, setLendoCamera] = useState(false);
 
@@ -114,9 +118,9 @@ const Checkout = () => {
     }
   }, [checkinResult]);
 
-  const checkoutLogs = (recentLogs || []).filter(l => {
+  const checkoutLogs = useMemo(() => (recentLogs || []).filter(l => {
     return l.tipo === 'checkout' || l.metodo === 'checkout';
-  });
+  }), [recentLogs]);
 
   const registrarSaida = (valor) => {
     const cod = (valor || pulseiraValue || '').trim();
@@ -141,7 +145,7 @@ const Checkout = () => {
           titulo="Check-out"
           icone={<LogoutIcon />}
           cor={COR}
-          dataHora={`${currentDate} ${currentTime} (${timezoneLabel})`}
+          dataHora={<RelogioSincronizado />}
           estacao={{
               sessaoAtiva,
               dispositivos: dispositivosDisponiveis,
@@ -196,8 +200,8 @@ const Checkout = () => {
                     firstLabel="Última saída"
                     emptyTitle="Nenhuma saída registrada ainda"
                     emptySubtitle="Cada saída aparece aqui na hora, com foto, empresa e pulseira."
-                    acoes={<BotaoJanelaRegistros tipo="checkout" cor={COR} />}
-                    onSelect={(log) => setCardLog(log)}
+                    acoes={acoesLista}
+                    onSelect={abrirCardLog}
                 />
             </GlassCard>
         </Grid>
@@ -215,7 +219,7 @@ const Checkout = () => {
                       <Typography variant="body1" sx={{ opacity: 0.9, mt: 1 }}>{resultMessage}</Typography>
                       {checkinResult === 'sucesso' && (
                           <Typography variant="h6" sx={{ mt: 1.5, opacity: 0.6, fontFamily: '"Inter", sans-serif', letterSpacing: 1.5 }}>
-                              {currentTime} • {timezoneLabel}
+                              <RelogioSincronizado formato="hora" />
                           </Typography>
                       )}
                   </Box>

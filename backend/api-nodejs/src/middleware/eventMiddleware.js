@@ -122,4 +122,4 @@ async function requireEvent(req, res, next) {
     }
 }
 
-module.exports = { requireEvent, invalidarEvento };
+module.exports = { requireEvent, invalidarEvento, buscarEvento };

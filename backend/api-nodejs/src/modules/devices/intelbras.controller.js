@@ -4,6 +4,12 @@ const { supabase } = require('../../config/supabase');
 const websocketService = require('../../services/websocketService');
 const IntelbrasService = require('./intelbras.service');
 
+const DISPOSITIVO_CACHE_MS = 15 * 1000;
+const CACHE_DISPOSITIVO = new Map(); // token/IP → { dispositivo, expiraEm }
+const ONLINE_INTERVALO_MS = 30 * 1000;
+const ULTIMO_ONLINE = new Map(); // id/token/IP do leitor → última gravação de "online"
+const { COLUNAS_PESSOA_ACESSO } = require('../checkin/services/colunasPessoa');
+
 class IntelbrasController {
     /**
      * Receber eventos via HTTP Push do dispositivo
@@ -53,18 +59,7 @@ class IntelbrasController {
 
                 try {
                     const devIp = req.ip.replace('::ffff:', '');
-                    let query = supabase.from('dispositivos_acesso').select('*');
-                    
-                    if (pushToken) {
-                        query = query.eq('control_token', pushToken);
-                    } else {
-                        query = query.eq('ip_address', devIp);
-                    }
-
-                    const { data: dispositivo } = await query
-                        .order('created_at', { ascending: false })
-                        .limit(1)
-                        .maybeSingle();
+                    const dispositivo = await this._findDevice(pushToken, req.ip);
 
                     if (dispositivo) {
                         eventoContexto = dispositivo.evento_id;
@@ -73,16 +68,8 @@ class IntelbrasController {
                         dispositivoConfig = dispositivo.config || {};
                         deviceAuth = dispositivo;
 
-                        // Atualizar metadata de segurança e STATUS ONLINE do dispositivo
-                        await supabase
-                            .from('dispositivos_acesso')
-                            .update({ 
-                                last_push_ip: devIp,
-                                last_push_at: new Date().toISOString(),
-                                status_online: 'online',
-                                ultimo_ping: new Date().toISOString()
-                            })
-                            .eq('id', dispositivo.id);
+                        // Metadata de segurança e STATUS ONLINE do dispositivo (sem segurar o acesso)
+                        this._marcarOnline({ id: dispositivo.id }, devIp);
 
                     } else if (pushToken) {
                         logger.error(`🚨 [Intelbras] PUSH SUSPEITO: Token informado (${pushToken}) não corresponde a nenhum dispositivo. IP: ${devIp}`);
@@ -96,7 +83,7 @@ class IntelbrasController {
                 let pessoa = null;
                 let searchError = null;
                 const buscarPessoa = async (campo, valor) => {
-                    let query = supabase.from('pessoas').select('*, empresas(nome, ativo)').eq(campo, valor);
+                    let query = supabase.from('pessoas').select(`${COLUNAS_PESSOA_ACESSO}, empresas(nome, ativo)`).eq(campo, valor);
                     if (eventoContexto) query = query.eq('evento_id', eventoContexto);
                     const { data, error } = await query.order('created_at', { ascending: false }).limit(1);
                     if (error) return { data: null, error };
@@ -105,7 +92,7 @@ class IntelbrasController {
                         // Fallback: pessoa pode estar cadastrada em outro evento
                         const { data: fallbackData, error: fallbackError } = await supabase
                             .from('pessoas')
-                            .select('*, empresas(nome, ativo)')
+                            .select(`${COLUNAS_PESSOA_ACESSO}, empresas(nome, ativo)`)
                             .eq(campo, valor)
                             .order('created_at', { ascending: false })
                             .limit(1);
@@ -322,7 +309,7 @@ class IntelbrasController {
 
             userID = this._extractOnlineUserId(body, eventData, rawBody);
 
-            logger.info(`[Online] REQUEST DEBUG:`, {
+            logger.debug(`[Online] REQUEST DEBUG:`, {
                 contentType: req.headers['content-type'],
                 eventCode,
                 bodyKeys: Object.keys(body || {}),
@@ -349,7 +336,7 @@ class IntelbrasController {
                 return respond(false, 'NAO IDENTIFICADO');
             }
 
-            logger.info(`[Online] Verificação de acesso: UserID=${userID}, IP=${req.ip}`);
+            logger.debug(`[Online] Verificação de acesso: UserID=${userID}, IP=${req.ip}`);
 
             // 2. Identificar dispositivo pelo token (ou IP exato, para legados)
             const dispositivo = await this._findDevice(req.query.token, req.ip);
@@ -357,12 +344,13 @@ class IntelbrasController {
                 logger.warn(`[Online] Dispositivo não registrado (token=${req.query.token || 'N/A'}, IP=${req.ip})`);
                 return respond(false, 'DISPOSITIVO NAO REGISTRADO');
             }
+            this._marcarOnline({ id: dispositivo.id }, (req.ip || '').replace('::ffff:', ''));
 
             const config = dispositivo.config || {};
             const eventoId = dispositivo.evento_id;
 
             // 3. Buscar pessoa (CPF ou UUID) e sessão de operador do leitor em paralelo
-            let q = supabase.from('pessoas').select('*, empresas(nome, ativo)');
+            let q = supabase.from('pessoas').select(`${COLUNAS_PESSOA_ACESSO}, empresas(nome, ativo)`);
             if (eventoId) q = q.eq('evento_id', eventoId);
             if (/^[0-9a-f]{8}-/i.test(userID)) q = q.eq('id', userID);
             else q = q.eq('cpf', userID);
@@ -468,11 +456,57 @@ class IntelbrasController {
      * Localiza o dispositivo por control_token; sem token, por IP exato (dispositivos legados).
      */
     async _findDevice(token, reqIp) {
+        // Cache curto: cada passagem buscava a linha inteira do leitor. Mudança feita no painel
+        // (modo, área, fluxo) vale em até 15 s.
+        const chave = token ? `t:${token}` : `ip:${(reqIp || '').replace('::ffff:', '')}`;
+        const item = CACHE_DISPOSITIVO.get(chave);
+        if (item && item.expiraEm > Date.now()) return item.dispositivo;
+
         let q = supabase.from('dispositivos_acesso').select('*');
         if (token) q = q.eq('control_token', token);
         else q = q.eq('ip_address', (reqIp || '').replace('::ffff:', ''));
-        const { data } = await q.order('created_at', { ascending: false }).limit(1).maybeSingle();
+        const { data, error } = await q.order('created_at', { ascending: false }).limit(1).maybeSingle();
+        if (error) throw error;
+        if (data) {
+            if (CACHE_DISPOSITIVO.size > 500) CACHE_DISPOSITIVO.clear();
+            CACHE_DISPOSITIVO.set(chave, { dispositivo: data, expiraEm: Date.now() + DISPOSITIVO_CACHE_MS });
+        }
         return data || null;
+    }
+
+    /**
+     * Marca o leitor como online sem segurar a resposta, no máximo 1x a cada 30 s
+     * por leitor (antes: uma gravação no banco por passagem e por keepalive).
+     * @param {{id?: string, token?: string, ip?: string}} alvo
+     */
+    _marcarOnline(alvo, devIp) {
+        const chave = alvo.id || alvo.token || alvo.ip;
+        if (!chave) return;
+        const ultima = ULTIMO_ONLINE.get(chave) || 0;
+        if (Date.now() - ultima < ONLINE_INTERVALO_MS) return;
+        if (ULTIMO_ONLINE.size > 1000) ULTIMO_ONLINE.clear();
+        ULTIMO_ONLINE.set(chave, Date.now());
+
+        const agora = new Date().toISOString();
+        let q = supabase.from('dispositivos_acesso').update({
+            status: 'online',
+            status_online: 'online',
+            ultimo_ping: agora,
+            last_push_at: agora,
+            last_push_ip: devIp
+        });
+        if (alvo.id) q = q.eq('id', alvo.id);
+        else if (alvo.token) q = q.eq('control_token', alvo.token);
+        else q = q.eq('ip_address', alvo.ip);
+        q.then(({ error }) => {
+            if (error) {
+                ULTIMO_ONLINE.delete(chave);
+                logger.warn(`[Intelbras] Falha ao marcar leitor online (${devIp}): ${error.message}`);
+            }
+        }, (e) => {
+            ULTIMO_ONLINE.delete(chave);
+            logger.warn(`[Intelbras] Falha ao marcar leitor online (${devIp}): ${e.message}`);
+        });
     }
 
     /**
@@ -516,21 +550,7 @@ class IntelbrasController {
         const devIp = req.ip?.replace('::ffff:', '');
         const pushToken = req.query.token;
 
-        try {
-            const updateData = { 
-                status: 'online',
-                status_online: 'online', 
-                ultimo_ping: new Date().toISOString(),
-                last_push_at: new Date().toISOString(),
-                last_push_ip: devIp
-            };
-            
-            let q = supabase.from('dispositivos_acesso').update(updateData);
-            if (pushToken) q = q.eq('control_token', pushToken);
-            else q = q.eq('ip_address', devIp);
-            const { error } = await q;
-            if (error) logger.warn(`[Keepalive] Falha ao atualizar status (${devIp}): ${error.message}`);
-        } catch (_) {}
+        this._marcarOnline(pushToken ? { token: pushToken } : { ip: devIp }, devIp);
 
         res.json({ success: true, code: 200, message: 'OK' });
     }

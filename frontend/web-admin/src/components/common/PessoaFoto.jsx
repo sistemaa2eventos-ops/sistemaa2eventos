@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Typography } from '@mui/material';
 
 /**
@@ -20,6 +20,8 @@ const PessoaFoto = ({
   sx = {}
 }) => {
   const [hasError, setHasError] = useState(false);
+  // Linha reaproveitada com outra pessoa: a foto nova não pode herdar o erro da anterior
+  useEffect(() => { setHasError(false); }, [src]);
   const initial = (nome || '').trim().charAt(0).toUpperCase() || '?';
 
   const defaultShadow = boxShadow !== undefined 
@@ -104,4 +106,4 @@ const PessoaFoto = ({
   );
 };
 
-export default PessoaFoto;
+export default React.memo(PessoaFoto);
