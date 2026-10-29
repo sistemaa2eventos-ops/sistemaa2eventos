@@ -9,7 +9,6 @@ import {
     CorporateFare as CompanyIcon,
     Close as CloseIcon,
     Login as LoginIcon,
-    QrCodeScanner as QrIcon,
     VerifiedUser as VerifiedIcon,
     Warning as WarningIcon,
     Cancel as CancelIcon,
@@ -345,6 +344,7 @@ export const ModalCredenciamento = ({
                                             pulseiraTypes={pulseiraTypes}
                                             loading={loading}
                                             autoFocus={true}
+                                            onAbrirCamera={permitirCamera ? () => setLendoCamera(true) : undefined}
                                         />
                                     </Grid>
                                 </Grid>
@@ -375,21 +375,7 @@ export const ModalCredenciamento = ({
                                 </NeonButton>
                             </Grid>
 
-                            {permitirCamera && (
-                                <Grid item xs={6} sm={2.5}>
-                                    <NeonButton
-                                        fullWidth
-                                        neonColor="#00D4FF"
-                                        onClick={() => setLendoCamera(true)}
-                                        disabled={loading}
-                                        sx={{ height: { xs: 46, sm: 56 }, fontSize: '0.8125rem', borderRadius: 1.5 }}
-                                    >
-                                        <QrIcon sx={{ mr: 0.5, fontSize: 20 }} /> Câmera
-                                    </NeonButton>
-                                </Grid>
-                            )}
-
-                            <Grid item xs={permitirCamera ? 6 : 12} sm={permitirCamera ? 2.5 : 5}>
+                            <Grid item xs={12} sm={5}>
                                 <NeonButton
                                     fullWidth
                                     neonColor="rgba(255, 255, 255, 0.4)"

@@ -4,7 +4,7 @@ import {
 } from '@mui/material';
 import {
   Logout as LogoutIcon, ExitToApp as CheckoutIcon,
-  Warning as WarningIcon, PhotoCamera as CameraIcon
+  Warning as WarningIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 
@@ -167,28 +167,17 @@ const Checkout = () => {
                     onChange={setPulseiraValue}
                     accentColor={COR}
                     label="Leitor, CPF ou pulseira"
-                    placeholder="Bipe a pulseira ou digite o código"
+                    placeholder="Bipe, digite ou toque no ícone"
                     helperText="Enter registra a saída na hora"
                     onConfirm={(val) => registrarSaida(val)}
                     loading={loading}
                     autoFocus={!modoQuiosque}
+                    onAbrirCamera={() => setLendoCamera(true)}
                 />
 
                 <BotaoSaida fullWidth startIcon={<LogoutIcon />} onClick={() => registrarSaida()} disabled={loading || !pulseiraValue.trim()}>
                     Registrar saída
                 </BotaoSaida>
-
-                {/* Sem leitor USB (celular/tablet): a câmera do aparelho lê o QR ou código de barras */}
-                <Button
-                    fullWidth
-                    variant="outlined"
-                    startIcon={<CameraIcon />}
-                    onClick={() => setLendoCamera(true)}
-                    disabled={loading}
-                    sx={{ minHeight: 44, textTransform: 'none', fontWeight: 600, borderColor: tom(COR, 0.4), color: COR }}
-                >
-                    Ler pela câmera
-                </Button>
 
                 <Stack spacing={0.75} sx={{ pt: 1.25, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                     <LinhaResumo rotulo="Saídas registradas" valor={checkoutLogs.length} cor={COR} />

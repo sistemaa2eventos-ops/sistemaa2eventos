@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
     Box, TextField, Typography, Stack, Chip, InputAdornment,
-    CircularProgress, Tooltip, Fade
+    CircularProgress, Tooltip, Fade, IconButton
 } from '@mui/material';
 import {
     QrCodeScanner as BarcodeIcon,
@@ -30,7 +30,9 @@ export const UniversalPulseiraInput = ({
     label = 'Código ou número da pulseira',
     disabled = false,
     helperText,
-    accentColor = '#00D4FF'
+    accentColor = '#00D4FF',
+    // Quando informado, o ícone dentro da caixa vira o botão que abre a câmera do aparelho
+    onAbrirCamera
 }) => {
     const inputRef = useRef(null);
     const keyTimestampsRef = useRef([]);
@@ -170,7 +172,30 @@ export const UniversalPulseiraInput = ({
                                     color: origemLeitura === 'barcode' ? '#00FF88' : accentColor
                                 }}
                             >
-                                <BarcodeIcon sx={{ fontSize: { xs: 22, sm: 26 } }} />
+                                {onAbrirCamera ? (
+                                    <Tooltip title="Ler pela câmera">
+                                        <span>
+                                            <IconButton
+                                                onClick={onAbrirCamera}
+                                                disabled={disabled || loading}
+                                                aria-label="Ler pela câmera"
+                                                sx={{
+                                                    // Área de toque de 44px sem aumentar a caixa
+                                                    width: 44, height: 44, ml: -1,
+                                                    color: 'inherit',
+                                                    borderRadius: 1.25,
+                                                    bgcolor: `${accentColor}1A`,
+                                                    border: `1px solid ${accentColor}40`,
+                                                    '&:hover': { bgcolor: `${accentColor}33` }
+                                                }}
+                                            >
+                                                <BarcodeIcon sx={{ fontSize: { xs: 22, sm: 26 } }} />
+                                            </IconButton>
+                                        </span>
+                                    </Tooltip>
+                                ) : (
+                                    <BarcodeIcon sx={{ fontSize: { xs: 22, sm: 26 } }} />
+                                )}
                                 {origemLeitura === 'barcode' && (
                                     <Tooltip title="Leitura ultra-rápida via código de barras">
                                         <FlashIcon sx={{ fontSize: 16, color: '#00FF88' }} />

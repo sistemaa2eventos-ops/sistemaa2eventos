@@ -2,12 +2,11 @@ import React, { useState } from 'react';
 import {
   Box, Typography, Grid, TextField,
   List, ListItemText,
-  ListItemButton, Zoom, Tooltip, Button
+  ListItemButton, Zoom, Tooltip
 } from '@mui/material';
 import {
   QrCodeScanner as ScannerIcon,
-  CheckCircle as SuccessIcon, Cancel as ErrorIcon, Search as SearchIcon,
-  PhotoCamera as CameraIcon
+  CheckCircle as SuccessIcon, Cancel as ErrorIcon, Search as SearchIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 
@@ -119,7 +118,7 @@ const Checkin = () => {
                     onChange={setBarcodeValue}
                     accentColor="#00FF88"
                     label="Leitor ou CPF"
-                    placeholder="Bipe o crachá ou digite o CPF"
+                    placeholder="Bipe, digite o CPF ou toque no ícone"
                     helperText="Enter libera a entrada na hora, sem pulseira"
                     onConfirm={(val) => {
                         const cod = (val || barcodeValue || '').trim();
@@ -130,19 +129,9 @@ const Checkin = () => {
                     }}
                     loading={loading}
                     autoFocus={!modoQuiosque}
+                    onAbrirCamera={() => setLendoCamera(true)}
                 />
 
-                {/* Sem leitor USB (celular/tablet): a câmera do aparelho lê o QR ou código de barras */}
-                <Button
-                    fullWidth
-                    variant="outlined"
-                    startIcon={<CameraIcon />}
-                    onClick={() => setLendoCamera(true)}
-                    disabled={loading}
-                    sx={{ mt: 1.5, minHeight: 44, textTransform: 'none', fontWeight: 600, borderColor: 'rgba(0,255,136,0.4)', color: '#00FF88' }}
-                >
-                    Ler pela câmera
-                </Button>
 
                 <Box sx={{ display: 'flex', alignItems: 'center', my: { xs: 1.5, sm: 2 } }}>
                     <Box sx={{ flex: 1, height: '1px', bgcolor: 'rgba(255,255,255,0.1)' }} />
