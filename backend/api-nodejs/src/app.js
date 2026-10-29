@@ -76,7 +76,7 @@ app.set('trust proxy', 1);
 
 // --- MIDDLEWARE DE FORÇAR HTTPS (Proxy Aware) ---
 app.use((req, res, next) => {
-    const isHealthcheck = req.path === '/health' || req.path === '/health/';
+    const isHealthcheck = req.path === '/health' || req.path === '/health/' || req.path === '/ready';
     const isHardwareCallback = req.path.startsWith('/api/intelbras/') || req.path.startsWith('/api/hikvision/');
     const isSmtpVerification = req.path === '/api/settings/verify-smtp';
     const isLocalhost = req.get('host').includes('localhost') || req.get('host').includes('127.0.0.1');

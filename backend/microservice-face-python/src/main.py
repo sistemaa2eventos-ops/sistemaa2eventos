@@ -25,7 +25,7 @@ import numpy as np
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from loguru import logger
 
@@ -438,7 +438,9 @@ def _loop_rostos():
             logger.debug(f"Sincronização de rostos: {e}")
 
 
-threading.Thread(target=_loop_rostos, daemon=True, name="rostos").start()
+THREADS_ESSENCIAIS = {}
+THREADS_ESSENCIAIS["rostos"] = threading.Thread(target=_loop_rostos, daemon=True, name="rostos")
+THREADS_ESSENCIAIS["rostos"].start()
 
 # ==========================================================
 # 3. CÂMERAS: leitores de vídeo (principal e sub-stream) e estado da IA por câmera
@@ -862,7 +864,8 @@ def _zelador():
             logger.debug(f"Zelador: {e}")
 
 
-threading.Thread(target=_zelador, daemon=True, name="zelador").start()
+THREADS_ESSENCIAIS["zelador"] = threading.Thread(target=_zelador, daemon=True, name="zelador")
+THREADS_ESSENCIAIS["zelador"].start()
 
 # ==========================================================
 # 4. IA: escalonador único (divide o orçamento entre as câmeras) e análise por quadro
@@ -1005,7 +1008,8 @@ def _escalonador():
             time.sleep(0.2)
 
 
-threading.Thread(target=_escalonador, daemon=True, name="ia").start()
+THREADS_ESSENCIAIS["ia"] = threading.Thread(target=_escalonador, daemon=True, name="ia")
+THREADS_ESSENCIAIS["ia"].start()
 
 # ==========================================================
 # VIGILÂNCIA: pessoas reconhecidas viram detecções que o agente leva à nuvem (alertas sem painel aberto)
@@ -1127,6 +1131,12 @@ class ExtractRequest(BaseModel):
 @app.get("/health")
 async def health():
     agora = time.time()
+    # Thread essencial morta (exceção não tratada) = motor "de pé" mas sem IA: responde 503
+    # para o vigia (scripts/ligar-ia-facial.ps1) reiniciar o motor, em vez de "healthy" para sempre
+    mortas = [nome for nome, t in THREADS_ESSENCIAIS.items() if not t.is_alive()]
+    if mortas:
+        return JSONResponse(status_code=503, content={"status": "unhealthy", "threads_paradas": mortas,
+                                                      "uptime_s": int(agora - INICIO_MOTOR)})
     return {
         "status": "healthy",
         "engine": "insightface_onnx" if det_model is not None else "mock",

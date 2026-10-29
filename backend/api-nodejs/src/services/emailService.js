@@ -338,6 +338,36 @@ class EmailService {
     }
 
     /**
+     * PC do evento (agente local) sem conexão com a nuvem: leitores faciais e câmeras
+     * deixam de receber comandos e a vigilância das câmeras para.
+     */
+    async sendAgentOfflineAlert(email, { nomeAgente, desde, linkPainel }) {
+        const mailOptions = {
+            from: `"NZT - Painel" <${process.env.SMTP_USER || 'no-reply@a2eventos.com.br'}>`,
+            to: email,
+            subject: `PC do evento desconectado: ${nomeAgente}`,
+            html: `
+                <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 12px; overflow: hidden;">
+                    <div style="background: #050B18; padding: 30px; text-align: center;">
+                        <h1 style="color: #00D4FF; margin: 0; font-size: 22px; letter-spacing: 2px;">NZT</h1>
+                        <p style="color: #8899BB; margin: 8px 0 0;">Intelligent Control System</p>
+                    </div>
+                    <div style="padding: 40px; color: #333; line-height: 1.6;">
+                        <p>O agente <strong>${nomeAgente}</strong> está sem conexão com o servidor desde <strong>${desde}</strong>.</p>
+                        <p>Enquanto ele estiver fora, os leitores faciais e as câmeras desse local não recebem comandos e os alertas das câmeras param.</p>
+                        <p>Confira se o computador do evento está ligado e com internet. Ele reconecta sozinho quando a conexão voltar.</p>
+                        <div style="text-align: center; margin: 35px 0;">
+                            <a href="${linkPainel}" style="background: linear-gradient(135deg, #00D4FF 0%, #094798 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">ABRIR O PAINEL</a>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+        await this.transporter.sendMail(mailOptions);
+        logger.info(`📧 [Agente] Alerta de desconexão de ${nomeAgente} enviado a ${email}`);
+    }
+
+    /**
      * Envia e-mail de alerta de segurança urgente quando um alvo procurado é identificado
      */
     async sendSecurityAlert(email, alerta) {

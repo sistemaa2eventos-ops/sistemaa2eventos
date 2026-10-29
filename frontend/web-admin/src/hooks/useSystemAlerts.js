@@ -65,7 +65,7 @@ export const useSystemAlerts = () => {
             }
 
             // Vencimento de documentos: atualiza o sino de notificações
-            if (payload.type === 'DOC_VENCIMENTO') {
+            if (payload.type === 'DOC_VENCIMENTO' || payload.type === 'AGENTE_OFFLINE') {
                 window.dispatchEvent(new CustomEvent('a2:notificacoes-atualizadas'));
             }
 

@@ -14,6 +14,10 @@ services:
     image: redis:7-alpine
     container_name: a2_eventos_redis
     restart: unless-stopped
+    # Fila de acessos que falharam no Supabase (stream) precisa sobreviver a reinício e nunca
+    # ser descartada: AOF a cada 1 s e "noeviction" (sem memória, recusa escrita em vez de apagar)
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec",
+              "--maxmemory", "512mb", "--maxmemory-policy", "noeviction"]
     ports:
       - "127.0.0.1:6379:6379" # Redis sem senha: só acessível no próprio servidor (Docker ignora o UFW)
     volumes:
@@ -48,15 +52,18 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - USE_REDIS=true
+      # heap do Node abaixo do limite do container: o V8 libera memória antes de o kernel matar o processo
+      - NODE_OPTIONS=--max-old-space-size=768
     env_file:
       - ./backend/api-nodejs/.env
     networks:
       - a2_net
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
-      interval: 30s
+      interval: 15s
       timeout: 10s
       retries: 3
+      start_period: 20s
     deploy:
       resources:
         limits:
@@ -85,15 +92,17 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - USE_REDIS=true
+      - NODE_OPTIONS=--max-old-space-size=384
     env_file:
       - ./backend/api-nodejs/.env
     networks:
       - a2_net
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002/api/intelbras/ping', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
-      interval: 30s
+      interval: 15s
       timeout: 10s
       retries: 3
+      start_period: 20s
     deploy:
       resources:
         limits:
@@ -122,6 +131,15 @@ services:
         condition: service_started
     networks:
       - a2_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8081/nginx-health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
   frontend:
     logging: *logging

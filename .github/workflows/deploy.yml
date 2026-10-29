@@ -3,9 +3,13 @@ name: Deploy Automático A2 Eventos
 on:
   push:
     branches:
-      - master
-      - main
+      - master # a VPS publica sempre origin/master (um push em outra branch não deve disparar)
   workflow_dispatch: # Permite disparar o deploy manualmente pela interface do GitHub
+
+# Um deploy por vez: dois pushes seguidos rodavam o deploy.sh em paralelo na VPS
+concurrency:
+  group: deploy-producao
+  cancel-in-progress: false
 
 jobs:
   test-backend:

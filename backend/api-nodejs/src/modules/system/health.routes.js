@@ -25,6 +25,46 @@ router.get('/health', async (req, res) => {
   });
 });
 
+/**
+ * Prontidão de verdade: o /health acima só diz que o processo responde.
+ * Aqui o banco (Supabase) e o Redis precisam responder em até 3 s — é o que o deploy
+ * e o monitoramento externo usam para saber se o sistema consegue registrar acessos.
+ */
+const comPrazo = (promessa, ms) => Promise.race([
+  promessa,
+  new Promise((_, rejeitar) => setTimeout(() => rejeitar(new Error(`sem resposta em ${ms} ms`)), ms))
+]);
+
+router.get(['/ready', '/api/ready'], async (req, res) => {
+  const checks = {};
+  const inicio = Date.now();
+
+  const verificarBanco = async () => {
+    const { supabase } = require('../../config/supabase');
+    const { error } = await comPrazo(supabase.from('eventos').select('id').limit(1), 3000);
+    if (error) throw new Error(error.message);
+  };
+  const verificarRedis = async () => {
+    if (process.env.USE_REDIS !== 'true') return 'desativado';
+    const cliente = require('../../services/queue.service').getClient();
+    if (!cliente?.isReady) throw new Error('desconectado');
+    await comPrazo(cliente.ping(), 3000);
+  };
+
+  const [banco, redis] = await Promise.allSettled([verificarBanco(), verificarRedis()]);
+  checks.database = banco.status === 'fulfilled' ? 'ok' : `erro: ${banco.reason.message}`;
+  checks.redis = redis.status === 'fulfilled' ? (redis.value || 'ok') : `erro: ${redis.reason.message}`;
+
+  const pronto = banco.status === 'fulfilled' && redis.status === 'fulfilled';
+  res.status(pronto ? 200 : 503).json({
+    status: pronto ? 'ok' : 'degraded',
+    checks,
+    duracao_ms: Date.now() - inicio,
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString()
+  });
+});
+
 router.get(['/time', '/api/time', '/api/system/time'], (req, res) => {
   const now = new Date();
   res.json({

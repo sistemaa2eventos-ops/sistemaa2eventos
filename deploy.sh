@@ -184,6 +184,101 @@ start_services() {
 }
 
 # ============================================================================
+# DEPLOY SEM DERRUBAR TUDO + VOLTA AUTOMÁTICA
+# ============================================================================
+# Serviços do sistema (o Redis fica de fora: guarda a fila de acessos e as conexões)
+SERVICOS_APP="api api_intelbras frontend cadastro gateway"
+CONTAINERS_SAUDE="a2_eventos_api a2_eventos_api_intelbras a2_eventos_admin_web a2_eventos_portal"
+# Nome das imagens = nome do projeto do compose (pasta em minúsculas, como o compose gera)
+PROJETO_IMG="${COMPOSE_PROJECT_NAME:-$(basename "$PWD" | tr '[:upper:]' '[:lower:]')}"
+PRAZO_SAUDE=180
+
+# Copia as imagens em uso para :anterior (é para onde a volta automática retorna)
+guardar_versao_atual() {
+    log_info "Guardando a versão atual para volta automática..."
+    for s in $SERVICOS_APP; do
+        img="${PROJETO_IMG}-${s}"
+        if docker image inspect "${img}:latest" > /dev/null 2>&1; then
+            docker tag "${img}:latest" "${img}:anterior"
+        fi
+    done
+    log_success "Versão atual guardada (${PROJETO_IMG}-*:anterior)"
+}
+
+# Recria só os containers cuja imagem/config mudou; Redis e o que não mudou seguem no ar
+trocar_servicos() {
+    log_info "Trocando os serviços do sistema (Redis continua no ar)..."
+    # containers legados de versões antigas, se ainda existirem
+    docker rm -f a2_eventos_pg_edge a2_eventos_ai_worker 2> /dev/null || true
+    docker-compose up -d --no-deps $SERVICOS_APP
+}
+
+# Espera os containers ficarem saudáveis e a API conseguir falar com banco e Redis
+esperar_saude() {
+    log_info "Aguardando os serviços ficarem saudáveis (até ${PRAZO_SAUDE}s)..."
+    local inicio=$(date +%s)
+    while true; do
+        local pendentes=""
+        for c in $CONTAINERS_SAUDE; do
+            st=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$c" 2> /dev/null || echo "ausente")
+            [ "$st" = "healthy" ] || pendentes="$pendentes $c($st)"
+        done
+        gw=$(docker inspect -f '{{.State.Status}}' a2_eventos_gateway 2> /dev/null || echo "ausente")
+        [ "$gw" = "running" ] || pendentes="$pendentes a2_eventos_gateway($gw)"
+
+        if [ -z "$pendentes" ]; then
+            if curl -sf -m 8 http://localhost:3001/ready > /dev/null; then
+                log_success "Todos os serviços saudáveis e API pronta (banco e Redis ok)"
+                return 0
+            fi
+            pendentes=" api(/ready falhou)"
+        fi
+
+        if [ $(( $(date +%s) - inicio )) -ge $PRAZO_SAUDE ]; then
+            log_error "Não ficaram saudáveis em ${PRAZO_SAUDE}s:${pendentes}"
+            curl -s -m 8 http://localhost:3001/ready || true
+            echo ""
+            return 1
+        fi
+        sleep 5
+    done
+}
+
+# Volta para as imagens :anterior e confere de novo
+voltar_versao_anterior() {
+    log_warn "↩️  Voltando para a versão anterior..."
+    for s in $SERVICOS_APP; do
+        img="${PROJETO_IMG}-${s}"
+        if docker image inspect "${img}:anterior" > /dev/null 2>&1; then
+            docker tag "${img}:anterior" "${img}:latest"
+        fi
+    done
+    docker-compose up -d --no-deps --force-recreate $SERVICOS_APP
+    if esperar_saude; then
+        log_warn "Versão anterior restaurada e saudável. O deploy da versão nova FALHOU."
+    else
+        log_error "A versão anterior também não ficou saudável — verificar o servidor manualmente!"
+    fi
+    docker-compose logs --tail=40 api api_intelbras || true
+}
+
+# Marca a versão que subiu bem com o commit (até 3 versões guardadas para voltar à mão)
+marcar_versao_boa() {
+    local sha
+    sha=$(git rev-parse --short HEAD 2> /dev/null || echo "")
+    [ -n "$sha" ] || return 0
+    for s in $SERVICOS_APP; do
+        img="${PROJETO_IMG}-${s}"
+        docker image inspect "${img}:latest" > /dev/null 2>&1 || continue
+        docker tag "${img}:latest" "${img}:${sha}"
+        docker images "${img}" --format '{{.CreatedAt}}|{{.Tag}}' \
+            | grep -E '\|[0-9a-f]{7,}$' | sort -r | tail -n +4 | cut -d'|' -f2 \
+            | while read -r velha; do docker rmi "${img}:${velha}" > /dev/null 2>&1 || true; done
+    done
+    log_success "Versão ${sha} marcada nas imagens"
+}
+
+# ============================================================================
 # FASE 6: VERIFICAÇÕES PÓS-DEPLOY
 # ============================================================================
 post_deploy_check() {
@@ -228,16 +323,16 @@ post_deploy_check() {
         log_warn "Supabase pode estar em manutenção"
     fi
 
-    # 6. Ver logs (últimas linhas)
+    # 6. Banco e Redis vistos pela API
+    log_info "Testando prontidão (banco + Redis)..."
+    if curl -sf -m 8 http://localhost:3001/ready > /dev/null; then
+        log_success "API pronta (http://localhost:3001/ready)"
+    else
+        log_error "API sem banco/Redis: $(curl -s -m 8 http://localhost:3001/ready)"
+    fi
+
+    # 7. Ver logs (últimas linhas)
     echo ""
-    log_info "Diagnóstico de Rede Externo (Error 522):"
-    echo "--- Netstat Porta 80 ---"
-    sudo netstat -tulnp | grep ":80 " || true
-    echo "--- UFW Status ---"
-    sudo ufw status verbose || true
-    echo "--- Docker IPTables ---"
-    sudo iptables -L DOCKER -n || true
-    
     log_info "Últimas linhas dos logs:"
     echo "─────────────────────────"
     docker-compose logs --tail=10
@@ -325,11 +420,16 @@ main() {
             echo ""
             pre_deploy_check
             update_git
-            # Constrói com o sistema no ar; só derruba e sobe na troca (segundos).
-            # Se o build falhar (set -e), o sistema atual continua rodando.
+            guardar_versao_atual
+            # Constrói com o sistema no ar. Se o build falhar (set -e), nada é trocado.
             build_docker
-            stop_services
-            start_services
+            # Sem "down": troca só os serviços do sistema; Redis e conexões continuam
+            trocar_servicos
+            if ! esperar_saude; then
+                voltar_versao_anterior
+                exit 1   # o GitHub Actions fica vermelho
+            fi
+            marcar_versao_boa
             post_deploy_check
             log_success "✨ DEPLOY RÁPIDO FINALIZADO COM SUCESSO!"
             ;;

@@ -61,6 +61,7 @@ class AgentService {
             logger.info(`🤖 Agente conectado: ${nome} (socket: ${socket.id})`);
 
             this.agents.set(agentId, socket);
+            require('./alertaAgente').agenteConectou(socket.agentInfo);
             supabase.from('agent_tokens').update({ last_connected_at: new Date().toISOString() }).eq('id', agentId)
                 .then(({ error }) => error && logger.debug(`[Agent] last_connected_at: ${error.message}`));
 
@@ -104,6 +105,8 @@ class AgentService {
                 if (this.agents.get(agentId) === socket) {
                     this.agents.delete(agentId);
                     require('./videoRelay').agenteDesconectou(agentId);
+                    // Fora por mais de 2 min → avisa os admins (painel + e-mail)
+                    require('./alertaAgente').agenteDesconectou(socket.agentInfo, () => this.agents.has(agentId));
                 }
                 // Chamadas feitas por esta conexão não terão resposta: falham já, sem esperar o timeout
                 for (const [requestId, pending] of this.pending) {
