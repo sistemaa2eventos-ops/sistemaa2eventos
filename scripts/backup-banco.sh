@@ -42,6 +42,9 @@ docker run --rm -v "$PASTA":/b postgres:17-alpine \
   pg_dump "$SUPABASE_DB_URL" --format=custom --no-owner --no-privileges \
   --schema=public --file="/b/$ARQUIVO"
 
+# Gravado pelo pg_dump do container (que ignora o umask deste script): fecha o arquivo também
+chmod 600 "$PASTA/$ARQUIVO"
+
 # Arquivo vazio/truncado é falha, não backup
 TAMANHO=$(stat -c %s "$PASTA/$ARQUIVO")
 if [ "$TAMANHO" -lt 10240 ]; then
