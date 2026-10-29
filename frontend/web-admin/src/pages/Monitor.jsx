@@ -2240,6 +2240,10 @@ const Monitor = () => {
                 width: '100%',
                 maxHeight: { xs: '100dvh', sm: (isMobileOrTablet || streamModalSize === 'fullscreen') ? '100dvh' : '92dvh' },
                 height: { xs: '100dvh', sm: (isMobileOrTablet || streamModalSize === 'fullscreen') ? '100dvh' : 'auto' },
+                // Modo janela (computador): o vídeo fica "solto" (position absolute) e não dá altura à
+                // janela — com height auto ela ficava com altura zero e a imagem não aparecia.
+                // A proporção de vídeo dá a altura (limitada pelo maxHeight acima).
+                aspectRatio: { sm: (isMobileOrTablet || streamModalSize === 'fullscreen') ? 'auto' : '16 / 9' },
                 borderRadius: { xs: 0, sm: (isMobileOrTablet || streamModalSize === 'fullscreen') ? 0 : 2.5 },
                 display: 'flex',
                 flexDirection: 'column',
@@ -2271,11 +2275,13 @@ const Monitor = () => {
                     alt={activeStreamCam.nome}
                     modo="stream"
                     qualidade="foco"
-                    fit={isLandscape ? 'cover' : 'contain'}
+                    // Preencher a tela (cortando bordas) só no celular deitado; no computador, imagem
+                    // inteira — "cover" ampliava e cortava o vídeo, deixando-o com aspecto pior
+                    fit={isMobileOrTablet && isLandscape ? 'cover' : 'contain'}
                     imgStyle={{
                         width: '100%',
                         height: '100%',
-                        objectFit: isLandscape ? 'cover' : 'contain',
+                        objectFit: isMobileOrTablet && isLandscape ? 'cover' : 'contain',
                         transform: `scale(${streamZoom / 100})`,
                         transformOrigin: 'center center',
                         transition: 'transform 0.15s ease'
