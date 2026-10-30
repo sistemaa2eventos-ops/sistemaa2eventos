@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { Upload, CheckCircle, AlertCircle, Calendar, ShieldCheck, ChevronRight, User, Briefcase, Users, Clock } from 'lucide-react';
 import api from '@/lib/api';
@@ -82,7 +82,13 @@ export default function RegistrationForm({ token, company, branding, requiredFie
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const erroRef = useRef<HTMLDivElement>(null);
     const [success, setSuccess] = useState(false);
+
+    // O aviso fica no topo do formulário: no celular, quem clicou em Enviar lá embaixo não o veria
+    useEffect(() => {
+        if (error) erroRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, [error]);
     const [rawPhoto, setRawPhoto] = useState<string | null>(null);
     const [employees, setEmployees] = useState<EmployeeSummary[]>([]);
     const [loadingEmployees, setLoadingEmployees] = useState(true);
@@ -360,7 +366,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
 
             <form onSubmit={handleSubmit} className="p-8 space-y-8 relative z-10">
                 {error && (
-                    <div className="p-4 bg-red-900/30 border border-red-500/50 text-red-400 rounded-xl flex items-center gap-3 backdrop-blur-sm">
+                    <div ref={erroRef} role="alert" className="p-4 bg-red-900/30 border border-red-500/50 text-red-400 rounded-xl flex items-center gap-3 backdrop-blur-sm">
                         <AlertCircle className="w-6 h-6 shrink-0" />
                         <span className="text-sm">{error}</span>
                     </div>

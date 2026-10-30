@@ -8,7 +8,9 @@ class PDFService {
     async generateAttendanceList(evento, pessoas) {
         return new Promise((resolve, reject) => {
             try {
-                const doc = new PDFDocument({ margin: 50, size: 'A4' });
+                // bufferPages: o rodapé "Página X de Y" volta às páginas anteriores (sem isso,
+                // switchToPage quebrava qualquer lista com mais de uma página)
+                const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
                 let buffers = [];
 
                 doc.on('data', buffers.push.bind(buffers));
@@ -62,9 +64,13 @@ class PDFService {
 
                 // Rodapé
                 const pages = doc.bufferedPageRange();
-                for (let i = 0; i < pages.count; i++) {
+                for (let i = pages.start; i < pages.start + pages.count; i++) {
                     doc.switchToPage(i);
-                    doc.fillColor('#999999').fontSize(8).text(`Página ${i + 1} de ${pages.count} • NZT Relatórios • A2 Eventos`, 50, 800, { align: 'center' });
+                    // y=800 fica abaixo da margem inferior: sem zerar a margem, o texto abria uma página nova
+                    const margemInferior = doc.page.margins.bottom;
+                    doc.page.margins.bottom = 0;
+                    doc.fillColor('#999999').fontSize(8).text(`Página ${i + 1} de ${pages.count} • NZT Relatórios • A2 Eventos`, 50, 800, { align: 'center', lineBreak: false });
+                    doc.page.margins.bottom = margemInferior;
                 }
 
                 doc.end();

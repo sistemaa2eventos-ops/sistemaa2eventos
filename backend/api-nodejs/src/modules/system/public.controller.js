@@ -25,6 +25,43 @@ const salvarDocumentosPortal = async (pessoaId, documentos) => {
     await require('../entities/documento.service').sincronizarStatusPessoa(null, pessoaId);
 };
 
+/**
+ * Envia os documentos do portal para o Storage. Se algum falhar, apaga os que já subiram e
+ * devolve os nomes que faltaram: o cadastro não é gravado e a pessoa reenvia o formulário
+ * (antes o cadastro saía sem o documento e ninguém ficava sabendo).
+ */
+const enviarDocumentosPortal = async (documentos, eventoId, cpfLimpo) => {
+    const salvos = [], caminhos = [], falharam = [];
+    for (const doc of (Array.isArray(documentos) ? documentos : [])) {
+        if (!doc?.base64 || !doc?.name) continue;
+        try {
+            const buffer = Buffer.from(doc.base64.split(',')[1], 'base64');
+            const ext = doc.name.split('.').pop().toLowerCase();
+            const mimeType = ext === 'pdf' ? 'application/pdf' : (ext === 'png' ? 'image/png' : 'image/jpeg');
+            // sem repetir a extensão (aso.pdf.pdf)
+            const path = `event_${eventoId}/docs/${cpfLimpo}_${Date.now()}_${doc.name.replace(/\.[^.]*$/, '').replace(/[^a-zA-Z0-9]/g, '_')}.${ext}`;
+            const upload = await uploadImage('documentos', path, buffer, mimeType);
+            if (!upload.success) throw new Error(upload.error?.message || upload.error || 'falha no envio');
+            salvos.push(documentoDoPortal(doc, upload.url));
+            caminhos.push(path);
+        } catch (err) {
+            logger.error(`[Portal] Falha no upload do documento ${doc.name}: ${err.message || err}`);
+            falharam.push(documentoDoPortal(doc, null).titulo);
+        }
+    }
+    if (falharam.length && caminhos.length) {
+        await supabase.storage.from('documentos').remove(caminhos).catch(() => {});
+    }
+    return { salvos, falharam };
+};
+
+const respostaDocumentosFalharam = (res, falharam) => res.status(502).json({
+    error: falharam.length === 1
+        ? `O documento ${falharam[0]} ainda não foi enviado. Tente de novo.`
+        : `Os documentos ${falharam.join(', ')} ainda não foram enviados. Tente de novo.`,
+    documentos_nao_enviados: falharam
+});
+
 class PublicController {
     /**
      * Obter dados da empresa pelo token (Publico)
@@ -390,25 +427,8 @@ class PublicController {
             }
 
             // 4. Upload de Documentos
-            let documentosSalvos = [];
-            if (documentos && Array.isArray(documentos) && documentos.length > 0) {
-                for (const doc of documentos) {
-                    if (doc.base64 && doc.name) {
-                        try {
-                            const buffer = Buffer.from(doc.base64.split(',')[1], 'base64');
-                            const ext = doc.name.split('.').pop().toLowerCase();
-                            const mimeType = ext === 'pdf' ? 'application/pdf' : (ext === 'png' ? 'image/png' : 'image/jpeg');
-                            const path = `event_${eventoId}/docs/${cpfLimpo}_${Date.now()}_${doc.name.replace(/[^a-zA-Z0-9.]/g, '_')}.${ext}`;
-                            const upload = await uploadImage('documentos', path, buffer, mimeType);
-                            if (upload.success) {
-                                documentosSalvos.push(documentoDoPortal(doc, upload.url));
-                            }
-                        } catch (docErr) {
-                            logger.error(`Falha no upload do documento ${doc.name}:`, docErr);
-                        }
-                    }
-                }
-            }
+            const { salvos: documentosSalvos, falharam } = await enviarDocumentosPortal(documentos, eventoId, cpfLimpo);
+            if (falharam.length) return respostaDocumentosFalharam(res, falharam);
             // 4.5 Verificar se CPF já existe antes de inserir (Para evitar 500 de UNIQUE constraint)
             const { data: cpfExistente } = await supabase
                 .from('pessoas')
@@ -646,29 +666,10 @@ class PublicController {
             if (finalFotoUrl) cleanPessoa.foto_url = finalFotoUrl;
 
             // --- 🛡️ Upload de Documentos Base64 Integrado ---
-            let documentosSalvos = [];
-            if (cleanPessoa.documentos && Array.isArray(cleanPessoa.documentos) && cleanPessoa.documentos.length > 0) {
-                 const cpfLimpo = cleanPessoa.cpf.replace(/[^\d]/g, '');
-                 for (const doc of cleanPessoa.documentos) {
-                     if (doc.base64 && doc.name) {
-                         const docBuffer = Buffer.from(doc.base64.split(',')[1], 'base64');
-                         const fileExt = doc.name.split('.').pop().toLowerCase();
-                         const mimeType = fileExt === 'pdf' ? 'application/pdf' : (fileExt === 'png' ? 'image/png' : 'image/jpeg');
-                         const docPath = `event_${empresa.evento_id}/docs/${cpfLimpo}_${Date.now()}_${doc.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-
-                         const uploadResult = await uploadImage(
-                             'documentos',
-                             docPath,
-                             docBuffer,
-                             mimeType
-                         );
-
-                         if (uploadResult.success) {
-                             documentosSalvos.push(documentoDoPortal(doc, uploadResult.url));
-                         }
-                     }
-                 }
-            }
+            const { salvos: documentosSalvos, falharam } = await enviarDocumentosPortal(
+                cleanPessoa.documentos, empresa.evento_id, String(cleanPessoa.cpf || '').replace(/[^\d]/g, '')
+            );
+            if (falharam.length) return respostaDocumentosFalharam(res, falharam);
             delete cleanPessoa.documentos;
 
             // 5. Gerar QR Code (Safety check)
