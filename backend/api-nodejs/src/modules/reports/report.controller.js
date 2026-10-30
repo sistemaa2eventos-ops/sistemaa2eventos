@@ -121,6 +121,7 @@ function montarTurnos(logs) {
             empresa_id: log.pessoas?.empresa_id,
             dia,
             primeira_entrada: null,
+            ultima_entrada: null,
             ultima_saida: null,
             saida_nao_registrada: false,
             entradas: 0,
@@ -131,6 +132,7 @@ function montarTurnos(logs) {
 
         if (entrada) {
             g.entradas++;
+            if (g.ultima_entrada === null || ms > g.ultima_entrada) g.ultima_entrada = ms;
             if (g.primeira_entrada === null || ms < g.primeira_entrada) {
                 g.primeira_entrada = ms;
                 // pulseira usada naquele turno, não a que a pessoa tem hoje
@@ -148,12 +150,13 @@ function montarTurnos(logs) {
     // só a saída automática de um turno aberto antes do período não é um dia de trabalho
     return Object.values(grupos).filter(g => g.entradas > 0 || !g.saida_nao_registrada).map(g => {
         let totalHoras = null;
+        // em aberto: a última entrada não tem saída depois (saiu e voltou sem registrar a saída final)
+        const emAberto = g.ultima_entrada !== null && (g.ultima_saida === null || g.ultima_saida < g.ultima_entrada);
         // saída gravada pelo fechamento de turno não é horário real: horas ficam "a conferir"
-        if (g.primeira_entrada !== null && g.ultima_saida !== null && !g.saida_nao_registrada && g.ultima_saida > g.primeira_entrada) {
+        if (g.primeira_entrada !== null && !emAberto && !g.saida_nao_registrada) {
             totalHoras = Math.round(((g.ultima_saida - g.primeira_entrada) / 3600000) * 100) / 100; // 2 casas
         }
         const inconsistencias = marcacoesForaDeOrdem(g.marcacoes);
-        const emAberto = g.primeira_entrada !== null && (g.ultima_saida === null || g.ultima_saida < g.primeira_entrada);
         const observacoes = [];
         if (g.saida_nao_registrada) observacoes.push('Saída não registrada: conferir horas');
         else if (emAberto) observacoes.push('Sem saída no período');
@@ -169,7 +172,7 @@ function montarTurnos(logs) {
             dia: g.dia,
             primeira_entrada: g.primeira_entrada,
             // horário da saída automática do fechamento não é real: não mostra
-            ultima_saida: g.ultima_saida !== null && !g.saida_nao_registrada ? g.ultima_saida : null,
+            ultima_saida: g.ultima_saida !== null && !g.saida_nao_registrada && !emAberto ? g.ultima_saida : null,
             saida_nao_registrada: g.saida_nao_registrada,
             em_aberto: emAberto,
             sem_entrada: g.primeira_entrada === null,
@@ -1408,9 +1411,9 @@ class ReportController {
                         pLogs.filter(l => (ehEntrada(l) || ehSaida(l)) && l.ms >= primeiraEntrada.ms && l.ms <= fimTurno)
                     );
 
-                    if (saidaFinal && ehSaidaForcada(saidaFinal)) {
-                        // Ficou "dentro" até o fechamento de turno: não houve saída real.
-                        // Não soma horas (antes contava até a hora do reset).
+                    if ((saidaFinal && ehSaidaForcada(saidaFinal)) || (!saidaFinal && !isHoje)) {
+                        // Ficou "dentro" até o fechamento de turno, ou o dia já passou sem saída:
+                        // não houve saída real. Não soma horas (antes contava até o reset / 23:59).
                         checkoutAt = 'Não registrada';
                         tempoPermanencia = 'Saída não registrada';
                         status = 'finalizado';
@@ -1988,7 +1991,7 @@ class ReportController {
         }
         ocorrencias.forEach(r => {
             const motivos = [];
-            if (r.saida_nao_registrada) motivos.push('Saída não registrada: a pessoa não bateu a saída e o fechamento de turno encerrou o registro');
+            if (r.saida_nao_registrada) motivos.push('Saída não registrada: a pessoa não bateu a saída (sem check-out real), conferir as horas');
             if (r.inconsistencias > 0) motivos.push(`${r.inconsistencias} marcação(ões) fora de ordem (entrada repetida ou saída sem entrada)`);
             const row = ocorr.addRow([r.empresa_nome, r.colaborador_nome, r.cpf, r.numero_pulseira,
                 r.checkin_iso ? dataExcel(r.checkin_iso) : '—', motivos.join(' • ')]);
@@ -2207,7 +2210,8 @@ class ReportController {
             const workbook = new ExcelJS.Workbook();
             workbook.creator = 'NZT Relatórios';
             workbook.created = new Date();
-            const sheet = workbook.addWorksheet(titulo.slice(0, 31));
+            // o Excel não aceita * ? : \ / [ ] no nome da planilha (ex.: "Função / Cargo")
+            const sheet = workbook.addWorksheet(titulo.replace(/[*?:\\/[\]]/g, '-').slice(0, 31));
             const ultimaCol = colunas.length;
 
             sheet.mergeCells(1, 1, 1, ultimaCol);
