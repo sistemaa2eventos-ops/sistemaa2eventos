@@ -739,6 +739,16 @@ docker system prune -af
 **Registre cada deploy aqui:**
 
 ```
+2026-10-30 - Deploy 23ff24f (relatórios, etapas 1–5)
+├─ Mudanças: Excel das abas, aba Ponto, diárias/fechamento por regra de remuneração,
+│            histórico de pulseiras, Dashboard "operação de hoje" (fluxo, lotação, alertas)
+├─ Migrations: regras de remuneração + 20261030_historico_pulseiras.sql (aplicadas antes)
+├─ Status: ✅ OK (GitHub Actions run 41083746108, deploy.sh quick)
+├─ Tempo: ~2min
+├─ Teste: 6 containers healthy, rotas novas 401 sem login, dados reais lidos no container
+├─ Rollback: tag antes-deploy-20261030 (859c57f) + imagens :859c57f na VPS
+└─ Próximo: cadastrar regras de remuneração; conferir 2 leitores offline
+
 2026-04-23 - Deploy #42
 ├─ Mudanças: Timeout dispositivo 5s→15s, debug logging
 ├─ Status: ✅ OK
@@ -755,5 +765,5 @@ docker system prune -af
 
 ---
 
-**Última verificação:** 2026-04-23  
+**Última verificação:** 2026-10-30  
 **Próxima revisão:** Quando adicionar novos serviços externos
