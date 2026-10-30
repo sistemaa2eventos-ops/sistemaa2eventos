@@ -348,6 +348,8 @@ class PessoaService {
                 evento_id: empresa.evento_id,
                 qr_code: qrCode,  // null inicialmente - gerado após aprovação
                 status_acesso: statusAcesso,
+                // Cadastro pelo operador não exige documento no sistema (conferido no atendimento)
+                ...(origenCadastroStr === 'interno' ? { status_documentos: 'aprovado' } : {}),
                 origem_cadastro: origenCadastroStr,
                 registration_token: registrationToken,
                 registration_token_expires_at: registrationTokenExpiresAt,

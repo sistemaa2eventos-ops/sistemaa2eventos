@@ -181,7 +181,7 @@ class DocumentoService {
         try {
             const { data: pessoa } = await supabase
                 .from('pessoas')
-                .select('id, evento_id, funcao, status_acesso, status_documentos')
+                .select('id, evento_id, funcao, status_acesso, status_documentos, origem_cadastro')
                 .eq('id', pessoaId)
                 .single();
             if (!pessoa) return null;
@@ -331,7 +331,7 @@ class DocumentoService {
         const [config, pessoasRes] = await Promise.all([
             requisitos.getConfig(eventoId),
             supabase.from('pessoas')
-                .select('id, nome_completo, cpf, email, telefone, funcao, foto_url, evento_id, empresa_id, status_acesso, status_documentos, liberacao_manual_ate, liberacao_manual_por, liberacao_manual_motivo, empresas(nome, cnpj)')
+                .select('id, nome_completo, cpf, email, telefone, funcao, foto_url, evento_id, empresa_id, origem_cadastro, status_acesso, status_documentos, liberacao_manual_ate, liberacao_manual_por, liberacao_manual_motivo, empresas(nome, cnpj)')
                 .eq('evento_id', eventoId)
                 .order('nome_completo')
         ]);

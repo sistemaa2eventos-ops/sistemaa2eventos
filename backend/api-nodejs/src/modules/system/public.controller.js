@@ -8,11 +8,63 @@ const cacheService = require('../../services/cacheService');
  * Registro de documento enviado pelo portal no formato real de pessoa_documentos.
  * O nome vem como "<TIPO>_<arquivo>" (ex.: RG_FRENTE_foto.jpg); o tipo vira o título.
  */
-const documentoDoPortal = (doc, url) => {
+const documentoDoPortal = (doc, url, tipo = null) => {
     const nome = String(doc.label || doc.tipo || doc.name || 'Documento');
-    const titulo = (doc.label || doc.tipo || nome.replace(/_[^_]*\.[a-z0-9]+$/i, '')).replace(/_/g, ' ').trim().toUpperCase() || 'DOCUMENTO';
-    return { titulo: titulo.substring(0, 255), tipo_doc: 'PORTAL', url_arquivo: url, status: 'pendente' };
+    const titulo = (tipo?.nome || doc.label || doc.tipo || nome.replace(/_[^_]*\.[a-z0-9]+$/i, '')).replace(/_/g, ' ').trim().toUpperCase() || 'DOCUMENTO';
+    const validade = /^\d{4}-\d{2}-\d{2}$/.test(String(doc.data_validade || '')) ? doc.data_validade : null;
+    return {
+        titulo: titulo.substring(0, 255), tipo_doc: 'PORTAL', url_arquivo: url, status: 'pendente',
+        tipo_documento_id: tipo?.id || null, data_validade: validade
+    };
 };
+
+const semAcento = (t) => String(t || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+const palavras = (t) => semAcento(t).split(/[^a-z0-9]+/).filter(Boolean);
+
+/**
+ * Tipo de documento de um anexo do portal: o link novo manda tipo_documento_id; o portal da
+ * empresa só nomeia o arquivo ("frente_foto.jpg"). Sem id, casa quando todas as palavras da
+ * dica estão no nome de um único tipo ("frente" → "RG/CNH - Frente").
+ */
+const tipoDoAnexo = (doc, tipos) => {
+    if (doc.tipo_documento_id) return tipos.find(t => t.id === doc.tipo_documento_id) || null;
+    const dica = palavras(doc.label || doc.tipo || String(doc.name || '').split('_')[0]);
+    if (!dica.length) return null;
+    const candidatos = tipos.filter(t => { const nome = palavras(t.nome); return dica.every(p => nome.includes(p)); });
+    return candidatos.length === 1 ? candidatos[0] : null;
+};
+
+/**
+ * Regras de documentos para o portal: o mínimo ("todas as funções") barra o envio;
+ * os da função são pedidos, mas a pessoa pode completar depois (fica pendente na Auditoria).
+ */
+const regrasDocumentosPortal = async (eventoId) => {
+    const requisitos = require('../entities/documentoRequisitos.service');
+    const config = await requisitos.getConfig(eventoId);
+    const ativos = config.tipos.filter(t => t.ativo !== false);
+    const resumo = (ids) => ativos.filter(t => (ids || []).includes(t.id)).map(t => ({ id: t.id, nome: t.nome, exige_validade: !!t.exige_validade }));
+    const minimo = resumo(config.regras[requisitos.FUNCAO_PADRAO]);
+    const por_funcao = {};
+    for (const [funcao, ids] of Object.entries(config.regras)) {
+        if (funcao === requisitos.FUNCAO_PADRAO) continue;
+        por_funcao[funcao] = resumo(ids).filter(t => !minimo.some(m => m.id === t.id));
+    }
+    return { minimo, por_funcao, funcoes: Object.keys(por_funcao).sort(), tipos: ativos };
+};
+
+/** Nomes dos documentos mínimos que não vieram no envio (vazio = pode gravar). */
+const minimoFaltando = (documentos, regras) => {
+    const enviados = new Set((Array.isArray(documentos) ? documentos : [])
+        .filter(d => d?.base64 && d?.name)
+        .map(d => tipoDoAnexo(d, regras.tipos)?.id)
+        .filter(Boolean));
+    return regras.minimo.filter(t => !enviados.has(t.id)).map(t => t.nome);
+};
+
+const respostaMinimoFaltando = (res, faltando) => res.status(400).json({
+    error: `Anexe ${faltando.length === 1 ? 'o documento' : 'os documentos'} ${faltando.join(' e ')} para enviar o cadastro.`,
+    documentos_faltando: faltando
+});
 
 /** Grava os documentos do portal e recalcula a situação da pessoa. */
 const salvarDocumentosPortal = async (pessoaId, documentos) => {
@@ -30,7 +82,7 @@ const salvarDocumentosPortal = async (pessoaId, documentos) => {
  * devolve os nomes que faltaram: o cadastro não é gravado e a pessoa reenvia o formulário
  * (antes o cadastro saía sem o documento e ninguém ficava sabendo).
  */
-const enviarDocumentosPortal = async (documentos, eventoId, cpfLimpo) => {
+const enviarDocumentosPortal = async (documentos, eventoId, cpfLimpo, tipos = []) => {
     const salvos = [], caminhos = [], falharam = [];
     for (const doc of (Array.isArray(documentos) ? documentos : [])) {
         if (!doc?.base64 || !doc?.name) continue;
@@ -42,7 +94,7 @@ const enviarDocumentosPortal = async (documentos, eventoId, cpfLimpo) => {
             const path = `event_${eventoId}/docs/${cpfLimpo}_${Date.now()}_${doc.name.replace(/\.[^.]*$/, '').replace(/[^a-zA-Z0-9]/g, '_')}.${ext}`;
             const upload = await uploadImage('documentos', path, buffer, mimeType);
             if (!upload.success) throw new Error(upload.error?.message || upload.error || 'falha no envio');
-            salvos.push(documentoDoPortal(doc, upload.url));
+            salvos.push(documentoDoPortal(doc, upload.url, tipoDoAnexo(doc, tipos)));
             caminhos.push(path);
         } catch (err) {
             logger.error(`[Portal] Falha no upload do documento ${doc.name}: ${err.message || err}`);
@@ -136,6 +188,9 @@ class PublicController {
                 branding,
                 requiredFields: evento?.campos_obrigatorios || null
             };
+            // Documentos pedidos no formulário (mínimo obrigatório + por função); sem a lista de tipos interna
+            const { tipos: _tipos, ...regrasDocs } = await regrasDocumentosPortal(empresa.evento_id);
+            responseData.company.documentos = regrasDocs;
 
             cacheService.set(`company_${token}`, responseData);
             res.json(responseData);
@@ -414,6 +469,14 @@ class PublicController {
                 }
             }
 
+            // 2.5 Documento mínimo (regra "todas as funções", ex.: RG/CNH) antes de subir qualquer arquivo.
+            // Só no link da empresa: o convite direto (PESSOA) completa um cadastro que já existe.
+            const regrasDocs = await regrasDocumentosPortal(eventoId);
+            if (context === 'EMPRESA') {
+                const faltando = minimoFaltando(documentos, regrasDocs);
+                if (faltando.length) return respostaMinimoFaltando(res, faltando);
+            }
+
             // 3. Upload de Foto
             let finalFotoUrl = foto_url || '';
             if (!finalFotoUrl && foto_base64) {
@@ -427,7 +490,7 @@ class PublicController {
             }
 
             // 4. Upload de Documentos
-            const { salvos: documentosSalvos, falharam } = await enviarDocumentosPortal(documentos, eventoId, cpfLimpo);
+            const { salvos: documentosSalvos, falharam } = await enviarDocumentosPortal(documentos, eventoId, cpfLimpo, regrasDocs.tipos);
             if (falharam.length) return respostaDocumentosFalharam(res, falharam);
             // 4.5 Verificar se CPF já existe antes de inserir (Para evitar 500 de UNIQUE constraint)
             const { data: cpfExistente } = await supabase
@@ -645,6 +708,11 @@ class PublicController {
                 return res.status(403).json({ error: 'Link inválido ou expirado.' });
             }
 
+            // Documento mínimo do evento (ex.: RG/CNH frente e verso) antes de subir qualquer arquivo
+            const regrasDocs = await regrasDocumentosPortal(empresa.evento_id);
+            const faltando = minimoFaltando(pessoa?.documentos, regrasDocs);
+            if (faltando.length) return respostaMinimoFaltando(res, faltando);
+
             // --- 🛡️ Upload de Foto Base64 Integrado ---
             let finalFotoUrl = null;
             if (pessoa.foto_base64) {
@@ -667,7 +735,7 @@ class PublicController {
 
             // --- 🛡️ Upload de Documentos Base64 Integrado ---
             const { salvos: documentosSalvos, falharam } = await enviarDocumentosPortal(
-                cleanPessoa.documentos, empresa.evento_id, String(cleanPessoa.cpf || '').replace(/[^\d]/g, '')
+                cleanPessoa.documentos, empresa.evento_id, String(cleanPessoa.cpf || '').replace(/[^\d]/g, ''), regrasDocs.tipos
             );
             if (falharam.length) return respostaDocumentosFalharam(res, falharam);
             delete cleanPessoa.documentos;

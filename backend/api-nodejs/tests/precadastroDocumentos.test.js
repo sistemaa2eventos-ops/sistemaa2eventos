@@ -55,3 +55,24 @@ it('caminho do arquivo não repete a extensão', async () => {
     await controller.registerEmployee(ficha([{ name: 'meu aso.v2.PDF', base64: PDF }, { name: 'x.pdf', base64: PDF }]), res);
     expect(estado.removidos[0]).toMatch(/_meu_aso_v2\.pdf$/);
 });
+
+describe('documentos exigidos', () => {
+    const requisitos = require('../src/modules/entities/documentoRequisitos.service');
+    const tipos = [
+        { id: 'rgf', nome: 'RG/CNH - Frente', ativo: true }, { id: 'rgv', nome: 'RG/CNH - Verso', ativo: true },
+        { id: 'aso', nome: 'ASO', ativo: true, exige_validade: true }
+    ];
+    const config = { tipos, regras: { '*': ['rgf', 'rgv'], LIMPEZA: ['aso'] }, aviso_vencimento_dias: 15 };
+
+    it('cadastro do operador não exige documento', () => {
+        const r = requisitos.avaliar(config, { funcao: 'LIMPEZA', origem_cadastro: 'interno' }, []);
+        expect(r.status_documentos).toBe('aprovado');
+        expect(r.pendencias).toHaveLength(0);
+    });
+
+    it('pré-cadastro: mínimo + função entram nas pendências', () => {
+        const r = requisitos.avaliar(config, { funcao: 'limpeza', origem_cadastro: 'externo' }, []);
+        expect(r.status_documentos).toBe('pendente');
+        expect(r.pendencias.map(p => p.nome)).toEqual(['RG/CNH - Frente', 'RG/CNH - Verso', 'ASO']);
+    });
+});

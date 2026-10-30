@@ -5,6 +5,9 @@ const { getHojeLocal } = require('../../utils/dateUtils');
 
 const FUNCAO_PADRAO = '*';
 const AVISO_VENCIMENTO_PADRAO = 15;
+// Cadastro feito por um usuário do painel (operador/admin) ou importado da planilha: o operador
+// confere os documentos no atendimento, então nenhum é exigido no sistema
+const ORIGENS_SEM_EXIGENCIA = new Set(['interno', 'importacao']);
 
 /** Função normalizada: maiúsculas e espaços simples ("  produtor " → "PRODUTOR"). */
 const normalizarFuncao = (funcao) => String(funcao || '').trim().replace(/\s+/g, ' ').toUpperCase();
@@ -78,6 +81,10 @@ class DocumentoRequisitosService {
         const hoje = getHojeLocal();
         const limiteAviso = new Date(Date.now() + config.aviso_vencimento_dias * 86400000).toISOString().slice(0, 10);
         const vencendo = docs.filter(d => d.status === 'aprovado' && d.data_validade && d.data_validade >= hoje && d.data_validade <= limiteAviso);
+
+        if (ORIGENS_SEM_EXIGENCIA.has(pessoa?.origem_cadastro)) {
+            return { status_documentos: 'aprovado', pendencias: [], vencendo, exigidos: [], regras_ativas: false, isento: true };
+        }
 
         // Sem regras: comportamento anterior
         if (!this.temRegras(config)) {

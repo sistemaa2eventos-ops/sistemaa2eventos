@@ -30,6 +30,19 @@ interface RequiredFieldsConfig {
     dias_trabalho?: boolean;
 }
 
+interface TipoDocumento {
+    id: string;
+    nome: string;
+    exige_validade: boolean;
+}
+
+/** Regras do evento: o mínimo barra o envio; os da função são pedidos e podem vir depois. */
+interface DocumentosEvento {
+    minimo: TipoDocumento[];
+    por_funcao: Record<string, TipoDocumento[]>;
+    funcoes: string[];
+}
+
 interface RegistrationFormProps {
     token: string;
     company: {
@@ -37,6 +50,7 @@ interface RegistrationFormProps {
         nome: string;
         vagas: number;
         datas_disponiveis: string[];
+        documentos?: DocumentosEvento;
     };
     branding?: BrandingData | null;
     requiredFields?: RequiredFieldsConfig | null;
@@ -59,7 +73,21 @@ interface UploadedDocument {
     name: string;
     type: string;
     base64: string;
+    tipo_documento_id?: string;
+    label?: string;
+    data_validade?: string;
 }
+
+const LIMITE_ARQUIVO = 3 * 1024 * 1024;
+// Mesma normalização do servidor ("  limpeza " → "LIMPEZA")
+const normalizarFuncao = (f: string) => f.trim().replace(/\s+/g, ' ').toUpperCase();
+
+const lerArquivo = (file: File): Promise<string> => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+});
 
 type ApiErrorShape = {
     response?: {
@@ -145,6 +173,27 @@ export default function RegistrationForm({ token, company, branding, requiredFie
         aceite_lgpd: false
     });
 
+    // Um anexo por tipo de documento pedido (id do tipo → arquivo)
+    const [docsPorTipo, setDocsPorTipo] = useState<Record<string, UploadedDocument>>({});
+    const [funcaoOutra, setFuncaoOutra] = useState(false);
+    const regrasDocs = company.documentos;
+    const funcoesDoEvento = regrasDocs?.funcoes || [];
+    const docsMinimos = regrasDocs?.minimo || [];
+    const docsDaFuncao = regrasDocs?.por_funcao?.[normalizarFuncao(formData.funcao || '')] || [];
+
+    const anexarPorTipo = async (tipo: TipoDocumento, file: File | undefined) => {
+        if (!file) return;
+        if (file.size > LIMITE_ARQUIVO) {
+            setError(`O arquivo ${file.name} ultrapassa o limite de 3MB.`);
+            return;
+        }
+        const base64 = await lerArquivo(file);
+        setDocsPorTipo(prev => ({
+            ...prev,
+            [tipo.id]: { name: file.name, type: file.type, base64, tipo_documento_id: tipo.id, label: tipo.nome, data_validade: prev[tipo.id]?.data_validade }
+        }));
+    };
+
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         let { name, value } = e.target;
@@ -168,8 +217,15 @@ export default function RegistrationForm({ token, company, branding, requiredFie
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        setLoading(true);
         setError('');
+
+        // Documento mínimo do evento (ex.: RG/CNH): sem ele o cadastro não é enviado
+        const faltando = docsMinimos.filter(t => !docsPorTipo[t.id]).map(t => t.nome);
+        if (faltando.length) {
+            setError(`Anexe ${faltando.length === 1 ? 'o documento' : 'os documentos'} ${faltando.join(' e ')} para enviar o cadastro.`);
+            return;
+        }
+        setLoading(true);
 
         try {
             const cleanCpf = formData.cpf.replace(/\D/g, '');
@@ -239,6 +295,11 @@ export default function RegistrationForm({ token, company, branding, requiredFie
             } = {
                 ...formData,
                 cpf: cleanCpf,
+                // Documentos pedidos (com o tipo) + outros anexos livres; só os da função atual
+                documentos: [
+                    ...[...docsMinimos, ...docsDaFuncao].map(t => docsPorTipo[t.id]).filter(Boolean),
+                    ...formData.documentos
+                ],
                 aceite_lgpd: true  // Always send as boolean
             };
 
@@ -512,6 +573,24 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                         {isVisible('funcao') && (
                         <div className="space-y-1.5">
                             <label className="block text-sm font-medium text-slate-300">{t('registration.role', { defaultValue: 'Função/Cargo' })}</label>
+                            {/* Funções configuradas no evento: escolher na lista garante que a regra de documentos da função se aplique */}
+                            {funcoesDoEvento.length > 0 && !preFilledData?.funcao && (
+                                <select
+                                    required={isRequired('funcao') && !funcaoOutra}
+                                    value={funcaoOutra ? '__outra__' : formData.funcao}
+                                    onChange={(e) => {
+                                        const outra = e.target.value === '__outra__';
+                                        setFuncaoOutra(outra);
+                                        setFormData(prev => ({ ...prev, funcao: outra ? '' : e.target.value }));
+                                    }}
+                                    className="w-full p-3.5 bg-slate-900/50 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-inner"
+                                >
+                                    <option value="" disabled>Selecione sua função</option>
+                                    {funcoesDoEvento.map(f => <option key={f} value={f}>{f}</option>)}
+                                    <option value="__outra__">Outra (digitar)</option>
+                                </select>
+                            )}
+                            {(funcoesDoEvento.length === 0 || funcaoOutra || preFilledData?.funcao) && (
                             <input
                                 required={isRequired('funcao')}
                                 name="funcao"
@@ -521,6 +600,59 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                                 className={`w-full p-3.5 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-inner ${preFilledData?.funcao ? 'opacity-70 cursor-not-allowed grayscale' : ''}`}
                                 placeholder="Descreva sua atribuição técnica"
                             />
+                            )}
+                        </div>
+                        )}
+
+                        {(docsMinimos.length > 0 || docsDaFuncao.length > 0) && (
+                        <div className="p-6 border border-slate-700/80 rounded-3xl bg-slate-900/40 shadow-inner space-y-4">
+                            <div>
+                                <p className="flex items-center gap-2 text-sm font-semibold text-slate-300">
+                                    <span className="p-1.5 bg-cyan-500/10 rounded-lg"><ShieldCheck className="w-4 h-4 text-cyan-400" /></span>
+                                    Documentos do cadastro
+                                </p>
+                                <p className="text-xs text-slate-500 mt-1 ml-8">
+                                    Os marcados com * são obrigatórios para enviar. Os demais são pedidos para a sua função e podem ser enviados agora ou depois (PDF, JPG ou PNG, até 3MB).
+                                </p>
+                            </div>
+                            {[...docsMinimos.map(t => ({ t, obrigatorio: true })), ...docsDaFuncao.map(t => ({ t, obrigatorio: false }))].map(({ t, obrigatorio }) => {
+                                const anexo = docsPorTipo[t.id];
+                                return (
+                                    <div key={t.id} className={`p-4 rounded-xl border ${anexo ? 'border-green-500/40 bg-green-500/5' : 'border-slate-700 bg-slate-800/40'}`}>
+                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                            <span className="text-sm font-medium text-slate-200">
+                                                {t.nome}{obrigatorio && <span className="text-red-400" aria-label="obrigatório"> *</span>}
+                                            </span>
+                                            <label className="relative cursor-pointer text-xs font-semibold px-3 py-2 rounded-lg border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10">
+                                                {anexo ? 'Trocar arquivo' : 'Anexar'}
+                                                <input
+                                                    type="file"
+                                                    accept=".pdf,.jpg,.jpeg,.png"
+                                                    aria-label={`Anexar ${t.nome}`}
+                                                    onChange={(e) => anexarPorTipo(t, e.target.files?.[0])}
+                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                />
+                                            </label>
+                                        </div>
+                                        {anexo && (
+                                            <p className="mt-2 text-xs text-green-400 flex items-center gap-1.5">
+                                                <CheckCircle className="w-3.5 h-3.5" /> <span className="truncate">{anexo.name}</span>
+                                            </p>
+                                        )}
+                                        {anexo && t.exige_validade && (
+                                            <label className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                                                Válido até
+                                                <input
+                                                    type="date"
+                                                    value={anexo.data_validade || ''}
+                                                    onChange={(e) => setDocsPorTipo(prev => ({ ...prev, [t.id]: { ...prev[t.id], data_validade: e.target.value } }))}
+                                                    className="p-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white"
+                                                />
+                                            </label>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                         )}
 
@@ -581,7 +713,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                         <div className="p-6 border border-slate-700/80 rounded-3xl bg-slate-900/40 shadow-inner group transition-all hover:border-slate-600">
                             <label className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-1">
                                 <div className="p-1.5 bg-cyan-500/10 rounded-lg"><Upload className="w-4 h-4 text-cyan-400" /></div>
-                                Central de Documentos Empresariais (ECM)
+                                Outros documentos (opcional)
                             </label>
                             <p className="text-xs text-slate-500 mb-5 ml-8">
                                 Envio seguro e criptografado de NRs, ASOs e certificações (PDF, JPG, PNG - máx 3MB).
