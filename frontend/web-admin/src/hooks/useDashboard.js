@@ -29,6 +29,8 @@ export const useDashboard = () => {
     const [fluxData, setFluxData] = useState([]);
     const [recentCheckins, setRecentCheckins] = useState([]);
     const [recentPessoas, setRecentPessoas] = useState([]);
+    // Operação de hoje: fluxo por hora, lotação por área e alertas (null até carregar)
+    const [operacao, setOperacao] = useState(null);
 
     const loadDashboardData = useCallback(async (isManualRefresh = false) => {
         if (!eventoId) {
@@ -43,9 +45,11 @@ export const useDashboard = () => {
                 setRefreshing(true);
             }
 
-            const [response, realtimeResp] = await Promise.all([
+            const [response, realtimeResp, operacaoResp] = await Promise.all([
                 api.get('/monitor/dashboard', { params: { evento_id: eventoId } }),
-                api.get('/access/stats/realtime', { params: { evento_id: eventoId } }).catch(() => ({ data: { data: {} } }))
+                api.get('/access/stats/realtime', { params: { evento_id: eventoId } }).catch(() => ({ data: { data: {} } })),
+                // falhar aqui não derruba o painel: o bloco da operação só não aparece
+                api.get('/monitor/dashboard/operacao', { params: { evento_id: eventoId } }).catch(() => null)
             ]);
 
             if (!isMountedRef.current) return;
@@ -69,6 +73,7 @@ export const useDashboard = () => {
             setTerminaisLista(data.terminais_lista || []);
             setRecentCheckins(data.ultimos_checkins || []);
             setRecentPessoas(data.ultimos_adicionados || []);
+            if (operacaoResp) setOperacao(operacaoResp.data?.data || null);
 
             if (data.fluxo_24h?.length > 0) {
                 setFluxData(data.fluxo_24h);
@@ -144,7 +149,7 @@ export const useDashboard = () => {
     }, [loadDashboardData]);
 
     return {
-        stats, empresasMetricas, terminaisLista, fluxData, recentCheckins, recentPessoas,
+        stats, empresasMetricas, terminaisLista, fluxData, recentCheckins, recentPessoas, operacao,
         loading, refreshing, resetting, eventoId, refresh, handleDailyReset
     };
 };

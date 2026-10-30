@@ -9,6 +9,15 @@ router.use(authenticate);
 
 // Dashboard principal (requireEvent aplicado UMA vez por rota)
 router.get('/dashboard', requireEvent, monitorController.dashboard);
+// Operação de hoje: fluxo por hora, lotação por área e alertas
+router.get('/dashboard/operacao', requireEvent, async (req, res) => {
+    try {
+        res.json({ success: true, data: await require('./operacao.service').resumo(req.event.id) });
+    } catch (error) {
+        require('../../services/logger').error('Erro na operação do dashboard:', { message: error.message });
+        res.status(500).json({ error: 'Erro ao carregar a operação de hoje.' });
+    }
+});
 router.post('/dashboard/reset-diario', checkPermission('monitor', 'escrita'), requireEvent, monitorController.resetDiario);
 
 // Rotas protegidas (Admin/Master)

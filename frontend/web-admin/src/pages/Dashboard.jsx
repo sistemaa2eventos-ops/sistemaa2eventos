@@ -18,6 +18,9 @@ import PageHeader from '../components/common/PageHeader';
 import RecentAdditions from '../components/dashboard/RecentAdditions';
 import EmpresasMetricasCard from '../components/dashboard/EmpresasMetricasCard';
 import TerminaisListaCard from '../components/dashboard/TerminaisListaCard';
+import FluxoHorarioCard from '../components/dashboard/FluxoHorarioCard';
+import LotacaoAreasCard from '../components/dashboard/LotacaoAreasCard';
+import AlertasOperacaoCard from '../components/dashboard/AlertasOperacaoCard';
 import NeonButton from '../components/common/NeonButton';
 import { useDashboard } from '../hooks/useDashboard';
 import { useConfirmacao } from '../contexts/ConfirmacaoContext';
@@ -27,6 +30,7 @@ import { useConfirmacao } from '../contexts/ConfirmacaoContext';
  * Estrutura Harmônica:
  * 1. Topo: Header Limpo com Leitores Online e Ações Rápidas Padronizadas.
  * 2. Telemetria Operacional em Tempo Real: 5 mini-cards compactos responsivos.
+ * 2b. Operação de hoje: alertas que pedem ação, fluxo por hora e lotação por área.
  * 3. Base Estrutural: 2 Cards integrados de Empresas e Participantes cadastrados.
  * 4. Bloco Central: Empresas & Fluxo ao lado de Terminais e equipamentos.
  * 5. Base: Últimos participantes cadastrados.
@@ -35,7 +39,7 @@ const Dashboard = () => {
     const confirmar = useConfirmacao();
     const navigate = useNavigate();
     const {
-        stats, empresasMetricas, terminaisLista, recentPessoas,
+        stats, empresasMetricas, terminaisLista, recentPessoas, operacao,
         loading, refreshing, resetting, eventoId, refresh, handleDailyReset
     } = useDashboard();
 
@@ -184,6 +188,21 @@ const Dashboard = () => {
                     <KpiCard titulo="Participantes cadastrados" valor={stats.total_pessoas || 0} icone={<PeopleIcon />} />
                 </Grid>
             </Grid>
+
+            {/* 2. OPERAÇÃO DE HOJE: alertas, fluxo por hora e lotação por área */}
+            {operacao && (
+                <Grid container spacing={{ xs: 2, md: 3 }} sx={{ mb: { xs: 2, md: 3 } }}>
+                    <Grid item xs={12}>
+                        <AlertasOperacaoCard operacao={operacao} />
+                    </Grid>
+                    <Grid item xs={12} lg={8}>
+                        <FluxoHorarioCard operacao={operacao} />
+                    </Grid>
+                    <Grid item xs={12} lg={4}>
+                        <LotacaoAreasCard operacao={operacao} />
+                    </Grid>
+                </Grid>
+            )}
 
             {/* 3. BLOCO CENTRAL: EMPRESAS & TERMINAIS */}
             <Grid container spacing={{ xs: 2, md: 3 }} sx={{ mb: { xs: 2, md: 3 } }}>
