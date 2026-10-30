@@ -7,6 +7,8 @@ const IntelbrasService = require('./intelbras.service');
 const DISPOSITIVO_CACHE_MS = 15 * 1000;
 const CACHE_DISPOSITIVO = new Map(); // token/IP → { dispositivo, expiraEm }
 const ONLINE_INTERVALO_MS = 30 * 1000;
+// Passagem com horário do leitor mais antigo que isto é reenvio, não alguém na frente do leitor
+const REENVIO_LIMITE_SEG = 5 * 60;
 const ULTIMO_ONLINE = new Map(); // id/token/IP do leitor → última gravação de "online"
 const { COLUNAS_PESSOA_ACESSO } = require('../checkin/services/colunasPessoa');
 
@@ -310,15 +312,14 @@ class IntelbrasController {
 
             userID = this._extractOnlineUserId(body, eventData, rawBody);
 
-            // Diagnóstico de reenvio: o leitor que volta a alcançar o servidor pode reenviar passagens
-            // antigas pelo modo online. Registra só os campos de horário (sem nome/CPF) para medir.
-            if (eventCode === 'AccessControl') {
-                const camposHora = {};
-                for (const k of ['UTC', 'RealUTC', 'CreateTime', 'Time', 'LocalTime', 'Offline', 'ReUpload']) {
-                    if (eventData?.[k] !== undefined) camposHora[k] = eventData[k];
-                    if (body?.[k] !== undefined) camposHora[`body.${k}`] = body[k];
-                }
-                logger.info(`[Online] horário do evento: ${JSON.stringify(camposHora)} | chaves: ${Object.keys(eventData || {}).join(',')} | agora=${Math.floor(Date.now() / 1000)}`);
+            // Passagem antiga reenviada: o leitor que volta a alcançar o servidor reenvia o que
+            // decidiu sozinho enquanto estava sem conexão (30/10: 4 "entradas" em 10 s, com gente
+            // que nem estava lá). Data.UTC/CreateTime vêm em segundos e batem com o relógio do
+            // servidor; mais de 5 min de atraso não é alguém na frente do leitor: não registra.
+            const idadeSeg = this._idadeEventoSegundos(eventData);
+            if (eventCode === 'AccessControl' && idadeSeg !== null && idadeSeg > REENVIO_LIMITE_SEG) {
+                logger.warn(`[Online] Passagem antiga reenviada pelo leitor (${Math.round(idadeSeg / 60)} min atrás) ignorada — não vira acesso de agora.`);
+                return respond(false, 'REGISTRO ANTIGO');
             }
 
             logger.debug(`[Online] REQUEST DEBUG:`, {
@@ -426,6 +427,16 @@ class IntelbrasController {
             logger.warn(`[Online] 🛑 Acesso RECUSADO para ${pessoa?.nome_completo || userID}: ${motivo}`);
             return respond(false, motivo);
         }
+    }
+
+    /**
+     * Quantos segundos atrás o leitor registrou o evento (Data.UTC ou CreateTime, epoch em
+     * segundos); null quando o evento não traz horário (firmware antigo, testes).
+     */
+    _idadeEventoSegundos(eventData) {
+        const t = Number(eventData?.UTC ?? eventData?.CreateTime);
+        if (!Number.isFinite(t) || t < 1e9) return null;
+        return Date.now() / 1000 - t;
     }
 
     /**
