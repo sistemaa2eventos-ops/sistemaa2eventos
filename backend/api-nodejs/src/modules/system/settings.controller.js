@@ -32,6 +32,7 @@ const SETTINGS_ALLOWED_FIELDS = [
     'cron_sync_interval', 'reset_hora',
     // Comunicação
     'alert_email', 'relatorio_emails', 'telegram_bot_token',
+    'telegram_chat_id', 'telegram_alerts_enabled', 'email_relatorio_ativo', 'relatorio_telegram_ativo',
     'whatsapp_api_url', 'whatsapp_api_key', 'email_from', 'email_from_name',
     // Gamificação
     'gamification_enabled', 'gamification_points_scan',
@@ -40,6 +41,8 @@ const SETTINGS_ALLOWED_FIELDS = [
     'syslog_retention_edge_days', 'syslog_retention_admin_days',
     // LPR/ANPR
     'anpr_enabled', 'anpr_endpoint', 'anpr_confidence_min', 'anpr_log_retention_days',
+    'telegram_chat_id', 'telegram_alerts_enabled', 'email_relatorio_ativo', 'relatorio_telegram_ativo',
+    'email_from', 'email_from_name', 'whatsapp_api_url', 'whatsapp_api_key',
     // Segurança (painel)
     'jwt_expiration_hours', 'force_2fa_admin', 'ddos_shield_enabled'
 ];
@@ -48,7 +51,9 @@ const SETTINGS_ALLOWED_FIELDS = [
 // São persistidos em system_settings.config (JSONB) para o upsert não falhar com 42703.
 const SETTINGS_LEGACY_CONFIG_FIELDS = [
     'biometric_login_enabled', 'alert_operator_login', 'alert_event_peak',
-    'anpr_enabled', 'anpr_endpoint', 'anpr_confidence_min', 'anpr_log_retention_days'
+    'anpr_enabled', 'anpr_endpoint', 'anpr_confidence_min', 'anpr_log_retention_days',
+    'telegram_chat_id', 'telegram_alerts_enabled', 'email_relatorio_ativo', 'relatorio_telegram_ativo',
+    'email_from', 'email_from_name', 'whatsapp_api_url', 'whatsapp_api_key'
 ];
 
 /** Extrai apenas campos permitidos do payload */
@@ -118,6 +123,10 @@ class SettingsController {
     async updateSettings(req, res) {
         try {
             const payload = pickAllowed(req.body, SETTINGS_ALLOWED_FIELDS);
+
+            // Sincronizar email_from e smtp_email para manter consistência
+            if (payload.smtp_email && !payload.email_from) payload.email_from = payload.smtp_email;
+            if (payload.email_from && !payload.smtp_email) payload.smtp_email = payload.email_from;
 
             // Separa campos sem coluna própria → persiste em config (JSONB)
             const legacy = {};
@@ -558,6 +567,53 @@ class SettingsController {
         } catch (error) {
             logger.error('Erro ao enviar email de teste:', error);
             res.status(500).json({ error: 'Falha ao enviar email de teste' });
+        }
+    }
+
+    async testTelegram(req, res) {
+        try {
+            const axios = require('axios');
+            let { token, chat_id } = req.body || {};
+
+            if (!token || !chat_id) {
+                const { data: currentSettings } = await supabase
+                    .from('system_settings')
+                    .select('telegram_bot_token, config')
+                    .eq('id', 1)
+                    .maybeSingle();
+
+                token = token || currentSettings?.telegram_bot_token || currentSettings?.config?.telegram_bot_token || process.env.TELEGRAM_BOT_TOKEN;
+                chat_id = chat_id || currentSettings?.config?.telegram_chat_id || process.env.TELEGRAM_CHAT_ID;
+            }
+
+            if (!token || !chat_id) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Token do Bot e Chat ID são obrigatórios para testar o Telegram.'
+                });
+            }
+
+            const dataHora = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+            const msg = `🤖 <b>Teste de Conexão — NZT Eventos</b>\n\n` +
+                        `✅ <b>Status:</b> Conexão com Telegram estabelecida com sucesso!\n` +
+                        `⏰ <b>Horário:</b> ${dataHora}\n` +
+                        `🔔 <b>Canal:</b> Alertas e Notificações do Sistema.\n\n` +
+                        `<i>Este bot está pronto para receber alertas em tempo real da Watchlist/CFTV e relatórios diários.</i>`;
+
+            await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
+                chat_id: String(chat_id).trim(),
+                text: msg,
+                parse_mode: 'HTML'
+            }, { timeout: 8000 });
+
+            res.json({ success: true, message: 'Mensagem de teste enviada com sucesso no Telegram!' });
+        } catch (error) {
+            logger.error('Erro ao testar Telegram:', error.response?.data || error.message);
+            const desc = error.response?.data?.description || error.message;
+            res.status(500).json({
+                success: false,
+                error: `Falha no envio Telegram: ${desc}`
+            });
         }
     }
 

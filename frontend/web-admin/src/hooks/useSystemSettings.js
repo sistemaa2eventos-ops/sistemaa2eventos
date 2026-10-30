@@ -38,6 +38,20 @@ export const useSystemSettings = () => {
         alert_email: '',
         relatorio_emails: [],
         telegram_bot_token: '',
+        telegram_chat_id: '',
+        telegram_alerts_enabled: false,
+        email_relatorio_ativo: true,
+        relatorio_telegram_ativo: false,
+        smtp_enabled: true,
+        smtp_host: '',
+        smtp_port: 587,
+        smtp_user: '',
+        smtp_pass: '',
+        smtp_email: '',
+        wpp_enabled: false,
+        wpp_provider: 'twilio',
+        wpp_token: '',
+        wpp_phone_id: '',
         whatsapp_api_url: '',
         whatsapp_api_key: '',
         email_from: '',
@@ -115,6 +129,24 @@ export const useSystemSettings = () => {
         }
     };
 
+    const testTelegram = async (customParams = null) => {
+        try {
+            const payload = customParams || {
+                token: settings.telegram_bot_token,
+                chat_id: settings.telegram_chat_id
+            };
+            const response = await api.post('/settings/test-telegram', payload);
+            if (response.data.success) {
+                enqueueSnackbar(response.data.message || 'Mensagem de teste enviada no Telegram!', { variant: 'success' });
+                return true;
+            }
+        } catch (error) {
+            const msg = error.response?.data?.error || 'Falha ao enviar mensagem de teste no Telegram.';
+            enqueueSnackbar(msg, { variant: 'error' });
+            return false;
+        }
+    };
+
     const forceLogoutAll = async () => {
         try {
             const response = await api.post('/settings/force-logout-all');
@@ -151,6 +183,7 @@ export const useSystemSettings = () => {
         handleSave,
         generateApiKey,
         testEmail,
+        testTelegram,
         forceLogoutAll,
         downloadDailyReport,
         refresh: fetchSettings

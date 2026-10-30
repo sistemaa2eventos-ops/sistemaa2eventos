@@ -336,16 +336,14 @@ const Sidebar = ({ open, onClose }) => {
                 // --- GRUPO 2: SEGURANÇA & USUÁRIOS ---
                 { text: 'Perfis de acesso', path: '/config/permissoes', icon: <VerifiedIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Segurança', path: '/config/seguranca', icon: <SecurityIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Comunicação', path: '/config/comunicacao', icon: <ChatIcon sx={{ fontSize: 16 }} /> },
                 { divider: true },
                 // --- GRUPO 3: INTEGRAÇÕES & AUTOMAÇÃO ---
-                { text: 'Integrações', path: '/config/integracoes', icon: <ExtensionIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Comunicação & Integrações', path: '/config/comunicacao', icon: <ExtensionIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Webhooks e chaves de API', path: '/config/webhooks', icon: <WebhookIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Câmeras', path: '/config/cameras', icon: <CameraIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Rotinas automáticas', path: '/config/cron', icon: <CronIcon sx={{ fontSize: 16 }} /> },
                 { divider: true },
                 // --- GRUPO 4: SISTEMA ---
-                { text: 'Notificações', path: '/config/notificacoes', icon: <NotifIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Idiomas', path: '/config/idiomas', icon: <PaletteIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Banco de dados', path: '/config/banco-dados', icon: <StorageIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Gamificação', path: '/config/gamificacao', icon: <TrophyIcon sx={{ fontSize: 16 }} /> },

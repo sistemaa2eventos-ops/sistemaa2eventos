@@ -340,25 +340,42 @@ class WatchlistService {
                     }
 
                     // Telegram Global se configurado (com envio de foto se disponível)
-                    if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
+                    // Telegram Global se configurado (com envio de foto se disponível)
+                    let tgToken = process.env.TELEGRAM_BOT_TOKEN;
+                    let tgChatId = process.env.TELEGRAM_CHAT_ID;
+                    if (!tgToken || !tgChatId) {
+                        try {
+                            const { data: sysSet } = await supabase
+                                .from('system_settings')
+                                .select('telegram_bot_token, config')
+                                .eq('id', 1)
+                                .maybeSingle();
+                            tgToken = tgToken || sysSet?.telegram_bot_token || sysSet?.config?.telegram_bot_token;
+                            tgChatId = tgChatId || sysSet?.config?.telegram_chat_id;
+                        } catch (e) {
+                            // Ignora erro opcional
+                        }
+                    }
+
+                    if (tgToken && tgChatId) {
                         if (alertaData.snapshot_url) {
                             try {
-                                await axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendPhoto`, {
-                                    chat_id: process.env.TELEGRAM_CHAT_ID,
+                                await axios.post(`https://api.telegram.org/bot${tgToken}/sendPhoto`, {
+                                    chat_id: String(tgChatId).trim(),
                                     photo: alertaData.snapshot_url,
                                     caption: msgTexto.length > 1024 ? msgTexto.substring(0, 1020) + '...' : msgTexto,
                                     parse_mode: 'HTML'
                                 }, { timeout: 6000 });
                             } catch (tErr) {
-                                await axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-                                    chat_id: process.env.TELEGRAM_CHAT_ID,
+                                await axios.post(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
+                                    chat_id: String(tgChatId).trim(),
                                     text: msgTexto,
                                     parse_mode: 'HTML'
                                 }, { timeout: 4000 });
                             }
                         } else {
-                            await axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-                                chat_id: process.env.TELEGRAM_CHAT_ID,
+                            await axios.post(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
+                                chat_id: String(tgChatId).trim(),
                                 text: msgTexto,
                                 parse_mode: 'HTML'
                             }, { timeout: 4000 });
@@ -419,8 +436,15 @@ class WatchlistService {
     async enviarNotificacao(contato, mensagemTexto, alertaData = {}) {
         try {
             if (contato.canal === 'telegram') {
-                const token = contato.bot_token || process.env.TELEGRAM_BOT_TOKEN;
-                const chatId = contato.telefone || process.env.TELEGRAM_CHAT_ID;
+                let token = contato.bot_token || process.env.TELEGRAM_BOT_TOKEN;
+                let chatId = contato.telefone || process.env.TELEGRAM_CHAT_ID;
+                if (!token || !chatId) {
+                    try {
+                        const { data: sysSet } = await supabase.from('system_settings').select('telegram_bot_token, config').eq('id', 1).maybeSingle();
+                        token = token || sysSet?.telegram_bot_token || sysSet?.config?.telegram_bot_token;
+                        chatId = chatId || sysSet?.config?.telegram_chat_id;
+                    } catch (e) {}
+                }
                 if (!token || !chatId) {
                     logger.warn(`Contato Telegram ${contato.nome} sem token ou chat_id.`);
                     return;

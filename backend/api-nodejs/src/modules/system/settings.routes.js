@@ -33,6 +33,7 @@ router.get('/sync-history', authorize(['admin', 'master']), settingsController.g
 router.post('/verify-smtp', authorize(['admin', 'master']), smtpValidators.verify, handleValidationErrors, settingsController.verifySmtp);
 router.post('/verify-wpp', authorize(['admin', 'master']), settingsController.verifyWpp);
 router.post('/test-email', checkPermission('configuracoes', 'escrita'), settingsController.testEmail);
+router.post('/test-telegram', checkPermission('configuracoes', 'escrita'), settingsController.testTelegram);
 
 // Segurança Avançada
 router.post('/generate-api-key', checkPermission('configuracoes', 'escrita'), settingsController.generateApiKey);
