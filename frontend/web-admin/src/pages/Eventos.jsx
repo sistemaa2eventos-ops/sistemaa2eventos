@@ -107,8 +107,8 @@ const Eventos = ({ isEmbedded = false }) => {
                 onConfirm={confirmDelete}
                 onCancel={() => setOpenDeleteConfirm(false)}
                 loading={deleteLoading}
-                title="Desativar NZT"
-                message="Esta ação irá remover permanentemente o evento e todas as suas configurações de cota. Deseja prosseguir?"
+                title="Excluir evento definitivamente"
+                message="O evento e as configurações dele serão apagados de vez, sem como desfazer. Para só pausar o evento, use o botão Ativo/Inativo no card. Deseja excluir?"
             />
         </Box>
     );

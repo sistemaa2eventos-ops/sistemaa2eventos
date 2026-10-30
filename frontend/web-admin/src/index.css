@@ -147,6 +147,7 @@ code, pre, .font-mono {
 }
 
 body.modo-quiosque .app-menu,
+body.modo-quiosque .app-ajuda,
 body.modo-quiosque .app-barra {
   display: none !important;
 }

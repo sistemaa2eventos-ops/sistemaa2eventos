@@ -3,6 +3,7 @@ import { Box, AppBar, Toolbar, IconButton, useTheme, useMediaQuery, Avatar, Typo
 import { Menu as MenuIcon, Event as EventIcon } from '@mui/icons-material';
 import Sidebar from './Sidebar';
 import NotificationBell from './NotificationBell';
+import AjudaContextual from '../ajuda/AjudaContextual';
 
 const MainLayout = ({ children }) => {
     const [mobileOpen, setMobileOpen] = useState(false);
@@ -99,6 +100,7 @@ const MainLayout = ({ children }) => {
                 }}
             >
                 {children}
+                <AjudaContextual />
             </Box>
         </Box>
     );

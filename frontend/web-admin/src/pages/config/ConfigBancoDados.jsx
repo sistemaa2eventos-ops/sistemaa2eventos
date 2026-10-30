@@ -5,7 +5,7 @@ import {
     TableBody, TableCell, TableHead, TableRow, IconButton, Tooltip
 } from '@mui/material';
 import {
-    Save as SaveIcon, Storage as DatabaseIcon, CloudSync as SyncIcon,
+    Storage as DatabaseIcon, CloudSync as SyncIcon,
     History as HistoryIcon, Close as CloseIcon, CheckCircle as SuccessIcon,
     Error as ErrorIcon
 } from '@mui/icons-material';
@@ -127,13 +127,11 @@ const ConfigBancoDados = () => {
                                 variant="outlined"
                                 onClick={handleTestConnection}
                                 disabled={testing}
-                                sx={{ ...botaoSecundario, mr: 1 }}
+                                sx={botaoSecundario}
                             >
                                 {testing ? "Testando..." : "Testar conexão"}
                             </Button>
-                            <NeonButton startIcon={<SaveIcon />} sx={{ ml: 2 }}>
-                                Salvar
-                            </NeonButton>
+                            {/* Campos só de leitura: o "Salvar" que havia aqui não gravava nada */}
                         </Box>
                     </GlassCard>
                 </Grid>
