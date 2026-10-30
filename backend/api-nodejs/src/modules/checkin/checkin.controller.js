@@ -8,6 +8,7 @@ const websocketService = require('../../services/websocketService'); // FIX C-02
 const databaseService = require('./services/database.service');
 const watchlistService = require('../system/watchlist.service');
 const { COLUNAS_PESSOA_ACESSO } = require('./services/colunasPessoa');
+const pulseiraService = require('../pulseiras/pulseira.service');
 
 class AccessController {
     constructor() {
@@ -431,11 +432,13 @@ class AccessController {
             const updateData = { numero_pulseira, updated_at: new Date() };
             if (tipoPulseira?.id) updateData.tipo_pulseira_id = tipoPulseira.id;
             await supabaseClient.from('pessoas').update(updateData).eq('id', pessoa_id);
+            pulseiraService.registrarEntrega(pessoa_id, req.user?.id);
 
             // Delegar ao fluxo centralizado (inclui validações, watchlist, anti-passback, websocket)
+            // A pessoa lida antes do update ainda tinha a pulseira antiga: o log gravava o número errado
             const result = await checkinService.registrarAcesso(supabaseClient, {
                 pessoa_id,
-                pessoa,
+                pessoa: { ...pessoa, numero_pulseira },
                 evento_id: eventoId,
                 tipo: req.body.tipo || null, // null = Smart Access decide
                 metodo: 'pulseira',
@@ -806,6 +809,7 @@ class AccessController {
             if (areasVinculadas.length > 0) updateData.areas_autorizadas = areasVinculadas.map(a => a.area_id);
             if (tipoPulseira?.id) updateData.tipo_pulseira_id = tipoPulseira.id;
             await supabaseClient.from('pessoas').update(updateData).eq('id', pessoa_id);
+            pulseiraService.registrarEntrega(pessoa_id, req.user?.id);
 
             // 6. Auto CHECK-IN via fluxo centralizado
             const result = await checkinService.registrarAcesso(supabaseClient, {

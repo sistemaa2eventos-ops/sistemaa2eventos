@@ -99,7 +99,30 @@ function proximaOcorrenciaHorario(horario = '00:00:00', agora = new Date()) {
     return alvo;
 }
 
+/**
+ * Limite do filtro de período em UTC. Aceita "YYYY-MM-DD" (dia inteiro), o horário local do
+ * datetime-local ("YYYY-MM-DDTHH:mm") ou ISO com fuso. Antes cada aba comparava de um jeito e
+ * o horário local ia direto contra o UTC do banco (3h de diferença).
+ */
+function limiteFiltro(valor, fim = false) {
+    if (!valor) return null;
+    const v = String(valor).trim();
+    if (/[zZ]|[+-]\d\d:?\d\d$/.test(v)) {
+        const ms = Date.parse(v);
+        return isNaN(ms) ? null : new Date(ms).toISOString();
+    }
+    const m = v.match(/^(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+    if (!m) return null;
+    const limites = getLimitesDiaLocalUTC(m[1]);
+    if (!m[2]) return fim ? limites.end : limites.start;
+    const deslocamento = ((parseInt(m[2], 10) * 60 + parseInt(m[3], 10)) * 60 + parseInt(m[4] || '0', 10)) * 1000;
+    // "até 23:59" inclui o minuto inteiro
+    const extra = fim ? (m[4] ? 999 : 59999) : 0;
+    return new Date(Date.parse(limites.start) + deslocamento + extra).toISOString();
+}
+
 module.exports = {
+    limiteFiltro,
     proximaOcorrenciaHorario,
     getHojeLocal,
     getNowLocal,

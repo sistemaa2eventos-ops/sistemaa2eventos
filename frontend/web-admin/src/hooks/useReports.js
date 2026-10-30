@@ -49,6 +49,8 @@ export const useReports = () => {
     const [reportPonto, setReportPonto] = useState([]);
     // Fechamento do período (diárias e horas extras pela regra da empresa/função)
     const [fechamento, setFechamento] = useState(null);
+    // Histórico de pulseiras (null = ainda não carregado)
+    const [pulseiras, setPulseiras] = useState(null);
 
     /**
      * Carrega Relatório Diário Consolidado
@@ -318,6 +320,38 @@ export const useReports = () => {
         }
     }, [eventoId, dateStart, dateEnd, empresaId, enqueueSnackbar]);
 
+    /**
+     * Histórico de pulseiras: vínculos que estiveram em uso no período
+     */
+    const loadPulseiras = useCallback(async () => {
+        if (!eventoId) return;
+        try {
+            setLoading(true);
+            const { data } = await api.get('/pulseiras/historico', {
+                params: { evento_id: eventoId, data_inicio: dateStart, data_fim: dateEnd, empresa_id: empresaId || undefined }
+            });
+            setPulseiras(data?.data || null);
+        } catch (error) {
+            setPulseiras(null);
+            enqueueSnackbar(error.response?.data?.error || 'Erro ao carregar o histórico de pulseiras.', { variant: 'error' });
+        } finally {
+            setLoading(false);
+        }
+    }, [eventoId, dateStart, dateEnd, empresaId, enqueueSnackbar]);
+
+    /** Devolvida ou perdida: encerra a pulseira em uso da pessoa */
+    const encerrarPulseira = async (pessoa_id, motivo, observacao) => {
+        try {
+            await api.post('/pulseiras/encerrar', { pessoa_id, motivo, observacao }, { params: { evento_id: eventoId } });
+            enqueueSnackbar(motivo === 'perdida' ? 'Pulseira marcada como perdida.' : 'Devolução registrada.', { variant: 'success' });
+            await loadPulseiras();
+            return true;
+        } catch (error) {
+            enqueueSnackbar(error.response?.data?.error || 'Erro ao registrar a pulseira.', { variant: 'error' });
+            return false;
+        }
+    };
+
     const handleExportFechamento = async () => {
         try {
             enqueueSnackbar('Gerando planilha do fechamento...', { variant: 'info' });
@@ -380,6 +414,7 @@ export const useReports = () => {
         dailyLogs, totalLogs, page, setPage: loadLogs,
         reportArea, reportEmpresa, reportLeitor, reportFuncao, reportStatus, reportPonto,
         fechamento, loadFechamento, handleExportFechamento,
+        pulseiras, loadPulseiras, encerrarPulseira,
         loadLogs, loadTab, handleExport, handleExportPDF, handleExportAbaPDF,
         refresh: loadLogs
     };

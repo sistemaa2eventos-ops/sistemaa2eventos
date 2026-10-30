@@ -2,7 +2,7 @@ const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const pdfService = require('../../services/pdf.service');
 const ExcelJS = require('exceljs');
-const { getHojeLocal, getLimitesDiaLocalUTC, TIMEZONE } = require('../../utils/dateUtils');
+const { getHojeLocal, getLimitesDiaLocalUTC, limiteFiltro, TIMEZONE } = require('../../utils/dateUtils');
 // PostgREST limita a 1000 linhas: relatórios que somam em memória buscam todas as páginas
 const { buscarTodos, buscarPorIdsEmLotes } = require('../../utils/buscarTodos');
 const remuneracaoService = require('../remuneracao/remuneracao.service');
@@ -42,27 +42,6 @@ const dataExcel = (ts) => {
     return new Date(Date.UTC(ano, mes - 1, dia, hora, min, seg));
 };
 
-/**
- * Limite do filtro de período em UTC. Aceita "YYYY-MM-DD" (dia inteiro), o horário local do
- * datetime-local ("YYYY-MM-DDTHH:mm") ou ISO com fuso. Antes cada aba comparava de um jeito e
- * o horário local ia direto contra o UTC do banco (3h de diferença).
- */
-const limiteFiltro = (valor, fim = false) => {
-    if (!valor) return null;
-    const v = String(valor).trim();
-    if (/[zZ]|[+-]\d\d:?\d\d$/.test(v)) {
-        const ms = Date.parse(v);
-        return isNaN(ms) ? null : new Date(ms).toISOString();
-    }
-    const m = v.match(/^(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/);
-    if (!m) return null;
-    const limites = getLimitesDiaLocalUTC(m[1]);
-    if (!m[2]) return fim ? limites.end : limites.start;
-    const deslocamento = ((parseInt(m[2], 10) * 60 + parseInt(m[3], 10)) * 60 + parseInt(m[4] || '0', 10)) * 1000;
-    // "até 23:59" inclui o minuto inteiro
-    const extra = fim ? (m[4] ? 999 : 59999) : 0;
-    return new Date(Date.parse(limites.start) + deslocamento + extra).toISOString();
-};
 const aplicarPeriodo = (query, { data_inicio, data_fim } = {}, coluna = 'created_at') => {
     const inicio = limiteFiltro(data_inicio);
     const fim = limiteFiltro(data_fim, true);
@@ -2140,6 +2119,28 @@ class ReportController {
                     { id: 'quantidade', label: 'Quantidade', align: 'center', tipo: 'numero' }
                 ],
                 carregar: () => executar(this.porStatus)
+            },
+            pulseiras: {
+                titulo: 'Histórico de Pulseiras',
+                colunas: [
+                    { id: 'numero_pulseira', label: 'Pulseira', align: 'center' },
+                    { id: 'tipo', label: 'Tipo' },
+                    { id: 'colaborador', label: 'Colaborador' },
+                    { id: 'cpf', label: 'CPF' },
+                    { id: 'empresa', label: 'Empresa' },
+                    { id: 'status_texto', label: 'Situação', align: 'center' },
+                    { id: 'entregue_em', label: 'Entregue em', tipo: 'data' },
+                    { id: 'encerrado_em', label: 'Encerrada em', tipo: 'data' },
+                    { id: 'minutos_em_uso', label: 'Tempo com a pulseira', tipo: 'horas', align: 'center' },
+                    { id: 'acessos', label: 'Acessos', tipo: 'numero', align: 'center' },
+                    { id: 'entregue_por', label: 'Entregue por' },
+                    { id: 'observacao', label: 'Observação' }
+                ],
+                carregar: async () => {
+                    const r = await require('../pulseiras/pulseira.service').historico(req.event.id, req.query);
+                    if (!r.disponivel) throw new Error('Histórico de pulseiras ainda não criado: rode a migration 20261030_historico_pulseiras.sql.');
+                    return r.linhas.map(l => ({ ...l, cpf: this._formatarCPF(l.cpf), tipo: l.tipo || '—' }));
+                }
             }
         };
 

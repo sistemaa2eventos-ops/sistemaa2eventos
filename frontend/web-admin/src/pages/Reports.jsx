@@ -17,7 +17,8 @@ import {
     EditNote as NoteIcon,
     InfoOutlined as InfoIcon,
     Search as SearchIcon,
-    Payments as PaymentsIcon
+    Payments as PaymentsIcon,
+    ConfirmationNumber as PulseiraIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -30,6 +31,7 @@ import PageHeader from '../components/common/PageHeader';
 import DataTable from '../components/common/DataTable';
 import { useReports } from '../hooks/useReports';
 import FechamentoPeriodo from '../components/remuneracao/FechamentoPeriodo';
+import HistoricoPulseiras from '../components/pulseiras/HistoricoPulseiras';
 import { useEmpresas } from '../hooks/useEmpresas';
 import api from '../services/api';
 
@@ -57,6 +59,7 @@ const Reports = () => {
         dailyLogs, totalLogs, page, setPage,
         reportArea, reportEmpresa, reportLeitor, reportFuncao, reportStatus, reportPonto,
         fechamento, loadFechamento, handleExportFechamento,
+        pulseiras, loadPulseiras, encerrarPulseira,
         loadLogs, loadTab, handleExport, handleExportAbaPDF
     } = useReports();
 
@@ -104,10 +107,12 @@ const Reports = () => {
             loadSessoes();
         } else if (tab === 'diarias') {
             loadFechamento();
+        } else if (tab === 'pulseiras') {
+            loadPulseiras();
         } else {
             loadTab(tab);
         }
-    }, [tab, loadDiarioConsolidado, loadFechamentos, loadLogs, loadTab, loadSessoes, loadFechamento]);
+    }, [tab, loadDiarioConsolidado, loadFechamentos, loadLogs, loadTab, loadSessoes, loadFechamento, loadPulseiras]);
 
     const handleTabChange = (_event, newValue) => {
         setTab(newValue);
@@ -880,6 +885,7 @@ const Reports = () => {
                                     if (tab === 'logs') loadLogs(1);
                                     else if (tab === 'sessoes') loadSessoes();
                                     else if (tab === 'diarias') loadFechamento();
+                                    else if (tab === 'pulseiras') loadPulseiras();
                                     else loadTab(tab);
                                 }}
                                 sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700 }}
@@ -903,6 +909,7 @@ const Reports = () => {
                     <Tab icon={<DailyIcon />} label="Relatório diário" value="diario" />
                     <Tab icon={<TimeIcon />} label="Ponto" value="ponto" />
                     <Tab icon={<PaymentsIcon />} label="Diárias" value="diarias" />
+                    <Tab icon={<PulseiraIcon />} label="Pulseiras" value="pulseiras" />
                     <Tab icon={<HistoryIcon />} label="Logs de acesso" value="logs" />
                     <Tab icon={<BadgeIcon />} label="Sessões de operador" value="sessoes" />
                     <Tab icon={<TableIcon />} label="Por área" value="area" />
@@ -923,7 +930,7 @@ const Reports = () => {
                         />
                     )}
 
-                    {/* PONTO: turno por pessoa e dia, com horas líquidas */}
+                    {/* PONTO: turno por pessoa e dia, do primeiro check-in ao check-out final */}
                     {tab === 'ponto' && (
                         <DataTable
                             data={reportPonto}
@@ -935,6 +942,9 @@ const Reports = () => {
 
                     {/* DIÁRIAS: fechamento do período pela regra de remuneração */}
                     {tab === 'diarias' && <FechamentoPeriodo fechamento={fechamento} loading={loading} />}
+
+                    {/* PULSEIRAS: entregas, trocas, devoluções e perdas */}
+                    {tab === 'pulseiras' && <HistoricoPulseiras historico={pulseiras} loading={loading} onEncerrar={encerrarPulseira} />}
 
                     {/* 2. LOGS DE ACESSO */}
                     {tab === 'logs' && (
