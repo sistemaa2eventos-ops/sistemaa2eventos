@@ -372,10 +372,54 @@ class ConfigController {
                 return res.json({ success: true, data: null });
             }
 
-            res.json({ success: true, data: data || null });
+            // O painel decide imprimir no check-in por esta opção do evento
+            const { data: evento } = await supabase.from('eventos').select('impressao_etiquetas').eq('id', evento_id).maybeSingle();
+            res.json({ success: true, data: data || null, imprimir_no_checkin: !!evento?.impressao_etiquetas });
         } catch (error) {
             logger.error('Erro ao buscar layout da etiqueta:', error);
             res.json({ success: true, data: null }); // Não crashar por falta de layout
+        }
+    }
+
+    /**
+     * Dados para imprimir a etiqueta de uma pessoa no navegador do operador:
+     * os valores dos marcadores do layout e o QR já desenhado (o painel não tem biblioteca de QR).
+     */
+    async getEtiquetaPessoa(req, res) {
+        try {
+            const evento_id = req.event?.id || req.query.evento_id;
+            const { data: pessoa, error } = await supabase
+                .from('pessoas')
+                .select('id, nome_completo, nome_credencial, cpf, funcao, qr_code, numero_pulseira, empresas(nome), eventos(nome)')
+                .eq('id', req.params.pessoaId)
+                .eq('evento_id', evento_id)
+                .maybeSingle();
+            if (error) throw error;
+            if (!pessoa) return res.status(404).json({ error: 'Pessoa não encontrada neste evento.' });
+
+            let qr_imagem = null;
+            if (pessoa.qr_code) {
+                qr_imagem = await require('qrcode').toDataURL(pessoa.qr_code, { margin: 1, width: 300, errorCorrectionLevel: 'M' });
+            }
+            const cpf = String(pessoa.cpf || '').replace(/\D/g, '');
+            res.json({
+                success: true,
+                data: {
+                    nome_pessoa: pessoa.nome_credencial || pessoa.nome_completo || '',
+                    nome_completo: pessoa.nome_completo || '',
+                    empresa: pessoa.empresas?.nome || '',
+                    funcao: pessoa.funcao || '',
+                    cpf: cpf.length === 11 ? cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : (pessoa.cpf || ''),
+                    pulseira: pessoa.numero_pulseira || '',
+                    evento: pessoa.eventos?.nome || '',
+                    data: new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+                    qr_code: pessoa.qr_code || '',
+                    qr_imagem
+                }
+            });
+        } catch (error) {
+            logger.error('Erro ao montar etiqueta da pessoa:', error.message || error);
+            res.status(500).json({ error: 'Falha ao montar a etiqueta.' });
         }
     }
 

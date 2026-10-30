@@ -5,6 +5,7 @@ import api from '../services/api';
 import localCheckinService from '../services/LocalCheckinService';
 import { entrarTelaCheia, sairTelaCheia, ouvirTelaCheia } from '../utils/telaCheia';
 import { obterAudioContext } from '../utils/alertSound';
+import { imprimirSeAtivo } from '../services/etiquetaService';
 
 /**
  * useCheckin: Hook de controle para a operação de recepção (NZT).
@@ -195,6 +196,11 @@ export const useCheckin = (defaultMode, options = {}) => {
             console.error('Erro ao carregar dados de check-in:', error);
         }
     }, [eventoId, defaultMode, logsTipo, carregarSessaoAtiva, carregarDispositivosDisponiveis]);
+
+    // Etiqueta só na entrada nova (saída e reenvio repetido não imprimem); a opção é do evento
+    const imprimirSeEntrada = useCallback((acesso, pessoaId) => {
+        if (acesso?.tipo === 'checkin' && !acesso?.already_done) imprimirSeAtivo(eventoId, pessoaId);
+    }, [eventoId]);
 
     // Depois de cada acesso só mudam os registros e as estatísticas: não recarrega evento,
     // áreas, tipos de pulseira nem sessão (eram 7 requisições por pessoa credenciada).
@@ -406,6 +412,7 @@ export const useCheckin = (defaultMode, options = {}) => {
                     ? `SAÍDA LIBERADA: ${data.pessoa?.nome || 'COLABORADOR'}`
                     : `ENTRADA LIBERADA: ${data.pessoa?.nome || 'COLABORADOR'}`);
 
+                imprimirSeEntrada(data, data.pessoa?.id || data.pessoa_id);
                 atualizarAposAcesso();
 
                 clearTimeout(resetTimerRef.current);
@@ -516,6 +523,7 @@ export const useCheckin = (defaultMode, options = {}) => {
             } else {
                 setCheckinResult('sucesso');
                 setResultMessage(isCheckout ? 'SAÍDA LIBERADA' : 'CHECK-IN REALIZADO');
+                imprimirSeEntrada(finalData, finalData?.pessoa_id || targetPessoa?.id);
             }
 
             // Reset automático após 3s
@@ -561,6 +569,7 @@ export const useCheckin = (defaultMode, options = {}) => {
             if (res.data?.success) {
                 setCheckinResult('sucesso');
                 setResultMessage('Pulseira vinculada e Entrada autorizada!');
+                imprimirSeEntrada(res.data.data, pessoaId);
             }
 
             clearTimeout(resetTimerRef.current);

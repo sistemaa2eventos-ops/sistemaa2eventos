@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Grid, TextField, IconButton, Paper, Stack } from '@mui/material';
-import { Save as SaveIcon, Add as AddIcon, Delete as DeleteIcon, Style as StyleIcon } from '@mui/icons-material';
+import { Save as SaveIcon, Add as AddIcon, Delete as DeleteIcon, Style as StyleIcon, Print as PrintIcon } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import { Rnd } from 'react-rnd';
 import { useSearchParams } from 'react-router-dom';
@@ -8,6 +8,14 @@ import api from '../../services/api';
 import GlassCard from '../../components/common/GlassCard';
 import NeonButton from '../../components/common/NeonButton';
 import PageHeader from '../../components/common/PageHeader';
+import { montarHtmlEtiqueta, imprimirHtml, limparCacheEtiqueta } from '../../services/etiquetaService';
+
+// Dados de exemplo para o teste de impressão (o QR sai como um quadrado tracejado)
+const DADOS_EXEMPLO = {
+    nome_pessoa: 'MARIA DA SILVA', nome_completo: 'MARIA DA SILVA SANTOS', empresa: 'EMPRESA EXEMPLO',
+    funcao: 'MONTADORA', cpf: '123.456.789-09', pulseira: '1024', evento: 'EVENTO',
+    data: new Date().toLocaleDateString('pt-BR'), qr_code: 'EXEMPLO', qr_imagem: null, exemplo: true
+};
 
 const ConfigEtiquetas = () => {
     const [searchParams] = useSearchParams();
@@ -95,12 +103,17 @@ const ConfigEtiquetas = () => {
         try {
             setSaving(true);
             await api.post('/config/etiquetas', payload);
+            limparCacheEtiqueta(eventoId); // o check-in passa a imprimir o layout novo na hora
             enqueueSnackbar(`Layout salvo com sucesso para ${localStorage.getItem('active_evento_nome') || 'o evento'}!`, { variant: 'success' });
         } catch (error) {
             enqueueSnackbar('Falha ao salvar o layout da etiqueta. ' + (error.response?.data?.details || ''), { variant: 'error' });
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleImprimirTeste = () => {
+        imprimirHtml(montarHtmlEtiqueta({ papel_config: config, elementos: elements }, DADOS_EXEMPLO));
     };
 
     return (
@@ -205,11 +218,17 @@ const ConfigEtiquetas = () => {
                                 <Typography variant="caption" sx={{ opacity: 0.5 }}>Clique em um elemento no canvas para editar.</Typography>
                             )}
 
-                            <Box sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
+                            <Stack spacing={1.5} sx={{ mt: 4 }}>
                                 <NeonButton startIcon={<SaveIcon />} fullWidth onClick={handleSave} loading={saving}>
                                     Salvar layout do evento
                                 </NeonButton>
-                            </Box>
+                                <NeonButton startIcon={<PrintIcon />} fullWidth variant="outlined" onClick={handleImprimirTeste}>
+                                    Imprimir teste
+                                </NeonButton>
+                                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                    Sai na impressora escolhida no navegador, com dados de exemplo. A etiqueta sai sozinha no check-in quando a opção “Imprimir etiqueta” do evento está ligada.
+                                </Typography>
+                            </Stack>
                         </GlassCard>
                     </Stack>
                 </Grid>

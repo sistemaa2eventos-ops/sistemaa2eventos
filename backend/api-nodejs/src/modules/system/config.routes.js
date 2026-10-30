@@ -21,6 +21,7 @@ router.delete('/pulseiras/:id', authorize('admin', 'supervisor'), configControll
 
 // Rotas para Editor de Etiquetas e Crachas
 router.get('/etiquetas', configController.getEtiquetas);
+router.get('/etiquetas/pessoa/:pessoaId', configController.getEtiquetaPessoa);
 router.post('/etiquetas', authorize('admin', 'supervisor'), configController.saveEtiquetas);
 
 // Rotas para Credenciamento Dinâmico
