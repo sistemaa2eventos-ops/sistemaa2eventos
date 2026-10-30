@@ -69,10 +69,11 @@ const apiLimiter = rateLimit({
 });
 
 // FIX I-10: Limiter para rotas públicas (cadastro, portal, etc.)
-// Mais restritivo para proteger contra abuso no endpoint de cadastro público
+// Por IP. Cada cadastro faz ~4 chamadas (empresa, equipe, URL da foto, envio):
+// 30/min travava um escritório ou Wi-Fi compartilhado com poucas pessoas ao mesmo tempo
 const publicLimiter = rateLimit({
     windowMs: 60 * 1000, // 1 minuto
-    max: isDev ? 200 : 30,
+    max: isDev ? 200 : 120,
     message: {
         error: 'Muitas requisições ao portal. Aguarde um momento.'
     },

@@ -83,7 +83,7 @@ const Empresas = () => {
       activeStep, setActiveStep, documentos,
       formData, setFormData, handleSave, handleDelete, handleSaveQuotas,
       handleAuditDocument, handleSelectAllDatesEmpresa, handleClearAllDatesEmpresa,
-      handleSelectAllPhaseEmpresa, handleClearPhaseEmpresa, loadDocumentos
+      handleSelectAllPhaseEmpresa, handleClearPhaseEmpresa, loadDocumentos, loadEmpresas
   } = useEmpresas(eventoIdParam);
 
   const steps = ['Dados cadastrais', 'Configurações', 'Documentos'];
@@ -202,16 +202,18 @@ const Empresas = () => {
         return;
       }
 
-      const { data } = await api.post(`/empresas/${row.id}/gerar-convite`, { refresh: forceRefresh });
-      setInviteResult({
-        link: data.link,
-        empresa: row
-      });
+      // Sem token (ou pedindo um novo): gera pelo refresh-token; o link antigo deixa de valer
+      const { data } = await api.post(`/empresas/${row.id}/refresh-token`);
+      const link = `https://cadastro.nzt.app.br/register/${data.token}`;
+      setInviteResult({ link, empresa: { ...row, registration_token: data.token } });
       setOpenInviteDialog(true);
-      
-      if (data.isNew) {
-        await navigator.clipboard.writeText(data.link);
+      loadEmpresas();
+
+      try {
+        await navigator.clipboard.writeText(link);
         enqueueSnackbar('Novo link gerado e copiado!', { variant: 'success' });
+      } catch {
+        enqueueSnackbar('Novo link gerado.', { variant: 'success' });
       }
     } catch (err) {
       enqueueSnackbar('Erro ao processar convite.', { variant: 'error' });

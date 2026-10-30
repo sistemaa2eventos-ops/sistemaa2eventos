@@ -5,19 +5,26 @@ const publicController = require('./public.controller');
 
 
 // --- 🛡️ LIMITADORES DE TAXA (Hardening de Rotas Públicas) ---
-// Previne ataques de negação de serviço e spam de cadastros
+// Previne ataques de negação de serviço e spam de cadastros.
+// Por IP: o RH de uma empresa cadastra a equipe inteira do mesmo escritório, e um
+// alojamento ou Wi-Fi do evento põe centenas de pessoas atrás de um IP só
+// (antes: 5 por 15 min barrava o 6º cadastro). 100 por 15 min ≈ 1 a cada 9 s, mais que
+// alguém digitando consegue, e ainda segura um robô de spam.
 const registerLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutos
-    max: 5, // Limite de 5 tentativas por IP
-    message: { error: 'Muitas tentativas de cadastro. Tente novamente em 15 minutos.' },
+    max: 100,
+    message: { error: 'Muitos cadastros seguidos desta rede. Aguarde alguns minutos e tente de novo.' },
     standardHeaders: true,
     legacyHeaders: false,
 });
 
+// Uma URL por foto enviada; reenvios após erro também contam
 const uploadLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 10,
-    message: { error: 'Limite de geração de URLs de upload excedido.' }
+    max: 150,
+    message: { error: 'Muitos envios de foto seguidos desta rede. Aguarde alguns minutos e tente de novo.' },
+    standardHeaders: true,
+    legacyHeaders: false,
 });
 
 /**

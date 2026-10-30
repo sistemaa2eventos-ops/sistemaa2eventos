@@ -380,7 +380,7 @@ class PessoaController {
             // 1. Aprovar na pivottable
             const { error: pivotError } = await supabaseClient
                 .from('pessoa_evento_empresa')
-                .update({ status_aprovacao: 'aprovado', atualizado_em: new Date() })
+                .update({ status_aprovacao: 'aprovado', updated_at: new Date() })
                 .eq('pessoa_id', id)
                 .eq('evento_id', tenantId);
 
@@ -523,7 +523,7 @@ class PessoaController {
 
             await supabaseClient
                 .from('pessoa_evento_empresa')
-                .update({ status_aprovacao: 'recusado', atualizado_em: new Date() })
+                .update({ status_aprovacao: 'recusado', updated_at: new Date() })
                 .eq('pessoa_id', id)
                 .eq('evento_id', tenantId);
 
