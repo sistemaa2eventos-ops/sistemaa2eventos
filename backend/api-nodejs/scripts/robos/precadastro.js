@@ -30,6 +30,12 @@ const PDF = 'data:application/pdf;base64,' + Buffer.from('%PDF-1.4\n1 0 obj<</Ty
     const empPub = await chamar('GET', `/api/public/company/${regToken}`, { headers: { 'x-evento-id': '' } });
     p.ok(empPub.status === 200 && JSON.stringify(empPub.json).includes('Empresa Robô'), 'portal mostra a empresa certa', empPub);
 
+    const faltaMinimo = (empPub.json?.company?.documentos?.minimo || []).length;
+    if (faltaMinimo) {
+        const sem = await chamar('POST', `/api/public/register/${regToken}`, { corpo: { nome: 'X', cpf: gerarCpf(), aceite_lgpd: true }, headers: { 'x-evento-id': '' } });
+        p.ok(sem.status === 400 && /Anexe/.test(sem.json?.error || ''), `sem o documento mínimo → recusa ("${sem.json?.error}")`, sem);
+    }
+
     const semLgpd = await chamar('POST', `/api/public/register/${regToken}`, { corpo: { nome: 'X', cpf: gerarCpf() }, headers: { 'x-evento-id': '' } });
     p.ok(semLgpd.status === 400, 'sem aceite LGPD → recusa com mensagem', semLgpd);
 
@@ -41,7 +47,11 @@ const PDF = 'data:application/pdf;base64,' + Buffer.from('%PDF-1.4\n1 0 obj<</Ty
     const ficha = {
         nome, cpf, email: `${cpf}@robo.teste`, nome_mae: 'MAE DO ROBO', data_nascimento: '1990-05-10',
         funcao: 'Montador', dias_trabalho: [], aceite_lgpd: true, foto_base64: JPEG,
-        documentos: [{ name: 'aso.pdf', base64: PDF, tipo: 'ASO' }]
+        // Documentos mínimos que o evento exige (ex.: RG/CNH frente e verso), cada um com o tipo
+        documentos: [
+            ...(empPub.json?.company?.documentos?.minimo || []).map(t => ({ name: `${t.id.slice(0, 4)}.pdf`, base64: PDF, tipo_documento_id: t.id, label: t.nome })),
+            { name: 'aso.pdf', base64: PDF, tipo: 'ASO' }
+        ]
     };
     const env = await chamar('POST', `/api/public/register/${regToken}`, { corpo: ficha, headers: { 'x-evento-id': '' } });
     p.ok(env.status === 200 || env.status === 201, 'envia cadastro com foto e documento', env);
