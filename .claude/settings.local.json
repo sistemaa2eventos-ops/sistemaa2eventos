@@ -6,7 +6,8 @@
       "Bash(grep -E \"\\\\.\\(js|ts|py\\)$\")",
       "Bash(grep -n \"CREATE TABLE\" c:/Projetos/Projeto_A2_Eventos/a2-eventos/database/supabase/migrations/*.sql)",
       "Bash(find c:/Projetos/Projeto_A2_Eventos -name \"*.sql\" -exec grep -l \"CREATE TABLE.*dispositivos_acesso\" {} \\\\;)",
-      "Bash(grep -A 50 \"CREATE TABLE.*dispositivos_acesso\" c:/Projetos/Projeto_A2_Eventos/a2-eventos/database/supabase/migrations/*.sql)"
+      "Bash(grep -A 50 \"CREATE TABLE.*dispositivos_acesso\" c:/Projetos/Projeto_A2_Eventos/a2-eventos/database/supabase/migrations/*.sql)",
+      "Bash(git push origin master)"
     ]
   }
 }
