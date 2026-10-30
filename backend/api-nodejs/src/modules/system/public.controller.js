@@ -69,11 +69,12 @@ const respostaMinimoFaltando = (res, faltando) => res.status(400).json({
 /** Grava os documentos do portal e recalcula a situação da pessoa. */
 const salvarDocumentosPortal = async (pessoaId, documentos) => {
     if (!documentos.length || !pessoaId) return;
-    const { error } = await supabase.from('pessoa_documentos').insert(documentos.map(d => ({ ...d, pessoa_id: pessoaId })));
+    const { data: gravados, error } = await supabase.from('pessoa_documentos').insert(documentos.map(d => ({ ...d, pessoa_id: pessoaId }))).select('id');
     if (error) {
         logger.error(`[Portal] Falha ao gravar ${documentos.length} documento(s) da pessoa ${pessoaId}: ${error.message}`);
         return;
     }
+    require('../integracoes/drive.service').copiarEmSegundoPlano('pessoa', (gravados || []).map(d => d.id));
     await require('../entities/documento.service').sincronizarStatusPessoa(null, pessoaId);
 };
 

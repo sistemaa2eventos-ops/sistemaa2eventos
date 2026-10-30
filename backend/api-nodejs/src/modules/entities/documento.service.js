@@ -54,6 +54,7 @@ class DocumentoService {
 
         if (error) throw error;
         logger.info(`📄 Documento '${tipo_doc}' submetido para aprovação (${entityType}: ${entityId})`);
+        require('../integracoes/drive.service').copiarEmSegundoPlano(entityType === 'empresa' ? 'empresa' : 'pessoa', data.id);
 
         // Documento novo pode mudar a situação da pessoa (ex.: de "não enviado" para "em análise")
         if (entityType === 'pessoa') await this.sincronizarStatusPessoa(supabaseClient, entityId);

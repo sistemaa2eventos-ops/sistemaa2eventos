@@ -28,6 +28,7 @@ import { useSnackbar } from 'notistack';
 import api from '../../services/api';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
 import PageHeader from '../../components/common/PageHeader';
+import GoogleDriveCard from '../../components/integracoes/GoogleDriveCard';
 import GlassCard from '../../components/common/GlassCard';
 import NeonButton from '../../components/common/NeonButton';
 import { botaoSecundario } from '../../styles/tokens';
@@ -637,6 +638,11 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                                 </Button>
                             </Box>
                         </GlassCard>
+                    </Grid>
+
+                    {/* GOOGLE DRIVE: cópia dos documentos */}
+                    <Grid item xs={12}>
+                        <GoogleDriveCard />
                     </Grid>
                 </Grid>
             )}
