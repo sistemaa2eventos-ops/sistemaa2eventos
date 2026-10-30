@@ -12,7 +12,11 @@ import {
   Sensors as TerminalIcon,
   Place as AreaIcon,
   ExitToApp as LogoutIcon,
-  Login as LoginIcon
+  Login as LoginIcon,
+  Phone as PhoneIcon,
+  Email as EmailIcon,
+  Event as EventIcon,
+  MeetingRoom as RoomIcon
 } from '@mui/icons-material';
 import PessoaFoto from '../common/PessoaFoto';
 import { formatLocalDateTime } from '../../utils/dateUtils';
@@ -23,6 +27,7 @@ const PessoaCardDialog = ({
   open,
   onClose,
   log,
+  pessoa,
   pessoaProp,
   accentColor = '#00D4FF'
 }) => {
@@ -30,8 +35,9 @@ const PessoaCardDialog = ({
   const [_loading, setLoading] = useState(false);
   useFecharComVoltar(open, onClose);
 
-  // Normalização preliminar com dados imediatos do log ou prop
-  const pessoaBase = pessoaProp || log?.pessoas || (log?.pessoa_id ? { id: log.pessoa_id, nome: log.pessoa_nome } : null) || {};
+  // Normalização preliminar com dados imediatos do log ou prop (compatível com 'pessoa' e 'pessoaProp')
+  const propPessoa = pessoa || pessoaProp;
+  const pessoaBase = propPessoa || log?.pessoas || (log?.pessoa_id ? { id: log.pessoa_id, nome: log.pessoa_nome } : null) || {};
   const pessoaId = pessoaBase?.id || log?.pessoa_id;
 
   useEffect(() => {
@@ -49,8 +55,8 @@ const PessoaCardDialog = ({
           setDetalhesPessoa(res.data.data);
         }
       } catch (err) {
-        // Fallback silencioso mantendo os dados que já vieram no log
-        console.debug('Usando dados em cache do log para exibição rápida:', err.message);
+        // Fallback silencioso mantendo os dados que já vieram no log ou card
+        console.debug('Usando dados imediatos do participante:', err.message);
       } finally {
         if (!isCancelled) setLoading(false);
       }
@@ -65,24 +71,64 @@ const PessoaCardDialog = ({
 
   if (!open) return null;
 
-  // Unifica dados completos (API prioritária, fallback para log)
-  const pessoa = detalhesPessoa || pessoaBase;
-  const nome = pessoa.nome_completo || pessoa.nome || log?.pessoa_nome || 'Participante';
-  const cpf = pessoa.cpf ? pessoa.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.***.***-$4') : (log?.cpf || 'Não informado');
-  const empresa = pessoa.empresas?.nome || pessoa.empresa_nome || log?.empresa_nome || 'Geral / Não informada';
-  const funcao = pessoa.funcao || log?.funcao || 'Operacional';
-  const fotoUrl = pessoa.foto_url || log?.foto_capturada || log?.foto_url;
-  const pulseira = pessoa.numero_pulseira || log?.numero_pulseira || log?.extra?.numero_pulseira;
-  const statusAcesso = pessoa.status_acesso || (log?.tipo === 'checkout' ? 'fora' : 'checkin_feito');
+  // Unifica dados completos (API prioritária, fallback inteligente para dados imediatos da lista)
+  const pessoaDados = { ...pessoaBase, ...(detalhesPessoa || {}) };
+  const nome = pessoaDados.nome_completo || pessoaDados.nome || log?.pessoa_nome || 'Participante';
+  const cpf = pessoaDados.cpf ? pessoaDados.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.***.***-$4') : (log?.cpf || 'Não informado');
+  const empresa = pessoaDados.empresas?.nome || pessoaDados.empresa_nome || log?.empresa_nome || 'Geral / Não informada';
+  const funcao = pessoaDados.funcao || log?.funcao || 'Operacional';
+  const fotoUrl = pessoaDados.foto_url || log?.foto_capturada || log?.foto_url;
+  const pulseira = pessoaDados.numero_pulseira || log?.numero_pulseira || log?.extra?.numero_pulseira;
+  const statusAcesso = pessoaDados.status_acesso || (log?.tipo === 'checkout' ? 'fora' : (log ? 'checkin_feito' : 'cadastrado'));
+  const telefone = pessoaDados.telefone || pessoaDados.celular || null;
+  const email = pessoaDados.email || null;
+  const dataCadastro = pessoaDados.created_at ? formatLocalDateTime(pessoaDados.created_at) : null;
+  const areasAutorizadas = pessoaDados.areas_autorizadas || [];
 
   // Metadados do Registro
-  const tipoAcesso = log?.tipo || log?.tipo_acesso || 'checkin';
+  const tipoAcesso = log?.tipo || log?.tipo_acesso || (pessoaDados.horario_checkin ? 'checkin' : null);
   const isCheckout = tipoAcesso === 'checkout';
-  const metodoAcesso = log?.metodo || 'Automático';
-  const horarioRegistro = log?.created_at ? formatLocalDateTime(log.created_at) : null;
-  const dispositivoNome = log?.dispositivo_nome || log?.dispositivo_id || 'Terminal Web';
-  const areaNome = log?.area_nome || log?.evento_areas?.nome_area || 'Área Geral';
+  const metodoAcesso = log?.metodo || pessoaDados.metodo_checkin || 'Automático';
+  const horarioRegistro = log?.created_at
+    ? formatLocalDateTime(log.created_at)
+    : (pessoaDados.horario_checkin ? formatLocalDateTime(pessoaDados.horario_checkin) : null);
+  const dispositivoNome = log?.dispositivo_nome || log?.dispositivo_id || (pessoaDados.horario_checkin ? 'Terminal de Acesso' : 'Terminal Web');
+  const areaNome = log?.area_nome || log?.evento_areas?.nome_area || pessoaDados.area_checkin || 'Área Geral';
   const confianca = log?.confianca ? `${log.confianca}%` : null;
+
+  // Definição visual do status
+  const isBloqueado = Boolean(pessoaDados.bloqueado);
+  const isSaida = isCheckout || statusAcesso === 'checkout_feito' || statusAcesso === 'fora';
+  const isPresente = statusAcesso === 'checkin_feito' || (!isCheckout && tipoAcesso === 'checkin');
+  const isPendente = statusAcesso === 'pendente';
+
+  let statusLabel = 'Cadastrado';
+  let statusColor = '#00D4FF';
+  let statusBg = 'rgba(0, 212, 255, 0.15)';
+
+  if (isBloqueado) {
+    statusLabel = 'Bloqueado';
+    statusColor = '#FF3366';
+    statusBg = 'rgba(255, 51, 102, 0.2)';
+  } else if (isSaida) {
+    statusLabel = 'Saída registrada';
+    statusColor = '#FF3366';
+    statusBg = 'rgba(255, 51, 102, 0.2)';
+  } else if (isPresente) {
+    statusLabel = 'Credenciado / No evento';
+    statusColor = '#00FF88';
+    statusBg = 'rgba(0, 255, 136, 0.15)';
+  } else if (isPendente) {
+    statusLabel = 'Aguardando Credenciamento';
+    statusColor = '#FFB800';
+    statusBg = 'rgba(255, 184, 0, 0.15)';
+  } else {
+    statusLabel = 'Autorizado';
+    statusColor = '#00FF88';
+    statusBg = 'rgba(0, 255, 136, 0.15)';
+  }
+
+  const temRegistroAcesso = Boolean(log || pessoaDados.horario_checkin);
 
   return (
     <Dialog
@@ -97,7 +143,7 @@ const PessoaCardDialog = ({
           overflowY: 'auto',
           '&::-webkit-scrollbar': { width: 6 },
           '&::-webkit-scrollbar-thumb': { bgcolor: `${accentColor}40`, borderRadius: 1.5 }
-                    }
+        }
       }}
     >
       <DialogContent sx={{ p: { xs: 2.5, sm: 4 }, position: 'relative' }}>
@@ -130,14 +176,14 @@ const PessoaCardDialog = ({
                 boxShadow={`0 10px 30px rgba(0,0,0,0.7), 0 0 25px ${accentColor}35`}
               />
 
-              <Stack direction="row" spacing={1} mt={2.5} flexWrap="wrap" justifyContent="center">
+              <Stack direction="row" spacing={1} mt={2.5} flexWrap="wrap" justifyContent="center" gap={1}>
                 <Chip
-                  label={isCheckout ? 'Saída registrada' : (statusAcesso === 'checkin_feito' ? 'Credenciado' : 'AUTORIZADO')}
+                  label={statusLabel}
                   size="small"
                   sx={{
-                    bgcolor: isCheckout ? 'rgba(255, 51, 102, 0.2)' : 'rgba(0, 255, 136, 0.15)',
-                    color: isCheckout ? '#FF3366' : '#00FF88',
-                    border: `1px solid ${isCheckout ? '#FF3366' : '#00FF88'}`,
+                    bgcolor: statusBg,
+                    color: statusColor,
+                    border: `1px solid ${statusColor}`,
                     fontWeight: 700,
                     letterSpacing: 0.5,
                     height: 26
@@ -161,7 +207,7 @@ const PessoaCardDialog = ({
             </Box>
           </Grid>
 
-          {/* COLUNA DIREITA: DADOS DO PARTICIPANTE E LOG */}
+          {/* COLUNA DIREITA: DADOS DO PARTICIPANTE E ACESSO */}
           <Grid item xs={12} sm={7.5}>
             <Box>
               <Typography variant="overline" sx={{ color: accentColor, fontWeight: 700, letterSpacing: 1.5 }}>
@@ -189,10 +235,58 @@ const PessoaCardDialog = ({
                   <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>Função:</Typography>
                   <Typography variant="body2" fontWeight={700} color="#FFFFFF">{funcao}</Typography>
                 </Box>
+
+                {telefone && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                    <PhoneIcon sx={{ color: accentColor, fontSize: 20 }} />
+                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>Telefone:</Typography>
+                    <Typography variant="body2" fontWeight={700} color="#FFFFFF">{telefone}</Typography>
+                  </Box>
+                )}
+
+                {email && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                    <EmailIcon sx={{ color: accentColor, fontSize: 20 }} />
+                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>E-mail:</Typography>
+                    <Typography variant="body2" fontWeight={700} color="#FFFFFF">{email}</Typography>
+                  </Box>
+                )}
+
+                {dataCadastro && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                    <EventIcon sx={{ color: accentColor, fontSize: 20 }} />
+                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>Cadastrado em:</Typography>
+                    <Typography variant="body2" fontWeight={700} color="#FFFFFF">{dataCadastro}</Typography>
+                  </Box>
+                )}
+
+                {areasAutorizadas && areasAutorizadas.length > 0 && (
+                  <Box sx={{ mt: 1 }}>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', display: 'block', mb: 0.5 }}>
+                      Áreas autorizadas:
+                    </Typography>
+                    <Stack direction="row" spacing={0.8} flexWrap="wrap" gap={0.8}>
+                      {areasAutorizadas.map((area) => (
+                        <Chip
+                          key={area.id || area.nome_area}
+                          label={area.nome_area}
+                          size="small"
+                          sx={{
+                            bgcolor: 'rgba(0, 212, 255, 0.08)',
+                            color: '#00D4FF',
+                            border: '1px solid rgba(0, 212, 255, 0.25)',
+                            fontSize: '0.75rem',
+                            height: 22
+                          }}
+                        />
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
               </Stack>
 
-              {/* CARD DETALHADO DO ÚLTIMO REGISTRO */}
-              {log && (
+              {/* CARD DETALHADO DO ÚLTIMO REGISTRO OU STATUS DE PRESENÇA */}
+              {temRegistroAcesso ? (
                 <Box
                   sx={{
                     mt: 3,
@@ -261,6 +355,29 @@ const PessoaCardDialog = ({
                       </Grid>
                     )}
                   </Grid>
+                </Box>
+              ) : (
+                <Box
+                  sx={{
+                    mt: 3,
+                    p: 2,
+                    bgcolor: 'rgba(0, 212, 255, 0.03)',
+                    borderRadius: 1.5,
+                    border: '1px dashed rgba(0, 212, 255, 0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.5
+                  }}
+                >
+                  <RoomIcon sx={{ color: accentColor, fontSize: 24, opacity: 0.8 }} />
+                  <Box>
+                    <Typography variant="caption" sx={{ color: accentColor, fontWeight: 700, display: 'block' }}>
+                      Status de presença
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                      Nenhum registro de acesso hoje • Aguardando primeira entrada na portaria
+                    </Typography>
+                  </Box>
                 </Box>
               )}
             </Box>

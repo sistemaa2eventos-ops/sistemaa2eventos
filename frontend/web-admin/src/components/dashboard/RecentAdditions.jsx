@@ -86,6 +86,7 @@ const RecentAdditions = ({ pessoas = [] }) => {
         open={Boolean(selectedPessoa)}
         onClose={() => setSelectedPessoa(null)}
         pessoa={selectedPessoa}
+        pessoaProp={selectedPessoa}
       />
     </>
   );
