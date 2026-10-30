@@ -310,6 +310,17 @@ class IntelbrasController {
 
             userID = this._extractOnlineUserId(body, eventData, rawBody);
 
+            // Diagnóstico de reenvio: o leitor que volta a alcançar o servidor pode reenviar passagens
+            // antigas pelo modo online. Registra só os campos de horário (sem nome/CPF) para medir.
+            if (eventCode === 'AccessControl') {
+                const camposHora = {};
+                for (const k of ['UTC', 'RealUTC', 'CreateTime', 'Time', 'LocalTime', 'Offline', 'ReUpload']) {
+                    if (eventData?.[k] !== undefined) camposHora[k] = eventData[k];
+                    if (body?.[k] !== undefined) camposHora[`body.${k}`] = body[k];
+                }
+                logger.info(`[Online] horário do evento: ${JSON.stringify(camposHora)} | chaves: ${Object.keys(eventData || {}).join(',')} | agora=${Math.floor(Date.now() / 1000)}`);
+            }
+
             logger.debug(`[Online] REQUEST DEBUG:`, {
                 contentType: req.headers['content-type'],
                 eventCode,

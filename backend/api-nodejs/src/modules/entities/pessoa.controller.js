@@ -301,6 +301,19 @@ class PessoaController {
                 return ApiResponse.error(res, 'Erro ao atualizar status.', 500);
             }
 
+            // O botão Aprovar/Recusar do painel usa esta rota (não /approve): sem refletir no vínculo
+            // com a empresa, a pessoa ficava "autorizada" com o vínculo pendente (fora da cota e do
+            // portal da empresa). Cliente de serviço: com o token do usuário o RLS ignorava em silêncio.
+            const statusVinculo = { autorizado: 'aprovado', recusado: 'recusado', pendente: 'pendente' }[status];
+            if (statusVinculo) {
+                const { error: pivotError } = await supabase
+                    .from('pessoa_evento_empresa')
+                    .update({ status_aprovacao: statusVinculo, updated_at: new Date() })
+                    .eq('pessoa_id', id)
+                    .eq('evento_id', tenantId || currentPessoa.evento_id);
+                if (pivotError) logger.error({ err: pivotError, person_id: id }, 'Error syncing pivot on status change');
+            }
+
             // Sincronização com terminais: status ativo envia, status inativo remove
             const statusAtivo = ['autorizado', 'checkin_feito', 'checkout_feito'].includes(status);
             if (statusAtivo) {
