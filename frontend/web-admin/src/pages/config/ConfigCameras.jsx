@@ -7,7 +7,7 @@ import {
 } from '@mui/material';
 import {
     Save as SaveIcon, Videocam as CameraIcon,
-    MeetingRoom as DoorIcon, Add as AddIcon, Delete as DeleteIcon,
+    Psychology as IaIcon, Add as AddIcon, Delete as DeleteIcon,
     Refresh as RefreshIcon, OpenInNew as OpenInNewIcon, Shield as ShieldIcon,
     Tune as TuneIcon, PowerSettingsNew as PowerIcon, Face as FaceIcon
 } from '@mui/icons-material';
@@ -18,6 +18,7 @@ import { useIaStatus, statusDaCamera } from '../../hooks/useIaConfig';
 import GlassCard from '../../components/common/GlassCard';
 import NeonButton from '../../components/common/NeonButton';
 import PageHeader from '../../components/common/PageHeader';
+import ConfigIAFacial from './ConfigIAFacial';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
 
 import { botaoSecundario } from '../../styles/tokens';
@@ -51,14 +52,15 @@ const situacaoCamera = (cam, status, isDesativada, st, iaErro) => {
     return { cor: '#94A3B8', titulo: 'Não verificada', detalhe: 'Toque em Testar para checar a conexão.', chips: semMotor };
 };
 
-const ConfigCameras = () => {
+const ConfigCameras = ({ abaInicial = null }) => {
     const confirmar = useConfirmacao();
     const { enqueueSnackbar } = useSnackbar();
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const eventoId = searchParams.get('evento_id') || localStorage.getItem('active_evento_id');
 
-    const [activeTab, setActiveTab] = useState(0); // 0 = Câmeras IP CFTV, 1 = Catracas & Periféricos
+    // 0 = Câmeras IP, 1 = Motor de IA facial (/config/ia-facial abre direto nesta aba)
+    const [activeTab, setActiveTab] = useState(abaInicial === 'ia' ? 1 : 0);
     const [cameras, setCameras] = useState([]);
     const [areas, setAreas] = useState([]);
     const [loadingCameras, setLoadingCameras] = useState(true);
@@ -74,11 +76,6 @@ const ConfigCameras = () => {
     const [testResults, setTestResults] = useState({});
     const [togglingId, setTogglingId] = useState(null);
     const [togglingAll, setTogglingAll] = useState(false);
-
-    // Catracas e Edge Devices
-    const [dispositivos, setDispositivos] = useState([]);
-    const [loadingDevices, setLoadingDevices] = useState(false);
-    const [savingDevices, setSavingDevices] = useState(false);
 
     // Carregar Câmeras do Evento
     const fetchCameras = useCallback(async () => {
@@ -105,35 +102,10 @@ const ConfigCameras = () => {
         }
     }, [eventoId]);
 
-    // Carregar Catracas
-    const fetchDevices = useCallback(async () => {
-        if (!eventoId) return;
-        try {
-            setLoadingDevices(true);
-            const resp = await api.get('/dispositivos', { params: { evento_id: eventoId } });
-            const catracas = (resp.data.data || []).filter(d => d.tipo === 'catraca');
-            setDispositivos(catracas.map(d => ({
-                id: d.id,
-                nome: d.nome,
-                tipo: 'catraca',
-                ip: d.ip_address,
-                porta: d.porta || 80,
-                user: d.user_device || 'admin',
-                pass: '', // a API não devolve a senha; vazio mantém a atual
-                marca: d.marca || 'intelbras'
-            })));
-        } catch (err) {
-            enqueueSnackbar('Erro ao buscar catracas.', { variant: 'error' });
-        } finally {
-            setLoadingDevices(false);
-        }
-    }, [eventoId, enqueueSnackbar]);
-
     useEffect(() => {
         fetchCameras();
         fetchAreas();
-        fetchDevices();
-    }, [fetchCameras, fetchAreas, fetchDevices]);
+    }, [fetchCameras, fetchAreas]);
 
     // Abrir Modal de Câmera
     const handleOpenModal = (camera = null) => {
@@ -306,42 +278,12 @@ const ConfigCameras = () => {
         }
     };
 
-    // Salvar Catracas
-    const handleSaveDevices = async () => {
-        try {
-            setSavingDevices(true);
-            for (const d of dispositivos) {
-                const payload = {
-                    evento_id: eventoId,
-                    nome: d.nome,
-                    tipo: 'catraca',
-                    marca: d.marca || 'intelbras',
-                    ip_address: d.ip,
-                    porta: parseInt(d.porta, 10),
-                    user_device: d.user,
-                    password_device: d.pass
-                };
-                if (d.isNew) {
-                    await api.post('/dispositivos', payload);
-                } else {
-                    await api.put(`/dispositivos/${d.id}`, payload);
-                }
-            }
-            enqueueSnackbar('Catracas e controladoras salvas com sucesso!', { variant: 'success' });
-            fetchDevices();
-        } catch (err) {
-            enqueueSnackbar('Erro ao salvar catracas.', { variant: 'error' });
-        } finally {
-            setSavingDevices(false);
-        }
-    };
-
     return (
         <Box sx={{ p: { xs: 2, md: 4 } }}>
             <PageHeader
-                title="Câmeras"
-                subtitle="Câmeras IP usadas no monitor de CFTV e no reconhecimento por IA."
-                breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Câmeras IP' }]}
+                title="Câmeras e IA facial"
+                subtitle="Cadastre as câmeras IP e ajuste o motor de reconhecimento facial."
+                breadcrumbs={[{ text: 'Configurações' }, { text: 'Equipamentos' }, { text: 'Câmeras e IA facial' }]}
             />
 
             {/* BARRA SUPERIOR DE AÇÕES & ABAS */}
@@ -358,7 +300,7 @@ const ConfigCameras = () => {
                         }}
                     >
                         <Tab icon={<CameraIcon sx={{ mr: 1 }} />} iconPosition="start" label={`Câmeras IP (${cameras.length})`} />
-                        <Tab icon={<DoorIcon sx={{ mr: 1 }} />} iconPosition="start" label={`Catracas e controladoras (${dispositivos.length})`} />
+                        <Tab icon={<IaIcon sx={{ mr: 1 }} />} iconPosition="start" label="Motor de IA facial" />
                     </Tabs>
 
                     <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
@@ -558,116 +500,8 @@ const ConfigCameras = () => {
                 </Box>
             )}
 
-            {/* ABA 1: CATRACAS & HARDWARE EDGE */}
-            {activeTab === 1 && (
-                <Grid container spacing={3}>
-                    <Grid item xs={12} md={8}>
-                        <GlassCard sx={{ p: 3 }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                                <Typography variant="h6" fontWeight={700}>
-                                    Catracas e controladoras de acesso
-                                </Typography>
-                                <Button
-                                    variant="outlined"
-                                    size="small"
-                                    startIcon={<AddIcon />}
-                                    onClick={() => setDispositivos([...dispositivos, {
-                                        id: Date.now().toString(),
-                                        isNew: true,
-                                        nome: 'Nova catraca',
-                                        tipo: 'catraca',
-                                        marca: 'intelbras',
-                                        ip: '192.168.1.150',
-                                        porta: 80,
-                                        user: 'admin',
-                                        pass: ''
-                                    }])}
-                                    sx={{ borderColor: '#FF3366', color: '#FF3366', fontWeight: 700 }}
-                                >
-                                    Nova catraca
-                                </Button>
-                            </Box>
-
-                            {loadingDevices ? (
-                                <CircularProgress />
-                            ) : dispositivos.length === 0 ? (
-                                <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-                                    Nenhuma catraca cadastrada.
-                                </Typography>
-                            ) : (
-                                <Stack spacing={2}>
-                                    {dispositivos.map((d, idx) => (
-                                        <GlassCard key={d.id} sx={{ p: 2, borderLeft: '4px solid #FF3366' }}>
-                                            <Grid container spacing={2} alignItems="center">
-                                                <Grid item xs={12} sm={4}>
-                                                    <TextField
-                                                        label="Identificação" size="small" fullWidth
-                                                        value={d.nome}
-                                                        onChange={(e) => {
-                                                            const val = e.target.value;
-                                                            setDispositivos(prev => prev.map((item, i) => i === idx ? { ...item, nome: val } : item));
-                                                        }}
-                                                    />
-                                                </Grid>
-                                                <Grid item xs={6} sm={3}>
-                                                    <TextField
-                                                        label="IP da Catraca" size="small" fullWidth
-                                                        value={d.ip}
-                                                        onChange={(e) => {
-                                                            const val = e.target.value;
-                                                            setDispositivos(prev => prev.map((item, i) => i === idx ? { ...item, ip: val } : item));
-                                                        }}
-                                                    />
-                                                </Grid>
-                                                <Grid item xs={4} sm={2}>
-                                                    <TextField
-                                                        label="Porta" size="small" fullWidth
-                                                        value={d.porta}
-                                                        onChange={(e) => {
-                                                            const val = e.target.value;
-                                                            setDispositivos(prev => prev.map((item, i) => i === idx ? { ...item, porta: val } : item));
-                                                        }}
-                                                    />
-                                                </Grid>
-                                                <Grid item xs={2} sm={3} sx={{ textAlign: 'right' }}>
-                                                    <IconButton
-                                                        color="error" size="small"
-                                                        onClick={() => setDispositivos(prev => prev.filter((_, i) => i !== idx))}
-                                                    >
-                                                        <DeleteIcon />
-                                                    </IconButton>
-                                                </Grid>
-                                            </Grid>
-                                        </GlassCard>
-                                    ))}
-                                </Stack>
-                            )}
-
-                            {dispositivos.length > 0 && (
-                                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-                                    <NeonButton startIcon={<SaveIcon />} loading={savingDevices} onClick={handleSaveDevices}>
-                                        Salvar catracas
-                                    </NeonButton>
-                                </Box>
-                            )}
-                        </GlassCard>
-                    </Grid>
-
-                    <Grid item xs={12} md={4}>
-                        <GlassCard sx={{ p: 3, borderLeft: '3px solid #00D4FF' }}>
-                            <Typography variant="subtitle1" fontWeight={700} color="#00D4FF" gutterBottom>
-                                Sincronização em tempo real
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" paragraph>
-                                As câmeras IP configuradas nesta tela tornam-se imediatamente elegíveis para serem ativadas no mosaico do Monitor e no Video Wall.
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                O microserviço Python de Visão Computacional utiliza o stream RTSP dessas câmeras para rastrear rostos e comparar com a Watchlist a cada ciclo de vigilância.
-                            </Typography>
-                        </GlassCard>
-                    </Grid>
-                </Grid>
-            )}
+            {/* ABA 1: MOTOR DE IA (as catracas são cadastradas em Leitores e dispositivos) */}
+            {activeTab === 1 && <ConfigIAFacial embutido />}
 
             {/* MODAL DE CADASTRO / EDIÇÃO DE CÂMERA */}
             <Dialog

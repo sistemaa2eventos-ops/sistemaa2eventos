@@ -3,6 +3,7 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import Box from '@mui/material/Box';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import theme from './styles/theme';
 import GlobalErrorBoundary from './components/common/GlobalErrorBoundary';
@@ -40,10 +41,9 @@ const Usuarios = lazy(() => import('./pages/Usuarios'));
 const AuditLogs = lazy(() => import('./pages/AuditLogs'));
 const Configuracoes = lazy(() => import('./pages/Configuracoes'));
 const ConfigEtiquetas = lazy(() => import('./pages/config/ConfigEtiquetas'));
-const ConfigLeitorFacial = lazy(() => import('./pages/config/ConfigLeitorFacial'));
+const ConfigDocumentos = lazy(() => import('./pages/config/ConfigDocumentos'));
 
 const ConfigCameras = lazy(() => import('./pages/config/ConfigCameras'));
-const ConfigIAFacial = lazy(() => import('./pages/config/ConfigIAFacial'));
 const ConfigBancoDados = lazy(() => import('./pages/config/ConfigBancoDados'));
 const ConfigGeral = lazy(() => import('./pages/config/ConfigGeral'));
 const ConfigIdiomas = lazy(() => import('./pages/config/ConfigIdiomas'));
@@ -59,7 +59,6 @@ const ConfigWebhooks = lazy(() => import('./pages/config/ConfigWebhooks'));
 const ConfigGamificacao = lazy(() => import('./pages/config/ConfigGamificacao'));
 const ConfigAreas = lazy(() => import('./pages/config/ConfigAreas'));
 const ConfigPulseiras = lazy(() => import('./pages/config/ConfigPulseiras'));
-const ConfigTerminais = lazy(() => import('./pages/config/ConfigTerminais'));
 const PermissoesAcesso = lazy(() => import('./pages/config/PermissoesAcesso'));
 const ConfigCron = lazy(() => import('./pages/config/ConfigCron'));
 const DispositivosPage = lazy(() => import('./pages/config/DispositivosPage'));
@@ -171,19 +170,21 @@ const AppContent = () => {
           <Route path="/audit-logs" element={<ProtectedRoute role="admin_master"><AuditLogs /></ProtectedRoute>} />
           <Route path="/configuracoes" element={<ProtectedRoute role="admin_master"><Configuracoes /></ProtectedRoute>} />
           <Route path="/config/geral" element={<ProtectedRoute role="admin_master"><ConfigGeral /></ProtectedRoute>} />
-          <Route path="/config/leitor-facial" element={<ProtectedRoute role="admin_master"><ConfigLeitorFacial /></ProtectedRoute>} />
+          {/* Tela antiga do leitor facial: os mesmos leitores ficam em Leitores e dispositivos */}
+          <Route path="/config/leitor-facial" element={<Navigate to="/config/dispositivos" replace />} />
+          <Route path="/config/documentos" element={<ProtectedRoute role="admin_master"><Box sx={{ p: { xs: 2, md: 4 } }}><ConfigDocumentos /></Box></ProtectedRoute>} />
           <Route path="/config/idiomas" element={<ProtectedRoute role="admin_master"><ConfigIdiomas /></ProtectedRoute>} />
           <Route path="/config/notificacoes" element={<ProtectedRoute role="admin_master"><ConfigNotificacoes /></ProtectedRoute>} />
           <Route path="/config/integracoes" element={<ProtectedRoute role="admin_master"><ConfigIntegracoes /></ProtectedRoute>} />
           <Route path="/config/etiquetas" element={<ProtectedRoute role="admin_master"><ConfigEtiquetas /></ProtectedRoute>} />
           <Route path="/config/dispositivos" element={<ProtectedRoute role="admin_master"><DispositivosPage /></ProtectedRoute>} />
           <Route path="/config/cameras" element={<ProtectedRoute role="admin_master"><ConfigCameras /></ProtectedRoute>} />
-          <Route path="/config/ia-facial" element={<ProtectedRoute role="admin_master"><ConfigIAFacial /></ProtectedRoute>} />
+          <Route path="/config/ia-facial" element={<ProtectedRoute role="admin_master"><ConfigCameras abaInicial="ia" /></ProtectedRoute>} />
           <Route path="/config/banco-dados" element={<ProtectedRoute role="admin_master"><ConfigBancoDados /></ProtectedRoute>} />
           <Route path="/config/credenciamento" element={<ProtectedRoute role="admin_master"><ConfigCredenciamento /></ProtectedRoute>} />
           <Route path="/config/areas" element={<ProtectedRoute role="admin_master"><ConfigAreas /></ProtectedRoute>} />
           <Route path="/config/pulseiras" element={<ProtectedRoute role="admin_master"><ConfigPulseiras /></ProtectedRoute>} />
-          <Route path="/config/terminais" element={<ProtectedRoute role="admin_master"><ConfigTerminais /></ProtectedRoute>} />
+          <Route path="/config/terminais" element={<Navigate to="/config/dispositivos" replace />} />
           <Route path="/config/checkin" element={<ProtectedRoute role="admin_master"><ConfigCheckin /></ProtectedRoute>} />
           <Route path="/config/veiculos" element={<ProtectedRoute role="admin_master"><ConfigVeiculos /></ProtectedRoute>} />
           <Route path="/config/seguranca" element={<ProtectedRoute role="admin_master"><ConfigSeguranca /></ProtectedRoute>} />

@@ -38,7 +38,8 @@ const Campo = ({ titulo, ajuda, children }) => (
     </Box>
 );
 
-const ConfigIAFacial = () => {
+// embutido: aparece como aba de Câmeras (sem cabeçalho e margem próprios)
+const ConfigIAFacial = ({ embutido = false }) => {
     const { enqueueSnackbar } = useSnackbar();
     const [cfg, setCfg] = useState(null);
     const [saving, setSaving] = useState(false);
@@ -125,12 +126,14 @@ const ConfigIAFacial = () => {
     if (semVideo.length) avisos.push({ sev: 'warning', txt: `Sem vídeo: ${semVideo.map(c => c.nome || c.camera).join(', ')}.` });
 
     return (
-        <Box sx={{ p: { xs: 2, md: 4 } }}>
-            <PageHeader
-                title="IA facial e câmeras"
-                subtitle="Equilíbrio entre precisão do reconhecimento, fluidez do vídeo e peso no computador do evento."
-                breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'IA facial e câmeras' }]}
-            />
+        <Box sx={embutido ? undefined : { p: { xs: 2, md: 4 } }}>
+            {!embutido && (
+                <PageHeader
+                    title="IA facial e câmeras"
+                    subtitle="Equilíbrio entre precisão do reconhecimento, fluidez do vídeo e peso no computador do evento."
+                    breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'IA facial e câmeras' }]}
+                />
+            )}
 
             {avisos.map((a, i) => <Alert key={i} severity={a.sev} sx={{ mt: 2 }}>{a.txt}</Alert>)}
 

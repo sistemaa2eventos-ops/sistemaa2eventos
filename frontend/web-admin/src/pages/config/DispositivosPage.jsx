@@ -25,6 +25,7 @@ import NeonButton from '../../components/common/NeonButton';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import api from '../../services/api';
 import AgentesLocais from '../../components/dispositivos/AgentesLocais';
+import ConfiancaFacial from '../../components/dispositivos/ConfiancaFacial';
 
 import { botaoSecundario } from '../../styles/tokens';
 // ── Paleta padronizada do sistema
@@ -479,6 +480,7 @@ export default function DispositivosPage() {
       />
 
       <AgentesLocais agentes={agentes} onChange={() => carregarDados()} />
+      <ConfiancaFacial />
 
       {/* ── Barra de ações */}
       <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>

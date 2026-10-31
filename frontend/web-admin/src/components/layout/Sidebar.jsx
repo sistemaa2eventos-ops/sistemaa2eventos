@@ -38,7 +38,6 @@ import {
     Storage as StorageIcon,
     Palette as PaletteIcon,
 
-    NotificationsActive as NotifIcon,
     CameraAlt as CameraIcon,
     Label as LabelIcon,
     VerifiedUser as VerifiedIcon,
@@ -48,7 +47,7 @@ import {
     ViewModule as CredIcon,
     FactCheck as CheckConfigIcon,
     Description as LogsIcon,
-    Chat as ChatIcon,
+    Article as DocsIcon,
     Place as AreaIcon,
     QrCode2 as PulseiraIcon,
     Face as FaceIcon,
@@ -314,36 +313,28 @@ const Sidebar = ({ open, onClose }) => {
             path: '/configuracoes',
             roles: ['admin_master'],
             children: [
-                // --- GRUPO 1: CONFIGURAÇÕES DO EVENTO ---
-                { text: 'Geral', path: '/config/geral', icon: <TuneIcon sx={{ fontSize: 16 }} /> },
-                {
-                    text: 'Leitor facial',
-                    icon: <FaceIcon sx={{ fontSize: 16 }} />,
-                    get path() {
-                        const eventoId = localStorage.getItem('active_evento_id');
-                        return eventoId ? `/config/leitor-facial?evento_id=${eventoId}` : '/config/leitor-facial';
-                    }
-                },
+                // Um caminho só para cada tela; os títulos agrupam (a central /configuracoes é só um índice)
+                { grupo: 'Evento' },
                 { text: 'Eventos', path: '/eventos', icon: <EventIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Credenciamento', path: '/config/credenciamento', icon: <CredIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Regras de acesso', path: '/config/checkin', icon: <CheckConfigIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Áreas', path: '/config/areas', icon: <AreaIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Regras de acesso', path: '/config/checkin', icon: <CheckConfigIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Credenciamento', path: '/config/credenciamento', icon: <CredIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Documentos', path: '/config/documentos', icon: <DocsIcon sx={{ fontSize: 16 }} /> },
+                { grupo: 'Credenciais físicas' },
                 { text: 'Pulseiras', path: '/config/pulseiras', icon: <PulseiraIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Leitores e dispositivos', path: '/config/dispositivos', icon: <FaceIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Etiquetas e crachás', path: '/config/etiquetas', icon: <LabelIcon sx={{ fontSize: 16 }} /> },
+                { grupo: 'Equipamentos' },
+                { text: 'Leitores e dispositivos', path: '/config/dispositivos', icon: <FaceIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Câmeras e IA facial', path: '/config/cameras', icon: <CameraIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Veículos', path: '/config/veiculos', icon: <CarIcon sx={{ fontSize: 16 }} /> },
-                { divider: true },
-                // --- GRUPO 2: SEGURANÇA & USUÁRIOS ---
-                { text: 'Perfis de acesso', path: '/config/permissoes', icon: <VerifiedIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Segurança', path: '/config/seguranca', icon: <SecurityIcon sx={{ fontSize: 16 }} /> },
-                { divider: true },
-                // --- GRUPO 3: INTEGRAÇÕES & AUTOMAÇÃO ---
+                { grupo: 'Comunicação' },
                 { text: 'Comunicação & Integrações', path: '/config/comunicacao', icon: <ExtensionIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Webhooks e chaves de API', path: '/config/webhooks', icon: <WebhookIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Câmeras', path: '/config/cameras', icon: <CameraIcon sx={{ fontSize: 16 }} /> },
+                { grupo: 'Sistema' },
+                { text: 'Geral', path: '/config/geral', icon: <TuneIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Perfis de acesso', path: '/config/permissoes', icon: <VerifiedIcon sx={{ fontSize: 16 }} /> },
+                { text: 'Segurança', path: '/config/seguranca', icon: <SecurityIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Rotinas automáticas', path: '/config/cron', icon: <CronIcon sx={{ fontSize: 16 }} /> },
-                { divider: true },
-                // --- GRUPO 4: SISTEMA ---
                 { text: 'Idiomas', path: '/config/idiomas', icon: <PaletteIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Banco de dados', path: '/config/banco-dados', icon: <StorageIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Gamificação', path: '/config/gamificacao', icon: <TrophyIcon sx={{ fontSize: 16 }} /> },
@@ -430,6 +421,14 @@ const Sidebar = ({ open, onClose }) => {
                             {item.children.map((child, idx) => {
                                 if (child.divider) {
                                     return <Divider key={`sub-div-${idx}`} sx={{ my: 0.5, mx: 5, borderColor: 'rgba(0, 212, 255, 0.08)' }} />;
+                                }
+                                if (child.grupo) {
+                                    return (
+                                        <Typography key={`grupo-${child.grupo}`} variant="overline"
+                                            sx={{ display: 'block', pl: 6.5, pt: idx === 0 ? 0.5 : 1.25, pb: 0.25, lineHeight: 1.6, fontSize: '0.65rem', fontWeight: 700, letterSpacing: 1, color: 'rgba(148, 163, 184, 0.7)' }}>
+                                            {child.grupo}
+                                        </Typography>
+                                    );
                                 }
                                 return (
                                     <NavItem

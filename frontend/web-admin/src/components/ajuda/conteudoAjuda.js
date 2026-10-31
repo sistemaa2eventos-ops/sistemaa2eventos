@@ -28,6 +28,7 @@ const AJUDAS = {
             'Clique em "Gerenciar" para tornar o evento ativo.',
             'Configurações → Áreas: crie as áreas (com capacidade).',
             'Configurações → Pulseiras: crie os lotes e as zonas liberadas.',
+            'Configurações → Credenciamento: escolha os campos do formulário de pré-cadastro.',
             'Configurações → Documentos: marque os documentos de "Todos (padrão)" (ex.: RG/CNH frente e verso) e os extras de cada função.',
             'Leitores e dispositivos: cadastre os leitores, ligue ao agente local, "Config online" e "Sync".',
             'Empresas: cadastre as empresas e envie o convite de pré-cadastro.'
@@ -191,8 +192,22 @@ const AJUDAS = {
     // ---------- Configurações ----------
     '/configuracoes': {
         titulo: 'Configurações',
-        objetivo: 'Reúne todas as configurações em abas. Cada aba tem a própria ajuda quando aberta pelo menu.',
-        dicas: ['Ordem sugerida para um evento novo: Áreas → Pulseiras → Documentos → Leitores e dispositivos → Etiquetas → Comunicação.']
+        objetivo: 'Índice de tudo o que se configura, nos mesmos grupos do menu lateral: Evento, Credenciais físicas, Equipamentos, Comunicação e Sistema.',
+        dicas: ['Ordem para um evento novo: Eventos → Áreas → Regras de acesso → Credenciamento → Documentos → Pulseiras → Etiquetas → Leitores e dispositivos → Câmeras e IA facial.']
+    },
+    '/config/documentos': {
+        titulo: 'Documentos obrigatórios',
+        objetivo: 'Quais documentos cada função precisa ter aprovados e dentro da validade. Vale para quem se cadastra pelo link; cadastro feito pelo operador não exige documento.',
+        passos: [
+            'Em "Tipos de documento", confira ou crie os tipos (marque "validade" quando o documento vence, como ASO e NRs).',
+            'Na linha "Todos (padrão)", marque o mínimo para todos — ex.: RG/CNH frente e verso. Sem eles, o pré-cadastro não é enviado.',
+            'Adicione cada função (ex.: ELETRICISTA) e marque os documentos extras dela.',
+            '"Salvar configuração": a situação de todos é recalculada.'
+        ],
+        atencao: [
+            'Os documentos da função são pedidos no link, mas a pessoa pode enviar depois: ela fica pendente na Auditoria até completar.',
+            'Tipo já salvo não pode ser apagado, só desativado.'
+        ]
     },
     '/config/geral': {
         titulo: 'Configurações gerais',
@@ -202,9 +217,17 @@ const AJUDAS = {
     },
     '/config/credenciamento': {
         titulo: 'Credenciamento',
-        objetivo: 'Campos do cadastro por tipo (Participante, Expositor, Staff), aprovação automática e texto da LGPD.',
-        passos: ['Em cada aba, marque "Habilitado" e "Obrigatório" por campo.', 'Defina a "Auto-aprovação" e o texto de consentimento.', 'Clique em "Salvar matriz de campos" (grava tudo, das três abas).'],
-        atencao: ['Com a auto-aprovação desligada, quem se cadastra fica "Pendente" até alguém aprovar.']
+        objetivo: 'Define o que a pessoa preenche no link de pré-cadastro enviado para cada empresa do evento ativo.',
+        passos: [
+            'Ligue os campos que devem aparecer (e ser obrigatórios): e-mail, data de nascimento, nome da mãe, função, foto do rosto, dias de trabalho.',
+            'Clique em "Salvar formulário" — vale na hora, inclusive para os links já enviados.',
+            'Configure os documentos pedidos em Documentos e envie o link em Empresas → "Gerar convite de cadastro".'
+        ],
+        atencao: [
+            'Nome completo e CPF são sempre obrigatórios.',
+            'Desligar a "Foto do rosto" impede o reconhecimento facial nos leitores para quem se cadastrar pelo link.',
+            'Quem se cadastra pelo link fica pendente até um administrador aprovar.'
+        ]
     },
     '/config/checkin': {
         titulo: 'Regras de acesso',
@@ -236,7 +259,8 @@ const AJUDAS = {
             'Em "Agentes locais", clique "Novo agente" e instale o agente num computador da rede do evento (o token aparece uma única vez). Ele precisa ficar ligado.',
             '"Novo dispositivo": nome, IP, usuário e senha do leitor, "Modo de operação", "Área / local" e, em "Conexão com o leitor", escolha "Via agente local".',
             'No card do leitor: "Config online" com os campos em branco (aponta o leitor para o servidor).',
-            'Clique "Sync" para enviar os rostos. Em até 1 minuto o leitor aparece online.'
+            'Clique "Sync" para enviar os rostos. Em até 1 minuto o leitor aparece online.',
+            'Ajuste a "Confiança mínima do rosto" (recomendado 75%): passagem facial abaixo disso é negada.'
         ],
         atencao: [
             '"Fail Open" libera a passagem se o sistema cair; "Fail Closed" nega. Para segurança, prefira Fail Closed com internet de reserva.',
@@ -246,12 +270,7 @@ const AJUDAS = {
         ],
         dicas: ['A "Fila de Sincronização" mostra os rostos que falharam; use "Reenviar".']
     },
-    '/config/leitor-facial': {
-        titulo: 'Leitor facial',
-        objetivo: 'Terminais faciais e parâmetros biométricos (limiar de reconhecimento e anti-fake).',
-        passos: ['Cadastre ou edite o terminal e use "Testar conexão" e "Sincronizar faces".', 'Ajuste o "Limiar de Reconhecimento" e salve.'],
-        atencao: ['É a mesma lista de Leitores e dispositivos: o que muda aqui muda lá.', 'Remover aqui não apaga os dados do aparelho.']
-    },
+
     '/config/etiquetas': {
         titulo: 'Etiquetas e crachás',
         objetivo: 'Desenhar a etiqueta que sai na impressora do computador do operador no check-in.',
@@ -270,17 +289,20 @@ const AJUDAS = {
         passos: ['Ligue o módulo, informe o endereço do motor de leitura e a confiança mínima. Salve.']
     },
     '/config/cameras': {
-        titulo: 'Câmeras',
-        objetivo: 'Câmeras IP usadas no Monitor CFTV e na IA facial.',
-        passos: ['"Cadastrar nova câmera": nome, área, IP, porta RTSP, usuário e senha.', 'Use "Testar" e depois "Abrir no monitor CFTV".'],
-        atencao: ['"Vigilância 24 h" só funciona com a IA ligada.', 'As câmeras são acessadas pelo agente local: ele precisa estar ligado.']
+        titulo: 'Câmeras e IA facial',
+        objetivo: 'Cadastrar as câmeras IP (aba "Câmeras IP") e ajustar o motor de reconhecimento facial (aba "Motor de IA facial").',
+        passos: [
+            'Aba "Câmeras IP": "Cadastrar nova câmera" com nome, área, IP, porta RTSP, usuário e senha; use "Testar".',
+            'Aba "Motor de IA facial": confira o status, escolha o perfil (Equilibrado é o recomendado) e "Salvar e aplicar".',
+            'Abra o resultado em "Abrir no monitor CFTV".'
+        ],
+        atencao: [
+            'As câmeras e a IA rodam pelo agente local: o computador do evento precisa ficar ligado.',
+            '"Vigilância 24 h" só funciona com a IA ligada. Trocar de perfil desfaz os ajustes finos.',
+            'Catracas e leitores são cadastrados em Leitores e dispositivos.'
+        ]
     },
-    '/config/ia-facial': {
-        titulo: 'IA facial e câmeras',
-        objetivo: 'Equilibrar precisão, fluidez do vídeo e carga no computador do evento.',
-        passos: ['Confira o status do motor no topo.', 'Escolha o perfil (Equilibrado é o recomendado) e ajuste.', '"Salvar e aplicar".'],
-        atencao: ['Trocar de perfil desfaz os ajustes finos.', 'Se o motor aparecer em CPU, prefira o perfil Leve.']
-    },
+
     '/config/comunicacao': {
         titulo: 'Comunicação & Integrações',
         objetivo: 'E-mail, Telegram, WhatsApp, alertas automáticos, modelos de mensagem e a cópia dos documentos no Google Drive.',
@@ -349,7 +371,9 @@ const AJUDAS = {
 const APELIDOS = {
     '/config/integracoes': '/config/comunicacao',
     '/config/notificacoes': '/config/comunicacao',
-    '/config/terminais': '/config/dispositivos'
+    '/config/terminais': '/config/dispositivos',
+    '/config/leitor-facial': '/config/dispositivos',
+    '/config/ia-facial': '/config/cameras'
 };
 
 /** Ajuda da rota atual (com a chave usada para lembrar que já foi vista), ou null. */

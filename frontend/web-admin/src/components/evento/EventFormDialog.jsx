@@ -285,48 +285,10 @@ const EventFormDialog = ({
 
                         <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.05)' }} />
 
-                        <Typography variant="subtitle2" sx={{ color: '#00FF88', fontWeight: 700, mb: 1 }}>
-                            Campos obrigatórios do formulário
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 2 }}>
-                            Defina quais campos o participante é obrigado a preencher no credenciamento público. (Nome e CPF são sempre obrigatórios).
-                        </Typography>
-
-                        <Box sx={{ p: 2, background: 'rgba(0,0,0,0.2)', borderRadius: 1.5, border: '1px solid rgba(0,255,136,0.1)' }}>
-                            <FormGroup row sx={{ gap: 2 }}>
-                                {[
-                                    { id: 'email', label: 'E-mail' },
-                                    { id: 'data_nascimento', label: 'Data de nascimento' },
-                                    { id: 'nome_mae', label: 'Nome da mãe' },
-                                    { id: 'funcao', label: 'Função/cargo' },
-                                    { id: 'foto', label: 'Foto (selfie)' },
-                                    { id: 'dias_trabalho', label: 'Dias de trabalho' }
-                                ].map(field => (
-                                    <FormControlLabel
-                                        key={field.id}
-                                        control={
-                                            <Switch
-                                                size="small"
-                                                color="primary"
-                                                checked={formData.campos_obrigatorios?.[field.id] !== false} // default true se undefined
-                                                onChange={(e) => {
-                                                    const currentConfig = formData.campos_obrigatorios || {};
-                                                    setFormData({
-                                                        ...formData,
-                                                        campos_obrigatorios: {
-                                                            ...currentConfig,
-                                                            [field.id]: e.target.checked
-                                                        }
-                                                    });
-                                                }}
-                                            />
-                                        }
-                                        label={<Typography variant="body2">{field.label}</Typography>}
-                                        sx={{ minWidth: '180px' }}
-                                    />
-                                ))}
-                            </FormGroup>
-                        </Box>
+                        {/* Os campos do formulário de pré-cadastro ficam em Configurações → Credenciamento (lugar único) */}
+                        <Alert severity="info" sx={{ mt: 1 }}>
+                            Os campos do formulário de pré-cadastro e os documentos pedidos ficam em <b>Configurações → Credenciamento</b> e <b>Documentos</b>.
+                        </Alert>
                     </Box>
                 ) : (
                     <Box>

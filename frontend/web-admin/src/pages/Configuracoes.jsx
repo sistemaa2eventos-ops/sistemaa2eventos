@@ -1,209 +1,101 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useEffect } from 'react';
+import { Box, Grid, Typography, CardActionArea } from '@mui/material';
 import {
-    Box,
-    Tabs,
-    Tab,
-    Paper,
-    CircularProgress,
-    Fade,
-    styled,
-    useTheme,
-    useMediaQuery
-} from '@mui/material';
-import {
-    Settings as SettingsIcon,
-    Event as EventIcon,
-    QrCodeScanner as CheckinIcon,
-    PersonAdd as CredIcon,
-    Place as AreaIcon,
-    ScreenshotMonitor as TerminalIcon,
-    NotificationsActive as AlertIcon,
-    Webhook as WebhookIcon,
-    Security as SecurityIcon,
-    Schedule as CronIcon,
-    Extension as IntegrIcon,
-    Description as DocIcon,
-    FaceRetouchingNatural as IaIcon
+    Event as EventIcon, Place as AreaIcon, FactCheck as RegrasIcon, ViewModule as CredIcon, Article as DocsIcon,
+    Watch as PulseiraIcon, Label as EtiquetaIcon, Face as LeitorIcon, Videocam as CameraIcon, DirectionsCar as CarIcon,
+    Extension as ComunicacaoIcon, Webhook as WebhookIcon, Tune as GeralIcon, VerifiedUser as PerfisIcon,
+    Security as SegurancaIcon, Schedule as CronIcon, Translate as IdiomaIcon, Storage as BancoIcon,
+    EmojiEvents as GamifIcon, Description as LogsIcon
 } from '@mui/icons-material';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/common/PageHeader';
+import GlassCard from '../components/common/GlassCard';
+import { cores } from '../styles/tokens';
 
-// Lazy loading de abas para performance
-const ConfigGeral = lazy(() => import('./config/ConfigGeral'));
-const ConfigEvento = lazy(() => import('./config/ConfigEvento')); // Nova ou adaptada
-const ConfigCheckin = lazy(() => import('./config/ConfigCheckin'));
-const ConfigCredenciamento = lazy(() => import('./config/ConfigCredenciamento'));
-const ConfigAreas = lazy(() => import('./config/ConfigAreas'));
-const ConfigLeitorFacial = lazy(() => import('./config/ConfigLeitorFacial'));
-const ConfigNotificacoes = lazy(() => import('./config/ConfigNotificacoes'));
-const ConfigWebhooks = lazy(() => import('./config/ConfigWebhooks'));
-const ConfigSeguranca = lazy(() => import('./config/ConfigSeguranca'));
-const ConfigCron = lazy(() => import('./config/ConfigCron'));
-const ConfigIntegracoes = lazy(() => import('./config/ConfigIntegracoes')); // Nova
-const ConfigDocumentos = lazy(() => import('./config/ConfigDocumentos'));
-const ConfigIAFacial = lazy(() => import('./config/ConfigIAFacial'));
-
-const StyledTabs = styled(Tabs)(({ theme }) => ({
-    borderRight: `1px solid ${theme.palette.divider}`,
-    minWidth: 200,
-    '& .MuiTabs-indicator': {
-        width: 4,
-        borderRadius: '0 4px 4px 0',
-        backgroundColor: theme.palette.primary.main,
-        boxShadow: `0 0 10px ${theme.palette.primary.main}`,
+// Mesma organização do menu lateral: um caminho só para cada tela
+const GRUPOS = [
+    {
+        titulo: 'Evento', itens: [
+            { nome: 'Eventos', texto: 'Criar, ativar e escolher o evento ativo', rota: '/eventos', icone: EventIcon },
+            { nome: 'Áreas', texto: 'Áreas de acesso e capacidade', rota: '/config/areas', icone: AreaIcon },
+            { nome: 'Regras de acesso', texto: 'Anti-passback, saída automática e lotação', rota: '/config/checkin', icone: RegrasIcon },
+            { nome: 'Credenciamento', texto: 'Campos do formulário de pré-cadastro', rota: '/config/credenciamento', icone: CredIcon },
+            { nome: 'Documentos', texto: 'Documentos obrigatórios por função', rota: '/config/documentos', icone: DocsIcon }
+        ]
     },
-}));
-
-const StyledTab = styled(Tab)(({ theme }) => ({
-    justifyContent: 'flex-start',
-    textAlign: 'left',
-    minHeight: 52,
-    fontSize: '0.875rem',
-    fontWeight: 600,
-    textTransform: 'none',
-    color: theme.palette.text.secondary,
-    borderRadius: theme.spacing(1),
-    margin: theme.spacing(0.5, 1),
-    transition: 'all 0.2s',
-    '&.Mui-selected': {
-        color: theme.palette.primary.main,
-        background: `linear-gradient(90deg, ${theme.palette.primary.main}15 0%, transparent 100%)`,
+    {
+        titulo: 'Credenciais físicas', itens: [
+            { nome: 'Pulseiras', texto: 'Lotes, cores e áreas liberadas', rota: '/config/pulseiras', icone: PulseiraIcon },
+            { nome: 'Etiquetas e crachás', texto: 'Layout e impressão no check-in', rota: '/config/etiquetas', icone: EtiquetaIcon }
+        ]
     },
-    '&:hover': {
-        background: theme.palette.action.hover,
+    {
+        titulo: 'Equipamentos', itens: [
+            { nome: 'Leitores e dispositivos', texto: 'Leitores faciais, agente local e confiança do rosto', rota: '/config/dispositivos', icone: LeitorIcon },
+            { nome: 'Câmeras e IA facial', texto: 'Câmeras IP e motor de reconhecimento', rota: '/config/cameras', icone: CameraIcon },
+            { nome: 'Veículos', texto: 'Leitura de placas', rota: '/config/veiculos', icone: CarIcon }
+        ]
     },
-}));
-
-const TabPanel = (props) => {
-    const { children, value, index, ...other } = props;
-    return (
-        <div role="tabpanel" hidden={value !== index} {...other} style={{ width: '100%' }}>
-            {value === index && (
-                <Fade in={true} timeout={400}>
-                    <Box sx={{ p: { xs: 1, md: 3 } }}>
-                        {children}
-                    </Box>
-                </Fade>
-            )}
-        </div>
-    );
-};
-
-const TAB_MAP = [
-    'geral', 'evento', 'checkin', 'credenciamento', 'areas', 
-    'terminais', 'alertas', 'webhooks', 'seguranca', 'automacao', 'integracoes', 'documentos', 'ia-facial'
+    {
+        titulo: 'Comunicação', itens: [
+            { nome: 'Comunicação & Integrações', texto: 'E-mail, Telegram, WhatsApp, alertas e Google Drive', rota: '/config/comunicacao', icone: ComunicacaoIcon },
+            { nome: 'Webhooks e chaves de API', texto: 'Integração com outros sistemas', rota: '/config/webhooks', icone: WebhookIcon }
+        ]
+    },
+    {
+        titulo: 'Sistema', itens: [
+            { nome: 'Geral', texto: 'Nome, logo e alerta de lotação', rota: '/config/geral', icone: GeralIcon },
+            { nome: 'Perfis de acesso', texto: 'Módulos padrão dos operadores', rota: '/config/permissoes', icone: PerfisIcon },
+            { nome: 'Segurança', texto: 'Duração do login e proteções', rota: '/config/seguranca', icone: SegurancaIcon },
+            { nome: 'Rotinas automáticas', texto: 'Fechamento do dia e relatório diário', rota: '/config/cron', icone: CronIcon },
+            { nome: 'Idiomas', texto: 'Idioma padrão', rota: '/config/idiomas', icone: IdiomaIcon },
+            { nome: 'Banco de dados', texto: 'Conexão e sincronização', rota: '/config/banco-dados', icone: BancoIcon },
+            { nome: 'Gamificação', texto: 'Pontos por ação', rota: '/config/gamificacao', icone: GamifIcon },
+            { nome: 'Logs do sistema', texto: 'Registros técnicos do servidor', rota: '/config/logs', icone: LogsIcon }
+        ]
+    }
 ];
 
+// Links antigos da central com abas (?aba=...) levam à tela equivalente
+const ABA_ANTIGA = {
+    geral: '/config/geral', evento: '/eventos', checkin: '/config/checkin', credenciamento: '/config/credenciamento',
+    areas: '/config/areas', terminais: '/config/dispositivos', alertas: '/config/notificacoes', webhooks: '/config/webhooks',
+    seguranca: '/config/seguranca', automacao: '/config/cron', integracoes: '/config/integracoes',
+    documentos: '/config/documentos', 'ia-facial': '/config/ia-facial'
+};
+
 const Configuracoes = () => {
-    const theme = useTheme();
-    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-    const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
+    const [params] = useSearchParams();
 
-    const currentTabId = searchParams.get('aba') || 'geral';
-    const [value, setValue] = useState(TAB_MAP.indexOf(currentTabId) !== -1 ? TAB_MAP.indexOf(currentTabId) : 0);
-
-    const handleChange = (_event, newValue) => {
-        setValue(newValue);
-        setSearchParams({ aba: TAB_MAP[newValue] });
-    };
-
-    // Sincronizar estado se a URL mudar externamente
     useEffect(() => {
-        const idx = TAB_MAP.indexOf(currentTabId);
-        if (idx !== -1 && idx !== value) {
-            setValue(idx);
-        }
-    }, [currentTabId, value]);
-
-    const tabs = [
-        { label: 'Geral', icon: <SettingsIcon /> },
-        { label: 'Evento', icon: <EventIcon /> },
-        { label: 'Check-in', icon: <CheckinIcon /> },
-        { label: 'Credenc.', icon: <CredIcon /> },
-        { label: 'Áreas', icon: <AreaIcon /> },
-        { label: 'Terminais', icon: <TerminalIcon /> },
-        { label: 'Alertas', icon: <AlertIcon /> },
-        { label: 'Webhooks', icon: <WebhookIcon /> },
-        { label: 'Segurança', icon: <SecurityIcon /> },
-        { label: 'Automação', icon: <CronIcon /> },
-        { label: 'Integr.', icon: <IntegrIcon /> },
-        { label: 'Documentos', icon: <DocIcon /> },
-        { label: 'IA facial', icon: <IaIcon /> },
-    ];
+        const destino = ABA_ANTIGA[params.get('aba')];
+        if (destino) navigate(destino, { replace: true });
+    }, [params, navigate]);
 
     return (
-        <Box sx={{ p: { xs: 2, md: 3 } }}>
-            <PageHeader 
-                title="Configurações" 
-                subtitle="Ajustes do evento, do credenciamento, dos equipamentos e da segurança." 
-            />
-
-            <Paper 
-                elevation={0}
-                sx={{ 
-                    mt: 3, 
-                    display: 'flex', 
-                    flexDirection: isMobile ? 'column' : 'row',
-                    minHeight: '70dvh',
-                    borderRadius: 1.5,
-                    overflow: 'hidden',
-                    border: `1px solid ${theme.palette.divider}`,
-                    background: theme.palette.background.paper,
-                }}
-            >
-                <Box sx={{ 
-                    width: isMobile ? '100%' : 240, 
-                    bgcolor: 'background.default',
-                    borderRight: isMobile ? 0 : `1px solid ${theme.palette.divider}`,
-                    borderBottom: isMobile ? `1px solid ${theme.palette.divider}` : 0,
-                    pt: 2
-                }}>
-                    <StyledTabs
-                        orientation={isMobile ? "horizontal" : "vertical"}
-                        variant="scrollable"
-                        value={value}
-                        onChange={handleChange}
-                        scrollButtons="auto"
-                        sx={{ 
-                            borderRight: isMobile ? 0 : 1,
-                            '& .MuiTabs-flexContainer': {
-                                gap: 0.5
-                            }
-                        }}
-                    >
-                        {tabs.map((tab, idx) => (
-                            <StyledTab 
-                                key={idx}
-                                icon={tab.icon} 
-                                iconPosition="start" 
-                                label={tab.label} 
-                            />
+        <Box sx={{ p: { xs: 2, md: 4 } }}>
+            <PageHeader title="Configurações" subtitle="Tudo o que se configura no sistema, nos mesmos grupos do menu lateral." />
+            {GRUPOS.map(g => (
+                <Box key={g.titulo} component="section" aria-labelledby={`grupo-${g.titulo}`} sx={{ mt: 3 }}>
+                    <Typography id={`grupo-${g.titulo}`} variant="overline" sx={{ color: cores.textoSecundario, fontWeight: 700, letterSpacing: 1 }}>{g.titulo}</Typography>
+                    <Grid container spacing={2} sx={{ mt: 0 }}>
+                        {g.itens.map(({ nome, texto, rota, icone: Icone }) => (
+                            <Grid item xs={12} sm={6} lg={4} key={rota}>
+                                <GlassCard sx={{ p: 0, height: '100%' }}>
+                                    <CardActionArea onClick={() => navigate(rota)} sx={{ p: 2, height: '100%', display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-start', gap: 1.5 }}>
+                                        <Icone sx={{ color: cores.primaria, mt: 0.25 }} aria-hidden="true" />
+                                        <Box>
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: cores.textoForte }}>{nome}</Typography>
+                                            <Typography variant="body2" sx={{ color: cores.textoSecundario }}>{texto}</Typography>
+                                        </Box>
+                                    </CardActionArea>
+                                </GlassCard>
+                            </Grid>
                         ))}
-                    </StyledTabs>
+                    </Grid>
                 </Box>
-
-                <Box sx={{ flex: 1, overflowY: 'auto', bgcolor: theme.palette.background.paper }}>
-                    <Suspense fallback={
-                        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                            <CircularProgress size={40} thickness={4} />
-                        </Box>
-                    }>
-                        <TabPanel value={value} index={0}><ConfigGeral /></TabPanel>
-                        <TabPanel value={value} index={1}><ConfigEvento /></TabPanel>
-                        <TabPanel value={value} index={2}><ConfigCheckin /></TabPanel>
-                        <TabPanel value={value} index={3}><ConfigCredenciamento /></TabPanel>
-                        <TabPanel value={value} index={4}><ConfigAreas /></TabPanel>
-                        <TabPanel value={value} index={5}><ConfigLeitorFacial /></TabPanel>
-                        <TabPanel value={value} index={6}><ConfigNotificacoes /></TabPanel>
-                        <TabPanel value={value} index={7}><ConfigWebhooks /></TabPanel>
-                        <TabPanel value={value} index={8}><ConfigSeguranca /></TabPanel>
-                        <TabPanel value={value} index={9}><ConfigCron /></TabPanel>
-                        <TabPanel value={value} index={10}><ConfigIntegracoes /></TabPanel>
-                        <TabPanel value={value} index={11}><ConfigDocumentos /></TabPanel>
-                        <TabPanel value={value} index={12}><ConfigIAFacial /></TabPanel>
-                    </Suspense>
-                </Box>
-            </Paper>
+            ))}
         </Box>
     );
 };
