@@ -6,6 +6,9 @@
 
 let consultasLogs = 0;
 let ultimoLog = null;
+let mockHorarioReset = '00:00:00';
+// "HH:MM" local de agora menos ms (o reset do evento relativo à hora em que o teste roda)
+const horaLocal = (msAtras) => new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(Date.now() - msAtras));
 
 const builder = (tabela) => {
     const b = {
@@ -23,7 +26,7 @@ const builder = (tabela) => {
 
 jest.mock('../src/config/supabase', () => ({ supabase: { from: (t) => builder(t) } }));
 jest.mock('../src/middleware/eventMiddleware', () => ({
-    buscarEvento: jest.fn(async () => ({ evento: { id: 'e1', min_face_score: 70 } }))
+    buscarEvento: jest.fn(async () => ({ evento: { id: 'e1', min_face_score: 70, horario_reset: mockHorarioReset } }))
 }));
 jest.mock('../src/services/logger', () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }));
 
@@ -32,6 +35,7 @@ const ValidationService = require('../src/modules/checkin/services/validation.se
 beforeEach(() => {
     consultasLogs = 0;
     ultimoLog = null;
+    mockHorarioReset = horaLocal(2 * 60 * 60 * 1000); // dia de operação começou há 2 h
 });
 
 describe('último log reaproveitado', () => {
@@ -42,6 +46,16 @@ describe('último log reaproveitado', () => {
         expect(tipo).toBe('checkout');
         await ValidationService.validateAntiPassback('e1', 'p1', tipo, 'facial', 15, 'a1', new Date(), ctx.ultimoLog);
         expect(consultasLogs).toBe(1);
+    });
+
+    it('o dia vira no horário de reset do evento, não à meia-noite', async () => {
+        // entrou há 1 h; o reset do evento foi há 30 min (o fechamento de turno já encerrou)
+        ultimoLog = { tipo: 'checkin', created_at: new Date(Date.now() - 60 * 60 * 1000).toISOString() };
+        mockHorarioReset = horaLocal(30 * 60 * 1000);
+        expect(await ValidationService.determineSmartAccessType('p1', 'e1', null, 'a1', {})).toBe('checkin');
+        // reset há 2 h (ex.: 06:00 com o turno das 22h às 2h): a passagem seguinte é saída, mesmo depois da meia-noite
+        mockHorarioReset = horaLocal(2 * 60 * 60 * 1000);
+        expect(await ValidationService.determineSmartAccessType('p1', 'e1', null, 'a1', {})).toBe('checkout');
     });
 
     it('sem log anterior, o "nenhum log" também é reaproveitado (não consulta de novo)', async () => {

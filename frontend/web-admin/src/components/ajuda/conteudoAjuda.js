@@ -175,8 +175,8 @@ const AJUDAS = {
         dicas: ['O modelo de módulos para operadores novos fica em Configurações → Perfis de acesso.']
     },
     '/audit-logs': {
-        titulo: 'Logs de auditoria',
-        objetivo: 'Histórico de quem fez o quê no painel (cadastros, aprovações, bloqueios, configurações). Somente leitura.',
+        titulo: 'Auditoria e logs — ações dos usuários',
+        objetivo: 'Histórico de quem fez o quê no painel (cadastros, aprovações, bloqueios, configurações). Somente leitura. A aba "Logs técnicos" mostra os registros do servidor.',
         passos: ['Filtre por módulo e período e clique em "Atualizar logs".', 'Passe o mouse em "Detalhes" para ver o que mudou.']
     },
     '/cftv': {
@@ -360,11 +360,11 @@ const AJUDAS = {
         passos: ['Ligue "Computar pontuação por ações isoladas", ajuste os pontos e salve.']
     },
     '/config/logs': {
-        titulo: 'Logs do sistema',
-        objetivo: 'Registros técnicos do servidor, para investigar erros.',
+        titulo: 'Auditoria e logs — logs técnicos',
+        objetivo: 'Registros técnicos do servidor, para investigar erros. As ações dos usuários ficam na aba "Ações dos usuários".',
         passos: ['Escolha o nível e o período e clique "Filtrar".'],
         atencao: ['"Limpar logs" apaga os registros e não pode ser desfeito.']
-    }
+    },
 };
 
 // Rotas antigas que abrem outra tela

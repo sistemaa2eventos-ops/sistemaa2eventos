@@ -46,12 +46,10 @@ import {
 
     ViewModule as CredIcon,
     FactCheck as CheckConfigIcon,
-    Description as LogsIcon,
     Article as DocsIcon,
     Place as AreaIcon,
     QrCode2 as PulseiraIcon,
     Face as FaceIcon,
-    EmojiEvents as TrophyIcon,
     SwapHoriz as SwapHorizIcon
 } from '@mui/icons-material';
 import { Collapse } from '@mui/material';
@@ -299,7 +297,7 @@ const Sidebar = ({ open, onClose }) => {
 
         { divider: true },
         { 
-            text: 'Logs de auditoria',
+            text: 'Auditoria e logs',
             icon: <HistoryIcon />, 
             menuKey: 'auditoria_sistema', 
             path: '/audit-logs', 
@@ -337,8 +335,6 @@ const Sidebar = ({ open, onClose }) => {
                 { text: 'Rotinas automáticas', path: '/config/cron', icon: <CronIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Idiomas', path: '/config/idiomas', icon: <PaletteIcon sx={{ fontSize: 16 }} /> },
                 { text: 'Banco de dados', path: '/config/banco-dados', icon: <StorageIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Gamificação', path: '/config/gamificacao', icon: <TrophyIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Logs do sistema', path: '/config/logs', icon: <LogsIcon sx={{ fontSize: 16 }} /> },
 
             ]
         },

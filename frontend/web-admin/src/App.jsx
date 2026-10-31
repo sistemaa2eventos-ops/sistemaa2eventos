@@ -38,7 +38,7 @@ const Eventos = lazy(() => import('./pages/Eventos'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Veiculos = lazy(() => import('./pages/Veiculos'));
 const Usuarios = lazy(() => import('./pages/Usuarios'));
-const AuditLogs = lazy(() => import('./pages/AuditLogs'));
+const AuditoriaELogs = lazy(() => import('./pages/AuditoriaELogs'));
 const Configuracoes = lazy(() => import('./pages/Configuracoes'));
 const ConfigEtiquetas = lazy(() => import('./pages/config/ConfigEtiquetas'));
 const ConfigDocumentos = lazy(() => import('./pages/config/ConfigDocumentos'));
@@ -53,7 +53,6 @@ const ConfigCredenciamento = lazy(() => import('./pages/config/ConfigCredenciame
 const ConfigCheckin = lazy(() => import('./pages/config/ConfigCheckin'));
 const ConfigVeiculos = lazy(() => import('./pages/config/ConfigVeiculos'));
 const ConfigSeguranca = lazy(() => import('./pages/config/ConfigSeguranca'));
-const ConfigLogs = lazy(() => import('./pages/config/ConfigLogs'));
 const ConfigComunicacao = lazy(() => import('./pages/config/ConfigComunicacao'));
 const ConfigWebhooks = lazy(() => import('./pages/config/ConfigWebhooks'));
 const ConfigGamificacao = lazy(() => import('./pages/config/ConfigGamificacao'));
@@ -167,7 +166,7 @@ const AppContent = () => {
           <Route path="/fiscalizacao" element={<ProtectedRoute modulo="fiscalizacao"><Fiscalizacao /></ProtectedRoute>} />
           <Route path="/monitor" element={<ProtectedRoute modulo="monitoramento"><Monitor /></ProtectedRoute>} />
           <Route path="/usuarios" element={<ProtectedRoute role="admin_master"><Usuarios /></ProtectedRoute>} />
-          <Route path="/audit-logs" element={<ProtectedRoute role="admin_master"><AuditLogs /></ProtectedRoute>} />
+          <Route path="/audit-logs" element={<ProtectedRoute role="admin_master"><AuditoriaELogs aba="acoes" /></ProtectedRoute>} />
           <Route path="/configuracoes" element={<ProtectedRoute role="admin_master"><Configuracoes /></ProtectedRoute>} />
           <Route path="/config/geral" element={<ProtectedRoute role="admin_master"><ConfigGeral /></ProtectedRoute>} />
           {/* Tela antiga do leitor facial: os mesmos leitores ficam em Leitores e dispositivos */}
@@ -188,7 +187,7 @@ const AppContent = () => {
           <Route path="/config/checkin" element={<ProtectedRoute role="admin_master"><ConfigCheckin /></ProtectedRoute>} />
           <Route path="/config/veiculos" element={<ProtectedRoute role="admin_master"><ConfigVeiculos /></ProtectedRoute>} />
           <Route path="/config/seguranca" element={<ProtectedRoute role="admin_master"><ConfigSeguranca /></ProtectedRoute>} />
-          <Route path="/config/logs" element={<ProtectedRoute role="admin_master"><ConfigLogs /></ProtectedRoute>} />
+          <Route path="/config/logs" element={<ProtectedRoute role="admin_master"><AuditoriaELogs aba="tecnicos" /></ProtectedRoute>} />
           <Route path="/config/comunicacao" element={<ProtectedRoute role="admin_master"><ConfigComunicacao /></ProtectedRoute>} />
           <Route path="/config/webhooks" element={<ProtectedRoute role="admin_master"><ConfigWebhooks /></ProtectedRoute>} />
           <Route path="/config/gamificacao" element={<ProtectedRoute role="admin_master"><ConfigGamificacao /></ProtectedRoute>} />

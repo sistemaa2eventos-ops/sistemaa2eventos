@@ -2,7 +2,7 @@ const { supabase } = require('../../../config/supabase');
 const { buscarTodos } = require('../../../utils/buscarTodos');
 const logger = require('../../../services/logger');
 const cacheService = require('../../../services/cacheService');
-const { getHojeLocal, getInicioHojeLocal, getLimitesDiaLocalUTC, TIMEZONE } = require('../../../utils/dateUtils');
+const { getHojeLocal, getInicioHojeLocal, getLimitesDiaLocalUTC, ultimaOcorrenciaHorario, TIMEZONE } = require('../../../utils/dateUtils');
 
 // Logs gravados pelo credenciamento (entrega de pulseira) não contam como passagem em leitor
 const MARCADOR_CREDENCIAMENTO = 'CREDENCIAMENTO';
@@ -211,9 +211,12 @@ class ValidationService {
         const lastLog = await buscarUltimoLog(pessoa_id, evento_id, area_id);
         if (ctx) ctx.ultimoLog = lastLog;
 
-        const { start } = getLimitesDiaLocalUTC();
+        // O dia de operação começa no horário de reset do evento (o mesmo em que o fechamento de
+        // turno roda), não à meia-noite: quem entrou às 22h e passa à 1h está saindo, não entrando de novo
+        const evento = await buscarEventoCache(evento_id).catch(() => null);
+        const start = ultimaOcorrenciaHorario(evento?.horario_reset || '00:00:00');
         const lastAt = lastLog ? new Date(/Z|[+-]\d{2}:\d{2}$/.test(lastLog.created_at) ? lastLog.created_at : `${lastLog.created_at}Z`) : null;
-        if (!lastLog || lastAt < new Date(start)) {
+        if (!lastLog || lastAt < start) {
             logger.debug(`✨ [SmartAccess] Primeiro acesso do dia para ${pessoa_id} (area: ${area_id || 'global'}). Forçando CHECK-IN.`);
             return 'checkin';
         }

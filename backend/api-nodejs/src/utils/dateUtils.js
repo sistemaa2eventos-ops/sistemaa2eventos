@@ -100,6 +100,15 @@ function proximaOcorrenciaHorario(horario = '00:00:00', agora = new Date()) {
 }
 
 /**
+ * Última ocorrência (já passada) de um horário local "HH:MM[:SS]": início do dia de operação
+ * de um evento que vira no horário de reset (ex.: 06:00 para turnos que passam da meia-noite).
+ * @returns {Date}
+ */
+function ultimaOcorrenciaHorario(horario = '00:00:00', agora = new Date()) {
+    return new Date(proximaOcorrenciaHorario(horario, agora).getTime() - 24 * 60 * 60 * 1000);
+}
+
+/**
  * Limite do filtro de período em UTC. Aceita "YYYY-MM-DD" (dia inteiro), o horário local do
  * datetime-local ("YYYY-MM-DDTHH:mm") ou ISO com fuso. Antes cada aba comparava de um jeito e
  * o horário local ia direto contra o UTC do banco (3h de diferença).
@@ -124,6 +133,7 @@ function limiteFiltro(valor, fim = false) {
 module.exports = {
     limiteFiltro,
     proximaOcorrenciaHorario,
+    ultimaOcorrenciaHorario,
     getHojeLocal,
     getNowLocal,
     getInicioHojeLocal,

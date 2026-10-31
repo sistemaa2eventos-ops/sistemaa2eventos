@@ -5,7 +5,7 @@ import {
     Watch as PulseiraIcon, Label as EtiquetaIcon, Face as LeitorIcon, Videocam as CameraIcon, DirectionsCar as CarIcon,
     Extension as ComunicacaoIcon, Webhook as WebhookIcon, Tune as GeralIcon, VerifiedUser as PerfisIcon,
     Security as SegurancaIcon, Schedule as CronIcon, Translate as IdiomaIcon, Storage as BancoIcon,
-    EmojiEvents as GamifIcon, Description as LogsIcon
+    Description as LogsIcon
 } from '@mui/icons-material';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/common/PageHeader';
@@ -50,8 +50,7 @@ const GRUPOS = [
             { nome: 'Rotinas automáticas', texto: 'Fechamento do dia e relatório diário', rota: '/config/cron', icone: CronIcon },
             { nome: 'Idiomas', texto: 'Idioma padrão', rota: '/config/idiomas', icone: IdiomaIcon },
             { nome: 'Banco de dados', texto: 'Conexão e sincronização', rota: '/config/banco-dados', icone: BancoIcon },
-            { nome: 'Gamificação', texto: 'Pontos por ação', rota: '/config/gamificacao', icone: GamifIcon },
-            { nome: 'Logs do sistema', texto: 'Registros técnicos do servidor', rota: '/config/logs', icone: LogsIcon }
+            { nome: 'Auditoria e logs', texto: 'Ações dos usuários e registros técnicos', rota: '/audit-logs', icone: LogsIcon }
         ]
     }
 ];

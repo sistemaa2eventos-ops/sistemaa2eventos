@@ -9,7 +9,8 @@ import NeonButton from '../../components/common/NeonButton';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
 
 import { comoRotulo } from '../../utils/formatadores';
-const ConfigLogs = () => {
+// embutido: aba de "Auditoria e logs" (sem cabeçalho e margem próprios)
+const ConfigLogs = ({ embutido = false }) => {
     const confirmar = useConfirmacao();
     const { enqueueSnackbar } = useSnackbar();
     const [loading, setLoading] = useState(true);
@@ -131,12 +132,14 @@ const ConfigLogs = () => {
         );
     }
     return (
-        <Box sx={{ p: { xs: 2, md: 4 } }}>
-            <PageHeader
-                title="Logs do sistema"
-                subtitle="Atividades e erros registrados pelo sistema."
-                breadcrumbs={[{ text: 'Configurações' }, { text: 'Logs do sistema' }]}
-            />
+        <Box sx={embutido ? undefined : { p: { xs: 2, md: 4 } }}>
+            {!embutido && (
+                <PageHeader
+                    title="Logs do sistema"
+                    subtitle="Atividades e erros registrados pelo sistema."
+                    breadcrumbs={[{ text: 'Configurações' }, { text: 'Logs do sistema' }]}
+                />
+            )}
 
             {/* FILTROS */}
             <GlassCard sx={{ p: 2, mb: 3 }}>

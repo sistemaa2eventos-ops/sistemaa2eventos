@@ -48,7 +48,8 @@ const StyledDataGrid = styled(DataGrid)(() => ({
     },
 }));
 
-const AuditLogs = () => {
+// embutido: aba de "Auditoria e logs" (sem cabeçalho e margem próprios)
+const AuditLogs = ({ embutido = false }) => {
     const {
         logs,
         loading,
@@ -151,9 +152,9 @@ const AuditLogs = () => {
     }
 
     return (
-        <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 }, position: 'relative', overflowX: 'hidden' }}>
+        <Box sx={{ p: embutido ? 0 : { xs: 1.5, sm: 2.5, md: 3 }, position: 'relative', overflowX: 'hidden' }}>
             {/* Header Security Label */}
-            <Box mb={{ xs: 2, sm: 3 }} display="flex" flexDirection={{ xs: 'column', sm: 'row' }} gap={1.5} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }}>
+            {!embutido && <Box mb={{ xs: 2, sm: 3 }} display="flex" flexDirection={{ xs: 'column', sm: 'row' }} gap={1.5} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }}>
                 <PageHeader
                     title="Logs de auditoria"
                     subtitle="Trilha de transparência operacional e histórico de ações administrativas."
@@ -172,7 +173,7 @@ const AuditLogs = () => {
                         height: 32
                     }}
                 />
-            </Box>
+            </Box>}
 
             {/* Filters Section */}
             <GlassCard sx={{ mb: 2.5, p: { xs: 2, sm: 3 } }}>
