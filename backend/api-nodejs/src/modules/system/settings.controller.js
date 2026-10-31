@@ -108,8 +108,15 @@ class SettingsController {
                     config: {}
                 };
             } else {
-                // Campos legados persistidos em config (JSONB) voltam no mesmo nível da resposta
-                settings = { ...(settings.config || {}), ...settings };
+                // Campos legados persistidos em config (JSONB) voltam no mesmo nível da resposta.
+                // Alguns (telegram_chat_id, email_from, whatsapp_*) também têm coluna, sempre vazia:
+                // a coluna nula cobria o valor salvo, a tela mostrava em branco e o próximo
+                // "Salvar" apagava o Chat ID. Coluna só prevalece quando tem valor.
+                const config = settings.config || {};
+                settings = { ...settings };
+                for (const [campo, valor] of Object.entries(config)) {
+                    if (settings[campo] === null || settings[campo] === undefined || settings[campo] === '') settings[campo] = valor;
+                }
             }
 
             res.json({ success: true, data: settings });
