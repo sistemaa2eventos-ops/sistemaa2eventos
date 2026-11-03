@@ -1,0 +1,4 @@
+# Painel administrativo (área com login): nada para indexar.
+# A página pública do sistema fica em https://cadastro.nzt.app.br
+User-agent: *
+Disallow: /
