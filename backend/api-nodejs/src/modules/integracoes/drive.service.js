@@ -70,6 +70,11 @@ class DriveService {
         });
         const tok = await resp.json();
         if (!resp.ok || !tok.refresh_token) throw new Error(tok.error_description || tok.error || 'O Google não devolveu a autorização. Tente conectar de novo.');
+        // O Google deixa desmarcar cada permissão na tela de autorização: sem a do Drive, não grava
+        if (!String(tok.scope || '').split(' ').includes(ESCOPOS[0])) {
+            await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(tok.refresh_token)}`, { method: 'POST' }).catch(() => {});
+            throw new Error('O Google não liberou o acesso ao Drive. Conecte de novo e, na tela do Google, marque a caixa "Ver, editar, criar e excluir apenas os arquivos específicos do Google Drive que você usa com este app".');
+        }
         const email = tok.id_token ? JSON.parse(Buffer.from(tok.id_token.split('.')[1], 'base64url').toString()).email : null;
 
         const { error } = await supabase.from('drive_conexao').upsert({
