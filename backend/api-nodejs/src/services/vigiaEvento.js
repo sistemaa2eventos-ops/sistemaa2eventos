@@ -87,7 +87,23 @@ async function verificarBanco(avisar) {
     return true;
 }
 
+/**
+ * Fração da memória realmente disponível. No Linux, MemAvailable (conta o cache que o sistema
+ * libera quando precisa); os.freemem() ignora esse cache e daria falso alarme na VPS.
+ */
+function memoriaDisponivel() {
+    try {
+        const info = fs.readFileSync('/proc/meminfo', 'utf8');
+        const kb = (nome) => parseInt((info.match(new RegExp(`^${nome}:\\s+(\\d+)`, 'm')) || [])[1], 10);
+        const total = kb('MemTotal');
+        const disponivel = kb('MemAvailable');
+        if (total > 0 && disponivel >= 0) return disponivel / total;
+    } catch (_) { /* fora do Linux */ }
+    return os.freemem() / os.totalmem();
+}
+
 async function verificarRecursos(avisar) {
+    if (process.env.VIGIA_SEM_RECURSOS === 'true') return; // testes: não depende da máquina
     const avisarUmaVezPorHora = async (tipo, texto) => {
         const ultimo = estado.recursoAvisado.get(tipo) || 0;
         if (Date.now() - ultimo < 60 * 60 * 1000) return;
@@ -98,7 +114,7 @@ async function verificarRecursos(avisar) {
         const usado = 1 - s.bavail / s.blocks;
         if (usado > 0.9) await avisarUmaVezPorHora('disco', `🟠 <b>Disco do servidor ${Math.round(usado * 100)}% cheio</b>. Libere espaço antes que os deploys e os registros falhem.`);
     } catch (_) { /* statfs indisponível */ }
-    const livre = os.freemem() / os.totalmem();
+    const livre = memoriaDisponivel();
     if (livre < 0.08) await avisarUmaVezPorHora('memoria', `🟠 <b>Memória do servidor quase no fim</b> (${Math.round(livre * 100)}% livre). O sistema pode ficar lento.`);
 }
 

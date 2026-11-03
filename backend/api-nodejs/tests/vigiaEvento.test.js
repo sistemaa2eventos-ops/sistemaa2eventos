@@ -2,6 +2,7 @@
  * Vigia do evento: avisa só quando muda (caiu / voltou), espera confirmar antes de avisar
  * e não repete o mesmo aviso de lotação.
  */
+process.env.VIGIA_SEM_RECURSOS = 'true'; // disco/memória dependem da máquina do teste
 const mockMundo = { leitores: [], bancoErro: null, alertas: [] };
 const mockEnviadas = [];
 
