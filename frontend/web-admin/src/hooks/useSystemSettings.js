@@ -39,6 +39,7 @@ export const useSystemSettings = () => {
         relatorio_emails: [],
         telegram_bot_token: '',
         telegram_chat_id: '',
+        telegram_chat_id_sistema: '',
         telegram_alerts_enabled: false,
         email_relatorio_ativo: true,
         relatorio_telegram_ativo: false,

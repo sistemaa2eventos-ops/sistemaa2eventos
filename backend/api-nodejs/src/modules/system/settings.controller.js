@@ -33,6 +33,7 @@ const SETTINGS_ALLOWED_FIELDS = [
     // Comunicação
     'alert_email', 'relatorio_emails', 'telegram_bot_token',
     'telegram_chat_id', 'telegram_alerts_enabled', 'email_relatorio_ativo', 'relatorio_telegram_ativo',
+    'telegram_chat_id_sistema', 'telegram_alertas_sistema',
     'whatsapp_api_url', 'whatsapp_api_key', 'email_from', 'email_from_name',
     // Gamificação
     'gamification_enabled', 'gamification_points_scan',
@@ -53,6 +54,7 @@ const SETTINGS_LEGACY_CONFIG_FIELDS = [
     'biometric_login_enabled', 'alert_operator_login', 'alert_event_peak',
     'anpr_enabled', 'anpr_endpoint', 'anpr_confidence_min', 'anpr_log_retention_days',
     'telegram_chat_id', 'telegram_alerts_enabled', 'email_relatorio_ativo', 'relatorio_telegram_ativo',
+    'telegram_chat_id_sistema', 'telegram_alertas_sistema',
     'email_from', 'email_from_name', 'whatsapp_api_url', 'whatsapp_api_key'
 ];
 
@@ -170,6 +172,7 @@ class SettingsController {
                 .single();
 
             if (error) throw error;
+            require('../../services/telegramSistema').limparCache(); // Chat ID/token novos valem na hora
 
             // Reagendar cron jobs configuráveis se os horários mudaram (sem precisar reiniciar o servidor)
             if (payload.cron_reset_hora || payload.cron_relatorio_hora) {

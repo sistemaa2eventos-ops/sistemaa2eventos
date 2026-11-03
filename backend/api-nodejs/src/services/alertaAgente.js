@@ -27,6 +27,9 @@ async function avisar(agente, desde) {
         details: { agent_id: agente.id }
     }, 'system_admin');
 
+    require('./telegramSistema').enviar(`🔴 <b>PC do evento desconectado</b>: ${nome}, desde ${horaLocal(desde)}.
+Leitores e câmeras desse local estão sem comando: cadastros novos não chegam aos leitores. Confira se o computador está ligado e com internet.`);
+
     if (agente.evento_id) {
         await notificacaoService.criar([{
             evento_id: agente.evento_id,
@@ -78,6 +81,7 @@ function agenteConectou(agente) {
         message: `PC do evento reconectado: ${agente.nome} (fora por ~${minutos} min).`,
         details: { agent_id: agente.id }
     }, 'system_admin');
+    require('./telegramSistema').enviar(`🟢 <b>PC do evento reconectado</b>: ${agente.nome} (fora por ~${minutos} min).`);
 }
 
 module.exports = { agenteDesconectou, agenteConectou, ESPERA_MS };

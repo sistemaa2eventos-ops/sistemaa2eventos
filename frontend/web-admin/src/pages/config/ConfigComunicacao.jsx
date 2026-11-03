@@ -510,13 +510,27 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                                         }}
                                     />
                                     <TextField
-                                        label="Chat ID Global (Usuário ou Canal/Grupo)"
+                                        label="Chat ID Global — alertas da watchlist (Usuário ou Canal/Grupo)"
                                         fullWidth
                                         size="small"
                                         placeholder="Ex: 123456789 ou -100192837482"
                                         value={settings.telegram_chat_id || ''}
                                         onChange={(e) => setSettings(prev => ({ ...prev, telegram_chat_id: e.target.value }))}
                                         helperText="Descubra seu Chat ID enviando /start para o @userinfobot ou adicione o bot ao grupo de segurança."
+                                    />
+                                    {/* Alertas do sistema (leitor caído, PC do evento, lotação, servidor): só para a administradora */}
+                                    <TextField
+                                        label="Chat ID dos alertas do sistema (só para você)"
+                                        fullWidth
+                                        size="small"
+                                        placeholder="Ex: 123456789"
+                                        value={settings.telegram_chat_id_sistema || ''}
+                                        onChange={(e) => setSettings(prev => ({ ...prev, telegram_chat_id_sistema: e.target.value }))}
+                                        helperText="Leitor sem conexão, PC do evento desconectado, lotação e servidor. Use o seu Chat ID pessoal (o @userinfobot mostra). Em branco: usa o Chat ID Global."
+                                    />
+                                    <FormControlLabel
+                                        control={<Switch checked={settings.telegram_alertas_sistema !== false} onChange={(e) => setSettings(prev => ({ ...prev, telegram_alertas_sistema: e.target.checked }))} />}
+                                        label={<Typography variant="body2">Enviar alertas do sistema no Telegram</Typography>}
                                     />
                                 </Stack>
 

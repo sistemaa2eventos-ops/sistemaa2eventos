@@ -309,6 +309,7 @@ const AJUDAS = {
         passos: [
             'Em "Canais & Conexões", preencha o canal e use o botão de teste.',
             'Telegram: crie o bot no @BotFather (Bot Token) e pegue o Chat ID no @userinfobot.',
+            'Telegram tem dois destinos: o "Chat ID Global" recebe a watchlist (pode ser o grupo da equipe); o "Chat ID dos alertas do sistema" recebe leitor sem conexão, PC do evento desconectado, lotação e servidor (use o seu pessoal).',
             'Clique "Salvar Alterações" no fim da página.',
             'Em "Alertas & Automações", ligue os alertas e salve de novo.'
         ],

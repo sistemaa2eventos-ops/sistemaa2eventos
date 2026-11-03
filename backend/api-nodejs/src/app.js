@@ -272,6 +272,7 @@ server.listen(PORT, async () => {
         // Alertas das câmeras com o painel fechado (agente local ou motor no próprio servidor)
         require('./modules/system/vigilancia.service').iniciar();
         syncScheduler.start();
+        require('./services/vigiaEvento').iniciar();
         cloudSyncWorker.start();
         healthService.start();
         cronController.start();
