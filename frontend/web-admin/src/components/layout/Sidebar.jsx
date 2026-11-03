@@ -76,11 +76,14 @@ const StyledDrawer = styled(Drawer)(() => ({
 }));
 
 const LogoContainer = styled(Box)(({ theme }) => ({
-    padding: theme.spacing(4, 3),
+    padding: '24px 20px 20px 20px',
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
-    gap: theme.spacing(2),
+    justifyContent: 'center',
     position: 'relative',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
     '&::after': {
         content: '""',
         position: 'absolute',
@@ -89,6 +92,10 @@ const LogoContainer = styled(Box)(({ theme }) => ({
         width: '80%',
         height: '1px',
         background: 'linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.4), transparent)',
+    },
+    '&:hover img': {
+        filter: 'drop-shadow(0 0 22px rgba(0, 212, 255, 0.55)) brightness(1.05)',
+        transform: 'scale(1.02)'
     }
 }));
 
@@ -468,43 +475,28 @@ const Sidebar = ({ open, onClose }) => {
                 keepMounted: true, // Better open performance on mobile.
             }}
         >
-            <LogoContainer>
-                <Avatar
-                    src="/assets/nzt-logo.jpg"
-                    variant="rounded"
-                    sx={{ width: 48, height: 48, boxShadow: '0 0 15px rgba(0, 212, 255, 0.6)', border: '1px solid rgba(0, 212, 255, 0.3)' }}
-                >
-                    NZT
-                </Avatar>
-                <Box sx={{ minWidth: 0, flex: 1 }}>
-                    <Typography
-                        variant="h6"
-                        sx={{
-                            fontFamily: '"Space Grotesk", sans-serif',
-                            color: '#00D4FF',
-                            fontWeight: 700,
-                            letterSpacing: '2px',
-                            textShadow: '0 0 10px rgba(0, 212, 255, 0.3)'
-                        }}
-                    >
-                        NZT
-                    </Typography>
-                        <Typography
-                        variant="caption"
-                        sx={{
-                            display: 'block',
-                            color: 'text.secondary',
-                            fontSize: '0.75rem',
-                            fontWeight: 500,
-                            lineHeight: 1.3,
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                        }}
-                    >
-                        Intelligent Control System
-                    </Typography>
-                </Box>
+            <LogoContainer 
+                onClick={() => {
+                    const eid = localStorage.getItem('active_evento_id');
+                    navigate(eid ? `/?evento_id=${eid}` : '/');
+                }} 
+                title="NZT Intelligent Control Systems"
+            >
+                <Box
+                    component="img"
+                    src="/assets/nzt-logo-full.png"
+                    alt="NZT Intelligent Control Systems"
+                    sx={{
+                        width: '100%',
+                        maxWidth: 228,
+                        height: 'auto',
+                        maxHeight: 110,
+                        objectFit: 'contain',
+                        filter: 'drop-shadow(0 0 16px rgba(0, 212, 255, 0.35))',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        userSelect: 'none'
+                    }}
+                />
             </LogoContainer>
 
 {/* Evento Ativo Context com Seletor Interativo */}

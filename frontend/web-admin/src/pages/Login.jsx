@@ -61,16 +61,54 @@ const GlassBox = styled(Box)(({ theme }) => ({
     position: 'relative',
     zIndex: 1,
     width: '100%',
-    maxWidth: 450,
-    padding: theme.spacing(6, 4),
-    background: 'linear-gradient(135deg, rgba(10,22,40,0.8) 0%, rgba(15,30,55,0.8) 100%)',
-    backdropFilter: 'blur(20px)',
-    border: '1px solid rgba(0, 212, 255, 0.2)',
-    borderRadius: 12,
-    boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 40px rgba(0, 212, 255, 0.1)',
+    maxWidth: 440,
+    padding: theme.spacing(5, 4),
+    background: 'linear-gradient(180deg, rgba(8, 18, 36, 0.92) 0%, rgba(4, 9, 20, 0.96) 100%)',
+    backdropFilter: 'blur(24px)',
+    border: '1px solid rgba(0, 212, 255, 0.22)',
+    borderRadius: 16,
+    boxShadow: '0 24px 80px rgba(0, 0, 0, 0.75), 0 0 45px rgba(0, 212, 255, 0.1)',
     textAlign: 'center',
     animation: 'fadeInUp 0.6s ease-out forwards',
 }));
+
+const inputSx = {
+    my: 1,
+    '& .MuiOutlinedInput-root': {
+        backgroundColor: 'rgba(5, 11, 24, 0.75)',
+        borderRadius: 2,
+        transition: 'all 0.2s ease',
+        '& fieldset': {
+            borderColor: 'rgba(0, 212, 255, 0.25)',
+        },
+        '&:hover fieldset': {
+            borderColor: 'rgba(0, 212, 255, 0.5)',
+        },
+        '&.Mui-focused fieldset': {
+            borderColor: '#00D4FF',
+            boxShadow: '0 0 16px rgba(0, 212, 255, 0.25)',
+        },
+        '& input': {
+            color: '#FFFFFF',
+            fontSize: '0.95rem',
+            fontWeight: 500,
+            '&:-webkit-autofill': {
+                WebkitBoxShadow: '0 0 0 100px #081120 inset !important',
+                WebkitTextFillColor: '#FFFFFF !important',
+                caretColor: '#00D4FF',
+                borderRadius: 'inherit',
+            }
+        }
+    },
+    '& .MuiInputLabel-root': {
+        color: '#94A3B8',
+        fontWeight: 500,
+        '&.Mui-focused': {
+            color: '#00D4FF',
+            fontWeight: 600,
+        }
+    }
+};
 
 const Login = () => {
     const [email, setEmail] = useState('');
@@ -153,27 +191,52 @@ const Login = () => {
 
             <Container maxWidth="xs" sx={{ display: 'flex', justifyContent: 'center' }}>
                 <GlassBox>
-                    <Box sx={{ mb: 2 }}>
-                        <img src="/assets/nzt-logo.jpg" alt="NZT Logo" style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '16px', border: '1px solid rgba(0, 212, 255, 0.4)', boxShadow: '0 0 25px rgba(0, 212, 255, 0.4)' }} />
+                    <Box sx={{ mb: 2.5, display: 'flex', justifyContent: 'center' }}>
+                        <Box
+                            component="img"
+                            src="/assets/nzt-emblem.png"
+                            alt="NZT Intelligent Control Systems"
+                            sx={{
+                                width: 110,
+                                height: 110,
+                                objectFit: 'contain',
+                                filter: 'drop-shadow(0 0 22px rgba(0, 212, 255, 0.45)) drop-shadow(0 0 45px rgba(0, 212, 255, 0.2))',
+                                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                                '&:hover': {
+                                    transform: 'scale(1.05)',
+                                    filter: 'drop-shadow(0 0 30px rgba(0, 212, 255, 0.65)) drop-shadow(0 0 60px rgba(0, 212, 255, 0.3))'
+                                }
+                            }}
+                        />
                     </Box>
 
                     <Typography
                         variant="h4"
                         sx={{
                             fontFamily: '"Space Grotesk", sans-serif',
-                            fontWeight: 700,
+                            fontWeight: 800,
                             color: '#FFFFFF',
-                            letterSpacing: '0.04em',
+                            letterSpacing: '5px',
+                            textShadow: '0 0 20px rgba(0, 212, 255, 0.35)',
                             mb: 0.5
                         }}
                     >
                         NZT
                     </Typography>
                     <Typography
-                        variant="body2"
-                        sx={{ color: 'text.secondary', mb: 4, fontSize: '0.875rem', fontWeight: 500 }}
+                        variant="caption"
+                        sx={{
+                            display: 'block',
+                            color: '#00D4FF',
+                            letterSpacing: '2.5px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            textTransform: 'uppercase',
+                            opacity: 0.9,
+                            mb: 3.5
+                        }}
                     >
-                        {isForgotMode ? 'Recuperação de acesso' : 'Intelligent Control System'}
+                        {isForgotMode ? 'Recuperação de acesso' : 'Intelligent Control Systems'}
                     </Typography>
 
                     {error && (
@@ -218,16 +281,16 @@ const Login = () => {
                             fullWidth
                             label="E-mail"
                             variant="outlined"
-                            margin="normal"
                             autoComplete="username email"
                             value={email}
                             error={!!emailError}
                             helperText={emailError}
                             onChange={(e) => setEmail(e.target.value)}
+                            sx={inputSx}
                             InputProps={{
                                 startAdornment: (
                                     <InputAdornment position="start">
-                                        <EmailIcon sx={{ color: 'rgba(0, 212, 255, 0.4)' }} />
+                                        <EmailIcon sx={{ color: '#00D4FF' }} />
                                     </InputAdornment>
                                 ),
                             }}
@@ -240,21 +303,21 @@ const Login = () => {
                                 label="Senha"
                                 type={showPassword ? 'text' : 'password'}
                                 variant="outlined"
-                                margin="normal"
                                 autoComplete="current-password"
                                 value={password}
                                 error={!!passwordError}
                                 helperText={passwordError}
                                 onChange={(e) => setPassword(e.target.value)}
+                                sx={inputSx}
                                 InputProps={{
                                     startAdornment: (
                                         <InputAdornment position="start">
-                                            <LockIcon sx={{ color: 'rgba(0, 212, 255, 0.4)' }} />
+                                            <LockIcon sx={{ color: '#00D4FF' }} />
                                         </InputAdornment>
                                     ),
                                     endAdornment: (
                                         <InputAdornment position="end">
-                                            <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
+                                            <IconButton onClick={() => setShowPassword(!showPassword)} edge="end" sx={{ color: '#94A3B8' }}>
                                                 {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
                                             </IconButton>
                                         </InputAdornment>
@@ -322,9 +385,9 @@ const Login = () => {
                         <Typography
                             variant="caption"
                             display="block"
-                            sx={{ mt: 4, color: 'text.secondary', opacity: 0.6 }}
+                            sx={{ mt: 4, color: '#64748B', fontWeight: 500, letterSpacing: '0.5px' }}
                         >
-                            &copy; 2026 NZT Intelligent Control System &bull; Desenvolvido por A2
+                            &copy; 2026 NZT Intelligent Control Systems &bull; Desenvolvido por A2
                         </Typography>
                     </form>
                 </GlassBox>

@@ -72,9 +72,9 @@ const MainLayout = ({ children }) => {
                             <NotificationBell />
                         </Box>
                         <Avatar
-                            src="/assets/nzt-logo.jpg"
+                            src="/assets/nzt-logo-icon.png"
                             variant="rounded"
-                            sx={{ width: 30, height: 30, border: '1px solid rgba(0, 212, 255, 0.3)', flexShrink: 0 }}
+                            sx={{ width: 32, height: 32, border: '1px solid rgba(0, 212, 255, 0.4)', bgcolor: '#050B18', flexShrink: 0 }}
                         >
                             NZT
                         </Avatar>
