@@ -32,6 +32,7 @@ import DataTable from '../components/common/DataTable';
 import { useReports } from '../hooks/useReports';
 import FechamentoPeriodo from '../components/remuneracao/FechamentoPeriodo';
 import HistoricoPulseiras from '../components/pulseiras/HistoricoPulseiras';
+import RelatorioAtendimento from '../components/relatorios/RelatorioAtendimento';
 import { useEmpresas } from '../hooks/useEmpresas';
 import api from '../services/api';
 
@@ -109,6 +110,8 @@ const Reports = () => {
             loadFechamento();
         } else if (tab === 'pulseiras') {
             loadPulseiras();
+        } else if (tab === 'atendimento') {
+            // a aba Atendimento carrega os próprios dados
         } else {
             loadTab(tab);
         }
@@ -655,7 +658,7 @@ const Reports = () => {
                         >
                             Exportar Excel
                         </Button>
-                    ) : tab === 'sessoes' ? (
+                    ) : tab === 'atendimento' ? null : tab === 'sessoes' ? (
                         <Button variant="outlined"
                             startIcon={<ExportIcon />}
                             onClick={exportarSessoesCSV}
@@ -910,6 +913,7 @@ const Reports = () => {
                     <Tab icon={<TimeIcon />} label="Ponto" value="ponto" />
                     <Tab icon={<PaymentsIcon />} label="Diárias" value="diarias" />
                     <Tab icon={<PulseiraIcon />} label="Pulseiras" value="pulseiras" />
+                    <Tab icon={<KpiTempoIcon />} label="Atendimento" value="atendimento" />
                     <Tab icon={<HistoryIcon />} label="Logs de acesso" value="logs" />
                     <Tab icon={<BadgeIcon />} label="Sessões de operador" value="sessoes" />
                     <Tab icon={<TableIcon />} label="Por área" value="area" />
@@ -945,6 +949,9 @@ const Reports = () => {
 
                     {/* PULSEIRAS: entregas, trocas, devoluções e perdas */}
                     {tab === 'pulseiras' && <HistoricoPulseiras historico={pulseiras} loading={loading} onEncerrar={encerrarPulseira} />}
+
+                    {/* ATENDIMENTO: tempo por operador, diagnóstico e planilha orçamentária */}
+                    {tab === 'atendimento' && <RelatorioAtendimento eventoId={localStorage.getItem('active_evento_id')} dateStart={dateStart} dateEnd={dateEnd} />}
 
                     {/* 2. LOGS DE ACESSO */}
                     {tab === 'logs' && (

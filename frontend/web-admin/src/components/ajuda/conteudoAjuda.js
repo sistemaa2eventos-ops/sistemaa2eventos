@@ -110,6 +110,7 @@ const AJUDAS = {
         ],
         atencao: [
             'Com leitor facial vinculado, o reconhecimento já registra a saída, sem confirmação.',
+            'Se a pessoa entrou num dia anterior e não registrou a saída, abre a janela "Saída de um dia anterior": confira o horário sugerido (o da saída do dia anterior) e clique em "Corrigir saída". O turno antigo é corrigido e nada é lançado para hoje.',
             'Quem não registrar a saída fica "a conferir" no relatório quando o dia vira.'
         ]
     },
@@ -147,7 +148,8 @@ const AJUDAS = {
         atencao: [
             'As horas contam da primeira entrada até a última saída do turno, sem descontar intervalos.',
             'Turno sem saída registrada aparece "a conferir" e fica fora das horas até alguém corrigir.',
-            'A aba Diárias só mostra valores para empresas com regra de remuneração.'
+            'A aba Diárias só mostra valores para empresas com regra de remuneração.',
+            'A aba "Atendimento" mostra o tempo de cada operador e calcula quantos operadores o próximo evento precisa; o botão "Planilha orçamentária" gera o Excel com custos e preço.'
         ]
     },
     '/veiculos': {
@@ -266,6 +268,7 @@ const AJUDAS = {
             '"Fail Open" libera a passagem se o sistema cair; "Fail Closed" nega. Para segurança, prefira Fail Closed com internet de reserva.',
             '"Liberar" e "Travar" ficam valendo até clicar "Normal".',
             'Leitor de credenciamento não grava entrada/saída: só abre a ficha na tela do operador vinculado.',
+            'Para entrada e saída pelo rosto (sem pulseira), use "Modo de operação: Bidirecional" e "Fluxo de acesso: Toggle": a primeira passagem do dia é entrada, a seguinte é saída.',
             'Reserve um IP fixo para cada leitor no roteador.'
         ],
         dicas: ['A "Fila de Sincronização" mostra os rostos que falharam; use "Reenviar".']

@@ -19,6 +19,9 @@ export const useCheckin = (defaultMode, options = {}) => {
     // States - Fluxo de Atendimento
     const [selectedPessoa, setSelectedPessoa] = useState(null);
     const [checkinResult, setCheckinResult] = useState(null); // 'sucesso' | 'negado' | null
+    // Saída de quem entrou num dia anterior: o servidor pede confirmação e o horário real
+    const [turnoAnterior, setTurnoAnterior] = useState(null);
+    const inicioAtendimentoRef = useRef(null);
     const [resultMessage, setResultMessage] = useState('');
     const [loading, setLoading] = useState(false);
     const [manualSaving, setManualSaving] = useState(false);
@@ -122,7 +125,8 @@ export const useCheckin = (defaultMode, options = {}) => {
             if (res.data?.success) {
                 setSessaoAtiva(res.data.data);
                 await carregarDispositivosDisponiveis();
-                return { success: true, data: res.data.data };
+                return {
+        turnoAnterior, confirmarTurnoAnterior, cancelarTurnoAnterior: () => setTurnoAnterior(null), success: true, data: res.data.data };
             }
             return { success: false, error: res.data?.error || 'Erro ao vincular leitor' };
         } catch (err) {
@@ -196,6 +200,31 @@ export const useCheckin = (defaultMode, options = {}) => {
             console.error('Erro ao carregar dados de check-in:', error);
         }
     }, [eventoId, defaultMode, logsTipo, carregarSessaoAtiva, carregarDispositivosDisponiveis]);
+
+    const pedeTurnoAnterior = (error) => {
+        const det = error?.response?.status === 409 ? error.response.data?.details : null;
+        if (det?.codigo !== 'TURNO_ANTERIOR') return false;
+        setTurnoAnterior(det);
+        return true;
+    };
+
+    const confirmarTurnoAnterior = async (saidaEm) => {
+        const t = turnoAnterior;
+        if (!t) return;
+        try {
+            await api.post('/access/checkout/corrigir-turno', { pessoa_id: t.pessoa?.id, saida_em: saidaEm });
+            setTurnoAnterior(null);
+            tocarBipeNotificacao();
+            setCheckinResult('sucesso');
+            const diaEntrada = new Date(t.entrada_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+            setResultMessage(`SAÍDA CORRIGIDA: ${t.pessoa?.nome || 'COLABORADOR'} — turno de ${diaEntrada}`);
+            clearTimeout(resetTimerRef.current);
+            resetTimerRef.current = setTimeout(() => { setCheckinResult(null); setResultMessage(''); }, 3500);
+            atualizarAposAcesso();
+        } catch (error) {
+            throw new Error(error.response?.data?.error || 'Falha ao corrigir a saída.');
+        }
+    };
 
     // Etiqueta só na entrada nova (saída e reenvio repetido não imprimem); a opção é do evento
     const imprimirSeEntrada = useCallback((acesso, pessoaId) => {
@@ -332,6 +361,8 @@ export const useCheckin = (defaultMode, options = {}) => {
     }, []);
 
     const handleSelectPessoa = (pessoa) => {
+        // Início do atendimento (credenciamento): métrica de tempo por operador
+        inicioAtendimentoRef.current = new Date().toISOString();
         setSelectedPessoa(pessoa);
         setSearchResults([]);
         setSearchQuery('');
@@ -433,6 +464,7 @@ export const useCheckin = (defaultMode, options = {}) => {
                 return { success: false, error: res.data?.error };
             }
         } catch (error) {
+            if (pedeTurnoAnterior(error)) return { success: false, turnoAnterior: true };
             setCheckinResult('negado');
             setResultMessage(error.response?.data?.error || 'Participante não localizado ou sem autorização.');
             clearTimeout(resetTimerRef.current);
@@ -490,7 +522,9 @@ export const useCheckin = (defaultMode, options = {}) => {
                 res = await localCheckinService.enviar('/access/credenciar-pulseira', {
                     pessoa_id: targetPessoa.id,
                     numero_pulseira: extraValue,
-                    area_id: areaId
+                    area_id: areaId,
+                    atendimento_inicio: inicioAtendimentoRef.current,
+                    estacao: sessaoAtiva?.estacao_nome || null
                 }, 'credenciar-pulseira');
             } else {
                 // CHECK-IN MANUAL ou QRCODE
@@ -538,6 +572,7 @@ export const useCheckin = (defaultMode, options = {}) => {
 
             atualizarAposAcesso();
         } catch (error) {
+            if (pedeTurnoAnterior(error)) return;
             setCheckinResult('negado');
             setResultMessage(error.response?.data?.error || 'Falha na comunicação com o servidor.');
             clearTimeout(resetTimerRef.current);
@@ -558,7 +593,9 @@ export const useCheckin = (defaultMode, options = {}) => {
                 tipo_pulseira_id: tipoPulseiraId,
                 numero_pulseira: numeroPulseira,
                 area_id: areaId,
-                dispositivoId: 'web-dashboard'
+                dispositivoId: 'web-dashboard',
+                atendimento_inicio: inicioAtendimentoRef.current,
+                estacao: sessaoAtiva?.estacao_nome || null
             }, 'credenciar-pulseira');
 
             if (res.status === 'local') {

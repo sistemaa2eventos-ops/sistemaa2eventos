@@ -313,7 +313,7 @@ class AccessController {
                 area_id: area_id || null
             });
 
-            if (result.error) return ApiResponse.error(res, result.error, result.status || 400);
+            if (result.error) return ApiResponse.error(res, result.error, result.status || 400, result.detalhes || null);
             return ApiResponse.success(res, result);
         } catch (error) {
             logger.error(
@@ -357,7 +357,7 @@ class AccessController {
                 area_id: area_id || null
             });
 
-            if (result.error) return ApiResponse.error(res, result.error, result.status || 400);
+            if (result.error) return ApiResponse.error(res, result.error, result.status || 400, result.detalhes || null);
             return ApiResponse.success(res, result);
         } catch (error) {
             logger.error(
@@ -447,7 +447,7 @@ class AccessController {
                 area_id
             });
 
-            if (result.error) return ApiResponse.error(res, result.error, result.status || 400);
+            if (result.error) return ApiResponse.error(res, result.error, result.status || 400, result.detalhes || null);
 
             // Montar info da pulseira para resposta
             const pulseiraInfo = tipoPulseira ? {
@@ -470,6 +470,24 @@ class AccessController {
                 'Error in bracelet checkin'
             );
             return ApiResponse.error(res, error.message || 'Erro ao processar check-in');
+        }
+    }
+
+    /**
+     * Corrige a saída do turno de um dia anterior (quem entrou e não registrou a saída):
+     * o operador confirmou e informou o horário real. Ver turnoAnterior.service.
+     */
+    async corrigirTurnoAnterior(req, res) {
+        try {
+            const { pessoa_id, saida_em } = req.body;
+            if (!pessoa_id || !saida_em) return ApiResponse.error(res, 'pessoa_id e saida_em são obrigatórios', 400);
+            const r = await require('./turnoAnterior.service').corrigir({ pessoa_id, evento_id: req.event?.id, saida_em, usuario_id: req.user?.id });
+            if (r.error) return ApiResponse.error(res, r.error, r.status || 400);
+            await require('../../services/audit.service').logEntity(req, 'FIX_PREVIOUS_SHIFT', 'ACESSOS', pessoa_id, r).catch(() => {});
+            return ApiResponse.success(res, r);
+        } catch (error) {
+            logger.error({ err: error, person_id: req.body?.pessoa_id }, 'Error fixing previous shift');
+            return ApiResponse.error(res, 'Erro ao corrigir a saída do turno anterior');
         }
     }
 
@@ -540,7 +558,7 @@ class AccessController {
                 offline_timestamp: req.body.offline_timestamp
             });
 
-            if (result.error) return ApiResponse.error(res, result.error, result.status || 400);
+            if (result.error) return ApiResponse.error(res, result.error, result.status || 400, result.detalhes || null);
 
             // Dispatch webhook
             webhookDispatcher.dispatchCheckout(eventoId, pessoa);
@@ -628,7 +646,7 @@ class AccessController {
                 sync_id, offline_timestamp
             });
 
-            if (result.error) return ApiResponse.error(res, result.error, result.status || 400);
+            if (result.error) return ApiResponse.error(res, result.error, result.status || 400, result.detalhes || null);
 
             // Disparar Webhook
             if (tipoAcesso === 'checkout') {
@@ -712,7 +730,7 @@ class AccessController {
                     sync_id, offline_timestamp
                 });
 
-                if (result.error) return ApiResponse.error(res, result.error, result.status || 400);
+                if (result.error) return ApiResponse.error(res, result.error, result.status || 400, result.detalhes || null);
                 webhookDispatcher.dispatchCheckin(eventoId, pessoa);
 
                 return ApiResponse.success(res, {
@@ -810,6 +828,12 @@ class AccessController {
             if (tipoPulseira?.id) updateData.tipo_pulseira_id = tipoPulseira.id;
             await supabaseClient.from('pessoas').update(updateData).eq('id', pessoa_id);
             pulseiraService.registrarEntrega(pessoa_id, req.user?.id);
+            if (req.body.atendimento_inicio) {
+                require('../reports/atendimento.service').registrar({
+                    evento_id: eventoId, operador_id: req.user?.id, pessoa_id, tipo: 'credenciamento',
+                    inicio: req.body.atendimento_inicio, estacao: req.body.estacao || null
+                });
+            }
 
             // 6. Auto CHECK-IN via fluxo centralizado
             const result = await checkinService.registrarAcesso(supabaseClient, {
@@ -826,7 +850,7 @@ class AccessController {
                 observacao: require('./services/validation.service').MARCADOR_CREDENCIAMENTO
             });
 
-            if (result.error) return ApiResponse.error(res, result.error, result.status || 400);
+            if (result.error) return ApiResponse.error(res, result.error, result.status || 400, result.detalhes || null);
 
             // 7. Montar resposta enriquecida
             const pulseiraInfo = tipoPulseira ? {

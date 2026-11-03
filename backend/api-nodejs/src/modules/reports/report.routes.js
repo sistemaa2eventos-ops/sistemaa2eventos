@@ -34,6 +34,25 @@ router.get('/diario-consolidado/xlsx', checkPermission('relatorios', 'leitura'),
 router.get('/diario-consolidado/pdf',  checkPermission('relatorios', 'leitura'), (req, res) => reportController.exportarRelatorioDiarioPDF(req, res));
 router.get('/fechamentos-diarios',     checkPermission('relatorios', 'leitura'), (req, res) => reportController.listarFechamentosDiarios(req, res));
 router.get('/exportar-aba-pdf',        checkPermission('relatorios', 'leitura'), (req, res) => reportController.exportarAbaPDF(req, res));
+// Métricas de atendimento por operador e planilha orçamentária
+router.get('/atendimento', checkPermission('relatorios', 'leitura'), async (req, res) => {
+    try {
+        res.json({ success: true, data: await require('./atendimento.service').metricas(req.event.id, req.query) });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+router.get('/orcamento/xlsx', checkPermission('relatorios', 'leitura'), async (req, res) => {
+    try {
+        const wb = await require('./orcamento.service').montarPlanilha(req.event.id, req.query);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename="orcamento-credenciamento.xlsx"');
+        await wb.xlsx.write(res);
+        res.end();
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
 router.get('/exportar-aba-xlsx',       checkPermission('relatorios', 'leitura'), (req, res) => reportController.exportarAbaXLSX(req, res));
 
 module.exports = router;

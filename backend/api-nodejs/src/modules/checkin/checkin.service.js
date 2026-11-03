@@ -39,6 +39,20 @@ class CheckinService {
         const tipoFinal = await ValidationService.determineSmartAccessType(pessoa_id, evento_id, accessData.tipo, area_id, ctxValidacao);
         const timestamp = offline_timestamp ? new Date(offline_timestamp) : new Date();
 
+        // Saída registrada por operador de quem entrou num dia anterior: pede confirmação e o
+        // horário real (a correção é feita em /checkout/corrigir-turno). Leitor sozinho (sem operador) não tem quem confirme.
+        if (tipoFinal === 'checkout' && created_by && !accessData.confirmar_turno_anterior && !offline_timestamp) {
+            const turno = await require('./turnoAnterior.service').verificar(pessoa_id, evento_id).catch(() => null);
+            if (turno) {
+                return {
+                    error: 'Esta pessoa entrou num dia anterior e não registrou a saída. Confirme o horário de saída daquele turno.',
+                    status: 409,
+                    action: 'confirmar',
+                    detalhes: { codigo: 'TURNO_ANTERIOR', pessoa: { id: pessoa_id, nome: pessoa?.nome_completo || pessoa?.nome || '' }, ...turno }
+                };
+            }
+        }
+
         // 3. Validar políticas de acesso
         try {
             const validation = await ValidationService.validateAccessRules(evento_id, pessoa, tipoFinal, metodo, timestamp, accessData.confianca, area_id, ctxValidacao);

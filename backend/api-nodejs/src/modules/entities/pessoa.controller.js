@@ -97,8 +97,16 @@ class PessoaController {
             // Sempre usar service_role para operações de escrita (criar/editar)
             // O req.supabase usa anon_key e passa pelas políticas RLS, que podem bloquear operações administrativas
             const supabaseClient = supabase;
-            const result = await pessoaService.createPessoa(supabaseClient, req.body, req.user);
+            // Início do atendimento (marcado pelo painel): métrica, não campo da pessoa
+            const { atendimento_inicio, ...dadosPessoa } = req.body;
+            const result = await pessoaService.createPessoa(supabaseClient, dadosPessoa, req.user);
             const novaPessoa = result?.pessoa || result;
+            if (atendimento_inicio && novaPessoa?.id) {
+                require('../reports/atendimento.service').registrar({
+                    evento_id: novaPessoa.evento_id || req.event?.id, operador_id: req.user?.id, pessoa_id: novaPessoa.id,
+                    tipo: 'cadastro', inicio: atendimento_inicio
+                });
+            }
 
             // Auditoria
             await auditService.logEntity(req, 'CREATE_PERSON', 'PESSOAS', novaPessoa?.id, { 

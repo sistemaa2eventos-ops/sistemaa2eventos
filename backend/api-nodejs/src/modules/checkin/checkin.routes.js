@@ -20,6 +20,7 @@ const sessionMiddleware = [authenticate, requireEvent];
 // ============================================
 router.post('/pulseira/checkin', sessionMiddleware, rateLimiter.access, accessController.checkinPulseira);
 router.post('/pulseira/checkout', sessionMiddleware, rateLimiter.access, accessController.checkoutPulseira);
+router.post('/checkout/corrigir-turno', sessionMiddleware, rateLimiter.access, accessController.corrigirTurnoAnterior);
 router.post('/pulseira/link-checkin', sessionMiddleware, rateLimiter.access, accessController.credenciarPulseira);
 router.post('/link-checkin', sessionMiddleware, rateLimiter.access, accessController.credenciarPulseira);
 router.get('/pulseira/buscar', sessionMiddleware, accessController.buscarPessoaPulseira);

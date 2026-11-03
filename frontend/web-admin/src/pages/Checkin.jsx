@@ -19,6 +19,7 @@ import PessoaFoto from '../components/common/PessoaFoto';
 import PessoaCardDialog from '../components/credenciamento/PessoaCardDialog';
 import RecentAccessList from '../components/credenciamento/RecentAccessList';
 import { useCheckin } from '../hooks/useCheckin';
+import CorrigirTurnoDialog from '../components/checkin/CorrigirTurnoDialog';
 import RelogioSincronizado from '../components/common/RelogioSincronizado';
 
 const FeedbackOverlay = styled(Box, { shouldForwardProp: (p) => p !== 'status' })(({ status }) => ({
@@ -56,7 +57,8 @@ const Checkin = () => {
     loadingSessao,
     vincularLeitor,
     desvincularLeitor,
-    carregarDispositivosDisponiveis
+    carregarDispositivosDisponiveis,
+    turnoAnterior, confirmarTurnoAnterior, cancelarTurnoAnterior,
   } = useCheckin(undefined, { logsTipo: 'checkin' });
 
 
@@ -233,6 +235,9 @@ const Checkin = () => {
             </GlassCard>
         </Grid>
       </Grid>
+
+      {/* Saída de um dia anterior: confirmar o horário */}
+      <CorrigirTurnoDialog turno={turnoAnterior} onConfirmar={confirmarTurnoAnterior} onCancelar={cancelarTurnoAnterior} />
 
       {/* FEEDBACK OVERLAY GLOBAL */}
       {checkinResult && (

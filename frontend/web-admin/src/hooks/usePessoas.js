@@ -11,6 +11,7 @@ export const usePessoas = () => {
     const { user } = useAuth();
     const { enqueueSnackbar } = useSnackbar();
     const searchTimerRef = useRef(null);
+    const inicioAtendimentoRef = useRef(null);
     const searchRef = useRef('');
     const fetchAbortRef = useRef(null);
     const buscaMontadaRef = useRef(false);
@@ -213,6 +214,8 @@ export const usePessoas = () => {
 
     const handleOpenDialog = async (pessoa = null) => {
       setActiveStep(0);
+      // Início do atendimento (cadastro novo): métrica de tempo por operador
+      inicioAtendimentoRef.current = pessoa ? null : new Date().toISOString();
       if (pessoa) {
         setLoading(true);
         try {
@@ -312,7 +315,7 @@ export const usePessoas = () => {
             }
           }
         }
-        else await api.post('/pessoas', payload);
+        else await api.post('/pessoas', { ...payload, atendimento_inicio: inicioAtendimentoRef.current });
         handleCloseDialog();
         loadPessoas();
       } catch (error) {

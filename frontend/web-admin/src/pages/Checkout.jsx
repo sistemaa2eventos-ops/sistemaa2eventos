@@ -15,6 +15,7 @@ import PessoaCardDialog from '../components/credenciamento/PessoaCardDialog';
 import RecentAccessList from '../components/credenciamento/RecentAccessList';
 import CabecalhoOperacao, { BotaoJanelaRegistros } from '../components/credenciamento/CabecalhoOperacao';
 import { useCheckin } from '../hooks/useCheckin';
+import CorrigirTurnoDialog from '../components/checkin/CorrigirTurnoDialog';
 import { funcao, tom } from '../styles/tokens';
 
 // Saída tem cor própria; vermelho fica só para acesso negado
@@ -99,7 +100,8 @@ const Checkout = () => {
     loadingSessao,
     vincularLeitor,
     desvincularLeitor,
-    carregarDispositivosDisponiveis
+    carregarDispositivosDisponiveis,
+    turnoAnterior, confirmarTurnoAnterior, cancelarTurnoAnterior,
   } = useCheckin('checkout', { logsTipo: 'checkout' });
 
 
@@ -206,6 +208,9 @@ const Checkout = () => {
             </GlassCard>
         </Grid>
       </Grid>
+
+      {/* Saída de um dia anterior: confirmar o horário */}
+      <CorrigirTurnoDialog turno={turnoAnterior} onConfirmar={confirmarTurnoAnterior} onCancelar={cancelarTurnoAnterior} />
 
       {/* FEEDBACK OVERLAY */}
       {checkinResult && (
