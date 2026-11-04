@@ -76,9 +76,10 @@ const GlassBox = styled(Box)(({ theme }) => ({
 const inputSx = {
     my: 1,
     '& .MuiOutlinedInput-root': {
-        backgroundColor: 'rgba(5, 11, 24, 0.75)',
+        backgroundColor: '#060D1A !important',
         borderRadius: 2,
         transition: 'all 0.2s ease',
+        overflow: 'hidden',
         '& fieldset': {
             borderColor: 'rgba(0, 212, 255, 0.25)',
         },
@@ -89,15 +90,23 @@ const inputSx = {
             borderColor: '#00D4FF',
             boxShadow: '0 0 16px rgba(0, 212, 255, 0.25)',
         },
+        '& .MuiInputAdornment-root': {
+            backgroundColor: 'transparent',
+            color: '#00D4FF',
+        },
         '& input': {
             color: '#FFFFFF',
             fontSize: '0.95rem',
             fontWeight: 500,
-            '&:-webkit-autofill': {
-                WebkitBoxShadow: '0 0 0 100px #081120 inset !important',
+            backgroundColor: 'transparent !important',
+            borderRadius: '0 !important',
+            '&:-webkit-autofill, &:-webkit-autofill:hover, &:-webkit-autofill:focus, &:-webkit-autofill:active': {
+                WebkitBoxShadow: '0 0 0 1000px #060D1A inset !important',
+                boxShadow: '0 0 0 1000px #060D1A inset !important',
                 WebkitTextFillColor: '#FFFFFF !important',
                 caretColor: '#00D4FF',
-                borderRadius: 'inherit',
+                borderRadius: '0 !important',
+                transition: 'background-color 5000s ease-in-out 0s',
             }
         }
     },

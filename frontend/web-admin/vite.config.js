@@ -43,11 +43,15 @@ export default defineConfig({
                 theme_color: '#050B18',
                 background_color: '#050B18',
                 display: 'standalone',
+                start_url: '/',
+                scope: '/',
                 icons: [
-                    { src: 'pwa-192x192-v2.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-                    { src: 'pwa-512x512-v2.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-                    // Android recorta em círculo/gota: versão com margem segura
-                    { src: 'pwa-maskable-512x512-v2.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+                    { src: '/favicon.ico', sizes: '48x48 32x32 16x16', type: 'image/x-icon', purpose: 'any' },
+                    { src: '/pwa-128x128.png', sizes: '128x128', type: 'image/png', purpose: 'any' },
+                    { src: '/pwa-192x192-v2.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+                    { src: '/pwa-256x256.png', sizes: '256x256', type: 'image/png', purpose: 'any' },
+                    { src: '/pwa-512x512-v2.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+                    { src: '/pwa-maskable-512x512-v2.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
                 ]
             }
         })
