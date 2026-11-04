@@ -23,6 +23,7 @@ import { authService } from '../services/auth';
 import { useNavigate } from 'react-router-dom';
 import { styled } from '@mui/material/styles';
 import NeonButton from '../components/common/NeonButton';
+import nztEmblem from '../assets/images/nzt-emblem.png';
 
 const LoginContainer = styled(Box)(() => ({
     minHeight: '100dvh',
@@ -194,7 +195,7 @@ const Login = () => {
                     <Box sx={{ mb: 2.5, display: 'flex', justifyContent: 'center' }}>
                         <Box
                             component="img"
-                            src="/assets/nzt-emblem.png"
+                            src={nztEmblem}
                             alt="NZT Intelligent Control Systems"
                             sx={{
                                 width: 110,

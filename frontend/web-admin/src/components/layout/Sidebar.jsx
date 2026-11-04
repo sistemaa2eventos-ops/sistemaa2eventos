@@ -77,7 +77,7 @@ const StyledDrawer = styled(Drawer)(() => ({
 }));
 
 const LogoContainer = styled(Box)(({ theme }) => ({
-    padding: '24px 20px 20px 20px',
+    padding: '16px 16px 14px 16px',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -490,9 +490,9 @@ const Sidebar = ({ open, onClose }) => {
                     alt="NZT Intelligent Control Systems"
                     sx={{
                         width: '100%',
-                        maxWidth: 220,
+                        maxWidth: 145,
                         height: 'auto',
-                        maxHeight: 96,
+                        maxHeight: 48,
                         objectFit: 'contain',
                         filter: 'drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5))',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',

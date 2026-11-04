@@ -4,6 +4,7 @@ import { Menu as MenuIcon, Event as EventIcon } from '@mui/icons-material';
 import Sidebar from './Sidebar';
 import NotificationBell from './NotificationBell';
 import AjudaContextual from '../ajuda/AjudaContextual';
+import nztEmblem from '../../assets/images/nzt-emblem.png';
 
 const MainLayout = ({ children }) => {
     const [mobileOpen, setMobileOpen] = useState(false);
@@ -72,9 +73,9 @@ const MainLayout = ({ children }) => {
                             <NotificationBell />
                         </Box>
                         <Avatar
-                            src="/assets/nzt-logo-icon.png"
-                            variant="rounded"
-                            sx={{ width: 32, height: 32, border: '1px solid rgba(0, 212, 255, 0.4)', bgcolor: '#050B18', flexShrink: 0 }}
+                            src={nztEmblem}
+                            variant="circular"
+                            sx={{ width: 34, height: 34, border: '1px solid rgba(0, 212, 255, 0.4)', bgcolor: '#050B18', flexShrink: 0 }}
                         >
                             NZT
                         </Avatar>
