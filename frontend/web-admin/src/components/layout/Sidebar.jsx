@@ -76,7 +76,7 @@ const StyledDrawer = styled(Drawer)(() => ({
 }));
 
 const LogoContainer = styled(Box)(({ theme }) => ({
-    padding: '24px 20px 20px 20px',
+    padding: '20px 20px 16px 20px',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -94,7 +94,7 @@ const LogoContainer = styled(Box)(({ theme }) => ({
         background: 'linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.4), transparent)',
     },
     '&:hover img': {
-        filter: 'drop-shadow(0 0 22px rgba(0, 212, 255, 0.55)) brightness(1.05)',
+        filter: 'drop-shadow(0 0 24px rgba(0, 212, 255, 0.65)) brightness(1.08)',
         transform: 'scale(1.02)'
     }
 }));
@@ -488,11 +488,11 @@ const Sidebar = ({ open, onClose }) => {
                     alt="NZT Intelligent Control Systems"
                     sx={{
                         width: '100%',
-                        maxWidth: 228,
+                        maxWidth: 216,
                         height: 'auto',
-                        maxHeight: 110,
+                        maxHeight: 92,
                         objectFit: 'contain',
-                        filter: 'drop-shadow(0 0 16px rgba(0, 212, 255, 0.35))',
+                        filter: 'drop-shadow(0 0 18px rgba(0, 212, 255, 0.45)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6))',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                         userSelect: 'none'
                     }}
