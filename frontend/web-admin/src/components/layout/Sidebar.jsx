@@ -60,6 +60,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '@mui/material/styles';
 import api from '../../services/api';
 import OperatorSection from './OperatorSection';
+import nztLogoClean from '../../assets/images/nzt-logo-clean.png';
 
 const StyledDrawer = styled(Drawer)(() => ({
     width: 280,
@@ -95,8 +96,8 @@ const LogoContainer = styled(Box)(({ theme }) => ({
         background: 'linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.35), transparent)',
     },
     '&:hover img': {
-        filter: 'drop-shadow(0 0 24px rgba(0, 212, 255, 0.65)) drop-shadow(0 4px 14px rgba(0, 0, 0, 0.8)) brightness(1.08)',
-        transform: 'scale(1.03)',
+        filter: 'brightness(1.08) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.7))',
+        transform: 'scale(1.02)',
     }
 }));
 
@@ -485,7 +486,7 @@ const Sidebar = ({ open, onClose }) => {
             >
                 <Box
                     component="img"
-                    src="/assets/nzt-logo-full.png"
+                    src={nztLogoClean}
                     alt="NZT Intelligent Control Systems"
                     sx={{
                         width: '100%',
@@ -493,7 +494,7 @@ const Sidebar = ({ open, onClose }) => {
                         height: 'auto',
                         maxHeight: 96,
                         objectFit: 'contain',
-                        filter: 'drop-shadow(0 0 16px rgba(0, 212, 255, 0.35)) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.7))',
+                        filter: 'drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5))',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                         userSelect: 'none'
                     }}
