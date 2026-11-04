@@ -76,14 +76,16 @@ const StyledDrawer = styled(Drawer)(() => ({
 }));
 
 const LogoContainer = styled(Box)(({ theme }) => ({
-    padding: '20px 20px 16px 20px',
+    padding: theme.spacing(3, 3, 2.5),
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
+    textAlign: 'center',
     position: 'relative',
     cursor: 'pointer',
-    transition: 'all 0.3s ease',
+    userSelect: 'none',
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     '&::after': {
         content: '""',
         position: 'absolute',
@@ -91,11 +93,18 @@ const LogoContainer = styled(Box)(({ theme }) => ({
         left: '10%',
         width: '80%',
         height: '1px',
-        background: 'linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.4), transparent)',
+        background: 'linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.35), transparent)',
     },
-    '&:hover img': {
-        filter: 'drop-shadow(0 0 24px rgba(0, 212, 255, 0.65)) brightness(1.08)',
-        transform: 'scale(1.02)'
+    '&:hover': {
+        '& .logo-title': {
+            filter: 'drop-shadow(0 0 24px rgba(0, 212, 255, 0.8))',
+            transform: 'scale(1.03)',
+        },
+        '& .logo-subtitle': {
+            color: '#00D4FF',
+            opacity: 1,
+            letterSpacing: '2.8px',
+        }
     }
 }));
 
@@ -480,23 +489,45 @@ const Sidebar = ({ open, onClose }) => {
                     const eid = localStorage.getItem('active_evento_id');
                     navigate(eid ? `/?evento_id=${eid}` : '/');
                 }} 
-                title="NZT Intelligent Control Systems"
+                title="NZT Intelligent Control Systems - Início"
             >
-                <Box
-                    component="img"
-                    src="/assets/nzt-logo-full.png"
-                    alt="NZT Intelligent Control Systems"
+                <Typography
+                    className="logo-title"
                     sx={{
-                        width: '100%',
-                        maxWidth: 216,
-                        height: 'auto',
-                        maxHeight: 92,
-                        objectFit: 'contain',
-                        filter: 'drop-shadow(0 0 18px rgba(0, 212, 255, 0.45)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6))',
+                        fontFamily: '"Space Grotesk", sans-serif',
+                        fontWeight: 900,
+                        fontSize: '2.1rem',
+                        lineHeight: 1.1,
+                        letterSpacing: '6px',
+                        background: 'linear-gradient(180deg, #FFFFFF 15%, #CAEDFF 50%, #00D4FF 100%)',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        filter: 'drop-shadow(0 0 16px rgba(0, 212, 255, 0.45))',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        userSelect: 'none'
+                        display: 'block',
                     }}
-                />
+                >
+                    NZT
+                </Typography>
+                <Typography
+                    className="logo-subtitle"
+                    variant="caption"
+                    sx={{
+                        mt: 0.75,
+                        fontFamily: '"Space Grotesk", sans-serif',
+                        color: '#7DD3FC',
+                        fontSize: '0.6875rem',
+                        fontWeight: 600,
+                        letterSpacing: '2.4px',
+                        textTransform: 'uppercase',
+                        opacity: 0.85,
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        display: 'block',
+                        whiteSpace: 'nowrap',
+                    }}
+                >
+                    Intelligent Control Systems
+                </Typography>
             </LogoContainer>
 
 {/* Evento Ativo Context com Seletor Interativo */}
