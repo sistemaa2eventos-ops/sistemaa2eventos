@@ -7,11 +7,14 @@ const isDev = process.env.NODE_ENV === 'development';
 
 /** Usuário do token (sem validar assinatura: serve só para separar a contagem). */
 function usuarioDoToken(req) {
-    const token = (req.headers.authorization || '').replace('Bearer ', '') || req.query?.token;
-    if (!token || token.split('.').length !== 3) return null;
+    // ?ingresso= (imagem/vídeo de câmera e gravação) leva o usuário no campo "u": sem isto, as
+    // imagens do CFTV contavam no limite do IP do local e travavam o login de todo o evento
+    const token = (req.headers.authorization || '').replace('Bearer ', '') || req.query?.token || req.query?.ingresso;
+    if (!token || typeof token !== 'string' || token.split('.').length !== 3) return null;
     try {
         const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
-        return typeof payload.sub === 'string' ? payload.sub : null;
+        const id = payload.sub || payload.u;
+        return typeof id === 'string' ? id : null;
     } catch {
         return null;
     }
@@ -64,6 +67,9 @@ const apiLimiter = rateLimit({
     // um 429 aqui vira acesso negado na porta.
     skip: (req) => {
         const url = req.originalUrl || req.url || '';
+        // Vídeo/imagem de câmera e gravação: um mosaico gera centenas de pedidos por minuto e cada
+        // um já exige ingresso assinado de 2 min (ou login)
+        if (/^\/api\/cameras\/[^/]+\/(snapshot|stream|video\.mp4)(\?|$)/.test(url) || /^\/api\/gravacoes\/[^/]+\/video(\?|$)/.test(url)) return true;
         return url.startsWith('/api/intelbras/') || url.startsWith('/api/hikvision/') || url.startsWith('/keepalive');
     }
 });

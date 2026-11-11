@@ -2,3 +2,8 @@
 .estado.json
 node_modules/
 .deteccoes-pendentes.json
+# Retransmissor/gravação: binários baixados pelo ligar-ia-facial e config com senhas das câmeras
+bin/
+.gravacoes-reportadas.json
+.motor-desligado
+.config-cameras.json

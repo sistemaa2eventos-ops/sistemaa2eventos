@@ -17,6 +17,7 @@ import PageHeader from '../../components/common/PageHeader';
 import GlassCard from '../../components/common/GlassCard';
 import NeonButton from '../../components/common/NeonButton';
 import { carregarIaConfig, definirIaConfig, useIaConfig, useIaStatus, statusDaCamera, NOMES_PERFIL } from '../../hooks/useIaConfig';
+import { MODOS_IA, modoIaDe, camposDoModoIa } from '../../components/cameras/opcoesCamera';
 
 // Mesma tabela do motor (backend/microservice-face-python/src/main.py → PERFIS e COMUNS)
 const PERFIS_IA = {
@@ -365,24 +366,9 @@ const ConfigIAFacial = ({ embutido = false }) => {
             if (info.agente_conectado) {
                 setEtapaAtivacao('Agente local já conectado! Verificando inicialização do motor de IA...');
             } else {
-                // Tenta conectar diretamente no motor local (porta 8000) se já estiver aberto neste PC
-                let conectouViaHttpLocal = false;
-                if (info.token) {
-                    try {
-                        const rLocal = await fetch('http://127.0.0.1:8000/api/conectar-evento', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ token: info.token, vps_url: info.vps_url, agent_name: info.agent_name }),
-                            signal: AbortSignal.timeout(3000)
-                        });
-                        if (rLocal.ok) conectouViaHttpLocal = true;
-                    } catch {
-                        // Motor na porta 8000 ainda não está aberto neste PC
-                    }
-                }
-
-                // Se o backend na nuvem não iniciou localmente nem conectou via HTTP local, aciona o protocolo nzt-ia://
-                if (!info.iniciado_localmente && !conectouViaHttpLocal && info.protocolo_url) {
+                // O motor não aceita mais troca de token pelo navegador (qualquer site podia fazê-lo):
+                // a ativação no PC passa pelo protocolo nzt-ia://, que o Windows confirma
+                if (!info.iniciado_localmente && info.protocolo_url) {
                     setEtapaAtivacao('Solicitando ao Windows a abertura do "ligar-ia-facial" neste computador...');
                     const link = document.createElement('a');
                     link.href = info.protocolo_url;
@@ -757,8 +743,7 @@ const ConfigIAFacial = ({ embutido = false }) => {
                                             <TableCell>Câmera</TableCell>
                                             <TableCell>Agora</TableCell>
                                             <TableCell align="center">Ativa</TableCell>
-                                            <TableCell align="center">IA</TableCell>
-                                            <TableCell align="center">Vigilância 24 h</TableCell>
+                                            <TableCell>Inteligência</TableCell>
                                             <TableCell>Prioridade</TableCell>
                                             <TableCell>Sub-stream (opcional)</TableCell>
                                         </TableRow>
@@ -789,14 +774,13 @@ const ConfigIAFacial = ({ embutido = false }) => {
                                                         <Switch size="small" color="success" checked={!isDesativada} disabled={salvandoCam === cam.id}
                                                             onChange={e => salvarCamera(cam, { status: e.target.checked ? 'offline' : 'desativada' })} />
                                                     </TableCell>
-                                                    <TableCell align="center">
-                                                        <Switch size="small" checked={cam.ia_ativa !== false && !isDesativada} disabled={salvandoCam === cam.id || isDesativada}
-                                                            onChange={e => salvarCamera(cam, { ia_ativa: e.target.checked })} />
-                                                    </TableCell>
-                                                    <TableCell align="center">
-                                                        <Switch size="small" checked={cam.vigilancia_ativa !== false && cam.ia_ativa !== false && !isDesativada}
-                                                            disabled={salvandoCam === cam.id || cam.ia_ativa === false || isDesativada}
-                                                            onChange={e => salvarCamera(cam, { vigilancia_ativa: e.target.checked })} />
+                                                    <TableCell sx={{ minWidth: 160 }}>
+                                                        {/* Mesma regra do cartão em Câmeras (opcoesCamera.js) */}
+                                                        <Select size="small" fullWidth value={modoIaDe(cam)} disabled={salvandoCam === cam.id || isDesativada}
+                                                            inputProps={{ 'aria-label': `Inteligência da câmera ${cam.nome}` }}
+                                                            onChange={e => salvarCamera(cam, camposDoModoIa(e.target.value))}>
+                                                            {MODOS_IA.map(m => <MenuItem key={m.valor} value={m.valor}>{m.rotulo}</MenuItem>)}
+                                                        </Select>
                                                     </TableCell>
                                                     <TableCell>
                                                         <Select size="small" value={cam.prioridade ?? 1} disabled={salvandoCam === cam.id || isDesativada}

@@ -218,6 +218,7 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/lgpd', lgpdRoutes);
 app.use('/api/watchlist', watchlistRoutes);
 app.use('/api/cameras', cameraRoutes);
+app.use('/api/gravacoes', require('./modules/system/gravacao.routes'));
 app.use('/public', rateLimiter.public, publicRoutes);
 app.use('/api/public', rateLimiter.public, publicRoutes); // FIX I-10: rate limiter dedicado para rotas públicas
 

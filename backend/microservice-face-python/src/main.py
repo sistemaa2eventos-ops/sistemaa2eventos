@@ -213,28 +213,80 @@ def yaw_estimado(kps: np.ndarray) -> float:
     return abs(math.degrees(math.asin(max(-1.0, min(1.0, (de - dd) / (de + dd))))))
 
 
-app = FastAPI(title="NZT - IA de rastreamento facial", version="4.0.0")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app = FastAPI(title="NZT - IA de rastreamento facial", version="5.0.0")
+
+# ----------------------------------------------------------------------------------------------
+# Acesso ao motor. Antes: escutava em toda a rede, aceitava qualquer site (CORS "*") e não pedia
+# senha — qualquer página aberta no navegador do PC, ou qualquer aparelho da rede do evento, podia
+# ler câmeras e trocar o token do agente. Agora:
+#  - escuta só em 127.0.0.1 (IA_HOST muda isso, ex.: motor num servidor separado);
+#  - toda rota exige o cabeçalho X-IA-Chave (chave gerada no 1º uso em .chave-interna, lida pelo
+#    agente local deste PC; na API direta, variável IA_CHAVE_INTERNA). Exceção: /health e o
+#    diagnóstico de hardware que o painel consulta neste PC;
+#  - navegador só das origens do painel (IA_ORIGENS).
+# ----------------------------------------------------------------------------------------------
+import secrets as _secrets
+
+_ARQ_CHAVE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".chave-interna")
+
+
+def _carregar_chave_interna() -> str:
+    chave = os.getenv("IA_CHAVE_INTERNA", "").strip()
+    if chave:
+        return chave
+    try:
+        with open(_ARQ_CHAVE, "r", encoding="utf-8") as f:
+            chave = f.read().strip()
+    except FileNotFoundError:
+        chave = ""
+    if len(chave) < 32:
+        chave = _secrets.token_hex(32)
+        with open(_ARQ_CHAVE, "w", encoding="utf-8") as f:
+            f.write(chave)
+        logger.info("🔑 Chave interna do motor criada em .chave-interna (o agente local deste PC a lê sozinho).")
+    return chave
+
+
+CHAVE_INTERNA = _carregar_chave_interna()
+ROTAS_PUBLICAS = {"/health", "/api/pc-compatibilidade"}
+IA_ORIGENS = [o.strip() for o in os.getenv(
+    "IA_ORIGENS", "https://painel.nzt.app.br,http://localhost:5173,http://localhost:3000").split(",") if o.strip()]
+
+app.add_middleware(CORSMiddleware, allow_origins=IA_ORIGENS, allow_credentials=False, allow_methods=["GET"], allow_headers=[])
 
 
 @app.middleware("http")
-async def _allow_private_network(request: Request, call_next):
+async def _proteger(request: Request, call_next):
+    caminho = request.url.path
+    origem = request.headers.get("origin")
     if request.method == "OPTIONS" and request.headers.get("access-control-request-private-network") == "true":
-        return Response(status_code=204, headers={
-            "Access-Control-Allow-Origin": request.headers.get("origin") or "*",
-            "Access-Control-Allow-Methods": "*",
-            "Access-Control-Allow-Headers": "*",
-            "Access-Control-Allow-Private-Network": "true",
-        })
+        # Painel (HTTPS) consultando o motor deste PC: só leitura pública e só das origens do painel
+        if origem in IA_ORIGENS and caminho in ROTAS_PUBLICAS:
+            return Response(status_code=204, headers={
+                "Access-Control-Allow-Origin": origem,
+                "Access-Control-Allow-Methods": "GET",
+                "Access-Control-Allow-Private-Network": "true",
+                "Vary": "Origin",
+            })
+        return Response(status_code=403)
+    if caminho not in ROTAS_PUBLICAS:
+        recebida = request.headers.get("x-ia-chave", "")
+        if not recebida or not _secrets.compare_digest(recebida, CHAVE_INTERNA):
+            return JSONResponse(status_code=401, content={"detail": "Chave do motor ausente ou inválida"})
     resp = await call_next(request)
-    resp.headers["Access-Control-Allow-Private-Network"] = "true"
+    if origem in IA_ORIGENS and caminho in ROTAS_PUBLICAS:
+        resp.headers["Access-Control-Allow-Private-Network"] = "true"
     return resp
 
 # ==========================================================
 # 2. ÍNDICE DE ROSTOS (FAISS, vários vetores por pessoa)
 # ==========================================================
-SUPABASE_URL = os.getenv("SUPABASE_URL", "https://zznrgwytywgjsjqdjfxn.supabase.co")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")  # obrigatória no .env (nunca no código)
+# Biometrias: por padrão a API envia ao motor (pelo agente) só as pessoas do evento — o PC do evento
+# não guarda a chave de serviço do Supabase. Com SUPABASE_SERVICE_ROLE_KEY definida (motor num
+# servidor da própria empresa, API em modo direto) o motor ainda lê do banco como antes.
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "") if SUPABASE_URL else ""
+MODO_SUPABASE = bool(SUPABASE_URL and SUPABASE_KEY)
 
 
 class Indice:
@@ -326,8 +378,9 @@ def avaliar_rosto_cadastro(img: np.ndarray) -> Dict[str, Any]:
 
 
 def sincronizar_biometrias_pendentes() -> int:
-    """Gera o embedding de quem tem foto_url mas ainda está sem face_encoding."""
-    if det_model is None or not SUPABASE_KEY:
+    """Modo Supabase: gera o embedding de quem tem foto_url mas ainda está sem face_encoding.
+    (Sem a chave, a API pede cada biometria pendente pelo agente em /api/extract.)"""
+    if det_model is None or not MODO_SUPABASE:
         return 0
     try:
         pendentes = _supabase_get("pessoas?select=id,nome_completo,foto_url&foto_url=not.is.null&face_encoding=is.null&limit=200")
@@ -366,12 +419,54 @@ def sincronizar_biometrias_pendentes() -> int:
     return gerados
 
 
-def reload_registered_faces() -> int:
-    """Carrega TODAS as pessoas com biometria (paginado: o Supabase devolve no máximo 1000 por vez)
-    e troca o índice de uma vez. Atualiza também nome, bloqueio e status de quem já estava no índice."""
+base_rostos: Dict[str, Dict[str, Any]] = {}   # pessoa_id → dados + "vec" (fonte do índice)
+base_lock = threading.Lock()
+
+
+def _pessoa_da_linha(p: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Linha de pessoa (banco ou API) → registro do índice, ou None se a biometria não serve."""
+    enc = p.get('face_encoding')
+    if isinstance(enc, str):
+        try:
+            enc = json.loads(enc)
+        except Exception:
+            enc = None
+    if not (isinstance(enc, list) and len(enc) == 512) or not p.get('id'):
+        return None
+    vec = np.array(enc, dtype=np.float32)
+    norma = float(np.linalg.norm(vec))
+    if norma <= 0:
+        return None
+    return {
+        "id": str(p['id']), "nome": p.get('nome_completo') or p.get('nome') or "Sem Nome", "cpf": p.get('cpf') or "",
+        "status_acesso": p.get('status_acesso') or "liberado", "bloqueado": bool(p.get('bloqueado', False)),
+        "foto_url": p.get('foto_url'), "vec": vec / norma}
+
+
+def _montar_indice_da_base():
+    """Troca o índice de uma vez a partir de base_rostos (quem está buscando usa o anterior)."""
     global indice, cadastro_por_id
-    if not SUPABASE_KEY:
-        ultima_carga.update(ts=time.time(), ok=False, erro="SUPABASE_SERVICE_ROLE_KEY ausente")
+    with base_lock:
+        registros = list(base_rostos.values())
+    pessoas = [{k: v for k, v in r.items() if k != "vec"} for r in registros]
+    cadastro = [r["vec"] for r in registros]
+    por_id = {r["id"]: r["vec"] for r in registros}
+    with aprendidos_lock:
+        # Vetor do cadastro mudou (foto nova): os aprendidos daquela pessoa não valem mais
+        for pid in list(aprendidos):
+            antigo = cadastro_por_id.get(pid)
+            if pid not in por_id or (antigo is not None and float(np.dot(antigo, por_id[pid])) < 0.98):
+                del aprendidos[pid]
+        novo = Indice(pessoas, cadastro, aprendidos)
+        indice, cadastro_por_id = novo, por_id
+    ultima_carga.update(ts=time.time(), ok=True, erro=None)
+    logger.info(f"👥 Índice de rostos: {len(pessoas)} pessoas, {novo.index.ntotal} vetores.")
+    return len(pessoas)
+
+
+def reload_registered_faces() -> int:
+    """Só no modo Supabase: carrega TODAS as pessoas com biometria (paginado) e troca o índice."""
+    if not MODO_SUPABASE:
         return len(indice.pessoas)
     try:
         linhas, offset = [], 0
@@ -383,38 +478,15 @@ def reload_registered_faces() -> int:
             if len(pagina) < 1000:
                 break
             offset += 1000
-        pessoas, cadastro, por_id = [], [], {}
+        nova = {}
         for p in linhas:
-            enc = p.get('face_encoding')
-            if isinstance(enc, str):
-                try:
-                    enc = json.loads(enc)
-                except Exception:
-                    enc = None
-            if not (isinstance(enc, list) and len(enc) == 512):
-                continue
-            vec = np.array(enc, dtype=np.float32)
-            norma = float(np.linalg.norm(vec))
-            if norma <= 0:
-                continue
-            vec /= norma
-            pessoas.append({
-                "id": p['id'], "nome": p.get('nome_completo') or "Sem Nome", "cpf": p.get('cpf') or "",
-                "status_acesso": p.get('status_acesso') or "liberado", "bloqueado": bool(p.get('bloqueado', False)),
-                "foto_url": p.get('foto_url')})
-            cadastro.append(vec)
-            por_id[p['id']] = vec
-        with aprendidos_lock:
-            # Vetor do cadastro mudou (foto nova): os aprendidos daquela pessoa não valem mais
-            for pid in list(aprendidos):
-                antigo = cadastro_por_id.get(pid)
-                if pid not in por_id or (antigo is not None and float(np.dot(antigo, por_id[pid])) < 0.98):
-                    del aprendidos[pid]
-            novo = Indice(pessoas, cadastro, aprendidos)
-        indice, cadastro_por_id = novo, por_id
-        ultima_carga.update(ts=time.time(), ok=True, erro=None)
-        logger.info(f"👥 Índice de rostos: {len(pessoas)} pessoas, {novo.index.ntotal} vetores.")
-        return len(pessoas)
+            r = _pessoa_da_linha(p)
+            if r:
+                nova[r["id"]] = r
+        with base_lock:
+            base_rostos.clear()
+            base_rostos.update(nova)
+        return _montar_indice_da_base()
     except Exception as e:
         ultima_carga.update(ts=time.time(), ok=False, erro=str(e))
         logger.error(f"Erro ao carregar biometrias do Supabase: {e}")
@@ -450,7 +522,11 @@ def _reconstruir_indice_com_aprendidos():
 
 
 def _loop_rostos():
-    """Biometrias pendentes a cada 60 s; recarga completa a cada RECARGA_ROSTOS_S ou quando pedida."""
+    """Modo Supabase: biometrias pendentes a cada 60 s; recarga completa a cada RECARGA_ROSTOS_S ou
+    quando pedida. Sem a chave, as biometrias chegam por POST /api/rostos e este laço só espera."""
+    if not MODO_SUPABASE:
+        ultima_carga.update(ts=0.0, ok=False, erro="aguardando as biometrias enviadas pelo painel")
+        logger.info("👥 Biometrias: aguardando o envio do painel (sem chave do banco neste PC).")
     reload_registered_faces()
     proxima_carga = time.time() + RECARGA_ROSTOS_S
     while True:
@@ -1197,7 +1273,9 @@ def url_da_camera(stream_url: str, camera_id: str = "") -> str:
         for cam in list(cameras.values()):
             if cam.camera_id == camera_id:
                 return cam.url
-        raise HTTPException(status_code=404, detail="Câmera não está na lista do motor")
+        # Câmera sem IA (fora da lista do motor): usa a URL enviada junto, se houver
+        if not stream_url or stream_url == DEFAULT_RTSP_URL:
+            raise HTTPException(status_code=404, detail="Câmera não está na lista do motor")
     return stream_url
 
 
@@ -1220,6 +1298,7 @@ async def health():
         "engine": "insightface_onnx" if det_model is not None else "mock",
         "providers": active_providers,
         "perfil": CFG["perfil"],
+        "supabase_direto": MODO_SUPABASE,
         "registered_persons": len(indice.pessoas),
         "cameras_em_uso": sum(1 for lt in list(leitores.values()) if lt.rodando),
         "cameras_com_video": sum(1 for lt in list(leitores.values()) if lt.rodando and lt.conectado()),
@@ -1287,12 +1366,18 @@ def get_camera_snapshot(stream_url: str = DEFAULT_RTSP_URL, annotate: bool = Fal
 
 
 @app.get("/api/track/live")
-def track_live_endpoint(stream_url: str = DEFAULT_RTSP_URL, threshold: float = 0.0, camera_id: str = ""):
-    """Últimos resultados da IA desta câmera (não roda uma análise extra) e o quadro anotado reduzido."""
+def track_live_endpoint(stream_url: str = DEFAULT_RTSP_URL, threshold: float = 0.0, camera_id: str = "",
+                        qualidade: str = "foco", quadro: bool = True):
+    """Últimos resultados da IA desta câmera (não roda uma análise extra) e o quadro anotado reduzido.
+    quadro=false: só as caixas (o painel desenha sobre o vídeo); qualidade=mini: ritmo de miniatura."""
     stream_url = url_da_camera(stream_url, camera_id)
-    lt = leitor_para(stream_url, "foco")
+    lt = leitor_para(stream_url, "mini" if qualidade == "mini" else "foco")
     cam = lt.cam
     results = cam.resultados_validos()
+    if not quadro:
+        leves = [{k: v for k, v in r.items() if k != "face_crop_base64"} for r in results]
+        return {"success": True, "timestamp": time.time(), "faces_detected": len(leves), "results": leves,
+                "conectada": lt.conectado(), "ia_ms": round(cam.ia_ms, 1)}
     dados, _, _ = lt.jpeg(True, 640, 60)
     if dados is None:
         return {"success": False, "error": "Câmera temporariamente sem vídeo.", "timestamp": time.time(), "results": []}
@@ -1464,10 +1549,79 @@ def get_engine_status():
     }
 
 
-class ConectarEventoRequest(BaseModel):
-    token: str
-    vps_url: Optional[str] = None
-    agent_name: Optional[str] = None
+class RostosRequest(BaseModel):
+    # pessoas: [{ id, nome_completo, cpf, status_acesso, bloqueado, foto_url, face_encoding[512] }]
+    pessoas: List[Dict[str, Any]] = []
+    # completo=True com ids: lista de TODAS as pessoas válidas do evento (quem não estiver sai do índice)
+    completo: bool = False
+    ids: Optional[List[str]] = None
+    remover: List[str] = []
+
+
+@app.post("/api/rostos")
+def receber_rostos(req: RostosRequest):
+    """Biometrias enviadas pela API (pelo agente): upsert do que mudou, remoção de quem saiu."""
+    mudou = False
+    with base_lock:
+        for p in req.pessoas:
+            r = _pessoa_da_linha(p)
+            if r:
+                base_rostos[r["id"]] = r
+                mudou = True
+            elif p.get("id") and str(p["id"]) in base_rostos:
+                del base_rostos[str(p["id"])]  # biometria apagada ou inválida
+                mudou = True
+        for pid in req.remover:
+            if base_rostos.pop(str(pid), None) is not None:
+                mudou = True
+        if req.completo and req.ids is not None:
+            validos = {str(i) for i in req.ids}
+            for pid in [k for k in base_rostos if k not in validos]:
+                del base_rostos[pid]
+                mudou = True
+        total = len(base_rostos)
+    if mudou or (req.completo and ultima_carga["ts"] == 0.0):
+        _montar_indice_da_base()
+    faltando = [] if req.ids is None else [i for i in req.ids if str(i) not in base_rostos]
+    return {"success": True, "total": total, "faltando": faltando[:2000]}
+
+
+class VerificarRequest(BaseModel):
+    image_base64: str
+    embedding: List[float]
+
+
+@app.post("/api/verificar")
+def verificar_rosto(req: VerificarRequest):
+    """Confirmação 1:1 do leitor facial: a foto que o leitor enviou é da pessoa que ele identificou?"""
+    if det_model is None:
+        return {"success": False, "motivo": "motor_sem_modelo"}
+    try:
+        img = cv2.imdecode(np.frombuffer(base64.b64decode(req.image_base64.split(',')[-1]), np.uint8), cv2.IMREAD_COLOR)
+    except Exception:
+        img = None
+    if img is None:
+        return {"success": False, "motivo": "imagem_invalida"}
+    if len(req.embedding) != 512:
+        return {"success": False, "motivo": "cadastro_sem_biometria"}
+    faces = detectar(img, 640)
+    if not faces:
+        # Foto recortada justa no rosto (comum no leitor): margem para o detector ancorar
+        h, w = img.shape[:2]
+        pad = max(120, int(max(h, w) * 0.45))
+        img = cv2.copyMakeBorder(img, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=[128, 128, 128])
+        faces = detectar(img, 640)
+    if not faces:
+        return {"success": True, "rosto": False, "similaridade": 0.0}
+    area = lambda f: float((f[0][2] - f[0][0]) * (f[0][3] - f[0][1]))
+    faces.sort(key=area, reverse=True)
+    _, score, kps = faces[0]
+    emb = embeddings([alinhar(img, kps)])[0]
+    cad = np.asarray(req.embedding, dtype=np.float32)
+    cad /= max(float(np.linalg.norm(cad)), 1e-6)
+    sim = float(np.dot(emb, cad))
+    return {"success": True, "rosto": True, "similaridade": round(sim, 4), "det_score": round(score, 3),
+            "limiar": CFG["limiar"], "confere": sim >= CFG["limiar"]}
 
 
 @app.get("/api/pc-compatibilidade")
@@ -1482,48 +1636,19 @@ def get_pc_compatibilidade():
         "cpu_threads": os.cpu_count() or 1,
         "hardware_acceleration": hw,
         "active_providers": active_providers,
-        "supabase_configured": bool(SUPABASE_KEY),
+        "supabase_configured": MODO_SUPABASE,
         "registered_faces_indexed": len(indice.pessoas),
         "perfil_atual": CFG["perfil"],
     }
 
 
-@app.post("/api/conectar-evento")
-def conectar_evento_local(req: ConectarEventoRequest):
-    """Atualiza o AGENT_TOKEN no backend/agent-local/.env deste PC e inicia/reinicia o agente local."""
-    import subprocess
-    raiz = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-    dir_agente = os.path.join(raiz, "backend", "agent-local")
-    env_path = os.path.join(dir_agente, ".env")
-    linhas = {}
-    if os.path.exists(env_path):
-        try:
-            with open(env_path, "r", encoding="utf-8") as f:
-                for ln in f:
-                    if "=" in ln and not ln.strip().startswith("#"):
-                        k, v = ln.strip().split("=", 1)
-                        linhas[k.strip()] = v.strip()
-        except Exception:
-            pass
-    linhas["VPS_URL"] = (req.vps_url or linhas.get("VPS_URL") or "https://painel.nzt.app.br").rstrip("/")
-    linhas["AGENT_TOKEN"] = req.token.strip()
-    linhas["AGENT_NAME"] = (req.agent_name or linhas.get("AGENT_NAME") or "PC IA Facial").strip()
-    linhas.setdefault("IA_URL", "http://127.0.0.1:8000")
-    os.makedirs(dir_agente, exist_ok=True)
-    with open(env_path, "w", encoding="utf-8") as f:
-        for k, v in linhas.items():
-            f.write(f"{k}={v}\n")
-    script_ps1 = os.path.join(raiz, "scripts", "ligar-ia-facial.ps1")
-    if sys.platform == "win32" and os.path.exists(script_ps1):
-        subprocess.Popen(
-            ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script_ps1, "reiniciar-agente"],
-            cwd=raiz,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000),
-        )
-    return {"success": True, "message": "Agente local configurado e iniciado neste PC."}
+# A antiga rota /api/conectar-evento (trocava o token do agente e executava PowerShell a pedido de
+# qualquer página do navegador) foi removida: a ativação usa o protocolo nzt-ia:// e o ligar-ia-facial.
 
 
 if __name__ == "__main__":
     # Sem log por requisição: o agente consulta o motor a cada segundo (~86 mil linhas/dia) e as
     # linhas gravavam a URL das câmeras com usuário e senha. Erros continuam no log.
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=False, access_log=False)
+    # Só neste PC por padrão (IA_HOST=0.0.0.0 para um motor em servidor separado, com a chave interna).
+    uvicorn.run(app, host=os.getenv("IA_HOST", "127.0.0.1"), port=int(os.getenv("IA_PORTA", "8000")),
+                reload=False, access_log=False)

@@ -787,6 +787,57 @@ export default function DispositivosPage() {
                 </Typography>
               }
             />
+
+            {formData.tipo === 'terminal_facial' && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pt: 1.5, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <Typography variant="subtitle2" sx={{ color: CYAN, fontWeight: 700 }}>
+                  Reconhecimento facial
+                </Typography>
+                <FormControl fullWidth size="small">
+                  <InputLabel id="ia-confirmacao-label" htmlFor="ia-confirmacao-select">Quem reconhece o rosto</InputLabel>
+                  <Select labelId="ia-confirmacao-label" inputProps={{ id: 'ia-confirmacao-select', name: 'ia_confirmacao' }}
+                    label="Quem reconhece o rosto"
+                    value={formData.config?.ia_confirmacao === true ? 'ia' : 'leitor'}
+                    onChange={e => setFormData(p => ({ ...p, config: { ...(p.config || {}), ia_confirmacao: e.target.value === 'ia' } }))}>
+                    <MenuItem value="leitor">Só o leitor (não usa o motor de IA)</MenuItem>
+                    <MenuItem value="ia">Leitor + confirmação da IA (mais seguro)</MenuItem>
+                  </Select>
+                </FormControl>
+                <Typography variant="caption" sx={{ color: '#94A3B8', mt: -0.5 }}>
+                  {formData.config?.ia_confirmacao === true
+                    ? 'O motor de IA do evento compara a foto tirada pelo leitor com o cadastro da pessoa identificada. Rosto diferente: acesso negado e alerta. Exige o leitor em modo online e o motor ligado.'
+                    : 'O leitor identifica a pessoa sozinho e o servidor aplica as regras de área, horário e bloqueio.'}
+                </Typography>
+                {formData.config?.ia_confirmacao === true && (
+                  <FormControl fullWidth size="small">
+                    <InputLabel id="ia-falha-label" htmlFor="ia-falha-select">Se a IA não responder em 1,5 s</InputLabel>
+                    <Select labelId="ia-falha-label" inputProps={{ id: 'ia-falha-select', name: 'ia_falha' }}
+                      label="Se a IA não responder em 1,5 s"
+                      value={formData.config?.ia_falha === 'negar' ? 'negar' : 'liberar'}
+                      onChange={e => setFormData(p => ({ ...p, config: { ...(p.config || {}), ia_falha: e.target.value } }))}>
+                      <MenuItem value="liberar">Vale o reconhecimento do leitor (fila não para)</MenuItem>
+                      <MenuItem value="negar">Negar o acesso (áreas restritas)</MenuItem>
+                    </Select>
+                  </FormControl>
+                )}
+                <FormControlLabel
+                  control={
+                    <Switch
+                      id="usar-como-camera-switch"
+                      name="usar_como_camera"
+                      checked={formData.config?.usar_como_camera === true}
+                      onChange={e => setFormData(p => ({ ...p, config: { ...(p.config || {}), usar_como_camera: e.target.checked } }))}
+                      size="small"
+                    />
+                  }
+                  label={
+                    <Typography variant="caption" sx={{ color: '#CBD5E1' }}>
+                      Usar também como câmera (aparece no Monitor; IA e gravação se escolhem em Câmeras)
+                    </Typography>
+                  }
+                />
+              </Box>
+            )}
           </Box>
         </DialogContent>
         <DialogActions sx={{ borderTop: `1px solid ${CYAN}22`, p: 2 }}>

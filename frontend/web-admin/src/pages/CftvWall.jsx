@@ -564,7 +564,14 @@ const CftvWall = () => {
                                             <Tooltip title="Capturar snapshot">
                                                 <IconButton
                                                     size="small"
-                                                    onClick={(e) => { e.stopPropagation(); window.open(urlMidiaCamera(cam.id, 'snapshot'), '_blank'); }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        // Aba aberta já no clique (o navegador bloqueia janela aberta depois de esperar a rede)
+                                                        const aba = window.open('', '_blank');
+                                                        urlMidiaCamera(cam.id, 'snapshot', { qualidade: 'foco' })
+                                                            .then((url) => { if (aba) aba.location.href = url; })
+                                                            .catch(() => { if (aba) aba.close(); });
+                                                    }}
                                                     sx={{ color: '#FFFFFF', bgcolor: 'rgba(255,255,255,0.2)' }}
                                                 >
                                                     <SnapshotIcon />

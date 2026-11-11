@@ -15,8 +15,77 @@ const QUADROS_POR_SEGUNDO_AGENTE = 4; // agente antigo: um pedido por quadro
 // Vídeo ao vivo enviado pelo agente: fps, largura e qualidade vêm do perfil (Configurações > IA facial).
 // Miniatura (sub-stream, ~480 px) ≈ 15-25 KB por quadro; tela grande (~1280 px) ≈ 60-90 KB.
 const videoRelay = require('../../services/videoRelay');
+const mp4Relay = require('../../services/mp4Relay');
 const iaConfig = require('./iaConfig.service');
+const gravacaoService = require('./gravacao.service');
+const jwt = require('jsonwebtoken');
 const qualidadeDe = (req) => (req.query.qualidade === 'mini' ? 'mini' : 'foco');
+const iaHeaders = () => (process.env.IA_CHAVE_INTERNA ? { 'X-IA-Chave': process.env.IA_CHAVE_INTERNA } : {});
+const ehRtsp = (cam) => cam.protocolo === 'rtsp' || /^rtsps?:\/\//i.test(cam.stream_url || '');
+const desativada = (cam) => cam.status === 'desativada' || cam.status === 'inativa';
+/** O PC do evento tem o retransmissor de vídeo (go2rtc)? Então o vídeo não depende do motor de IA. */
+const videoLocal = (rota) => rota?.tipo === 'agente' && !!agentService.recursos(rota.agentId).video_local;
+
+/**
+ * Evento da requisição, sempre vindo do requireEvent (perfil do usuário; admin escolhe pelo
+ * cabeçalho). Antes algumas rotas usavam o evento_id da URL/corpo — dava para mexer em câmera de
+ * outro evento.
+ */
+const eventoDaReq = (req) => req.event?.id || null;
+const ehSoberano = (req) => !!req.user && ['admin_master', 'admin'].includes(require('../../middleware/auth').extractRole(req.user));
+
+/** Câmera do evento da requisição (admin sem evento escolhido: qualquer uma) */
+async function cameraDoEvento(req, id, campos = '*') {
+    let q = supabase.from('cameras_ip').select(campos).eq('id', id);
+    const eventoId = eventoDaReq(req);
+    if (eventoId) q = q.eq('evento_id', eventoId);
+    else if (!ehSoberano(req)) return null;
+    const { data } = await q.maybeSingle();
+    return data || null;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Ingresso de vídeo: <img>/<video> não enviam o cabeçalho de login, e o token de login na URL ficava
+// gravado no log do nginx e no histórico do navegador. Agora o painel pede um ingresso de 2 min,
+// válido para UMA câmera, e só ele vai na URL.
+// ---------------------------------------------------------------------------------------------
+const segredoMidia = () => process.env.JWT_SECRET || process.env.SUPABASE_JWT_SECRET;
+
+function emitirIngresso(cam, usuario) {
+    const segredo = segredoMidia();
+    if (!segredo) throw new Error('JWT_SECRET não configurado no servidor');
+    return jwt.sign({ p: 'cam', c: cam.id, e: cam.evento_id, u: usuario?.id || null }, segredo, { expiresIn: '2m' });
+}
+
+/** Middleware das rotas de imagem/vídeo: ?ingresso= ou login no cabeçalho (nunca ?token=) */
+function autenticarMidia(req, res, next) {
+    const ingresso = req.query.ingresso;
+    if (ingresso) {
+        try {
+            const d = jwt.verify(String(ingresso), segredoMidia());
+            if (d.p !== 'cam' || d.c !== req.params.id) throw new Error('ingresso de outra câmera');
+            req.midia = { evento_id: d.e, usuario_id: d.u };
+            return next();
+        } catch {
+            return res.status(401).send('Ingresso de vídeo inválido ou vencido');
+        }
+    }
+    delete req.query.token;
+    const { authenticate, checkPermission } = require('../../middleware/auth');
+    const { requireEvent } = require('../../middleware/eventMiddleware');
+    authenticate(req, res, () => requireEvent(req, res, () => checkPermission('monitor', 'leitura')(req, res, () => {
+        req.midia = { evento_id: eventoDaReq(req), usuario_id: req.user?.id, soberano: ehSoberano(req) };
+        next();
+    })));
+}
+
+/** Câmera pedida na rota de mídia, conferindo que é do evento do ingresso/login */
+async function cameraDaMidia(req) {
+    const { data: cam } = await supabase.from('cameras_ip').select('*').eq('id', req.params.id).maybeSingle();
+    if (!cam) return null;
+    if (req.midia?.evento_id ? cam.evento_id !== req.midia.evento_id : !req.midia?.soberano) return null;
+    return cam;
+}
 
 const rotaDaCamera = (cam) => {
     if (IA_URL_DIRETA) return { tipo: 'direto', url: IA_URL_DIRETA, chave: 'direto' };
@@ -40,7 +109,7 @@ const iaOffline = (motivo) => Object.assign(new Error(motivo), { iaOffline: true
 async function chamarIa(rota, path, params, { binary = false, timeout = 8000 } = {}) {
     if (rota.tipo === 'direto') {
         try {
-            const r = await axios.get(`${rota.url}${path}`, { params, timeout, responseType: binary ? 'arraybuffer' : 'json' });
+            const r = await axios.get(`${rota.url}${path}`, { params, timeout, responseType: binary ? 'arraybuffer' : 'json', headers: iaHeaders() });
             return { data: r.data, contentType: r.headers['content-type'] };
         } catch (err) {
             throw erroDeConexao(err) ? iaOffline(err.code) : err;
@@ -130,6 +199,7 @@ async function processarDeteccoesCamera(cam, results, annotatedB64, { origem = '
                 tipo: 'pessoa_bloqueada',
                 hora: new Date().toISOString()
             });
+            gravacaoService.marcarAlerta(cam, `Pessoa bloqueada: ${mp.nome}`);
             // Fica registrado no sino mesmo sem ninguém com o painel aberto (1 por pessoa/câmera a cada 10 min)
             require('./notificacao.service').criar([{
                 evento_id: eventoId,
@@ -160,6 +230,7 @@ async function processarDeteccoesCamera(cam, results, annotatedB64, { origem = '
                         mp.em_rastreamento = true;
                     } else {
                         logger.warn(`🚨 [NOVO ALERTA] WATCHLIST DETECTADO PELA CÂMERA (${origem}): ${mp.nome} (CPF: ${mp.cpf}) na câmera '${cam.nome}' em '${localizacaoEvento}'`);
+                        gravacaoService.marcarAlerta(cam, 'Lista de observação');
 
                         // Disparo único multicanal com foto capturada, dispositivo e localização física
                         watchlistService.registrarAlerta(monitorado, {
@@ -192,13 +263,33 @@ async function processarDeteccoesCamera(cam, results, annotatedB64, { origem = '
 // Credenciais nunca vão para o navegador: rtsp://user:senha@host → rtsp://user:***@host
 const mascararUrl = (url) => (typeof url === 'string' ? url.replace(/(\/\/[^:/@]+:)[^@/]*@/, '$1***@') : url);
 const ALERTAS_CAMERA = new Map(); // `${camId}:${cpf}` → último alerta de pessoa bloqueada (ms)
-// Opções de IA por câmera (migration 20261028_cameras_ia_opcoes.sql)
-const CAMPOS_IA = ['ia_ativa', 'vigilancia_ativa', 'prioridade', 'url_substream'];
+// Opções de IA por câmera (migration 20261028) e de gravação (migration 20261111)
+const CAMPOS_IA = ['ia_ativa', 'vigilancia_ativa', 'prioridade', 'url_substream', 'gravacao_modo', 'gravacao_stream', 'gravacao_drive'];
 const CAMPOS_EDITAVEIS = ['nome', 'area_id', 'fabricante', 'stream_url', 'snapshot_url', 'protocolo', 'ip_address', 'porta', 'usuario', 'senha', 'status', ...CAMPOS_IA];
+
+/** Normaliza os campos de IA/gravação vindos do painel (valor desconhecido sai, banco usa o padrão) */
+function normalizarOpcoes(dados) {
+    if (dados.ia_ativa !== undefined) dados.ia_ativa = dados.ia_ativa === true;
+    if (dados.vigilancia_ativa !== undefined) dados.vigilancia_ativa = dados.vigilancia_ativa === true && dados.ia_ativa !== false;
+    if (dados.gravacao_drive !== undefined) dados.gravacao_drive = dados.gravacao_drive === true;
+    if (dados.gravacao_modo !== undefined && !['desligada', 'continua', 'alertas'].includes(dados.gravacao_modo)) delete dados.gravacao_modo;
+    if (dados.gravacao_stream !== undefined && !['sub', 'principal'].includes(dados.gravacao_stream)) delete dados.gravacao_stream;
+    if (dados.prioridade !== undefined) dados.prioridade = Math.min(3, Math.max(0, parseInt(dados.prioridade, 10) || 0));
+    for (const campo of ['url_substream', 'snapshot_url', 'area_id']) if (dados[campo] === '') dados[campo] = null;
+    return dados;
+}
 const URLS_MASCARADAS = ['stream_url', 'snapshot_url', 'url_substream'];
 // Banco ainda sem a migration: grava sem as colunas novas em vez de falhar o cadastro inteiro
 const colunaInexistente = (error) => error?.code === '42703' || error?.code === 'PGRST204';
-const semCamposIa = (dados) => Object.fromEntries(Object.entries(dados).filter(([k]) => !CAMPOS_IA.includes(k)));
+const CAMPOS_GRAVACAO = ['gravacao_modo', 'gravacao_stream', 'gravacao_drive'];
+const semCampos = (dados, lista) => Object.fromEntries(Object.entries(dados).filter(([k]) => !lista.includes(k)));
+/** Grava; banco sem a migration 20261111 tira só os campos de gravação, sem a 20261028 tira os de IA */
+async function gravarComRecuo(operacao, dados) {
+    let r = await operacao(dados);
+    if (colunaInexistente(r.error)) r = await operacao(semCampos(dados, CAMPOS_GRAVACAO));
+    if (colunaInexistente(r.error)) r = await operacao(semCampos(dados, CAMPOS_IA));
+    return r;
+}
 
 function podarAlertasCamera() {
     if (ALERTAS_CAMERA.size < 500) return;
@@ -327,7 +418,7 @@ class CameraController {
      */
     async list(req, res) {
         try {
-            const evento_id = req.query.evento_id || req.headers['x-evento-id'];
+            const evento_id = eventoDaReq(req);
             if (!evento_id) return res.status(400).json({ error: 'evento_id obrigatório' });
 
             const { data, error } = await supabase
@@ -356,15 +447,19 @@ class CameraController {
      */
     async create(req, res) {
         try {
-            const evento_id = req.body.evento_id || req.headers['x-evento-id'];
-            const cameraData = { ...req.body };
+            const evento_id = eventoDaReq(req);
+            if (!evento_id) return res.status(400).json({ error: 'Selecione o evento antes de cadastrar a câmera.' });
+            // Só campos conhecidos (antes o corpo inteiro ia ao banco, inclusive evento_id de outro evento)
+            const cameraData = {};
+            for (const campo of CAMPOS_EDITAVEIS) {
+                if (req.body[campo] !== undefined) cameraData[campo] = req.body[campo];
+            }
+            normalizarOpcoes(cameraData);
 
             // Sanitizar campos UUID e opcionais vazios para evitar erro 22P02 no Postgres
             if (!cameraData.area_id || String(cameraData.area_id).trim() === '') {
                 cameraData.area_id = null;
             }
-            if (cameraData.snapshot_url === '') cameraData.snapshot_url = null;
-            if (cameraData.url_substream === '') cameraData.url_substream = null;
 
             // Se for RTSP ou snapshot_url contiver rtsp://
             if (cameraData.snapshot_url && cameraData.snapshot_url.startsWith('rtsp://')) {
@@ -388,12 +483,12 @@ class CameraController {
             }
 
             const inserir = (dados) => supabase.from('cameras_ip').insert([{ ...dados, evento_id }]).select().single();
-            let { data, error } = await inserir(cameraData);
-            if (colunaInexistente(error)) ({ data, error } = await inserir(semCamposIa(cameraData)));
+            const { data, error } = await gravarComRecuo(inserir, cameraData);
 
             if (error) throw error;
             require('./vigilancia.service').eventoAlterado(data.evento_id).catch(() => {}); // câmeras sob vigilância mudaram
-            res.json({ success: true, data });
+            const { senha: _s, ...segura } = data;
+            res.json({ success: true, data: { ...segura, stream_url: mascararUrl(segura.stream_url), snapshot_url: mascararUrl(segura.snapshot_url), url_substream: mascararUrl(segura.url_substream) } });
         } catch (error) {
             logger.error('Erro ao criar câmera:', error);
             res.status(500).json({ error: 'Erro ao salvar câmera' });
@@ -406,7 +501,8 @@ class CameraController {
     async update(req, res) {
         try {
             const { id } = req.params;
-            const evento_id = req.event?.id || req.headers['x-evento-id'];
+            const evento_id = eventoDaReq(req);
+            if (!evento_id) return res.status(400).json({ error: 'Selecione o evento da câmera.' });
 
             // Só campos conhecidos; senha vazia e URLs mascaradas mantêm o valor atual
             const updateData = {};
@@ -417,14 +513,10 @@ class CameraController {
             for (const campo of URLS_MASCARADAS) {
                 if (typeof updateData[campo] === 'string' && updateData[campo].includes(':***@')) delete updateData[campo];
             }
-            if (updateData.prioridade !== undefined) updateData.prioridade = Math.min(3, Math.max(0, parseInt(updateData.prioridade, 10) || 0));
-            if (updateData.url_substream === '') updateData.url_substream = null;
-            if (updateData.snapshot_url === '') updateData.snapshot_url = null;
-            if (updateData.area_id === '') updateData.area_id = null;
+            normalizarOpcoes(updateData);
 
             const atualizar = (dados) => supabase.from('cameras_ip').update(dados).eq('id', id).eq('evento_id', evento_id).select().single();
-            let { data, error } = await atualizar(updateData);
-            if (colunaInexistente(error)) ({ data, error } = await atualizar(semCamposIa(updateData)));
+            const { data, error } = await gravarComRecuo(atualizar, updateData);
 
             if (error) throw error;
             const { senha: _omit, ...segura } = data;
@@ -442,14 +534,16 @@ class CameraController {
     async delete(req, res) {
         try {
             const { id } = req.params;
+            const cam = await cameraDoEvento(req, id, 'id, evento_id');
+            if (!cam) return res.status(404).json({ error: 'Câmera não encontrada neste evento' });
             const { error } = await supabase
                 .from('cameras_ip')
                 .delete()
-                .eq('id', id);
+                .eq('id', id)
+                .eq('evento_id', cam.evento_id);
 
             if (error) throw error;
-            const eventoDaCamera = req.event?.id || req.headers['x-evento-id'];
-            if (eventoDaCamera) require('./vigilancia.service').eventoAlterado(eventoDaCamera).catch(() => {}); // câmeras sob vigilância mudaram
+            require('./vigilancia.service').eventoAlterado(cam.evento_id).catch(() => {}); // câmeras sob vigilância mudaram
             res.json({ success: true });
         } catch (error) {
             logger.error('Erro ao excluir câmera:', error);
@@ -463,7 +557,7 @@ class CameraController {
     async testarConexao(req, res) {
         try {
             const { id } = req.params;
-            const { data: cam } = await supabase.from('cameras_ip').select('*').eq('id', id).single();
+            const cam = await cameraDoEvento(req, id);
             if (!cam) return res.status(404).json({ error: 'Câmera não encontrada' });
 
             const start = Date.now();
@@ -471,16 +565,31 @@ class CameraController {
             let latencia = 0;
             let motivo = null;
 
-            const isRtsp = cam.protocolo === 'rtsp' || (cam.stream_url && cam.stream_url.startsWith('rtsp://'));
+            const isRtsp = ehRtsp(cam);
             const rota = rotaDaCamera(cam);
+            let testadoLocal = false;
 
-            if (isRtsp) {
+            // Retransmissor do PC do evento: testa sem depender do motor de IA
+            if (isRtsp && videoLocal(rota)) {
+                try {
+                    const r = await agentService.sendCommand(rota.agentId, 'camera_testar', { camera_id: cam.id }, 14000);
+                    testadoLocal = true;
+                    if (r?.online) { status = 'online'; latencia = r.latencia_ms || Date.now() - start; }
+                    else motivo = r?.motivo ? `O PC do evento não recebe imagem desta câmera (${r.motivo})` : 'O PC do evento não recebe imagem desta câmera';
+                } catch (err) {
+                    logger.debug(`[testarConexao] retransmissor: ${err.message}`); // câmera ainda fora do retransmissor: tenta pelo motor
+                }
+            }
+
+            if (testadoLocal) {
+                // já testado pelo retransmissor
+            } else if (isRtsp) {
                 if (!rota) {
                     motivo = MSG_IA_OFFLINE;
                 } else {
                     try {
                         const { data } = await chamarIa(rota, '/api/camera/test',
-                            { stream_url: cam.stream_url || cam.snapshot_url }, { timeout: 5000 });
+                            { stream_url: cam.stream_url || cam.snapshot_url, camera_id: cam.id }, { timeout: 8000 });
                         if (data?.online) {
                             status = 'online';
                             latencia = Date.now() - start;
@@ -506,7 +615,8 @@ class CameraController {
             await supabase
                 .from('cameras_ip')
                 .update({ status, last_seen: new Date() })
-                .eq('id', id);
+                .eq('id', id)
+                .eq('evento_id', cam.evento_id);
 
             res.json({ success: true, online: status === 'online', latencia_ms: latencia, ...(motivo ? { motivo } : {}) });
         } catch (error) {
@@ -520,24 +630,37 @@ class CameraController {
     async getSnapshot(req, res) {
         let rota = null;
         try {
-            const { id } = req.params;
-            const { data: cam } = await supabase.from('cameras_ip').select('*').eq('id', id).single();
+            const cam = await cameraDaMidia(req);
             if (!cam) return res.status(404).send('Camera Not Found');
-            if (cam.status === 'desativada' || cam.status === 'inativa') {
+            if (desativada(cam)) {
                 return res.status(423).send('Câmera desativada');
             }
 
-            const isRtsp = cam.protocolo === 'rtsp' || (cam.stream_url && cam.stream_url.startsWith('rtsp://'));
+            const isRtsp = ehRtsp(cam);
             rota = rotaDaCamera(cam);
+            // Miniatura por padrão (sub-stream, reduzida): a grade em modo "Snapshots" não precisa de 1080p
+            const qualidade = req.query.qualidade === 'foco' ? 'foco' : 'mini';
+            const anotar = req.query.annotate !== 'false' && cam.ia_ativa === true;
+
+            // Sem IA para desenhar: imagem direto do retransmissor do PC do evento (motor pode estar desligado)
+            if (isRtsp && videoLocal(rota) && !anotar) {
+                try {
+                    const r = await agentService.sendCommand(rota.agentId, 'snapshot_local', { camera_id: cam.id, qualidade }, 12000);
+                    res.set('Content-Type', 'image/jpeg');
+                    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+                    return res.send(Buffer.from(r.base64, 'base64'));
+                } catch (err) {
+                    logger.debug(`[getSnapshot] retransmissor: ${err.message}; tentando pelo motor`);
+                }
+            }
 
             if (isRtsp) {
                 if (!iaDisponivel(rota)) return res.status(503).send(MSG_IA_OFFLINE);
-                // Miniatura por padrão (sub-stream, reduzida): a grade em modo "Snapshots" não precisa de 1080p
-                const qualidade = req.query.qualidade === 'foco' ? 'foco' : 'mini';
                 const { video } = await iaConfig.obter();
                 const { data } = await chamarIa(rota, '/api/camera/snapshot', {
                     stream_url: cam.stream_url || cam.snapshot_url,
-                    annotate: req.query.annotate !== 'false',
+                    camera_id: cam.id,
+                    annotate: anotar,
                     qualidade,
                     max_width: video[qualidade].max_width,
                     quality: video[qualidade].quality
@@ -569,28 +692,30 @@ class CameraController {
     async getStream(req, res) {
         let rota = null;
         try {
-            const { id } = req.params;
-            const { data: cam } = await supabase.from('cameras_ip').select('*').eq('id', id).single();
+            const cam = await cameraDaMidia(req);
             if (!cam) return res.status(404).send('Camera Not Found');
-            if (cam.status === 'desativada' || cam.status === 'inativa') {
+            if (desativada(cam)) {
                 return res.status(423).send('Câmera desativada');
             }
 
             rota = rotaDaCamera(cam);
-            if (!iaDisponivel(rota)) return res.status(503).send(MSG_IA_OFFLINE);
             const streamUrl = cam.stream_url || cam.snapshot_url;
-            const annotate = req.query.annotate !== 'false';
+            // Caixas da IA queimadas no vídeo só se a câmera tem IA (com IA desligada, nada a desenhar)
+            const annotate = req.query.annotate !== 'false' && cam.ia_ativa === true;
+            // Sem IA para desenhar e PC com retransmissor: MJPEG local, sem depender do motor
+            const fonte = videoLocal(rota) && ehRtsp(cam) && !annotate ? 'local' : 'motor';
+            if (fonte === 'motor' && !iaDisponivel(rota)) return res.status(503).send(MSG_IA_OFFLINE);
             // mini: miniatura na grade (sub-stream, leve) · foco: tela grande (stream principal)
             const qualidade = qualidadeDe(req);
             const formato = (await iaConfig.obter()).video[qualidade];
 
-            if (rota.tipo === 'agente') {
+            if (rota?.tipo === 'agente') {
                 // Agente 2.2+: envia os quadros sozinho na taxa pedida, um envio serve todos os espectadores
                 try {
                     return await videoRelay.assistir({
                         agentId: rota.agentId,
-                        streamId: `${cam.id}:${qualidade}${annotate ? '' : ':cru'}`,
-                        params: { stream_url: streamUrl, annotate, qualidade, ...formato },
+                        streamId: `${cam.id}:${qualidade}${annotate ? '' : ':cru'}:${fonte}`,
+                        params: { stream_url: streamUrl, camera_id: cam.id, fonte, annotate, qualidade, ...formato },
                         req, res
                     });
                 } catch (err) {
@@ -610,7 +735,7 @@ class CameraController {
                     const inicio = Date.now();
                     try {
                         const { data } = await chamarIa(rota, '/api/camera/snapshot',
-                            { stream_url: streamUrl, annotate, qualidade, max_width: formato.max_width, quality: formato.quality },
+                            { stream_url: streamUrl, camera_id: cam.id, annotate, qualidade, max_width: formato.max_width, quality: formato.quality },
                             { binary: true, timeout: 5000 });
                         if (!ativo) break;
                         if (primeiro) {
@@ -638,12 +763,14 @@ class CameraController {
                 return res.end();
             }
 
+            if (!rota) return res.status(503).send(MSG_IA_OFFLINE);
             const response = await axios({
                 method: 'get',
                 url: `${rota.url}/api/camera/stream`,
-                params: { stream_url: streamUrl, annotate, qualidade, max_width: formato.max_width, quality: formato.quality },
+                params: { stream_url: streamUrl, camera_id: cam.id, annotate, qualidade, max_width: formato.max_width, quality: formato.quality },
                 responseType: 'stream',
-                timeout: 0
+                timeout: 0,
+                headers: iaHeaders()
             });
 
             res.set('Content-Type', response.headers['content-type'] || 'multipart/x-mixed-replace; boundary=frame');
@@ -683,15 +810,7 @@ class CameraController {
     async trackFace(req, res) {
         try {
             const { id } = req.params;
-            const { data: cam, error: camErr } = await supabase
-                .from('cameras_ip')
-                .select('*, area:evento_areas(id, nome_area)')
-                .eq('id', id)
-                .maybeSingle();
-
-            if (camErr) {
-                logger.error(`[trackFace] Erro ao buscar câmera no banco: ${camErr.message}`);
-            }
+            const cam = await cameraDoEvento(req, id, '*, area:evento_areas(id, nome_area)');
             if (!cam) return res.status(404).json({ error: 'Câmera não encontrada' });
             if (cam.status === 'desativada' || cam.status === 'inativa' || cam.ia_ativa === false) {
                 return res.json({ success: false, error: 'Câmera ou IA desativada', results: [], camera: { id: cam.id, nome: cam.nome } });
@@ -705,6 +824,7 @@ class CameraController {
             try {
                 trackResp = await chamarIa(rota, '/api/track/live', {
                     stream_url: cam.stream_url,
+                    camera_id: cam.id,
                     threshold: req.query.threshold || 0.50
                 }, { timeout: 8000 });
             } catch (pyErr) {
@@ -755,9 +875,113 @@ class CameraController {
             res.status(500).json({ error: 'Erro no rastreamento facial', detail: error.message });
         }
     }
+
+    /** Ingresso de 2 min para o <img>/<video> desta câmera (ver autenticarMidia) */
+    async ingresso(req, res) {
+        try {
+            const cam = await cameraDoEvento(req, req.params.id, 'id, evento_id, status, ia_ativa, protocolo, stream_url');
+            if (!cam) return res.status(404).json({ error: 'Câmera não encontrada neste evento' });
+            const rota = rotaDaCamera(cam);
+            res.json({
+                success: true,
+                ingresso: emitirIngresso(cam, req.user),
+                // O painel escolhe o caminho do vídeo: MP4 do PC do evento (sem IA) ou MJPEG
+                mp4: ehRtsp(cam) && videoLocal(rota),
+                ia: cam.ia_ativa === true
+            });
+        } catch (error) {
+            logger.error(`[Câmera] ingresso: ${error.message}`);
+            res.status(500).json({ error: 'Não foi possível liberar o vídeo desta câmera' });
+        }
+    }
+
+    /** Vídeo MP4 ao vivo pelo retransmissor do PC do evento (não usa o motor de IA) */
+    async getVideoMp4(req, res) {
+        try {
+            const cam = await cameraDaMidia(req);
+            if (!cam) return res.status(404).send('Câmera não encontrada');
+            if (desativada(cam)) return res.status(423).send('Câmera desativada');
+            const rota = rotaDaCamera(cam);
+            if (!ehRtsp(cam) || !videoLocal(rota)) return res.status(409).send('Vídeo MP4 indisponível para esta câmera');
+            return await mp4Relay.assistir({
+                agentId: rota.agentId, cameraId: cam.id, qualidade: qualidadeDe(req),
+                ua: req.headers['user-agent'], req, res
+            });
+        } catch (error) {
+            logger.error(`[Vídeo MP4] ${error.message}`);
+            if (!res.headersSent) res.status(502).send('Erro no vídeo');
+        }
+    }
+
+    /**
+     * Caixas da IA para o painel desenhar por cima do vídeo (sem imagem: leve). Consultar marca a
+     * câmera como "alguém assistindo", o que faz a IA analisar no modo "IA ao assistir".
+     */
+    async deteccoes(req, res) {
+        try {
+            const cam = await cameraDoEvento(req, req.params.id, 'id, evento_id, status, ia_ativa, stream_url');
+            if (!cam) return res.status(404).json({ error: 'Câmera não encontrada' });
+            if (desativada(cam) || cam.ia_ativa !== true) return res.json({ success: true, ia: false, results: [] });
+            const rota = rotaDaCamera(cam);
+            if (!iaDisponivel(rota)) return res.json({ success: false, ia: true, motor: false, results: [] });
+            let r;
+            try {
+                r = await chamarIa(rota, '/api/track/live', {
+                    camera_id: cam.id, stream_url: cam.stream_url, qualidade: qualidadeDe(req), quadro: false
+                }, { timeout: 6000 });
+            } catch (err) {
+                if (err.iaOffline) marcarIaIndisponivel(rota, 'deteccoes', err);
+                return res.json({ success: false, ia: true, motor: false, results: [] });
+            }
+            const results = (r.data?.results || []).map((f) => ({
+                id: f.track_id,
+                caixa: f.bbox_n,
+                qualidade: f.quality_status,
+                pessoa: f.matched_person ? {
+                    nome: f.matched_person.nome,
+                    semelhanca: f.matched_person.similarity,
+                    bloqueado: !!(f.matched_person.bloqueado || f.matched_person.status_acesso === 'bloqueado')
+                } : null
+            }));
+            res.json({ success: true, ia: true, motor: true, results });
+        } catch (error) {
+            logger.error(`[deteccoes] ${error.message}`);
+            res.status(500).json({ error: 'Erro ao consultar a IA' });
+        }
+    }
+
+    /** Chaves gerais das câmeras do evento (motor de IA, gravação, espaço e prazo) */
+    async getEventoConfig(req, res) {
+        try {
+            const eventoId = eventoDaReq(req);
+            if (!eventoId) return res.status(400).json({ error: 'Selecione um evento' });
+            const config = await gravacaoService.configEvento(eventoId);
+            const agentId = agentService.findAgentForEvent(eventoId);
+            res.json({
+                success: true,
+                data: config,
+                pc: agentId ? { conectado: true, recursos: agentService.recursos(agentId) } : { conectado: false }
+            });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
+    async salvarEventoConfig(req, res) {
+        try {
+            const eventoId = eventoDaReq(req);
+            if (!eventoId) return res.status(400).json({ error: 'Selecione um evento' });
+            const data = await gravacaoService.salvarConfigEvento(eventoId, req.body || {}, req.user);
+            logger.info(`⚙️ [Câmeras] evento ${eventoId}: motor ${data.motor_ia_ativo ? 'ligado' : 'desligado'}, gravação ${data.gravacao_ativa ? 'ligada' : 'desligada'} (${req.user?.email || req.user?.id})`);
+            res.json({ success: true, data });
+        } catch (error) {
+            res.status(400).json({ error: error.message });
+        }
+    }
 }
 
 module.exports = new CameraController();
+module.exports.autenticarMidia = autenticarMidia;
 
 // Usado pela vigilância (detecções enviadas pelo agente ou buscadas no motor local)
 module.exports.processarDeteccoesCamera = processarDeteccoesCamera;

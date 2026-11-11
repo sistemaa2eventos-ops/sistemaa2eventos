@@ -8,9 +8,19 @@ const multer = require('multer');
 // Usar storage em memória temporário para fotos de passagem rápida
 const upload = multer({ storage: multer.memoryStorage() });
 
-const parseMultipartMixed = express.text({
+// multipart/mixed (modo online): lido em bytes para a foto do leitor chegar intacta (confirmação pela
+// IA); o controller continua recebendo o texto como antes (mesma decodificação UTF-8 do express.text)
+const lerMultipartMixed = express.raw({
     type: (req) => (req.headers['content-type'] || '').toLowerCase().includes('multipart/mixed'),
     limit: '15mb'
+});
+const parseMultipartMixed = (req, res, next) => lerMultipartMixed(req, res, (err) => {
+    if (err) return next(err);
+    if (Buffer.isBuffer(req.body)) {
+        req.rawBody = req.body;
+        req.body = req.body.toString('utf8');
+    }
+    next();
 });
 
 const parseIntelbrasBody = (req, res, next) => {

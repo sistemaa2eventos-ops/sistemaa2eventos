@@ -16,6 +16,7 @@ const logger = require('../../services/logger');
  * e no navegador.
  */
 const IA_URL_DIRETA = process.env.PYTHON_MICROSERVICE_URL || null;
+const iaHeaders = () => (process.env.IA_CHAVE_INTERNA ? { 'X-IA-Chave': process.env.IA_CHAVE_INTERNA } : {});
 const CACHE_MS = 30000;
 
 // Vídeo e painel por perfil (a parte de IA de cada perfil vive no motor: src/main.py → PERFIS)
@@ -132,7 +133,7 @@ async function aplicarEmTodos() {
     await Promise.all([...agentService.agents.keys()].map(aplicarNoAgente));
     if (IA_URL_DIRETA) {
         const { perfil, ajustes } = await obter();
-        await axios.post(`${IA_URL_DIRETA}/api/config`, { perfil, ajustes }, { timeout: 10000 })
+        await axios.post(`${IA_URL_DIRETA}/api/config`, { perfil, ajustes }, { timeout: 10000, headers: iaHeaders() })
             .catch(err => logger.debug(`[IA config] motor direto: ${err.message}`));
     }
 }
@@ -140,7 +141,7 @@ async function aplicarEmTodos() {
 /** Status do motor do evento (GPU, fps e IA por câmera) */
 async function status(eventoId) {
     if (IA_URL_DIRETA) {
-        const { data } = await axios.get(`${IA_URL_DIRETA}/api/engine/status`, { timeout: 5000 });
+        const { data } = await axios.get(`${IA_URL_DIRETA}/api/engine/status`, { timeout: 5000, headers: iaHeaders() });
         return data;
     }
     const agentService = require('../../services/agentService');

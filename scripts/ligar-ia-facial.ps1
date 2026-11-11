@@ -47,7 +47,9 @@ if ($Acao -match '^nzt-ia://') {
                 $k = [System.Uri]::UnescapeDataString($matches[1])
                 $v = [System.Uri]::UnescapeDataString($matches[2])
                 if ($k -eq 'token' -and $v) { $Token = $v }
-                elseif ($k -eq 'vps' -and $v) { $VpsUrl = $v }
+                # Qualquer site pode abrir um link nzt-ia://: só aceita servidor do próprio sistema
+                # (senão uma página maliciosa ligaria o agente deste PC a um servidor de terceiros)
+                elseif ($k -eq 'vps' -and $v -match '^https://([a-z0-9-]+\.)*nzt\.app\.br/?$|^http://(localhost|127\.0\.0\.1)(:\d+)?/?$') { $VpsUrl = $v }
                 elseif ($k -eq 'name' -and $v) { $AgentName = $v }
             }
         }
@@ -136,6 +138,9 @@ if ($Acao -eq 'reiniciar-agente') {
     $Acao = 'unico'
 }
 
+$FlagMotorDesligado = Join-Path $DirAgente '.motor-desligado'
+function Test-MotorDesligadoPeloPainel { Test-Path $FlagMotorDesligado }
+
 function Get-PidNaPorta([int]$porta) {
     $c = Get-NetTCPConnection -LocalPort $porta -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($c) { return [int]$c.OwningProcess } else { return $null }
@@ -210,6 +215,14 @@ if ($Acao -eq 'parar') {
     exit 0
 }
 
+# Painel desligou o motor de IA do evento (o agente cria .motor-desligado e chama esta ação):
+# desliga só o motor; vídeo, gravação e leitores seguem pelo agente
+if ($Acao -eq 'parar-motor') {
+    $p = Get-PidNaPorta $PortaMotor
+    if ($p) { Stop-Process -Id $p -Force -ErrorAction SilentlyContinue; Escrever "Motor de IA desligado pelo painel (PID $p)." 'Yellow' }
+    exit 0
+}
+
 # Evitar duas instâncias do vigia rodando ao mesmo tempo
 $outroVigia = Get-OutrosVigias | Select-Object -First 1
 if ($outroVigia -and $Acao -ne 'unico') {
@@ -274,13 +287,19 @@ function Invoke-VerificacaoCompatibilidade {
         Escrever "  • Ambiente Python IA  : Pendente (venv-ia em backend\microservice-face-python)" 'Red'
     }
 
-    $envMotor = Read-ArquivoEnv (Join-Path $DirMotor '.env')
-    $envApi   = Read-ArquivoEnv (Join-Path $Raiz 'backend\api-nodejs\.env')
-    $temSupa  = [bool]($envMotor['SUPABASE_SERVICE_ROLE_KEY'] -or $envApi['SUPABASE_SERVICE_ROLE_KEY'])
-    Escrever ("  • Chave Supabase      : " + $(if ($temSupa) { 'Configurada (OK)' } else { 'Ausente no .env' })) $(if ($temSupa) { 'Green' } else { 'Red' })
-
     $envAgente = Read-ArquivoEnv (Join-Path $DirAgente '.env')
     $temToken  = [bool]$envAgente['AGENT_TOKEN']
+    if ($temToken) {
+        Escrever '  • Biometrias          : enviadas pelo painel ao agente (sem chave do banco neste PC)' 'Green'
+    } else {
+        $envMotor = Read-ArquivoEnv (Join-Path $DirMotor '.env')
+        $temSupa  = [bool]$envMotor['SUPABASE_SERVICE_ROLE_KEY']
+        Escrever ("  • Chave Supabase      : " + $(if ($temSupa) { 'Configurada no .env do motor (modo sem agente)' } else { 'Ausente (configure o agente local)' })) $(if ($temSupa) { 'Yellow' } else { 'Red' })
+    }
+    $temGo2rtc = Test-Path (Join-Path $DirAgente 'bin\go2rtc.exe')
+    $temFfmpeg = Test-Path (Join-Path $DirAgente 'bin\ffmpeg.exe')
+    Escrever ("  • Vídeo sem IA        : " + $(if ($temGo2rtc) { 'go2rtc instalado' } else { 'go2rtc será instalado ao ligar' })) $(if ($temGo2rtc) { 'Green' } else { 'Yellow' })
+    Escrever ("  • Gravação            : " + $(if ($temFfmpeg) { 'ffmpeg instalado' } else { 'ffmpeg será instalado ao ligar' })) $(if ($temFfmpeg) { 'Green' } else { 'Yellow' })
     Escrever ("  • Token Agente Local  : " + $(if ($temToken) { "Configurado ($($envAgente['AGENT_NAME']))" } else { 'Ausente em backend\agent-local\.env' })) $(if ($temToken) { 'Green' } else { 'Yellow' })
 
     # Recomendações de configuração baseadas no hardware
@@ -358,15 +377,17 @@ function Start-Motor {
         Escrever '      Atenção: "onnxruntime" (só CPU) está instalado junto com o "onnxruntime-directml". Rode: venv-ia\Scripts\pip uninstall -y onnxruntime  e depois  venv-ia\Scripts\pip install --force-reinstall --no-deps onnxruntime-directml==1.24.4' 'Yellow'
     }
 
-    # Credenciais: .env do microservice; o que faltar vem do .env do backend
-    $envMotor = Read-ArquivoEnv (Join-Path $DirMotor '.env')
-    $envApi   = Read-ArquivoEnv (Join-Path $Raiz 'backend\api-nodejs\.env')
-    foreach ($k in 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY') {
-        $v = if ($envMotor[$k]) { $envMotor[$k] } else { $envApi[$k] }
-        if ($v) { Set-Item "env:$k" $v }
-    }
-    if (-not $env:SUPABASE_SERVICE_ROLE_KEY) {
-        Escrever '[2/3] Motor de IA: SUPABASE_SERVICE_ROLE_KEY não encontrada (backend\api-nodejs\.env). Sem ela a IA não carrega os rostos cadastrados.' 'Red'
+    # Biometrias: com o agente configurado, o painel as envia pelo agente e o motor NÃO recebe a chave
+    # de serviço do banco (acesso total). Sem agente (motor isolado), usa a chave do .env do motor.
+    $envAgenteM = Read-ArquivoEnv (Join-Path $DirAgente '.env')
+    Remove-Item Env:SUPABASE_SERVICE_ROLE_KEY -ErrorAction SilentlyContinue
+    Remove-Item Env:SUPABASE_URL -ErrorAction SilentlyContinue
+    if (-not $envAgenteM['AGENT_TOKEN']) {
+        $envMotor = Read-ArquivoEnv (Join-Path $DirMotor '.env')
+        foreach ($k in 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY') { if ($envMotor[$k]) { Set-Item "env:$k" $envMotor[$k] } }
+        if (-not $env:SUPABASE_SERVICE_ROLE_KEY) {
+            Escrever '[2/3] Motor de IA: sem agente local e sem chave no .env do motor: a IA não terá rostos cadastrados.' 'Red'
+        }
     }
     $env:PYTHONUNBUFFERED = '1'
     $env:PYTHONIOENCODING = 'utf-8'
@@ -404,7 +425,9 @@ function Show-Motor {
     $s = Get-SaudeMotor
     if (-not $s) { return }
     $faiss = $null
-    try { $faiss = Invoke-RestMethod "http://127.0.0.1:$PortaMotor/api/engine/status" -TimeoutSec 5 } catch {}
+    $arqChave = Join-Path $DirMotor '.chave-interna'
+    $cab = if (Test-Path $arqChave) { @{ 'X-IA-Chave' = (Get-Content $arqChave -Raw).Trim() } } else { @{} }
+    try { $faiss = Invoke-RestMethod "http://127.0.0.1:$PortaMotor/api/engine/status" -Headers $cab -TimeoutSec 5 } catch {}
     $hw = if ($faiss -and $faiss.hardware_acceleration) { $faiss.hardware_acceleration } else { 'CPU' }
     Escrever ("[2/3] Motor de IA: LIGADO em http://localhost:{0}  |  {1}  |  perfil {2}  |  {3} rostos indexados  |  {4}/{5} câmera(s) com vídeo" -f `
         $PortaMotor, $hw, $s.perfil, $s.registered_persons, $s.cameras_com_video, $s.cameras_em_uso) 'Green'
@@ -413,7 +436,24 @@ function Show-Motor {
     if ($faiss -and $faiss.faiss_total_vectors -eq 0) { Escrever '      Atenção: nenhum rosto no índice. Confira a chave do Supabase e se há pessoas com biometria.' 'Yellow' }
 }
 
+# Processo iniciado antes da última atualização do arquivo? (código novo no disco, versão antiga rodando)
+function Test-ProcessoDesatualizado([int]$processId, [string]$arquivo) {
+    try {
+        $p = Get-CimInstance Win32_Process -Filter "ProcessId=$processId" -ErrorAction Stop
+        return ((Get-Item $arquivo).LastWriteTime -gt $p.CreationDate)
+    } catch { return $false }
+}
+
 function Confirm-Motor {
+    if (Test-MotorDesligadoPeloPainel) {
+        Escrever '[2/3] Motor de IA: desligado pelo painel (Câmeras > Motor de IA do evento). Câmeras seguem com vídeo.' 'Cyan'
+        return
+    }
+    $pidAtual = Get-PidNaPorta $PortaMotor
+    if ($pidAtual -and (Test-ProcessoDesatualizado $pidAtual (Join-Path $DirMotor 'src\main.py'))) {
+        Escrever '[2/3] Motor de IA: código atualizado no disco, reiniciando o motor para a versão nova...' 'Yellow'
+        Stop-Process -Id $pidAtual -Force -ErrorAction SilentlyContinue; Start-Sleep 2
+    }
     if (Get-SaudeMotor) { Escrever '[2/3] Motor de IA: já estava ligado, mantendo.' 'Green'; Show-Motor; return }
     $ocupante = Get-PidNaPorta $PortaMotor
     if ($ocupante) {
@@ -457,6 +497,14 @@ function Confirm-Agente {
         Push-Location $DirAgente; try { npm ci --omit=dev 2>&1 | Out-Null } finally { Pop-Location }
     }
     $script:AgenteAtivo = $true
+    # Agente antigo rodando com código novo no disco (ex.: motor novo exige a chave interna): reinicia
+    $antigos = Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -match 'agent\.js' -and (Test-ProcessoDesatualizado $_.ProcessId (Join-Path $DirAgente 'src\agent.js')) }
+    foreach ($a in $antigos) {
+        Escrever '[3/3] Agente local: código atualizado no disco, reiniciando o agente para a versão nova...' 'Yellow'
+        Stop-Process -Id $a.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+    if ($antigos) { Start-Sleep 2 }
     if (Test-AgenteRodando) { Escrever '[3/3] Agente local: já estava ligado, mantendo.' 'Green'; return }
     Start-Agente
     Start-Sleep 3
@@ -464,8 +512,56 @@ function Confirm-Agente {
     else { Escrever "[3/3] Agente local: LIGADO, levando IA, câmeras e leitores ao painel em $($envAgente['VPS_URL'])." 'Green' }
 }
 
+# ---------------------------------------------------------------- vídeo sem IA e gravação
+# go2rtc (retransmissor: vídeo das câmeras sem o motor de IA) e ffmpeg (gravação e vídeo de reserva).
+# Versões fixas, baixadas do GitHub e conferidas pelo SHA-256 publicado: arquivo diferente é recusado.
+$Binarios = @(
+    @{ Nome = 'go2rtc.exe'; Url = 'https://github.com/AlexxIT/go2rtc/releases/download/v1.9.14/go2rtc_win64.zip';
+       Sha256 = 'dd4167d75cb04abe618855b7c71f8658bd009f60c1a71835d134d2c11c939907'; Descricao = 'go2rtc 1.9.14 (7 MB)' },
+    @{ Nome = 'ffmpeg.exe'; Url = 'https://github.com/GyanD/codexffmpeg/releases/download/8.0/ffmpeg-8.0-essentials_build.zip';
+       Sha256 = '647e467caf82b9fa200a562769b5ff4d736aaf725804ed2c64ea9752106fa569'; Descricao = 'ffmpeg 8.0 (100 MB)' }
+)
+
+function Install-VideoLocal {
+    $dirBin = Join-Path $DirAgente 'bin'
+    New-Item -ItemType Directory -Force $dirBin | Out-Null
+    foreach ($b in $Binarios) {
+        $destino = Join-Path $dirBin $b.Nome
+        if (Test-Path $destino) { continue }
+        $tmp = Join-Path $env:TEMP ("nzt-" + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Force $tmp | Out-Null
+        try {
+            Escrever "      Baixando $($b.Descricao)..." 'Yellow'
+            $zip = Join-Path $tmp 'pacote.zip'
+            $ProgressPreference = 'SilentlyContinue'
+            Invoke-WebRequest -Uri $b.Url -OutFile $zip -UseBasicParsing -TimeoutSec 900
+            $hash = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLower()
+            if ($hash -ne $b.Sha256) { throw "hash não confere ($hash): download recusado" }
+            Expand-Archive -Path $zip -DestinationPath (Join-Path $tmp 'x') -Force
+            $exe = Get-ChildItem (Join-Path $tmp 'x') -Recurse -Filter $b.Nome | Select-Object -First 1
+            if (-not $exe) { throw "$($b.Nome) não encontrado no pacote" }
+            Copy-Item $exe.FullName $destino -Force
+            Escrever "      $($b.Nome) instalado em backend\agent-local\bin." 'Green'
+        } catch {
+            Escrever "      Não foi possível instalar $($b.Nome): $($_.Exception.Message)" 'Red'
+        } finally {
+            Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+function Confirm-VideoLocal {
+    $ErrorActionPreference = 'Continue'
+    Install-VideoLocal
+    $ok = (Test-Path (Join-Path $DirAgente 'bin\go2rtc.exe'))
+    if ($ok) { Escrever '[+] Vídeo das câmeras sem IA: retransmissor local pronto (o agente o liga).' 'Green' }
+    else { Escrever '[+] Vídeo das câmeras sem IA: indisponível; o vídeo seguirá pelo motor de IA.' 'Yellow' }
+    $ErrorActionPreference = 'Stop'
+}
+
 # ---------------------------------------------------------------- execução
 Confirm-Camera
+Confirm-VideoLocal
 Confirm-Motor
 Confirm-Agente
 
@@ -482,7 +578,9 @@ $falhas = 0
 while ($true) {
     Start-Sleep $IntervaloVigia
 
-    if (Get-SaudeMotor) {
+    if (Test-MotorDesligadoPeloPainel) {
+        $falhas = 0
+    } elseif (Get-SaudeMotor) {
         if ($falhas -gt 0) { Escrever 'Motor de IA voltou a responder.' 'Green' }
         $falhas = 0
     } else {

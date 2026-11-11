@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Box, Typography, Grid, TextField, Button, Chip, Stack, MenuItem,
-    IconButton, CircularProgress, Dialog, DialogTitle, DialogContent,
-    DialogActions, FormControl, InputLabel, Select,
-    Tabs, Tab, Switch, FormControlLabel, Tooltip
+    Box, Typography, Grid, Button, Chip, Stack,
+    IconButton, CircularProgress, Tabs, Tab
 } from '@mui/material';
 import {
-    Save as SaveIcon, Videocam as CameraIcon,
+    Videocam as CameraIcon, VideoLibrary as GravacoesIcon,
     Psychology as IaIcon, Add as AddIcon, Delete as DeleteIcon,
     Refresh as RefreshIcon, OpenInNew as OpenInNewIcon, Shield as ShieldIcon,
-    Tune as TuneIcon, PowerSettingsNew as PowerIcon, Face as FaceIcon
+    Tune as TuneIcon, PowerSettingsNew as PowerIcon
 } from '@mui/icons-material';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
@@ -20,36 +18,41 @@ import NeonButton from '../../components/common/NeonButton';
 import PageHeader from '../../components/common/PageHeader';
 import ConfigIAFacial from './ConfigIAFacial';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
+import CameraFormDialog from '../../components/cameras/CameraFormDialog';
+import CamerasEventoBarra from '../../components/cameras/CamerasEventoBarra';
+import GravacoesPainel from '../../components/cameras/GravacoesPainel';
+import SeletorModo from '../../components/cameras/SeletorModo';
+import { MODOS_IA, MODOS_GRAVACAO, modoIaDe, camposDoModoIa } from '../../components/cameras/opcoesCamera';
 
-import { botaoSecundario } from '../../styles/tokens';
-const FABRICANTES = ['RTSP / OBS / Webcam', 'Intelbras', 'Hikvision', 'Genérica'];
+const ABAS = { cameras: 0, gravacoes: 1, ia: 2 };
 
 /**
- * Situação de uma câmera em linguagem simples. Quando o motor de IA está acompanhando a câmera,
- * vale o que ele vê agora (vídeo chegando ou não); senão, o último teste de rede.
+ * Situação de uma câmera em linguagem simples. O vídeo não depende mais do motor de IA: com IA
+ * ligada vale o que o motor vê agora; sem IA, o último teste de conexão.
  */
-const situacaoCamera = (cam, status, isDesativada, st, iaErro) => {
+const situacaoCamera = (cam, status, isDesativada, st, iaErro, motorLigado) => {
     if (isDesativada) {
-        return { cor: '#FFB800', titulo: 'Desativada', detalhe: 'Vídeo e reconhecimento facial pausados.', chips: [] };
+        return { cor: '#FFB800', titulo: 'Desativada', detalhe: 'Sem vídeo, IA e gravação.', chips: [] };
     }
-    if (st) {
-        const chips = [];
-        if (st.conectada) {
-            if (st.video_fps) chips.push(`${Math.round(st.video_fps)} quadros/s`);
-            const res = st.resolucao?.principal || st.resolucao?.sub;
-            if (res) chips.push(Array.isArray(res) ? res.join('×') : String(res));
-        }
-        if (cam.ia_ativa === false || st.ia_ativa === false) chips.push('IA pausada');
-        else if (st.ia_analisando) chips.push(st.rostos ? `IA analisando • ${st.rostos} rosto(s)` : 'IA analisando');
-        else chips.push('IA em espera (sem movimento)');
+    const chips = [];
+    const modo = modoIaDe(cam);
+    if (modo === 'monitorar') chips.push('Não usa o motor de IA');
+    else if (!motorLigado) chips.push('Motor de IA desligado no evento');
+    else if (st?.ia_analisando) chips.push(st.rostos ? `IA analisando · ${st.rostos} rosto(s)` : 'IA analisando');
+    else if (st) chips.push(modo === '24h' ? 'IA em espera (sem movimento)' : 'IA em espera (ninguém assistindo)');
+    else if (iaErro) chips.push('Motor de IA do evento indisponível');
+    if (cam.gravacao_modo === 'continua') chips.push('Gravando sempre');
+    if (cam.gravacao_modo === 'alertas') chips.push('Grava em alertas');
+
+    if (modo !== 'monitorar' && st) {
+        if (st.conectada && st.video_fps) chips.push(`${Math.round(st.video_fps)} quadros/s`);
         return st.conectada
             ? { cor: '#00FF88', titulo: 'Online', detalhe: 'Recebendo vídeo agora.', chips }
-            : { cor: '#FF3366', titulo: 'Sem sinal', detalhe: 'O servidor do evento não está recebendo o vídeo desta câmera.', chips };
+            : { cor: '#FF3366', titulo: 'Sem sinal', detalhe: 'O PC do evento não está recebendo o vídeo desta câmera.', chips };
     }
-    const semMotor = iaErro ? ['Servidor de IA do evento indisponível'] : [];
-    if (status === 'online') return { cor: '#00FF88', titulo: 'Online', detalhe: 'Respondeu ao último teste de rede.', chips: semMotor };
-    if (status === 'offline') return { cor: '#FF3366', titulo: 'Offline', detalhe: 'Não respondeu ao último teste de rede.', chips: semMotor };
-    return { cor: '#94A3B8', titulo: 'Não verificada', detalhe: 'Toque em Testar para checar a conexão.', chips: semMotor };
+    if (status === 'online') return { cor: '#00FF88', titulo: 'Online', detalhe: 'Respondeu ao último teste.', chips };
+    if (status === 'offline') return { cor: '#FF3366', titulo: 'Offline', detalhe: 'Não respondeu ao último teste.', chips };
+    return { cor: '#94A3B8', titulo: 'Não verificada', detalhe: 'Toque em Testar para checar a conexão.', chips };
 };
 
 const ConfigCameras = ({ abaInicial = null }) => {
@@ -59,19 +62,19 @@ const ConfigCameras = ({ abaInicial = null }) => {
     const navigate = useNavigate();
     const eventoId = searchParams.get('evento_id') || localStorage.getItem('active_evento_id');
 
-    // 0 = Câmeras IP, 1 = Motor de IA facial (/config/ia-facial abre direto nesta aba)
-    const [activeTab, setActiveTab] = useState(abaInicial === 'ia' ? 1 : 0);
+    // 0 = Câmeras, 1 = Gravações, 2 = Motor de IA facial (/config/ia-facial abre direto nesta aba)
+    const [activeTab, setActiveTab] = useState(ABAS[abaInicial] ?? 0);
     const [cameras, setCameras] = useState([]);
     const [areas, setAreas] = useState([]);
     const [loadingCameras, setLoadingCameras] = useState(true);
-    // Prévia renovada só ao recarregar a lista (antes cada tecla digitada no cadastro baixava todas de novo)
-    // Situação ao vivo de cada câmera (vídeo chegando, fps, IA), atualizada a cada 15 s
-    const { status: iaStatus, erro: iaErro } = useIaStatus(activeTab === 0, 15000);
+    // Situação ao vivo das câmeras com IA (vídeo chegando, fps, IA), atualizada a cada 15 s
+    const temCameraComIa = cameras.some(c => c.ia_ativa === true);
+    const { status: iaStatus, erro: iaErro } = useIaStatus(activeTab === 0 && temCameraComIa, 15000);
+    const [motorLigado, setMotorLigado] = useState(true);
 
     // Dialog de Câmera (Criar / Editar)
     const [cameraModalOpen, setCameraModalOpen] = useState(false);
     const [editingCamera, setEditingCamera] = useState(null);
-    const [savingCamera, setSavingCamera] = useState(false);
     const [testingId, setTestingId] = useState(null);
     const [testResults, setTestResults] = useState({});
     const [togglingId, setTogglingId] = useState(null);
@@ -107,69 +110,28 @@ const ConfigCameras = ({ abaInicial = null }) => {
         fetchAreas();
     }, [fetchCameras, fetchAreas]);
 
+    useEffect(() => {
+        api.get('/cameras/evento-config', { hideDefaultError: true })
+            .then(({ data }) => setMotorLigado(data.data?.motor_ia_ativo !== false))
+            .catch(() => {});
+    }, [activeTab]);
+
     // Abrir Modal de Câmera
     const handleOpenModal = (camera = null) => {
-        if (camera) {
-            setEditingCamera({ ...camera });
-        } else {
-            setEditingCamera({
-                nome: '',
-                fabricante: 'RTSP / OBS / Webcam',
-                ip_address: '127.0.0.1',
-                porta: 8554,
-                usuario: 'a2eventos',
-                senha: '',
-                protocolo: 'rtsp',
-                stream_url: 'rtsp://127.0.0.1:8554/live',
-                snapshot_url: '',
-                area_id: areas[0]?.id || '',
-                ia_ativa: true,
-                vigilancia_ativa: true,
-                prioridade: 1,
-                url_substream: ''
-            });
-        }
+        setEditingCamera(camera);
         setCameraModalOpen(true);
     };
 
-    // Salvar Câmera IP
-    const handleSaveCamera = async () => {
-        if (!editingCamera?.nome || !editingCamera?.ip_address) {
-            enqueueSnackbar('Nome e Endereço IP são obrigatórios.', { variant: 'warning' });
-            return;
-        }
-
+    /** Muda o modo de IA ou de gravação direto no cartão (salva na hora) */
+    const mudarOpcao = async (cam, campos, mensagem) => {
+        const anterior = { ...cam };
+        setCameras(prev => prev.map(c => c.id === cam.id ? { ...c, ...campos } : c));
         try {
-            setSavingCamera(true);
-            const payload = {
-                ...editingCamera,
-                evento_id: eventoId,
-                area_id: editingCamera.area_id || null,
-                snapshot_url: editingCamera.snapshot_url || null,
-                url_substream: editingCamera.url_substream || null,
-                porta: parseInt(editingCamera.porta, 10) || (editingCamera.protocolo === 'rtsp' ? 554 : 80)
-            };
-
-            // Auto-gerar RTSP URL caso vazia
-            if (!payload.stream_url && payload.ip_address) {
-                const auth = payload.usuario && payload.senha ? `${payload.usuario}:${payload.senha}@` : '';
-                payload.stream_url = `rtsp://${auth}${payload.ip_address}:${payload.porta}/live`;
-            }
-
-            if (editingCamera.id) {
-                await api.put(`/cameras/${editingCamera.id}`, payload);
-                enqueueSnackbar('Câmera atualizada com sucesso!', { variant: 'success' });
-            } else {
-                await api.post('/cameras', payload);
-                enqueueSnackbar('Nova câmera IP cadastrada no sistema!', { variant: 'success' });
-            }
-
-            setCameraModalOpen(false);
-            fetchCameras();
+            await api.put(`/cameras/${cam.id}`, campos);
+            enqueueSnackbar(mensagem, { variant: 'success' });
         } catch (err) {
-            enqueueSnackbar('Erro ao salvar câmera: ' + (err.response?.data?.error || err.message), { variant: 'error' });
-        } finally {
-            setSavingCamera(false);
+            setCameras(prev => prev.map(c => c.id === cam.id ? anterior : c));
+            enqueueSnackbar(err.response?.data?.error || 'Não foi possível salvar a opção da câmera.', { variant: 'error' });
         }
     };
 
@@ -231,25 +193,6 @@ const ConfigCameras = ({ abaInicial = null }) => {
         }
     };
 
-    // Ativar / Pausar apenas a IA Facial da câmera
-    const handleToggleCameraIa = async (cam) => {
-        const novaIa = cam.ia_ativa === false;
-        try {
-            setTogglingId(cam.id);
-            setCameras(prev => prev.map(c => c.id === cam.id ? { ...c, ia_ativa: novaIa } : c));
-            await api.put(`/cameras/${cam.id}`, { ia_ativa: novaIa });
-            enqueueSnackbar(
-                novaIa ? `Reconhecimento facial ativado em "${cam.nome}".` : `Reconhecimento facial pausado em "${cam.nome}".`,
-                { variant: novaIa ? 'success' : 'info' }
-            );
-        } catch (err) {
-            setCameras(prev => prev.map(c => c.id === cam.id ? { ...c, ia_ativa: !novaIa } : c));
-            enqueueSnackbar('Erro ao atualizar IA da câmera.', { variant: 'error' });
-        } finally {
-            setTogglingId(null);
-        }
-    };
-
     // Desativar / Ativar Todas as Câmeras do Evento
     const temCameraAtiva = cameras.some(c => c.status !== 'desativada' && c.status !== 'inativa');
     const handleToggleAllCameras = async () => {
@@ -285,7 +228,7 @@ const ConfigCameras = ({ abaInicial = null }) => {
         <Box sx={{ p: { xs: 2, md: 4 } }}>
             <PageHeader
                 title="Câmeras e IA facial"
-                subtitle="Cadastre as câmeras IP e ajuste o motor de reconhecimento facial."
+                subtitle="As câmeras funcionam sem IA. Ligue o reconhecimento facial e a gravação só onde precisar."
                 breadcrumbs={[{ text: 'Configurações' }, { text: 'Equipamentos' }, { text: 'Câmeras e IA facial' }]}
             />
 
@@ -302,7 +245,8 @@ const ConfigCameras = ({ abaInicial = null }) => {
                             '& .MuiTabs-indicator': { bgcolor: '#00D4FF', height: 3 }
                         }}
                     >
-                        <Tab icon={<CameraIcon sx={{ mr: 1 }} />} iconPosition="start" label={`Câmeras IP (${cameras.length})`} />
+                        <Tab icon={<CameraIcon sx={{ mr: 1 }} />} iconPosition="start" label={`Câmeras (${cameras.length})`} />
+                        <Tab icon={<GravacoesIcon sx={{ mr: 1 }} />} iconPosition="start" label="Gravações" />
                         <Tab icon={<IaIcon sx={{ mr: 1 }} />} iconPosition="start" label="Motor de IA facial" />
                     </Tabs>
 
@@ -340,9 +284,17 @@ const ConfigCameras = ({ abaInicial = null }) => {
                         )}
                     </Stack>
                 </Stack>
+                {activeTab === 0 && (
+                    <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                        <CamerasEventoBarra />
+                    </Box>
+                )}
             </GlassCard>
 
-            {/* ABA 0: CÂMERAS IP DO EVENTO */}
+            {/* ABA 1: GRAVAÇÕES (ficam no PC do evento) */}
+            {activeTab === 1 && <GravacoesPainel cameras={cameras} />}
+
+            {/* ABA 0: CÂMERAS DO EVENTO */}
             {activeTab === 0 && (
                 <Box>
                     {loadingCameras ? (
@@ -385,7 +337,7 @@ const ConfigCameras = ({ abaInicial = null }) => {
                                         }}>
                                             {/* Situação da câmera (as imagens ficam no Monitoramento) */}
                                             {(() => {
-                                                const sit = situacaoCamera(cam, status, isDesativada, statusDaCamera(iaStatus, cam.id), iaErro);
+                                                const sit = situacaoCamera(cam, status, isDesativada, statusDaCamera(iaStatus, cam.id), iaErro, motorLigado);
                                                 return (
                                                     <Box sx={{ p: 2, borderBottom: '1px solid rgba(255,255,255,0.06)', bgcolor: `${sit.cor}0F` }}>
                                                         <Stack direction="row" alignItems="center" spacing={1.25}>
@@ -419,32 +371,22 @@ const ConfigCameras = ({ abaInicial = null }) => {
                                                     <Typography variant="h6" fontWeight={700} noWrap sx={{ color: '#FFFFFF', flex: 1 }}>
                                                         {cam.nome}
                                                     </Typography>
-                                                    <Tooltip title={cam.ia_ativa === false ? 'Reconhecimento facial desligado nesta câmera (clique para ligar)' : 'Reconhecimento facial ativo (clique para pausar só a IA)'}>
-                                                        <Chip
-                                                            icon={<FaceIcon sx={{ fontSize: 14 }} />}
-                                                            label={cam.ia_ativa === false ? 'IA pausada' : 'IA ativa'}
-                                                            size="small"
-                                                            onClick={() => handleToggleCameraIa(cam)}
-                                                            disabled={isToggling || isDesativada}
-                                                            sx={{
-                                                                cursor: 'pointer',
-                                                                fontWeight: 700,
-                                                                fontSize: '0.7rem',
-                                                                bgcolor: cam.ia_ativa === false ? 'rgba(255,255,255,0.06)' : 'rgba(0, 212, 255, 0.14)',
-                                                                color: cam.ia_ativa === false ? '#94A3B8' : '#00D4FF',
-                                                                border: '1px solid currentColor'
-                                                            }}
-                                                        />
-                                                    </Tooltip>
                                                 </Stack>
 
                                                 <Typography variant="body2" color="text.secondary" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem', mt: 0.5 }}>
                                                     {cam.ip_address}:{cam.porta} • {cam.protocolo?.toUpperCase() || 'RTSP'}
                                                 </Typography>
 
-                                                <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.5)', mt: 1, noWrap: true, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    Stream: {cam.stream_url || 'Padrão / RTSP'}
-                                                </Typography>
+                                                <Stack spacing={1.5} sx={{ mt: 2 }}>
+                                                    <SeletorModo compacto id={`ia-${cam.id}`} rotulo="Inteligência" opcoes={MODOS_IA}
+                                                        valor={modoIaDe(cam)} disabled={isDesativada}
+                                                        onChange={(m) => mudarOpcao(cam, camposDoModoIa(m),
+                                                            `${cam.nome}: ${MODOS_IA.find(o => o.valor === m).rotulo}.`)} />
+                                                    <SeletorModo compacto id={`grav-${cam.id}`} rotulo="Gravação" opcoes={MODOS_GRAVACAO}
+                                                        valor={cam.gravacao_modo || 'desligada'} disabled={isDesativada}
+                                                        onChange={(m) => mudarOpcao(cam, { gravacao_modo: m },
+                                                            `${cam.nome}: gravação ${MODOS_GRAVACAO.find(o => o.valor === m).rotulo.toLowerCase()}.`)} />
+                                                </Stack>
 
                                                 {/* Ações */}
                                                 <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" mt={2.5} sx={{ '& .MuiButton-root': { flex: '1 1 30%', minWidth: 96 } }}>
@@ -503,183 +445,18 @@ const ConfigCameras = ({ abaInicial = null }) => {
                 </Box>
             )}
 
-            {/* ABA 1: MOTOR DE IA (as catracas são cadastradas em Leitores e dispositivos) */}
-            {activeTab === 1 && <ConfigIAFacial embutido />}
+            {/* ABA 2: MOTOR DE IA (as catracas são cadastradas em Leitores e dispositivos) */}
+            {activeTab === 2 && <ConfigIAFacial embutido />}
 
-            {/* MODAL DE CADASTRO / EDIÇÃO DE CÂMERA */}
-            <Dialog
+            {/* CADASTRO / EDIÇÃO DE CÂMERA (mesmo formulário do Monitor) */}
+            <CameraFormDialog
                 open={cameraModalOpen}
+                camera={editingCamera}
+                areas={areas}
+                eventoId={eventoId}
                 onClose={() => setCameraModalOpen(false)}
-                fullWidth
-                maxWidth="sm"
-            >
-                <DialogTitle sx={{ fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                    {editingCamera?.id ? 'Editar câmera IP' : 'Cadastrar nova câmera IP'}
-                </DialogTitle>
-                <DialogContent sx={{ pt: 2.5 }}>
-                    <Stack spacing={2.5}>
-                        <TextField
-                            label="Nome de identificação da câmera"
-                            fullWidth
-                            required
-                            placeholder="Ex: Câmera Portão 1 - Entrada Principal, VIP Lounge"
-                            value={editingCamera?.nome || ''}
-                            onChange={(e) => setEditingCamera({ ...editingCamera, nome: e.target.value })}
-                        />
-
-                        <Grid container spacing={2}>
-                            <Grid item xs={12} sm={6}>
-                                <FormControl fullWidth required>
-                                    <InputLabel>Fabricante / tipo</InputLabel>
-                                    <Select
-                                        label="Fabricante / tipo"
-                                        value={editingCamera?.fabricante || 'RTSP / OBS / Webcam'}
-                                        onChange={(e) => {
-                                            const fab = e.target.value;
-                                            const update = { ...editingCamera, fabricante: fab };
-                                            if (fab === 'RTSP / OBS / Webcam') {
-                                                update.porta = 8554;
-                                                update.usuario = update.usuario || 'a2eventos';
-                                                update.protocolo = 'rtsp';
-                                            } else if (fab === 'Intelbras' || fab === 'Hikvision') {
-                                                update.porta = 554;
-                                                update.protocolo = 'rtsp';
-                                            }
-                                            setEditingCamera(update);
-                                        }}
-                                    >
-                                        {FABRICANTES.map(f => <MenuItem key={f} value={f}>{f}</MenuItem>)}
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-
-                            <Grid item xs={12} sm={6}>
-                                <FormControl fullWidth>
-                                    <InputLabel>Área / setor do evento</InputLabel>
-                                    <Select
-                                        label="Área / setor do evento"
-                                        value={editingCamera?.area_id || ''}
-                                        onChange={(e) => setEditingCamera({ ...editingCamera, area_id: e.target.value })}
-                                    >
-                                        <MenuItem value=""><em>Nenhuma / geral</em></MenuItem>
-                                        {areas.map(a => (
-                                            <MenuItem key={a.id} value={a.id}>
-                                                {a.nome_area || a.nome}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                        </Grid>
-
-                        <Grid container spacing={2}>
-                            <Grid item xs={12} sm={8}>
-                                <TextField
-                                    label="Endereço IP na rede"
-                                    fullWidth
-                                    required
-                                    placeholder="Ex: 192.168.1.108 ou 127.0.0.1"
-                                    value={editingCamera?.ip_address || ''}
-                                    onChange={(e) => setEditingCamera({ ...editingCamera, ip_address: e.target.value })}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    label="Porta RTSP"
-                                    type="number"
-                                    fullWidth
-                                    value={editingCamera?.porta || 554}
-                                    onChange={(e) => setEditingCamera({ ...editingCamera, porta: e.target.value })}
-                                />
-                            </Grid>
-                        </Grid>
-
-                        <Grid container spacing={2}>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    label="Usuário da câmera"
-                                    fullWidth
-                                    placeholder="Ex: admin"
-                                    value={editingCamera?.usuario || ''}
-                                    onChange={(e) => setEditingCamera({ ...editingCamera, usuario: e.target.value })}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    label="Senha da câmera"
-                                    type="password"
-                                    fullWidth
-                                    placeholder="Senha de acesso"
-                                    value={editingCamera?.senha || ''}
-                                    onChange={(e) => setEditingCamera({ ...editingCamera, senha: e.target.value })}
-                                />
-                            </Grid>
-                        </Grid>
-
-                        <TextField
-                            label="URL de stream RTSP (opcional / gerada automaticamente)"
-                            fullWidth
-                            placeholder="rtsp://usuario:senha@ip:porta/live"
-                            value={editingCamera?.stream_url || ''}
-                            onChange={(e) => setEditingCamera({ ...editingCamera, stream_url: e.target.value })}
-                            helperText="Deixe em branco para o sistema compor automaticamente a URL com base no IP e fabricante."
-                        />
-
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700, pt: 0.5 }}>
-                            Status e reconhecimento facial
-                        </Typography>
-                        <Grid container spacing={2} alignItems="center">
-                            <Grid item xs={12} sm={4}>
-                                <FormControlLabel
-                                    control={
-                                        <Switch
-                                            checked={editingCamera?.status !== 'desativada' && editingCamera?.status !== 'inativa'}
-                                            onChange={(e) => setEditingCamera({
-                                                ...editingCamera,
-                                                status: e.target.checked ? 'offline' : 'desativada'
-                                            })}
-                                        />
-                                    }
-                                    label="Câmera ativa"
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <FormControlLabel
-                                    control={
-                                        <Switch
-                                            checked={editingCamera?.ia_ativa !== false}
-                                            onChange={(e) => setEditingCamera({ ...editingCamera, ia_ativa: e.target.checked })}
-                                        />
-                                    }
-                                    label="IA ligada"
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <FormControlLabel
-                                    control={
-                                        <Switch
-                                            checked={editingCamera?.vigilancia_ativa !== false && editingCamera?.ia_ativa !== false}
-                                            disabled={editingCamera?.ia_ativa === false}
-                                            onChange={(e) => setEditingCamera({ ...editingCamera, vigilancia_ativa: e.target.checked })}
-                                        />
-                                    }
-                                    label="Vigilância 24 h"
-                                />
-                            </Grid>
-                        </Grid>
-                    </Stack>
-                </DialogContent>
-                <DialogActions sx={{ p: 2.5, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                    <Button variant="outlined" onClick={() => setCameraModalOpen(false)} sx={botaoSecundario}>Cancelar</Button>
-                    <NeonButton
-                        loading={savingCamera}
-                        startIcon={<SaveIcon />}
-                        onClick={handleSaveCamera}
-                    >
-                        {editingCamera?.id ? 'Salvar alterações' : 'Cadastrar câmera'}
-                    </NeonButton>
-                </DialogActions>
-            </Dialog>
+                onSalvo={fetchCameras}
+            />
         </Box>
     );
 };

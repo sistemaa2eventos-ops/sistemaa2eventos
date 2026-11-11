@@ -12,6 +12,7 @@ class AgentService {
     constructor() {
         this.agents = new Map();    // agentToken → socket
         this.pending = new Map();   // requestId → { resolve, reject, timer }
+        this.videoSockets = new Map(); // agentId → socket do namespace /agent-video
         this.REQUEST_TIMEOUT = 30000;
     }
 
@@ -50,9 +51,18 @@ class AgentService {
         nsVideo.use(autenticar);
         nsVideo.on('connection', (socket) => {
             const agentId = socket.agentInfo.id;
+            // Comandos pesados (pedaços de gravação) vão por aqui, não pelo canal dos leitores
+            this.videoSockets.set(agentId, socket);
+            socket.on('disconnect', () => { if (this.videoSockets.get(agentId) === socket) this.videoSockets.delete(agentId); });
+            socket.on('agent:response', (msg) => this._resposta(msg));
             socket.on('agent:video_quadro', (msg, ack) => {
                 if (typeof ack === 'function') ack();
                 require('./videoRelay').receber(agentId, msg);
+            });
+            // Vídeo MP4 (retransmissor local, sem IA) — ver services/mp4Relay.js
+            socket.on('agent:video_mp4', (msg, ack) => {
+                const r = require('./mp4Relay').receber(agentId, msg);
+                if (typeof ack === 'function') ack(r || {});
             });
         });
 
@@ -65,8 +75,11 @@ class AgentService {
             supabase.from('agent_tokens').update({ last_connected_at: new Date().toISOString() }).eq('id', agentId)
                 .then(({ error }) => error && logger.debug(`[Agent] last_connected_at: ${error.message}`));
 
-            socket.on('agent:ready', (info) => {
-                logger.info(`🤖 Agente ${nome} pronto (${info.name || nome}, v${info.version || '?'})`);
+            socket.on('agent:ready', (info = {}) => {
+                socket.recursos = info.recursos || {};
+                socket.versaoAgente = info.version || null;
+                const r = socket.recursos;
+                logger.info(`🤖 Agente ${nome} pronto (${info.name || nome}, v${info.version || '?'}${r.video_local ? ', vídeo local' : ''}${r.gravacao ? ', gravação' : ''})`);
                 // Perfil da IA e câmeras do evento que o motor local deve vigiar com o painel fechado
                 require('../modules/system/iaConfig.service').aplicarNoAgente(agentId).catch(() => {});
                 require('../modules/system/vigilancia.service').configurarAgente(agentId, socket.agentInfo.evento_id);
@@ -79,19 +92,30 @@ class AgentService {
                     .catch(err => logger.error(`[Vigilância] detecção do agente ${nome}: ${err.message}`));
             });
 
-            socket.on('agent:response', ({ requestId, success, data, error }) => {
-                const pending = this.pending.get(requestId);
-                if (!pending) return;
-
-                clearTimeout(pending.timer);
-                this.pending.delete(requestId);
-
-                if (success) {
-                    pending.resolve(data);
-                } else {
-                    pending.reject(new Error(error || 'Erro desconhecido no agente'));
-                }
+            // Biometrias das pessoas do evento para o motor de IA (sem chave do banco no PC)
+            socket.on('agent:rostos', (pedido, ack) => {
+                if (typeof ack !== 'function') return;
+                require('../modules/system/biometriaAgente.service').atender(socket.agentInfo, pedido)
+                    .then(ack)
+                    .catch(err => { logger.warn(`[Biometria] pedido do agente ${nome}: ${err.message}`); ack({ ok: false, erro: err.message }); });
             });
+
+            // Gravação concluída no PC do evento / gravações apagadas pelo prazo ou limite de espaço
+            socket.on('agent:gravacao', (dados, ack) => {
+                require('../modules/system/gravacao.service').registrar(socket.agentInfo, dados)
+                    .then(() => typeof ack === 'function' && ack({ ok: true }))
+                    .catch(err => {
+                        logger.warn(`[Gravação] registro do agente ${nome}: ${err.message}`);
+                        if (typeof ack === 'function') ack({ ok: false, erro: err.message });
+                    });
+            });
+            socket.on('agent:gravacao_apagadas', (dados, ack) => {
+                require('../modules/system/gravacao.service').apagadas(socket.agentInfo, dados?.arquivos)
+                    .then(() => typeof ack === 'function' && ack({ ok: true }))
+                    .catch(err => typeof ack === 'function' && ack({ ok: false, erro: err.message }));
+            });
+
+            socket.on('agent:response', (msg) => this._resposta(msg));
 
             // Quadros de vídeo ao vivo enviados pelo agente (ver services/videoRelay.js)
             socket.on('agent:video_quadro', (msg, ack) => {
@@ -105,6 +129,7 @@ class AgentService {
                 if (this.agents.get(agentId) === socket) {
                     this.agents.delete(agentId);
                     require('./videoRelay').agenteDesconectou(agentId);
+                    require('./mp4Relay').agenteDesconectou(agentId);
                     // Fora por mais de 2 min → avisa os admins (painel + e-mail)
                     require('./alertaAgente').agenteDesconectou(socket.agentInfo, () => this.agents.has(agentId));
                 }
@@ -125,9 +150,25 @@ class AgentService {
      * Envia um comando para o agente responsável pelo dispositivo
      * e aguarda a resposta com timeout.
      */
-    async sendCommand(agentId, command, payload, timeoutMs = this.REQUEST_TIMEOUT) {
-        const socket = this.agents.get(agentId);
-        if (!socket) throw new Error(`Agente ${agentId} não está conectado`);
+    _resposta({ requestId, success, data, error } = {}) {
+        const pending = this.pending.get(requestId);
+        if (!pending) return;
+        clearTimeout(pending.timer);
+        this.pending.delete(requestId);
+        if (success) pending.resolve(data);
+        else pending.reject(new Error(error || 'Erro desconhecido no agente'));
+    }
+
+    /**
+     * @param {{ canal?: 'video' }} [opcoes] canal 'video': usa a conexão de vídeo do agente (3.0+),
+     *   para comandos pesados não atrasarem os leitores; sem ela, a conexão principal
+     */
+    async sendCommand(agentId, command, payload, timeoutMs = this.REQUEST_TIMEOUT, opcoes = {}) {
+        const principal = this.agents.get(agentId);
+        if (!principal) throw new Error(`Agente ${agentId} não está conectado`);
+        const socket = (opcoes.canal === 'video' && this.videoSockets.get(agentId)?.connected && principal.versaoAgente >= '3.0.0')
+            ? this.videoSockets.get(agentId)
+            : principal;
 
         const requestId = crypto.randomUUID();
 
@@ -165,6 +206,11 @@ class AgentService {
             if (socket.agentInfo?.evento_id === eventoId) return agentId;
         }
         return null;
+    }
+
+    /** O que o PC do agente sabe fazer (enviado no agent:ready): { video_local, ffmpeg, gravacao, rostos_pelo_agente } */
+    recursos(agentId) {
+        return this.agents.get(agentId)?.recursos || {};
     }
 
     /** Encerra a conexão de um agente (ex.: token desativado) */

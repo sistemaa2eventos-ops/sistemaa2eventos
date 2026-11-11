@@ -396,8 +396,30 @@ class IntelbrasController {
                 return respond(true, `IDENTIFICADO ${primeiroNome}`);
             }
 
-            // 4. Validar + registrar em uma única etapa (Smart Access por área)
             const areaId = dispositivo.area_id || config.area_id || null;
+
+            // 3.2 Leitor + confirmação da IA: a foto que o leitor tirou confere com o cadastro?
+            if (config.ia_confirmacao === true) {
+                const conf = await this._confirmarComIa(dispositivo, pessoa, req, eventoId);
+                if (conf.negar) {
+                    logger.warn(`[Online] 🛑 IA não confirmou ${pessoa.nome_completo} no leitor ${dispositivo.nome}: ${conf.motivo}`);
+                    require('../system/gravacao.service').marcarAlertaArea(eventoId, areaId, `Rosto não confere: ${pessoa.nome_completo} (${dispositivo.nome})`);
+                    if (conf.divergente) {
+                        websocketService.io?.to(`evento_${eventoId}`).emit('area_alert', {
+                            pessoa_nome: pessoa.nome_completo,
+                            area_nome: dispositivo.area_nome || dispositivo.nome,
+                            dispositivo_nome: dispositivo.nome,
+                            localizacao: dispositivo.area_nome || dispositivo.nome,
+                            tipo: 'rosto_nao_confere',
+                            hora: new Date().toISOString()
+                        });
+                    }
+                    return respond(false, conf.divergente ? 'ROSTO NAO CONFERE' : 'CONFIRMACAO INDISPONIVEL');
+                }
+                if (conf.motivo) logger.info(`[Online] Confirmação da IA indisponível (${conf.motivo}); liberado pelo leitor: ${pessoa.nome_completo}`);
+            }
+
+            // 4. Validar + registrar em uma única etapa (Smart Access por área)
             const tipoFluxo = config.fluxo || 'checkin';
 
             const result = await checkinService.registrarAcesso(supabase, {
@@ -415,6 +437,8 @@ class IntelbrasController {
 
             if (result.action !== 'allow') {
                 logger.warn(`[Online] 🛑 Acesso RECUSADO para ${pessoa.nome_completo}: ${result.error}`);
+                // Câmeras da área que gravam "em alertas" guardam o trecho
+                require('../system/gravacao.service').marcarAlertaArea(eventoId, areaId, `Acesso negado: ${pessoa.nome_completo} (${result.error || 'recusado'})`);
                 return respond(false, result.error || 'ACESSO NEGADO');
             }
 
@@ -426,6 +450,56 @@ class IntelbrasController {
             const motivo = error.message || 'Acesso Não Autorizado';
             logger.warn(`[Online] 🛑 Acesso RECUSADO para ${pessoa?.nome_completo || userID}: ${motivo}`);
             return respond(false, motivo);
+        }
+    }
+
+    /**
+     * Foto da passagem enviada pelo leitor (multipart/mixed ou form-data), em base64, ou null.
+     */
+    _fotoDoLeitor(req) {
+        const arquivo = (req.files || []).find(f => /image|jpe?g/i.test(f.mimetype || '') || /\.jpe?g$/i.test(f.originalname || ''));
+        if (arquivo?.buffer?.length) return arquivo.buffer.toString('base64');
+        const bruto = req.rawBody;
+        if (!Buffer.isBuffer(bruto)) return null;
+        const inicio = bruto.indexOf(Buffer.from([0xff, 0xd8, 0xff]));
+        if (inicio < 0) return null;
+        const fim = bruto.lastIndexOf(Buffer.from([0xff, 0xd9]));
+        if (fim <= inicio) return null;
+        return bruto.subarray(inicio, fim + 2).toString('base64');
+    }
+
+    /**
+     * Leitor + confirmação da IA. O motor do evento compara a foto do leitor com a biometria da pessoa
+     * que o leitor identificou. Prazo de 1,5 s (a catraca não pode esperar); motor fora, foto ausente ou
+     * cadastro sem biometria seguem config.ia_falha: 'liberar' (padrão, decide o leitor) ou 'negar'.
+     * @returns {{ negar: boolean, divergente?: boolean, motivo?: string, similaridade?: number }}
+     */
+    async _confirmarComIa(dispositivo, pessoa, req, eventoId) {
+        const config = dispositivo.config || {};
+        const falha = (motivo) => ({ negar: config.ia_falha === 'negar', motivo });
+        // Motor desligado de propósito pela chave do evento: vale o leitor (senão "negar" barraria todos)
+        const cfgEvento = await require('../system/gravacao.service').configEvento(eventoId).catch(() => null);
+        if (cfgEvento && cfgEvento.motor_ia_ativo === false) return { negar: false, motivo: 'motor de IA desligado no painel' };
+        const foto = this._fotoDoLeitor(req);
+        if (!foto) return falha('o leitor não enviou a foto da passagem');
+        const { data: bio } = await supabase.from('pessoas').select('face_encoding').eq('id', pessoa.id).maybeSingle();
+        let embedding = bio?.face_encoding;
+        if (typeof embedding === 'string') { try { embedding = JSON.parse(embedding); } catch { embedding = null; } }
+        if (!Array.isArray(embedding) || embedding.length !== 512) return falha('cadastro sem biometria');
+        const agentService = require('../../services/agentService');
+        const agentId = agentService.findAgentForEvent(eventoId);
+        if (!agentId) return falha('PC do evento desconectado');
+        try {
+            const r = await agentService.sendCommand(agentId, 'ia_post',
+                { path: '/api/verificar', body: { image_base64: foto, embedding }, timeoutMs: 1500 }, 1800);
+            const j = r?.json;
+            if (!r?.ok || !j?.success) return falha(j?.motivo || 'motor de IA indisponível');
+            if (!j.rosto) return falha('IA não encontrou rosto na foto do leitor');
+            if (!j.confere) return { negar: true, divergente: true, motivo: `semelhança ${Math.round(j.similaridade * 100)}% abaixo do mínimo`, similaridade: j.similaridade };
+            return { negar: false, similaridade: j.similaridade };
+        } catch (err) {
+            if (/desligado pelo painel/.test(err.message)) return { negar: false, motivo: 'motor de IA desligado no painel' };
+            return falha(/Timeout/.test(err.message) ? 'motor de IA demorou mais de 1,5 s' : err.message);
         }
     }
 

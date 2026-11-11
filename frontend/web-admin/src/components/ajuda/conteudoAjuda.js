@@ -270,6 +270,9 @@ const AJUDAS = {
             '"Fail Open" libera a passagem se o sistema cair; "Fail Closed" nega. Para segurança, prefira Fail Closed com internet de reserva.',
             '"Liberar" e "Travar" ficam valendo até clicar "Normal".',
             'Leitor de credenciamento não grava entrada/saída: só abre a ficha na tela do operador vinculado.',
+            '"Quem reconhece o rosto → Leitor + confirmação da IA": o motor de IA confere a foto tirada pelo leitor com o cadastro (até 1,5 s). Só vale com o leitor em modo online e o motor ligado.',
+            '"Se a IA não responder": "Vale o reconhecimento do leitor" mantém a fila andando; "Negar" é para áreas restritas. Com o motor desligado no painel, vale sempre o leitor.',
+            '"Usar também como câmera" cria uma câmera com o vídeo do leitor (em Câmeras, escolha IA e gravação dela).',
             'Para entrada e saída pelo rosto (sem pulseira), use "Modo de operação: Bidirecional" e "Fluxo de acesso: Toggle": a primeira passagem do dia é entrada, a seguinte é saída.',
             'Reserve um IP fixo para cada leitor no roteador.'
         ],
@@ -295,16 +298,20 @@ const AJUDAS = {
     },
     '/config/cameras': {
         titulo: 'Câmeras e IA facial',
-        objetivo: 'Cadastrar as câmeras IP (aba "Câmeras IP") e ajustar o motor de reconhecimento facial (aba "Motor de IA facial").',
+        objetivo: 'Cadastrar as câmeras, escolher em quais roda o reconhecimento facial e quais gravam, e assistir às gravações.',
         passos: [
-            'Aba "Câmeras IP": "Cadastrar nova câmera" com nome, área, IP, porta RTSP, usuário e senha; use "Testar".',
-            'Aba "Motor de IA facial": use "Verificar compatibilidade e ligar IA neste PC" para diagnosticar o computador, ver as recomendações de configuração e iniciar a IA facial.',
-            'Confira o status, escolha o perfil (ou aplique o recomendado) e clique em "Salvar e aplicar".',
-            'Abra o resultado em "Abrir no monitor CFTV".'
+            'Aba "Câmeras": "Cadastrar nova câmera" com nome, área, IP, porta RTSP, usuário e senha; use "Testar".',
+            'No cartão de cada câmera, "Inteligência": "Só monitorar" (vídeo sem IA), "IA ao assistir" (reconhece enquanto alguém assiste) ou "IA 24 h" (alerta mesmo com o painel fechado).',
+            'No cartão, "Gravação": "Não gravar", "Contínua" (blocos de 5 min) ou "Em alertas" (10 s antes a 30 s depois de cada alerta da IA ou acesso negado no leitor da mesma área).',
+            'No topo: "Motor de IA do evento" e "Gravação do evento" desligam tudo sem perder as escolhas de cada câmera; "Espaço máximo" e "Guardar por" controlam o que fica no PC.',
+            'Aba "Gravações": filtre por câmera, tipo e dia; assista ou baixe.',
+            'Aba "Motor de IA facial": "Verificar compatibilidade e ligar IA neste PC" e o perfil do motor.'
         ],
         atencao: [
-            'As câmeras e a IA rodam pelo agente local: o computador do evento precisa ficar ligado.',
-            '"Vigilância 24 h" só funciona com a IA ligada. Trocar de perfil desfaz os ajustes finos.',
+            'Vídeo, IA e gravação passam pelo PC do evento (agente local): ele precisa ficar ligado. Rode o ligar-ia-facial.bat nele após cada atualização.',
+            'As gravações ficam só no PC do evento (não vão para a nuvem). Se o PC for perdido, elas se perdem junto; para ter prova fora do PC, ligue "Copiar os trechos de alerta para o Google Drive" nas opções avançadas da câmera.',
+            'Passou do espaço ou do prazo, as gravações mais antigas são apagadas. Quem assiste ou baixa fica registrado.',
+            'LGPD: avise no local, com placas, que há gravação de imagens.',
             'Catracas e leitores são cadastrados em Leitores e dispositivos.'
         ]
     },

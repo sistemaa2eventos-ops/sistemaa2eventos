@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions,
-    Box, Typography, Button, IconButton, TextField,
-    Grid, Stack, Chip, MenuItem, FormControl, InputLabel, Select,
-    CircularProgress, Tooltip, Switch, FormControlLabel
+    Box, Typography, Button, IconButton,
+    Stack, Chip, CircularProgress, Tooltip
 } from '@mui/material';
 import {
     Close as CloseIcon,
@@ -20,9 +19,9 @@ import {
 import api from '../../services/api';
 import { useSnackbar } from 'notistack';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
+import CameraFormDialog from './CameraFormDialog';
 
 import { botaoSecundario } from '../../styles/tokens';
-const FABRICANTES = ['RTSP / OBS / Webcam', 'Intelbras', 'Hikvision', 'Genérica'];
 
 const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, onCamerasChange, areas = [], eventoId }) => {
     const confirmar = useConfirmacao();
@@ -35,7 +34,6 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
 
     const [formMode, setFormMode] = useState(false); // false = listagem, true = form (criar/editar)
     const [editingCamera, setEditingCamera] = useState(null);
-    const [saving, setSaving] = useState(false);
     const [testResults, setTestResults] = useState({});
     const [testingId, setTestingId] = useState(null);
     const [togglingId, setTogglingId] = useState(null);
@@ -89,68 +87,13 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
     };
 
     const handleOpenForm = (cam = null) => {
-        if (cam) {
-            setEditingCamera({ ...cam });
-        } else {
-            setEditingCamera({
-                nome: '',
-                fabricante: 'RTSP / OBS / Webcam',
-                ip_address: '127.0.0.1',
-                porta: 8554,
-                usuario: 'a2eventos',
-                senha: '',
-                protocolo: 'rtsp',
-                stream_url: 'rtsp://127.0.0.1:8554/live',
-                snapshot_url: '',
-                area_id: areas[0]?.id || '',
-                ia_ativa: true,
-                vigilancia_ativa: true,
-                prioridade: 1,
-                url_substream: ''
-            });
-        }
+        setEditingCamera(cam);
         setFormMode(true);
     };
 
     const handleCloseForm = () => {
         setFormMode(false);
         setEditingCamera(null);
-    };
-
-    const handleSave = async () => {
-        if (!editingCamera?.nome || !editingCamera?.ip_address) {
-            enqueueSnackbar('Nome e Endereço IP são obrigatórios.', { variant: 'warning' });
-            return;
-        }
-
-        try {
-            setSaving(true);
-            const payload = {
-                ...editingCamera,
-                evento_id: eventoId,
-                porta: parseInt(editingCamera.porta, 10) || 554
-            };
-
-            if (!payload.stream_url && payload.ip_address) {
-                const auth = payload.usuario && payload.senha ? `${payload.usuario}:${payload.senha}@` : '';
-                payload.stream_url = `rtsp://${auth}${payload.ip_address}:${payload.porta}/live`;
-            }
-
-            if (editingCamera.id) {
-                await api.put(`/cameras/${editingCamera.id}`, payload);
-                enqueueSnackbar('Câmera atualizada com sucesso!', { variant: 'success' });
-            } else {
-                await api.post('/cameras', payload);
-                enqueueSnackbar('Nova câmera IP cadastrada no sistema!', { variant: 'success' });
-            }
-
-            handleCloseForm();
-            triggerUpdate();
-        } catch (err) {
-            enqueueSnackbar('Erro ao salvar câmera: ' + (err.response?.data?.error || err.message), { variant: 'error' });
-        } finally {
-            setSaving(false);
-        }
     };
 
     const handleDelete = async (id, nome) => {
@@ -203,7 +146,7 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, minWidth: 0 }}>
                     <CameraIcon sx={{ color: '#00D4FF', flexShrink: 0 }} />
                     <Typography variant="h6" noWrap sx={{ fontWeight: 700, fontFamily: '"Space Grotesk", sans-serif', fontSize: { xs: '1rem', sm: '1.2rem' } }}>
-                        {formMode ? (editingCamera?.id ? 'Editar câmera IP' : 'Nova câmera IP') : 'Gerenciar câmeras IP'}
+                        Gerenciar câmeras
                     </Typography>
                 </Box>
                 <IconButton onClick={onClose} size="small" sx={{ color: '#94A3B8', '&:hover': { color: '#FFFFFF' } }}>
@@ -212,168 +155,6 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
             </DialogTitle>
 
             <DialogContent sx={{ py: { xs: 2, sm: 3 }, px: { xs: 1.5, sm: 3 } }}>
-                {formMode ? (
-                    <Box component="form" sx={{ mt: 0.5 }}>
-                        <Grid container spacing={2}>
-                            <Grid item xs={12} sm={8}>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    label="Nome / identificação da câmera"
-                                    value={editingCamera?.nome || ''}
-                                    onChange={(e) => setEditingCamera({ ...editingCamera, nome: e.target.value })}
-                                    placeholder="Ex: Câmera Portão VIP 01"
-                                    required
-                                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'rgba(0,0,0,0.3)', color: '#FFFFFF' } }}
-                                />
-                            </Grid>
-
-                            <Grid item xs={12} sm={4}>
-                                <FormControl fullWidth size="small">
-                                    <InputLabel sx={{ color: '#94A3B8' }}>Fabricante / protocolo</InputLabel>
-                                    <Select
-                                        value={editingCamera?.fabricante || 'RTSP / OBS / Webcam'}
-                                        label="Fabricante / protocolo"
-                                        onChange={(e) => setEditingCamera({ ...editingCamera, fabricante: e.target.value })}
-                                        sx={{ bgcolor: 'rgba(0,0,0,0.3)', color: '#FFFFFF' }}
-                                    >
-                                        {FABRICANTES.map(f => (
-                                            <MenuItem key={f} value={f}>{f}</MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-
-                            <Grid item xs={12} sm={8}>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    label="Endereço IP ou host"
-                                    value={editingCamera?.ip_address || ''}
-                                    onChange={(e) => setEditingCamera({ ...editingCamera, ip_address: e.target.value })}
-                                    placeholder="192.168.1.100 ou cam.dominio.com"
-                                    required
-                                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'rgba(0,0,0,0.3)', color: '#FFFFFF' } }}
-                                />
-                            </Grid>
-
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    label="Porta RTSP / HTTP"
-                                    type="number"
-                                    value={editingCamera?.porta || 554}
-                                    onChange={(e) => setEditingCamera({ ...editingCamera, porta: e.target.value })}
-                                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'rgba(0,0,0,0.3)', color: '#FFFFFF' } }}
-                                />
-                            </Grid>
-
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    label="Usuário (autenticação)"
-                                    value={editingCamera?.usuario || ''}
-                                    onChange={(e) => setEditingCamera({ ...editingCamera, usuario: e.target.value })}
-                                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'rgba(0,0,0,0.3)', color: '#FFFFFF' } }}
-                                />
-                            </Grid>
-
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    type="password"
-                                    label="Senha (autenticação)"
-                                    value={editingCamera?.senha || ''}
-                                    onChange={(e) => setEditingCamera({ ...editingCamera, senha: e.target.value })}
-                                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'rgba(0,0,0,0.3)', color: '#FFFFFF' } }}
-                                />
-                            </Grid>
-
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    label="URL stream completa (RTSP / HLS / MJPEG)"
-                                    value={editingCamera?.stream_url || ''}
-                                    onChange={(e) => setEditingCamera({ ...editingCamera, stream_url: e.target.value })}
-                                    placeholder="rtsp://usuario:senha@192.168.1.100:554/cam/realmonitor?channel=1&subtype=0"
-                                    helperText="Se deixado em branco, será gerado automaticamente com base no IP e Porta"
-                                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'rgba(0,0,0,0.3)', color: '#FFFFFF' } }}
-                                />
-                            </Grid>
-
-                            <Grid item xs={12}>
-                                <FormControl fullWidth size="small">
-                                    <InputLabel sx={{ color: '#94A3B8' }}>Área do evento vinculada</InputLabel>
-                                    <Select
-                                        value={editingCamera?.area_id || ''}
-                                        label="Área do evento vinculada"
-                                        onChange={(e) => setEditingCamera({ ...editingCamera, area_id: e.target.value })}
-                                        sx={{ bgcolor: 'rgba(0,0,0,0.3)', color: '#FFFFFF' }}
-                                    >
-                                        <MenuItem value=""><em>Nenhuma (monitoramento geral)</em></MenuItem>
-                                        {areas.map(a => (
-                                            <MenuItem key={a.id} value={a.id}>{a.nome_area}</MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-
-                            {/* IA FACIAL NESTA CÂMERA (mesmas opções de Configurações > IA facial) */}
-                            <Grid item xs={12}>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 700, mt: 0.5 }}>Reconhecimento facial</Typography>
-                            </Grid>
-                            <Grid item xs={6} sm={4}>
-                                <FormControlLabel
-                                    control={<Switch checked={editingCamera?.ia_ativa !== false}
-                                        onChange={(e) => setEditingCamera({ ...editingCamera, ia_ativa: e.target.checked })} />}
-                                    label="IA ligada"
-                                />
-                            </Grid>
-                            <Grid item xs={6} sm={4}>
-                                <Tooltip title="Reconhece e alerta mesmo com o painel fechado (usa o computador do evento o tempo todo)">
-                                    <FormControlLabel
-                                        control={<Switch checked={editingCamera?.vigilancia_ativa !== false && editingCamera?.ia_ativa !== false}
-                                            disabled={editingCamera?.ia_ativa === false}
-                                            onChange={(e) => setEditingCamera({ ...editingCamera, vigilancia_ativa: e.target.checked })} />}
-                                        label="Vigilância 24 h"
-                                    />
-                                </Tooltip>
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <FormControl fullWidth size="small">
-                                    <InputLabel sx={{ color: '#94A3B8' }}>Prioridade da IA</InputLabel>
-                                    <Select
-                                        value={editingCamera?.prioridade ?? 1}
-                                        label="Prioridade da IA"
-                                        onChange={(e) => setEditingCamera({ ...editingCamera, prioridade: e.target.value })}
-                                        sx={{ bgcolor: 'rgba(0,0,0,0.3)', color: '#FFFFFF' }}
-                                    >
-                                        <MenuItem value={0}>Baixa</MenuItem>
-                                        <MenuItem value={1}>Normal</MenuItem>
-                                        <MenuItem value={2}>Alta</MenuItem>
-                                        <MenuItem value={3}>Crítica (entrada principal)</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    label="Sub-stream (opcional)"
-                                    value={editingCamera?.url_substream || ''}
-                                    onChange={(e) => setEditingCamera({ ...editingCamera, url_substream: e.target.value })}
-                                    placeholder="rtsp://usuario:senha@192.168.1.100:554/cam/realmonitor?channel=1&subtype=1"
-                                    helperText="Vídeo em baixa resolução usado nas miniaturas e na vigilância. Vazio: deduzido automaticamente."
-                                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'rgba(0,0,0,0.3)', color: '#FFFFFF' } }}
-                                />
-                            </Grid>
-                        </Grid>
-                    </Box>
-                ) : (
                     <Box>
                         <Box sx={{
                             display: 'flex',
@@ -570,36 +351,23 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
                             </Stack>
                         )}
                     </Box>
-                )}
             </DialogContent>
 
             <DialogActions sx={{ p: { xs: 1.5, sm: 2.5 }, borderTop: '1px solid rgba(255,255,255,0.08)', gap: 1 }}>
-                {formMode ? (
-                    <>
-                        <Button variant="outlined" onClick={handleCloseForm} sx={{ ...botaoSecundario, flex: { xs: 1, sm: 'initial' } }}>
-                            Cancelar
-                        </Button>
-                        <Button
-                            variant="contained"
-                            onClick={handleSave}
-                            disabled={saving}
-                            sx={{
-                                bgcolor: '#00D4FF',
-                                color: '#000000',
-                                fontWeight: 700,
-                                flex: { xs: 1, sm: 'initial' },
-                                '&:hover': { bgcolor: '#00D4FF' }
-                            }}
-                        >
-                            {saving ? <CircularProgress size={20} color="inherit" /> : 'Salvar câmera'}
-                        </Button>
-                    </>
-                ) : (
-                    <Button variant="outlined" fullWidth onClick={onClose} sx={{ ...botaoSecundario, maxWidth: { sm: 140 } }}>
-                        Fechar
-                    </Button>
-                )}
+                <Button variant="outlined" fullWidth onClick={onClose} sx={{ ...botaoSecundario, maxWidth: { sm: 140 } }}>
+                    Fechar
+                </Button>
             </DialogActions>
+
+            {/* Mesmo formulário de Configurações › Câmeras */}
+            <CameraFormDialog
+                open={formMode}
+                camera={editingCamera}
+                areas={areas}
+                eventoId={eventoId}
+                onClose={handleCloseForm}
+                onSalvo={triggerUpdate}
+            />
         </Dialog>
     );
 };

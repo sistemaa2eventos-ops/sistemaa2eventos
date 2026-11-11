@@ -156,6 +156,9 @@ class DeviceController {
                 user_id: req.user?.id
             });
 
+            require('./leitorCamera.service').sincronizar(data)
+                .catch(err => logger.warn(`[Leitor como câmera] ${err.message}`));
+
             // Auto-configurar Push
             if (marca === 'intelbras') {
                 try {
@@ -625,6 +628,10 @@ class DeviceController {
 
             if (error) throw error;
             if (!data) return res.status(404).json({ error: 'Dispositivo não encontrado ou sem permissão' });
+
+            // "Usar também como câmera": cria, atualiza ou remove a câmera do leitor
+            require('./leitorCamera.service').sincronizar(data)
+                .catch(err => logger.warn(`[Leitor como câmera] ${err.message}`));
 
             logger.info('Device updated', {
                 device_id: req.params.id,

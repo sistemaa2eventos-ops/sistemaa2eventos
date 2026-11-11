@@ -257,6 +257,59 @@ class DriveService {
         });
     }
 
+    /**
+     * Trecho de ALERTA gravado no PC do evento → Drive (só câmeras com "copiar alertas para o Drive").
+     * O vídeo passa por aqui em pedaços (o PC não recebe nenhuma autorização do Google).
+     * Pasta: Evento / Gravações de alertas / Câmera. Limite de 60 MB por trecho (fica em memória na API).
+     */
+    async copiarGravacao(gravacaoId) {
+        const gravacaoService = require('../system/gravacao.service');
+        const { data: g } = await supabase.from('gravacoes').select('*').eq('id', gravacaoId).maybeSingle();
+        if (!g || g.drive_file_id || g.status !== 'local') return;
+        try {
+            const primeiro = await gravacaoService.lerDoAgente(g, 0, 768 * 1024);
+            if (primeiro.total > 60 * 1024 * 1024) throw new Error('trecho maior que 60 MB: fica só no PC');
+            const partes = [primeiro.dados];
+            let lido = primeiro.dados.length;
+            while (lido < primeiro.total) {
+                const p = await gravacaoService.lerDoAgente(g, lido, 768 * 1024);
+                if (!p.dados.length) break;
+                partes.push(p.dados);
+                lido += p.dados.length;
+            }
+            const conteudo = Buffer.concat(partes);
+            const { data: ev } = await supabase.from('eventos').select('nome').eq('id', g.evento_id).maybeSingle();
+            let pai = await this.garantirRaiz();
+            for (const nome of [ev?.nome || 'Evento', 'Gravações de alertas', g.camera_nome || 'Câmera']) pai = await this.pasta(limparNome(nome), pai);
+
+            const nomeArquivo = `${limparNome(new Date(g.inicio).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }).replace(/[/:]/g, '-'))} - ${limparNome(g.alerta_descricao || 'alerta').slice(0, 80)}.mp4`;
+            const token = await this.accessToken();
+            const inicio = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': 'video/mp4', 'X-Upload-Content-Length': String(conteudo.length) },
+                body: JSON.stringify({ name: nomeArquivo, parents: [pai] })
+            });
+            const sessao = inicio.headers.get('location');
+            if (!inicio.ok || !sessao) throw new Error(`Google Drive recusou o envio (HTTP ${inicio.status})`);
+            const envio = await fetch(sessao, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: conteudo });
+            const criado = await envio.json().catch(() => ({}));
+            if (!envio.ok || !criado.id) throw new Error(criado?.error?.message || `Google Drive respondeu ${envio.status}`);
+            await supabase.from('gravacoes').update({ drive_file_id: criado.id, drive_erro: null }).eq('id', g.id);
+            logger.info(`[Drive] Trecho de alerta copiado: ${g.camera_nome} ${g.inicio}`);
+        } catch (err) {
+            await supabase.from('gravacoes').update({ drive_erro: String(err.message || err).slice(0, 300) }).eq('id', g.id);
+            throw err;
+        }
+    }
+
+    copiarGravacaoEmSegundoPlano(gravacaoId) {
+        if (!this.configurado()) return;
+        this.fila = this.fila.then(async () => {
+            if (!(await this.conexao().catch(() => null))) return;
+            await this.copiarGravacao(gravacaoId).catch(e => logger.warn(`[Drive] Gravação ${gravacaoId} não copiada: ${e.message}`));
+        });
+    }
+
     /** Copia todos os documentos do evento que ainda não estão no Drive (inclui os que falharam). */
     async copiarTudo(eventoId) {
         if (this.progresso?.rodando) return this.progresso;

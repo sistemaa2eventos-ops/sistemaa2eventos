@@ -326,9 +326,9 @@ const Monitor = () => {
         motivo: 'SIMULAÇÃO — teste do fluxo de alerta (nenhum alvo real).',
         nivel_alerta: 'TESTE'
       },
-      foto_capturada: urlMidiaCamera(camMock.id, 'snapshot', { t: Date.now() }),
+      foto_capturada: null,
       face_crop: null,
-      snapshot_url: urlMidiaCamera(camMock.id, 'snapshot', { t: Date.now() }),
+      snapshot_url: null,
       dispositivo: {
         id: camMock.id,
         nome: camMock.nome,
@@ -343,6 +343,12 @@ const Monitor = () => {
         camera_nome: camMock.nome
       }
     });
+    // Imagem real da câmera (ingresso de vídeo): chega em seguida, se a câmera existir
+    if (cameras.some(c => c.id === camMock.id)) {
+      urlMidiaCamera(camMock.id, 'snapshot', { t: Date.now() })
+        .then(url => setActiveAlert(a => (a && a.dispositivo?.id === camMock.id ? { ...a, foto_capturada: url, snapshot_url: url } : a)))
+        .catch(() => {});
+    }
     enqueueSnackbar('Notificação de ocorrência sigilosa emitida no console.', { variant: 'info' });
   };
 
