@@ -2,6 +2,21 @@ const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const websocketService = require('../../services/websocketService');
 
+// Banco sem a migration 20261111c (coluna camera_ids): a estação segue só com leitor facial
+const semColunaCameras = (error) => error?.code === '42703' || error?.code === 'PGRST204' || /camera_ids/.test(error?.message || '');
+const CAMPOS_SESSAO = `
+    id, operador_id, dispositivo_id, evento_id, estacao_nome, ativo, created_at,
+    dispositivos_acesso ( id, nome, tipo, marca, modelo, ip_address, status_online, config )`;
+
+/** Nomes das câmeras da estação, para o painel mostrar o que está vinculado */
+async function comCameras(sessao) {
+    if (!sessao) return sessao;
+    const ids = Array.isArray(sessao.camera_ids) ? sessao.camera_ids : [];
+    if (!ids.length) return { ...sessao, camera_ids: [], cameras: [] };
+    const { data } = await supabase.from('cameras_ip').select('id, nome, ia_ativa').in('id', ids);
+    return { ...sessao, cameras: data || [] };
+}
+
 class SessaoOperadorController {
     /**
      * Obter a sessão ativa do operador logado
@@ -13,32 +28,16 @@ class SessaoOperadorController {
                 return res.status(401).json({ success: false, error: 'Usuário não autenticado' });
             }
 
-            const { data, error } = await supabase
+            const consultar = (campos) => supabase
                 .from('sessoes_operador')
-                .select(`
-                    id,
-                    operador_id,
-                    dispositivo_id,
-                    evento_id,
-                    estacao_nome,
-                    ativo,
-                    created_at,
-                    dispositivos_acesso (
-                        id,
-                        nome,
-                        tipo,
-                        marca,
-                        modelo,
-                        ip_address,
-                        status_online,
-                        config
-                    )
-                `)
+                .select(campos)
                 .eq('operador_id', operadorId)
                 .eq('ativo', true)
                 .order('created_at', { ascending: false })
                 .limit(1)
                 .maybeSingle();
+            let { data, error } = await consultar(`${CAMPOS_SESSAO}, camera_ids`);
+            if (semColunaCameras(error)) ({ data, error } = await consultar(CAMPOS_SESSAO));
 
             if (error) {
                 if (error.code === 'PGRST205' || error.message?.includes('schema cache')) {
@@ -54,7 +53,7 @@ class SessaoOperadorController {
 
             return res.json({
                 success: true,
-                data: data || null
+                data: await comCameras(data || null)
             });
         } catch (err) {
             logger.error('❌ [SessaoOperador] Erro ao obter sessão ativa:', err.message);
@@ -63,33 +62,74 @@ class SessaoOperadorController {
     }
 
     /**
-     * Vincular o operador logado a um leitor facial / dispositivo
+     * Vincular a estação do operador logado a um leitor facial e/ou a câmeras com IA.
+     * Corpo: { dispositivo_id?, camera_ids?: [], estacao_nome } — pelo menos um dos dois.
      */
     async vincularLeitor(req, res) {
         try {
             const operadorId = req.user?.id;
-            const { dispositivo_id, estacao_nome } = req.body;
+            const { estacao_nome } = req.body;
+            const dispositivo_id = req.body.dispositivo_id || null;
+            const cameraIds = [...new Set((Array.isArray(req.body.camera_ids) ? req.body.camera_ids : []).filter(Boolean).map(String))];
             const eventoId = req.event?.id || req.tenantId || req.body.evento_id || req.user?.evento_id;
 
-            if (!dispositivo_id) {
-                return res.status(400).json({ success: false, error: 'dispositivo_id é obrigatório' });
+            if (!dispositivo_id && !cameraIds.length) {
+                return res.status(400).json({ success: false, error: 'Escolha um leitor facial ou pelo menos uma câmera com IA.' });
             }
 
             if (!eventoId) {
                 return res.status(400).json({ success: false, error: 'Contexto de evento não identificado' });
             }
 
-            // Verificar se o dispositivo existe
-            const { data: dispositivo, error: devErr } = await supabase
-                .from('dispositivos_acesso')
-                .select('id, nome, ip_address, status_online, config')
-                .eq('id', dispositivo_id)
-                .eq('evento_id', eventoId)
-                .eq('tipo', 'terminal_facial')
-                .single();
+            // Leitor (opcional): precisa ser leitor facial deste evento
+            let dispositivo = null;
+            if (dispositivo_id) {
+                const { data, error: devErr } = await supabase
+                    .from('dispositivos_acesso')
+                    .select('id, nome, ip_address, status_online, config')
+                    .eq('id', dispositivo_id)
+                    .eq('evento_id', eventoId)
+                    .eq('tipo', 'terminal_facial')
+                    .maybeSingle();
+                if (devErr || !data) {
+                    return res.status(404).json({ success: false, error: 'Leitor facial não encontrado neste evento' });
+                }
+                dispositivo = data;
+            }
 
-            if (devErr || !dispositivo) {
-                return res.status(404).json({ success: false, error: 'Dispositivo não encontrado' });
+            // Câmeras (opcionais): deste evento, ativas e com IA ligada
+            let cameras = [];
+            if (cameraIds.length) {
+                const { data, error: camErr } = await supabase
+                    .from('cameras_ip')
+                    .select('id, nome, status, ia_ativa')
+                    .eq('evento_id', eventoId)
+                    .in('id', cameraIds);
+                if (camErr) throw camErr;
+                cameras = data || [];
+                const invalidas = cameraIds.filter(id => {
+                    const c = cameras.find(x => x.id === id);
+                    return !c || c.ia_ativa !== true || c.status === 'desativada' || c.status === 'inativa';
+                });
+                if (invalidas.length) {
+                    return res.status(400).json({ success: false, error: 'Só câmeras ativas e com IA ligada podem identificar pessoas na estação. Ligue a IA da câmera em Câmeras e IA facial.' });
+                }
+                // Uma câmera abre conferência em uma estação só (senão duas baias abririam a mesma pessoa)
+                const { data: outras, error: ocErr } = await supabase
+                    .from('sessoes_operador')
+                    .select('operador_id, estacao_nome, camera_ids')
+                    .eq('evento_id', eventoId)
+                    .eq('ativo', true)
+                    .overlaps('camera_ids', cameraIds)
+                    .neq('operador_id', operadorId);
+                if (semColunaCameras(ocErr)) {
+                    return res.status(409).json({ success: false, error: 'Para vincular câmeras à estação, aplique a migration 20261111c_sessao_cameras.sql no Supabase.' });
+                }
+                if (ocErr) throw ocErr;
+                if (outras?.length) {
+                    const nome = cameras.find(c => outras[0].camera_ids.includes(c.id))?.nome || 'Uma câmera';
+                    return res.status(409).json({ success: false, error: `${nome} já está na estação "${outras[0].estacao_nome || 'outro operador'}".` });
+                }
             }
 
             // 1. Desativar qualquer sessão ativa anterior deste operador
@@ -99,42 +139,28 @@ class SessaoOperadorController {
                 .eq('operador_id', operadorId)
                 .eq('ativo', true);
 
-            // 2. Desativar qualquer operador anterior vinculado a este dispositivo
-            await supabase
-                .from('sessoes_operador')
-                .update({ ativo: false, updated_at: new Date().toISOString() })
-                .eq('dispositivo_id', dispositivo_id)
-                .eq('ativo', true);
+            // 2. Desativar qualquer operador anterior vinculado a este leitor
+            if (dispositivo_id) {
+                await supabase
+                    .from('sessoes_operador')
+                    .update({ ativo: false, updated_at: new Date().toISOString() })
+                    .eq('dispositivo_id', dispositivo_id)
+                    .eq('ativo', true);
+            }
 
             // 3. Criar a nova sessão ativa
-            const { data: novaSessao, error: insErr } = await supabase
+            const linha = {
+                operador_id: operadorId,
+                dispositivo_id,
+                evento_id: eventoId,
+                estacao_nome: estacao_nome || dispositivo?.nome || 'Baia Operador',
+                ativo: true,
+                ...(cameraIds.length ? { camera_ids: cameraIds } : {})
+            };
+            const { data: criada, error: insErr } = await supabase
                 .from('sessoes_operador')
-                .insert({
-                    operador_id: operadorId,
-                    dispositivo_id: dispositivo_id,
-                    evento_id: eventoId,
-                    estacao_nome: estacao_nome || dispositivo.nome || 'Baia Operador',
-                    ativo: true
-                })
-                .select(`
-                    id,
-                    operador_id,
-                    dispositivo_id,
-                    evento_id,
-                    estacao_nome,
-                    ativo,
-                    created_at,
-                    dispositivos_acesso (
-                        id,
-                        nome,
-                        tipo,
-                        marca,
-                        modelo,
-                        ip_address,
-                        status_online,
-                        config
-                    )
-                `)
+                .insert(linha)
+                .select(CAMPOS_SESSAO)
                 .single();
 
             if (insErr) {
@@ -145,10 +171,14 @@ class SessaoOperadorController {
                         dica: 'Execute a migration 20261001_sessoes_operador.sql no SQL Editor do Supabase.'
                     });
                 }
+                if (semColunaCameras(insErr) || insErr.code === '23502') {
+                    return res.status(409).json({ success: false, error: 'Para usar câmeras (ou estação sem leitor), aplique a migration 20261111c_sessao_cameras.sql no Supabase.' });
+                }
                 throw insErr;
             }
+            const novaSessao = await comCameras({ ...criada, camera_ids: cameraIds });
 
-            logger.info(`✅ [SessaoOperador] Operador ${operadorId} vinculado ao leitor ${dispositivo.nome} (${dispositivo_id})`);
+            logger.info(`✅ [SessaoOperador] Operador ${operadorId} na estação "${novaSessao.estacao_nome}"${dispositivo ? ` (leitor ${dispositivo.nome})` : ''}${cameras.length ? ` (câmeras: ${cameras.map(c => c.nome).join(', ')})` : ''}`);
 
             // Notificar via WebSocket
             websocketService.emitToOperador(operadorId, 'sessao_operador_atualizada', novaSessao);
@@ -161,7 +191,7 @@ class SessaoOperadorController {
 
             return res.json({
                 success: true,
-                message: 'Operador vinculado ao leitor facial com sucesso',
+                message: 'Estação vinculada com sucesso',
                 data: novaSessao
             });
         } catch (err) {
@@ -243,11 +273,13 @@ class SessaoOperadorController {
             // 2. Buscar sessões ativas para esses dispositivos
             let sessoesAtivas = [];
             try {
-                const { data: sessoes, error: sessErr } = await supabase
+                const consultar = (campos) => supabase
                     .from('sessoes_operador')
-                    .select('id, operador_id, dispositivo_id, estacao_nome, ativo')
+                    .select(campos)
                     .eq('evento_id', eventoId)
                     .eq('ativo', true);
+                let { data: sessoes, error: sessErr } = await consultar('id, operador_id, dispositivo_id, estacao_nome, ativo, camera_ids');
+                if (semColunaCameras(sessErr)) ({ data: sessoes, error: sessErr } = await consultar('id, operador_id, dispositivo_id, estacao_nome, ativo'));
 
                 if (!sessErr && sessoes) {
                     sessoesAtivas = sessoes;
@@ -255,7 +287,30 @@ class SessaoOperadorController {
             } catch (_) {}
 
             const sessoesMap = new Map();
-            sessoesAtivas.forEach(s => sessoesMap.set(s.dispositivo_id, s));
+            sessoesAtivas.forEach(s => { if (s.dispositivo_id) sessoesMap.set(s.dispositivo_id, s); });
+
+            // Câmeras com IA ligada do evento (podem identificar a pessoa na estação)
+            const { data: camerasIa } = await supabase
+                .from('cameras_ip')
+                .select('id, nome, status, ia_ativa, vigilancia_ativa, area:evento_areas(nome_area)')
+                .eq('evento_id', eventoId)
+                .eq('ia_ativa', true)
+                .order('nome', { ascending: true });
+            const cameras = (camerasIa || [])
+                .filter(c => c.status !== 'desativada' && c.status !== 'inativa')
+                .map((c) => {
+                    const sessao = sessoesAtivas.find(s => Array.isArray(s.camera_ids) && s.camera_ids.includes(c.id));
+                    const minha = sessao?.operador_id === operadorId;
+                    return {
+                        id: c.id,
+                        nome: c.nome,
+                        area_nome: c.area?.nome_area || null,
+                        ia_24h: c.vigilancia_ativa === true,
+                        vinculada_a_mim: minha,
+                        ocupada: !!sessao && !minha,
+                        estacao_nome: sessao && !minha ? sessao.estacao_nome : null
+                    };
+                });
 
             // 3. Montar lista enriquecida
             const resultado = (dispositivos || []).map(dev => {
@@ -273,7 +328,8 @@ class SessaoOperadorController {
 
             return res.json({
                 success: true,
-                data: resultado
+                data: resultado,
+                cameras
             });
         } catch (err) {
             logger.error('❌ [SessaoOperador] Erro ao listar dispositivos para vínculo:', err.message);

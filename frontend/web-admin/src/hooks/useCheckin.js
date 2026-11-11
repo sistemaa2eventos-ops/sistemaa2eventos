@@ -48,6 +48,8 @@ export const useCheckin = (defaultMode, options = {}) => {
     // Estados de Vínculo com Leitor Facial (Fase 1)
     const [sessaoAtiva, setSessaoAtiva] = useState(null);
     const [dispositivosDisponiveis, setDispositivosDisponiveis] = useState([]);
+    // Câmeras com IA que podem identificar a pessoa nesta estação (além do leitor facial)
+    const [camerasDisponiveis, setCamerasDisponiveis] = useState([]);
     const [loadingSessao, setLoadingSessao] = useState(false);
 
     const rfidInputRef = useRef(null);
@@ -108,20 +110,23 @@ export const useCheckin = (defaultMode, options = {}) => {
             const res = await api.get('/devices/sessao/disponiveis', { params: { evento_id: eventoId } });
             if (res.data?.success) {
                 setDispositivosDisponiveis(res.data.data || []);
+                setCamerasDisponiveis(res.data.cameras || []);
             }
         } catch (err) {
             console.warn('Erro ao carregar dispositivos para vínculo:', err.message);
         }
     }, [eventoId]);
 
-    const vincularLeitor = async (dispositivoId, estacaoNome) => {
+    /** Estação: leitor facial e/ou câmeras com IA (pelo menos um) */
+    const vincularLeitor = async (dispositivoId, estacaoNome, cameraIds = []) => {
         try {
             setLoadingSessao(true);
             const res = await api.post('/devices/sessao/vincular', {
-                dispositivo_id: dispositivoId,
+                dispositivo_id: dispositivoId || null,
+                camera_ids: cameraIds,
                 estacao_nome: estacaoNome,
                 evento_id: eventoId
-            });
+            }, { hideDefaultError: true });
             if (res.data?.success) {
                 setSessaoAtiva(res.data.data);
                 await carregarDispositivosDisponiveis();
@@ -716,6 +721,7 @@ export const useCheckin = (defaultMode, options = {}) => {
         // Sessão do Leitor Facial (Fase 1)
         sessaoAtiva,
         dispositivosDisponiveis,
+        camerasDisponiveis,
         loadingSessao,
         carregarSessaoAtiva,
         carregarDispositivosDisponiveis,

@@ -56,6 +56,7 @@ const Checkin = () => {
     // Vínculo Facial (Fase 1)
     sessaoAtiva,
     dispositivosDisponiveis,
+    camerasDisponiveis,
     loadingSessao,
     vincularLeitor,
     desvincularLeitor,
@@ -120,6 +121,7 @@ const Checkin = () => {
           estacao={{
               sessaoAtiva,
               dispositivos: dispositivosDisponiveis,
+              cameras: camerasDisponiveis,
               loading: loadingSessao,
               onVincular: vincularLeitor,
               onDesvincular: desvincularLeitor,

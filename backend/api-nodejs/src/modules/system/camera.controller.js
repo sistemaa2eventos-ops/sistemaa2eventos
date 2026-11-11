@@ -266,38 +266,38 @@ async function processarDeteccoesCamera(cam, results, annotatedB64, { origem = '
 }
 
 // Estação já avisada desta pessoa há pouco: não abre a conferência de novo (o rastreamento repete a leitura)
-const ULTIMA_ESTACAO = new Map(); // `${dispositivo}:${pessoa}` → ms
+const ULTIMA_ESTACAO = new Map(); // `${sessão}:${pessoa}` → ms
 const ESTACAO_REPETIR_MS = 20000;
 
 /**
- * Câmera com IA que reconheceu alguém: avisa as ESTAÇÕES vinculadas a ela (config.cameras_vinculadas
- * do dispositivo). No check-in abre a janela de conferência; na saída (estação de checkout) faz a
- * baixa. Usa o mesmo evento do leitor facial, então só a estação vinculada ao operador reage.
+ * Câmera com IA que reconheceu alguém: avisa o operador da ESTAÇÃO que tem esta câmera
+ * (sessoes_operador.camera_ids, escolhida na janela da estação do check-in/check-out). No check-in
+ * abre a conferência de dados e pulseira; no check-out dá a saída. Mesmo evento do leitor facial.
  */
 async function encaminharParaEstacoes(cam, results, eventoId) {
     if (!eventoId || !Array.isArray(results)) return;
     const reconhecidos = results.map(r => r.matched_person).filter(mp => mp?.id);
     if (!reconhecidos.length) return;
-    const { data: dispositivos } = await supabase.from('dispositivos_acesso')
-        .select('id, nome, tipo, config').eq('evento_id', eventoId);
-    const estacoes = (dispositivos || []).filter(d => d.tipo !== 'camera' && d.tipo !== 'impressora'
-        && Array.isArray(d.config?.cameras_vinculadas) && d.config.cameras_vinculadas.includes(cam.id));
-    if (!estacoes.length) return;
+    const { data: sessoes, error } = await supabase.from('sessoes_operador')
+        .select('id, operador_id, dispositivo_id, estacao_nome')
+        .eq('evento_id', eventoId).eq('ativo', true)
+        .contains('camera_ids', [cam.id]);
+    if (error || !sessoes?.length) return; // sem estação com esta câmera (ou migration 20261111c pendente)
 
     const intelbras = require('../devices/intelbras.controller');
     const agora = Date.now();
     for (const mp of reconhecidos) {
-        const pendentes = estacoes.filter(est => agora - (ULTIMA_ESTACAO.get(`${est.id}:${mp.id}`) || 0) >= ESTACAO_REPETIR_MS);
+        const pendentes = sessoes.filter(s => agora - (ULTIMA_ESTACAO.get(`${s.id}:${mp.id}`) || 0) >= ESTACAO_REPETIR_MS);
         if (!pendentes.length) continue;
         const { data: pessoa } = await supabase.from('pessoas')
             .select(`${COLUNAS_PESSOA_ACESSO}, empresas(nome, ativo)`).eq('id', mp.id).maybeSingle();
         if (!pessoa) continue;
-        for (const est of pendentes) {
-            ULTIMA_ESTACAO.set(`${est.id}:${mp.id}`, agora);
-            const sessao = await intelbras._buscarSessaoOperador(est.id);
-            intelbras._emitCredenciamento({ id: est.id, nome: est.nome }, sessao, pessoa,
+        for (const sessao of pendentes) {
+            ULTIMA_ESTACAO.set(`${sessao.id}:${mp.id}`, agora);
+            // dispositivo_id da própria sessão: a estação aceita o aviso (filtro do check-in)
+            intelbras._emitCredenciamento({ id: sessao.dispositivo_id, nome: `${cam.nome} (câmera)` }, sessao, pessoa,
                 Math.round((mp.similarity || 0) * 100), eventoId);
-            logger.info(`🎯 [Câmera ${cam.nome}] ${pessoa.nome_completo} → estação ${est.nome}`);
+            logger.info(`🎯 [Câmera ${cam.nome}] ${pessoa.nome_completo} → estação ${sessao.estacao_nome || sessao.id}`);
         }
     }
     if (ULTIMA_ESTACAO.size > 2000) {

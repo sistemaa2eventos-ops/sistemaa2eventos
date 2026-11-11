@@ -152,7 +152,7 @@ class ConfigController {
     async createPulseira(req, res) {
         try {
             const evento_id = req.event?.id || req.body.evento_id;
-            const { nome_tipo, cor_hex, numero_inicial, numero_final, areas_permitidas, tipo_leitura } = req.body;
+            const { nome_tipo, cor_hex, numero_inicial, numero_final, areas_permitidas, tipo_leitura, fase, data_especifica } = req.body;
 
             if (!nome_tipo || typeof numero_inicial !== 'number' || typeof numero_final !== 'number') {
                 return res.status(400).json({ error: 'Dados incompletos para a pulseira' });
@@ -162,14 +162,40 @@ class ConfigController {
                 return res.status(400).json({ error: 'O número inicial não pode ser maior que o final' });
             }
 
-            // Inserir a Pulseira Base
-            const { data: pulseira, error: pulseiraErr } = await supabase
+            // Inserir a Pulseira Base com fase e data_especifica (com fallback para esquemas sem as colunas)
+            const insertPayload = {
+                evento_id,
+                nome_tipo,
+                cor_hex,
+                numero_inicial,
+                numero_final,
+                tipo_leitura: tipo_leitura || 'qr_code'
+            };
+            if (fase) insertPayload.fase = fase;
+            if (data_especifica) insertPayload.data_especifica = data_especifica;
+
+            let pulseira = null;
+            let { data: createdPulseira, error: pulseiraErr } = await supabase
                 .from('evento_tipos_pulseira')
-                .insert([{ evento_id, nome_tipo, cor_hex, numero_inicial, numero_final, tipo_leitura: tipo_leitura || 'qr_code' }])
+                .insert([insertPayload])
                 .select()
                 .single();
 
+            // Fallback gracioso caso a migration de fase/data_especifica ainda não tenha sido executada no banco
+            if (pulseiraErr && (pulseiraErr.message?.includes('column') || pulseiraErr.code === '42703')) {
+                delete insertPayload.fase;
+                delete insertPayload.data_especifica;
+                const retry = await supabase
+                    .from('evento_tipos_pulseira')
+                    .insert([insertPayload])
+                    .select()
+                    .single();
+                createdPulseira = retry.data;
+                pulseiraErr = retry.error;
+            }
+
             if (pulseiraErr) throw pulseiraErr;
+            pulseira = createdPulseira;
 
             // Inserir as Associações com Áreas Permitidas
             if (areas_permitidas && Array.isArray(areas_permitidas) && areas_permitidas.length > 0) {
@@ -284,7 +310,7 @@ class ConfigController {
         try {
             const { id } = req.params;
             const eventoId = req.event?.id;
-            const { nome_tipo, cor_hex, numero_inicial, numero_final, areas_permitidas, tipo_leitura, prefixo_codigo, alerta_duplicidade, tempo_confirmacao_checkout } = req.body;
+            const { nome_tipo, cor_hex, numero_inicial, numero_final, areas_permitidas, tipo_leitura, prefixo_codigo, alerta_duplicidade, tempo_confirmacao_checkout, fase, data_especifica } = req.body;
 
             // Validar range
             if (numero_inicial && numero_final && numero_inicial > numero_final) {
@@ -295,6 +321,8 @@ class ConfigController {
             const updateData = { atualizado_em: new Date() };
             if (nome_tipo !== undefined) updateData.nome_tipo = nome_tipo;
             if (cor_hex !== undefined) updateData.cor_hex = cor_hex;
+            if (fase !== undefined) updateData.fase = fase;
+            if (data_especifica !== undefined) updateData.data_especifica = data_especifica ? data_especifica : null;
             if (numero_inicial !== undefined) updateData.numero_inicial = numero_inicial;
             if (numero_final !== undefined) updateData.numero_final = numero_final;
             if (tipo_leitura !== undefined) updateData.tipo_leitura = tipo_leitura;
@@ -302,13 +330,28 @@ class ConfigController {
             if (alerta_duplicidade !== undefined) updateData.alerta_duplicidade = alerta_duplicidade;
             if (tempo_confirmacao_checkout !== undefined) updateData.tempo_confirmacao_checkout = tempo_confirmacao_checkout;
 
-            const { data: pulseira, error: pulseiraErr } = await supabase
+            let { data: pulseira, error: pulseiraErr } = await supabase
                 .from('evento_tipos_pulseira')
                 .update(updateData)
                 .eq('id', id)
                 .eq('evento_id', eventoId)
                 .select()
                 .single();
+
+            // Fallback gracioso caso as colunas fase/data_especifica ainda não existam no banco
+            if (pulseiraErr && (pulseiraErr.message?.includes('column') || pulseiraErr.code === '42703')) {
+                delete updateData.fase;
+                delete updateData.data_especifica;
+                const retry = await supabase
+                    .from('evento_tipos_pulseira')
+                    .update(updateData)
+                    .eq('id', id)
+                    .eq('evento_id', eventoId)
+                    .select()
+                    .single();
+                pulseira = retry.data;
+                pulseiraErr = retry.error;
+            }
 
             if (pulseiraErr) throw pulseiraErr;
 

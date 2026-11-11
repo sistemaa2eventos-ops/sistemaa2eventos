@@ -397,9 +397,9 @@ class AccessController {
                 return ApiResponse.error(res, 'Pessoa não encontrada', 404);
             }
 
-            // Buscar tipo de pulseira pela faixa numérica
+            // Buscar tipo de pulseira pela faixa numérica (se houver múltiplos por fases diferentes, pega o mais recente/específico)
             const numeroPulseiraInt = parseInt(numero_pulseira, 10);
-            const { data: tipoPulseira } = await supabaseClient
+            const { data: tiposEncontrados } = await supabaseClient
                 .from('evento_tipos_pulseira')
                 .select(`
                     id, nome_tipo, cor_hex, alerta_duplicidade,
@@ -411,7 +411,9 @@ class AccessController {
                 .eq('evento_id', eventoId)
                 .lte('numero_inicial', numeroPulseiraInt)
                 .gte('numero_final', numeroPulseiraInt)
-                .single();
+                .limit(1);
+
+            const tipoPulseira = tiposEncontrados && tiposEncontrados.length > 0 ? tiposEncontrados[0] : null;
 
             // Verificar duplicidade de pulseira
             if (tipoPulseira?.alerta_duplicidade) {
@@ -421,7 +423,7 @@ class AccessController {
                     .eq('numero_pulseira', numero_pulseira)
                     .eq('evento_id', eventoId)
                     .neq('id', pessoa_id)
-                    .single();
+                    .maybeSingle();
 
                 if (pulseiraExistente) {
                     logger.warn(`⚠️ Pulseira ${numero_pulseira} já vinculada a ${pulseiraExistente.nome_completo}`);
@@ -766,7 +768,7 @@ class AccessController {
             if (!tipoPulseira && numero_pulseira) {
                 const numeroPulseiraInt = parseInt(numero_pulseira, 10);
                 if (!isNaN(numeroPulseiraInt)) {
-                    const { data: tp } = await supabaseClient
+                    const { data: tpList } = await supabaseClient
                         .from('evento_tipos_pulseira')
                         .select(`
                             id, nome_tipo, cor_hex, alerta_duplicidade,
@@ -778,8 +780,8 @@ class AccessController {
                         .eq('evento_id', eventoId)
                         .lte('numero_inicial', numeroPulseiraInt)
                         .gte('numero_final', numeroPulseiraInt)
-                        .single();
-                    if (tp) tipoPulseira = tp;
+                        .limit(1);
+                    if (tpList && tpList.length > 0) tipoPulseira = tpList[0];
                 }
             }
 
@@ -791,7 +793,7 @@ class AccessController {
                     .eq('numero_pulseira', numero_pulseira)
                     .eq('evento_id', eventoId)
                     .neq('id', pessoa_id)
-                    .single();
+                    .maybeSingle();
 
                 if (existente) {
                     return ApiResponse.error(res,

@@ -56,6 +56,8 @@ const ConfigPulseiras = ({ embedded = false }) => {
     const [formData, setFormData] = useState({
         nome_tipo: '',
         cor_hex: '#00D4FF',
+        fase: 'todas',
+        data_especifica: '',
         numero_inicial: '',
         numero_final: '',
         tipo_leitura: 'qr_code',
@@ -103,6 +105,41 @@ const ConfigPulseiras = ({ embedded = false }) => {
                         variant="outlined"
                         sx={{ borderColor: 'rgba(255,255,255,0.2)', color: 'text.secondary', fontSize: '0.75rem' }}
                     />
+                );
+            }
+        },
+        {
+            id: 'fase',
+            label: 'Etapa / Fase',
+            minWidth: 140,
+            format: (val, row) => {
+                const mapFase = {
+                    'todas': { label: 'Todas as fases', color: '#00D4FF', bg: 'rgba(0, 212, 255, 0.1)' },
+                    'montagem': { label: 'Montagem', color: '#FFB800', bg: 'rgba(255, 184, 0, 0.1)' },
+                    'evento': { label: 'Evento (Show)', color: '#00FF88', bg: 'rgba(0, 255, 136, 0.1)' },
+                    'desmontagem': { label: 'Desmontagem', color: '#FF0055', bg: 'rgba(255, 0, 85, 0.1)' }
+                };
+                const config = mapFase[val || 'todas'] || mapFase.todas;
+                return (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                        <Chip
+                            label={config.label}
+                            size="small"
+                            sx={{
+                                background: config.bg,
+                                color: config.color,
+                                border: `1px solid ${config.color}33`,
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                width: 'fit-content'
+                            }}
+                        />
+                        {row.data_especifica && (
+                            <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.7rem' }}>
+                                📅 {row.data_especifica}
+                            </Typography>
+                        )}
+                    </Box>
                 );
             }
         },
@@ -189,6 +226,8 @@ const ConfigPulseiras = ({ embedded = false }) => {
             setFormData({
                 nome_tipo: pulseira.nome_tipo || '',
                 cor_hex: pulseira.cor_hex || '#00D4FF',
+                fase: pulseira.fase || 'todas',
+                data_especifica: pulseira.data_especifica || '',
                 numero_inicial: pulseira.numero_inicial || '',
                 numero_final: pulseira.numero_final || '',
                 tipo_leitura: pulseira.tipo_leitura || 'qr_code',
@@ -202,6 +241,8 @@ const ConfigPulseiras = ({ embedded = false }) => {
             setFormData({
                 nome_tipo: '',
                 cor_hex: '#00D4FF',
+                fase: 'todas',
+                data_especifica: '',
                 numero_inicial: '',
                 numero_final: '',
                 tipo_leitura: 'qr_code',
@@ -243,6 +284,8 @@ const ConfigPulseiras = ({ embedded = false }) => {
             setSaving(true);
             const payload = {
                 ...formData,
+                fase: formData.fase || 'todas',
+                data_especifica: formData.data_especifica ? formData.data_especifica : null,
                 numero_inicial: nInicial,
                 numero_final: nFinal,
                 tempo_confirmacao_checkout: parseInt(formData.tempo_confirmacao_checkout) || 3
@@ -341,6 +384,37 @@ const ConfigPulseiras = ({ embedded = false }) => {
                                     fullWidth
                                     value={formData.cor_hex}
                                     onChange={(e) => setFormData({ ...formData, cor_hex: e.target.value })}
+                                />
+                            </Grid>
+                        </Grid>
+
+                        <Grid container spacing={2}>
+                            <Grid item xs={12} sm={6}>
+                                <FormControl fullWidth size="small">
+                                    <InputLabel>Etapa / Fase de Validade</InputLabel>
+                                    <Select
+                                        value={formData.fase || 'todas'}
+                                        onChange={(e) => setFormData({ ...formData, fase: e.target.value })}
+                                        input={<OutlinedInput label="Etapa / Fase de Validade" />}
+                                        MenuProps={MenuProps}
+                                    >
+                                        <MenuItem value="todas">Todas as Fases</MenuItem>
+                                        <MenuItem value="montagem">Montagem</MenuItem>
+                                        <MenuItem value="evento">Evento (Showday)</MenuItem>
+                                        <MenuItem value="desmontagem">Desmontagem</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    label="Data específica (opcional)"
+                                    type="date"
+                                    fullWidth
+                                    size="small"
+                                    value={formData.data_especifica || ''}
+                                    onChange={(e) => setFormData({ ...formData, data_especifica: e.target.value })}
+                                    InputLabelProps={{ shrink: true }}
+                                    helperText="Deixe vazio se for válida em todo o período da fase"
                                 />
                             </Grid>
                         </Grid>

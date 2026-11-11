@@ -250,9 +250,9 @@ const AJUDAS = {
     },
     '/config/pulseiras': {
         titulo: 'Pulseiras',
-        objetivo: 'Lotes de pulseiras: cor, faixa de números e áreas liberadas.',
-        passos: ['"Provisionar lote": nome, cor, número inicial e final, método de leitura e "Zonas de acesso permitidas".', '"Criar lote".'],
-        atencao: ['Crie as áreas antes: lote sem zona fica "Sem acesso".', 'Excluir um lote é irreversível.']
+        objetivo: 'Lotes de pulseiras: cor, faixa de números, áreas liberadas e fase do evento (Montagem, Evento, Desmontagem).',
+        passos: ['"Provisionar lote": nome, cor, etapa/fase de validade, data específica (opcional), número inicial e final, método de leitura e "Zonas de acesso permitidas".', '"Criar lote".'],
+        atencao: ['Crie as áreas antes: lote sem zona fica "Sem acesso".', 'Lotes de fases diferentes podem repetir números e cores; ao rodar o reset de turnos as pulseiras anteriores são liberadas automaticamente.', 'Excluir um lote é irreversível.']
     },
     '/config/dispositivos': {
         titulo: 'Leitores e dispositivos',

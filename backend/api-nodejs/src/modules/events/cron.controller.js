@@ -290,12 +290,18 @@ class CronController {
             }
 
             // 2. Status de entrada/saída volta a "autorizado" para o novo dia
+            //    E desvincula o número da pulseira das pessoas para que a numeração possa ser
+            //    reutilizada no novo turno/fase (o histórico fica salvo em pulseira_vinculos)
             const pessoasIds = [...new Set([...statusParaZerar, ...dentro])];
             // em lotes: milhares de ids num .in() estouram o tamanho da URL
             for (const lote of emLotes(statusParaZerar, 200)) {
                 const { error: updateErr } = await supabase
                     .from('pessoas')
-                    .update({ status_acesso: 'autorizado', updated_at: new Date().toISOString() })
+                    .update({ 
+                        status_acesso: 'autorizado', 
+                        numero_pulseira: null,
+                        updated_at: new Date().toISOString() 
+                    })
                     .in('id', lote);
                 if (updateErr) throw updateErr;
             }

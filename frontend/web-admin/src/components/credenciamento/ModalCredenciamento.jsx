@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, Box, Typography, Grid, Stack,
     Chip, CircularProgress, IconButton, FormControl,
@@ -125,13 +125,55 @@ export const ModalCredenciamento = ({
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [open, loading, onClose]);
 
+    const [filtroFase, setFiltroFase] = useState('todas');
+
+    // Filtrar tipos de pulseira de acordo com a fase selecionada pelo operador ou do evento
+    const tiposPulseiraFiltrados = useMemo(() => {
+        if (!pulseiraTypes || pulseiraTypes.length === 0) return [];
+        if (filtroFase === 'todas') return pulseiraTypes;
+        return pulseiraTypes.filter(t => !t.fase || t.fase === 'todas' || t.fase === filtroFase);
+    }, [pulseiraTypes, filtroFase]);
+
+    // Auto-sincronizar o seletor de Lote/Tipo de Pulseira quando o operador digitar/bipar o número
+    const handleNumeroPulseiraChange = (val) => {
+        setNumeroPulseira(val);
+        if (!val) return;
+        const num = parseInt(String(val).trim(), 10);
+        if (isNaN(num)) return;
+
+        // Procura primeiro nos tipos da fase ativa (ou todos)
+        const loteIdentificado = (tiposPulseiraFiltrados || []).find(tipo => {
+            const ini = tipo.numero_inicial != null ? parseInt(tipo.numero_inicial, 10) : null;
+            const fim = tipo.numero_final != null ? parseInt(tipo.numero_final, 10) : null;
+            if (ini != null && fim != null) {
+                return num >= ini && num <= fim;
+            }
+            return false;
+        }) || (pulseiraTypes || []).find(tipo => {
+            const ini = tipo.numero_inicial != null ? parseInt(tipo.numero_inicial, 10) : null;
+            const fim = tipo.numero_final != null ? parseInt(tipo.numero_final, 10) : null;
+            if (ini != null && fim != null) {
+                return num >= ini && num <= fim;
+            }
+            return false;
+        });
+
+        if (loteIdentificado && loteIdentificado.id !== selectedTipoPulseira) {
+            setSelectedTipoPulseira(loteIdentificado.id);
+            if (loteIdentificado.fase && loteIdentificado.fase !== 'todas' && filtroFase !== loteIdentificado.fase) {
+                setFiltroFase(loteIdentificado.fase);
+            }
+        }
+    };
+
     if (!pessoa) return null;
 
     const handleConfirmar = (numInput, origem = 'manual', tipoAuto = null) => {
         if (loading) return;
 
         const numFinal = (numInput || numeroPulseira || '').trim();
-        const tipoFinal = tipoAuto?.id || selectedTipoPulseira || pulseiraTypes[0]?.id;
+        // A escolha manual do operador no dropdown (selectedTipoPulseira) tem prioridade sobre o tipoAuto
+        const tipoFinal = selectedTipoPulseira || tipoAuto?.id || pulseiraTypes[0]?.id;
 
         setErroValidacao('');
         if (onConfirmar) {
@@ -305,43 +347,80 @@ export const ModalCredenciamento = ({
 
                             <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.08)', my: 1.75 }} />
 
-                            {/* Campo de Atribuição de Pulseira Universal */}
+                            {/* Campo de Atribuição de Pulseira Universal com Seletor de Fase e Lote */}
                             <Box sx={{ mt: 1.5 }}>
                                 <Grid container spacing={1.5} alignItems="center">
-                                    {pulseiraTypes.length > 1 && (
-                                        <Grid item xs={12} sm={4}>
-                                            <FormControl fullWidth size="small">
-                                                <InputLabel id="tipo-pulseira-select" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                                                    Lote / Tipo
-                                                </InputLabel>
-                                                <Select
-                                                    labelId="tipo-pulseira-select"
-                                                    value={selectedTipoPulseira}
-                                                    label="Lote / tipo"
-                                                    onChange={(e) => setSelectedTipoPulseira(e.target.value)}
-                                                    sx={{
-                                                        bgcolor: 'rgba(0,0,0,0.3)',
-                                                        color: '#FFFFFF',
-                                                        borderRadius: 1.5,
-                                                        '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 212, 255, 0.3)' }
-                                                    }}
-                                                >
-                                                    {pulseiraTypes.map(t => (
-                                                        <MenuItem key={t.id} value={t.id}>
-                                                            {t.nome_tipo}
-                                                        </MenuItem>
-                                                    ))}
-                                                </Select>
-                                            </FormControl>
-                                        </Grid>
-                                    )}
+                                    {/* Seletor Manual de Fase/Etapa (Montagem / Evento / Desmontagem) */}
+                                    <Grid item xs={12} sm={3}>
+                                        <FormControl fullWidth size="small">
+                                            <InputLabel id="fase-pulseira-select" sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem' }}>
+                                                Etapa / Fase
+                                            </InputLabel>
+                                            <Select
+                                                labelId="fase-pulseira-select"
+                                                value={filtroFase}
+                                                label="Etapa / Fase"
+                                                onChange={(e) => {
+                                                    setFiltroFase(e.target.value);
+                                                    // Se o lote atual não faz parte da nova fase, limpa ou reseta
+                                                    const novos = e.target.value === 'todas'
+                                                        ? pulseiraTypes
+                                                        : pulseiraTypes.filter(t => !t.fase || t.fase === 'todas' || t.fase === e.target.value);
+                                                    if (novos.length > 0 && !novos.some(t => t.id === selectedTipoPulseira)) {
+                                                        setSelectedTipoPulseira(novos[0].id);
+                                                    }
+                                                }}
+                                                sx={{
+                                                    bgcolor: 'rgba(0,0,0,0.3)',
+                                                    color: '#FFFFFF',
+                                                    borderRadius: 1.5,
+                                                    fontSize: '0.82rem',
+                                                    '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 212, 255, 0.3)' }
+                                                }}
+                                            >
+                                                <MenuItem value="todas">Todas as Fases</MenuItem>
+                                                <MenuItem value="montagem">Montagem</MenuItem>
+                                                <MenuItem value="evento">Evento (Show)</MenuItem>
+                                                <MenuItem value="desmontagem">Desmontagem</MenuItem>
+                                            </Select>
+                                        </FormControl>
+                                    </Grid>
 
-                                    <Grid item xs={12} sm={pulseiraTypes.length > 1 ? 8 : 12}>
+                                    {/* Seletor do Lote de Pulseira */}
+                                    <Grid item xs={12} sm={4}>
+                                        <FormControl fullWidth size="small">
+                                            <InputLabel id="tipo-pulseira-select" sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem' }}>
+                                                Lote / Tipo
+                                            </InputLabel>
+                                            <Select
+                                                labelId="tipo-pulseira-select"
+                                                value={selectedTipoPulseira}
+                                                label="Lote / Tipo"
+                                                onChange={(e) => setSelectedTipoPulseira(e.target.value)}
+                                                sx={{
+                                                    bgcolor: 'rgba(0,0,0,0.3)',
+                                                    color: '#FFFFFF',
+                                                    borderRadius: 1.5,
+                                                    fontSize: '0.82rem',
+                                                    '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 212, 255, 0.3)' }
+                                                }}
+                                            >
+                                                {tiposPulseiraFiltrados.map(t => (
+                                                    <MenuItem key={t.id} value={t.id}>
+                                                        {t.nome_tipo} {t.fase && t.fase !== 'todas' ? `(${t.fase})` : ''}
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+                                    </Grid>
+
+                                    {/* Input Universal de Pulseira */}
+                                    <Grid item xs={12} sm={5}>
                                         <UniversalPulseiraInput
                                             value={numeroPulseira}
-                                            onChange={setNumeroPulseira}
+                                            onChange={handleNumeroPulseiraChange}
                                             onConfirm={handleConfirmar}
-                                            pulseiraTypes={pulseiraTypes}
+                                            pulseiraTypes={tiposPulseiraFiltrados.length > 0 ? tiposPulseiraFiltrados : pulseiraTypes}
                                             loading={loading}
                                             autoFocus={true}
                                             onAbrirCamera={permitirCamera ? () => setLendoCamera(true) : undefined}

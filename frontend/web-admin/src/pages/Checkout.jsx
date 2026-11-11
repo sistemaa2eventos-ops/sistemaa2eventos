@@ -97,6 +97,7 @@ const Checkout = () => {
     // Vínculo Facial
     sessaoAtiva,
     dispositivosDisponiveis,
+    camerasDisponiveis,
     loadingSessao,
     vincularLeitor,
     desvincularLeitor,
@@ -151,6 +152,7 @@ const Checkout = () => {
           estacao={{
               sessaoAtiva,
               dispositivos: dispositivosDisponiveis,
+              cameras: camerasDisponiveis,
               loading: loadingSessao,
               onVincular: vincularLeitor,
               onDesvincular: desvincularLeitor,
