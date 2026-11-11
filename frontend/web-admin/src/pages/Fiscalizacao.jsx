@@ -222,7 +222,11 @@ const Fiscalizacao = () => {
     const formatarHora = (isoStr) => {
         if (!isoStr) return null;
         try {
-            return new Date(isoStr).toLocaleTimeString('pt-BR', {
+            // created_at do banco é UTC sem o marcador de fuso: sem o "Z" o navegador lê como horário
+            // local e mostra 3 h adiantado. Mesmo tratamento do serviço de pulseiras no backend.
+            const comFuso = /[zZ]|[+-]\d\d:?\d\d$/.test(isoStr) ? isoStr : `${isoStr}Z`;
+            return new Date(comFuso).toLocaleTimeString('pt-BR', {
+                timeZone: 'America/Sao_Paulo',
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit'
