@@ -45,8 +45,9 @@ export const EstacaoFacialSelector = ({
 
     const handleOpen = () => {
         if (sessaoAtiva) {
-            setSelectedDispositivoId(sessaoAtiva.dispositivo_id || '');
-            setSelectedCameraIds(sessaoAtiva.camera_ids || []);
+            // Só o que existe neste evento (estação antiga pode apontar para leitor/câmera de outro)
+            setSelectedDispositivoId(dispositivos.some(d => d.id === sessaoAtiva.dispositivo_id) ? sessaoAtiva.dispositivo_id : '');
+            setSelectedCameraIds((sessaoAtiva.camera_ids || []).filter(id => cameras.some(c => c.id === id)));
             setEstacaoNome(sessaoAtiva.estacao_nome || 'Baia 01');
         } else {
             const primeiroLivre = dispositivos.find(d => !d.ocupado);
@@ -65,14 +66,17 @@ export const EstacaoFacialSelector = ({
     const alternarCamera = (id) => setSelectedCameraIds(atual => (atual.includes(id) ? atual.filter(x => x !== id) : [...atual, id]));
 
     const handleConfirmarVinculo = async () => {
-        if (!selectedDispositivoId && selectedCameraIds.length === 0) {
+        // Envia só o que está na lista deste evento (nada escondido de outra estação/evento)
+        const leitor = dispositivos.some(d => d.id === selectedDispositivoId) ? selectedDispositivoId : null;
+        const camerasEscolhidas = selectedCameraIds.filter(id => cameras.some(c => c.id === id));
+        if (!leitor && camerasEscolhidas.length === 0) {
             setErrorMsg('Escolha um leitor facial ou pelo menos uma câmera com IA.');
             return;
         }
         setSaving(true);
         setErrorMsg('');
         try {
-            const res = await onVincular(selectedDispositivoId || null, estacaoNome.trim() || 'Baia Operador', selectedCameraIds);
+            const res = await onVincular(leitor, estacaoNome.trim() || 'Baia Operador', camerasEscolhidas);
             if (res?.success) {
                 setOpenModal(false);
             } else {

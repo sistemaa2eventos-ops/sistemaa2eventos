@@ -28,14 +28,18 @@ class SessaoOperadorController {
                 return res.status(401).json({ success: false, error: 'Usuário não autenticado' });
             }
 
-            const consultar = (campos) => supabase
-                .from('sessoes_operador')
-                .select(campos)
-                .eq('operador_id', operadorId)
-                .eq('ativo', true)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
+            // Só a estação do evento em foco: uma estação antiga de OUTRO evento (com o leitor de lá)
+            // voltava como ativa e o painel tentava religar aquele leitor neste evento
+            const eventoId = req.event?.id || null;
+            const consultar = (campos) => {
+                let q = supabase
+                    .from('sessoes_operador')
+                    .select(campos)
+                    .eq('operador_id', operadorId)
+                    .eq('ativo', true);
+                if (eventoId) q = q.eq('evento_id', eventoId);
+                return q.order('created_at', { ascending: false }).limit(1).maybeSingle();
+            };
             let { data, error } = await consultar(`${CAMPOS_SESSAO}, camera_ids`);
             if (semColunaCameras(error)) ({ data, error } = await consultar(CAMPOS_SESSAO));
 
