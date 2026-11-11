@@ -58,6 +58,8 @@ const ConfigPulseiras = ({ embedded = false }) => {
         cor_hex: '#00D4FF',
         fase: 'todas',
         data_especifica: '',
+        hora_inicio: '',
+        hora_fim: '',
         numero_inicial: '',
         numero_final: '',
         tipo_leitura: 'qr_code',
@@ -134,9 +136,10 @@ const ConfigPulseiras = ({ embedded = false }) => {
                                 width: 'fit-content'
                             }}
                         />
-                        {row.data_especifica && (
+                        {(row.data_especifica || (row.hora_inicio && row.hora_fim)) && (
                             <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.7rem' }}>
-                                📅 {row.data_especifica}
+                                {row.data_especifica && `📅 ${row.data_especifica} `}
+                                {row.hora_inicio && row.hora_fim && `⏰ ${row.hora_inicio.slice(0, 5)} - ${row.hora_fim.slice(0, 5)}`}
                             </Typography>
                         )}
                     </Box>
@@ -228,6 +231,8 @@ const ConfigPulseiras = ({ embedded = false }) => {
                 cor_hex: pulseira.cor_hex || '#00D4FF',
                 fase: pulseira.fase || 'todas',
                 data_especifica: pulseira.data_especifica || '',
+                hora_inicio: pulseira.hora_inicio ? pulseira.hora_inicio.slice(0, 5) : '',
+                hora_fim: pulseira.hora_fim ? pulseira.hora_fim.slice(0, 5) : '',
                 numero_inicial: pulseira.numero_inicial || '',
                 numero_final: pulseira.numero_final || '',
                 tipo_leitura: pulseira.tipo_leitura || 'qr_code',
@@ -243,6 +248,8 @@ const ConfigPulseiras = ({ embedded = false }) => {
                 cor_hex: '#00D4FF',
                 fase: 'todas',
                 data_especifica: '',
+                hora_inicio: '',
+                hora_fim: '',
                 numero_inicial: '',
                 numero_final: '',
                 tipo_leitura: 'qr_code',
@@ -286,6 +293,8 @@ const ConfigPulseiras = ({ embedded = false }) => {
                 ...formData,
                 fase: formData.fase || 'todas',
                 data_especifica: formData.data_especifica ? formData.data_especifica : null,
+                hora_inicio: formData.hora_inicio ? formData.hora_inicio : null,
+                hora_fim: formData.hora_fim ? formData.hora_fim : null,
                 numero_inicial: nInicial,
                 numero_final: nFinal,
                 tempo_confirmacao_checkout: parseInt(formData.tempo_confirmacao_checkout) || 3
@@ -403,7 +412,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
                         </Grid>
 
                         <Grid container spacing={2}>
-                            <Grid item xs={12} sm={6}>
+                            <Grid item xs={12} sm={4}>
                                 <FormControl fullWidth size="small">
                                     <InputLabel>Etapa / Fase de Validade</InputLabel>
                                     <Select
@@ -419,7 +428,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
                                     </Select>
                                 </FormControl>
                             </Grid>
-                            <Grid item xs={12} sm={6}>
+                            <Grid item xs={12} sm={4}>
                                 <TextField
                                     label="Data específica (opcional)"
                                     type="date"
@@ -428,8 +437,30 @@ const ConfigPulseiras = ({ embedded = false }) => {
                                     value={formData.data_especifica || ''}
                                     onChange={(e) => setFormData({ ...formData, data_especifica: e.target.value })}
                                     InputLabelProps={{ shrink: true }}
-                                    helperText="Deixe vazio se for válida em todo o período da fase"
+                                    helperText="Válida em todo o dia ou período"
                                 />
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                    <TextField
+                                        label="Início uso"
+                                        type="time"
+                                        fullWidth
+                                        size="small"
+                                        value={formData.hora_inicio || ''}
+                                        onChange={(e) => setFormData({ ...formData, hora_inicio: e.target.value })}
+                                        InputLabelProps={{ shrink: true }}
+                                    />
+                                    <TextField
+                                        label="Fim uso"
+                                        type="time"
+                                        fullWidth
+                                        size="small"
+                                        value={formData.hora_fim || ''}
+                                        onChange={(e) => setFormData({ ...formData, hora_fim: e.target.value })}
+                                        InputLabelProps={{ shrink: true }}
+                                    />
+                                </Box>
                             </Grid>
                         </Grid>
 

@@ -13,7 +13,8 @@ import {
     Warning as WarningIcon,
     Cancel as CancelIcon,
     Description as DocIcon,
-    LockOpen as LiberarIcon
+    LockOpen as LiberarIcon,
+    AssignmentReturn as DevolverIcon
 } from '@mui/icons-material';
 import GlassCard from '../common/GlassCard';
 import NeonButton from '../common/NeonButton';
@@ -113,6 +114,25 @@ export const ModalCredenciamento = ({
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, pessoa, pulseiraTypes]);
+
+    const [devolvendo, setDevolvendo] = useState(false);
+
+    const handleDevolverPulseira = async () => {
+        if (!pessoa?.id || devolvendo) return;
+        try {
+            setDevolvendo(true);
+            await api.post(`/reports/pulseiras/${pessoa.id}/encerrar`, {
+                motivo: 'devolvida',
+                observacao: 'Devolução registrada no credenciamento'
+            });
+            setNumeroPulseira('');
+            if (pessoa) pessoa.numero_pulseira = null;
+        } catch (err) {
+            console.error('Erro ao devolver pulseira:', err);
+        } finally {
+            setDevolvendo(false);
+        }
+    };
 
     // Atalho Escape para fechar
     useEffect(() => {
@@ -427,6 +447,31 @@ export const ModalCredenciamento = ({
                                         />
                                     </Grid>
                                 </Grid>
+
+                                {pessoa.numero_pulseira && (
+                                    <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: 'rgba(0, 212, 255, 0.05)', p: 1, borderRadius: 1.5, border: '1px solid rgba(0, 212, 255, 0.15)' }}>
+                                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>
+                                            Pulseira em uso: <strong>{pessoa.numero_pulseira}</strong>
+                                        </Typography>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            startIcon={<DevolverIcon sx={{ fontSize: 16 }} />}
+                                            onClick={handleDevolverPulseira}
+                                            disabled={devolvendo}
+                                            sx={{
+                                                fontSize: '0.7rem',
+                                                color: '#00D4FF',
+                                                borderColor: 'rgba(0, 212, 255, 0.4)',
+                                                textTransform: 'none',
+                                                py: 0.2,
+                                                px: 1
+                                            }}
+                                        >
+                                            {devolvendo ? 'Registrando...' : 'Marcar como Devolvida'}
+                                        </Button>
+                                    </Box>
+                                )}
 
                                 {erroValidacao && (
                                     <Typography variant="caption" sx={{ color: '#FF3366', fontWeight: 700, mt: 1, display: 'block' }}>
