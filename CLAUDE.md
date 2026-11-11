@@ -739,6 +739,16 @@ docker system prune -af
 **Registre cada deploy aqui:**
 
 ```
+2026-11-12 - Deploy 40cdccd (acesso: operador só opera os eventos da lista; dashboard opcional)
+├─ Mudanças: operador só troca entre eventos da sua lista (supervisor global mantém todos; admin inalterado);
+│            dashboard deixa de ser obrigatório (padrão desligado para operador novo); página "/" sem
+│            dashboard leva à primeira página permitida
+├─ Migrations: 20261112b_operadores_eventos_permitidos.sql (aplicada pela usuária antes do deploy)
+├─ Status: ✅ OK (GitHub Actions run 43084748734); /health 200, banco conectado, rota protegida 401
+├─ Testes: 58 testes do backend passam (6 novos de permissão de evento)
+├─ Rollback: tag antes-deploy-20261112d (2b853b7)
+└─ Próximo: etapa 2 (página inicial escolhida por quem administra) e etapa 3 (quiosque com bloqueio)
+
 2026-11-12 - Deploy 2b853b7 (motor de IA sob demanda + servidor de IA central)
 ├─ Mudanças: motor do PC do evento liga só com câmera em IA ou leitor com confirmação da IA
 │            (interruptor do painel continua mandando); servidor de IA central em backend/ia-servidor
