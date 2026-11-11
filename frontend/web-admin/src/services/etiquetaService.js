@@ -42,22 +42,55 @@ export function montarHtmlEtiqueta(layout, dados) {
     const papel = layout?.papel_config || LAYOUT_PADRAO.papel_config;
     const largura = Number(papel.width) || 100;
     const altura = Number(papel.height) || 150;
+    const bgUrl = papel.background_url || papel.bg_url || null;
+    const bgStyle = bgUrl ? `background-image: url('${bgUrl}'); background-size: cover; background-position: center; background-repeat: no-repeat;` : 'background-color: #ffffff;';
+
     const elementos = (layout?.elementos || []).map(el => {
         const caixa = `left:${mm(el.x)};top:${mm(el.y)};width:${mm(el.width)};height:${mm(el.height)}`;
+        const borda = el.borderRadius ? `border-radius: ${el.borderRadius}px;` : '';
+        const borderStyle = el.borderColor ? `border: ${el.borderWidth || 1}px solid ${el.borderColor};` : '';
+        const opacidade = el.opacity != null ? `opacity: ${el.opacity};` : '';
+
         if (el.type === 'qrcode') {
-            if (dados.qr_imagem) return `<img class="el" style="${caixa};object-fit:contain" src="${dados.qr_imagem}" alt="">`;
-            // Teste de impressão: marca onde o QR vai sair
-            return dados.exemplo ? `<div class="el qr-exemplo" style="${caixa}">QR</div>` : '';
+            if (dados.qr_imagem) return `<img class="el" style="${caixa};object-fit:contain;${borda}" src="${dados.qr_imagem}" alt="QR">`;
+            return dados.exemplo ? `<div class="el qr-exemplo" style="${caixa};${borda}">QR</div>` : '';
         }
-        const fonte = `font-size:${mm(el.fontSize || 14)};font-weight:${el.fontWeight === 'bold' ? 700 : 400}`;
+
+        if (el.type === 'foto') {
+            const fotoUrl = dados.foto_url || dados.foto || null;
+            if (fotoUrl) {
+                return `<img class="el" style="${caixa};object-fit:cover;${borda}${borderStyle}" src="${fotoUrl}" alt="Foto">`;
+            }
+            return `<div class="el foto-placeholder" style="${caixa};${borda}${borderStyle}">Foto</div>`;
+        }
+
+        if (el.type === 'image') {
+            const imgSrc = el.content || el.url;
+            if (imgSrc) {
+                return `<img class="el" style="${caixa};object-fit:contain;${borda}${opacidade}" src="${imgSrc}" alt="Elemento">`;
+            }
+            return '';
+        }
+
+        if (el.type === 'shape') {
+            const bgCor = el.backgroundColor || el.cor || '#000000';
+            return `<div class="el" style="${caixa};background-color:${bgCor};${borda}${borderStyle}${opacidade}"></div>`;
+        }
+
+        // Tipo texto
+        const cor = el.color ? `color:${el.color};` : 'color:#000000;';
+        const align = el.textAlign ? `text-align:${el.textAlign};` : '';
+        const fonte = `font-size:${mm(el.fontSize || 14)};font-weight:${el.fontWeight === 'bold' ? 700 : 400};${cor}${align}`;
         return `<div class="el" style="${caixa};${fonte}">${escapar(preencher(el.content, dados))}</div>`;
     }).join('');
-    return `<!doctype html><html><head><meta charset="utf-8"><title>Etiqueta</title><style>
+
+    return `<!doctype html><html><head><meta charset="utf-8"><title>Etiqueta / Crachá</title><style>
         @page { size: ${largura}mm ${altura}mm; margin: 0; }
         html, body { margin: 0; padding: 0; }
-        .pagina { position: relative; width: ${largura}mm; height: ${altura}mm; overflow: hidden; font-family: Arial, Helvetica, sans-serif; color: #000; }
-        .el { position: absolute; overflow: hidden; line-height: 1.15; white-space: nowrap; text-overflow: ellipsis; }
-        .qr-exemplo { box-sizing: border-box; border: 0.4mm dashed #000; display: flex; align-items: center; justify-content: center; font-size: 4mm; }
+        .pagina { position: relative; width: ${largura}mm; height: ${altura}mm; overflow: hidden; font-family: Arial, Helvetica, sans-serif; color: #000; ${bgStyle} }
+        .el { position: absolute; overflow: hidden; box-sizing: border-box; line-height: 1.15; }
+        .qr-exemplo { box-sizing: border-box; border: 0.4mm dashed #000; display: flex; align-items: center; justify-content: center; font-size: 4mm; background: rgba(0,0,0,0.05); }
+        .foto-placeholder { box-sizing: border-box; border: 0.4mm dashed #777; display: flex; align-items: center; justify-content: center; font-size: 3.5mm; color: #777; background: rgba(0,0,0,0.03); }
     </style></head><body><div class="pagina">${elementos}</div></body></html>`;
 }
 

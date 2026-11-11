@@ -116,19 +116,24 @@ export const ModalCredenciamento = ({
     }, [open, pessoa, pulseiraTypes]);
 
     const [devolvendo, setDevolvendo] = useState(false);
+    // Id da pessoa cuja pulseira foi devolvida agora (esconde o aviso sem mutar a prop)
+    const [devolvidaId, setDevolvidaId] = useState(null);
 
     const handleDevolverPulseira = async () => {
         if (!pessoa?.id || devolvendo) return;
         try {
             setDevolvendo(true);
-            await api.post(`/reports/pulseiras/${pessoa.id}/encerrar`, {
+            setErroValidacao('');
+            const eventoId = localStorage.getItem('active_evento_id');
+            await api.post('/pulseiras/encerrar', {
+                pessoa_id: pessoa.id,
                 motivo: 'devolvida',
                 observacao: 'Devolução registrada no credenciamento'
-            });
+            }, { params: { evento_id: eventoId } });
             setNumeroPulseira('');
-            if (pessoa) pessoa.numero_pulseira = null;
+            setDevolvidaId(pessoa.id);
         } catch (err) {
-            console.error('Erro ao devolver pulseira:', err);
+            setErroValidacao(err.response?.data?.error || 'Não foi possível registrar a devolução da pulseira.');
         } finally {
             setDevolvendo(false);
         }
@@ -448,7 +453,7 @@ export const ModalCredenciamento = ({
                                     </Grid>
                                 </Grid>
 
-                                {pessoa.numero_pulseira && (
+                                {pessoa.numero_pulseira && devolvidaId !== pessoa.id && (
                                     <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: 'rgba(0, 212, 255, 0.05)', p: 1, borderRadius: 1.5, border: '1px solid rgba(0, 212, 255, 0.15)' }}>
                                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>
                                             Pulseira em uso: <strong>{pessoa.numero_pulseira}</strong>

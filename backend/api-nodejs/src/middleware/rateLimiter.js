@@ -5,11 +5,30 @@ const isDev = process.env.NODE_ENV === 'development';
 // No evento, todos os operadores saem pelo mesmo IP de internet (NAT do local).
 // Por isso os limites de quem está logado são contados POR USUÁRIO, e não por IP.
 
-/** Usuário do token (sem validar assinatura: serve só para separar a contagem). */
+const jwt = require('jsonwebtoken');
+
+/**
+ * Ingresso de mídia (?ingresso=, 2 min/30 min) é JWT nosso: a assinatura é conferida antes de
+ * usar o usuário "u" como chave. Sem isso, quem envia um ingresso forjado escolhe o balde de outro.
+ */
+function usuarioDoIngresso(ingresso) {
+    const segredo = process.env.JWT_SECRET || process.env.SUPABASE_JWT_SECRET;
+    if (!segredo || typeof ingresso !== 'string') return null;
+    try {
+        const d = jwt.verify(ingresso, segredo);
+        return (d.p === 'cam' || d.p === 'grav') && typeof d.u === 'string' ? d.u : null;
+    } catch {
+        return null;
+    }
+}
+
+/** Usuário do token (sem validar assinatura do login: serve só para separar a contagem). */
 function usuarioDoToken(req) {
-    // ?ingresso= (imagem/vídeo de câmera e gravação) leva o usuário no campo "u": sem isto, as
-    // imagens do CFTV contavam no limite do IP do local e travavam o login de todo o evento
-    const token = (req.headers.authorization || '').replace('Bearer ', '') || req.query?.token || req.query?.ingresso;
+    const bearer = (req.headers.authorization || '').replace('Bearer ', '');
+    // ?ingresso= (imagem/vídeo de câmera e gravação): sem isto, as imagens do CFTV contavam no
+    // limite do IP do local e travavam o login de todo o evento
+    if (!bearer && !req.query?.token && req.query?.ingresso) return usuarioDoIngresso(req.query.ingresso);
+    const token = bearer || req.query?.token;
     if (!token || typeof token !== 'string' || token.split('.').length !== 3) return null;
     try {
         const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));

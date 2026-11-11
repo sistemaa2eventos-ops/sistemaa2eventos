@@ -9,6 +9,7 @@ const databaseService = require('./services/database.service');
 const watchlistService = require('../system/watchlist.service');
 const { COLUNAS_PESSOA_ACESSO } = require('./services/colunasPessoa');
 const pulseiraService = require('../pulseiras/pulseira.service');
+const { buscarLotesDaFaixa, escolherLote } = require('../pulseiras/loteSelecao');
 
 class AccessController {
     constructor() {
@@ -397,36 +398,25 @@ class AccessController {
                 return ApiResponse.error(res, 'Pessoa não encontrada', 404);
             }
 
-            // Buscar tipo de pulseira pela faixa numérica (se houver múltiplos por fases diferentes, pega o mais recente/específico)
+            // Lote da faixa que vale AGORA (fase, data e horário); a faixa pode repetir entre lotes
             const numeroPulseiraInt = parseInt(numero_pulseira, 10);
-            const { data: tiposEncontrados } = await supabaseClient
-                .from('evento_tipos_pulseira')
-                .select(`
-                    id, nome_tipo, cor_hex, alerta_duplicidade,
-                    pulseira_areas_permitidas (
-                        area_id,
-                        evento_areas (id, nome_area)
-                    )
-                `)
-                .eq('evento_id', eventoId)
-                .lte('numero_inicial', numeroPulseiraInt)
-                .gte('numero_final', numeroPulseiraInt)
-                .limit(1);
+            const candidatos = await buscarLotesDaFaixa(supabaseClient, eventoId, numeroPulseiraInt);
+            const escolha = await escolherLote(candidatos, eventoId);
+            if (escolha.bloqueado) return ApiResponse.error(res, escolha.motivo, 403);
+            const tipoPulseira = escolha.lote;
 
-            const tipoPulseira = tiposEncontrados && tiposEncontrados.length > 0 ? tiposEncontrados[0] : null;
-
-            // Verificar duplicidade de pulseira
+            // Verificar duplicidade de pulseira (lista: maybeSingle falhava com 2+ donos e a checagem passava)
             if (tipoPulseira?.alerta_duplicidade) {
-                const { data: pulseiraExistente } = await supabaseClient
+                const { data: existentes } = await supabaseClient
                     .from('pessoas')
                     .select('id, nome_completo')
                     .eq('numero_pulseira', numero_pulseira)
                     .eq('evento_id', eventoId)
                     .neq('id', pessoa_id)
-                    .maybeSingle();
+                    .limit(1);
 
-                if (pulseiraExistente) {
-                    logger.warn(`⚠️ Pulseira ${numero_pulseira} já vinculada a ${pulseiraExistente.nome_completo}`);
+                if (existentes && existentes.length > 0) {
+                    logger.warn(`⚠️ Pulseira ${numero_pulseira} já vinculada a ${existentes[0].nome_completo}`);
                 }
             }
 
@@ -768,32 +758,23 @@ class AccessController {
             if (!tipoPulseira && numero_pulseira) {
                 const numeroPulseiraInt = parseInt(numero_pulseira, 10);
                 if (!isNaN(numeroPulseiraInt)) {
-                    const { data: tpList } = await supabaseClient
-                        .from('evento_tipos_pulseira')
-                        .select(`
-                            id, nome_tipo, cor_hex, alerta_duplicidade,
-                            pulseira_areas_permitidas (
-                                area_id,
-                                evento_areas (id, nome_area)
-                            )
-                        `)
-                        .eq('evento_id', eventoId)
-                        .lte('numero_inicial', numeroPulseiraInt)
-                        .gte('numero_final', numeroPulseiraInt)
-                        .limit(1);
-                    if (tpList && tpList.length > 0) tipoPulseira = tpList[0];
+                    const candidatos = await buscarLotesDaFaixa(supabaseClient, eventoId, numeroPulseiraInt);
+                    const escolha = await escolherLote(candidatos, eventoId);
+                    if (escolha.bloqueado) return ApiResponse.error(res, escolha.motivo, 403);
+                    if (escolha.lote) tipoPulseira = escolha.lote;
                 }
             }
 
             // 3. Verificar duplicidade
             if (tipoPulseira?.alerta_duplicidade) {
-                const { data: existente } = await supabaseClient
+                const { data: existentes } = await supabaseClient
                     .from('pessoas')
                     .select('id, nome_completo')
                     .eq('numero_pulseira', numero_pulseira)
                     .eq('evento_id', eventoId)
                     .neq('id', pessoa_id)
-                    .maybeSingle();
+                    .limit(1);
+                const existente = existentes?.[0];
 
                 if (existente) {
                     return ApiResponse.error(res,

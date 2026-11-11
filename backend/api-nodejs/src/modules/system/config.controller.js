@@ -185,6 +185,10 @@ class ConfigController {
 
             // Fallback gracioso caso a migration de fase/data_especifica/horarios ainda não tenha sido executada no banco
             if (pulseiraErr && (pulseiraErr.message?.includes('column') || pulseiraErr.code === '42703')) {
+                // Não grava em silêncio: se o usuário escolheu fase/data/horário, o banco precisa da migration
+                if ((fase && fase !== 'todas') || data_especifica || hora_inicio || hora_fim) {
+                    return res.status(409).json({ error: 'Aplique a migration 20261111_pulseiras_fase_data.sql no Supabase para salvar fase, data e horário do lote.' });
+                }
                 delete insertPayload.fase;
                 delete insertPayload.data_especifica;
                 delete insertPayload.hora_inicio;
@@ -346,6 +350,9 @@ class ConfigController {
 
             // Fallback gracioso caso as colunas fase/data_especifica/horarios ainda não existam no banco
             if (pulseiraErr && (pulseiraErr.message?.includes('column') || pulseiraErr.code === '42703')) {
+                if ((fase && fase !== 'todas') || data_especifica || hora_inicio || hora_fim) {
+                    return res.status(409).json({ error: 'Aplique a migration 20261111_pulseiras_fase_data.sql no Supabase para salvar fase, data e horário do lote.' });
+                }
                 delete updateData.fase;
                 delete updateData.data_especifica;
                 delete updateData.hora_inicio;

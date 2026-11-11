@@ -809,7 +809,8 @@ class PublicController {
 
             const { data: documentos, error: docsErr } = await supabase
                 .from('empresa_documentos')
-                .select('id, titulo, tipo_doc, status, data_inclusao, data_validade, notas_auditoria')
+                // notas_auditoria é interno da auditoria: não sai pelo link público da empresa
+                .select('id, titulo, tipo_doc, status, data_inclusao, data_validade')
                 .eq('empresa_id', empresa.id)
                 .order('data_inclusao', { ascending: false });
 
