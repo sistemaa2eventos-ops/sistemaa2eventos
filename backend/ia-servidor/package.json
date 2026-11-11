@@ -1,0 +1,17 @@
+{
+  "name": "a2-eventos-ia-servidor",
+  "version": "1.0.0",
+  "description": "Servidor de IA central: reconhece os rostos enviados pelos PCs dos eventos (conexão de saída para a nuvem, nenhuma porta aberta)",
+  "main": "src/servidor.js",
+  "private": true,
+  "scripts": {
+    "start": "node src/servidor.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "socket.io-client": "^4.8.1"
+  }
+}

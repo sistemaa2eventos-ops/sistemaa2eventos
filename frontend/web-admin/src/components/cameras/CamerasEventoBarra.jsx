@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    Box, Stack, Switch, FormControlLabel, Chip, TextField, Tooltip, Typography, CircularProgress, Button
+    Box, Stack, Switch, FormControlLabel, Chip, TextField, Tooltip, Typography, CircularProgress, Button,
+    FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
 import { Computer as PcIcon, Save as SaveIcon } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
@@ -20,6 +21,7 @@ const CamerasEventoBarra = ({ podeEditar = true }) => {
     const [cfg, setCfg] = useState(null);
     const [pc, setPc] = useState(null);
     const [disco, setDisco] = useState(null);
+    const [reconhecimento, setReconhecimento] = useState(null);
     const [salvando, setSalvando] = useState(false);
     const [limites, setLimites] = useState({ gravacao_limite_gb: 40, gravacao_retencao_dias: 30 });
 
@@ -35,6 +37,10 @@ const CamerasEventoBarra = ({ podeEditar = true }) => {
         api.get('/gravacoes/status', { hideDefaultError: true, timeout: 12000 })
             .then(({ data }) => setDisco(data.data))
             .catch(() => setDisco(null));
+        // Onde o reconhecimento está acontecendo agora (servidor central, reserva ou PC do evento)
+        api.get('/cameras/ia-status', { hideDefaultError: true, timeout: 10000 })
+            .then(({ data }) => setReconhecimento(data.data?.reconhecimento || null))
+            .catch(() => setReconhecimento(null));
     }, []);
 
     useEffect(() => {
@@ -91,6 +97,17 @@ const CamerasEventoBarra = ({ podeEditar = true }) => {
                     control={<Switch id="evento-gravacao" checked={cfg.gravacao_ativa} onChange={(e) => alternarGravacao(e.target.checked)} />}
                     label={<Typography fontWeight={700} fontSize="0.875rem">Gravação do evento</Typography>}
                 />
+                <FormControl size="small" sx={{ minWidth: 280 }} disabled={!podeEditar || salvando || !cfg.motor_ia_ativo}>
+                    <InputLabel id="evento-ia-onde-rotulo">Onde roda o reconhecimento</InputLabel>
+                    <Select labelId="evento-ia-onde-rotulo" id="evento-ia-onde" label="Onde roda o reconhecimento"
+                        value={cfg.ia_onde || 'local'}
+                        onChange={(e) => salvar({ ia_onde: e.target.value }, e.target.value === 'auto'
+                            ? 'Reconhecimento no servidor de IA central (o PC do evento fica de reserva).'
+                            : 'Reconhecimento no PC do evento.')}>
+                        <MenuItem value="local">Neste PC do evento</MenuItem>
+                        <MenuItem value="auto">Servidor de IA central (PC do evento de reserva)</MenuItem>
+                    </Select>
+                </FormControl>
                 {salvando && <CircularProgress size={16} />}
             </Stack>
 
@@ -103,6 +120,17 @@ const CamerasEventoBarra = ({ podeEditar = true }) => {
                         <Chip size="small" variant="outlined" sx={{ fontWeight: 700 }}
                             color={recursos.video_local ? 'success' : 'warning'}
                             label={recursos.video_local ? 'Vídeo sem IA: pronto' : 'Vídeo sem IA: não instalado'} />
+                    </Tooltip>
+                )}
+                {pc?.conectado && cfg.ia_onde === 'auto' && cfg.motor_ia_ativo && (
+                    <Tooltip title={reconhecimento?.modo !== 'auto'
+                        ? 'O PC do evento ainda não recebeu a escolha (agente antigo ou motor reiniciando): rode ligar-ia-facial.bat nele.'
+                        : 'O PC do evento acha os rostos e o servidor de IA central diz quem é. Sem resposta do servidor, o PC do evento reconhece sozinho.'}>
+                        <Chip size="small" variant="outlined" sx={{ fontWeight: 700 }}
+                            color={reconhecimento?.usando_servidor ? 'success' : 'warning'}
+                            label={reconhecimento?.usando_servidor ? 'Reconhecendo no servidor central'
+                                : reconhecimento?.modo === 'auto' ? 'Servidor central indisponível: reserva no PC do evento'
+                                    : 'Servidor central ainda não ativo no PC do evento'} />
                     </Tooltip>
                 )}
                 {pc?.conectado && !recursos.gravacao && (

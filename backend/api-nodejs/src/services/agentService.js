@@ -59,6 +59,29 @@ class AgentService {
                 if (typeof ack === 'function') ack();
                 require('./videoRelay').receber(agentId, msg);
             });
+            // Rostos alinhados para o servidor de IA central (modo "auto" do evento) — ver services/iaCentral.js
+            // Um PC de evento não ocupa o servidor central de todos: no máximo 3 levas ao mesmo tempo, e
+            // só se o evento dele está em "servidor central"
+            let iaEmVoo = 0;
+            socket.on('agent:ia_reconhecer', async (msg, ack) => {
+                if (typeof ack !== 'function') return;
+                const eventoId = socket.agentInfo.evento_id; // sempre o evento do token do agente
+                if (!eventoId || iaEmVoo >= 3) return ack({ indisponivel: true });
+                iaEmVoo++;
+                try {
+                    const cfg = await require('../modules/system/gravacao.service').configEvento(eventoId).catch(() => null);
+                    if (cfg?.ia_onde !== 'auto') return ack({ indisponivel: true, local: true });
+                    ack(await require('./iaCentral').reconhecer(eventoId, msg?.itens));
+                } catch {
+                    ack({ indisponivel: true });
+                } finally {
+                    iaEmVoo--;
+                }
+            });
+            // Há servidor de IA central ligado? (o agente avisa o motor, que só manda rostos se houver)
+            socket.on('agent:ia_servidor_status', (_msg, ack) => {
+                if (typeof ack === 'function') ack({ disponivel: require('./iaCentral').temServidor() });
+            });
             // Vídeo MP4 (retransmissor local, sem IA) — ver services/mp4Relay.js
             socket.on('agent:video_mp4', (msg, ack) => {
                 const r = require('./mp4Relay').receber(agentId, msg);

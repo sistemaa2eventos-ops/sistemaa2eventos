@@ -291,6 +291,8 @@ const handlers = {
         await video.configurarCameras(cameras); // antes de montar a lista do motor (usa o RTSP local)
         if (evento) {
             vigilancia.evento = evento;
+            iaCentral.modo = evento.ia_onde === 'auto' ? 'auto' : 'local';
+            aplicarModoIa();
             gravador.configurar({
                 ativa: evento.gravacao_ativa !== false,
                 limite_gb: evento.gravacao_limite_gb,
@@ -641,6 +643,65 @@ async function sincronizarRostos() {
 }
 setInterval(() => { sincronizarRostos(); }, 60000);
 setTimeout(() => { sincronizarRostos(); }, 8000);
+
+/**
+ * Reconhecimento no SERVIDOR DE IA CENTRAL (evento em "auto"): o motor deste PC acha e acompanha os
+ * rostos e deixa numa fila só o rosto alinhado (~4 KB). Este laço leva a fila à nuvem (canal de
+ * vídeo), que repassa a um servidor de IA, e devolve as respostas ao motor. Sem servidor, o motor
+ * deste PC reconhece sozinho (reserva).
+ */
+const iaCentral = { modo: 'local', avisou: false };
+
+async function aplicarModoIa() {
+    if (motorDesligadoPeloPainel()) return;
+    try {
+        // Disponível = canal de vídeo conectado E a nuvem confirma um servidor de IA ligado
+        let disponivel = false;
+        if (iaCentral.modo === 'auto' && socketVideo.connected) {
+            disponivel = await socketVideo.timeout(3000).emitWithAck('agent:ia_servidor_status', {})
+                .then(r => r?.disponivel === true).catch(() => false);
+        }
+        await postarNoMotor('/api/remoto/estado', { modo: iaCentral.modo, disponivel });
+    } catch { /* motor desligado: reaplica no próximo ciclo */ }
+}
+setInterval(aplicarModoIa, 5000);
+
+/** Uma leva: até 50 rostos do motor → nuvem → respostas ao motor. Devolve quantos levou. */
+async function levarLeva() {
+    const r = await fetchIa('/api/remoto/pendentes?limite=50', { signal: AbortSignal.timeout(2000) });
+    const { itens = [] } = await r.json();
+    if (!itens.length) return 0;
+    let resposta = { indisponivel: true };
+    if (socketVideo.connected) {
+        try {
+            resposta = await socketVideo.timeout(2200).emitWithAck('agent:ia_reconhecer', { itens });
+        } catch { /* nuvem não respondeu a tempo: reserva local */ }
+    }
+    if (resposta?.indisponivel && !iaCentral.avisou) {
+        log('warn', `servidor de IA central indisponível${resposta.carregando ? ' (carregando os cadastrados do evento)' : ''}: reconhecendo neste PC`);
+        iaCentral.avisou = true;
+    } else if (!resposta?.indisponivel) iaCentral.avisou = false;
+    await postarNoMotor('/api/remoto/resultados', { resultados: resposta?.resultados || [], indisponivel: !!resposta?.indisponivel });
+    return itens.length;
+}
+
+// Até 2 levas ao mesmo tempo; com a fila cheia (50), pede a próxima na hora em vez de esperar o ciclo
+let levasEmVoo = 0;
+setInterval(() => {
+    if (levasEmVoo >= 2 || iaCentral.modo !== 'auto' || motorDesligadoPeloPainel()) return;
+    levasEmVoo++;
+    (async () => {
+        try {
+            for (let i = 0; i < 4; i++) {
+                if ((await levarLeva()) < 50) break;
+            }
+        } catch {
+            // motor desligado ou reiniciando
+        } finally {
+            levasEmVoo--;
+        }
+    })();
+}, 250);
 
 // PC religado: aplica a última configuração conhecida até o painel mandar a atual
 {

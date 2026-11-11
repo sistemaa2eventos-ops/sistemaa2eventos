@@ -219,6 +219,7 @@ app.use('/api/lgpd', lgpdRoutes);
 app.use('/api/watchlist', watchlistRoutes);
 app.use('/api/cameras', cameraRoutes);
 app.use('/api/gravacoes', require('./modules/system/gravacao.routes'));
+app.use('/api/ia-servidores', require('./modules/system/iaServidores.routes'));
 app.use('/public', rateLimiter.public, publicRoutes);
 app.use('/api/public', rateLimiter.public, publicRoutes); // FIX I-10: rate limiter dedicado para rotas públicas
 
@@ -270,6 +271,8 @@ server.listen(PORT, async () => {
         await websocketService.init(server);
         const agentService = require('./services/agentService');
         agentService.init(websocketService.io);
+        // Servidores de IA centrais (reconhecimento fora da rede do evento)
+        require('./services/iaCentral').init(websocketService.io);
         // Alertas das câmeras com o painel fechado (agente local ou motor no próprio servidor)
         require('./modules/system/vigilancia.service').iniciar();
         syncScheduler.start();

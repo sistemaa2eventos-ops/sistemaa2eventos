@@ -311,13 +311,16 @@ const AJUDAS = {
             'No cartão, "Gravação": "Não gravar", "Contínua" (blocos de 5 min) ou "Em alertas" (10 s antes a 30 s depois de cada alerta da IA ou acesso negado no leitor da mesma área).',
             'No topo: "Motor de IA do evento" e "Gravação do evento" desligam tudo sem perder as escolhas de cada câmera; "Espaço máximo" e "Guardar por" controlam o que fica no PC.',
             'Aba "Gravações": filtre por câmera, tipo e dia; assista ou baixe.',
-            'Aba "Motor de IA facial": "Verificar compatibilidade e ligar IA neste PC" e o perfil do motor.'
+            'Aba "Motor de IA facial": "Verificar compatibilidade e ligar IA neste PC" e o perfil do motor.',
+            'Servidor de IA central (fora do evento): na aba "Motor de IA facial", quadro "Servidores de IA", o Admin Master cadastra o servidor e copia o token (aparece uma vez). No evento, em "Onde roda o reconhecimento", escolha "Servidor de IA central": o PC do evento acha os rostos e o servidor diz quem é.'
         ],
         atencao: [
             'Vídeo, IA e gravação passam pelo PC do evento (agente local): ele precisa ficar ligado. Rode o ligar-ia-facial.bat nele após cada atualização.',
             'As gravações ficam só no PC do evento (não vão para a nuvem). Se o PC for perdido, elas se perdem junto; para ter prova fora do PC, ligue "Copiar os trechos de alerta para o Google Drive" nas opções avançadas da câmera.',
             'Passou do espaço ou do prazo, as gravações mais antigas são apagadas. Quem assiste ou baixa fica registrado.',
             'LGPD: avise no local, com placas, que há gravação de imagens.',
+            'Com o servidor central, o PC do evento continua precisando do motor ligado: ele acha os rostos e, se o servidor não responder em 2,5 s, reconhece sozinho. O chip "Reconhecendo no servidor central" no topo mostra onde está acontecendo agora.',
+            'Token de servidor de IA vazou ou o PC foi perdido: revogue o servidor no quadro "Servidores de IA". Ele é desconectado na hora.',
             'Catracas e leitores são cadastrados em Leitores e dispositivos.'
         ]
     },

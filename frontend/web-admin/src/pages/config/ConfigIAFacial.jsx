@@ -18,6 +18,7 @@ import GlassCard from '../../components/common/GlassCard';
 import NeonButton from '../../components/common/NeonButton';
 import { carregarIaConfig, definirIaConfig, useIaConfig, useIaStatus, statusDaCamera, NOMES_PERFIL } from '../../hooks/useIaConfig';
 import { MODOS_IA, modoIaDe, camposDoModoIa } from '../../components/cameras/opcoesCamera';
+import ServidoresIaPainel from '../../components/cameras/ServidoresIaPainel';
 
 // Mesma tabela do motor (backend/microservice-face-python/src/main.py → PERFIS e COMUNS)
 const PERFIS_IA = {
@@ -501,6 +502,9 @@ const ConfigIAFacial = ({ embutido = false }) => {
                     breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'IA facial e câmeras' }]}
                 />
             )}
+
+            {/* Servidores de IA centrais (fora da rede do evento) — só Admin Master vê */}
+            <ServidoresIaPainel />
 
             {avisos.map((a, i) => (
                 <Alert

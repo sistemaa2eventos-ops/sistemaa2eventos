@@ -572,7 +572,7 @@ def derivar_substream(url: str) -> Optional[str]:
 
 class Rastro:
     """Um rosto acompanhado entre análises (mesma pessoa andando na frente da câmera)."""
-    __slots__ = ("id", "box", "visto", "ultimo_rec", "votos", "pessoa", "sim", "qualidade", "crop_b64", "melhor_nitidez")
+    __slots__ = ("id", "box", "visto", "ultimo_rec", "votos", "pessoa", "sim", "qualidade", "crop_b64", "melhor_nitidez", "aguardando")
 
     def __init__(self, tid: int, box):
         self.id, self.box, self.visto = tid, box, time.time()
@@ -583,6 +583,7 @@ class Rastro:
         self.qualidade = "optimal"
         self.crop_b64: Optional[str] = None
         self.melhor_nitidez = 0.0
+        self.aguardando = 0.0  # instante do pedido ao servidor central ainda sem resposta (0 = nenhum)
 
 
 def _iou(a, b) -> float:
@@ -651,6 +652,7 @@ class Camera:
         self.ia_ms = 0.0
         self.fonte_ia = ""
         self._ultima_deteccao: Dict[str, float] = {}
+        self.remotos: deque = deque(maxlen=200)  # respostas do servidor central para esta câmera
 
     def url_sub(self) -> Optional[str]:
         if not self.usar_sub or self.sub_ruim:
@@ -1026,9 +1028,101 @@ THREADS_ESSENCIAIS["zelador"].start()
 # ==========================================================
 estatisticas = {"analises": 0, "ia_ms": 0.0, "fila": 0, "ocupacao": 0.0}
 
+# ----------------------------------------------------------------------------------------------
+# RECONHECIMENTO NO SERVIDOR CENTRAL (modo "auto"): este PC acha e acompanha os rostos; o rosto
+# alinhado (112x112, ~4 KB) vai ao servidor de IA (pelo agente → nuvem) e a resposta volta para cá.
+# Sem resposta em PRAZO_REMOTO_S, este PC reconhece sozinho por RESERVA_S (motor local de reserva).
+# ----------------------------------------------------------------------------------------------
+import uuid as _uuid
+
+PRAZO_REMOTO_S = 2.5
+RESERVA_S = 30.0
+AVISO_AGENTE_S = 15.0  # agente avisa a cada 5 s; sem aviso há 15 s, o servidor central não conta
+remoto: Dict[str, Any] = {
+    "modo": "local",          # local · auto (definido pelo painel, via agente)
+    "disponivel": False,      # agente diz se há servidor central respondendo
+    "aviso_ts": 0.0,          # último aviso do agente
+    "reserva_ate": 0.0,       # até quando reconhecer aqui (servidor não respondeu)
+    "enviados": 0, "respondidos": 0, "expirados": 0,
+}
+remoto_lock = threading.Lock()
+fila_remota: deque = deque(maxlen=1000)          # {id, img} aguardando o agente levar
+pendentes_remotos: Dict[str, Dict[str, Any]] = {}  # id → {cam, track, nit, crop, ts}
+
+
+def usar_remoto() -> bool:
+    agora = time.time()
+    return (remoto["modo"] == "auto" and remoto["disponivel"] and agora - remoto["aviso_ts"] <= AVISO_AGENTE_S
+            and agora >= remoto["reserva_ate"])
+
+
+def entrar_em_reserva(motivo: str):
+    if time.time() >= remoto["reserva_ate"]:
+        logger.warning(f"🛟 Servidor de IA sem resposta ({motivo}): reconhecendo neste PC por {int(RESERVA_S)} s")
+    remoto["reserva_ate"] = time.time() + RESERVA_S
+
+
+def _expirar_pendentes():
+    agora = time.time()
+    with remoto_lock:
+        velhos = [k for k, p in pendentes_remotos.items() if agora - p["ts"] > PRAZO_REMOTO_S]
+        for k in velhos:
+            pendentes_remotos.pop(k, None)
+        remoto["expirados"] += len(velhos)
+    if velhos and remoto["modo"] == "auto":
+        entrar_em_reserva(f"{len(velhos)} rosto(s) sem resposta em {PRAZO_REMOTO_S} s")
+
+
+def aplicar_reconhecimento(r: "Rastro", p: Optional[str], s1: float, aceito: bool, nit: float, recorte_b64) -> bool:
+    """Votação/confirmação de um rastro (mesma regra para reconhecimento local e no servidor).
+    recorte_b64: str já pronto ou função que o gera (só chamada se precisar). True se confirmou."""
+    r.votos.append(p)
+    forte = aceito and s1 >= CFG["limiar"] + 0.08
+    confirmado = aceito and (forte or sum(1 for v in r.votos if v == p) >= CFG["confirmacoes"])
+    if confirmado and p is not None:
+        if r.pessoa != p:
+            r.crop_b64 = None
+            r.melhor_nitidez = 0.0
+        r.pessoa, r.sim = p, s1
+        if nit > r.melhor_nitidez or r.crop_b64 is None:
+            r.melhor_nitidez = nit
+            c = recorte_b64() if callable(recorte_b64) else recorte_b64
+            if c:
+                r.crop_b64 = c
+        return True
+    if r.pessoa is not None and len(r.votos) == r.votos.maxlen and r.pessoa not in r.votos:
+        r.pessoa = None  # três leituras seguidas sem ela: não era ela
+        r.crop_b64 = None
+    return False
+
+
+def _jpeg_b64(img: np.ndarray, qualidade: int) -> Optional[str]:
+    if img is None or not img.size:
+        return None
+    ok, buf = cv2.imencode('.jpg', img, [cv2.IMWRITE_JPEG_QUALITY, qualidade])
+    return base64.b64encode(buf).decode('utf-8') if ok else None
+
+
+def _aplicar_remotos(cam: "Camera"):
+    """Respostas do servidor central que chegaram para esta câmera (aplicadas na thread da IA)."""
+    idx = indice
+    while cam.remotos:
+        res = cam.remotos.popleft()
+        r = cam.rastreador.rastros.get(res["track"])
+        if r is None:
+            continue  # a pessoa já saiu da cena
+        r.aguardando = 0.0
+        pid = res.get("pessoa_id")
+        s1, s2 = float(res.get("s1") or 0.0), float(res.get("s2") or 0.0)
+        # A pessoa precisa existir no índice deste PC (nome, bloqueio): ele é a reserva e a fonte dos dados
+        conhecido = pid is not None and pid in idx.pos_por_id
+        aceito = conhecido and s1 >= CFG["limiar"] and (s1 - s2 >= CFG["margem"])
+        aplicar_reconhecimento(r, pid if aceito else None, s1, aceito, res["nit"], res["crop"])
+
 
 def analisar(cam: Camera, frame: np.ndarray, src: Leitor):
     h, w = frame.shape[:2]
+    _aplicar_remotos(cam)
     faces = detectar(frame, CFG["det_size"])
     boxes = [f[0] for f in faces]
     rastros = cam.rastreador.atualizar(boxes)
@@ -1057,36 +1151,41 @@ def analisar(cam: Camera, frame: np.ndarray, src: Leitor):
                 para_rec.append((r, alinhado, nit, bbox))
         avaliados.append((bbox, score, r))
 
-    if para_rec:
+    def recorte_da_caixa(bbox):
+        x1, y1, x2, y2 = [int(v) for v in bbox]
+        return lambda: _jpeg_b64(frame[max(0, y1):min(h, y2), max(0, x1):min(w, x2)], 85)
+
+    if para_rec and usar_remoto():
+        # Servidor central reconhece: vai só o rosto alinhado; a resposta é aplicada na próxima análise
+        enviados = 0
+        with remoto_lock:
+            for r, alinhado, nit, bbox in para_rec:
+                # Um pedido por vez por pessoa: sem isso, cada rosto gerava 2 ou 3 pedidos durante a ida e volta
+                if r.aguardando and agora - r.aguardando < PRAZO_REMOTO_S:
+                    continue
+                img = _jpeg_b64(alinhado, 90)
+                if not img:
+                    continue
+                rid = _uuid.uuid4().hex
+                pendentes_remotos[rid] = {"cam": cam, "track": r.id, "nit": nit,
+                                          "crop": recorte_da_caixa(bbox)(), "ts": agora}
+                fila_remota.append({"id": rid, "img": img})
+                r.ultimo_rec = agora
+                r.aguardando = agora
+                enviados += 1
+            remoto["enviados"] += enviados
+    elif para_rec:
         feats = embeddings([a for _, a, _, _ in para_rec])
         for (r, alinhado, nit, bbox), emb in zip(para_rec, feats):
             r.ultimo_rec = agora
             pos, s1, s2, do_cadastro = idx.buscar(emb)
             aceito = pos >= 0 and s1 >= CFG["limiar"] and (s1 - s2 >= CFG["margem"])
             p = idx.pessoas[pos]["id"] if aceito else None
-            r.votos.append(p)
-            forte = aceito and s1 >= CFG["limiar"] + 0.08
-            confirmado = aceito and (forte or sum(1 for v in r.votos if v == p) >= CFG["confirmacoes"])
-            if confirmado and p is not None:
-                if r.pessoa != p:
-                    r.crop_b64 = None
-                    r.melhor_nitidez = 0.0
-                r.pessoa, r.sim = p, s1
-                if nit > r.melhor_nitidez or r.crop_b64 is None:
-                    r.melhor_nitidez = nit
-                    x1, y1, x2, y2 = [int(v) for v in bbox]
-                    recorte = frame[max(0, y1):min(h, y2), max(0, x1):min(w, x2)]
-                    if recorte.size:
-                        ok, buf = cv2.imencode('.jpg', recorte, [cv2.IMWRITE_JPEG_QUALITY, 85])
-                        if ok:
-                            r.crop_b64 = base64.b64encode(buf).decode('utf-8')
-                # Só aprende com folga, casando com o vetor do cadastro e já visto 2x (um erro aprendido erra para sempre)
-                if (CFG["aprender"] and do_cadastro and s1 >= CFG["limiar"] + 0.10 and s1 - s2 >= CFG["margem"] + 0.04
-                        and sum(1 for v in r.votos if v == p) >= 2):
-                    aprender_vetor(p, emb)
-            elif r.pessoa is not None and len(r.votos) == r.votos.maxlen and r.pessoa not in r.votos:
-                r.pessoa = None  # três leituras seguidas sem ela: não era ela
-                r.crop_b64 = None
+            confirmado = aplicar_reconhecimento(r, p, s1, aceito, nit, recorte_da_caixa(bbox))
+            # Só aprende com folga, casando com o vetor do cadastro e já visto 2x (um erro aprendido erra para sempre)
+            if (confirmado and CFG["aprender"] and do_cadastro and s1 >= CFG["limiar"] + 0.10
+                    and s1 - s2 >= CFG["margem"] + 0.04 and sum(1 for v in r.votos if v == p) >= 2):
+                aprender_vetor(p, emb)
 
     resultados = []
     for bbox, score, r in avaliados:
@@ -1117,9 +1216,13 @@ def analisar(cam: Camera, frame: np.ndarray, src: Leitor):
 def _escalonador():
     """Uma só thread de IA para todas as câmeras: escolhe a mais atrasada (pesando a prioridade) e
     respeita o teto global de análises/s. Antes eram 2 threads por câmera disputando o mesmo modelo."""
+    ultima_expiracao = 0.0
     while True:
         try:
             agora = time.time()
+            if pendentes_remotos and agora - ultima_expiracao > 0.5:
+                ultima_expiracao = agora
+                _expirar_pendentes()
             escolhida, melhor, devidas = None, 0.0, 0
             for cam in list(cameras.values()):
                 iv = cam.intervalo_ia(agora)
@@ -1541,6 +1644,11 @@ def get_engine_status():
         "cameras_em_uso": sum(1 for lt in list(leitores.values()) if lt.rodando),
         "cameras": lista,
         "registered_faces_indexed": len(indice.pessoas),
+        "reconhecimento": {
+            "modo": remoto["modo"], "servidor_disponivel": remoto["disponivel"], "usando_servidor": usar_remoto(),
+            "em_reserva": remoto["modo"] == "auto" and time.time() < remoto["reserva_ate"],
+            "enviados": remoto["enviados"], "respondidos": remoto["respondidos"], "expirados": remoto["expirados"],
+        },
         "faiss_total_vectors": indice.index.ntotal,
         "vetores_aprendidos": sum(len(v) for v in aprendidos.values()),
         "ultima_carga_rostos": {"ha_s": int(agora - ultima_carga["ts"]) if ultima_carga["ts"] else None,
@@ -1622,6 +1730,169 @@ def verificar_rosto(req: VerificarRequest):
     sim = float(np.dot(emb, cad))
     return {"success": True, "rosto": True, "similaridade": round(sim, 4), "det_score": round(score, 3),
             "limiar": CFG["limiar"], "confere": sim >= CFG["limiar"]}
+
+
+class RemotoEstado(BaseModel):
+    modo: Optional[str] = None          # local · auto
+    disponivel: Optional[bool] = None   # há servidor central respondendo?
+
+
+@app.post("/api/remoto/estado")
+def remoto_estado(req: RemotoEstado):
+    """Agente informa o modo do evento e se o servidor central está respondendo."""
+    if req.modo in ("local", "auto"):
+        if req.modo != remoto["modo"]:
+            logger.info(f"🧠 Reconhecimento: {'servidor central (reserva neste PC)' if req.modo == 'auto' else 'neste PC'}")
+        remoto["modo"] = req.modo
+    if req.disponivel is not None:
+        remoto["disponivel"] = bool(req.disponivel)
+    remoto["aviso_ts"] = time.time()
+    return {"success": True, "modo": remoto["modo"], "usando_servidor": usar_remoto()}
+
+
+@app.get("/api/remoto/pendentes")
+def remoto_pendentes(limite: int = 30):
+    """Rostos alinhados esperando o servidor central (o agente leva). Some da fila ao ser lido."""
+    _expirar_pendentes()
+    itens = []
+    teto = max(1, min(limite, 50))
+    with remoto_lock:
+        while fila_remota and len(itens) < teto:
+            it = fila_remota.popleft()
+            if it["id"] in pendentes_remotos:  # já expirou: não manda
+                itens.append(it)
+    return {"itens": itens}
+
+
+class RemotoResultados(BaseModel):
+    resultados: List[Dict[str, Any]] = []   # [{id, pessoa_id|null, s1, s2}]
+    indisponivel: bool = False               # nenhum servidor central respondeu
+
+
+@app.post("/api/remoto/resultados")
+def remoto_resultados(req: RemotoResultados):
+    if req.indisponivel:
+        entrar_em_reserva("nuvem sem servidor de IA disponível")
+    aplicados = 0
+    with remoto_lock:
+        for res in req.resultados:
+            pend = pendentes_remotos.pop(str(res.get("id")), None)
+            if pend is None:
+                continue  # chegou tarde (expirou)
+            pend["cam"].remotos.append({"track": pend["track"], "nit": pend["nit"], "crop": pend["crop"],
+                                        "pessoa_id": res.get("pessoa_id"), "s1": res.get("s1"), "s2": res.get("s2")})
+            aplicados += 1
+        remoto["respondidos"] += aplicados
+    return {"success": True, "aplicados": aplicados}
+
+
+# ----------------------------------------------------------------------------------------------
+# MODO SERVIDOR CENTRAL: este motor reconhece rostos alinhados enviados pelos PCs dos eventos.
+# Um índice POR EVENTO, só na memória (nada de biometria em disco neste PC); o programa do servidor
+# (backend/ia-servidor) carrega e descarrega os eventos conforme a nuvem distribui o trabalho.
+# ----------------------------------------------------------------------------------------------
+centrais: Dict[str, Dict[str, Any]] = {}   # evento_id → {"base": {pid: registro}, "indice": Indice, "uso": ts}
+centrais_lock = threading.Lock()
+
+
+def _central(evento_id: str, criar: bool = False) -> Optional[Dict[str, Any]]:
+    with centrais_lock:
+        c = centrais.get(evento_id)
+        if c is None and criar:
+            c = centrais[evento_id] = {"base": {}, "indice": Indice([], [], {}), "uso": time.time(), "lock": threading.Lock()}
+        return c
+
+
+class CentralRostos(BaseModel):
+    evento_id: str
+    pessoas: List[Dict[str, Any]] = []
+    completo: bool = False
+    ids: Optional[List[str]] = None
+    remover: List[str] = []
+
+
+@app.post("/api/central/rostos")
+def central_rostos(req: CentralRostos):
+    c = _central(req.evento_id, criar=True)
+    # Uma carga por vez por evento (manutenção e recarga podem chegar juntas)
+    with c["lock"]:
+        base = c["base"]
+        for p in req.pessoas:
+            r = _pessoa_da_linha(p)
+            if r:
+                base[r["id"]] = r
+            elif p.get("id"):
+                base.pop(str(p["id"]), None)
+        for pid in req.remover:
+            base.pop(str(pid), None)
+        if req.completo and req.ids is not None:
+            validos = {str(i) for i in req.ids}
+            for pid in [k for k in base if k not in validos]:
+                del base[pid]
+        registros = list(base.values())
+        c["indice"] = Indice([{k: v for k, v in r.items() if k != "vec"} for r in registros], [r["vec"] for r in registros], {})
+        c["uso"] = time.time()
+        faltando = [] if req.ids is None else [i for i in req.ids if str(i) not in base]
+        total = len(base)
+    return {"success": True, "total": total, "faltando": faltando[:2000]}
+
+
+class CentralReconhecer(BaseModel):
+    evento_id: str
+    itens: List[Dict[str, Any]] = []   # [{id, img: JPEG base64 do rosto alinhado 112x112}]
+
+
+@app.post("/api/central/reconhecer")
+def central_reconhecer(req: CentralReconhecer):
+    c = _central(req.evento_id)
+    if c is None:
+        return {"success": False, "carregado": False}
+    c["uso"] = time.time()
+    validos, ids = [], []
+    for it in req.itens[:50]:
+        try:
+            img = cv2.imdecode(np.frombuffer(base64.b64decode(str(it.get("img", ""))[:200000]), np.uint8), cv2.IMREAD_COLOR)
+        except Exception:
+            img = None
+        if img is None:
+            continue
+        if img.shape[:2] != (112, 112):
+            img = cv2.resize(img, (112, 112))
+        validos.append(img)
+        ids.append(str(it.get("id")))
+    resultados = []
+    if validos:
+        t0 = time.time()
+        feats = embeddings(validos)
+        idx = c["indice"]
+        for rid, emb in zip(ids, feats):
+            pos, s1, s2, _ = idx.buscar(emb)
+            resultados.append({"id": rid, "pessoa_id": idx.pessoas[pos]["id"] if pos >= 0 else None,
+                               "s1": round(float(s1), 4), "s2": round(float(s2), 4)})
+        estatisticas["central_ms"] = round((time.time() - t0) * 1000, 1)
+        estatisticas["central_rostos"] = estatisticas.get("central_rostos", 0) + len(validos)
+    return {"success": True, "carregado": True, "resultados": resultados}
+
+
+class CentralEvento(BaseModel):
+    evento_id: str
+
+
+@app.post("/api/central/descarregar")
+def central_descarregar(req: CentralEvento):
+    with centrais_lock:
+        removido = centrais.pop(req.evento_id, None) is not None
+    return {"success": True, "removido": removido}
+
+
+@app.get("/api/central/status")
+def central_status():
+    with centrais_lock:
+        eventos = {ev: {"pessoas": len(c["base"]), "parado_s": int(time.time() - c["uso"])} for ev, c in centrais.items()}
+    hw = "GPU (DirectML)" if "DmlExecutionProvider" in active_providers else (
+        "GPU (CUDA)" if "CUDAExecutionProvider" in active_providers else "CPU")
+    return {"hardware": hw, "eventos": eventos, "rostos_reconhecidos": estatisticas.get("central_rostos", 0),
+            "ms_ultimo_lote": estatisticas.get("central_ms")}
 
 
 @app.get("/api/pc-compatibilidade")
