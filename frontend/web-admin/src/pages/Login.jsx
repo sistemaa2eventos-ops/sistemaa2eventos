@@ -21,6 +21,7 @@ import {
 import { useAuth, getDefaultRoute } from '../contexts/AuthContext';
 import { authService } from '../services/auth';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { styled } from '@mui/material/styles';
 import NeonButton from '../components/common/NeonButton';
 import nztEmblem from '../assets/images/nzt-emblem.png';
@@ -121,6 +122,7 @@ const inputSx = {
 };
 
 const Login = () => {
+    const { t } = useTranslation();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -246,7 +248,7 @@ const Login = () => {
                             mb: 3.5
                         }}
                     >
-                        {isForgotMode ? 'Recuperação de acesso' : 'Intelligent Control Systems'}
+                        {isForgotMode ? t('login.recovery_subtitle', { defaultValue: 'Recuperação de acesso' }) : t('login.subtitle', { defaultValue: 'Intelligent Control Systems' })}
                     </Typography>
 
                     {error && (
@@ -281,15 +283,14 @@ const Login = () => {
 
                     {isForgotMode && !forgotSuccess && (
                         <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1, textAlign: 'left' }}>
-                            A senha dos operadores é redefinida pelo administrador do painel. Informe seu e-mail:
-                            ele recebe o pedido e depois te passa a nova senha.
+                            {t('login.forgot_notice', { defaultValue: 'A senha dos operadores é redefinida pelo administrador do painel. Informe seu e-mail: ele recebe o pedido e depois te passa a nova senha.' })}
                         </Typography>
                     )}
 
                     <form onSubmit={isForgotMode ? handleForgotSubmit : handleLoginSubmit}>
                         <TextField
                             fullWidth
-                            label="E-mail"
+                            label={t('login.email', { defaultValue: 'E-mail' })}
                             variant="outlined"
                             autoComplete="username email"
                             value={email}
@@ -310,7 +311,7 @@ const Login = () => {
                           <>
                             <TextField
                                 fullWidth
-                                label="Senha"
+                                label={t('login.password', { defaultValue: 'Senha' })}
                                 type={showPassword ? 'text' : 'password'}
                                 variant="outlined"
                                 autoComplete="current-password"
@@ -344,7 +345,7 @@ const Login = () => {
                                             sx={{ color: 'rgba(0, 212, 255, 0.4)', '&.Mui-checked': { color: '#00D4FF' } }}
                                         />
                                     }
-                                    label={<Typography variant="body2" sx={{ color: 'text.secondary' }}>Lembrar de mim</Typography>}
+                                    label={<Typography variant="body2" sx={{ color: 'text.secondary' }}>{t('login.remember_me', { defaultValue: 'Lembrar de mim' })}</Typography>}
                                 />
                             </Box>
                           </>
@@ -360,10 +361,10 @@ const Login = () => {
                                 {loading ? (
                                     <>
                                         <CircularProgress size={20} color="inherit" sx={{ mr: 1.5 }} />
-                                        {isForgotMode ? 'Enviando...' : 'Entrando...'}
+                                        {isForgotMode ? t('login.sending', { defaultValue: 'Enviando...' }) : t('login.signing_in', { defaultValue: 'Entrando...' })}
                                     </>
                                 ) : (
-                                    isForgotMode ? 'Pedir nova senha ao administrador' : 'Entrar'
+                                    isForgotMode ? t('login.request_new_password', { defaultValue: 'Pedir nova senha ao administrador' }) : t('login.sign_in', { defaultValue: 'Entrar' })
                                 )}
                             </NeonButton>
                         </Box>
@@ -377,7 +378,7 @@ const Login = () => {
                                     onClick={() => { setIsForgotMode(false); setError(null); setForgotSuccess(''); }} 
                                     sx={{ color: '#00D4FF', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
                                 >
-                                    Voltar ao login
+                                    {t('login.back_to_login', { defaultValue: 'Voltar ao login' })}
                                 </Link>
                             ) : (
                                 <Link 
@@ -387,7 +388,7 @@ const Login = () => {
                                     onClick={() => { setIsForgotMode(true); setError(null); setForgotSuccess(''); }} 
                                     sx={{ color: '#00D4FF', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
                                 >
-                                    Esqueci minha senha
+                                    {t('login.forgot_password', { defaultValue: 'Esqueci minha senha' })}
                                 </Link>
                             )}
                         </Box>
@@ -397,7 +398,7 @@ const Login = () => {
                             display="block"
                             sx={{ mt: 4, color: '#64748B', fontWeight: 500, letterSpacing: '0.5px' }}
                         >
-                            &copy; 2026 NZT Intelligent Control Systems &bull; Desenvolvido por A2
+                            {t('login.footer', { defaultValue: '© 2026 NZT Intelligent Control Systems • Desenvolvido por A2' })}
                         </Typography>
                     </form>
                 </GlassBox>

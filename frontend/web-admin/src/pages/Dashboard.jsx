@@ -24,6 +24,7 @@ import AlertasOperacaoCard from '../components/dashboard/AlertasOperacaoCard';
 import NeonButton from '../components/common/NeonButton';
 import { useDashboard } from '../hooks/useDashboard';
 import { useConfirmacao } from '../contexts/ConfirmacaoContext';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Dashboard: Painel Central de Controle Operacional & Telemetria A2 Eventos.
@@ -36,6 +37,7 @@ import { useConfirmacao } from '../contexts/ConfirmacaoContext';
  * 5. Base: Últimos participantes cadastrados.
  */
 const Dashboard = () => {
+    const { t } = useTranslation();
     const confirmar = useConfirmacao();
     const navigate = useNavigate();
     const {
@@ -45,9 +47,9 @@ const Dashboard = () => {
 
     const confirmDailyReset = async () => {
         const ok = await confirmar({
-            titulo: 'Reset diário',
-            mensagem: 'Quem não estiver no evento passa a "ausente" e começa um novo dia de operação. Continuar?',
-            textoConfirmar: 'Fazer reset'
+            titulo: t('dashboard.reset_confirm_title', { defaultValue: 'Reset diário' }),
+            mensagem: t('dashboard.reset_confirm_msg', { defaultValue: 'Quem não estiver no evento passa a "ausente" e começa um novo dia de operação. Continuar?' }),
+            textoConfirmar: t('dashboard.reset_confirm_btn', { defaultValue: 'Fazer reset' })
         });
         if (ok) handleDailyReset();
     };
@@ -56,9 +58,15 @@ const Dashboard = () => {
         return (
             <Box sx={{ p: { xs: 2, md: 3 }, textAlign: 'center', mt: 10 }}>
                 <EventIcon sx={{ fontSize: 60, opacity: 0.2, mb: 2 }} />
-                <Typography variant="h5" fontWeight={700}>Nenhum evento ativo selecionado</Typography>
-                <Typography variant="body2" sx={{ mb: 3 }} color="text.secondary">Selecione um Evento no menu lateral para visualizar a telemetria.</Typography>
-                <NeonButton onClick={() => navigate('/eventos')}>Ir para eventos</NeonButton>
+                <Typography variant="h5" fontWeight={700}>
+                    {t('dashboard.no_active_event', { defaultValue: 'Nenhum evento ativo selecionado' })}
+                </Typography>
+                <Typography variant="body2" sx={{ mb: 3 }} color="text.secondary">
+                    {t('dashboard.no_active_event_sub', { defaultValue: 'Selecione um Evento no menu lateral para visualizar a telemetria.' })}
+                </Typography>
+                <NeonButton onClick={() => navigate('/eventos')}>
+                    {t('dashboard.go_to_events', { defaultValue: 'Ir para eventos' })}
+                </NeonButton>
             </Box>
         );
     }
@@ -83,8 +91,8 @@ const Dashboard = () => {
                 mb: { xs: 2, sm: 2.5, md: 3 }
             }}>
                 <PageHeader 
-                    title="Painel operacional" 
-                    subtitle="Monitoramento em tempo real de ocupação, participantes, empresas e equipamentos do evento." 
+                    title={t('dashboard.title', { defaultValue: 'Painel operacional' })} 
+                    subtitle={t('dashboard.subtitle', { defaultValue: 'Monitoramento em tempo real de ocupação, participantes, empresas e equipamentos do evento.' })} 
                     sx={{ mb: 0 }}
                 />
 
@@ -101,7 +109,7 @@ const Dashboard = () => {
                     {/* Leitores Online */}
                     <Chip 
                         icon={<DevicesIcon sx={{ fontSize: 16, color: '#00FF88 !important' }} />}
-                        label={`${stats.dispositivos_online || 0} ${(stats.dispositivos_online || 0) === 1 ? 'leitor online' : 'leitores online'}`} 
+                        label={`${stats.dispositivos_online || 0} ${(stats.dispositivos_online || 0) === 1 ? t('dashboard.reader_online', { defaultValue: 'leitor online' }) : t('dashboard.readers_online', { defaultValue: 'leitores online' })}`} 
                         sx={{
                             fontFamily: '"Inter", sans-serif',
                             fontWeight: 700,
@@ -121,13 +129,13 @@ const Dashboard = () => {
                         disabled={resetting}
                         neonColor={funcao.alerta}
                     >
-                        {resetting ? 'Zerando o dia...' : 'Reset diário'}
+                        {resetting ? t('dashboard.resetting_day', { defaultValue: 'Zerando o dia...' }) : t('dashboard.daily_reset', { defaultValue: 'Reset diário' })}
                     </NeonButton>
 
                     {/* Refresh */}
                     <IconButton
                         onClick={refresh}
-                        title="Atualizar dados"
+                        title={t('dashboard.refresh_data', { defaultValue: 'Atualizar dados' })}
                         sx={{
                             color: '#00D4FF',
                             bgcolor: 'rgba(0, 212, 255, 0.08)',
@@ -156,36 +164,36 @@ const Dashboard = () => {
             <Grid container spacing={2} sx={{ mb: 3 }}>
                 <Grid item xs={6} sm={4} md={2.4}>
                     <KpiCard
-                        titulo="Presentes agora"
+                        titulo={t('dashboard.present_now', { defaultValue: 'Presentes agora' })}
                         valor={stats.presentes || 0}
                         icone={<GroupsIcon />}
                         cor={cores.primaria}
                         progresso={stats.capacidade ? ((stats.presentes || 0) / stats.capacidade) * 100 : undefined}
-                        rodape={stats.capacidade ? `${Math.round(((stats.presentes || 0) / stats.capacidade) * 100)}% de ${stats.capacidade}` : 'Capacidade não definida'}
+                        rodape={stats.capacidade ? `${Math.round(((stats.presentes || 0) / stats.capacidade) * 100)}% de ${stats.capacidade}` : t('dashboard.capacity_undefined', { defaultValue: 'Capacidade não definida' })}
                     />
                 </Grid>
                 <Grid item xs={6} sm={4} md={2.4}>
-                    <KpiCard titulo="Entradas hoje" valor={stats.checkins_hoje || 0} icone={<LoginIcon />} cor={cores.sucesso} />
+                    <KpiCard titulo={t('dashboard.entries_today', { defaultValue: 'Entradas hoje' })} valor={stats.checkins_hoje || 0} icone={<LoginIcon />} cor={cores.sucesso} />
                 </Grid>
                 <Grid item xs={6} sm={4} md={2.4}>
-                    <KpiCard titulo="Saídas hoje" valor={stats.checkouts_hoje || 0} icone={<LogoutIcon />} cor={cores.saida} />
+                    <KpiCard titulo={t('dashboard.exits_today', { defaultValue: 'Saídas hoje' })} valor={stats.checkouts_hoje || 0} icone={<LogoutIcon />} cor={cores.saida} />
                 </Grid>
                 <Grid item xs={6} sm={6} md={2.4}>
-                    <KpiCard titulo="Negados hoje" valor={stats.negados_hoje || 0} icone={<BlockIcon />} cor={cores.erro} />
+                    <KpiCard titulo={t('dashboard.negados_today', { defaultValue: 'Negados hoje' })} valor={stats.negados_hoje || 0} icone={<BlockIcon />} cor={cores.erro} />
                 </Grid>
                 <Grid item xs={12} sm={6} md={2.4}>
-                    <KpiCard titulo="Fiscalizações hoje" valor={stats.fiscalizacoes_hoje || 0} icone={<SecurityIcon />} cor={cores.secundariaClara} />
+                    <KpiCard titulo={t('dashboard.inspections_today', { defaultValue: 'Fiscalizações hoje' })} valor={stats.fiscalizacoes_hoje || 0} icone={<SecurityIcon />} cor={cores.secundariaClara} />
                 </Grid>
                 <Grid item xs={12} sm={6}>
                     <KpiCard
-                        titulo="Empresas credenciadas"
+                        titulo={t('dashboard.accredited_companies', { defaultValue: 'Empresas credenciadas' })}
                         valor={stats.total_empresas || 0}
                         icone={<BusinessIcon />}
-                        rodape={`${empresasMetricas.length} ativas no evento`}
+                        rodape={`${empresasMetricas.length} ${t('dashboard.active_in_event', { defaultValue: 'ativas no evento' })}`}
                     />
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                    <KpiCard titulo="Participantes cadastrados" valor={stats.total_pessoas || 0} icone={<PeopleIcon />} />
+                    <KpiCard titulo={t('dashboard.registered_participants', { defaultValue: 'Participantes cadastrados' })} valor={stats.total_pessoas || 0} icone={<PeopleIcon />} />
                 </Grid>
             </Grid>
 
@@ -226,10 +234,10 @@ const Dashboard = () => {
                                     color: '#FFFFFF',
                                     fontFamily: '"Space Grotesk", sans-serif'
                                 }}>
-                                    Últimos participantes cadastrados
+                                    {t('dashboard.recent_participants', { defaultValue: 'Últimos participantes cadastrados' })}
                                 </Typography>
                                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
-                                    Conferência imediata dos colaboradores recém-adicionados com foto e empresa
+                                    {t('dashboard.recent_participants_sub', { defaultValue: 'Conferência imediata dos colaboradores recém-adicionados com foto e empresa' })}
                                 </Typography>
                             </Box>
                         </Box>

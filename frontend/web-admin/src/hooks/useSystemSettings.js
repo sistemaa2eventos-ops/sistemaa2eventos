@@ -1,10 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSnackbar } from 'notistack';
 import api from '../services/api';
+import i18n from '../config/i18n';
 
-export const useSystemSettings = () => {
-    const { enqueueSnackbar } = useSnackbar();
-    const [settings, setSettings] = useState({
+const CONFIG_INICIAL = {
         system_name: 'NZT Eventos',
         logo_url: '',
         theme_neon_enabled: true,
@@ -63,7 +62,13 @@ export const useSystemSettings = () => {
         config: {
             api_keys: []
         }
-    });
+};
+
+export const useSystemSettings = () => {
+    const { enqueueSnackbar } = useSnackbar();
+    const [settings, setSettings] = useState(CONFIG_INICIAL);
+    // Última versão que o servidor confirmou: só o que difere dela é enviado ao salvar
+    const ultimoSalvo = useRef(CONFIG_INICIAL);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
@@ -72,10 +77,21 @@ export const useSystemSettings = () => {
             setLoading(true);
             const response = await api.get('/settings');
             if (response.data.success) {
+                const data = response.data.data || {};
+                ultimoSalvo.current = { ...CONFIG_INICIAL, ...data };
                 setSettings(prev => ({
                     ...prev,
-                    ...response.data.data
+                    ...data
                 }));
+
+                // Se o navegador ainda não tem preferência local salva, adota o idioma do servidor
+                const serverLang = data.language;
+                if (serverLang && !localStorage.getItem('i18nextLng')) {
+                    const norm = serverLang.startsWith('en') ? 'en' :
+                                 serverLang.startsWith('es') ? 'es' :
+                                 serverLang.startsWith('de') ? 'de' : 'pt-BR';
+                    i18n.changeLanguage(norm);
+                }
             }
         } catch (error) {
             enqueueSnackbar('Erro ao carregar configurações do sistema.', { variant: 'error' });
@@ -91,11 +107,25 @@ export const useSystemSettings = () => {
     const handleSave = async (newSettings = null) => {
         try {
             setSaving(true);
-            const payload = newSettings || settings;
+            let payload = newSettings;
+            if (!payload) {
+                // Só o que esta tela alterou: salvar o objeto inteiro desfazia mudanças feitas em outras telas
+                payload = {};
+                for (const chave of Object.keys(settings)) {
+                    if (JSON.stringify(settings[chave]) !== JSON.stringify(ultimoSalvo.current[chave])) {
+                        payload[chave] = settings[chave];
+                    }
+                }
+                if (Object.keys(payload).length === 0) {
+                    enqueueSnackbar('Nada foi alterado.', { variant: 'info' });
+                    return true;
+                }
+            }
             const response = await api.put('/settings', payload);
             if (response.data.success) {
                 enqueueSnackbar('Configurações atualizadas com sucesso!', { variant: 'success' });
-                setSettings(response.data.data);
+                ultimoSalvo.current = { ...CONFIG_INICIAL, ...response.data.data };
+                setSettings(prev => ({ ...prev, ...response.data.data }));
                 return true;
             }
         } catch (error) {

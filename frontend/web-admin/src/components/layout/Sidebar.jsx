@@ -191,9 +191,9 @@ const Sidebar = ({ open, onClose }) => {
         return () => { isSubscribed = false; };
     }, [user?.id]);
 
-    const handleSubMenuToggle = (text, e) => {
+    const handleSubMenuToggle = (key, e) => {
         e.stopPropagation();
-        setOpenSubMenus(prev => ({ ...prev, [text]: !prev[text] }));
+        setOpenSubMenus(prev => ({ ...prev, [key]: !prev[key] }));
     };
 
     const menuItems = [
@@ -208,7 +208,7 @@ const Sidebar = ({ open, onClose }) => {
             roles: ['admin_master', 'operador']
         },
         {
-            text: 'Empresas',
+            text: t('sidebar.empresas', { defaultValue: 'Empresas' }),
             icon: <EmpresaIcon />,
             menuKey: 'empresas',
             get path() {
@@ -229,7 +229,7 @@ const Sidebar = ({ open, onClose }) => {
             roles: ['admin_master', 'operador']
         },
         {
-            text: 'Auditoria documental',
+            text: t('sidebar.auditoria_documental', { defaultValue: 'Auditoria documental' }),
             icon: <AssignmentTurnedInIcon />,
             menuKey: 'auditoria_documentos',
             legacyMenuKey: 'auditoria',
@@ -250,7 +250,7 @@ const Sidebar = ({ open, onClose }) => {
             roles: ['admin_master', 'operador']
         },
         {
-            text: 'Veículos',
+            text: t('sidebar.veiculos', { defaultValue: 'Veículos' }),
             icon: <CarIcon />,
             menuKey: 'veiculos',
             legacyMenuKey: 'frota_lpr',
@@ -262,7 +262,7 @@ const Sidebar = ({ open, onClose }) => {
         },
         { divider: true },
         {
-            text: 'Check-in',
+            text: t('sidebar.checkin', { defaultValue: 'Check-in' }),
             icon: <CheckinIcon />,
             menuKey: 'checkin',
             get path() {
@@ -272,7 +272,7 @@ const Sidebar = ({ open, onClose }) => {
             roles: ['admin_master', 'operador']
         },
         {
-            text: 'Check-out',
+            text: t('sidebar.checkout', { defaultValue: 'Check-out' }),
             icon: <CheckoutIcon />,
             menuKey: 'checkout',
             get path() {
@@ -282,7 +282,7 @@ const Sidebar = ({ open, onClose }) => {
             roles: ['admin_master', 'operador']
         },
         {
-            text: 'Fiscalização de áreas',
+            text: t('sidebar.fiscalizacao', { defaultValue: 'Fiscalização de áreas' }),
             icon: <SecurityIcon />,
             menuKey: 'fiscalizacao',
             get path() {
@@ -305,13 +305,19 @@ const Sidebar = ({ open, onClose }) => {
 
         { divider: true },
         { 
-            text: 'Auditoria e logs',
+            text: t('sidebar.auditoria_sistema', { defaultValue: 'Auditoria e logs' }),
             icon: <HistoryIcon />, 
             menuKey: 'auditoria_sistema', 
             path: '/audit-logs', 
             roles: ['admin_master'] 
         },
-        { text: 'Usuários', icon: <UserIcon />, menuKey: 'usuarios', path: '/usuarios', roles: ['admin_master'] },
+        { 
+            text: t('sidebar.usuarios', { defaultValue: 'Usuários' }), 
+            icon: <UserIcon />, 
+            menuKey: 'usuarios', 
+            path: '/usuarios', 
+            roles: ['admin_master'] 
+        },
         {
             text: t('sidebar.settings', { defaultValue: 'Configurações' }),
             icon: <SettingsIcon />,
@@ -320,29 +326,29 @@ const Sidebar = ({ open, onClose }) => {
             roles: ['admin_master'],
             children: [
                 // Um caminho só para cada tela; os títulos agrupam (a central /configuracoes é só um índice)
-                { grupo: 'Evento' },
-                { text: 'Eventos', path: '/eventos', icon: <EventIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Áreas', path: '/config/areas', icon: <AreaIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Regras de acesso', path: '/config/checkin', icon: <CheckConfigIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Credenciamento', path: '/config/credenciamento', icon: <CredIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Documentos', path: '/config/documentos', icon: <DocsIcon sx={{ fontSize: 16 }} /> },
-                { grupo: 'Credenciais físicas' },
-                { text: 'Pulseiras', path: '/config/pulseiras', icon: <PulseiraIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Etiquetas e crachás', path: '/config/etiquetas', icon: <LabelIcon sx={{ fontSize: 16 }} /> },
-                { grupo: 'Equipamentos' },
-                { text: 'Leitores e dispositivos', path: '/config/dispositivos', icon: <FaceIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Câmeras e IA facial', path: '/config/cameras', icon: <CameraIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Veículos', path: '/config/veiculos', icon: <CarIcon sx={{ fontSize: 16 }} /> },
-                { grupo: 'Comunicação' },
-                { text: 'Comunicação & Integrações', path: '/config/comunicacao', icon: <ExtensionIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Webhooks e chaves de API', path: '/config/webhooks', icon: <WebhookIcon sx={{ fontSize: 16 }} /> },
-                { grupo: 'Sistema' },
-                { text: 'Geral', path: '/config/geral', icon: <TuneIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Perfis de acesso', path: '/config/permissoes', icon: <VerifiedIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Segurança', path: '/config/seguranca', icon: <SecurityIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Rotinas automáticas', path: '/config/cron', icon: <CronIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Idiomas', path: '/config/idiomas', icon: <PaletteIcon sx={{ fontSize: 16 }} /> },
-                { text: 'Banco de dados', path: '/config/banco-dados', icon: <StorageIcon sx={{ fontSize: 16 }} /> },
+                { grupo: t('sidebar.grupo_evento', { defaultValue: 'Evento' }) },
+                { text: t('sidebar.eventos', { defaultValue: 'Eventos' }), path: '/eventos', icon: <EventIcon sx={{ fontSize: 16 }} /> },
+                { text: t('sidebar.areas', { defaultValue: 'Áreas' }), path: '/config/areas', icon: <AreaIcon sx={{ fontSize: 16 }} /> },
+                { text: t('sidebar.regras_acesso', { defaultValue: 'Regras de acesso' }), path: '/config/checkin', icon: <CheckConfigIcon sx={{ fontSize: 16 }} /> },
+                { text: t('sidebar.credenciamento', { defaultValue: 'Credenciamento' }), path: '/config/credenciamento', icon: <CredIcon sx={{ fontSize: 16 }} /> },
+                { text: t('sidebar.documentos', { defaultValue: 'Documentos' }), path: '/config/documentos', icon: <DocsIcon sx={{ fontSize: 16 }} /> },
+                { grupo: t('sidebar.grupo_credenciais', { defaultValue: 'Credenciais físicas' }) },
+                { text: t('sidebar.pulseiras', { defaultValue: 'Pulseiras' }), path: '/config/pulseiras', icon: <PulseiraIcon sx={{ fontSize: 16 }} /> },
+                { text: t('sidebar.etiquetas', { defaultValue: 'Etiquetas e crachás' }), path: '/config/etiquetas', icon: <LabelIcon sx={{ fontSize: 16 }} /> },
+                { grupo: t('sidebar.grupo_equipamentos', { defaultValue: 'Equipamentos' }) },
+                { text: t('sidebar.dispositivos', { defaultValue: 'Leitores e dispositivos' }), path: '/config/dispositivos', icon: <FaceIcon sx={{ fontSize: 16 }} /> },
+                { text: t('sidebar.cameras', { defaultValue: 'Câmeras e IA facial' }), path: '/config/cameras', icon: <CameraIcon sx={{ fontSize: 16 }} /> },
+                { text: t('sidebar.veiculos_config', { defaultValue: 'Veículos' }), path: '/config/veiculos', icon: <CarIcon sx={{ fontSize: 16 }} /> },
+                { grupo: t('sidebar.grupo_comunicacao', { defaultValue: 'Comunicação' }) },
+                { text: t('sidebar.comunicacao', { defaultValue: 'Comunicação & Integrações' }), path: '/config/comunicacao', icon: <ExtensionIcon sx={{ fontSize: 16 }} /> },
+                { text: t('sidebar.webhooks', { defaultValue: 'Webhooks e chaves de API' }), path: '/config/webhooks', icon: <WebhookIcon sx={{ fontSize: 16 }} /> },
+                { grupo: t('sidebar.grupo_sistema', { defaultValue: 'Sistema' }) },
+                { text: t('sidebar.geral', { defaultValue: 'Geral' }), path: '/config/geral', icon: <TuneIcon sx={{ fontSize: 16 }} /> },
+                { text: t('sidebar.permissoes', { defaultValue: 'Perfis de acesso' }), path: '/config/permissoes', icon: <VerifiedIcon sx={{ fontSize: 16 }} /> },
+                { text: t('sidebar.seguranca', { defaultValue: 'Segurança' }), path: '/config/seguranca', icon: <SecurityIcon sx={{ fontSize: 16 }} /> },
+                { text: t('sidebar.cron', { defaultValue: 'Rotinas automáticas' }), path: '/config/cron', icon: <CronIcon sx={{ fontSize: 16 }} /> },
+                { text: t('sidebar.idiomas', { defaultValue: 'Idiomas' }), path: '/config/idiomas', icon: <PaletteIcon sx={{ fontSize: 16 }} /> },
+                { text: t('sidebar.banco_dados', { defaultValue: 'Banco de dados' }), path: '/config/banco-dados', icon: <StorageIcon sx={{ fontSize: 16 }} /> },
 
             ]
         },
@@ -372,7 +378,8 @@ const Sidebar = ({ open, onClose }) => {
     const renderMenuItem = (item) => {
         const isActive = location.pathname === item.path;
         const hasChildren = item.children && item.children.length > 0;
-        const isOpen = openSubMenus[item.text];
+        const itemKey = item.menuKey || item.path || item.text;
+        const isOpen = openSubMenus[itemKey];
 
         if (item.divider) {
             return (
@@ -384,7 +391,7 @@ const Sidebar = ({ open, onClose }) => {
         }
 
         return (
-            <React.Fragment key={item.text}>
+            <React.Fragment key={itemKey}>
                 <Tooltip title={item.disabled ? "Em breve" : ""} placement="right">
                     <Box component="div">
                         <NavItem
@@ -393,7 +400,7 @@ const Sidebar = ({ open, onClose }) => {
                             onClick={(e) => {
                                 if (item.disabled) return;
                                 if (hasChildren) {
-                                    handleSubMenuToggle(item.text, e);
+                                    handleSubMenuToggle(itemKey, e);
                                 } else {
                                     navigate(item.path);
                                     if (isMobile && onClose) onClose();
@@ -436,7 +443,7 @@ const Sidebar = ({ open, onClose }) => {
                                 }
                                 return (
                                     <NavItem
-                                        key={child.text}
+                                        key={child.path || child.text}
                                         active={location.pathname === child.path ? 1 : 0}
                                         onClick={() => {
                                             navigate(child.path);
@@ -506,7 +513,7 @@ const Sidebar = ({ open, onClose }) => {
                     {/* Notificações são do evento: o sino fica junto do evento em foco */}
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
                         <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                            Evento em foco
+                            {t('operator.focus_event', { defaultValue: 'Evento em foco' })}
                         </Typography>
                         <NotificationBell />
                     </Box>
@@ -543,7 +550,9 @@ const Sidebar = ({ open, onClose }) => {
                                         color: availableEvents.length > 1 ? '#00D4FF' : (isSuper ? '#00FF88' : '#FFB800'),
                                         fontWeight: 700, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 0.5
                                     }}>
-                                        {availableEvents.length > 1 ? 'Clique para alterar' : (isSuper ? 'Gerenciar eventos' : 'Evento fixo')}
+                                        {availableEvents.length > 1 
+                                            ? t('operator.click_to_change', { defaultValue: 'Clique para alterar' }) 
+                                            : (isSuper ? t('operator.manage_events', { defaultValue: 'Gerenciar eventos' }) : t('operator.fixed_event', { defaultValue: 'Evento fixo' }))}
                                     </Typography>
                                 </Box>
                             </Box>
@@ -570,7 +579,7 @@ const Sidebar = ({ open, onClose }) => {
                     >
                         <Box sx={{ px: 2, py: 1, borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
                             <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, }}>
-                                Selecionar evento ativo
+                                {t('operator.select_active_event', { defaultValue: 'Selecionar evento ativo' })}
                             </Typography>
                         </Box>
                         {availableEvents.map(ev => {

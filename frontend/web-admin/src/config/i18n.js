@@ -2,7 +2,7 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 
-// Translation files imported directly (or use HTTP backend if preferred)
+// Translation files imported directly
 import ptBR from '../locales/pt-BR.json';
 import en from '../locales/en.json';
 import es from '../locales/es.json';
@@ -14,18 +14,23 @@ i18n
     .init({
         resources: {
             'pt-BR': { translation: ptBR },
-            en: { translation: en },
-            es: { translation: es },
-            de: { translation: de }
+            'pt': { translation: ptBR },
+            'en': { translation: en },
+            'en-US': { translation: en },
+            'es': { translation: es },
+            'es-ES': { translation: es },
+            'de': { translation: de },
+            'de-DE': { translation: de }
         },
         fallbackLng: 'pt-BR',
         debug: false,
         interpolation: {
-            escapeValue: false // not needed for react as it escapes by default
+            escapeValue: false
         },
         detection: {
-            // Sem 'navigator': o painel é em português; outro idioma só se escolhido em Configurações > Idiomas
-            order: ['queryString', 'cookie', 'localStorage'],
+            // Ordem de detecção: se já foi definido no navegador, respeita; caso contrário cai no fallback
+            order: ['localStorage', 'queryString', 'cookie'],
+            lookupLocalStorage: 'i18nextLng',
             caches: ['localStorage', 'cookie']
         }
     });

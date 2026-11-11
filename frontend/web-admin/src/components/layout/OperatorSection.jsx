@@ -18,6 +18,7 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
 import { cores, funcao, papeis, tom, tamanhos, botaoSecundario } from '../../styles/tokens';
@@ -160,6 +161,7 @@ const lerFotoReduzida = (arquivo) => new Promise((resolve, reject) => {
 });
 
 export const OperatorSection = () => {
+    const { t } = useTranslation();
     const { user, logout, updateUserAvatar } = useAuth();
     const [anchorEl, setAnchorEl] = useState(null);
 
@@ -358,7 +360,7 @@ export const OperatorSection = () => {
                         <Typography noWrap sx={{ fontSize: tamanhos.xs, color: papel.cor, fontWeight: 600, minWidth: 0 }}>
                             {papel.rotulo}
                         </Typography>
-                        <Tooltip title={`No turno desde ${loginTimeFormatted}`} placement="top">
+                        <Tooltip title={`${t('operator.shift_since', { defaultValue: 'No turno desde' })} ${loginTimeFormatted}`} placement="top">
                             <Typography sx={{ ml: 'auto', fontSize: tamanhos.xs, color: cores.textoSecundario, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
                                 <TempoNoTurno loginKey={loginKey} />
                             </Typography>
@@ -366,8 +368,8 @@ export const OperatorSection = () => {
                     </Box>
                 </Box>
 
-                <Tooltip title="Opções">
-                    <IconButton size="small" onClick={handleMenuOpen} aria-label="Opções do operador" sx={{ color: cores.textoSecundario }}>
+                <Tooltip title={t('operator.operator_options', { defaultValue: 'Opções' })}>
+                    <IconButton size="small" onClick={handleMenuOpen} aria-label={t('operator.operator_options', { defaultValue: 'Opções do operador' })} sx={{ color: cores.textoSecundario }}>
                         <MoreIcon fontSize="small" />
                     </IconButton>
                 </Tooltip>
@@ -381,7 +383,7 @@ export const OperatorSection = () => {
                     onClick={() => setNotesModalOpen(true)}
                     sx={{ ...botaoSecundario, flex: 1, minHeight: 34 }}
                 >
-                    Notas
+                    {t('operator.shift_notes', { defaultValue: 'Notas' })}
                 </Button>
                 {/* Chamar o master não faz sentido para o próprio admin master */}
                 {!ehMaster && (
@@ -425,7 +427,7 @@ export const OperatorSection = () => {
                         {user?.email}
                     </Typography>
                     <Typography variant="caption" sx={{ color: '#00D4FF', fontFamily: '"Inter", sans-serif' }}>
-                        No turno há <TempoNoTurno loginKey={loginKey} formato="longo" />
+                        {t('operator.shift_time_prefix', { defaultValue: 'No turno há' })} <TempoNoTurno loginKey={loginKey} formato="longo" />
                     </Typography>
                 </Box>
 
@@ -437,7 +439,7 @@ export const OperatorSection = () => {
                     sx={{ gap: 1.5, mx: 1, borderRadius: 1.5, '&:hover': { background: 'rgba(0, 212, 255, 0.1)' } }}
                 >
                     <PhotoCameraIcon fontSize="small" sx={{ color: '#00D4FF' }} />
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>Trocar foto</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{t('operator.change_photo', { defaultValue: 'Trocar foto' })}</Typography>
                 </MenuItem>
 
                 <MenuItem
@@ -448,7 +450,7 @@ export const OperatorSection = () => {
                     sx={{ gap: 1.5, mx: 1, borderRadius: 1.5, '&:hover': { background: 'rgba(0, 212, 255, 0.1)' } }}
                 >
                     <NoteIcon fontSize="small" sx={{ color: '#00FF88' }} />
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>Notas do turno</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{t('operator.shift_notes', { defaultValue: 'Notas do turno' })}</Typography>
                 </MenuItem>
 
                 {!ehMaster && (
@@ -482,9 +484,9 @@ export const OperatorSection = () => {
                 >
                     <LogoutIcon fontSize="small" />
                     <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 700 }}>Encerrar turno e sair</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>{t('operator.logout_btn', { defaultValue: 'Encerrar turno e sair' })}</Typography>
                         <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontSize: '0.75rem' }}>
-                            Salva o relatório do turno
+                            {t('operator.logout_sub', { defaultValue: 'Salva o relatório do turno' })}
                         </Typography>
                     </Box>
                 </MenuItem>

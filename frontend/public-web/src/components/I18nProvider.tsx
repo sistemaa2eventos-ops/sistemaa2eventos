@@ -16,14 +16,21 @@ i18next
     .init({
         resources: {
             'pt-BR': { common: ptBR },
-            en: { common: en },
-            es: { common: es },
-            de: { common: de },
+            'pt': { common: ptBR },
+            'en': { common: en },
+            'en-US': { common: en },
+            'es': { common: es },
+            'es-ES': { common: es },
+            'de': { common: de },
+            'de-DE': { common: de },
         },
         defaultNS: 'common',
-        lng: 'pt-BR', // Default language. Can be dynamic based on detection
         fallbackLng: 'pt-BR',
         interpolation: { escapeValue: false },
+        detection: {
+            order: ['querystring', 'cookie', 'localStorage', 'navigator'],
+            caches: ['localStorage', 'cookie'],
+        },
     });
 
 export function I18nProvider({ children }: { children: ReactNode }) {
