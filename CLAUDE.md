@@ -739,6 +739,14 @@ docker system prune -af
 **Registre cada deploy aqui:**
 
 ```
+2026-11-11 - Deploy 29fd7f1 (webcam pelo retransmissor)
+├─ Mudanças: webcam USB / OBS local fechado via go2rtc (H.264, teto ~0,9 Mbit/s); go2rtc chama
+│            ffmpeg pelo PATH (caminho com espaço quebrava foto/reserva); fecha filhos ao parar
+├─ Status: ✅ OK (GitHub Actions run 42978325639)
+├─ Teste: /health 200 (uptime 42 s), rotas novas 401 sem login; webcam testada no PC local
+├─ Rollback: tag antes-deploy-20261111b (bb678ec)
+└─ Próximo: rodar ligar-ia-facial.bat no PC do evento para o agente pegar a versão nova
+
 2026-11-11 - Deploy be7de3a (câmeras sob demanda)
 ├─ Mudanças: vídeo das câmeras via go2rtc no agente (sem motor de IA), IA por câmera
 │            (só monitorar / ao assistir / 24 h), chave do motor por evento, gravação local
