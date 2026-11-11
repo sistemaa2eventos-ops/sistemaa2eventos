@@ -670,7 +670,14 @@ class Leitor:
                         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
                         ret, frame = cap.read()
                         if ret and frame is not None:
-                            logger.info(f"✅ Webcam USB conectada (índice {idx}, {frame.shape[1]}x{frame.shape[0]})")
+                            agora = time.time()
+                            with self.lock:
+                                self.quadro = frame
+                                self.seq += 1
+                                self.quadro_ts = agora
+                            self.resolucao = f"{frame.shape[1]}x{frame.shape[0]}"
+                            self._eh_webcam_usb = True
+                            logger.info(f"✅ Webcam USB conectada (índice {idx}, {self.resolucao})")
                             return cap
                     if cap is not None:
                         cap.release()
@@ -682,12 +689,24 @@ class Leitor:
         u = (self.url or "").lower()
         return "localhost:8554" in u or "127.0.0.1:8554" in u
 
+    def _porta_8554_aberta(self) -> bool:
+        import socket
+        try:
+            with socket.create_connection(("127.0.0.1", 8554), timeout=0.25):
+                return True
+        except Exception:
+            return False
+
     def _abrir(self):
+        self._eh_webcam_usb = False
         u = (self.url or "").strip()
         low = u.lower()
         if low.startswith("webcam") or low.startswith("usb") or u.isdigit():
             partes = [p for p in low.replace("://", ":").split(":") if p.isdigit()]
             return self._abrir_webcam_usb(int(partes[0]) if partes else None)
+        if self._eh_local_padrao() and not self._porta_8554_aberta():
+            logger.info("🔄 RTSP local (8554) indisponível; usando a webcam USB direto...")
+            return self._abrir_webcam_usb()
         # Timeouts reais: câmera fora do ar não trava mais a leitura por 30 s
         cap = cv2.VideoCapture(u, cv2.CAP_FFMPEG, [cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 5000, cv2.CAP_PROP_READ_TIMEOUT_MSEC, 5000])
         if cap is not None and cap.isOpened():
@@ -741,24 +760,41 @@ class Leitor:
                     self.falhas_abertura = 0
                     ultimo_quadro = time.time()
 
-                # grab() só avança o vídeo; a conversão para imagem (retrieve) é feita no ritmo
-                # necessário (video_fps_max), não na velocidade da câmera
-                if not self.cap.grab():
-                    if time.time() - ultimo_quadro > SEM_QUADRO_S:
-                        logger.warning(f"⚠️ Sem vídeo há {SEM_QUADRO_S}s ({self.url.split('@')[-1]}), reconectando...")
-                        self.cap.release()
-                        self.cap = None
-                        self.reconexoes += 1
-                    else:
-                        time.sleep(0.05)
-                    continue
-                agora = time.time()
-                ultimo_quadro = agora
-                if agora - ultima_decodificacao < 1.0 / CFG["video_fps_max"]:
-                    continue
-                ret, frame = self.cap.retrieve()
-                if not ret or frame is None:
-                    continue
+                if getattr(self, "_eh_webcam_usb", False):
+                    espera_fps = (1.0 / CFG["video_fps_max"]) - (time.time() - ultima_decodificacao)
+                    if espera_fps > 0.002:
+                        time.sleep(espera_fps)
+                    ret, frame = self.cap.read()
+                    if not ret or frame is None:
+                        if time.time() - ultimo_quadro > SEM_QUADRO_S:
+                            logger.warning(f"⚠️ Sem vídeo na webcam há {SEM_QUADRO_S}s, reconectando...")
+                            self.cap.release()
+                            self.cap = None
+                            self.reconexoes += 1
+                        else:
+                            time.sleep(0.05)
+                        continue
+                    agora = time.time()
+                    ultimo_quadro = agora
+                else:
+                    # grab() só avança o vídeo; a conversão para imagem (retrieve) é feita no ritmo
+                    # necessário (video_fps_max), não na velocidade da câmera
+                    if not self.cap.grab():
+                        if time.time() - ultimo_quadro > SEM_QUADRO_S:
+                            logger.warning(f"⚠️ Sem vídeo há {SEM_QUADRO_S}s ({self.url.split('@')[-1]}), reconectando...")
+                            self.cap.release()
+                            self.cap = None
+                            self.reconexoes += 1
+                        else:
+                            time.sleep(0.05)
+                        continue
+                    agora = time.time()
+                    ultimo_quadro = agora
+                    if agora - ultima_decodificacao < 1.0 / CFG["video_fps_max"]:
+                        continue
+                    ret, frame = self.cap.retrieve()
+                    if not ret or frame is None:
+                        continue
                 dt = agora - ultima_decodificacao
                 ultima_decodificacao = agora
                 if 0 < dt < 5:
