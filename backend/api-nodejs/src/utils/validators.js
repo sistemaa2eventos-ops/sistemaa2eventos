@@ -183,10 +183,10 @@ function getDefaultPermissions(nivel_acesso) {
     }
 
     if (nivel_acesso === 'operador') {
-        // PADRÃO: Tudo desligado exceto dashboard
+        // PADRÃO: tudo desligado (dashboard opcional)
         // Admin master ativa conforme precisa
         return {
-            dashboard: true,
+            dashboard: false,
             empresas: false,
             pessoas: false,
             auditoria_documentos: false,

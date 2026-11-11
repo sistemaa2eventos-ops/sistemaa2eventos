@@ -523,8 +523,7 @@ const Usuarios = () => {
                                         <Box key={perm.key} sx={{ display: 'flex', alignItems: 'center', p: 0.5 }}>
                                             <Switch
                                                 size="small"
-                                                disabled={perm.key === 'dashboard'}
-                                                checked={perm.key === 'dashboard' ? true : (formData.permissions[perm.key] || false)}
+                                                checked={formData.permissions[perm.key] || false}
                                                 onChange={(e) => setFormData({
                                                     ...formData,
                                                     permissions: {
@@ -534,8 +533,8 @@ const Usuarios = () => {
                                                 })}
                                                 color="info"
                                             />
-                                            <Typography variant="body2" sx={{ ml: 1, color: perm.key === 'dashboard' ? 'text.secondary' : '#FFFFFF' }}>
-                                                {perm.label} {perm.key === 'dashboard' && '(Padrão)'}
+                                            <Typography variant="body2" sx={{ ml: 1, color: '#FFFFFF' }}>
+                                                {perm.label}
                                             </Typography>
                                         </Box>
                                     ))}
@@ -557,7 +556,7 @@ const Usuarios = () => {
                                             const newPerms = { ...formData.eventos_permissoes };
                                             val.forEach(eid => {
                                                 if (!newPerms[eid]) {
-                                                    newPerms[eid] = { ...formData.permissions, dashboard: true };
+                                                    newPerms[eid] = { ...formData.permissions };
                                                 }
                                             });
                                             setFormData({
@@ -649,13 +648,12 @@ const Usuarios = () => {
                                                         <Box key={perm.key} sx={{ display: 'flex', alignItems: 'center', p: 0.5 }}>
                                                             <Switch
                                                                 size="small"
-                                                                disabled={perm.key === 'dashboard'}
-                                                                checked={perm.key === 'dashboard' ? true : (eventPerms[perm.key] || false)}
+                                                                checked={eventPerms[perm.key] || false}
                                                                 onChange={(e) => updateEventPermission(eventoId, perm.key, e.target.checked)}
                                                                 color="info"
                                                             />
-                                                            <Typography variant="body2" sx={{ ml: 1, color: perm.key === 'dashboard' ? 'text.secondary' : '#FFFFFF' }}>
-                                                                {perm.label} {perm.key === 'dashboard' && '(Padrão)'}
+                                                            <Typography variant="body2" sx={{ ml: 1, color: '#FFFFFF' }}>
+                                                                {perm.label}
                                                             </Typography>
                                                         </Box>
                                                     ))}

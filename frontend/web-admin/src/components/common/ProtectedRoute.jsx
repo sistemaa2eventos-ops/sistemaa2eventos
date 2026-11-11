@@ -22,7 +22,7 @@ const MODULE_ROUTES = [
  * FIX I-09 & Multi-Event Guard: ProtectedRoute
  * Bloqueia estritamente qualquer rota para a qual o operador não tenha permissão liberada.
  */
-const ProtectedRoute = ({ children, modulo, role }) => {
+const ProtectedRoute = ({ children, modulo, role, irParaPrimeiraPermitida = false }) => {
   const { user, hasPermission } = useAuth();
 
   // Não autenticado → Login
@@ -42,6 +42,11 @@ const ProtectedRoute = ({ children, modulo, role }) => {
 
   // Verificação de módulo via hasPermission do AuthContext
   if (modulo && !hasPermission(modulo)) {
+    // Página inicial sem permissão (ex.: dashboard desligado): leva à primeira página que o usuário pode usar
+    if (irParaPrimeiraPermitida) {
+      const primeira = MODULE_ROUTES.find(m => m.modulo !== modulo && hasPermission(m.modulo));
+      if (primeira) return <Navigate to={primeira.path} replace />;
+    }
     return <AccessDenied />;
   }
 

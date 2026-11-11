@@ -153,7 +153,7 @@ const AppContent = () => {
     <MainLayout>
       <Suspense fallback={<LoadingOverlay />}>
         <Routes>
-          <Route path="/" element={<ProtectedRoute modulo="dashboard"><Dashboard /></ProtectedRoute>} />
+          <Route path="/" element={<ProtectedRoute modulo="dashboard" irParaPrimeiraPermitida><Dashboard /></ProtectedRoute>} />
           <Route path="/cftv" element={<ProtectedRoute modulo="monitoramento"><CftvWall /></ProtectedRoute>} />
           <Route path="/eventos" element={<ProtectedRoute role="admin_master"><Eventos /></ProtectedRoute>} />
           <Route path="/empresas" element={<ProtectedRoute modulo="empresas"><Empresas /></ProtectedRoute>} />

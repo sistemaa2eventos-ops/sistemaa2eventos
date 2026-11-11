@@ -85,8 +85,10 @@ class User {
      */
     isAllowedEvent(eventoId) {
         if (this.isAdminMaster()) return true;
-        if (this.vinculo_tipo === 'global') return true;
         if (!eventoId) return true;
+        // Supervisor com vínculo global continua com todos os eventos (decisão mantida)
+        if (this.vinculo_tipo === 'global' && this.role === User.ROLES.SUPERVISOR) return true;
+        // Operador (e supervisor com vínculo específico) só opera os eventos da própria lista
         return Array.isArray(this.eventos_permitidos) && this.eventos_permitidos.includes(eventoId);
     }
 

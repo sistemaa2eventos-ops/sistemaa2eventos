@@ -327,12 +327,12 @@ class AuthController {
             };
 
             if (permissions && typeof permissions === 'object') {
-                basePermissions = { ...basePermissions, ...permissions, dashboard: true };
+                basePermissions = { ...basePermissions, ...permissions };
             }
 
+            // Dashboard é opcional para todos: vale o que foi marcado (padrão: desligado)
             const finalPermissions = {
                 ...basePermissions,
-                dashboard: true,
                 vinculo_tipo: isEspecifico ? 'especifico' : 'global',
                 eventos_permitidos: finalEventosPermitidos,
                 eventos_permissoes: eventos_permissoes || {}
@@ -610,10 +610,7 @@ class AuthController {
             // Atualizar permissões se fornecidas
             if (permissions) {
                 // Garantir que dashboard é sempre true
-                updateData.permissions = {
-                    ...permissions,
-                    dashboard: true
-                };
+                updateData.permissions = { ...permissions }; // dashboard opcional: vale o marcado
             }
 
             const { data, error } = await supabase
@@ -664,8 +661,7 @@ class AuthController {
             const currentPerms = existingPerfil?.permissions || {};
             const safePermissions = {
                 ...currentPerms,
-                ...(permissions || {}),
-                dashboard: true
+                ...(permissions || {})
             };
 
             if (vinculo_tipo !== undefined) safePermissions.vinculo_tipo = vinculo_tipo;
@@ -1112,8 +1108,7 @@ class AuthController {
 
                 const updatedPerms = {
                     ...currentPerms,
-                    ...basePerms,
-                    dashboard: true
+                    ...basePerms
                 };
 
                 if (vinculo_tipo !== undefined) updatedPerms.vinculo_tipo = vinculo_tipo;

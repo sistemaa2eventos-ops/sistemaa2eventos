@@ -18,7 +18,7 @@ export const MODULOS = [
 ];
 
 export const DEFAULT_PERMISSIONS = {
-  dashboard: true,
+  dashboard: false, // opcional para todos (padrão desligado)
   checkin: false,
   checkout: false,
   fiscalizacao: false,
@@ -118,7 +118,7 @@ export const useUsuarios = () => {
             const vinculoTipo = user.vinculo_tipo || user.permissions?.vinculo_tipo || (user.evento_id ? 'especifico' : 'global');
             const permitidos = user.eventos_permitidos || user.permissions?.eventos_permitidos || (user.evento_id ? [user.evento_id] : []);
             const permsPorEvento = user.eventos_permissoes || user.permissions?.eventos_permissoes || {};
-            const basePerms = { ...DEFAULT_PERMISSIONS, ...(user.permissions || {}), dashboard: true };
+            const basePerms = { ...DEFAULT_PERMISSIONS, ...(user.permissions || {}) };
 
             const initializedPerms = { ...permsPorEvento };
             permitidos.forEach(eid => {
@@ -162,7 +162,7 @@ export const useUsuarios = () => {
                     if (!modelo) return;
                     // Só se as permissões ainda forem as padrão (o admin não começou a ajustar)
                     setFormData(prev => JSON.stringify(prev.permissions) === JSON.stringify(DEFAULT_PERMISSIONS)
-                        ? { ...prev, permissions: { ...DEFAULT_PERMISSIONS, ...modelo, dashboard: true } }
+                        ? { ...prev, permissions: { ...DEFAULT_PERMISSIONS, ...modelo } }
                         : prev);
                 })
                 .catch(() => { /* sem modelo: fica o padrão */ });
@@ -205,8 +205,7 @@ export const useUsuarios = () => {
                     ...(prev.eventos_permissoes || {}),
                     [eventoId]: {
                         ...currentEventPerms,
-                        [permKey]: value,
-                        dashboard: true
+                        [permKey]: value
                     }
                 }
             };
@@ -221,7 +220,7 @@ export const useUsuarios = () => {
 
             const newPermissoes = {};
             (prev.eventos_permitidos || []).forEach(eid => {
-                newPermissoes[eid] = { ...sourcePerms, dashboard: true };
+                newPermissoes[eid] = { ...sourcePerms };
             });
 
             return {
@@ -261,7 +260,7 @@ export const useUsuarios = () => {
                 eventos_permitidos: formData.vinculo_tipo === 'especifico' ? formData.eventos_permitidos : [],
                 eventos_permissoes: formData.vinculo_tipo === 'especifico' ? formData.eventos_permissoes : {},
                 evento_id: formData.vinculo_tipo === 'especifico' && formData.eventos_permitidos.length > 0 ? formData.eventos_permitidos[0] : (formData.evento_id || null),
-                permissions: { ...formData.permissions, dashboard: true }
+                permissions: { ...formData.permissions }
             };
 
             if (selectedUser) {

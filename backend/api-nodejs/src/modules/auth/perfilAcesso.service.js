@@ -101,7 +101,7 @@ async function aplicarATodos(perfil) {
 
     let atualizados = 0;
     for (const u of usuarios || []) {
-        const permissions = { ...(u.permissions || {}), ...modelo.modulos, dashboard: true };
+        const permissions = { ...(u.permissions || {}), ...modelo.modulos };
         const { error: upErr } = await supabase
             .from('perfis')
             .update({ permissions, updated_at: new Date().toISOString() })
