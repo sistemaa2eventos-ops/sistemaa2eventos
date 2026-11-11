@@ -325,7 +325,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
     };
 
     return (
-        <Box sx={{ p: embedded ? 0 : { xs: 1.5, sm: 2.5, md: 4 }, maxWidth: 1000, margin: '0 auto' }}>
+        <Box sx={{ p: embedded ? 0 : { xs: 1.5, sm: 2.5, md: 4 } }}>
             {!embedded && (
                 <PageHeader
                     title="Pulseiras"
@@ -350,7 +350,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
                 </Box>
             )}
 
-            <GlassCard glowColor="#7B2FBE" sx={{ p: 3, mb: 3 }}>
+            <GlassCard glowColor="#7B2FBE" sx={{ p: { xs: 2, sm: 2.5, md: 3 }, mb: 3 }}>
                 <DataTable
                     columns={columns}
                     data={pulseiras}
@@ -362,7 +362,21 @@ const ConfigPulseiras = ({ embedded = false }) => {
                 />
             </GlassCard>
 
-            <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth disableRestoreFocus>
+            <Dialog 
+                open={openDialog} 
+                onClose={handleCloseDialog} 
+                maxWidth="md" 
+                fullWidth 
+                disableRestoreFocus
+                PaperProps={{
+                    sx: {
+                        background: '#0A1628',
+                        border: '1px solid rgba(0, 212, 255, 0.2)',
+                        borderRadius: 2,
+                        maxHeight: '90vh'
+                    }
+                }}
+            >
                 <DialogTitle sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 }}>
                     {editingId ? 'Editar pulseira' : 'Provisionamento de pulseira'}
                 </DialogTitle>
