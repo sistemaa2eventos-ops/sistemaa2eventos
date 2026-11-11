@@ -739,6 +739,15 @@ docker system prune -af
 **Registre cada deploy aqui:**
 
 ```
+2026-11-12 - Deploy 8941cf5 (modo de tela: normal, tela cheia, quiosque bloqueado)
+├─ Mudanças: Usuários > "Modo de tela"; quiosque bloqueado restringe à página escolhida e exige senha de
+│            administrador ou supervisor para sair (POST /api/auth/quiosque/desbloquear, sem criar sessão);
+│            o botão de sair do check-in respeita o bloqueio; Admin Master nunca fica restrito
+├─ Status: ✅ OK (GitHub Actions run 43088982000); /health 200, banco conectado, painel 200, rota 400 sem dados
+├─ Teste: NÃO verificado com operador real nesta sessão (fluxo de bloqueio e desbloqueio com senha)
+├─ Rollback: tag antes-deploy-20261112f (f7394b7)
+└─ Próximo: testar um operador em quiosque; depois, quiosque com bloqueio em Monitor e Câmeras já cobertos (página)
+
 2026-11-12 - Deploy f7394b7 (página inicial escolhida por quem administra)
 ├─ Mudanças: Usuários > "Página inicial ao entrar" (vazio = primeira página permitida); a escolha só vale
 │            se o usuário ainda tem acesso à página; sem migration
