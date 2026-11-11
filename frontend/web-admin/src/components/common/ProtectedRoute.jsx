@@ -5,7 +5,7 @@ import { Box, Typography, Button } from '@mui/material';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 
 import { botaoSecundario } from '../../styles/tokens';
-const MODULE_ROUTES = [
+export const MODULE_ROUTES = [
   { modulo: 'checkin', path: '/checkin', label: 'Check-in' },
   { modulo: 'checkout', path: '/checkout', label: 'Check-out' },
   { modulo: 'fiscalizacao', path: '/fiscalizacao', label: 'Fiscalização' },
@@ -38,6 +38,15 @@ const ProtectedRoute = ({ children, modulo, role, irParaPrimeiraPermitida = fals
   // Rota restrita a um perfil específico (ex: role="admin_master")
   if (role && user.nivel_acesso !== role) {
     return <AccessDenied />;
+  }
+
+  // Página inicial escolhida por quem administra (só na rota "/"): se a escolhida existe e o
+  // usuário ainda tem acesso a ela, abre ela em vez do dashboard
+  if (irParaPrimeiraPermitida) {
+    const escolhida = MODULE_ROUTES.find(m => m.modulo === user.permissions?.pagina_inicial);
+    if (escolhida && escolhida.modulo !== 'dashboard' && hasPermission(escolhida.modulo)) {
+      return <Navigate to={escolhida.path} replace />;
+    }
   }
 
   // Verificação de módulo via hasPermission do AuthContext

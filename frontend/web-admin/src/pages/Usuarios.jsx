@@ -23,6 +23,7 @@ import PageHeader from '../components/common/PageHeader';
 import NeonButton from '../components/common/NeonButton';
 import DataTable from '../components/common/DataTable';
 import { useUsuarios, MODULOS, DEFAULT_PERMISSIONS } from '../hooks/useUsuarios';
+import { MODULE_ROUTES } from '../components/common/ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
 import TituloModal from '../components/common/TituloModal';
 
@@ -508,6 +509,25 @@ const Usuarios = () => {
                                 />
                             </RadioGroup>
                         </Box>
+
+                        {/* PÁGINA INICIAL: escolhida por quem administra. Vazio = a primeira página permitida. */}
+                        <FormControl fullWidth size="small">
+                            <InputLabel id="pagina-inicial-label">Página inicial ao entrar</InputLabel>
+                            <Select
+                                labelId="pagina-inicial-label"
+                                label="Página inicial ao entrar"
+                                value={formData.permissions?.pagina_inicial || ''}
+                                onChange={(e) => setFormData({
+                                    ...formData,
+                                    permissions: { ...formData.permissions, pagina_inicial: e.target.value || null }
+                                })}
+                            >
+                                <MenuItem value=""><em>Automática (primeira página permitida)</em></MenuItem>
+                                {MODULOS.filter(m => MODULE_ROUTES.some(r => r.modulo === m.key)).map(m => (
+                                    <MenuItem key={m.key} value={m.key}>{m.label}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
 
                         {/* CASO 1: VÍNCULO GLOBAL - CONFIGURAÇÃO ÚNICA DE PERMISSÕES */}
                         {formData.vinculo_tipo === 'global' && (
