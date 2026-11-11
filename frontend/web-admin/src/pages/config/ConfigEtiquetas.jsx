@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     Box, Typography, Grid, TextField, IconButton, Paper, Stack,
     Button, Tooltip, MenuItem, FormControl, InputLabel, Select,
-    Divider, Slider
+    Divider, Slider, Switch, FormControlLabel
 } from '@mui/material';
 import {
     Save as SaveIcon,
@@ -15,7 +15,12 @@ import {
     QrCode2 as QrIcon,
     FormatColorText as TextIcon,
     CloudUpload as UploadIcon,
-    LayersClear as ClearBgIcon
+    LayersClear as ClearBgIcon,
+    GridOn as GridOnIcon,
+    GridOff as GridOffIcon,
+    Lock as LockIcon,
+    LockOpen as LockOpenIcon,
+    CenterFocusStrong as CenterIcon
 } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import { Rnd } from 'react-rnd';
@@ -69,13 +74,23 @@ const ConfigEtiquetas = () => {
         { id: '1', type: 'text', content: '{nome_pessoa}', x: 10, y: 15, width: 220, height: 35, fontSize: 18, fontWeight: 'bold', color: '#000000', textAlign: 'center' },
         { id: '2', type: 'text', content: '{funcao}', x: 10, y: 55, width: 220, height: 25, fontSize: 14, fontWeight: 'normal', color: '#555555', textAlign: 'center' },
         { id: '3', type: 'qrcode', content: '{qr_code}', x: 75, y: 95, width: 90, height: 90 },
-        { id: '4', type: 'foto', content: '{foto_url}', x: 80, y: 200, width: 80, height: 80, borderRadius: 8, borderColor: '#00D4FF', borderWidth: 2 }
+        { id: '4', type: 'foto', content: '{foto_url}', x: 80, y: 200, width: 80, height: 80, borderRadius: 8, borderColor: '#00D4FF', borderWidth: 2, lockAspectRatio: true }
     ]);
 
     const [selectedId, setSelectedId] = useState(null);
     const [_loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const { enqueueSnackbar } = useSnackbar();
+
+    // Recursos de Design estilo Canva / Figma
+    const [showGrid, setShowGrid] = useState(true);
+    const [gridSize, setGridSize] = useState(10); // pixels
+    const [snapToGrid, setSnapToGrid] = useState(true);
+    const [smartGuides, setSmartGuides] = useState({ vertical: null, horizontal: null });
+
+    const scaleFactor = 3;
+    const canvasWidth = config.width * scaleFactor;
+    const canvasHeight = config.height * scaleFactor;
 
     useEffect(() => {
         if (!eventoId) return;
@@ -142,7 +157,8 @@ const ConfigEtiquetas = () => {
             x: 20,
             y: 20,
             width: 150,
-            height: 35
+            height: 35,
+            lockAspectRatio: false
         };
 
         if (type === 'text') {
@@ -159,7 +175,8 @@ const ConfigEtiquetas = () => {
                 ...newEl,
                 content: '{qr_code}',
                 width: 80,
-                height: 80
+                height: 80,
+                lockAspectRatio: true
             };
         } else if (type === 'foto') {
             newEl = {
@@ -169,7 +186,8 @@ const ConfigEtiquetas = () => {
                 height: 75,
                 borderRadius: 6,
                 borderColor: '#00D4FF',
-                borderWidth: 2
+                borderWidth: 2,
+                lockAspectRatio: true
             };
         } else if (type === 'shape') {
             newEl = {
@@ -181,7 +199,6 @@ const ConfigEtiquetas = () => {
                 opacity: 1
             };
         } else if (type === 'image') {
-            // Se for imagem, aciona upload
             fileElementInputRef.current?.click();
             return;
         }
@@ -205,7 +222,8 @@ const ConfigEtiquetas = () => {
                 width: 80,
                 height: 80,
                 borderRadius: 0,
-                opacity: 1
+                opacity: 1,
+                lockAspectRatio: true
             };
             setElements(prev => [...prev, newEl]);
             setSelectedId(newEl.id);
@@ -223,7 +241,85 @@ const ConfigEtiquetas = () => {
         if (selectedId === id) setSelectedId(null);
     };
 
-    const scaleFactor = 3;
+    // Alinhamento Inteligente ao Centro
+    const centralizarElemento = (eixo = 'horizontal') => {
+        if (!selectedId) return;
+        const el = elements.find(item => item.id === selectedId);
+        if (!el) return;
+
+        if (eixo === 'horizontal') {
+            const newX = Math.round((canvasWidth - el.width) / 2);
+            updateElement(selectedId, { x: newX });
+            setSmartGuides({ vertical: canvasWidth / 2, horizontal: null });
+            setTimeout(() => setSmartGuides({ vertical: null, horizontal: null }), 1200);
+        } else if (eixo === 'vertical') {
+            const newY = Math.round((canvasHeight - el.height) / 2);
+            updateElement(selectedId, { y: newY });
+            setSmartGuides({ vertical: null, horizontal: canvasHeight / 2 });
+            setTimeout(() => setSmartGuides({ vertical: null, horizontal: null }), 1200);
+        } else if (eixo === 'ambos') {
+            const newX = Math.round((canvasWidth - el.width) / 2);
+            const newY = Math.round((canvasHeight - el.height) / 2);
+            updateElement(selectedId, { x: newX, y: newY });
+            setSmartGuides({ vertical: canvasWidth / 2, horizontal: canvasHeight / 2 });
+            setTimeout(() => setSmartGuides({ vertical: null, horizontal: null }), 1200);
+        }
+    };
+
+    // Detecção de Linhas Magnéticas (Guia Inteligente estilo Canva)
+    const handleDrag = (_e, d, el) => {
+        const elCenterX = d.x + el.width / 2;
+        const elCenterY = d.y + el.height / 2;
+        const canvasCenterX = canvasWidth / 2;
+        const canvasCenterY = canvasHeight / 2;
+
+        const threshold = 6;
+        let guideV = null;
+        let guideH = null;
+
+        // Alinhamento com o Centro do Canvas
+        if (Math.abs(elCenterX - canvasCenterX) <= threshold) {
+            guideV = canvasCenterX;
+        }
+        if (Math.abs(elCenterY - canvasCenterY) <= threshold) {
+            guideH = canvasCenterY;
+        }
+
+        // Alinhamento com outros elementos
+        elements.forEach(other => {
+            if (other.id === el.id) return;
+            const otherCenterX = other.x + other.width / 2;
+            const otherCenterY = other.y + other.height / 2;
+
+            if (Math.abs(elCenterX - otherCenterX) <= threshold) {
+                guideV = otherCenterX;
+            }
+            if (Math.abs(d.x - other.x) <= threshold) {
+                guideV = other.x;
+            }
+            if (Math.abs(elCenterY - otherCenterY) <= threshold) {
+                guideH = otherCenterY;
+            }
+            if (Math.abs(d.y - other.y) <= threshold) {
+                guideH = other.y;
+            }
+        });
+
+        setSmartGuides({ vertical: guideV, horizontal: guideH });
+    };
+
+    const handleDragStop = (_e, d, elId) => {
+        setSmartGuides({ vertical: null, horizontal: null });
+        let finalX = d.x;
+        let finalY = d.y;
+
+        if (snapToGrid) {
+            finalX = Math.round(d.x / gridSize) * gridSize;
+            finalY = Math.round(d.y / gridSize) * gridSize;
+        }
+
+        updateElement(elId, { x: finalX, y: finalY });
+    };
 
     const handleSave = async () => {
         if (!eventoId) {
@@ -259,7 +355,7 @@ const ConfigEtiquetas = () => {
         <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 4 } }}>
             <PageHeader
                 title="Etiquetas e crachás"
-                subtitle="Editor visual para crachás de PVC, credenciais de festival e etiquetas térmicas."
+                subtitle="Editor visual estilo Canva: grade inteligente, alinhamento magnético e artes completas de crachá."
                 breadcrumbs={[{ text: 'Configurações' }, { text: 'Impressão & etiquetas' }]}
             />
 
@@ -280,7 +376,7 @@ const ConfigEtiquetas = () => {
             />
 
             <Grid container spacing={3} sx={{ mt: 0.5 }}>
-                {/* COLUNA ESQUERDA: CONFIGURAÇÕES, ELEMENTOS E PROPRIEDADES */}
+                {/* COLUNA ESQUERDA: CONFIGURAÇÕES, FERRAMENTAS E PROPRIEDADES */}
                 <Grid item xs={12} md={4.5} lg={4}>
                     <Stack spacing={2.5}>
                         {/* 1. PARÂMETROS DO CRACHÁ / PAPEL */}
@@ -468,6 +564,50 @@ const ConfigEtiquetas = () => {
 
                             {selectedElement ? (
                                 <Stack spacing={1.5} sx={{ p: 1.5, background: 'rgba(0,0,0,0.3)', borderRadius: 1.5, border: '1px solid rgba(0, 212, 255, 0.2)' }}>
+                                    {/* Botões de Alinhamento Rápido estilo Canva */}
+                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 0.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 1 }}>
+                                        <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700 }}>
+                                            Alinhamento Rápido:
+                                        </Typography>
+                                        <Stack direction="row" spacing={0.5}>
+                                            <Tooltip title="Centralizar Horizontalmente">
+                                                <Button size="small" onClick={() => centralizarElemento('horizontal')} sx={{ minWidth: 32, px: 0.8, fontSize: '0.7rem', color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.2)' }}>
+                                                    Centro X
+                                                </Button>
+                                            </Tooltip>
+                                            <Tooltip title="Centralizar Verticalmente">
+                                                <Button size="small" onClick={() => centralizarElemento('vertical')} sx={{ minWidth: 32, px: 0.8, fontSize: '0.7rem', color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.2)' }}>
+                                                    Centro Y
+                                                </Button>
+                                            </Tooltip>
+                                            <Tooltip title="Centro Total">
+                                                <IconButton size="small" onClick={() => centralizarElemento('ambos')} sx={{ color: '#00D4FF', border: '1px solid rgba(0, 212, 255, 0.3)' }}>
+                                                    <CenterIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </Stack>
+                                    </Box>
+
+                                    {/* Proporção Real / Livre para Fotos e Imagens */}
+                                    {(selectedElement.type === 'foto' || selectedElement.type === 'image' || selectedElement.type === 'qrcode') && (
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: 'rgba(0, 212, 255, 0.05)', p: 1, borderRadius: 1 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                {selectedElement.lockAspectRatio ? <LockIcon sx={{ fontSize: 18, color: '#00FF88' }} /> : <LockOpenIcon sx={{ fontSize: 18, color: '#FFB800' }} />}
+                                                <Typography variant="caption" sx={{ color: '#FFFFFF', fontWeight: 600 }}>
+                                                    {selectedElement.lockAspectRatio ? 'Proporção Real Travada' : 'Redimensionamento Livre (Esticar)'}
+                                                </Typography>
+                                            </Box>
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                onClick={() => updateElement(selectedElement.id, { lockAspectRatio: !selectedElement.lockAspectRatio })}
+                                                sx={{ fontSize: '0.68rem', py: 0.2, px: 1, color: '#00D4FF', borderColor: 'rgba(0,212,255,0.3)', textTransform: 'none' }}
+                                            >
+                                                {selectedElement.lockAspectRatio ? 'Permitir Esticar' : 'Travar Proporção'}
+                                            </Button>
+                                        </Box>
+                                    )}
+
                                     {/* Propriedades para TEXTO */}
                                     {selectedElement.type === 'text' && (
                                         <>
@@ -624,16 +764,65 @@ const ConfigEtiquetas = () => {
                     </Stack>
                 </Grid>
 
-                {/* COLUNA DIREITA: CANVAS VISUAL DO CRACHÁ */}
+                {/* COLUNA DIREITA: CANVAS VISUAL DO CRACHÁ COM GRADE E GUIAS INTELIGENTES */}
                 <Grid item xs={12} md={7.5} lg={8}>
                     <GlassCard sx={{ p: { xs: 1.5, sm: 3 }, height: '100%', display: 'flex', flexDirection: 'column' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
-                                Pré-visualização do Crachá / Etiqueta ({config.width} × {config.height} mm)
-                            </Typography>
-                            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
-                                Arraste ou redimensione os itens pelas bordas
-                            </Typography>
+                        {/* Barra de Ferramentas da Grade e Guias */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                                    Pré-visualização do Crachá ({config.width} × {config.height} mm)
+                                </Typography>
+                            </Box>
+
+                            {/* Controles de Grade e Snap */}
+                            <Stack direction="row" spacing={1.5} alignItems="center">
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            size="small"
+                                            checked={showGrid}
+                                            onChange={(e) => setShowGrid(e.target.checked)}
+                                        />
+                                    }
+                                    label={
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.78rem', color: '#FFFFFF' }}>
+                                            {showGrid ? <GridOnIcon sx={{ fontSize: 16, color: '#00D4FF' }} /> : <GridOffIcon sx={{ fontSize: 16 }} />}
+                                            Grade
+                                        </Box>
+                                    }
+                                    sx={{ m: 0 }}
+                                />
+
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            size="small"
+                                            checked={snapToGrid}
+                                            onChange={(e) => setSnapToGrid(e.target.checked)}
+                                        />
+                                    }
+                                    label={
+                                        <Typography sx={{ fontSize: '0.78rem', color: '#FFFFFF' }}>
+                                            Alinhamento Automático
+                                        </Typography>
+                                    }
+                                    sx={{ m: 0 }}
+                                />
+
+                                {showGrid && (
+                                    <Select
+                                        size="small"
+                                        value={gridSize}
+                                        onChange={(e) => setGridSize(Number(e.target.value))}
+                                        sx={{ height: 28, fontSize: '0.72rem', color: '#FFFFFF', bgcolor: 'rgba(0,0,0,0.3)' }}
+                                    >
+                                        <MenuItem value={5}>5px</MenuItem>
+                                        <MenuItem value={10}>10px</MenuItem>
+                                        <MenuItem value={20}>20px</MenuItem>
+                                    </Select>
+                                )}
+                            </Stack>
                         </Box>
 
                         <Box sx={{
@@ -644,13 +833,14 @@ const ConfigEtiquetas = () => {
                             background: 'rgba(0,0,0,0.6)',
                             borderRadius: 2,
                             border: '1px dashed rgba(0, 212, 255, 0.3)',
-                            overflow: 'auto'
+                            overflow: 'auto',
+                            position: 'relative'
                         }}>
                             <Paper elevation={16} sx={{
                                 m: 'auto',
                                 flexShrink: 0,
-                                width: config.width * scaleFactor,
-                                height: config.height * scaleFactor,
+                                width: canvasWidth,
+                                height: canvasHeight,
                                 backgroundColor: '#FFFFFF',
                                 backgroundImage: config.background_url ? `url('${config.background_url}')` : 'none',
                                 backgroundSize: 'cover',
@@ -661,12 +851,60 @@ const ConfigEtiquetas = () => {
                                 borderRadius: config.layout?.includes('cr80') ? '12px' : '4px',
                                 boxShadow: '0 12px 40px rgba(0,0,0,0.8), 0 0 20px rgba(0, 212, 255, 0.2)'
                             }}>
+                                {/* Camada de Grade Visual Ativável / Desativável */}
+                                {showGrid && (
+                                    <Box sx={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 0,
+                                        right: 0,
+                                        bottom: 0,
+                                        pointerEvents: 'none',
+                                        backgroundImage: `
+                                            linear-gradient(to right, rgba(0, 212, 255, 0.08) 1px, transparent 1px),
+                                            linear-gradient(to bottom, rgba(0, 212, 255, 0.08) 1px, transparent 1px)
+                                        `,
+                                        backgroundSize: `${gridSize}px ${gridSize}px`,
+                                        zIndex: 1
+                                    }} />
+                                )}
+
+                                {/* Guias Inteligentes Magnéticas estilo Canva (Rosa / Ciano) */}
+                                {smartGuides.vertical !== null && (
+                                    <Box sx={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        bottom: 0,
+                                        left: smartGuides.vertical,
+                                        width: '1.5px',
+                                        backgroundColor: '#FF0077',
+                                        boxShadow: '0 0 6px #FF0077',
+                                        zIndex: 999,
+                                        pointerEvents: 'none'
+                                    }} />
+                                )}
+                                {smartGuides.horizontal !== null && (
+                                    <Box sx={{
+                                        position: 'absolute',
+                                        left: 0,
+                                        right: 0,
+                                        top: smartGuides.horizontal,
+                                        height: '1.5px',
+                                        backgroundColor: '#FF0077',
+                                        boxShadow: '0 0 6px #FF0077',
+                                        zIndex: 999,
+                                        pointerEvents: 'none'
+                                    }} />
+                                )}
+
                                 {elements.map(el => (
                                     <Rnd
                                         key={el.id}
                                         size={{ width: el.width, height: el.height }}
                                         position={{ x: el.x, y: el.y }}
-                                        onDragStop={(_e, d) => updateElement(el.id, { x: d.x, y: d.y })}
+                                        lockAspectRatio={Boolean(el.lockAspectRatio)}
+                                        onDrag={(_e, d) => handleDrag(_e, d, el)}
+                                        onDragStop={(_e, d) => handleDragStop(_e, d, el.id)}
                                         onResizeStop={(_e, _direction, ref, _delta, position) => {
                                             updateElement(el.id, {
                                                 width: parseInt(ref.style.width, 10),
@@ -684,7 +922,8 @@ const ConfigEtiquetas = () => {
                                             overflow: 'hidden',
                                             cursor: 'move',
                                             borderRadius: el.borderRadius ? `${el.borderRadius}px` : 0,
-                                            opacity: el.opacity != null ? el.opacity : 1
+                                            opacity: el.opacity != null ? el.opacity : 1,
+                                            zIndex: selectedId === el.id ? 10 : 2
                                         }}
                                     >
                                         {/* RENDERIZAÇÃO: TEXTO */}
