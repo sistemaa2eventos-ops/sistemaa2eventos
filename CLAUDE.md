@@ -739,6 +739,15 @@ docker system prune -af
 **Registre cada deploy aqui:**
 
 ```
+2026-11-12 - Deploy 2b853b7 (motor de IA sob demanda + servidor de IA central)
+├─ Mudanças: motor do PC do evento liga só com câmera em IA ou leitor com confirmação da IA
+│            (interruptor do painel continua mandando); servidor de IA central em backend/ia-servidor
+│            (ligar-servidor-ia.bat); escolha "Onde roda o reconhecimento" por evento
+├─ Migrations: 20261112_servidores_ia.sql (aplicada pela usuária antes)
+├─ Status: ✅ OK (GitHub Actions run 43057206758); /health 200, banco conectado
+├─ Rollback: tag antes-deploy-20261112b (b7617ed)
+└─ Próximo: PC do evento precisa do ligar-ia-facial.bat para pegar o agente novo; teste com câmera real
+
 2026-11-11 - Deploy b43ba55 (pulseiras: janelas de uso, fase e devolução; crachás)
 ├─ Mudanças: lote de pulseira só vale na fase/data/horário do momento (novo loteSelecao.js; janela que vira
 │            a noite); fora disso check-in e credenciamento respondem 403; "Marcar como Devolvida" no
