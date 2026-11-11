@@ -17,6 +17,7 @@ import CabecalhoOperacao, { BotaoJanelaRegistros } from '../components/credencia
 import ModalCredenciamento from '../components/credenciamento/ModalCredenciamento';
 import PessoaFoto from '../components/common/PessoaFoto';
 import PessoaCardDialog from '../components/credenciamento/PessoaCardDialog';
+import PreviewEtiquetaDialog from '../components/credenciamento/PreviewEtiquetaDialog';
 import RecentAccessList from '../components/credenciamento/RecentAccessList';
 import { useCheckin } from '../hooks/useCheckin';
 import CorrigirTurnoDialog from '../components/checkin/CorrigirTurnoDialog';
@@ -49,8 +50,9 @@ const Checkin = () => {
     recentLogs, realtimeStats, offlineCount,
     areaId, changeAreaId, eventAreas, pulseiraTypes,
     performCheckin,
-    executarLeituraRapida,
+    abrirConferenciaPorCodigo,
     handleLinkPulseiraAndCheckin,
+    eventoId,
     // Vínculo Facial (Fase 1)
     sessaoAtiva,
     dispositivosDisponiveis,
@@ -69,16 +71,34 @@ const Checkin = () => {
   const [barcodeValue, setBarcodeValue] = useState('');
   const [lendoCamera, setLendoCamera] = useState(false);
 
+  // Controle de Impressão de Etiqueta / Cartão PVC no Check-in
+  const [imprimirAtivo, setImprimirAtivo] = useState(() => {
+    return localStorage.getItem('nzt_imprimir_checkin') === 'true';
+  });
+  const [previewEtiquetaPessoaId, setPreviewEtiquetaPessoaId] = useState(null);
+
+  const handleToggleImprimir = (checked) => {
+    setImprimirAtivo(checked);
+    localStorage.setItem('nzt_imprimir_checkin', checked ? 'true' : 'false');
+  };
+
   // Confirmação de credenciamento do modal (Fase 2)
-  const handleConfirmarCredenciamento = ({ pessoa_id, numero_pulseira, tipo_pulseira_id }) => {
+  const handleConfirmarCredenciamento = async ({ pessoa_id, numero_pulseira, tipo_pulseira_id }) => {
     if (manualSaving || loading || !pessoa_id) return;
+    let resultado = null;
     if (tipo_pulseira_id && numero_pulseira) {
-      handleLinkPulseiraAndCheckin(pessoa_id, tipo_pulseira_id, numero_pulseira);
+      resultado = await handleLinkPulseiraAndCheckin(pessoa_id, tipo_pulseira_id, numero_pulseira);
     } else if (numero_pulseira) {
-      performCheckin('pulseira', numero_pulseira, pessoa_id);
+      resultado = await performCheckin('pulseira', numero_pulseira, pessoa_id);
     } else {
-      performCheckin('manual', null, pessoa_id);
+      resultado = await performCheckin('manual', null, pessoa_id);
     }
+
+    // Se a impressão estiver ativada, abre o preview da etiqueta/cartão
+    if (imprimirAtivo) {
+      setPreviewEtiquetaPessoaId(pessoa_id);
+    }
+    return resultado;
   };
 
   return (
@@ -110,6 +130,8 @@ const Checkin = () => {
           onAreaChange={changeAreaId}
           modoQuiosque={modoQuiosque}
           onToggleQuiosque={toggleQuiosque}
+          imprimirAtivo={imprimirAtivo}
+          onToggleImprimir={handleToggleImprimir}
       />
 
       <Grid container spacing={{ xs: 1.5, sm: 2 }} sx={{ flex: 1, minHeight: 0 }}>
@@ -123,11 +145,11 @@ const Checkin = () => {
                     accentColor="#00FF88"
                     label="Leitor ou CPF"
                     placeholder="Bipe, digite o CPF ou toque no ícone"
-                    helperText="Enter libera a entrada na hora, sem pulseira"
+                    helperText="Enter confere os dados do participante e abre para pulseira"
                     onConfirm={(val) => {
                         const cod = (val || barcodeValue || '').trim();
                         if (cod) {
-                            executarLeituraRapida(cod, 'checkin', 'barcode');
+                            abrirConferenciaPorCodigo(cod);
                             setBarcodeValue('');
                         }
                     }}
@@ -275,7 +297,18 @@ const Checkin = () => {
           open={lendoCamera}
           onClose={() => setLendoCamera(false)}
           titulo="Entrada pela câmera"
-          onLeitura={(cod) => executarLeituraRapida(cod, 'checkin', 'qrcode')}
+          onLeitura={(cod) => {
+              setLendoCamera(false);
+              abrirConferenciaPorCodigo(cod);
+          }}
+      />
+
+      {/* MODAL DE PRÉ-VISUALIZAÇÃO DA ETIQUETA / CARTÃO */}
+      <PreviewEtiquetaDialog
+          open={!!previewEtiquetaPessoaId}
+          pessoaId={previewEtiquetaPessoaId}
+          eventoId={eventoId}
+          onClose={() => setPreviewEtiquetaPessoaId(null)}
       />
 
       {/* DIALOG DETALHADO DO CARD DO PARTICIPANTE */}

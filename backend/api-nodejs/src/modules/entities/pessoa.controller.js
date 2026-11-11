@@ -334,25 +334,43 @@ class PessoaController {
                     .catch(e => logger.error('[AutoDelete] Erro Status:', e));
             }
 
-            // 5. Notificar por e-mail se for APROVAÇÃO
+            // 5. Notificar por e-mail se for APROVAÇÃO (para a Empresa e DIRETAMENTE para a Pessoa)
             if (status === 'autorizado' && currentPessoa.status_acesso !== 'autorizado') {
+                const qrFinal = updateData.qr_code || currentPessoa.qr_code;
                 const empresa = currentPessoa.empresas;
-                if (empresa?.email) {
+
+                // E-mail para a pessoa cadastrada com seu QR Code de acesso
+                if (currentPessoa.email) {
+                    try {
+                        await emailService.sendApprovalNotification(
+                            currentPessoa.email,
+                            currentPessoa.nome_completo,
+                            empresa?.nome || 'A2 Eventos',
+                            qrFinal
+                        );
+                        logger.info(`📧 [Approval] QR Code enviado ao participante: ${currentPessoa.email}`);
+                    } catch (emailErr) {
+                        logger.error({ err: emailErr, pessoa_email: currentPessoa.email }, 'Failed to send approval email to person');
+                    }
+                }
+
+                // Notificar empresa também se tiver e-mail cadastrado
+                if (empresa?.email && empresa.email !== currentPessoa.email) {
                     try {
                         await emailService.sendApprovalNotification(
                             empresa.email,
                             currentPessoa.nome_completo,
                             empresa.nome,
-                            updateData.qr_code
+                            qrFinal
                         );
-                        logger.info('Approval email sent', {
+                        logger.info('Approval email sent to company', {
                             company_id: empresa.id,
                             company_email: empresa.email
                         });
                     } catch (emailErr) {
                         logger.error(
                             { err: emailErr, company_email: empresa.email },
-                            'Failed to send approval email'
+                            'Failed to send approval email to company'
                         );
                     }
                 }
@@ -497,6 +515,17 @@ class PessoaController {
                 });
             }
 
+            // 5. Notificar por e-mail com QR Code (pessoa e empresa)
+            const qrParaEnvio = qrCodeGenerated?.code || pessoa.qr_code;
+            if (pessoa.email) {
+                emailService.sendApprovalNotification(
+                    pessoa.email,
+                    pessoa.nome_completo,
+                    pessoa.empresas?.nome || 'A2 Eventos',
+                    qrParaEnvio
+                ).catch(err => logger.error({ err, email: pessoa.email }, 'Falha ao enviar QR Code ao participante'));
+            }
+
             await auditService.logEntity(req, 'APPROVE_PERSON', 'PESSOAS', id, {
                 nome: pessoa.nome_completo,
                 areas: areas_autorizadas?.length || 0
@@ -604,6 +633,57 @@ class PessoaController {
         } catch (error) {
             logger.error(`Erro ao revogar liberação manual da pessoa ${req.params.id}: ${error.message}`);
             return ApiResponse.error(res, error.message, 500);
+        }
+    }
+
+    /**
+     * Reenvia manualmente o e-mail contendo o QR Code de acesso ao participante.
+     */
+    async reenviarQRCode(req, res) {
+        try {
+            const { id } = req.params;
+            const eventoId = req.event?.id;
+            const supabaseClient = req.supabase || supabase;
+
+            const { data: pessoa, error: pErr } = await supabaseClient
+                .from('pessoas')
+                .select('id, nome_completo, email, qr_code, cpf, empresas(nome)')
+                .eq('id', id)
+                .eq('evento_id', eventoId)
+                .single();
+
+            if (pErr || !pessoa) {
+                return ApiResponse.error(res, 'Pessoa não encontrada neste evento.', 404);
+            }
+
+            if (!pessoa.email) {
+                return ApiResponse.error(res, 'Participante não possui e-mail cadastrado.', 400);
+            }
+
+            // Se ainda não tiver QR Code, gera agora
+            let qrCode = pessoa.qr_code;
+            if (!qrCode) {
+                const qrGenerator = require('../../utils/qrGenerator');
+                const qrData = await qrGenerator.generate(pessoa.cpf || pessoa.id);
+                qrCode = qrData.code;
+                await supabaseClient.from('pessoas').update({ qr_code: qrCode }).eq('id', id);
+            }
+
+            await emailService.sendApprovalNotification(
+                pessoa.email,
+                pessoa.nome_completo,
+                pessoa.empresas?.nome || 'A2 Eventos',
+                qrCode
+            );
+
+            logger.info(`📧 QR Code reenviado com sucesso para ${pessoa.email}`);
+            return ApiResponse.success(res, {
+                success: true,
+                message: `QR Code enviado com sucesso para ${pessoa.email}`
+            });
+        } catch (error) {
+            logger.error(`Erro ao reenviar QR Code para pessoa ${req.params.id}: ${error.message}`);
+            return ApiResponse.error(res, error.message || 'Erro ao enviar e-mail.', 500);
         }
     }
 }

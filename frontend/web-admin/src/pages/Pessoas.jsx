@@ -43,6 +43,7 @@ const Pessoas = () => {
   const [qrImage, setQrImage] = React.useState('');
   const [qrPessoa, setQrPessoa] = React.useState(null);
   const [qrLoading, setQrLoading] = React.useState(false);
+  const [enviandoEmailQR, setEnviandoEmailQR] = React.useState(false);
   const {
     // States/Params
     search, setSearch,
@@ -118,6 +119,19 @@ const Pessoas = () => {
     }
   };
 
+
+  const handleReenviarEmailQR = async () => {
+    if (!qrPessoa?.id) return;
+    try {
+      setEnviandoEmailQR(true);
+      await api.post(`/pessoas/${qrPessoa.id}/reenviar-qrcode`);
+      enqueueSnackbar(`QR Code enviado com sucesso para ${qrPessoa.email || 'o e-mail cadastrado'}!`, { variant: 'success' });
+    } catch (err) {
+      enqueueSnackbar(err.response?.data?.error || 'Erro ao enviar e-mail com QR Code.', { variant: 'error' });
+    } finally {
+      setEnviandoEmailQR(false);
+    }
+  };
 
   return (
     <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 }, maxWidth: '100%', overflowX: 'hidden' }}>
@@ -422,9 +436,27 @@ const Pessoas = () => {
             </Box>
           )}
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
           <Button variant="outlined" onClick={() => setOpenQR(false)} sx={botaoSecundario}>Fechar</Button>
-          {!qrLoading && <Button variant="contained" onClick={() => { const link = document.createElement('a'); link.href = qrImage; link.download = `QR_${qrPessoa?.nome}.png`; link.click(); }} sx={{ bgcolor: '#00FF88', color: '#000000', fontWeight: 700, height: 38 }}>Baixar png</Button>}
+          {!qrLoading && (
+            <>
+              <Button
+                variant="outlined"
+                onClick={handleReenviarEmailQR}
+                disabled={enviandoEmailQR}
+                sx={{ borderColor: 'rgba(0, 212, 255, 0.4)', color: '#00D4FF', fontWeight: 600, height: 38 }}
+              >
+                {enviandoEmailQR ? 'Enviando...' : 'Enviar por E-mail'}
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => { const link = document.createElement('a'); link.href = qrImage; link.download = `QR_${qrPessoa?.nome}.png`; link.click(); }}
+                sx={{ bgcolor: '#00FF88', color: '#000000', fontWeight: 700, height: 38 }}
+              >
+                Baixar png
+              </Button>
+            </>
+          )}
         </DialogActions>
       </Dialog>
     </Box>

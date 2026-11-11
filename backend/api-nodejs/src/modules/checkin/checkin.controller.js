@@ -924,9 +924,14 @@ class AccessController {
                 return ApiResponse.error(res, 'Código inválido.', 400);
             }
             // Comparar com id (UUID) só quando o código for um UUID — senão o banco rejeita a consulta inteira
-            const filtros = [`numero_pulseira.eq.${safeCodigo}`];
+            const filtros = [`numero_pulseira.eq.${safeCodigo}`, `qr_code.eq.${safeCodigo}`];
             const cpfDigitos = safeCodigo.replace(/\D/g, '');
-            if (cpfDigitos.length === 11) filtros.push(`cpf.eq.${cpfDigitos}`);
+            if (cpfDigitos.length === 11) {
+                const cpfFmt = cpfDigitos.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+                filtros.push(`cpf.eq.${cpfDigitos}`, `cpf.eq.${cpfFmt}`);
+            } else if (cpfDigitos.length > 0) {
+                filtros.push(`cpf.eq.${cpfDigitos}`);
+            }
             if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(safeCodigo)) filtros.push(`id.eq.${safeCodigo}`);
 
             const { data: pessoas, error } = await supabaseClient

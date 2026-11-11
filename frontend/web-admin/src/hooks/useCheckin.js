@@ -401,6 +401,38 @@ export const useCheckin = (defaultMode, options = {}) => {
         }
     };
 
+    /**
+     * Consulta participante por QR Code / CPF / Código e abre o modal de credenciamento
+     * para conferência visual de dados e atribuição de pulseira antes de liberar o acesso.
+     */
+    const abrirConferenciaPorCodigo = async (codigo) => {
+        if (!codigo || !eventoId) return { success: false, error: 'Código ou evento ausente' };
+        try {
+            setLoading(true);
+            const res = await api.get(`/access/consultar-pulseira/${encodeURIComponent(String(codigo).trim())}`, {
+                params: { evento_id: eventoId }
+            });
+            if (res.data?.success && res.data?.data) {
+                const pessoa = res.data.data;
+                tocarBipeNotificacao();
+                handleSelectPessoa(pessoa);
+                return { success: true, data: pessoa };
+            }
+            throw new Error(res.data?.error || 'Participante não localizado');
+        } catch (error) {
+            setCheckinResult('negado');
+            setResultMessage(error.response?.data?.error || 'Participante não localizado pelo código/QR Code.');
+            clearTimeout(resetTimerRef.current);
+            resetTimerRef.current = setTimeout(() => {
+                setCheckinResult(null);
+                setResultMessage('');
+            }, 3500);
+            return { success: false, error: error.response?.data?.error || error.message };
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // Acesso guardado no aparelho (servidor fora): libera a fila da recepção e avisa o operador
     const mostrarSalvoOffline = (mensagem) => {
         tocarBipeNotificacao();
@@ -676,6 +708,7 @@ export const useCheckin = (defaultMode, options = {}) => {
         refreshLogs,
         areaId, changeAreaId, eventAreas, pulseiraTypes,
         consultarPulseiraAPI,
+        abrirConferenciaPorCodigo,
         performCheckin,
         executarLeituraRapida,
         handleLinkPulseiraAndCheckin,

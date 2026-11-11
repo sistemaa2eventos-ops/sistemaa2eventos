@@ -24,6 +24,7 @@ router.post('/:id/liberacao-manual', authorize('admin', 'supervisor', 'operador'
 router.delete('/:id/liberacao-manual', authorize('admin', 'supervisor', 'operador'), pessoaController.revogarLiberacaoManual.bind(pessoaController));
 router.post('/:id/qr-code', authorize('admin', 'supervisor', 'operador'), pessoaController.generateQRCode.bind(pessoaController));
 router.get('/:id/qrcode', pessoaController.generateQRCode.bind(pessoaController));
+router.post('/:id/reenviar-qrcode', authorize('admin', 'supervisor', 'operador'), pessoaController.reenviarQRCode.bind(pessoaController));
 
 //Fluxo de Aprovação
 router.post('/:id/approve', authorize('admin', 'supervisor'), pessoaController.approve.bind(pessoaController));

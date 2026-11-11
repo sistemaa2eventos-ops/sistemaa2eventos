@@ -6,7 +6,6 @@ import {
     ListItemIcon,
     ListItemText,
     Divider,
-    Avatar,
     Typography,
     Box,
     Menu,
@@ -76,7 +75,7 @@ const StyledDrawer = styled(Drawer)(() => ({
     },
 }));
 
-const LogoContainer = styled(Box)(({ theme }) => ({
+const LogoContainer = styled(Box)(() => ({
     padding: '16px 16px 14px 16px',
     display: 'flex',
     flexDirection: 'column',

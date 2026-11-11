@@ -1,9 +1,10 @@
 import React from 'react';
-import { Box, Typography, IconButton, Tooltip } from '@mui/material';
+import { Box, Typography, IconButton, Tooltip, FormControlLabel, Switch } from '@mui/material';
 import {
   Fullscreen as KioskIcon,
   FullscreenExit as ExitKioskIcon,
-  OpenInNew as JanelaIcon
+  OpenInNew as JanelaIcon,
+  Print as PrintIcon
 } from '@mui/icons-material';
 import EstacaoFacialSelector from '../common/EstacaoFacialSelector';
 import AreaSelector from '../common/AreaSelector';
@@ -33,7 +34,7 @@ export const BotaoJanelaRegistros = ({ tipo, cor }) => (
 
 /**
  * Cabeçalho das telas de operação (check-in/checkout): título e hora à esquerda;
- * estação do leitor facial, área e modo quiosque (só ícone) à direita.
+ * switch de impressão, estação do leitor facial, área e modo quiosque (só ícone) à direita.
  */
 const CabecalhoOperacao = ({
   titulo,
@@ -45,7 +46,9 @@ const CabecalhoOperacao = ({
   areaId,
   onAreaChange,
   modoQuiosque,
-  onToggleQuiosque
+  onToggleQuiosque,
+  imprimirAtivo = null,
+  onToggleImprimir = null
 }) => (
   <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: { xs: 1, sm: 1.5 }, mb: { xs: 1.5, sm: 2 } }}>
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mr: 'auto', minWidth: 0 }}>
@@ -61,6 +64,37 @@ const CabecalhoOperacao = ({
     </Box>
 
     <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1, width: { xs: '100%', sm: 'auto' }, justifyContent: { xs: 'space-between', sm: 'flex-end' } }}>
+      {onToggleImprimir && (
+        <Tooltip title="Ao autorizar a entrada ou credenciar, abre a janela de impressão da etiqueta/crachá">
+          <Box sx={{
+            display: 'flex', alignItems: 'center', px: 1.5, py: 0.5,
+            bgcolor: imprimirAtivo ? 'rgba(0, 255, 136, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+            border: `1px solid ${imprimirAtivo ? 'rgba(0, 255, 136, 0.4)' : 'rgba(255, 255, 255, 0.12)'}`,
+            borderRadius: 1.5,
+            transition: 'all 0.2s ease'
+          }}>
+            <PrintIcon sx={{ fontSize: 18, color: imprimirAtivo ? '#00FF88' : 'rgba(255, 255, 255, 0.5)', mr: 1 }} />
+            <FormControlLabel
+              control={
+                <Switch
+                  size="small"
+                  checked={!!imprimirAtivo}
+                  onChange={(e) => onToggleImprimir(e.target.checked)}
+                  color="success"
+                  sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: '#00FF88' } }}
+                />
+              }
+              label={
+                <Typography variant="caption" sx={{ color: imprimirAtivo ? '#00FF88' : 'rgba(255, 255, 255, 0.7)', fontWeight: 600, userSelect: 'none' }}>
+                  {imprimirAtivo ? 'Imprimir etiqueta: ON' : 'Imprimir etiqueta: OFF'}
+                </Typography>
+              }
+              sx={{ m: 0 }}
+            />
+          </Box>
+        </Tooltip>
+      )}
+
       {!modoQuiosque && <EstacaoFacialSelector compacto {...estacao} />}
       <AreaSelector compacto areas={areas} value={areaId} onChange={onAreaChange} accentColor={cor} />
       <Tooltip title={modoQuiosque ? 'Sair do modo quiosque' : 'Modo quiosque (tela cheia)'}>
