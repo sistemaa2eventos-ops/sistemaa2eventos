@@ -301,7 +301,10 @@ const AJUDAS = {
             'No Modo Gabarito, a arte fica com opacidade regulável na tela mas é excluída automaticamente da impressão.',
             'No cadastro do evento, ative "Habilitar impressão de etiquetas" para imprimir direto no credenciamento.'
         ],
-        dicas: ['Para impressão instantânea sem diálogo do Windows na recepção, inicie o Chrome com o parâmetro --kiosk-printing.']
+        dicas: [
+            'Atalhos de teclado: use as setas para mover o elemento selecionado com precisão de 1 px (Shift + setas move 10 px) e Delete ou Backspace para excluir.',
+            'Para impressão instantânea sem diálogo do Windows na recepção, inicie o Chrome com o parâmetro --kiosk-printing.'
+        ]
     },
     '/config/veiculos': {
         titulo: 'Veículos e estacionamento',

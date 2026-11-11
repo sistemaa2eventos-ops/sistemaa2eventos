@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
     Box, Typography, Grid, TextField, IconButton, Paper, Stack,
     Button, Tooltip, MenuItem, FormControl, InputLabel, Select,
@@ -37,7 +37,8 @@ import {
     ZoomOut as ZoomOutIcon,
     RestartAlt as ResetZoomIcon,
     Tune as TuneIcon,
-    AddCircleOutline as AddElementIcon
+    AddCircleOutline as AddElementIcon,
+    Keyboard as KeyboardIcon
 } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import { Rnd } from 'react-rnd';
@@ -311,13 +312,64 @@ const ConfigEtiquetas = () => {
     };
 
     const updateElement = (id, newProps) => {
-        setElements(elements.map(el => el.id === id ? { ...el, ...newProps } : el));
+        setElements(prev => prev.map(el => el.id === id ? { ...el, ...newProps } : el));
     };
 
-    const deleteElement = (id) => {
-        setElements(elements.filter(el => el.id !== id));
-        if (selectedId === id) setSelectedId(null);
-    };
+    const deleteElement = useCallback((id) => {
+        setElements(prev => prev.filter(el => el.id !== id));
+        setSelectedId(prev => (prev === id ? null : prev));
+    }, []);
+
+    // Atalhos de Teclado: Setas para ajuste milimétrico e Delete para excluir elemento selecionado
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            // Ignora se o foco estiver digitando dentro de campos de formulário
+            const tag = e.target?.tagName?.toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || e.target?.isContentEditable) {
+                return;
+            }
+
+            if (!selectedId) return;
+
+            // Teclas Delete ou Backspace: exclui o elemento selecionado
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                e.preventDefault();
+                deleteElement(selectedId);
+                enqueueSnackbar('Elemento excluído!', { variant: 'info', autoHideDuration: 1500 });
+                return;
+            }
+
+            // Setas do teclado: movimentação milimétrica (1px normal, 10px com Shift)
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                e.preventDefault();
+                const step = e.shiftKey ? 10 : 1;
+
+                setElements(prevElements => {
+                    const el = prevElements.find(item => item.id === selectedId);
+                    if (!el) return prevElements;
+
+                    let dx = 0;
+                    let dy = 0;
+                    if (e.key === 'ArrowUp') dy = -step;
+                    if (e.key === 'ArrowDown') dy = step;
+                    if (e.key === 'ArrowLeft') dx = -step;
+                    if (e.key === 'ArrowRight') dx = step;
+
+                    const novoX = Math.round(Math.max(0, Math.min(canvasWidth - el.width, el.x + dx)));
+                    const novoY = Math.round(Math.max(0, Math.min(canvasHeight - el.height, el.y + dy)));
+
+                    return prevElements.map(item =>
+                        item.id === selectedId ? { ...item, x: novoX, y: novoY } : item
+                    );
+                });
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [selectedId, canvasWidth, canvasHeight, deleteElement, enqueueSnackbar]);
 
     const duplicateElement = (elToDup) => {
         if (!elToDup) return;
@@ -827,6 +879,14 @@ const ConfigEtiquetas = () => {
                                                     </IconButton>
                                                 </Tooltip>
                                             </Stack>
+                                        </Box>
+
+                                        {/* Barra de Atalhos de Teclado */}
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1, bgcolor: 'rgba(0, 212, 255, 0.05)', borderRadius: 1.5, border: '1px dashed rgba(0, 212, 255, 0.25)' }}>
+                                            <KeyboardIcon sx={{ fontSize: 18, color: '#00D4FF' }} />
+                                            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.68rem', lineHeight: 1.25 }}>
+                                                <strong>Setas:</strong> ajuste fino (1px) | <strong>Shift + Setas:</strong> 10px | <strong>Del/Backspace:</strong> excluir
+                                            </Typography>
                                         </Box>
 
                                         {/* Barra de Alinhamento Rápido estilo Canva */}
