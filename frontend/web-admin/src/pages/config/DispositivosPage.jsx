@@ -61,6 +61,17 @@ export default function DispositivosPage() {
   const [openDialog, setOpenDialog] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  // Câmeras do evento para vincular à estação (check-in / check-out)
+  const [camerasEvento, setCamerasEvento] = useState([]);
+
+  useEffect(() => {
+    if (!openDialog) return;
+    const eventoId = localStorage.getItem('active_evento_id');
+    if (!eventoId) return;
+    api.get('/cameras', { params: { evento_id: eventoId }, hideDefaultError: true, timeout: 8000 })
+      .then(({ data }) => setCamerasEvento(data.data || []))
+      .catch(() => setCamerasEvento([]));
+  }, [openDialog]);
 
   // Estados de ação por dispositivo
   const [actionLoading, setActionLoading] = useState({});
@@ -836,6 +847,31 @@ export default function DispositivosPage() {
                     </Typography>
                   }
                 />
+              </Box>
+            )}
+
+            {formData.tipo && formData.tipo !== 'camera' && formData.tipo !== 'impressora' && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pt: 1.5, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <Typography variant="subtitle2" sx={{ color: CYAN, fontWeight: 700 }}>
+                  Câmeras que identificam a pessoa nesta estação
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#94A3B8', mt: -0.5 }}>
+                  Quando uma destas câmeras reconhece alguém, a estação faz o mesmo que faz com o leitor facial: no check-in abre a conferência de dados e a pulseira; no check-out dá a saída. Só câmeras com IA ligada aparecem aqui. O operador precisa estar vinculado a esta estação.
+                </Typography>
+                <FormControl fullWidth size="small">
+                  <InputLabel id="cameras-vinc-label">Câmeras com IA</InputLabel>
+                  <Select labelId="cameras-vinc-label" multiple label="Câmeras com IA"
+                    value={formData.config?.cameras_vinculadas || []}
+                    onChange={e => setFormData(p => ({ ...p, config: { ...(p.config || {}), cameras_vinculadas: e.target.value } }))}
+                    renderValue={(sel) => camerasEvento.filter(c => sel.includes(c.id)).map(c => c.nome).join(', ') || 'Nenhuma'}>
+                    {camerasEvento.filter(c => c.ia_ativa === true).map(c => (
+                      <MenuItem key={c.id} value={c.id}>{c.nome}</MenuItem>
+                    ))}
+                    {camerasEvento.filter(c => c.ia_ativa === true).length === 0 && (
+                      <MenuItem disabled value="">Nenhuma câmera com IA ligada neste evento</MenuItem>
+                    )}
+                  </Select>
+                </FormControl>
               </Box>
             )}
           </Box>

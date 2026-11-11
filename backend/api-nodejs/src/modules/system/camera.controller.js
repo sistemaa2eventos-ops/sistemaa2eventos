@@ -18,6 +18,7 @@ const videoRelay = require('../../services/videoRelay');
 const mp4Relay = require('../../services/mp4Relay');
 const iaConfig = require('./iaConfig.service');
 const gravacaoService = require('./gravacao.service');
+const { COLUNAS_PESSOA_ACESSO } = require('../checkin/services/colunasPessoa');
 const jwt = require('jsonwebtoken');
 const qualidadeDe = (req) => (req.query.qualidade === 'mini' ? 'mini' : 'foco');
 const iaHeaders = () => (process.env.IA_CHAVE_INTERNA ? { 'X-IA-Chave': process.env.IA_CHAVE_INTERNA } : {});
@@ -258,6 +259,49 @@ async function processarDeteccoesCamera(cam, results, annotatedB64, { origem = '
                 logger.error(`Erro ao verificar watchlist na câmera: ${wErr.message}`);
             }
         }
+    }
+
+    // Estações de check-in / check-out com esta câmera vinculada
+    encaminharParaEstacoes(cam, results, eventoId).catch(err => logger.warn(`[Câmera→estação] ${err.message}`));
+}
+
+// Estação já avisada desta pessoa há pouco: não abre a conferência de novo (o rastreamento repete a leitura)
+const ULTIMA_ESTACAO = new Map(); // `${dispositivo}:${pessoa}` → ms
+const ESTACAO_REPETIR_MS = 20000;
+
+/**
+ * Câmera com IA que reconheceu alguém: avisa as ESTAÇÕES vinculadas a ela (config.cameras_vinculadas
+ * do dispositivo). No check-in abre a janela de conferência; na saída (estação de checkout) faz a
+ * baixa. Usa o mesmo evento do leitor facial, então só a estação vinculada ao operador reage.
+ */
+async function encaminharParaEstacoes(cam, results, eventoId) {
+    if (!eventoId || !Array.isArray(results)) return;
+    const reconhecidos = results.map(r => r.matched_person).filter(mp => mp?.id);
+    if (!reconhecidos.length) return;
+    const { data: dispositivos } = await supabase.from('dispositivos_acesso')
+        .select('id, nome, tipo, config').eq('evento_id', eventoId);
+    const estacoes = (dispositivos || []).filter(d => d.tipo !== 'camera' && d.tipo !== 'impressora'
+        && Array.isArray(d.config?.cameras_vinculadas) && d.config.cameras_vinculadas.includes(cam.id));
+    if (!estacoes.length) return;
+
+    const intelbras = require('../devices/intelbras.controller');
+    const agora = Date.now();
+    for (const mp of reconhecidos) {
+        const pendentes = estacoes.filter(est => agora - (ULTIMA_ESTACAO.get(`${est.id}:${mp.id}`) || 0) >= ESTACAO_REPETIR_MS);
+        if (!pendentes.length) continue;
+        const { data: pessoa } = await supabase.from('pessoas')
+            .select(`${COLUNAS_PESSOA_ACESSO}, empresas(nome, ativo)`).eq('id', mp.id).maybeSingle();
+        if (!pessoa) continue;
+        for (const est of pendentes) {
+            ULTIMA_ESTACAO.set(`${est.id}:${mp.id}`, agora);
+            const sessao = await intelbras._buscarSessaoOperador(est.id);
+            intelbras._emitCredenciamento({ id: est.id, nome: est.nome }, sessao, pessoa,
+                Math.round((mp.similarity || 0) * 100), eventoId);
+            logger.info(`🎯 [Câmera ${cam.nome}] ${pessoa.nome_completo} → estação ${est.nome}`);
+        }
+    }
+    if (ULTIMA_ESTACAO.size > 2000) {
+        for (const [k, t] of ULTIMA_ESTACAO) if (agora - t > ESTACAO_REPETIR_MS) ULTIMA_ESTACAO.delete(k);
     }
 }
 
