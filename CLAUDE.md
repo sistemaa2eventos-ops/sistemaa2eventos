@@ -739,6 +739,17 @@ docker system prune -af
 **Registre cada deploy aqui:**
 
 ```
+2026-11-12 - Deploy b71d30d (editor de crachás: seleção por área, grupos, escala em bloco, arte como camada e grade visível)
+├─ Mudanças: seleção por área arrastando o mouse (marquee), alças e botões de escala em bloco (-10%/+10%),
+│            agrupamento com Ctrl+G/Ctrl+Shift+G e Z-Index contíguo, exclusão em lote com Delete, arte do
+│            evento como camada com Z-Index real (trazer para frente, enviar para trás), filtro na impressão
+│            física e modal de credenciamento para "Só referência", grade visível com 4 cores/intensidade,
+│            e layout do editor reorganizado em 3 janelas padrão NZT
+├─ Status: ✅ OK (GitHub Actions run 43091066819); /health 200, banco conectado, painel 200
+├─ Testes: 6 testes unitários em camadas.test.mjs passaram; Jest do backend 15 suítes / 58 testes OK
+├─ Rollback: tag antes-deploy-20261111-etiquetas-editor-v2 (1234b64)
+└─ Próximo: testar fluxo completo com arte de cliente real e crachás pré-impressos no credenciamento
+
 2026-11-12 - Deploy 8941cf5 (modo de tela: normal, tela cheia, quiosque bloqueado)
 ├─ Mudanças: Usuários > "Modo de tela"; quiosque bloqueado restringe à página escolhida e exige senha de
 │            administrador ou supervisor para sair (POST /api/auth/quiosque/desbloquear, sem criar sessão);
