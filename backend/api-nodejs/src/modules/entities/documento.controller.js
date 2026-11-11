@@ -18,7 +18,7 @@ class DocumentoController {
     async uploadDocumento(req, res) {
         try {
             const { entityType, entityId } = req.params;
-            const { titulo, tipo_doc, tipo_documento_id } = req.body;
+            const { titulo, tipo_doc, tipo_documento_id, data_validade } = req.body;
 
             if (entityType !== 'empresa' && entityType !== 'pessoa') {
                 return ApiResponse.error(res, 'Entidade inválida. Use empresa ou pessoa.', 400);
@@ -33,7 +33,13 @@ class DocumentoController {
             // Backend processa o upload com service_role (a verificação de permissão já ocorreu na rota)
             const supabaseClient = req.supabase || supabase;
             const data = await documentoService.uploadDocumento(supabaseClient, {
-                entityType, entityId: safeEntityId, titulo, tipo_doc, tipo_documento_id: _s(tipo_documento_id), file: req.file
+                entityType,
+                entityId: safeEntityId,
+                titulo,
+                tipo_doc,
+                tipo_documento_id: _s(tipo_documento_id),
+                data_validade: _s(data_validade),
+                file: req.file
             });
 
             return ApiResponse.success(res, data, 201);
@@ -183,6 +189,25 @@ class DocumentoController {
         } catch (error) {
             logger.error('Erro ao listar colaboradores (documentos):', error.message);
             return ApiResponse.error(res, 'Erro ao buscar colaboradores.');
+        }
+    }
+
+    /**
+     * Empresas do evento com documentos entregues e situação documental
+     */
+    async listarEmpresas(req, res) {
+        try {
+            const eventoId = eventoDaRequisicao(req);
+            if (!eventoId) return ApiResponse.error(res, 'Evento não identificado', 400);
+            const { search = '', page = 1, limit = 30, pendentes } = req.query;
+            const result = await documentoService.listarEmpresas(eventoId, {
+                search, page: parseInt(page) || 1, limit: Math.min(parseInt(limit) || 30, 100),
+                somentePendentes: pendentes === '1' || pendentes === 'true'
+            });
+            return res.status(200).json({ success: true, data: result.data, metadata: { total: result.total, page: result.page, limit: result.limit } });
+        } catch (error) {
+            logger.error('Erro ao listar empresas (documentos):', error.message);
+            return ApiResponse.error(res, 'Erro ao buscar empresas.');
         }
     }
 

@@ -216,6 +216,20 @@ def yaw_estimado(kps: np.ndarray) -> float:
 app = FastAPI(title="NZT - IA de rastreamento facial", version="4.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
+
+@app.middleware("http")
+async def _allow_private_network(request: Request, call_next):
+    if request.method == "OPTIONS" and request.headers.get("access-control-request-private-network") == "true":
+        return Response(status_code=204, headers={
+            "Access-Control-Allow-Origin": request.headers.get("origin") or "*",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Private-Network": "true",
+        })
+    resp = await call_next(request)
+    resp.headers["Access-Control-Allow-Private-Network"] = "true"
+    return resp
+
 # ==========================================================
 # 2. ÍNDICE DE ROSTOS (FAISS, vários vetores por pessoa)
 # ==========================================================
@@ -1412,6 +1426,65 @@ def get_engine_status():
                                 "ok": ultima_carga["ok"], "erro": ultima_carga["erro"]},
         "vector_search_engine": "FAISS IndexFlatIP",
     }
+
+
+class ConectarEventoRequest(BaseModel):
+    token: str
+    vps_url: Optional[str] = None
+    agent_name: Optional[str] = None
+
+
+@app.get("/api/pc-compatibilidade")
+def get_pc_compatibilidade():
+    """Retorna diagnóstico de hardware e ambiente deste computador local."""
+    import platform
+    hw = "GPU (DirectML)" if "DmlExecutionProvider" in active_providers else (
+        "GPU (CUDA)" if "CUDAExecutionProvider" in active_providers else "CPU")
+    return {
+        "success": True,
+        "os": f"{platform.system()} {platform.release()} ({platform.machine()})",
+        "cpu_threads": os.cpu_count() or 1,
+        "hardware_acceleration": hw,
+        "active_providers": active_providers,
+        "supabase_configured": bool(SUPABASE_KEY),
+        "registered_faces_indexed": len(indice.pessoas),
+        "perfil_atual": CFG["perfil"],
+    }
+
+
+@app.post("/api/conectar-evento")
+def conectar_evento_local(req: ConectarEventoRequest):
+    """Atualiza o AGENT_TOKEN no backend/agent-local/.env deste PC e inicia/reinicia o agente local."""
+    import subprocess
+    raiz = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    dir_agente = os.path.join(raiz, "backend", "agent-local")
+    env_path = os.path.join(dir_agente, ".env")
+    linhas = {}
+    if os.path.exists(env_path):
+        try:
+            with open(env_path, "r", encoding="utf-8") as f:
+                for ln in f:
+                    if "=" in ln and not ln.strip().startswith("#"):
+                        k, v = ln.strip().split("=", 1)
+                        linhas[k.strip()] = v.strip()
+        except Exception:
+            pass
+    linhas["VPS_URL"] = (req.vps_url or linhas.get("VPS_URL") or "https://painel.nzt.app.br").rstrip("/")
+    linhas["AGENT_TOKEN"] = req.token.strip()
+    linhas["AGENT_NAME"] = (req.agent_name or linhas.get("AGENT_NAME") or "PC IA Facial").strip()
+    linhas.setdefault("IA_URL", "http://127.0.0.1:8000")
+    os.makedirs(dir_agente, exist_ok=True)
+    with open(env_path, "w", encoding="utf-8") as f:
+        for k, v in linhas.items():
+            f.write(f"{k}={v}\n")
+    script_ps1 = os.path.join(raiz, "scripts", "ligar-ia-facial.ps1")
+    if sys.platform == "win32" and os.path.exists(script_ps1):
+        subprocess.Popen(
+            ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script_ps1, "reiniciar-agente"],
+            cwd=raiz,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000),
+        )
+    return {"success": True, "message": "Agente local configurado e iniciado neste PC."}
 
 
 if __name__ == "__main__":

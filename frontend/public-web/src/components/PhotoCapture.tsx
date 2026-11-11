@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import Webcam from 'react-webcam';
-import { Camera, RefreshCw, Trash2, CheckCircle, AlertCircle, Upload, ShieldCheck, Sparkles } from 'lucide-react';
+import { Camera, RefreshCw, Trash2, AlertCircle, ShieldCheck } from 'lucide-react';
 import { FaceValidator } from '../utils/FaceValidator';
 
 interface PhotoCaptureProps {
@@ -11,43 +11,133 @@ interface PhotoCaptureProps {
     initialPhoto?: string | null;
 }
 
+const traduzirErroCamera = (err: unknown): string => {
+    const nome = (err as { name?: string })?.name || '';
+    const msg = String((err as { message?: string })?.message || err || '');
+    if (nome === 'NotAllowedError' || /permission|denied/i.test(msg)) {
+        return 'Permissão da câmera bloqueada. Clique no ícone de cadeado/câmera na barra de endereço do navegador, permita o acesso e tente de novo.';
+    }
+    if (nome === 'NotFoundError' || /not found|no camera|requested device/i.test(msg)) {
+        return 'Nenhuma câmera foi encontrada conectada a este dispositivo.';
+    }
+    if (nome === 'NotReadableError' || /in use|could not start|hardware/i.test(msg)) {
+        return 'A câmera está ocupada por outro aplicativo (OBS, Teams, Zoom ou outra aba). Feche o outro app ou troque a câmera.';
+    }
+    if (typeof window !== 'undefined' && !window.isSecureContext) {
+        return 'A câmera só pode ser aberta em conexão segura (HTTPS ou localhost).';
+    }
+    return 'Não foi possível iniciar o vídeo da câmera. Tente trocar de câmera ou enviar uma foto da galeria.';
+};
+
 export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: PhotoCaptureProps) {
     const webcamRef = useRef<Webcam>(null);
     const [imgSrc, setImgSrc] = useState<string | null>(initialPhoto);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
+    const [cameraReady, setCameraReady] = useState(false);
+    const [fallbackMode, setFallbackMode] = useState(false);
+    const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+    const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [faceDetected, setFaceDetected] = useState(false);
-    const [guidance, setGuidance] = useState("Aguardando câmera...");
+    const [guidance, setGuidance] = useState("Iniciando câmera...");
 
-    const videoConstraints = {
-        width: 640,
-        height: 480,
-        facingMode: "user"
+    const atualizarListaCameras = useCallback(async () => {
+        if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) return;
+        try {
+            const all = await navigator.mediaDevices.enumerateDevices();
+            const cams = all.filter(d => d.kind === 'videoinput');
+            setDevices(cams);
+            setSelectedDeviceId(prev => {
+                if (prev && cams.some(c => c.deviceId === prev)) return prev;
+                const fisica = cams.find(c => !/obs|virtual/i.test(c.label || ''));
+                return (fisica || cams[0])?.deviceId || '';
+            });
+        } catch {
+            // ignorar falha de enumeração
+        }
+    }, []);
+
+    const abrirCamera = () => {
+        setError(null);
+        setCameraReady(false);
+        setFallbackMode(false);
+        setGuidance("Iniciando câmera...");
+        setIsCameraOpen(true);
+        atualizarListaCameras();
     };
+
+    const handleUserMedia = () => {
+        setCameraReady(true);
+        setError(null);
+        setGuidance("Posicione seu rosto dentro do quadro.");
+        atualizarListaCameras();
+    };
+
+    const handleUserMediaError = (err: string | DOMException) => {
+        console.warn("Webcam erro:", err);
+        if (!fallbackMode) {
+            setFallbackMode(true);
+            setSelectedDeviceId('');
+            return;
+        }
+        setCameraReady(false);
+        const msg = traduzirErroCamera(err);
+        setError(msg);
+        setGuidance("Falha ao abrir câmera");
+    };
+
+    const trocarCamera = () => {
+        if (devices.length < 2) return;
+        const idx = devices.findIndex(d => d.deviceId === selectedDeviceId);
+        const next = devices[(idx + 1) % devices.length];
+        if (next) {
+            setCameraReady(false);
+            setError(null);
+            setFallbackMode(false);
+            setGuidance("Trocando câmera...");
+            setSelectedDeviceId(next.deviceId);
+        }
+    };
+
+    const videoConstraints = useMemo< boolean | MediaTrackConstraints >(() => {
+        if (fallbackMode) return true;
+        if (selectedDeviceId) {
+            return {
+                deviceId: { exact: selectedDeviceId },
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+            };
+        }
+        return {
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: "user"
+        };
+    }, [fallbackMode, selectedDeviceId]);
 
     // Sync imgSrc with prop when it changes (e.g. if cleared by parent)
     useEffect(() => {
         setImgSrc(initialPhoto);
     }, [initialPhoto]);
 
-    // Real-time detection loop
+    // Real-time detection loop (intervalo de ~250ms para não travar CPU no navegador do PC)
     useEffect(() => {
-        let animationFrame: number;
+        let timer: ReturnType<typeof setTimeout>;
         let isActive = true;
 
         const detectLoop = async () => {
             if (!isActive) return;
 
             try {
-                if (isCameraOpen && webcamRef.current?.video) {
+                if (isCameraOpen && cameraReady && webcamRef.current?.video) {
                     const video = webcamRef.current.video;
                     if (video.readyState === 4) {
                         const detection = await FaceValidator.detect(video);
                         if (isActive) {
                             if (detection) {
                                 setFaceDetected(true);
-                                setGuidance("Rosto detectado! Mantenha a posição.");
+                                setGuidance("Rosto detectado! Clique em CAPTURAR.");
                                 setError(null);
                             } else {
                                 setFaceDetected(false);
@@ -61,22 +151,22 @@ export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: P
             }
             
             if (isActive && isCameraOpen) {
-                animationFrame = requestAnimationFrame(detectLoop);
+                timer = setTimeout(detectLoop, 250);
             }
         };
 
-        if (isCameraOpen) {
+        if (isCameraOpen && cameraReady) {
             detectLoop();
         }
 
         return () => {
             isActive = false;
-            if (animationFrame) cancelAnimationFrame(animationFrame);
+            if (timer) clearTimeout(timer);
         };
-    }, [isCameraOpen]);
+    }, [isCameraOpen, cameraReady]);
 
     const capture = useCallback(async () => {
-        if (webcamRef.current) {
+        if (webcamRef.current && cameraReady) {
             const imageSrc = webcamRef.current.getScreenshot();
             if (imageSrc) {
                 setLoading(true);
@@ -86,19 +176,20 @@ export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: P
                     if (validation.isValid && validation.croppedBase64) {
                         setImgSrc(validation.croppedBase64);
                         setIsCameraOpen(false);
+                        setCameraReady(false);
                         setError(null);
                         onPhotoCaptured(validation.croppedBase64, 'camera');
                     } else {
                         setError(validation.errors[0] || "Rosto não reconhecido");
                     }
-                } catch (err) {
+                } catch {
                     setError("Erro ao processar a biometria facial.");
                 } finally {
                     setLoading(false);
                 }
             }
         }
-    }, [webcamRef, onPhotoCaptured]);
+    }, [webcamRef, cameraReady, onPhotoCaptured]);
 
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -169,13 +260,25 @@ export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: P
                     {isCameraOpen ? (
                         <>
                             <Webcam
+                                key={fallbackMode ? 'fallback' : (selectedDeviceId || 'default')}
                                 audio={false}
                                 ref={webcamRef}
                                 screenshotFormat="image/jpeg"
+                                screenshotQuality={0.92}
+                                forceScreenshotSourceSize={true}
                                 videoConstraints={videoConstraints}
                                 mirrored={true}
+                                onUserMedia={handleUserMedia}
+                                onUserMediaError={handleUserMediaError}
                                 className="w-full h-full object-cover"
                             />
+
+                            {!cameraReady && !error && (
+                                <div className="absolute inset-0 z-15 bg-slate-950/80 flex flex-col items-center justify-center gap-3 p-6 text-center">
+                                    <RefreshCw className="w-8 h-8 text-cyan-400 animate-spin" />
+                                    <span className="text-xs font-semibold text-slate-300">Iniciando câmera...</span>
+                                </div>
+                            )}
 
                             {/* Cyber Scanner Overlay */}
                             <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
@@ -201,22 +304,37 @@ export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: P
                             </div>
 
                             {/* Control Bar */}
-                            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-4 bg-slate-900/80 backdrop-blur-xl p-3 rounded-3xl border border-white/10 shadow-2xl">
+                            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-slate-900/80 backdrop-blur-xl p-3 rounded-3xl border border-white/10 shadow-2xl">
                                 <button
                                     type="button"
-                                    onClick={() => setIsCameraOpen(false)}
+                                    onClick={() => {
+                                        setIsCameraOpen(false);
+                                        setCameraReady(false);
+                                    }}
+                                    title="Fechar câmera"
                                     className="p-3 bg-white/5 text-slate-400 rounded-2xl hover:bg-white/10"
                                 >
                                     <Trash2 className="w-6 h-6" />
                                 </button>
+
+                                {devices.length > 1 && (
+                                    <button
+                                        type="button"
+                                        onClick={trocarCamera}
+                                        title="Trocar câmera"
+                                        className="p-3 bg-white/5 text-cyan-400 rounded-2xl hover:bg-white/10"
+                                    >
+                                        <RefreshCw className="w-5 h-5" />
+                                    </button>
+                                )}
                                 
                                 <button
                                     type="button"
                                     onClick={capture}
-                                    disabled={loading}
+                                    disabled={loading || !cameraReady}
                                     className={`px-8 py-3 rounded-2xl font-black tracking-widest text-xs flex items-center gap-3 transition-all
-                                        ${faceDetected 
-                                            ? 'bg-cyan-600 text-white hover:bg-cyan-500' 
+                                        ${cameraReady && !loading
+                                            ? (faceDetected ? 'bg-emerald-600 text-white hover:bg-emerald-500' : 'bg-cyan-600 text-white hover:bg-cyan-500')
                                             : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50'}`}
                                 >
                                     {loading ? (
@@ -241,7 +359,7 @@ export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: P
                             <div className="flex flex-col w-full gap-3">
                                 <button
                                     type="button"
-                                    onClick={() => setIsCameraOpen(true)}
+                                    onClick={abrirCamera}
                                     className="w-full bg-white text-slate-950 font-bold py-3.5 rounded-xl text-sm"
                                 >
                                     ATIVAR CÂMERA

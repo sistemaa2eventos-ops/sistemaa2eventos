@@ -6,39 +6,82 @@
 
 export class FaceValidator {
     private static isInitialized = false;
+    private static failedInit = false;
+    private static loadingPromise: Promise<typeof import('@vladmandic/face-api') | null> | null = null;
     private static faceapi: typeof import('@vladmandic/face-api') | null = null;
 
     /**
-     * Carrega dinamicamente a biblioteca face-api e os modelos neurais.
-     * Isso impede o erro de 'TextEncoder' no servidor (SSR).
+     * Carrega dinamicamente a biblioteca face-api e os modelos neurais locais (/models).
+     * Isso impede o erro de 'TextEncoder' no servidor (SSR) e evita bloqueio de CDN pelo CSP.
      */
     static async initModels() {
         if (this.isInitialized && this.faceapi) return this.faceapi;
+        if (this.failedInit) return null;
+        if (this.loadingPromise) return this.loadingPromise;
 
-        // Import dinâmico da biblioteca (Executado apenas no Client)
-        this.faceapi = await import('@vladmandic/face-api');
-        
-        const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
-        
-        // Carrega o modelo de detecção (SSD Mobilenet v1)
-        await this.faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
-        
-        this.isInitialized = true;
-        return this.faceapi;
+        this.loadingPromise = (async () => {
+            try {
+                this.faceapi = await import('@vladmandic/face-api');
+                const tf = (this.faceapi as unknown as { tf?: { setBackend?: (b: string) => Promise<boolean>; ready?: () => Promise<void> } }).tf;
+                if (tf?.setBackend) {
+                    for (const backend of ['webgl', 'cpu']) {
+                        const ok = await tf.setBackend(backend).catch(() => false);
+                        if (ok) break;
+                    }
+                    if (tf.ready) await tf.ready();
+                }
+
+                const MODEL_URL = '/models';
+                await this.faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+                this.isInitialized = true;
+                return this.faceapi;
+            } catch (err) {
+                console.error('Face-API: falha ao carregar detector local em /models', err);
+                this.failedInit = true;
+                return null;
+            } finally {
+                this.loadingPromise = null;
+            }
+        })();
+
+        return this.loadingPromise;
     }
 
     static async validate(base64Image: string): Promise<{ isValid: boolean; errors: string[]; croppedBase64?: string }> {
         try {
-            // Garante que o motor e os modelos estão carregados
             const api = await this.initModels();
 
             return new Promise((resolve) => {
                 const img = new Image();
                 img.onload = async () => {
                     const errors: string[] = [];
+
+                    // Se o modelo neural não puder carregar (ex.: PC sem WebGL/CPU lenta), aplica recorte central 3:4
+                    if (!api) {
+                        const targetRatio = 3 / 4;
+                        let cw = img.width;
+                        let ch = img.height;
+                        if (cw / ch > targetRatio) cw = ch * targetRatio;
+                        else ch = cw / targetRatio;
+                        const finalX = Math.max(0, (img.width - cw) / 2);
+                        const finalY = Math.max(0, (img.height - ch) / 2);
+                        const canvas = document.createElement('canvas');
+                        canvas.width = Math.round(cw);
+                        canvas.height = Math.round(ch);
+                        const ctx = canvas.getContext('2d');
+                        if (ctx) {
+                            ctx.drawImage(img, finalX, finalY, cw, ch, 0, 0, canvas.width, canvas.height);
+                            return resolve({
+                                isValid: true,
+                                errors: [],
+                                croppedBase64: canvas.toDataURL('image/jpeg', 0.92)
+                            });
+                        }
+                        return resolve({ isValid: false, errors: ['Falha ao processar imagem.'] });
+                    }
                     
-                    // Executa a detecção neural de rosto
-                    const detection = await api.detectSingleFace(img, new api.SsdMobilenetv1Options({ minConfidence: 0.6 }));
+                    // Executa a detecção neural de rosto (TinyFaceDetector é leve e funciona rápido em webcams de PC)
+                    const detection = await api.detectSingleFace(img, new api.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.45 }));
                     
                     if (!detection) {
                         errors.push("Nenhum rosto claro detectado. Retire óculos escuros, bonés e aproxime-se de um local iluminado.");
@@ -73,12 +116,12 @@ export class FaceValidator {
                     if (finalY + ch > img.height) ch = img.height - finalY;
 
                     const canvas = document.createElement('canvas');
-                    canvas.width = cw;
-                    canvas.height = ch;
+                    canvas.width = Math.round(cw);
+                    canvas.height = Math.round(ch);
                     const ctx = canvas.getContext('2d');
                     if (ctx) {
-                        ctx.drawImage(img, finalX, finalY, cw, ch, 0, 0, cw, ch);
-                        const croppedBase64 = canvas.toDataURL('image/jpeg', 0.95);
+                        ctx.drawImage(img, finalX, finalY, cw, ch, 0, 0, canvas.width, canvas.height);
+                        const croppedBase64 = canvas.toDataURL('image/jpeg', 0.92);
                         
                         return resolve({
                             isValid: true,
@@ -107,10 +150,10 @@ export class FaceValidator {
      * Real-time face detection on Video or Image element.
      */
     static async detect(input: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement) {
-        if (!this.faceapi) await this.initModels();
-        if (!this.faceapi) return null;
+        const api = await this.initModels();
+        if (!api) return null;
         
-        return await this.faceapi.detectSingleFace(input, new this.faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }));
+        return await api.detectSingleFace(input, new api.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.45 }));
     }
 }
 

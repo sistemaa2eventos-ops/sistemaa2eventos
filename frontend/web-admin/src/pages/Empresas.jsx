@@ -14,7 +14,8 @@ import {
   Stepper,
   Step,
   StepLabel,
-  Tooltip
+  MenuItem,
+  Alert
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -26,8 +27,8 @@ import {
   ContentCopy as CopyIcon,
   Assessment as QuotaIcon,
   InsertDriveFile as FileIcon,
-  CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon,
+  FileUpload as UploadIcon,
+  CameraAlt as CameraIcon,
   WhatsApp as WhatsAppIcon,
   Email as EmailIcon,
   Check as CheckIcon,
@@ -38,6 +39,8 @@ import PageHeader from '../components/common/PageHeader';
 import NeonButton from '../components/common/NeonButton';
 import DataTable from '../components/common/DataTable';
 import ConfirmDialog from '../components/common/ConfirmDialog';
+import PhotoCapture from '../components/common/PhotoCapture';
+import ListaDocumentos from '../components/documentos/ListaDocumentos';
 import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { useSnackbar } from 'notistack';
@@ -51,6 +54,18 @@ import { useRemuneracao } from '../hooks/useRemuneracao';
 import RegrasRemuneracaoDialog from '../components/remuneracao/RegrasRemuneracaoDialog';
 import RemuneracaoEmpresa from '../components/remuneracao/RemuneracaoEmpresa';
 
+const TIPOS_DOC_EMPRESA = [
+  { valor: 'Cartão CNPJ', tipo: 'CNPJ' },
+  { valor: 'Contrato Social / Ato Constitutivo', tipo: 'CONTRATO_SOCIAL' },
+  { valor: 'Alvará de Funcionamento', tipo: 'ALVARA' },
+  { valor: 'PGR / PPRA', tipo: 'PGR' },
+  { valor: 'PCMSO', tipo: 'PCMSO' },
+  { valor: 'ART / RRT / Laudo Técnico', tipo: 'ART_RRT' },
+  { valor: 'Apólice de Seguro', tipo: 'SEGURO' },
+  { valor: 'GFIP / FGTS / Relação de Funcionários', tipo: 'GFIP_FGTS' },
+  { valor: 'Outro documento', tipo: 'CORPORATIVO' }
+];
+
 const Empresas = () => {
     const confirmar = useConfirmacao();
   const { enqueueSnackbar } = useSnackbar();
@@ -60,9 +75,16 @@ const Empresas = () => {
   const [empresaToDelete, setEmpresaToDelete] = useState(null);
   const [openQuotaDialog, setOpenQuotaDialog] = useState(false);
   const [openInviteDialog, setOpenInviteDialog] = useState(false);
-  const [inviteResult, setInviteResult] = useState({ link: '', empresa: null });
+  const [inviteResult, setInviteResult] = useState({ link: '', linkDocumentos: '', empresa: null });
+  const [enviandoEmailConvite, setEnviandoEmailConvite] = useState(false);
   const [activePhaseTabEmpresa, setActivePhaseTabEmpresa] = useState('todas');
   const [openRegras, setOpenRegras] = useState(false);
+  const [openDocsEmpresaDialog, setOpenDocsEmpresaDialog] = useState(false);
+  const [empresaDocsAlvo, setEmpresaDocsAlvo] = useState(null);
+  const [openCameraDocEmpresa, setOpenCameraDocEmpresa] = useState(false);
+  const [docTipoSelecionado, setDocTipoSelecionado] = useState('Cartão CNPJ');
+  const [docTituloCustom, setDocTituloCustom] = useState('');
+  const [docValidade, setDocValidade] = useState('');
   const remuneracao = useRemuneracao();
   // Só manda os campos de remuneração quando a tabela existe (antes da migration o update falharia)
   const camposRemuneracao = (empresa = {}) => remuneracao.disponivel
@@ -82,11 +104,156 @@ const Empresas = () => {
       activeEvent, dailyQuotas, setDailyQuotas,
       activeStep, setActiveStep, documentos,
       formData, setFormData, handleSave, handleDelete, handleSaveQuotas,
-      handleAuditDocument, handleSelectAllDatesEmpresa, handleClearAllDatesEmpresa,
+      handleAuditDocument, handleUploadDocumentoEmpresa, handleUploadWebcamEmpresa,
+      handleSelectAllDatesEmpresa, handleClearAllDatesEmpresa,
       handleSelectAllPhaseEmpresa, handleClearPhaseEmpresa, loadDocumentos, loadEmpresas
   } = useEmpresas(eventoIdParam);
 
-  const steps = ['Dados cadastrais', 'Configurações', 'Documentos'];
+  // Ao criar nova empresa não exige documentação (2 etapas); ao editar empresa exibe as 3 etapas
+  const steps = selectedEmpresa
+    ? ['Dados cadastrais', 'Configurações', 'Documentos']
+    : ['Dados cadastrais', 'Configurações'];
+
+  const obterMetadadosDocEmpresa = () => {
+    const item = TIPOS_DOC_EMPRESA.find(t => t.valor === docTipoSelecionado) || TIPOS_DOC_EMPRESA[0];
+    const titulo = docTipoSelecionado === 'Outro documento'
+      ? (docTituloCustom.trim() || 'Documento da Empresa')
+      : item.valor;
+    return { titulo, tipo_doc: item.tipo, data_validade: docValidade || '' };
+  };
+
+  const handleOpenDocsEmpresa = (empresa) => {
+    setEmpresaDocsAlvo(empresa);
+    setDocTipoSelecionado('Cartão CNPJ');
+    setDocTituloCustom('');
+    setDocValidade('');
+    loadDocumentos(empresa.id);
+    setOpenDocsEmpresaDialog(true);
+  };
+
+  const handleSelecionarArquivoEmpresa = (empresaId) => {
+    if (!empresaId) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/pdf,image/jpeg,image/png';
+    input.onchange = async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const ok = await handleUploadDocumentoEmpresa(empresaId, file, obterMetadadosDocEmpresa());
+      if (ok) {
+        setDocTituloCustom('');
+        setDocValidade('');
+      }
+    };
+    input.click();
+  };
+
+  const renderPainelDocumentosEmpresa = (empresaAlvo) => {
+    if (!empresaAlvo?.id) {
+      return (
+        <Typography color="text.secondary" sx={{ py: 4 }}>
+          Salve a empresa primeiro para gerenciar os documentos.
+        </Typography>
+      );
+    }
+
+    const docsFormatados = (Array.isArray(documentos) ? documentos : []).map(d => ({
+      ...d,
+      tipo_entidade: 'empresa',
+      entidade_nome: empresaAlvo.nome,
+      entidade_doc: empresaAlvo.cnpj
+    }));
+
+    return (
+      <Box sx={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+        <Alert severity="info" sx={{ bgcolor: 'rgba(0, 212, 255, 0.08)', color: '#E2E8F0', border: '1px solid rgba(0, 212, 255, 0.25)' }}>
+          Os documentos anexados aqui ou enviados pelo responsável através do link da empresa entram na fila de <strong>Auditoria documental</strong> e são salvos automaticamente na pasta <strong>{empresaAlvo.nome} / Documentos da empresa</strong> no Google Drive.
+        </Alert>
+
+        <Box sx={{ p: { xs: 2, sm: 2.5 }, border: '1px dashed rgba(0, 212, 255, 0.35)', borderRadius: 2, bgcolor: 'rgba(0,0,0,0.2)' }}>
+          <Typography variant="subtitle2" sx={{ color: '#00D4FF', fontWeight: 700, mb: 2 }}>
+            Anexar novo documento da empresa
+          </Typography>
+
+          <Grid container spacing={2} sx={{ mb: 2 }}>
+            <Grid item xs={12} sm={docTipoSelecionado === 'Outro documento' ? 4 : 7}>
+              <TextField
+                select
+                size="small"
+                label="Tipo de documento"
+                fullWidth
+                value={docTipoSelecionado}
+                onChange={(e) => setDocTipoSelecionado(e.target.value)}
+              >
+                {TIPOS_DOC_EMPRESA.map((t) => (
+                  <MenuItem key={t.valor} value={t.valor}>{t.valor}</MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+
+            {docTipoSelecionado === 'Outro documento' && (
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  size="small"
+                  label="Nome do documento"
+                  placeholder="Ex: Certidão Negativa"
+                  fullWidth
+                  value={docTituloCustom}
+                  onChange={(e) => setDocTituloCustom(e.target.value)}
+                />
+              </Grid>
+            )}
+
+            <Grid item xs={12} sm={docTipoSelecionado === 'Outro documento' ? 4 : 5}>
+              <TextField
+                size="small"
+                type="date"
+                label="Validade (opcional)"
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+                value={docValidade}
+                onChange={(e) => setDocValidade(e.target.value)}
+              />
+            </Grid>
+          </Grid>
+
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="center">
+            <Button
+              variant="contained"
+              disabled={saving}
+              startIcon={<UploadIcon />}
+              onClick={() => handleSelecionarArquivoEmpresa(empresaAlvo.id)}
+              sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700, '&:hover': { bgcolor: '#00B8E6' } }}
+            >
+              Anexar arquivo (PDF / imagem)
+            </Button>
+            <Button
+              variant="contained"
+              disabled={saving}
+              startIcon={<CameraIcon />}
+              onClick={() => {
+                setEmpresaDocsAlvo(empresaAlvo);
+                setOpenCameraDocEmpresa(true);
+              }}
+              sx={{ bgcolor: '#7B2FBE', color: '#FFFFFF', fontWeight: 700, '&:hover': { bgcolor: '#6924A8' } }}
+            >
+              Tirar foto com a câmera
+            </Button>
+          </Stack>
+        </Box>
+
+        <Box>
+          <Typography variant="subtitle2" sx={{ color: '#FFFFFF', fontWeight: 700, mb: 1.5 }}>
+            Documentos enviados ({docsFormatados.length})
+          </Typography>
+          <ListaDocumentos
+            documentos={docsFormatados}
+            onAuditar={(doc, acao) => handleAuditDocument(doc.id, acao, empresaAlvo.id)}
+          />
+        </Box>
+      </Box>
+    );
+  };
 
   const columns = [
     {
@@ -105,18 +272,10 @@ const Empresas = () => {
     {
       id: 'acoes',
       label: 'Ações',
-      minWidth: 180,
+      minWidth: 150,
       align: 'center',
       format: (value, row) => (
         <Stack direction="row" spacing={1} justifyContent="center">
-          <IconButton
-            size="small"
-            onClick={() => handleCopyPhone(row)}
-            sx={acaoTabela}
-            title="Copiar telefone"
-          >
-            <WhatsAppIcon fontSize="small" />
-          </IconButton>
           <IconButton
             size="small"
             onClick={() => handleGerarConvite(row)}
@@ -124,6 +283,14 @@ const Empresas = () => {
             title="Gerar convite de cadastro"
           >
             <LinkIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            onClick={() => handleOpenDocsEmpresa(row)}
+            sx={acaoTabela}
+            title="Documentos da empresa (upload ou câmera)"
+          >
+            <FileIcon fontSize="small" />
           </IconButton>
           <IconButton
             size="small"
@@ -160,52 +327,23 @@ const Empresas = () => {
     },
   ];
 
-  const handleCopyPhone = (row) => {
-    const telefone = row.telefone || row.responsavel_telefone || '';
-    if (!telefone) {
-      enqueueSnackbar('Telefone não cadastrado.', { variant: 'warning' });
-      return;
-    }
-
-    const cleanPhone = telefone.replace(/\D/g, '');
-    let waPhone = cleanPhone;
-    if (waPhone && waPhone.length <= 11 && !waPhone.startsWith('55')) {
-      waPhone = `55${waPhone}`;
-    }
-
-    const eventoNome = localStorage.getItem('active_evento_nome') || 'Evento';
-    const publicUrl = 'https://cadastro.nzt.app.br'; // Fallback base
-    
-    // Se a empresa já tem um token, enviamos o link direto
-    if (row.registration_token) {
-      const link = `${publicUrl}/register/${row.registration_token}`;
-      const body = encodeURIComponent(
-        `Olá, *${row.responsavel || 'Responsável'}*!\n\n` +
-        `Segue o link para registro da equipe da *${row.nome}* no evento *${eventoNome}*:\n\n` +
-        `${link}`
-      );
-      window.open(`https://wa.me/${waPhone}?text=${body}`, '_blank');
-    } else {
-      // Caso contrário, apenas abre o chat
-      window.open(`https://wa.me/${waPhone}`, '_blank');
-    }
-  };
-
   const handleGerarConvite = async (row, forceRefresh = false) => {
     try {
+      const publicUrl = 'https://cadastro.nzt.app.br';
       // Se já tem token e não estamos forçando refresh, apenas mostra o que tem
       if (row.registration_token && !forceRefresh) {
-        const publicUrl = 'https://cadastro.nzt.app.br';
         const link = `${publicUrl}/register/${row.registration_token}`;
-        setInviteResult({ link, empresa: row });
+        const linkDocumentos = `${publicUrl}/empresa/${row.registration_token}`;
+        setInviteResult({ link, linkDocumentos, empresa: row });
         setOpenInviteDialog(true);
         return;
       }
 
       // Sem token (ou pedindo um novo): gera pelo refresh-token; o link antigo deixa de valer
       const { data } = await api.post(`/empresas/${row.id}/refresh-token`);
-      const link = `https://cadastro.nzt.app.br/register/${data.token}`;
-      setInviteResult({ link, empresa: { ...row, registration_token: data.token } });
+      const link = `${publicUrl}/register/${data.token}`;
+      const linkDocumentos = `${publicUrl}/empresa/${data.token}`;
+      setInviteResult({ link, linkDocumentos, empresa: { ...row, registration_token: data.token } });
       setOpenInviteDialog(true);
       loadEmpresas();
 
@@ -225,12 +363,17 @@ const Empresas = () => {
     const eventoNome = localStorage.getItem('active_evento_nome') || 'Evento';
     const empresaNome = inviteResult.empresa.nome;
     const responsavel = inviteResult.empresa.responsavel || 'Responsável';
+    const linkDocs = inviteResult.linkDocumentos || inviteResult.link.replace('/register/', '/empresa/');
     
-    const subject = encodeURIComponent(`Convite de Gerenciamento de Staff - ${eventoNome}`);
+    const subject = encodeURIComponent(`Portal de Credenciamento e Documentação - ${empresaNome} (${eventoNome})`);
     const body = encodeURIComponent(
       `Olá, ${responsavel}!\n\n` +
-      `Temos o prazer de confirmar que a empresa ${empresaNome} foi cadastrada no evento ${eventoNome}.\n\n` +
-      `Para registrar sua equipe, por favor utilize o portal de inscrições através do link abaixo. Você pode preencher diretamente ou repassar o link para seus colaboradores:\n` +
+      `Confirmamos que a empresa ${empresaNome} foi cadastrada no evento ${eventoNome}.\n\n` +
+      `1) DOCUMENTAÇÃO DA EMPRESA (Responsável):\n` +
+      `Acesse o link abaixo para anexar os documentos da empresa (Cartão CNPJ, Contrato Social, PGR, PCMSO, Alvará, etc.) para auditoria:\n` +
+      `${linkDocs}\n\n` +
+      `2) CADASTRO DA EQUIPE / COLABORADORES:\n` +
+      `Utilize ou compartilhe o link abaixo com seus colaboradores para o credenciamento facial da equipe:\n` +
       `${inviteResult.link}\n\n` +
       `Atenciosamente,\n` +
       `Equipe de Credenciamento.`
@@ -250,16 +393,38 @@ const Empresas = () => {
     if (waPhone && waPhone.length <= 11 && !waPhone.startsWith('55')) {
       waPhone = `55${waPhone}`;
     }
+    const linkDocs = inviteResult.linkDocumentos || inviteResult.link.replace('/register/', '/empresa/');
     
-    // Garantir que usamos o link gerado, que agora vem no formato correto do backend
     const body = encodeURIComponent(
       `Olá, *${responsavel}*!\n\n` +
-      `Sua empresa *${empresaNome}* foi cadastrada para o evento *${eventoNome}*.\n` +
-      `Para registrar sua equipe acesse ou compartilhe o portal abaixo:\n\n` +
+      `Sua empresa *${empresaNome}* foi cadastrada para o evento *${eventoNome}*.\n\n` +
+      `📄 *1. Enviar documentos da empresa (Responsável):*\n` +
+      `${linkDocs}\n\n` +
+      `👥 *2. Cadastrar colaboradores da equipe:*\n` +
       `${inviteResult.link}`
     );
     
     return `https://wa.me/${waPhone}?text=${body}`;
+  };
+
+  const handleEnviarConvitePorEmail = async () => {
+    if (!inviteResult.empresa) return;
+    const emailDestino = inviteResult.empresa.email_convite || inviteResult.empresa.email || '';
+    if (!emailDestino) {
+      window.location.href = buildMailto();
+      return;
+    }
+    try {
+      setEnviandoEmailConvite(true);
+      const { data } = await api.post(`/empresas/${inviteResult.empresa.id}/send-invite`, { email: emailDestino });
+      enqueueSnackbar(data.message || `E-mail enviado para ${emailDestino}!`, { variant: 'success' });
+      setOpenInviteDialog(false);
+    } catch (err) {
+      // Se o servidor SMTP não responder, abre o cliente de e-mail padrão com a mensagem pronta
+      window.location.href = buildMailto();
+    } finally {
+      setEnviandoEmailConvite(false);
+    }
   };
 
   const getAllEventDates = () => {
@@ -389,20 +554,15 @@ const Empresas = () => {
           p: { xs: 2.5, md: 3.5 }, 
           pr: { xs: 2, md: 2.5 }, 
           overflowY: 'auto', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          minHeight: 0, 
-          height: '100%',
-          maxHeight: '100%',
           flex: '1 1 auto',
           '&::-webkit-scrollbar': { width: '6px' }, 
           '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.4)', borderRadius: '10px' }, 
           '&::-webkit-scrollbar-track': { background: 'rgba(255,255,255,0.02)' } 
         }}>
-          <Box sx={{ pr: { xs: 0, md: 0.5 }, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <Box sx={{ pr: { xs: 0, md: 0.5 }, display: 'flex', flexDirection: 'column' }}>
           <Stepper activeStep={activeStep} alternativeLabel sx={{ pt: 1, mb: 2.5 }}>
-            {steps.map((label) => (
-              <Step key={label}>
+            {steps.map((label, idx) => (
+              <Step key={label} onClick={() => selectedEmpresa && setActiveStep(idx)} sx={{ cursor: selectedEmpresa ? 'pointer' : 'default' }}>
                 <StepLabel>{label}</StepLabel>
               </Step>
             ))}
@@ -433,7 +593,7 @@ const Empresas = () => {
           )}
 
           {activeStep === 1 && (
-            <Box sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 2.5, flex: 1, minHeight: 0 }}>
+            <Box sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
               <Grid container spacing={2}>
                 <Grid item xs={8}>
                   <TextField label="Link de cadastro da empresa" fullWidth disabled value={formData.registration_token} />
@@ -455,7 +615,7 @@ const Empresas = () => {
               />
 
               {activeEvent && formData && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, mt: 1 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', mt: 1 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
                     <Box>
                       <Typography variant="subtitle2" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: '0.5px' }}>
@@ -520,19 +680,14 @@ const Empresas = () => {
                   
                   <Box 
                     sx={{ 
-                      flex: 1,
-                      minHeight: 0,
+                      minHeight: 220,
                       border: '1px solid rgba(0, 212, 255, 0.2)',
                       borderRadius: 1.5,
                       p: 2,
                       bgcolor: 'rgba(0,0,0,0.25)',
-                      overflowY: 'auto',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: 2,
-                      '&::-webkit-scrollbar': { width: '6px' }, 
-                      '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.5)', borderRadius: '10px' }, 
-                      '&::-webkit-scrollbar-track': { background: 'rgba(255,255,255,0.02)' }
+                      gap: 2
                     }}
                   >
                     {[
@@ -644,45 +799,9 @@ const Empresas = () => {
             </Box>
           )}
 
-          {activeStep === 2 && (
-            <Box sx={{ pt: 2, textAlign: 'center' }}>
-              {!selectedEmpresa ? (
-                <Typography color="text.secondary" sx={{ py: 4 }}>Por favor, salve a empresa primeiro antes de gerenciar documentos.</Typography>
-              ) : (
-                <Box>
-                  <Stack spacing={2} sx={{ mb: 3 }}>
-                    {documentos.length === 0 ? (
-                      <Typography variant="body2" color="text.secondary">Nenhum documento formal anexado ainda.</Typography>
-                    ) : (
-                      documentos.map(doc => (
-                        <Box key={doc.id} sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 1.5, border: '1px solid rgba(0, 212, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <FileIcon sx={{ color: '#00D4FF' }} />
-                            <Box sx={{ textAlign: 'left' }}>
-                              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{doc.titulo}</Typography>
-                              <Typography variant="caption" color="text.secondary">{doc.tipo_doc} • {new Date(doc.data_inclusao).toLocaleDateString()}</Typography>
-                            </Box>
-                          </Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            {doc.status === 'pendente' ? (
-                              <Stack direction="row" spacing={1}>
-                                <Tooltip title="Aprovar"><IconButton size="small" onClick={() => handleAuditDocument(doc.id, 'aprovado')} sx={{ color: '#00FF88', border: '1px solid rgba(0,255,136,0.2)' }}><CheckCircleIcon fontSize="small" /></IconButton></Tooltip>
-                                <Tooltip title="Rejeitar"><IconButton size="small" onClick={() => handleAuditDocument(doc.id, 'rejeitado')} sx={{ color: '#FF3366', border: '1px solid rgba(255,51,102,0.2)' }}><CancelIcon fontSize="small" /></IconButton></Tooltip>
-                              </Stack>
-                            ) : (
-                              <>
-                                {doc.status === 'aprovado' && <CheckCircleIcon sx={{ color: '#00FF88' }} />}
-                                {doc.status === 'rejeitado' && <CancelIcon sx={{ color: '#FF3366' }} />}
-                              </>
-                            )}
-                            <IconButton size="small" onClick={() => window.open(doc.url_arquivo, '_blank')} sx={{ color: 'rgba(255,255,255,0.5)' }}><LinkIcon fontSize="small" /></IconButton>
-                          </Box>
-                        </Box>
-                      ))
-                    )}
-                  </Stack>
-                </Box>
-              )}
+          {activeStep === 2 && selectedEmpresa && (
+            <Box sx={{ pt: 2 }}>
+              {renderPainelDocumentosEmpresa(selectedEmpresa)}
             </Box>
           )}
           </Box>
@@ -748,28 +867,61 @@ const Empresas = () => {
           }}>Salvar cotas</NeonButton>
         </DialogActions>
       </Dialog>
-      <Dialog open={openInviteDialog} onClose={() => setOpenInviteDialog(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, textAlign: 'center' }}>Convite gerado</DialogTitle>
-        <DialogContent sx={{ textAlign: 'center', py: 3 }}>
-          <Typography variant="body2" sx={{ mb: 3, color: 'text.secondary' }}>
-            O link de acesso seguro para a empresa <strong>{inviteResult.empresa?.nome}</strong> foi gerado com sucesso.
+      <Dialog open={openInviteDialog} onClose={() => setOpenInviteDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700, textAlign: 'center' }}>Links da empresa gerados</DialogTitle>
+        <DialogContent sx={{ py: 2.5 }}>
+          <Typography variant="body2" sx={{ mb: 2.5, color: 'text.secondary', textAlign: 'center' }}>
+            Compartilhe os links abaixo com o responsável da empresa <strong>{inviteResult.empresa?.nome}</strong>:
           </Typography>
-          
-          <Box sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 1.5, mb: 3, wordBreak: 'break-all' }}>
-            <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700 }}>{inviteResult.link}</Typography>
+
+          <Box sx={{ p: 2, bgcolor: 'rgba(123, 47, 190, 0.08)', border: '1px solid rgba(123, 47, 190, 0.3)', borderRadius: 1.5, mb: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5, gap: 1 }}>
+              <Typography variant="caption" sx={{ color: '#C084FC', fontWeight: 700 }}>
+                1. Link para anexar documentos da empresa (Responsável)
+              </Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<CopyIcon fontSize="small" />}
+                onClick={() => {
+                  const docLink = inviteResult.linkDocumentos || inviteResult.link.replace('/register/', '/empresa/');
+                  navigator.clipboard.writeText(docLink);
+                  enqueueSnackbar('Link de documentos da empresa copiado!', { variant: 'success' });
+                }}
+                sx={{ borderColor: 'rgba(192,132,252,0.4)', color: '#C084FC', fontSize: '0.72rem', py: 0.2 }}
+              >
+                Copiar
+              </Button>
+            </Box>
+            <Typography variant="caption" sx={{ color: '#FFFFFF', wordBreak: 'break-all', display: 'block' }}>
+              {inviteResult.linkDocumentos || inviteResult.link.replace('/register/', '/empresa/')}
+            </Typography>
           </Box>
 
-          <Stack direction="row" spacing={2} justifyContent="center">
-            <Button 
-                variant="outlined" 
-                startIcon={<CopyIcon />}
+          <Box sx={{ p: 2, bgcolor: 'rgba(0, 212, 255, 0.06)', border: '1px solid rgba(0, 212, 255, 0.25)', borderRadius: 1.5, mb: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5, gap: 1 }}>
+              <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700 }}>
+                2. Link para cadastro de colaboradores (Equipe)
+              </Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<CopyIcon fontSize="small" />}
                 onClick={() => {
-                    navigator.clipboard.writeText(inviteResult.link);
-                    enqueueSnackbar('Link copiado!', { variant: 'success' });
+                  navigator.clipboard.writeText(inviteResult.link);
+                  enqueueSnackbar('Link de cadastro de colaboradores copiado!', { variant: 'success' });
                 }}
-            >
+                sx={{ borderColor: 'rgba(0,212,255,0.4)', color: '#00D4FF', fontSize: '0.72rem', py: 0.2 }}
+              >
                 Copiar
-            </Button>
+              </Button>
+            </Box>
+            <Typography variant="caption" sx={{ color: '#FFFFFF', wordBreak: 'break-all', display: 'block' }}>
+              {inviteResult.link}
+            </Typography>
+          </Box>
+
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="center">
             <Button 
                 variant="outlined" 
                 startIcon={<WhatsAppIcon />}
@@ -778,36 +930,97 @@ const Empresas = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setOpenInviteDialog(false)}
-                sx={{ borderColor: '#25D366', color: '#25D366', '&:hover': { bgcolor: 'rgba(37, 211, 102, 0.1)', borderColor: '#25D366' } }}
+                sx={{ borderColor: '#25D366', color: '#25D366', fontWeight: 700, '&:hover': { bgcolor: 'rgba(37, 211, 102, 0.1)', borderColor: '#25D366' } }}
             >
-                WhatsApp
+                Enviar no WhatsApp
             </Button>
             
             <Button 
                 variant="contained" 
                 color="primary"
+                disabled={enviandoEmailConvite}
                 startIcon={<EmailIcon />}
-                component="a"
-                href={buildMailto()}
-                onClick={() => setOpenInviteDialog(false)}
+                onClick={handleEnviarConvitePorEmail}
                 sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700 }}
             >
-                Enviar e-mail
+                {enviandoEmailConvite ? 'Enviando e-mail...' : 'Enviar para o e-mail do responsável'}
             </Button>
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-            <Button variant="outlined" onClick={() => setOpenInviteDialog(false)} sx={botaoSecundario}>Fechar</Button>
+        <DialogActions sx={{ p: 2, justifyContent: 'space-between' }}>
             <Button 
                 size="small"
                 onClick={async () => {
-                    const ok = await confirmar({ titulo: 'Gerar novo link', mensagem: 'O link atual deixa de funcionar. Gerar um novo?', textoConfirmar: 'Gerar novo link', perigo: false });
+                    const ok = await confirmar({ titulo: 'Gerar novo link', mensagem: 'Os links atuais deixam de funcionar. Gerar novos?', textoConfirmar: 'Gerar novos links', perigo: false });
                     if (ok) handleGerarConvite(inviteResult.empresa, true);
                 }}
-                sx={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem' }}
+                sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem' }}
             >
-                Reciclar link
+                Reciclar links
             </Button>
+            <Button variant="outlined" onClick={() => setOpenInviteDialog(false)} sx={botaoSecundario}>Fechar</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal rápido de Documentos da Empresa (acessível pelo ícone na coluna Ações) */}
+      <Dialog
+        open={openDocsEmpresaDialog}
+        onClose={() => setOpenDocsEmpresaDialog(false)}
+        maxWidth="md"
+        fullWidth
+        disableRestoreFocus
+      >
+        <TituloModal
+          titulo="Documentos da empresa"
+          subtitulo={empresaDocsAlvo?.nome}
+          onFechar={() => setOpenDocsEmpresaDialog(false)}
+          desabilitarFechar={saving}
+        />
+        <DialogContent sx={{ p: { xs: 2.5, md: 3.5 } }}>
+          {renderPainelDocumentosEmpresa(empresaDocsAlvo)}
+        </DialogContent>
+        <DialogActions sx={{ p: 2.5, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <Button variant="outlined" onClick={() => setOpenDocsEmpresaDialog(false)} sx={botaoSecundario}>
+            Fechar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal de câmera para fotografar documento da empresa */}
+      <Dialog
+        open={openCameraDocEmpresa}
+        onClose={() => setOpenCameraDocEmpresa(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <TituloModal
+          titulo="Fotografar documento da empresa"
+          subtitulo={empresaDocsAlvo?.nome || selectedEmpresa?.nome}
+          onFechar={() => setOpenCameraDocEmpresa(false)}
+        />
+        <DialogContent sx={{ overflowY: 'auto', py: 2 }}>
+          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.65)', display: 'block', textAlign: 'center', mb: 1.5 }}>
+            Enquadre o documento ({obterMetadadosDocEmpresa().titulo}) de forma nítida e clique no botão verde para capturar.
+          </Typography>
+          <PhotoCapture
+            modoDocumento={true}
+            autoOpen={true}
+            onPhotoCaptured={async (base64) => {
+              if (!base64) return;
+              const alvoId = empresaDocsAlvo?.id || selectedEmpresa?.id;
+              const ok = await handleUploadWebcamEmpresa(alvoId, base64, obterMetadadosDocEmpresa());
+              if (ok) {
+                setOpenCameraDocEmpresa(false);
+                setDocTituloCustom('');
+                setDocValidade('');
+              }
+            }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button variant="outlined" onClick={() => setOpenCameraDocEmpresa(false)} sx={botaoSecundario}>
+            Cancelar
+          </Button>
         </DialogActions>
       </Dialog>
       <RegrasRemuneracaoDialog

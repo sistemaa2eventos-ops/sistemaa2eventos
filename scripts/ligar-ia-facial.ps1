@@ -2,7 +2,8 @@
   NZT Intelligent Control System — liga os motores da IA de rastreamento facial
   no servidor local do evento e fica vigiando (religa o que cair).
 
-  Uso:  ligar-ia-facial.bat                     liga tudo e vigia
+  Uso:  ligar-ia-facial.bat                     verifica compatibilidade, liga tudo e vigia
+        ligar-ia-facial.bat verificar           faz apenas a verificação de compatibilidade e recomendações
         ligar-ia-facial.bat parar               desliga vigia, motor de IA e agente local
         ligar-ia-facial.bat instalar-autostart  ativa inicialização automática no login do Windows
         ligar-ia-facial.bat remover-autostart   remove inicialização automática
@@ -16,7 +17,12 @@
                    a IA facial, as câmeras e os leitores faciais da rede do evento
                    (só sobe se backend/agent-local/.env tiver AGENT_TOKEN)
 #>
-param([string]$Acao = 'ligar')
+param(
+    [string]$Acao = 'ligar',
+    [string]$Token = '',
+    [string]$VpsUrl = '',
+    [string]$AgentName = ''
+)
 
 $ErrorActionPreference = 'Stop'
 $Raiz      = Split-Path -Parent $PSScriptRoot
@@ -29,6 +35,27 @@ $UrlSaude  = "http://127.0.0.1:$PortaMotor/health"
 $IntervaloVigia = 15      # segundos entre verificações
 $FalhasParaReiniciar = 4  # verificações seguidas sem resposta antes de reiniciar o motor
 $EsperaCargaModelo = 180  # segundos para o InsightFace carregar
+
+# Suporte a chamada via protocolo customizado do navegador: nzt-ia://iniciar?token=...&vps=...&name=...
+if ($Acao -match '^nzt-ia://') {
+    try {
+        $uriObj = [System.Uri]$Acao
+        $caminho = ($uriObj.Host + $uriObj.AbsolutePath).Trim('/')
+        $q = $uriObj.Query.TrimStart('?')
+        foreach ($par in ($q -split '&')) {
+            if ($par -match '^([^=]+)=(.*)$') {
+                $k = [System.Uri]::UnescapeDataString($matches[1])
+                $v = [System.Uri]::UnescapeDataString($matches[2])
+                if ($k -eq 'token' -and $v) { $Token = $v }
+                elseif ($k -eq 'vps' -and $v) { $VpsUrl = $v }
+                elseif ($k -eq 'name' -and $v) { $AgentName = $v }
+            }
+        }
+        $Acao = if ($caminho -eq 'verificar') { 'verificar' } elseif ($caminho -eq 'parar') { 'parar' } else { 'ligar' }
+    } catch {
+        $Acao = 'ligar'
+    }
+}
 
 try { $Host.UI.RawUI.WindowTitle = 'NZT - IA de rastreamento facial' } catch {}
 New-Item -ItemType Directory -Force $DirLogs | Out-Null
@@ -44,6 +71,24 @@ function Escrever([string]$msg, [string]$cor = 'Gray') {
     Add-Content -Path $LogVigia -Value $linha -Encoding UTF8
 }
 
+function Register-ProtocoloNztIa {
+    try {
+        $chaveBase = 'HKCU:\Software\Classes\nzt-ia'
+        $chaveCmd  = 'HKCU:\Software\Classes\nzt-ia\shell\open\command'
+        if (-not (Test-Path $chaveCmd)) { New-Item -Path $chaveCmd -Force | Out-Null }
+        Set-ItemProperty -Path $chaveBase -Name '(Default)' -Value 'URL:NZT IA Facial Protocol' -Force
+        Set-ItemProperty -Path $chaveBase -Name 'URL Protocol' -Value '' -Force
+        $cmd = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" `"%1`""
+        Set-ItemProperty -Path $chaveCmd -Name '(Default)' -Value $cmd -Force
+    } catch {}
+}
+Register-ProtocoloNztIa
+
+if ($Acao -eq 'registrar-protocolo') {
+    Escrever 'Protocolo nzt-ia:// registrado no Windows com sucesso.' 'Green'
+    exit 0
+}
+
 function Read-ArquivoEnv([string]$arquivo) {
     $vars = @{}
     if (Test-Path $arquivo) {
@@ -54,6 +99,41 @@ function Read-ArquivoEnv([string]$arquivo) {
         }
     }
     return $vars
+}
+
+function Set-TokenAgenteLocal([string]$novoToken, [string]$novaVps, [string]$novoNome) {
+    if (-not $novoToken) { return $false }
+    $arqEnv = Join-Path $DirAgente '.env'
+    $atuais = Read-ArquivoEnv $arqEnv
+    $vpsFinal  = if ($novaVps) { $novaVps.TrimEnd('/') } elseif ($atuais['VPS_URL']) { $atuais['VPS_URL'] } else { 'https://painel.nzt.app.br' }
+    $nomeFinal = if ($novoNome) { $novoNome } elseif ($atuais['AGENT_NAME']) { $atuais['AGENT_NAME'] } else { "PC-IA-$env:COMPUTERNAME" }
+    $iaFinal   = if ($atuais['IA_URL']) { $atuais['IA_URL'] } else { "http://127.0.0.1:$PortaMotor" }
+    $mudou     = ($atuais['AGENT_TOKEN'] -ne $novoToken) -or ($atuais['VPS_URL'] -ne $vpsFinal)
+    $conteudo  = @(
+        "VPS_URL=$vpsFinal",
+        "AGENT_TOKEN=$novoToken",
+        "AGENT_NAME=$nomeFinal",
+        "IA_URL=$iaFinal"
+    ) -join "`r`n"
+    [System.IO.File]::WriteAllText($arqEnv, "$conteudo`r`n", (New-Object System.Text.UTF8Encoding($false)))
+    return $mudou
+}
+
+if ($Token) {
+    $tokenMudou = Set-TokenAgenteLocal $Token $VpsUrl $AgentName
+    if ($tokenMudou) {
+        Escrever "Token do Agente Local atualizado para este evento em backend\agent-local\.env." 'Cyan'
+        Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+            Where-Object { $_.CommandLine -match 'agent\.js' } |
+            ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    }
+}
+
+if ($Acao -eq 'reiniciar-agente') {
+    Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -match 'agent\.js' } |
+        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    $Acao = 'unico'
 }
 
 function Get-PidNaPorta([int]$porta) {
@@ -142,6 +222,110 @@ Write-Host '  ==========================================================' -Foreg
 Write-Host '    NZT Intelligent Control System - IA de rastreamento facial' -ForegroundColor Cyan
 Write-Host '  ==========================================================' -ForegroundColor Cyan
 Write-Host ''
+
+function Invoke-VerificacaoCompatibilidade {
+    Escrever '--- VERIFICAÇÃO DE COMPATIBILIDADE DESTE COMPUTADOR ---' 'Cyan'
+    $cpu = Get-CimInstance Win32_Processor -ErrorAction SilentlyContinue | Select-Object -First 1
+    $cs  = Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue
+    $os  = Get-CimInstance Win32_OperatingSystem -ErrorAction SilentlyContinue
+    $gpus = @(Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue)
+    $disco = Get-PSDrive -Name ($Raiz.Substring(0, 1)) -ErrorAction SilentlyContinue
+
+    $cpuNome = if ($cpu) { $cpu.Name.Trim() } else { 'Desconhecido' }
+    $cores   = if ($cpu) { [int]$cpu.NumberOfCores } else { 2 }
+    $threads = if ($cpu) { [int]$cpu.NumberOfLogicalProcessors } else { 4 }
+    $ramGb   = if ($cs) { [math]::Round($cs.TotalPhysicalMemory / 1GB, 1) } else { 0 }
+    $ramLivreGb = if ($os) { [math]::Round(($os.FreePhysicalMemory * 1KB) / 1GB, 1) } else { 0 }
+    $discoLivreGb = if ($disco) { [math]::Round($disco.Free / 1GB, 1) } else { 0 }
+
+    $corCpu = if ($threads -ge 8) { 'Green' } elseif ($threads -ge 4) { 'Yellow' } else { 'Red' }
+    $corRam = if ($ramGb -ge 12) { 'Green' } elseif ($ramGb -ge 7) { 'Yellow' } else { 'Red' }
+    $corDisco = if ($discoLivreGb -ge 5) { 'Green' } else { 'Yellow' }
+
+    Escrever "  • Sistema Operacional : $($os.Caption) ($($os.OSArchitecture))" 'Green'
+    Escrever "  • Processador (CPU)   : $cpuNome ($cores núcleos / $threads threads)" $corCpu
+    Escrever "  • Memória RAM         : $ramGb GB total ($ramLivreGb GB livre agora)" $corRam
+    Escrever "  • Espaço em Disco     : $discoLivreGb GB livres" $corDisco
+
+    $temGpuForte = $false
+    $temGpuEntrada = $false
+    $temGpuIntegrada = $false
+    foreach ($g in $gpus) {
+        $vramGb = if ($g.AdapterRAM -gt 0) { [math]::Round($g.AdapterRAM / 1GB, 1) } else { 0 }
+        $nomeGpu = "$($g.Name)"
+        if ($nomeGpu -match 'RTX|GTX 1[60]|GTX [2345]|Radeon RX') {
+            $temGpuForte = $true
+            Escrever "  • Placa de Vídeo (GPU): $nomeGpu (~$vramGb GB) [Dedicada Forte - DirectML]" 'Green'
+        } elseif ($nomeGpu -match 'GeForce MX|GTX|Quadro|Radeon') {
+            $temGpuEntrada = $true
+            Escrever "  • Placa de Vídeo (GPU): $nomeGpu (~$vramGb GB) [Dedicada Entrada - DirectML]" 'Yellow'
+        } elseif ($nomeGpu -match 'Intel|Iris|UHD|HD Graphics|Vega') {
+            $temGpuIntegrada = $true
+            Escrever "  • Placa de Vídeo (GPU): $nomeGpu [Integrada - DirectML básico]" 'Yellow'
+        } else {
+            Escrever "  • Placa de Vídeo (GPU): $nomeGpu" 'Gray'
+        }
+    }
+
+    $pyOk = Find-PythonIA
+    if ($pyOk) {
+        Escrever "  • Ambiente Python IA  : OK ($pyOk)" 'Green'
+    } else {
+        Escrever "  • Ambiente Python IA  : Pendente (venv-ia em backend\microservice-face-python)" 'Red'
+    }
+
+    $envMotor = Read-ArquivoEnv (Join-Path $DirMotor '.env')
+    $envApi   = Read-ArquivoEnv (Join-Path $Raiz 'backend\api-nodejs\.env')
+    $temSupa  = [bool]($envMotor['SUPABASE_SERVICE_ROLE_KEY'] -or $envApi['SUPABASE_SERVICE_ROLE_KEY'])
+    Escrever ("  • Chave Supabase      : " + $(if ($temSupa) { 'Configurada (OK)' } else { 'Ausente no .env' })) $(if ($temSupa) { 'Green' } else { 'Red' })
+
+    $envAgente = Read-ArquivoEnv (Join-Path $DirAgente '.env')
+    $temToken  = [bool]$envAgente['AGENT_TOKEN']
+    Escrever ("  • Token Agente Local  : " + $(if ($temToken) { "Configurado ($($envAgente['AGENT_NAME']))" } else { 'Ausente em backend\agent-local\.env' })) $(if ($temToken) { 'Green' } else { 'Yellow' })
+
+    # Recomendações de configuração baseadas no hardware
+    $perfilRec = 'leve'
+    $fpsRec    = '15 análises/s'
+    $streamRec = 'Sempre o sub-stream (leve)'
+    $videosRec = 'até 6 vídeos ao vivo no mosaico'
+    $motivoRec = 'Computador de entrada/notebook ou sem GPU dedicada forte: o perfil Leve mantém o reconhecimento fluido sem travar o vídeo.'
+
+    if ($temGpuForte -and $threads -ge 8 -and $ramGb -ge 15) {
+        $perfilRec = 'maximo'
+        $fpsRec    = '45 análises/s'
+        $streamRec = 'Sempre o stream principal (nítido)'
+        $videosRec = 'até 16 vídeos ao vivo no mosaico'
+        $motivoRec = 'Placa de vídeo dedicada forte + CPU de 8+ threads e 16+ GB RAM detectados.'
+    } elseif (($temGpuForte -or $temGpuEntrada) -and $threads -ge 4 -and $ramGb -ge 7.5) {
+        if ($temGpuEntrada -and $threads -le 4) {
+            $perfilRec = 'leve'
+            $fpsRec    = '15 a 20 análises/s'
+            $streamRec = 'Sempre o sub-stream (leve) ou Automático (até 3 câmeras)'
+            $videosRec = 'até 6 vídeos ao vivo no mosaico'
+            $motivoRec = 'Notebook com CPU de 4 threads e GPU MX dedicada: prefira o perfil Leve (ou Equilibrado até 3 câmeras) para não sobrecarregar o processador.'
+        } else {
+            $perfilRec = 'equilibrado'
+            $fpsRec    = '30 análises/s'
+            $streamRec = 'Automático (sub-stream no mosaico, principal em tela grande)'
+            $videosRec = 'até 9 vídeos ao vivo no mosaico'
+            $motivoRec = 'Boa combinação de GPU DirectML e memória RAM para operação equilibrada.'
+        }
+    }
+
+    Write-Host ''
+    Escrever '--- RECOMENDAÇÕES DE CONFIGURAÇÃO PARA ESTE PC ---' 'Cyan'
+    Escrever "  ★ Perfil recomendado  : $($perfilRec.ToUpper())" 'Green'
+    Escrever "  • Taxa de análise IA  : $fpsRec" 'Gray'
+    Escrever "  • Stream para a IA    : $streamRec" 'Gray'
+    Escrever "  • Mosaico CFTV        : $videosRec" 'Gray'
+    Escrever "  • Diagnóstico         : $motivoRec" 'Cyan'
+    Write-Host ''
+}
+
+Invoke-VerificacaoCompatibilidade
+if ($Acao -eq 'verificar') {
+    exit 0
+}
 
 # ---------------------------------------------------------------- 1. câmera
 function Confirm-Camera {

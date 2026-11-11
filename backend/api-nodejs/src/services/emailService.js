@@ -142,28 +142,50 @@ class EmailService {
 
     /**
      * Envia convite corporativo unificado para Empresa (B2B)
+     * Inclui o link de cadastro de colaboradores e o link para envio da documentação da empresa.
      */
-    async sendCompanyInvite(email, nomeEmpresa, link) {
+    async sendCompanyInvite(email, nomeEmpresa, link, linkDocumentos = null, responsavel = null, eventoNome = null) {
+        if (!email) return false;
         try {
+            const docLink = linkDocumentos || String(link || '').replace('/register/', '/empresa/');
+            const saudacao = responsavel ? `Olá, ${responsavel} (${nomeEmpresa})!` : `Olá, ${nomeEmpresa}!`;
+            const textoEvento = eventoNome ? ` para atuar no evento <strong>${eventoNome}</strong>` : ' para atuar no evento';
             const mailOptions = {
-                from: `"CREDENCIAMENTO - Cadastro B2B" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
+                from: `"CREDENCIAMENTO - Cadastro B2B" <${process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@a2eventos.com.br'}>`,
                 to: email,
-                subject: `Portal de Credenciamento - ${nomeEmpresa} 🏢`,
+                subject: `Portal de Credenciamento e Documentação - ${nomeEmpresa}${eventoNome ? ` (${eventoNome})` : ''} 🏢`,
                 html: `
                     <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
                         <div style="background: #050B18; padding: 30px; text-align: center;">
                             <h1 style="color: #00D4FF; margin: 0; font-size: 24px; letter-spacing: 2px;">CREDENCIAMENTO BIOMÉTRICO</h1>
                         </div>
                         <div style="padding: 40px; color: #333; line-height: 1.6;">
-                            <h2 style="color: #050B18;">Olá, ${nomeEmpresa}!</h2>
-                            <p>Sua empresa foi cadastrada com sucesso para atuar no evento.</p>
-                            <p>Para iniciar o credenciamento de acesso da sua equipe, você deve utilizar o link exclusivo abaixo. <strong>Atenção:</strong> Você pode preencher o cadastro pela sua equipe ou compartilhar este link diretamente com eles para que preencham seus próprios dados.</p>
-                            
-                            <div style="text-align: center; margin: 35px 0;">
-                                <a href="${link}" style="background: linear-gradient(135deg, #00D4FF 0%, #094798 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">ACESSAR PORTAL DE INSCRIÇÕES</a>
+                            <h2 style="color: #050B18;">${saudacao}</h2>
+                            <p>Sua empresa foi cadastrada com sucesso${textoEvento}.</p>
+
+                            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; margin: 25px 0;">
+                                <h3 style="margin: 0 0 10px 0; color: #050B18; font-size: 16px;">1. Documentação da Empresa (Responsável)</h3>
+                                <p style="margin: 0 0 18px 0; font-size: 14px; color: #475569;">
+                                    Utilize o link abaixo para anexar os documentos da empresa (Cartão CNPJ, Contrato Social, PGR, PCMSO, Alvará ou outros exigidos pela organização) para análise da auditoria documental:
+                                </p>
+                                <div style="text-align: center;">
+                                    <a href="${docLink}" style="background: linear-gradient(135deg, #7B2FBE 0%, #4C1D95 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 15px; display: inline-block;">ANEXAR DOCUMENTOS DA EMPRESA</a>
+                                </div>
+                                <p style="margin: 12px 0 0 0; font-size: 12px; color: #64748b; word-break: break-all; text-align: center;">${docLink}</p>
                             </div>
 
-                            <p style="font-size: 14px; color: #666;"><strong>Dica:</strong> Através do mesmo link fornecido acima, você poderá acompanhar o status de aprovação de todos os colaboradores já cadastrados pela sua empresa.</p>
+                            <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 10px; padding: 20px; margin: 25px 0;">
+                                <h3 style="margin: 0 0 10px 0; color: #050B18; font-size: 16px;">2. Cadastro da Equipe / Colaboradores</h3>
+                                <p style="margin: 0 0 18px 0; font-size: 14px; color: #475569;">
+                                    Para iniciar o credenciamento facial da sua equipe, utilize ou compartilhe com seus colaboradores o link abaixo:
+                                </p>
+                                <div style="text-align: center;">
+                                    <a href="${link}" style="background: linear-gradient(135deg, #00D4FF 0%, #094798 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 15px; display: inline-block;">ACESSAR PORTAL DE COLABORADORES</a>
+                                </div>
+                                <p style="margin: 12px 0 0 0; font-size: 12px; color: #64748b; word-break: break-all; text-align: center;">${link}</p>
+                            </div>
+
+                            <p style="font-size: 14px; color: #666;"><strong>Dica:</strong> Através dos links acima, você poderá acompanhar em tempo real o status de aprovação dos documentos da empresa e dos colaboradores cadastrados.</p>
                             <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;" />
                             <p style="font-size: 12px; color: #999; text-align: center;">Suporte Técnico: suporte@nzt.app.br<br>© 2026 A2 Eventos - Sistema Soberano de Acesso</p>
                         </div>
@@ -172,8 +194,10 @@ class EmailService {
             };
             await this.transporter.sendMail(mailOptions);
             logger.info(`📧 [Invite] Convite de empresa enviado para ${email}`);
+            return true;
         } catch (error) {
             logger.error(`❌ [Invite] Erro ao enviar convite de empresa para ${email}:`, error);
+            return false;
         }
     }
 

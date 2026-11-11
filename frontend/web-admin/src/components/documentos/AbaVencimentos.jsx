@@ -32,7 +32,7 @@ const AbaVencimentos = ({ onAuditar, recarregarToken }) => {
 
     const vencidos = dados.data.filter(d => d.situacao === 'vencido');
     const aVencer = dados.data.filter(d => d.situacao !== 'vencido');
-    const comoDoc = (d) => ({ ...d, tipo_entidade: 'pessoa', entidade_nome: d.pessoa_nome, entidade_doc: d.pessoa_cpf, titulo: `${d.pessoa_nome} — ${d.titulo}` });
+    const comoDoc = (d) => ({ ...d, tipo_entidade: d.tipo_entidade || 'pessoa', entidade_nome: d.pessoa_nome, entidade_doc: d.pessoa_cpf, titulo: `${d.pessoa_nome} — ${d.titulo}` });
 
     const Grupo = ({ titulo, cor, itens }) => (
         <Box sx={{ mb: 3 }}>

@@ -175,14 +175,53 @@ export const useEmpresas = (eventoIdParam) => {
         }
     };
 
-    const handleAuditDocument = async (docId, status) => {
+    const handleAuditDocument = async (docId, status, empresaId = null) => {
         try {
             await api.patch(`/documentos/empresa/${docId}/auditar`, { status });
-            enqueueSnackbar(`Documento ${status === 'aprovado' ? 'aprovado' : 'rejeitado'}!`, { variant: 'success' });
-            if (selectedEmpresa) loadDocumentos(selectedEmpresa.id);
+            const rotulo = status === 'aprovado' ? 'aprovado' : status === 'reenvio_solicitado' ? 'marcado para reenvio' : 'reprovado';
+            enqueueSnackbar(`Documento ${rotulo}!`, { variant: 'success' });
+            const targetId = empresaId || selectedEmpresa?.id;
+            if (targetId) loadDocumentos(targetId);
             return true;
         } catch (e) {
             enqueueSnackbar('Falha ao auditar documento.', { variant: 'error' });
+            return false;
+        }
+    };
+
+    const handleUploadDocumentoEmpresa = async (empresaId, file, { titulo = 'Documento da Empresa', tipo_doc = 'CORPORATIVO', data_validade = '' } = {}) => {
+        if (!empresaId || !file) return false;
+        const tituloLimpo = String(titulo || '').trim() || 'Documento da Empresa';
+        const formDataUpload = new FormData();
+        formDataUpload.append('arquivo', file);
+        formDataUpload.append('titulo', tituloLimpo);
+        formDataUpload.append('tipo_doc', String(tipo_doc || 'CORPORATIVO').trim());
+        if (data_validade) formDataUpload.append('data_validade', data_validade);
+
+        try {
+            setSaving(true);
+            await api.post(`/documentos/empresa/${empresaId}/upload`, formDataUpload, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            enqueueSnackbar('Documento da empresa enviado com sucesso!', { variant: 'success' });
+            await loadDocumentos(empresaId);
+            return true;
+        } catch (error) {
+            enqueueSnackbar(error.response?.data?.error || 'Erro ao enviar documento da empresa.', { variant: 'error' });
+            return false;
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleUploadWebcamEmpresa = async (empresaId, base64, metadados = {}) => {
+        if (!empresaId || !base64) return false;
+        try {
+            const blob = await (await fetch(base64)).blob();
+            const file = new File([blob], `documento_empresa_${Date.now()}.jpg`, { type: 'image/jpeg' });
+            return await handleUploadDocumentoEmpresa(empresaId, file, metadados);
+        } catch (e) {
+            enqueueSnackbar('Erro ao processar foto do documento.', { variant: 'error' });
             return false;
         }
     };
@@ -214,6 +253,8 @@ export const useEmpresas = (eventoIdParam) => {
         handleDelete,
         handleSaveQuotas,
         handleAuditDocument,
+        handleUploadDocumentoEmpresa,
+        handleUploadWebcamEmpresa,
         handleSelectAllDatesEmpresa,
         handleClearAllDatesEmpresa,
         handleSelectAllPhaseEmpresa,

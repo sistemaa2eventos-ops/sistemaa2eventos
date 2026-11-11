@@ -40,14 +40,16 @@ const AJUDAS = {
     },
     '/empresas': {
         titulo: 'Empresas',
-        objetivo: 'Cadastra as empresas contratadas do evento, as cotas diárias e envia o link para cada empresa cadastrar a própria equipe.',
+        objetivo: 'Cadastra as empresas contratadas do evento, as cotas diárias e envia os links para o responsável anexar a documentação da empresa e cadastrar a equipe.',
         passos: [
-            '"Nova empresa": preencha "Dados cadastrais", depois "Configurações" (cota, dias permitidos, regra de remuneração) e "Documentos". "Finalizar & salvar".',
-            'Clique em "Gerar convite de cadastro" e envie o link por WhatsApp, e-mail ou copie.',
+            '"Nova empresa": preencha "Dados cadastrais" e "Configurações" (cota, dias permitidos, regra de remuneração) e clique em "Finalizar & salvar".',
+            'Clique em "Gerar convite de cadastro" para copiar ou enviar por e-mail / WhatsApp os dois links (documentação da empresa e cadastro de colaboradores).',
+            'Para anexar documentos da empresa manualmente (arquivo ou foto pela câmera), clique no ícone "Documentos da empresa" nas Ações ou na etapa "Documentos" ao editar a empresa.',
             'Use "Gerenciar cotas diárias" para limitar quantas pessoas da empresa entram por dia.'
         ],
         atencao: [
             'Gerar um novo link invalida o anterior: quem tiver o link antigo não consegue mais se cadastrar.',
+            'Os documentos da empresa entram na fila de Auditoria documental e são salvos na pasta da empresa no Google Drive.',
             'Os "Dias permitidos" valem para todos os colaboradores da empresa.',
             'Excluir a empresa mantém os colaboradores, mas eles podem perder o acesso.'
         ],
@@ -70,11 +72,11 @@ const AJUDAS = {
     },
     '/auditoria': {
         titulo: 'Auditoria documental',
-        objetivo: 'Conferir os documentos enviados (RG/CNH, ASO, NRs) e aprovar, reprovar ou pedir reenvio. Quem não tem os documentos exigidos da função fica pendente.',
+        objetivo: 'Conferir os documentos enviados pelas empresas e pelos colaboradores (CNPJ, contratos, RG/CNH, ASO, NRs) e aprovar, reprovar ou pedir reenvio.',
         passos: [
             'Na aba "Fila de análise", clique em "Ver e analisar documento".',
             'Escolha a ação. Ao aprovar, informe o "Tipo do documento" e a "Data de Validade" quando o tipo exigir.',
-            'Na aba "Colaboradores", veja o que falta para cada pessoa; em "Vencimentos", o que vai vencer.'
+            'Na aba "Colaboradores", veja o que falta para cada pessoa; em "Empresas", confira os documentos de cada empresa; em "Vencimentos", o que vai vencer.'
         ],
         atencao: [
             'Reprovar e pedir reenvio exigem motivo.',
@@ -296,7 +298,8 @@ const AJUDAS = {
         objetivo: 'Cadastrar as câmeras IP (aba "Câmeras IP") e ajustar o motor de reconhecimento facial (aba "Motor de IA facial").',
         passos: [
             'Aba "Câmeras IP": "Cadastrar nova câmera" com nome, área, IP, porta RTSP, usuário e senha; use "Testar".',
-            'Aba "Motor de IA facial": confira o status, escolha o perfil (Equilibrado é o recomendado) e "Salvar e aplicar".',
+            'Aba "Motor de IA facial": use "Verificar compatibilidade e ligar IA neste PC" para diagnosticar o computador, ver as recomendações de configuração e iniciar a IA facial.',
+            'Confira o status, escolha o perfil (ou aplique o recomendado) e clique em "Salvar e aplicar".',
             'Abra o resultado em "Abrir no monitor CFTV".'
         ],
         atencao: [

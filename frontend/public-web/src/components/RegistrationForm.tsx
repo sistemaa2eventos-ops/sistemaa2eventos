@@ -382,7 +382,18 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                         {company.vagas === Infinity ? '∞ vagas' : `${company.vagas} vaga${company.vagas !== 1 ? 's' : ''}`}
                     </div>
                 </div>
-                <p className="text-slate-500 text-sm">Cadastro institucional — <span className="text-slate-300 font-medium">{company.nome}</span></p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-slate-500 text-sm">Cadastro institucional — <span className="text-slate-300 font-medium">{company.nome}</span></p>
+                    {!preFilledData && (
+                        <a
+                            href={`/empresa/${token}`}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/30 hover:bg-purple-500/20 transition-all"
+                        >
+                            <Briefcase className="w-3.5 h-3.5" />
+                            Responsável: enviar documentos da empresa
+                        </a>
+                    )}
+                </div>
 
                 {/* Stepper Progress */}
                 <div className="flex items-center mt-7 gap-3">

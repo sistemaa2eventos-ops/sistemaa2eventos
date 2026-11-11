@@ -17,6 +17,7 @@ router.put('/ia-config', authenticate, requireAdminMaster, cameraController.salv
 router.use(authenticate, requireEvent);
 
 router.get('/ia-status', checkPermission('monitor', 'leitura'), cameraController.iaStatus);
+router.post('/ia-iniciar', checkPermission('monitor', 'escrita'), cameraController.iniciarIa);
 
 router.get('/:id/track', checkPermission('monitor', 'leitura'), cameraController.trackFace);
 router.post('/:id/track', checkPermission('monitor', 'leitura'), cameraController.trackFace);

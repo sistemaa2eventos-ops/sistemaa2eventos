@@ -134,7 +134,7 @@ app.use(require('./modules/system/health.routes'));
 // app.use(cors(corsOptions)); // DESATIVADO: Gateway (Nginx) centraliza a autoridade de CORS (v15.0)
 app.use(compression());
 app.use(express.json({
-    limit: '10mb',
+    limit: '15mb',
     verify: (req, res, buf) => {
         // Preservar raw body para validação de assinatura de webhooks
         if (req.originalUrl && req.originalUrl.startsWith('/api/payments')) {
@@ -142,7 +142,7 @@ app.use(express.json({
         }
     }
 }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
 // 🔍 LOG DE REQUESTS (apenas em desenvolvimento, sem logar body de rotas sensíveis)
 if (process.env.NODE_ENV === 'development') {

@@ -29,6 +29,7 @@ import DataTable from '../components/common/DataTable';
 import api from '../services/api';
 import VisualizadorDocumento from '../components/documentos/VisualizadorDocumento';
 import AbaColaboradores from '../components/documentos/AbaColaboradores';
+import AbaEmpresas from '../components/documentos/AbaEmpresas';
 import AbaVencimentos from '../components/documentos/AbaVencimentos';
 
 import { comoRotulo } from '../utils/formatadores';
@@ -73,9 +74,9 @@ const AuditoriaDocumental = () => {
     const [tiposDocumento, setTiposDocumento] = useState([]);
     const [submitting, setSubmitting] = useState(false);
 
-    // Abas: 0 = fila, 1 = colaboradores, 2 = vencimentos
+    // Abas: 0 = fila, 1 = colaboradores, 2 = empresas, 3 = vencimentos
     const [searchParams] = useSearchParams();
-    const [aba, setAba] = useState(() => ({ colaboradores: 1, vencimentos: 2 }[searchParams.get('aba')] || 0));
+    const [aba, setAba] = useState(() => ({ colaboradores: 1, empresas: 2, vencimentos: 3 }[searchParams.get('aba')] || 0));
     const [recarregarToken, setRecarregarToken] = useState(0);
     const [previewUrl, setPreviewUrl] = useState(null);
 
@@ -366,6 +367,7 @@ const AuditoriaDocumental = () => {
             }}>
                 <Tab label={`Fila de análise (${stats.pendentes})`} />
                 <Tab label="Colaboradores" />
+                <Tab label="Empresas" />
                 <Tab label="Vencimentos" />
             </Tabs>
 
@@ -376,6 +378,12 @@ const AuditoriaDocumental = () => {
             )}
 
             {aba === 2 && (
+                <GlassCard sx={{ p: 3 }}>
+                    <AbaEmpresas onAuditar={(doc, a) => handleOpenAction(doc, a)} recarregarToken={recarregarToken} />
+                </GlassCard>
+            )}
+
+            {aba === 3 && (
                 <GlassCard sx={{ p: 3 }}>
                     <AbaVencimentos onAuditar={(doc, a) => handleOpenAction(doc, a)} recarregarToken={recarregarToken} />
                 </GlassCard>
@@ -645,13 +653,17 @@ const AuditoriaDocumental = () => {
                         {/* Mensagem Explicativa */}
                         {acao === 'reenvio_solicitado' && (
                             <Alert severity="warning" sx={{ bgcolor: 'rgba(255,170,0,0.1)', color: '#FFB800' }}>
-                                O colaborador receberá notificação no portal de auto-cadastro com o motivo apontado abaixo para reenviar o arquivo correto.
+                                {actionDoc?.tipo_entidade === 'empresa'
+                                    ? 'O responsável da empresa visualizará o motivo apontado abaixo no link de documentação da empresa para reenviar o arquivo correto.'
+                                    : 'O colaborador receberá notificação no portal de auto-cadastro com o motivo apontado abaixo para reenviar o arquivo correto.'}
                             </Alert>
                         )}
 
                         {acao === 'reprovado' && (
                             <Alert severity="error" sx={{ bgcolor: 'rgba(255,51,102,0.1)', color: '#FF3366' }}>
-                                O status do colaborador será marcado como irregular, bloqueando seu credenciamento e emissão de pulseira no evento.
+                                {actionDoc?.tipo_entidade === 'empresa'
+                                    ? 'O documento da empresa será marcado como reprovado com a justificativa abaixo.'
+                                    : 'O status do colaborador será marcado como irregular, bloqueando seu credenciamento e emissão de pulseira no evento.'}
                             </Alert>
                         )}
 

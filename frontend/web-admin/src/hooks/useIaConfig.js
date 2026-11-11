@@ -61,6 +61,7 @@ export function useIaConfig() {
 export function useIaStatus(ativo = true, intervaloMs = 15000) {
     const [status, setStatus] = useState(null);
     const [erro, setErro] = useState(null);
+    const [gatilho, setGatilho] = useState(0);
     useEffect(() => {
         if (!ativo) return undefined;
         let cancelado = false;
@@ -85,8 +86,9 @@ export function useIaStatus(ativo = true, intervaloMs = 15000) {
             clearInterval(timer);
             document.removeEventListener('visibilitychange', aoVoltar);
         };
-    }, [ativo, intervaloMs]);
-    return { status, erro };
+    }, [ativo, intervaloMs, gatilho]);
+    const recarregar = () => setGatilho(g => g + 1);
+    return { status, erro, recarregar };
 }
 
 /** Status de uma câmera dentro do status do motor */

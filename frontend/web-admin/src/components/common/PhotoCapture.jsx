@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Webcam from 'react-webcam';
 import { useSnackbar } from 'notistack';
 import {
@@ -13,7 +13,9 @@ import {
     DialogContent,
     DialogActions,
     Tooltip,
-    Grid
+    Grid,
+    Select,
+    MenuItem
 } from '@mui/material';
 import {
     CameraAlt as CameraIcon,
@@ -24,10 +26,29 @@ import {
     RadioButtonUnchecked as UncheckedIcon,
     ReplayRounded as RetryIcon,
     SaveAlt as SaveIcon,
+    Cameraswitch as SwitchCameraIcon,
 } from '@mui/icons-material';
 import { FaceValidator } from '../../utils/FaceValidator';
 import FaceCropper from './FaceCropper';
 import { keyframes } from '@mui/material/styles';
+
+const traduzirErroCamera = (err) => {
+    const nome = err?.name || '';
+    const msg = String(err?.message || err || '');
+    if (nome === 'NotAllowedError' || /permission|denied/i.test(msg)) {
+        return 'Permissão da câmera bloqueada. Clique no ícone de cadeado/câmera na barra de endereço do navegador, permita o acesso e tente de novo.';
+    }
+    if (nome === 'NotFoundError' || /not found|no camera|requested device/i.test(msg)) {
+        return 'Nenhuma câmera foi encontrada conectada a este computador.';
+    }
+    if (nome === 'NotReadableError' || /in use|could not start|hardware/i.test(msg)) {
+        return 'A câmera está ocupada por outro programa (como OBS, Teams, Zoom ou outra aba) ou falhou ao iniciar. Feche o outro app ou troque a câmera abaixo.';
+    }
+    if (typeof window !== 'undefined' && !window.isSecureContext) {
+        return 'A câmera só pode ser aberta em conexão segura (HTTPS ou localhost).';
+    }
+    return 'Não foi possível iniciar o vídeo da câmera. Tente trocar de câmera abaixo ou enviar arquivo.';
+};
 
 const scanLine = keyframes`
   0%   { top: 8%; opacity: 0.7; }
@@ -253,10 +274,15 @@ const VerificationDialog = ({ image, result, onSave, onRetry }) => (
 /* ────────────────────────────────────────────────
    Componente principal
    ──────────────────────────────────────────────── */
-const PhotoCapture = ({ onPhotoCaptured, initialPhoto }) => {
+const PhotoCapture = ({ onPhotoCaptured, initialPhoto, modoDocumento = false, autoOpen = false }) => {
     const webcamRef  = useRef(null);
     const [imgSrc, setImgSrc]                 = useState(initialPhoto || null);
-    const [isCameraOpen, setIsCameraOpen]     = useState(false);
+    const [isCameraOpen, setIsCameraOpen]     = useState(Boolean(autoOpen));
+    const [cameraReady, setCameraReady]       = useState(false);
+    const [cameraError, setCameraError]       = useState(null);
+    const [fallbackMode, setFallbackMode]     = useState(false);
+    const [devices, setDevices]               = useState([]);
+    const [selectedDeviceId, setSelectedDeviceId] = useState('');
     const [loading, setLoading]               = useState(false);
     const [cropperOpen, setCropperOpen]       = useState(false);
     const [tempImage, setTempImage]           = useState(null);
@@ -265,12 +291,110 @@ const PhotoCapture = ({ onPhotoCaptured, initialPhoto }) => {
 
     const { enqueueSnackbar } = useSnackbar();
 
+    useEffect(() => {
+        setImgSrc(initialPhoto || null);
+    }, [initialPhoto]);
+
+    const atualizarListaCameras = useCallback(async () => {
+        if (!navigator.mediaDevices?.enumerateDevices) return;
+        try {
+            const all = await navigator.mediaDevices.enumerateDevices();
+            const cams = all.filter(d => d.kind === 'videoinput');
+            setDevices(cams);
+            setSelectedDeviceId(prev => {
+                if (prev && cams.some(c => c.deviceId === prev)) return prev;
+                // Prioriza webcam física se houver câmera virtual (ex: OBS) desligada
+                const fisica = cams.find(c => !/obs|virtual/i.test(c.label || ''));
+                return (fisica || cams[0])?.deviceId || '';
+            });
+        } catch {
+            // ignorar erro de enumeração
+        }
+    }, []);
+
+    useEffect(() => {
+        if (autoOpen) {
+            atualizarListaCameras();
+        }
+    }, [autoOpen, atualizarListaCameras]);
+
+    const abrirCamera = () => {
+        setCameraError(null);
+        setCameraReady(false);
+        setFallbackMode(false);
+        setIsCameraOpen(true);
+        atualizarListaCameras();
+    };
+
+    const handleUserMedia = () => {
+        setCameraReady(true);
+        setCameraError(null);
+        atualizarListaCameras();
+    };
+
+    const handleUserMediaError = (err) => {
+        console.warn('Webcam erro:', err);
+        if (!fallbackMode) {
+            // Fallback: remove restrições de resolução/deviceId e pede qualquer vídeo disponível no PC
+            setFallbackMode(true);
+            setSelectedDeviceId('');
+            return;
+        }
+        setCameraReady(false);
+        const msg = traduzirErroCamera(err);
+        setCameraError(msg);
+        enqueueSnackbar(msg, { variant: 'error' });
+    };
+
+    const trocarCamera = () => {
+        if (devices.length < 2) return;
+        const idx = devices.findIndex(d => d.deviceId === selectedDeviceId);
+        const next = devices[(idx + 1) % devices.length];
+        if (next) {
+            setCameraReady(false);
+            setCameraError(null);
+            setFallbackMode(false);
+            setSelectedDeviceId(next.deviceId);
+        }
+    };
+
+    const videoConstraints = React.useMemo(() => {
+        if (fallbackMode) return true;
+        const idealW = modoDocumento ? 1280 : 640;
+        const idealH = modoDocumento ? 720 : 480;
+        if (selectedDeviceId) {
+            return {
+                deviceId: { exact: selectedDeviceId },
+                width: { ideal: idealW },
+                height: { ideal: idealH }
+            };
+        }
+        return {
+            width: { ideal: idealW },
+            height: { ideal: idealH },
+            facingMode: modoDocumento ? 'environment' : 'user'
+        };
+    }, [fallbackMode, selectedDeviceId, modoDocumento]);
+
     const handleCapture = async () => {
-        if (!webcamRef.current) return;
+        if (!webcamRef.current || !cameraReady) return;
         
         try {
             setLoading(true);
             const imageSrc = webcamRef.current.getScreenshot();
+            if (!imageSrc) {
+                enqueueSnackbar('A câmera ainda está iniciando. Aguarde a imagem aparecer e tente novamente.', { variant: 'warning' });
+                return;
+            }
+
+            if (modoDocumento) {
+                setImgSrc(imageSrc);
+                onPhotoCaptured(imageSrc);
+                setIsCameraOpen(false);
+                setCameraReady(false);
+                enqueueSnackbar('Foto do documento capturada com sucesso.', { variant: 'success' });
+                return;
+            }
             
             // Bypass manual cropper for webcam: Use Automated Smart Crop
             const validation = await FaceValidator.validate(imageSrc);
@@ -280,6 +404,7 @@ const PhotoCapture = ({ onPhotoCaptured, initialPhoto }) => {
                 setImgSrc(validation.croppedBase64);
                 onPhotoCaptured(validation.croppedBase64);
                 setIsCameraOpen(false);
+                setCameraReady(false);
                 enqueueSnackbar('Biometria capturada com sucesso.', { variant: 'success' });
             } else {
                 enqueueSnackbar(validation.errors[0] || 'Falha na detecção facial. Tente novamente.', { variant: 'error' });
@@ -297,6 +422,12 @@ const PhotoCapture = ({ onPhotoCaptured, initialPhoto }) => {
         if (!file) return;
         const reader = new FileReader();
         reader.onload = () => {
+            if (modoDocumento) {
+                setImgSrc(reader.result);
+                onPhotoCaptured(reader.result);
+                setIsCameraOpen(false);
+                return;
+            }
             setTempImage(reader.result);
             setCropperOpen(true);
         };
@@ -325,6 +456,8 @@ const PhotoCapture = ({ onPhotoCaptured, initialPhoto }) => {
         onPhotoCaptured(null);
         setTempImage(null);
         setIsCameraOpen(false);
+        setCameraReady(false);
+        setCameraError(null);
     };
 
     if (showVerification) {
@@ -345,8 +478,8 @@ const PhotoCapture = ({ onPhotoCaptured, initialPhoto }) => {
             <Box sx={{
                 position: 'relative',
                 width: '100%',
-                maxWidth: 260,
-                aspectRatio: '3 / 4',
+                maxWidth: modoDocumento ? 420 : 260,
+                aspectRatio: modoDocumento ? '4 / 3' : '3 / 4',
                 bgcolor: 'rgba(0,0,0,0.4)',
                 borderRadius: 1.5,
                 border: '1px solid rgba(0,212,255,0.15)',
@@ -355,13 +488,49 @@ const PhotoCapture = ({ onPhotoCaptured, initialPhoto }) => {
             }}>
                 {/* Conteúdo */}
                 {isCameraOpen ? (
-                    <Webcam
-                        audio={false}
-                        ref={webcamRef}
-                        screenshotFormat="image/jpeg"
-                        videoConstraints={{ width: 480, height: 640, facingMode: 'user' }}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                    />
+                    <>
+                        <Webcam
+                            key={fallbackMode ? 'fallback' : (selectedDeviceId || 'default')}
+                            audio={false}
+                            ref={webcamRef}
+                            mirrored={!modoDocumento}
+                            screenshotFormat="image/jpeg"
+                            screenshotQuality={0.92}
+                            forceScreenshotSourceSize={true}
+                            videoConstraints={videoConstraints}
+                            onUserMedia={handleUserMedia}
+                            onUserMediaError={handleUserMediaError}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        />
+                        {!cameraReady && !cameraError && (
+                            <Box sx={{
+                                position: 'absolute', inset: 0, zIndex: 5,
+                                bgcolor: 'rgba(5, 11, 24, 0.78)',
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                                gap: 1.5, p: 2, textAlign: 'center'
+                            }}>
+                                <CircularProgress size={28} sx={{ color: '#00D4FF' }} />
+                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>
+                                    Iniciando câmera...
+                                </Typography>
+                            </Box>
+                        )}
+                        {cameraError && (
+                            <Box sx={{
+                                position: 'absolute', inset: 0, zIndex: 6,
+                                bgcolor: 'rgba(5, 11, 24, 0.92)',
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                                gap: 1.5, p: 2, textAlign: 'center'
+                            }}>
+                                <Typography variant="caption" sx={{ color: '#FF8A80', lineHeight: 1.4 }}>
+                                    {cameraError}
+                                </Typography>
+                                <Button size="small" variant="outlined" onClick={abrirCamera} sx={{ color: '#00D4FF', borderColor: '#00D4FF', fontSize: '0.72rem' }}>
+                                    Tentar novamente
+                                </Button>
+                            </Box>
+                        )}
+                    </>
                 ) : imgSrc ? (
                     <Box
                         component="img"
@@ -391,8 +560,8 @@ const PhotoCapture = ({ onPhotoCaptured, initialPhoto }) => {
                     </Box>
                 )}
 
-                {/* Máscara oval */}
-                <FaceMask active={isCameraOpen} />
+                {/* Máscara oval (apenas para captura facial) */}
+                {!modoDocumento && <FaceMask active={isCameraOpen && cameraReady} />}
 
                 {/* Spinner de processamento */}
                 {loading && (
@@ -406,12 +575,42 @@ const PhotoCapture = ({ onPhotoCaptured, initialPhoto }) => {
                 )}
             </Box>
 
+            {/* Seletor de câmera quando houver mais de 1 câmera no PC */}
+            {isCameraOpen && devices.length > 1 && (
+                <Select
+                    size="small"
+                    value={selectedDeviceId}
+                    onChange={(e) => {
+                        setCameraReady(false);
+                        setCameraError(null);
+                        setFallbackMode(false);
+                        setSelectedDeviceId(e.target.value);
+                    }}
+                    sx={{
+                        mt: 1.5,
+                        maxWidth: 260,
+                        width: '100%',
+                        height: 32,
+                        fontSize: '0.75rem',
+                        color: '#FFFFFF',
+                        bgcolor: 'rgba(0,0,0,0.35)',
+                        '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0,212,255,0.25)' }
+                    }}
+                >
+                    {devices.map((d, idx) => (
+                        <MenuItem key={d.deviceId || idx} value={d.deviceId} sx={{ fontSize: '0.75rem' }}>
+                            {d.label || `Câmera ${idx + 1}`}
+                        </MenuItem>
+                    ))}
+                </Select>
+            )}
+
             {/* Barra de ações */}
             <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
                 {!isCameraOpen ? (
                     <Tooltip title="Abrir câmera" placement="bottom">
                         <IconButton
-                            onClick={() => setIsCameraOpen(true)}
+                            onClick={abrirCamera}
                             size="medium"
                             sx={{
                                 color: 'primary.main',
@@ -424,20 +623,42 @@ const PhotoCapture = ({ onPhotoCaptured, initialPhoto }) => {
                         </IconButton>
                     </Tooltip>
                 ) : (
-                    <Tooltip title="Tirar foto" placement="bottom">
-                        <IconButton
-                            onClick={handleCapture}
-                            size="medium"
-                            sx={{
-                                color: '#00FF88',
-                                bgcolor: 'rgba(0,255,136,0.08)',
-                                border: '1px solid rgba(0,255,136,0.25)',
-                                '&:hover': { bgcolor: 'rgba(0,255,136,0.16)' },
-                            }}
-                        >
-                            <CameraIcon />
-                        </IconButton>
-                    </Tooltip>
+                    <>
+                        <Tooltip title="Tirar foto" placement="bottom">
+                            <span>
+                                <IconButton
+                                    onClick={handleCapture}
+                                    disabled={!cameraReady || loading}
+                                    size="medium"
+                                    sx={{
+                                        color: '#00FF88',
+                                        bgcolor: 'rgba(0,255,136,0.08)',
+                                        border: '1px solid rgba(0,255,136,0.25)',
+                                        '&:hover': { bgcolor: 'rgba(0,255,136,0.16)' },
+                                        '&.Mui-disabled': { opacity: 0.35 },
+                                    }}
+                                >
+                                    <CameraIcon />
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                        {devices.length > 1 && (
+                            <Tooltip title="Trocar câmera" placement="bottom">
+                                <IconButton
+                                    onClick={trocarCamera}
+                                    size="medium"
+                                    sx={{
+                                        color: '#00D4FF',
+                                        bgcolor: 'rgba(0,212,255,0.08)',
+                                        border: '1px solid rgba(0,212,255,0.2)',
+                                        '&:hover': { bgcolor: 'rgba(0,212,255,0.16)' },
+                                    }}
+                                >
+                                    <SwitchCameraIcon />
+                                </IconButton>
+                            </Tooltip>
+                        )}
+                    </>
                 )}
 
                 <Tooltip title="Enviar arquivo" placement="bottom">

@@ -320,7 +320,7 @@ const Pessoas = () => {
         <DialogTitle>Capturar foto do documento</DialogTitle>
         <DialogContent sx={{ overflowY: 'auto' }}>
           <Box sx={{ py: 2 }}>
-            <PhotoCapture onPhotoCaptured={(base64) => { if (base64) handleUploadWebcamECM(base64); }} />
+            <PhotoCapture modoDocumento={true} autoOpen={true} onPhotoCaptured={(base64) => { if (base64) handleUploadWebcamECM(base64); }} />
           </Box>
         </DialogContent>
         <DialogActions><Button variant="outlined" onClick={() => setOpenWebcamECM(false)} sx={botaoSecundario}>Fechar</Button></DialogActions>

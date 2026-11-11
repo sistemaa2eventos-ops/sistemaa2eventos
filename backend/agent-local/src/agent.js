@@ -151,6 +151,30 @@ const handlers = {
         return res.json();
     },
 
+    /** Inicia o motor de IA facial local caso esteja desligado */
+    async ia_iniciar() {
+        try {
+            const res = await fetch(`${IA_URL}/api/engine/status`, { signal: AbortSignal.timeout(3000) });
+            if (res.ok) return { iniciado: true, ja_rodando: true, status: await res.json() };
+        } catch {
+            // motor desligado, vamos iniciar via ligar-ia-facial.ps1
+        }
+        const { spawn } = require('child_process');
+        const raiz = path.resolve(__dirname, '..', '..', '..');
+        const scriptPs1 = path.join(raiz, 'scripts', 'ligar-ia-facial.ps1');
+        if (process.platform === 'win32' && fs.existsSync(scriptPs1)) {
+            const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPs1, 'unico'], {
+                cwd: raiz,
+                detached: true,
+                stdio: 'ignore',
+                windowsHide: true
+            });
+            child.unref();
+            return { iniciado: true, ja_rodando: false, mensagem: 'Inicialização do motor de IA facial disparada no PC local.' };
+        }
+        throw new Error('Script ligar-ia-facial.ps1 não encontrado no PC do agente.');
+    },
+
     async video_parar({ streamId }) {
         const video = videos.get(streamId);
         if (video) video.parar = true;

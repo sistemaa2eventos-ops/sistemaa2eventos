@@ -24,7 +24,7 @@ class DocumentoService {
     /**
      * Upload e registro de documento
      */
-    async uploadDocumento(supabaseClient, { entityType, entityId, titulo, tipo_doc, tipo_documento_id, file }) {
+    async uploadDocumento(supabaseClient, { entityType, entityId, titulo, tipo_doc, tipo_documento_id, data_validade, file }) {
         if (!this.isValidBuffer(file.buffer, file.mimetype)) {
             throw new Error('Arquivo corrompido ou formato forjado (Spoofing detectado).');
         }
@@ -49,6 +49,9 @@ class DocumentoService {
             status: 'pendente'
         };
         if (tipo_documento_id) registro.tipo_documento_id = tipo_documento_id;
+        if (data_validade && /^\d{4}-\d{2}-\d{2}$/.test(String(data_validade))) {
+            registro.data_validade = data_validade;
+        }
 
         const { data, error } = await supabaseClient.from(tableName).insert([registro]).select().single();
 
@@ -378,6 +381,62 @@ class DocumentoService {
     }
 
     /**
+     * Empresas do evento com documentos entregues e situação documental.
+     * Busca por nome da empresa, CNPJ, responsável, e-mail, telefone ou serviço.
+     */
+    async listarEmpresas(eventoId, { search = '', page = 1, limit = 30, somentePendentes = false }) {
+        const { data: empresas, error } = await supabase
+            .from('empresas')
+            .select('id, nome, cnpj, servico, responsavel, email, telefone, evento_id')
+            .eq('evento_id', eventoId)
+            .order('nome');
+        if (error) throw error;
+
+        const linhas = (empresas || []).map(e => ({
+            ...e,
+            _busca: [e.nome, e.cnpj, e.servico, e.responsavel, e.email, e.telefone]
+        }));
+        const filtradas = this.filtrarPorBusca(linhas, search);
+
+        const ids = filtradas.map(e => e.id);
+        const docsPorEmpresa = {};
+        for (let i = 0; i < ids.length; i += 200) {
+            const { data } = await supabase
+                .from('empresa_documentos')
+                .select('*')
+                .in('empresa_id', ids.slice(i, i + 200))
+                .order('data_inclusao', { ascending: false });
+            for (const d of data || []) (docsPorEmpresa[d.empresa_id] = docsPorEmpresa[d.empresa_id] || []).push(d);
+        }
+
+        let resultado = filtradas.map(({ _busca, ...e }) => {
+            const docs = docsPorEmpresa[e.id] || [];
+            let situacao_documental = 'pendente';
+            if (docs.length > 0) {
+                if (docs.some(d => d.status === 'reprovado' || d.status === 'rejeitado')) {
+                    situacao_documental = 'reprovado';
+                } else if (docs.some(d => d.status === 'reenvio_solicitado')) {
+                    situacao_documental = 'reenvio_solicitado';
+                } else if (docs.some(d => d.status === 'pendente' || d.status === 'em_analise')) {
+                    situacao_documental = 'em_analise';
+                } else if (docs.every(d => d.status === 'aprovado')) {
+                    situacao_documental = 'aprovado';
+                }
+            }
+            return {
+                ...e,
+                documentos: docs.map(d => ({ ...d, tipo_entidade: 'empresa', entidade_nome: e.nome, entidade_doc: e.cnpj })),
+                situacao_documental
+            };
+        });
+
+        if (somentePendentes) resultado = resultado.filter(e => e.situacao_documental !== 'aprovado');
+
+        const from = (page - 1) * limit;
+        return { data: resultado.slice(from, from + limit), total: resultado.length, page: Number(page), limit: Number(limit) };
+    }
+
+    /**
      * Documentos vencidos e a vencer nos próximos `dias` (padrão: configuração do evento).
      */
     async listarVencimentos(eventoId, dias = null) {
@@ -386,26 +445,29 @@ class DocumentoService {
         const hoje = getHojeLocal();
         const limite = new Date(Date.now() + janela * 86400000).toISOString().slice(0, 10);
 
-        const { pessoasPorId, pesDocs } = await this._documentosDoEvento(eventoId, q => q
+        const { pessoasPorId, empresasPorId, pesDocs, empDocs } = await this._documentosDoEvento(eventoId, q => q
             .in('status', ['aprovado', 'vencido'])
             .not('data_validade', 'is', null)
             .lte('data_validade', limite));
-        const data = pesDocs
-            .map(d => ({ ...d, pessoas: pessoasPorId[d.pessoa_id] }))
-            .sort((a, b) => a.data_validade.localeCompare(b.data_validade));
+        const data = [
+            ...pesDocs.map(d => ({ ...d, _entidade: 'pessoa', pessoas: pessoasPorId[d.pessoa_id] })),
+            ...empDocs.map(d => ({ ...d, _entidade: 'empresa', empresas: empresasPorId[d.empresa_id] }))
+        ].sort((a, b) => a.data_validade.localeCompare(b.data_validade));
 
         const tiposPorId = Object.fromEntries(config.tipos.map(t => [t.id, t]));
         return {
             janela_dias: janela,
-            data: data.map(({ pessoas, ...d }) => {
+            data: data.map(({ pessoas, empresas, _entidade, ...d }) => {
                 const diasRestantes = Math.round((new Date(d.data_validade) - new Date(hoje)) / 86400000);
+                const ehEmpresa = _entidade === 'empresa';
                 return {
                     ...d,
+                    tipo_entidade: ehEmpresa ? 'empresa' : 'pessoa',
                     tipo_nome: tiposPorId[d.tipo_documento_id]?.nome || d.titulo,
-                    pessoa_nome: pessoas?.nome_completo,
-                    pessoa_cpf: pessoas?.cpf,
-                    pessoa_funcao: pessoas?.funcao,
-                    empresa_nome: pessoas?.empresas?.nome || null,
+                    pessoa_nome: ehEmpresa ? empresas?.nome : pessoas?.nome_completo,
+                    pessoa_cpf: ehEmpresa ? empresas?.cnpj : pessoas?.cpf,
+                    pessoa_funcao: ehEmpresa ? 'Empresa' : pessoas?.funcao,
+                    empresa_nome: ehEmpresa ? empresas?.nome : (pessoas?.empresas?.nome || null),
                     dias_restantes: diasRestantes,
                     situacao: diasRestantes < 0 || d.status === 'vencido' ? 'vencido' : 'a_vencer'
                 };

@@ -5,10 +5,10 @@ import {
     CircularProgress, Checkbox, FormControlLabel,
     Alert, Divider, Container
 } from '@mui/material';
-import { PhotoCamera, CloudUpload } from '@mui/icons-material';
-import PessoaFoto from '../components/common/PessoaFoto';
+import { CloudUpload } from '@mui/icons-material';
+import PhotoCapture from '../components/common/PhotoCapture';
 import api from '../services/api';
-import { FaceValidator, reduzirFoto } from '../utils/FaceValidator';
+import { reduzirFoto } from '../utils/FaceValidator';
 
 const PortalCadastro = () => {
     const [searchParams] = useSearchParams();
@@ -34,7 +34,6 @@ const PortalCadastro = () => {
         documentos: []
     });
 
-    const fileInputRef = useRef(null);
     const docFrenteRef = useRef(null);
     const docVersoRef = useRef(null);
 
@@ -72,32 +71,13 @@ const PortalCadastro = () => {
 
     // Foto do rosto: conferida (um rosto, nítido, grande o bastante) e reduzida antes de enviar.
     // Foto ruim gera biometria que não reconhece a pessoa nas câmeras e nos leitores.
-    const [avaliandoFoto, setAvaliandoFoto] = useState(false);
-    const [problemasFoto, setProblemasFoto] = useState([]);
-    const handlePhotoUpload = async (e) => {
-        const file = e.target.files[0];
-        e.target.value = '';
-        if (!file) return;
-        if (!file.type.startsWith('image/')) {
-            setProblemasFoto(['Envie uma imagem (JPG ou PNG).']);
+    const handlePhotoCaptured = async (b64) => {
+        if (!b64) {
+            setFormData(prev => ({ ...prev, foto_base64: null }));
             return;
         }
-        setAvaliandoFoto(true);
-        setProblemasFoto([]);
-        try {
-            const b64 = await handleBase64(file);
-            const resultado = await FaceValidator.validate(b64);
-            if (!resultado.isValid || !resultado.croppedBase64) {
-                setProblemasFoto(resultado.errors?.length ? resultado.errors : ['Rosto não reconhecido na foto.']);
-                return;
-            }
-            const reduzida = await reduzirFoto(resultado.croppedBase64);
-            setFormData(prev => ({ ...prev, foto_base64: reduzida }));
-        } catch {
-            setProblemasFoto(['Não foi possível ler a foto. Tente outra imagem.']);
-        } finally {
-            setAvaliandoFoto(false);
-        }
+        const reduzida = await reduzirFoto(b64);
+        setFormData(prev => ({ ...prev, foto_base64: reduzida }));
     };
 
     const handleDocUpload = async (e, type) => {
@@ -206,32 +186,11 @@ const PortalCadastro = () => {
                         {/* SEÇÃO 1: FOTO */}
                         <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700, fontSize: '1rem' }}>1. Biometria facial</Typography>
                         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', my: 3 }}>
-                            <Box sx={{ mb: 2 }}>
-                                <PessoaFoto 
-                                    src={formData.foto_base64} 
-                                    nome={formData.nome || 'Biometria'}
-                                    width={130}
-                                    borderRadius="16px"
-                                    accentColor="#00D4FF"
-                                    borderWidth="2px"
-                                />
-                            </Box>
-                            <input type="file" accept="image/*" capture="user" style={{ display: 'none' }} ref={fileInputRef} onChange={handlePhotoUpload} />
-                            <Button 
-                                variant="outlined" 
-                                startIcon={<PhotoCamera />} 
-                                onClick={() => fileInputRef.current.click()}
-                                disabled={avaliandoFoto}
-                                sx={{ color: '#00D4FF', borderColor: '#00D4FF', '&:hover': { bgcolor: 'rgba(0,212,255,0.1)' } }}
-                            >
-                                {avaliandoFoto ? 'Conferindo a foto...' : 'Tirar ou fazer upload de foto'}
-                            </Button>
+                            <PhotoCapture
+                                onPhotoCaptured={handlePhotoCaptured}
+                                initialPhoto={formData.foto_base64}
+                            />
                             <Typography variant="caption" sx={{ mt: 1, color: 'text.secondary' }}>* Só você na foto, de frente, rosto nítido e sem óculos escuros.</Typography>
-                            {problemasFoto.length > 0 && (
-                                <Alert severity="warning" sx={{ mt: 1.5, width: '100%' }}>
-                                    {problemasFoto.map(p => <div key={p}>{p}</div>)}
-                                </Alert>
-                            )}
                         </Box>
                         
                         <Divider sx={{ my: 4, borderColor: 'rgba(255,255,255,0.05)' }} />

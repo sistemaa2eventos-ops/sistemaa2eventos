@@ -241,6 +241,88 @@ class CameraController {
     }
 
     /**
+     * Inicia/conecta o motor de IA facial e o agente local para o evento ativo no PC solicitado.
+     * Se ainda não houver agente conectado para o evento, gera o token automaticamente e devolve a
+     * URL de protocolo (nzt-ia://) e dados para ativação imediata no PC do operador.
+     */
+    async iniciarIa(req, res) {
+        try {
+            const evento_id = req.event?.id || req.headers['x-evento-id'];
+            if (!evento_id) return res.status(400).json({ error: 'Selecione um evento ativo antes de iniciar a IA facial.' });
+
+            // 1. Se o painel enviou a configuração recomendada junto com o pedido, aplica antes de iniciar
+            let configSalva = null;
+            if (req.body?.config && typeof req.body.config === 'object') {
+                configSalva = await iaConfig.salvar(req.body.config, req.user);
+                logger.info(`⚙️ [IA iniciar] perfil recomendado (${configSalva.perfil}) aplicado por ${req.user?.email || req.user?.id}`);
+            }
+
+            // 2. Se já existe agente local conectado para este evento, envia comando direto para subir o motor
+            const agentId = agentService.findAgentForEvent(evento_id);
+            if (agentId) {
+                let resultadoAgente = null;
+                try {
+                    resultadoAgente = await agentService.sendCommand(agentId, 'ia_iniciar', {}, 12000);
+                } catch (err) {
+                    logger.warn(`[IA iniciar] comando ia_iniciar no agente ${agentId}: ${err.message}`);
+                }
+                await iaConfig.aplicarNoAgente(agentId).catch(() => {});
+                return res.json({
+                    success: true,
+                    data: {
+                        agente_conectado: true,
+                        agent_id: agentId,
+                        resultado_agente: resultadoAgente,
+                        config: configSalva
+                    }
+                });
+            }
+
+            // 3. Sem agente conectado para este evento: gera token de agente para o PC solicitado
+            const nomeAgente = String(req.body?.nome_pc || 'PC IA Facial').trim().substring(0, 100);
+            const AgentService = agentService.constructor;
+            const novoAgente = await AgentService.generateToken(nomeAgente, evento_id, req.user?.id || null);
+            const vpsUrl = (process.env.API_URL || `${req.protocol}://${req.get('host')}`).replace(/\/api\/?$/, '');
+            const protocoloUrl = `nzt-ia://iniciar?token=${encodeURIComponent(novoAgente.token)}&vps=${encodeURIComponent(vpsUrl)}&name=${encodeURIComponent(novoAgente.nome)}`;
+
+            // 4. Se o próprio backend estiver rodando localmente em Windows, dispara o script direto
+            let iniciadoLocalmente = false;
+            if (process.platform === 'win32') {
+                const path = require('path');
+                const fs = require('fs');
+                const { spawn } = require('child_process');
+                const raiz = path.resolve(__dirname, '..', '..', '..', '..', '..');
+                const scriptPs1 = path.join(raiz, 'scripts', 'ligar-ia-facial.ps1');
+                if (fs.existsSync(scriptPs1)) {
+                    const child = spawn('powershell.exe', [
+                        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPs1,
+                        '-Acao', 'unico', '-Token', novoAgente.token, '-VpsUrl', vpsUrl, '-AgentName', novoAgente.nome
+                    ], { cwd: raiz, detached: true, stdio: 'ignore', windowsHide: true });
+                    child.unref();
+                    iniciadoLocalmente = true;
+                }
+            }
+
+            return res.json({
+                success: true,
+                data: {
+                    agente_conectado: false,
+                    iniciado_localmente: iniciadoLocalmente,
+                    agent_id: novoAgente.id,
+                    agent_name: novoAgente.nome,
+                    token: novoAgente.token,
+                    vps_url: vpsUrl,
+                    protocolo_url: protocoloUrl,
+                    config: configSalva
+                }
+            });
+        } catch (error) {
+            logger.error(`[IA iniciar] erro: ${error.message}`);
+            return res.status(500).json({ error: error.message || 'Erro ao iniciar a IA facial' });
+        }
+    }
+
+    /**
      * Listar Câmeras do Evento
      */
     async list(req, res) {

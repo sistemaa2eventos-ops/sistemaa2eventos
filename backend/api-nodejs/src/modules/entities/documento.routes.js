@@ -10,7 +10,7 @@ const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png'];
 // Configuração do Multer (Armazenamento em memória para repassar ao Supabase)
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB máximo
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB máximo (alinhado ao gateway Nginx)
     fileFilter: (req, file, cb) => {
         if (allowedMimeTypes.includes(file.mimetype)) {
             cb(null, true);
@@ -55,6 +55,13 @@ router.get(
     '/colaboradores',
     checkPermission('documentos', 'ler'),
     documentoController.listarColaboradores
+);
+
+// Empresas com documentos entregues e situação documental
+router.get(
+    '/empresas',
+    checkPermission('documentos', 'ler'),
+    documentoController.listarEmpresas
 );
 
 // Documentos vencidos e a vencer

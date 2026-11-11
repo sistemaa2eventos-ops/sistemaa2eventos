@@ -62,7 +62,7 @@ class EmpresaController {
 
     async create(req, res) {
         try {
-            const { nome, cnpj, servico, email, responsavel } = req.body;
+            const { nome, cnpj, servico, email, email_convite, responsavel, telefone } = req.body;
             
             // --- NEXUS CONTEXT FALLBACK (v24.0) ---
             const evento_id = req.event?.id || req.body.evento_id || req.user?.evento_id || req.headers['x-evento-id'];
@@ -71,26 +71,49 @@ class EmpresaController {
                 return res.status(400).json({ error: 'Falta vincular evento ativo para criar empresa.' });
             }
 
+            const token = require('crypto').randomUUID();
+            const emailPrincipal = email || email_convite || '';
+
             const { data, error } = await supabase
                 .from('empresas')
                 .insert([{
                     nome,
                     cnpj,
                     servico,
-                    email,
+                    email: emailPrincipal,
+                    telefone: telefone || null,
                     responsavel,
                     evento_id,
                     max_colaboradores: req.body.max_colaboradores || 0,
                     datas_presenca: req.body.datas_presenca || [],
                     observacao: req.body.observacao || '',
                     ...camposRemuneracao(req.body),
-                    registration_token: require('crypto').randomUUID(),
+                    registration_token: token,
                     created_by: req.user?.id
                 }])
                 .select();
 
             if (error) throw error;
-            res.status(201).json({ success: true, data: data[0] });
+            const novaEmpresa = data[0];
+
+            // Se houver e-mail cadastrado para o responsável, envia automaticamente o convite com os 2 links (colaboradores + documentação da empresa)
+            const emailDestino = (email_convite || email || '').trim();
+            if (emailDestino && novaEmpresa?.registration_token) {
+                const portalBase = (process.env.PUBLIC_PORTAL_URL || 'https://cadastro.nzt.app.br').replace(/\/+$/, '');
+                const linkEquipe = `${portalBase}/register/${novaEmpresa.registration_token}`;
+                const linkDocsEmpresa = `${portalBase}/empresa/${novaEmpresa.registration_token}`;
+                const emailService = require('../../services/emailService');
+                emailService.sendCompanyInvite(
+                    emailDestino,
+                    novaEmpresa.nome,
+                    linkEquipe,
+                    linkDocsEmpresa,
+                    novaEmpresa.responsavel,
+                    req.event?.nome || null
+                ).catch(err => logger.warn(`⚠️ [EmpresaCreate] Falha ao enviar e-mail de convite automático: ${err.message}`));
+            }
+
+            res.status(201).json({ success: true, data: novaEmpresa });
         } catch (error) {
             logger.error('Erro ao criar empresa:', error.message);
             res.status(500).json({ error: error.message });
@@ -118,7 +141,19 @@ class EmpresaController {
     async update(req, res) {
         try {
             const { id } = req.params;
-            const updates = { ...req.body, ...camposRemuneracao(req.body) };
+            const camposPermitidos = [
+                'nome', 'cnpj', 'servico', 'tipo_operacao', 'email',
+                'responsavel', 'responsavel_legal', 'telefone',
+                'max_colaboradores', 'datas_presenca', 'observacao', 'ativo'
+            ];
+            const filtrados = {};
+            camposPermitidos.forEach(campo => {
+                if (req.body[campo] !== undefined) filtrados[campo] = req.body[campo];
+            });
+            if (!filtrados.email && req.body.email_convite) {
+                filtrados.email = req.body.email_convite;
+            }
+            const updates = { ...filtrados, ...camposRemuneracao(req.body) };
             const { data, error } = await supabase
                 .from('empresas')
                 .update(updates)
@@ -167,6 +202,63 @@ class EmpresaController {
             res.json({ success: true, token: newToken, data });
         } catch (error) {
             res.status(500).json({ error: 'Erro ao gerar token' });
+        }
+    }
+
+    /**
+     * Enviar convite por e-mail para o responsável da empresa (com link de colaboradores + link de documentação da empresa)
+     */
+    async sendInviteEmail(req, res) {
+        try {
+            const { id } = req.params;
+            const { data: empresa, error } = await supabase
+                .from('empresas')
+                .select('*, eventos(nome)')
+                .eq('id', id)
+                .single();
+
+            if (error || !empresa) {
+                return res.status(404).json({ error: 'Empresa não encontrada.' });
+            }
+
+            const emailDestino = (req.body?.email || empresa.email || '').trim();
+            if (!emailDestino) {
+                return res.status(400).json({ error: 'Esta empresa não possui e-mail cadastrado. Informe um e-mail no cadastro da empresa.' });
+            }
+
+            let token = empresa.registration_token;
+            if (!token) {
+                token = require('crypto').randomUUID();
+                await supabase.from('empresas').update({ registration_token: token }).eq('id', id);
+            }
+
+            const portalBase = (process.env.PUBLIC_PORTAL_URL || 'https://cadastro.nzt.app.br').replace(/\/+$/, '');
+            const linkEquipe = `${portalBase}/register/${token}`;
+            const linkDocsEmpresa = `${portalBase}/empresa/${token}`;
+
+            const emailService = require('../../services/emailService');
+            const enviado = await emailService.sendCompanyInvite(
+                emailDestino,
+                empresa.nome,
+                linkEquipe,
+                linkDocsEmpresa,
+                empresa.responsavel,
+                empresa.eventos?.nome || req.event?.nome || null
+            );
+
+            if (!enviado) {
+                return res.status(502).json({ error: 'Não foi possível enviar o e-mail pelo servidor SMTP. Verifique as configurações de e-mail.' });
+            }
+
+            res.json({
+                success: true,
+                message: `Convite enviado com sucesso para ${emailDestino}!`,
+                link: linkEquipe,
+                link_documentos: linkDocsEmpresa
+            });
+        } catch (error) {
+            logger.error('Erro ao enviar convite por e-mail:', error);
+            res.status(500).json({ error: 'Erro ao enviar convite por e-mail.' });
         }
     }
 }

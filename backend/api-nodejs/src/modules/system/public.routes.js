@@ -44,6 +44,10 @@ router.get('/company/:token', tokenDeEmpresa, publicController.getCompanyByToken
 // Listar colaboradores (Nome, Função, Status) vinculados à empresa via token público
 router.get('/company/:token/employees', tokenDeEmpresa, publicController.getCompanyEmployeesByToken);
 
+// Listar e enviar documentos da própria empresa via token público (Responsável da empresa)
+router.get('/company/:token/documentos', tokenDeEmpresa, publicController.getCompanyDocumentsByToken);
+router.post('/company/:token/documentos', tokenDeEmpresa, uploadLimiter, publicController.uploadCompanyDocumentByToken);
+
 // Obter dados do colaborador pelo token (Pré-preenchimento)
 router.get('/person/:token', publicController.getPersonByToken);
 

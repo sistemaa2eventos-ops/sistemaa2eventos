@@ -780,6 +780,146 @@ class PublicController {
             res.status(500).json({ error: 'Erro fatal interno no cadastro.' });
         }
     }
+
+    /**
+     * Obter dados da empresa e lista de documentos corporativos pelo token (Público - Responsável da Empresa)
+     */
+    async getCompanyDocumentsByToken(req, res) {
+        try {
+            const { token } = req.params;
+
+            const { data: empresa, error } = await supabase
+                .from('empresas')
+                .select(`
+                    id, nome, cnpj, servico, responsavel, registration_token_expires_at, evento_id,
+                    eventos (
+                        nome, cor_primaria, cor_secundaria, logo_url, banner_url, politica_privacidade_url
+                    )
+                `)
+                .eq('registration_token', token)
+                .single();
+
+            if (error || !empresa) {
+                return res.status(404).json({ error: 'Link da empresa inválido ou inexistente. Solicite um novo link ao administrador do evento.' });
+            }
+
+            if (empresa.registration_token_expires_at && new Date(empresa.registration_token_expires_at) < new Date()) {
+                return res.status(403).json({ error: 'Este link expirou. Solicite um novo convite ao administrador do evento.' });
+            }
+
+            const { data: documentos, error: docsErr } = await supabase
+                .from('empresa_documentos')
+                .select('id, titulo, tipo_doc, status, data_inclusao, data_validade, notas_auditoria')
+                .eq('empresa_id', empresa.id)
+                .order('data_inclusao', { ascending: false });
+
+            if (docsErr) throw docsErr;
+
+            const evento = empresa.eventos;
+            const branding = evento ? {
+                evento_nome: evento.nome,
+                cor_primaria: evento.cor_primaria || null,
+                cor_secundaria: evento.cor_secundaria || null,
+                logo_url: evento.logo_url || null,
+                banner_url: evento.banner_url || null,
+                politica_url: evento.politica_privacidade_url || null
+            } : null;
+
+            res.json({
+                success: true,
+                company: {
+                    id: empresa.id,
+                    nome: empresa.nome,
+                    cnpj: empresa.cnpj || '',
+                    servico: empresa.servico || '',
+                    responsavel: empresa.responsavel || ''
+                },
+                branding,
+                documentos: documentos || []
+            });
+        } catch (error) {
+            logger.error('Erro em getCompanyDocumentsByToken:', error);
+            res.status(500).json({ error: 'Erro ao carregar documentos da empresa.' });
+        }
+    }
+
+    /**
+     * Enviar documentos corporativos da empresa pelo token (Público - Responsável da Empresa)
+     * Passa pela auditoria documental (status='pendente') e copia para a pasta da empresa no Google Drive.
+     */
+    async uploadCompanyDocumentByToken(req, res) {
+        try {
+            const { token } = req.params;
+
+            const { data: empresa, error } = await supabase
+                .from('empresas')
+                .select('id, nome, registration_token_expires_at, evento_id')
+                .eq('registration_token', token)
+                .single();
+
+            if (error || !empresa) {
+                return res.status(404).json({ error: 'Link da empresa inválido ou inexistente.' });
+            }
+
+            if (empresa.registration_token_expires_at && new Date(empresa.registration_token_expires_at) < new Date()) {
+                return res.status(403).json({ error: 'Este link expirou. Solicite um novo convite ao administrador do evento.' });
+            }
+
+            const lista = Array.isArray(req.body?.documentos)
+                ? req.body.documentos
+                : (req.body?.base64 ? [req.body] : []);
+
+            if (lista.length === 0) {
+                return res.status(400).json({ error: 'Selecione ou fotografe ao menos um documento para enviar.' });
+            }
+
+            const documentoService = require('../entities/documento.service');
+            const enviados = [];
+
+            for (const item of lista) {
+                if (!item?.base64 || !item?.name) continue;
+                const base64Part = String(item.base64).includes(',') ? String(item.base64).split(',')[1] : String(item.base64);
+                const buffer = Buffer.from(base64Part, 'base64');
+                const ext = String(item.name).split('.').pop().toLowerCase();
+                const mimetype = ext === 'pdf' || item.type === 'application/pdf'
+                    ? 'application/pdf'
+                    : (ext === 'png' || item.type === 'image/png' ? 'image/png' : 'image/jpeg');
+                const extFinal = mimetype === 'application/pdf' ? 'pdf' : (mimetype === 'image/png' ? 'png' : 'jpg');
+                const titulo = String(item.titulo || item.label || item.tipo_doc || item.name).trim().substring(0, 255) || 'Documento da Empresa';
+                const tipo_doc = String(item.tipo_doc || 'CORPORATIVO').trim().substring(0, 100);
+                const data_validade = /^\d{4}-\d{2}-\d{2}$/.test(String(item.data_validade || '')) ? item.data_validade : null;
+
+                const gravado = await documentoService.uploadDocumento(supabase, {
+                    entityType: 'empresa',
+                    entityId: empresa.id,
+                    titulo,
+                    tipo_doc,
+                    data_validade,
+                    file: {
+                        buffer,
+                        mimetype,
+                        originalname: `doc_empresa.${extFinal}`
+                    }
+                });
+                enviados.push(gravado);
+            }
+
+            if (enviados.length === 0) {
+                return res.status(400).json({ error: 'Nenhum arquivo válido foi identificado no envio.' });
+            }
+
+            res.status(201).json({
+                success: true,
+                message: enviados.length === 1
+                    ? 'Documento enviado com sucesso! Ele está em análise pela auditoria documental.'
+                    : `${enviados.length} documentos enviados com sucesso! Eles estão em análise pela auditoria documental.`,
+                data: enviados
+            });
+        } catch (error) {
+            logger.error('Erro em uploadCompanyDocumentByToken:', error);
+            res.status(400).json({ error: error.message || 'Erro ao enviar documento da empresa.' });
+        }
+    }
 }
 
 module.exports = new PublicController();

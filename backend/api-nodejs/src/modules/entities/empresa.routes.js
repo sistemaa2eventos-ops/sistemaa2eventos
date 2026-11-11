@@ -19,4 +19,7 @@ router.delete('/:id', authorize('master', 'admin'), empresaController.delete);
 // Gerar novo token de cadastro (Admin/Supervisor)
 router.post('/:id/refresh-token', authorize('master', 'admin', 'supervisor'), empresaController.refreshToken);
 
+// Enviar convite por e-mail para o responsável da empresa (link de colaboradores + link de documentação da empresa)
+router.post('/:id/send-invite', authorize('master', 'admin', 'supervisor', 'operador'), empresaController.sendInviteEmail);
+
 module.exports = router;
