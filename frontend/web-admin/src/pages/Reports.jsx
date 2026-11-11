@@ -60,7 +60,7 @@ const Reports = () => {
         dailyLogs, totalLogs, page, setPage,
         reportArea, reportEmpresa, reportLeitor, reportFuncao, reportStatus, reportPonto,
         fechamento, loadFechamento, handleExportFechamento,
-        pulseiras, loadPulseiras, encerrarPulseira,
+        pulseiras, loadPulseiras, encerrarPulseira, anularPulseira,
         loadLogs, loadTab, handleExport, handleExportAbaPDF
     } = useReports();
 
@@ -948,7 +948,7 @@ const Reports = () => {
                     {tab === 'diarias' && <FechamentoPeriodo fechamento={fechamento} loading={loading} />}
 
                     {/* PULSEIRAS: entregas, trocas, devoluções e perdas */}
-                    {tab === 'pulseiras' && <HistoricoPulseiras historico={pulseiras} loading={loading} onEncerrar={encerrarPulseira} />}
+                    {tab === 'pulseiras' && <HistoricoPulseiras historico={pulseiras} loading={loading} onEncerrar={encerrarPulseira} onAnular={anularPulseira} />}
 
                     {/* ATENDIMENTO: tempo por operador, diagnóstico e planilha orçamentária */}
                     {tab === 'atendimento' && <RelatorioAtendimento eventoId={localStorage.getItem('active_evento_id')} dateStart={dateStart} dateEnd={dateEnd} />}

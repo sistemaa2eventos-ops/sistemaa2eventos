@@ -782,6 +782,14 @@ class AccessController {
                 }
             }
 
+            // 3b. Pulseira trocada ou perdida neste lote não volta a ser entregue (antes de gravar qualquer coisa)
+            const bloqueio = await pulseiraService.numeroBloqueado(eventoId, numero_pulseira, tipoPulseira?.id || null);
+            if (bloqueio) {
+                const acao = bloqueio.motivo === 'perdida' ? 'foi marcada como perdida' : 'já foi trocada';
+                return ApiResponse.error(res,
+                    `Pulseira ${String(numero_pulseira).trim()} ${acao} neste lote e não pode ser entregue de novo.`, 409);
+            }
+
             // 4. Vincular áreas de acesso (pessoa_areas_acesso) — uma única gravação para todas as áreas
             const areasVinculadas = [];
             const permissoes = tipoPulseira?.pulseira_areas_permitidas || [];
@@ -809,7 +817,19 @@ class AccessController {
             const updateData = { numero_pulseira, updated_at: new Date() };
             if (areasVinculadas.length > 0) updateData.areas_autorizadas = areasVinculadas.map(a => a.area_id);
             if (tipoPulseira?.id) updateData.tipo_pulseira_id = tipoPulseira.id;
-            await supabaseClient.from('pessoas').update(updateData).eq('id', pessoa_id);
+            const { error: gravarErr } = await supabaseClient.from('pessoas').update(updateData).eq('id', pessoa_id);
+            if (gravarErr) throw gravarErr; // antes o erro era ignorado e o operador via "sucesso"
+
+            // Troca de lote (ex.: montagem → evento): sai o que só o lote antigo liberava.
+            // Usa o cliente de serviço: a função só é executável pelo backend.
+            const tipoAntes = pessoa.tipo_pulseira_id || null;
+            if (tipoPulseira?.id && tipoAntes !== tipoPulseira.id) {
+                const { error: areasErr } = await supabase.rpc('ajustar_areas_pulseira', {
+                    p_evento_id: eventoId, p_pessoa_id: pessoa_id,
+                    p_tipo_saiu: tipoAntes, p_tipo_entrou: tipoPulseira.id
+                });
+                if (areasErr) throw areasErr;
+            }
             pulseiraService.registrarEntrega(pessoa_id, req.user?.id);
             if (req.body.atendimento_inicio) {
                 require('../reports/atendimento.service').registrar({

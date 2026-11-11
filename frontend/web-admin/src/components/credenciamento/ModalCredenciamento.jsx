@@ -139,6 +139,30 @@ export const ModalCredenciamento = ({
         }
     };
 
+    // Lançamento errado: desfaz a pulseira em uso; a anterior volta (se houve troca) com a mesma hora de entrada
+    const [desfazendo, setDesfazendo] = useState(false);
+    const [desfeitaInfo, setDesfeitaInfo] = useState(null); // { id, restaurado } — esconde o botão e mostra o aviso
+
+    const handleDesfazerLancamento = async () => {
+        if (!pessoa?.id || desfazendo) return;
+        try {
+            setDesfazendo(true);
+            setErroValidacao('');
+            const eventoId = localStorage.getItem('active_evento_id');
+            const { data } = await api.post('/pulseiras/anular', {
+                pessoa_id: pessoa.id,
+                observacao: 'Pulseira lançada errada no credenciamento'
+            }, { params: { evento_id: eventoId } });
+            const r = data?.data || data || {};
+            setNumeroPulseira(r.numero_restaurado || '');
+            setDesfeitaInfo({ id: pessoa.id, restaurado: r.numero_restaurado || null });
+        } catch (err) {
+            setErroValidacao(err.response?.data?.error || 'Não foi possível desfazer o lançamento da pulseira.');
+        } finally {
+            setDesfazendo(false);
+        }
+    };
+
     // Atalho Escape para fechar
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -453,7 +477,7 @@ export const ModalCredenciamento = ({
                                     </Grid>
                                 </Grid>
 
-                                {pessoa.numero_pulseira && devolvidaId !== pessoa.id && (
+                                {pessoa.numero_pulseira && devolvidaId !== pessoa.id && desfeitaInfo?.id !== pessoa.id && (
                                     <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: 'rgba(0, 212, 255, 0.05)', p: 1, borderRadius: 1.5, border: '1px solid rgba(0, 212, 255, 0.15)' }}>
                                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>
                                             Pulseira em uso: <strong>{pessoa.numero_pulseira}</strong>
@@ -475,7 +499,28 @@ export const ModalCredenciamento = ({
                                         >
                                             {devolvendo ? 'Registrando...' : 'Marcar como Devolvida'}
                                         </Button>
+                                        <Tooltip title="Pulseira digitada errada? Desfaz o lançamento; a anterior volta com a mesma hora de entrada" arrow>
+                                            <span>
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    onClick={handleDesfazerLancamento}
+                                                    disabled={desfazendo}
+                                                    sx={{ fontSize: '0.7rem', color: '#FFB020', borderColor: 'rgba(255, 176, 32, 0.4)', textTransform: 'none', py: 0.2, px: 1, ml: 0.5 }}
+                                                >
+                                                    {desfazendo ? 'Desfazendo...' : 'Lançamento errado'}
+                                                </Button>
+                                            </span>
+                                        </Tooltip>
                                     </Box>
+                                )}
+
+                                {desfeitaInfo?.id === pessoa.id && (
+                                    <Typography variant="caption" sx={{ display: 'block', mt: 1, color: '#00D4FF', fontWeight: 700 }}>
+                                        Lançamento desfeito.{desfeitaInfo.restaurado
+                                            ? ` Pulseira ${desfeitaInfo.restaurado} voltou para a pessoa.`
+                                            : ' A pessoa ficou sem pulseira em uso.'}
+                                    </Typography>
                                 )}
 
                                 {erroValidacao && (

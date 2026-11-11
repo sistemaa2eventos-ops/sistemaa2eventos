@@ -257,6 +257,9 @@ const AJUDAS = {
         passosConferir: [
             'Janela de horário: crie um lote com "Início uso" 16:00 e "Fim uso" 02:00. Tente vincular uma pulseira desse lote fora desse horário: o sistema deve recusar com aviso.',
             'Devolução: no credenciamento, com uma pessoa que já tem pulseira, clique em "Marcar como Devolvida". A pulseira sai da pessoa e aparece no histórico como devolvida.',
+            'Pulseira errada: no credenciamento, "Lançamento errado" desfaz a pulseira em uso. Se houve troca, a anterior volta com a mesma hora de entrada. Também funciona em Relatórios → Pulseiras, mesmo horas depois, desde que o número não esteja com outra pessoa no evento.',
+            'Trocada ou perdida: o número não volta a ser entregue no mesmo lote do evento. Uma marcação feita por engano se desfaz em Relatórios → Pulseiras ("Desfazer").',
+            'Troca de empresa: refaça a saída e o credenciamento com a pulseira nova. Acessos antes da troca contam na empresa anterior; os depois, na nova, no ponto, no fechamento e nos logs.',
             'Lotes sobrepostos: crie dois lotes com a mesma faixa de números, um de "Montagem" e outro de "Evento (Showday)". No dia de cada fase, a leitura deve usar o lote certo.'
         ]
     },

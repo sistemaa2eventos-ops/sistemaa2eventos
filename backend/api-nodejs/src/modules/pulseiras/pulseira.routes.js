@@ -35,4 +35,19 @@ router.post('/encerrar', checkPermission('checkin', 'escrita'), async (req, res)
     }
 });
 
+// Lançamento errado (pulseira digitada errada, marcação por engano): desfaz e restaura o anterior
+router.post('/anular', checkPermission('checkin', 'escrita'), async (req, res) => {
+    try {
+        const { pessoa_id, observacao } = req.body || {};
+        if (!pessoa_id) return ApiResponse.error(res, 'pessoa_id é obrigatório.', 400);
+        const r = await pulseiraService.anularUltimo(req.event.id, pessoa_id, { observacao }, req.user?.id || null);
+        await auditService.logEntity(req, 'BRACELET_ANNULLED', 'PESSOA', pessoa_id,
+            { ...r, observacao: String(observacao || '').trim() || null });
+        return ApiResponse.success(res, r);
+    } catch (error) {
+        logger.error('Erro ao anular lançamento de pulseira:', error.message);
+        return ApiResponse.error(res, error.status ? error.message : 'Não foi possível desfazer o lançamento da pulseira.', error.status || 500);
+    }
+});
+
 module.exports = router;

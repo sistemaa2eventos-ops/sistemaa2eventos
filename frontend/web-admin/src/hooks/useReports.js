@@ -339,6 +339,26 @@ export const useReports = () => {
         }
     }, [eventoId, dateStart, dateEnd, empresaId, enqueueSnackbar]);
 
+    /**
+     * Lançamento errado: desfaz a pulseira em uso (ou a última marcação de perdida/devolvida).
+     * A pulseira anterior volta com a mesma hora de entrada. Não funciona se o número já foi
+     * dado a outra pessoa no evento (o servidor recusa e explica).
+     */
+    const anularPulseira = async (pessoa_id, observacao) => {
+        try {
+            const { data } = await api.post('/pulseiras/anular', { pessoa_id, observacao }, { params: { evento_id: eventoId } });
+            const r = data?.data || data || {};
+            enqueueSnackbar(r.numero_restaurado
+                ? `Lançamento desfeito. Pulseira ${r.numero_restaurado} voltou para a pessoa.`
+                : 'Lançamento desfeito. A pessoa ficou sem pulseira em uso.', { variant: 'success' });
+            await loadPulseiras();
+            return true;
+        } catch (error) {
+            enqueueSnackbar(error.response?.data?.error || 'Não foi possível desfazer o lançamento.', { variant: 'error' });
+            return false;
+        }
+    };
+
     /** Devolvida ou perdida: encerra a pulseira em uso da pessoa */
     const encerrarPulseira = async (pessoa_id, motivo, observacao) => {
         try {
@@ -414,7 +434,7 @@ export const useReports = () => {
         dailyLogs, totalLogs, page, setPage: loadLogs,
         reportArea, reportEmpresa, reportLeitor, reportFuncao, reportStatus, reportPonto,
         fechamento, loadFechamento, handleExportFechamento,
-        pulseiras, loadPulseiras, encerrarPulseira,
+        pulseiras, loadPulseiras, encerrarPulseira, anularPulseira,
         loadLogs, loadTab, handleExport, handleExportPDF, handleExportAbaPDF,
         refresh: loadLogs
     };

@@ -21,7 +21,8 @@ const SITUACOES = {
     devolvida: [cores.secundariaClara, 'Devolvida'],
     perdida: [cores.erro, 'Perdida'],
     substituida: [cores.alerta, 'Trocada'],
-    desvinculada: [cores.textoSecundario, 'Desvinculada']
+    desvinculada: [cores.textoSecundario, 'Desvinculada'],
+    anulada: [cores.textoFraco, 'Anulada']
 };
 
 const dataHora = (iso) => (iso ? format(new Date(iso), 'dd/MM HH:mm') : '—');
@@ -30,10 +31,10 @@ const dataHora = (iso) => (iso ? format(new Date(iso), 'dd/MM HH:mm') : '—');
  * Histórico de pulseiras: quem recebeu cada número, quando, por quanto tempo, quantos acessos
  * fez com ela e como terminou (trocada, devolvida, perdida). Registra devolução e perda.
  */
-const HistoricoPulseiras = ({ historico, loading, onEncerrar }) => {
+const HistoricoPulseiras = ({ historico, loading, onEncerrar, onAnular }) => {
     const [situacao, setSituacao] = useState('todas');
     const [busca, setBusca] = useState('');
-    const [encerrando, setEncerrando] = useState(null); // { linha, motivo }
+    const [encerrando, setEncerrando] = useState(null); // { linha, motivo: 'devolvida' | 'perdida' | 'anulada' }
     const [observacao, setObservacao] = useState('');
     const [salvando, setSalvando] = useState(false);
 
@@ -49,7 +50,10 @@ const HistoricoPulseiras = ({ historico, loading, onEncerrar }) => {
     const abrir = (linha, motivo) => { setEncerrando({ linha, motivo }); setObservacao(''); };
     const confirmar = async () => {
         setSalvando(true);
-        const ok = await onEncerrar(encerrando.linha.pessoa_id, encerrando.motivo, observacao);
+        // 'anulada' desfaz o lançamento (servidor restaura a pulseira anterior); os outros encerram a pulseira
+        const ok = encerrando.motivo === 'anulada'
+            ? await onAnular(encerrando.linha.pessoa_id, observacao)
+            : await onEncerrar(encerrando.linha.pessoa_id, encerrando.motivo, observacao);
         setSalvando(false);
         if (ok) setEncerrando(null);
     };
@@ -118,13 +122,28 @@ const HistoricoPulseiras = ({ historico, loading, onEncerrar }) => {
             )
         },
         {
-            id: 'acoes', label: '', width: 190, align: 'right',
-            format: (_, row) => row.status === 'em_uso' ? (
-                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                    <Button size="small" onClick={() => abrir(row, 'devolvida')} sx={{ color: cores.secundariaClara, fontWeight: 700, minWidth: 0 }}>Devolvida</Button>
-                    <Button size="small" onClick={() => abrir(row, 'perdida')} sx={{ color: cores.erro, fontWeight: 700, minWidth: 0 }}>Perdida</Button>
-                </Stack>
-            ) : null
+            id: 'acoes', label: '', width: 260, align: 'right',
+            format: (_, row) => {
+                if (row.status === 'em_uso') {
+                    return (
+                        <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                            <Tooltip title="Pulseira errada? Desfaz o lançamento e devolve a anterior, se houve troca" arrow>
+                                <Button size="small" onClick={() => abrir(row, 'anulada')} sx={{ color: cores.alerta, fontWeight: 700, minWidth: 0 }}>Lançamento errado</Button>
+                            </Tooltip>
+                            <Button size="small" onClick={() => abrir(row, 'devolvida')} sx={{ color: cores.secundariaClara, fontWeight: 700, minWidth: 0 }}>Devolvida</Button>
+                            <Button size="small" onClick={() => abrir(row, 'perdida')} sx={{ color: cores.erro, fontWeight: 700, minWidth: 0 }}>Perdida</Button>
+                        </Stack>
+                    );
+                }
+                if (row.pode_desfazer) {
+                    return (
+                        <Tooltip title="Marcação feita por engano: a pulseira volta para a pessoa com a mesma hora de entrada" arrow>
+                            <Button size="small" onClick={() => abrir(row, 'anulada')} sx={{ color: cores.alerta, fontWeight: 700, minWidth: 0 }}>Desfazer</Button>
+                        </Tooltip>
+                    );
+                }
+                return null;
+            }
         }
     ], []);
 
@@ -139,6 +158,8 @@ const HistoricoPulseiras = ({ historico, loading, onEncerrar }) => {
 
     const r = historico?.resumo || {};
     const perdendo = encerrando?.motivo === 'perdida';
+    const anulando = encerrando?.motivo === 'anulada';
+    const trocasEmpresa = historico?.trocas_empresa || [];
 
     return (
         <Box>
@@ -175,6 +196,7 @@ const HistoricoPulseiras = ({ historico, loading, onEncerrar }) => {
                     <ToggleButton value="substituida">Trocadas</ToggleButton>
                     <ToggleButton value="devolvida">Devolvidas</ToggleButton>
                     <ToggleButton value="perdida">Perdidas</ToggleButton>
+                    <ToggleButton value="anulada">Anuladas</ToggleButton>
                     <ToggleButton value="alertas">Alertas</ToggleButton>
                 </ToggleButtonGroup>
                 <TextField
@@ -187,32 +209,59 @@ const HistoricoPulseiras = ({ historico, loading, onEncerrar }) => {
                 />
             </Stack>
 
+            {trocasEmpresa.length > 0 && (
+                <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" sx={{ color: cores.textoForte, fontWeight: 700, mb: 1 }}>Trocas de empresa no período</Typography>
+                    <DataTable
+                        data={trocasEmpresa}
+                        rowsPerPage={10}
+                        columns={[
+                            { id: 'colaborador', label: 'Colaborador', width: 240, format: (v, row) => (
+                                <Box sx={{ minWidth: 0 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 700, color: cores.textoForte }} noWrap>{v}</Typography>
+                                    <Typography variant="caption" sx={{ color: cores.textoSecundario }}>{row.cpf}</Typography>
+                                </Box>
+                            ) },
+                            { id: 'de', label: 'Empresa anterior' },
+                            { id: 'para', label: 'Nova empresa' },
+                            { id: 'em', label: 'Quando', width: 120, format: (v) => dataHora(v) }
+                        ]}
+                    />
+                    <Typography variant="caption" sx={{ color: cores.textoFraco, display: 'block', mt: 0.75 }}>
+                        Acessos anteriores à troca ficam na empresa anterior; os seguintes, na nova. Cada empresa mostra só o próprio período.
+                    </Typography>
+                </Box>
+            )}
+
             <DataTable data={linhas} columns={colunas} loading={loading} rowsPerPage={25} />
 
             <Typography variant="caption" sx={{ color: cores.textoFraco, display: 'block', mt: 1.5 }}>
                 Toda troca de número no cadastro, no credenciamento ou no check-in entra aqui automaticamente.
                 Acessos = entradas e saídas feitas com aquela pulseira. * entrega reconstruída dos acessos anteriores (horário aproximado).
+                Lançamento anulado (errado) não conta como entrega e não bloqueia o número.
             </Typography>
 
             <Dialog open={!!encerrando} onClose={() => !salvando && setEncerrando(null)} maxWidth="xs" fullWidth disableRestoreFocus>
                 <TituloModal
-                    titulo={perdendo ? 'Pulseira perdida' : 'Devolução de pulseira'}
+                    titulo={anulando ? 'Desfazer lançamento' : perdendo ? 'Pulseira perdida' : 'Devolução de pulseira'}
                     subtitulo={encerrando ? `Pulseira ${encerrando.linha.numero_pulseira} • ${encerrando.linha.colaborador}` : null}
                     onFechar={() => setEncerrando(null)}
                     desabilitarFechar={salvando}
                 />
                 <DialogContent>
                     <Typography variant="body2" sx={{ color: cores.textoSecundario, mb: 2 }}>
-                        {perdendo
-                            ? 'O número sai do cadastro da pessoa e deixa de abrir acesso. Para voltar a entrar, ela recebe uma pulseira nova no credenciamento.'
-                            : 'O número sai do cadastro da pessoa. Para voltar a entrar, ela recebe uma pulseira no credenciamento.'}
+                        {anulando
+                            ? 'Use quando a pulseira foi digitada errada ou a marcação foi feita por engano. Se houve troca, a pulseira anterior volta para a pessoa com a mesma hora de entrada. Se o número já foi dado a outra pessoa neste evento, o sistema não desfaz e avisa.'
+                            : perdendo
+                                ? 'O número sai do cadastro da pessoa e deixa de abrir acesso. Para voltar a entrar, ela recebe uma pulseira nova no credenciamento.'
+                                : 'O número sai do cadastro da pessoa. Para voltar a entrar, ela recebe uma pulseira no credenciamento.'}
                     </Typography>
                     <TextField label="Observação (opcional)" fullWidth size="small" multiline rows={2} value={observacao} onChange={(e) => setObservacao(e.target.value)} />
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
                     <Button variant="outlined" sx={botaoSecundario} onClick={() => setEncerrando(null)} disabled={salvando}>Cancelar</Button>
                     <NeonButton onClick={confirmar} disabled={salvando}>
-                        {salvando ? 'Salvando...' : perdendo ? 'Marcar como perdida' : 'Registrar devolução'}
+                        {salvando ? 'Salvando...' : anulando ? 'Desfazer lançamento' : perdendo ? 'Marcar como perdida' : 'Registrar devolução'}
                     </NeonButton>
                 </DialogActions>
             </Dialog>

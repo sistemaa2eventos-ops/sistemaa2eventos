@@ -82,22 +82,36 @@ function marcacoesForaDeOrdem(logsTurno) {
  * primeiro check-in ao último check-out (em evento, saídas no meio do turno não descontam).
  * Usado pelo Ponto e pelo fechamento de diárias, para os dois darem as mesmas horas.
  */
+/**
+ * Empresa do acesso: a gravada no próprio log (período em que a pessoa estava na empresa).
+ * Acessos anteriores à migration 20261112c caem na empresa atual da pessoa.
+ */
+const empresaDoLog = (log) => log.empresa_id || log.pessoas?.empresa_id || null;
+
 function montarTurnos(logs) {
     const grupos = {};
     const diaDoTurno = {}; // pessoa_id → dia da última entrada vista
+    const empresaDoTurno = {}; // pessoa_id → empresa da última entrada vista
     (logs || []).forEach(log => {
         const ms = instante(log.created_at);
         const entrada = ehEntrada(log);
         const dia = entrada || !diaDoTurno[log.pessoa_id] ? diaLocal(ms) : diaDoTurno[log.pessoa_id];
-        if (entrada) diaDoTurno[log.pessoa_id] = dia;
-        const key = `${log.pessoa_id}_${dia}`;
+        // a saída fecha o turno da entrada: fica com a mesma empresa dela (troca de empresa no meio do dia separa os turnos)
+        if (entrada) {
+            diaDoTurno[log.pessoa_id] = dia;
+            empresaDoTurno[log.pessoa_id] = empresaDoLog(log);
+        }
+        const empresa = empresaDoTurno[log.pessoa_id] !== undefined && !entrada
+            ? empresaDoTurno[log.pessoa_id]
+            : empresaDoLog(log);
+        const key = `${log.pessoa_id}_${dia}_${empresa || ''}`;
 
         const g = grupos[key] || (grupos[key] = {
             pessoa_id: log.pessoa_id,
             pessoa: log.pessoas?.nome_completo,
             cpf: log.pessoas?.cpf,
             pulseira: null,
-            empresa_id: log.pessoas?.empresa_id,
+            empresa_id: empresa,
             dia,
             primeira_entrada: null,
             ultima_entrada: null,
@@ -167,7 +181,7 @@ function montarTurnos(logs) {
 
 /** Logs brutos → linhas da aba "Logs de acesso" (empresa e equipamento pelo nome, não pelo id) */
 async function formatarLogs(logs, evento_id) {
-    const empIds = [...new Set((logs || []).map(l => l.pessoas?.empresa_id).filter(Boolean))];
+    const empIds = [...new Set((logs || []).map(empresaDoLog).filter(Boolean))];
     const [empRes, dispRes] = await Promise.all([
         empIds.length > 0
             ? buscarPorIdsEmLotes(empIds, (lote) => supabase.from('empresas').select('id, nome').in('id', lote))
@@ -189,7 +203,7 @@ async function formatarLogs(logs, evento_id) {
         horario: isoUTC(log.created_at),
         pessoa: log.pessoas?.nome_completo || 'Desconhecido',
         cpf: log.pessoas?.cpf,
-        empresa: empMap[log.pessoas?.empresa_id] || 'Sem Empresa'
+        empresa: empMap[empresaDoLog(log)] || 'Sem Empresa'
     }));
 }
 
@@ -207,11 +221,11 @@ class ReportController {
             // Passo 1: Buscar logs de acesso brutos
             let query = supabase
                 .from('logs_acesso')
-                .select('id, tipo, metodo, dispositivo_id, confianca, observacao, numero_pulseira, created_at, pessoa_id, pessoas!inner(id, nome_completo, cpf, empresa_id)', { count: 'exact' })
+                .select('id, tipo, metodo, dispositivo_id, confianca, observacao, numero_pulseira, created_at, pessoa_id, empresa_id, pessoas!inner(id, nome_completo, cpf, empresa_id)', { count: 'exact' })
                 .eq('evento_id', evento_id);
 
             query = aplicarPeriodo(query, req.query);
-            if (empresa_id) query = query.eq('pessoas.empresa_id', empresa_id);
+            if (empresa_id) query = query.eq('empresa_id', empresa_id);
 
             const { data: logs, count, error } = await query
                 .order('created_at', { ascending: false })
@@ -416,12 +430,15 @@ class ReportController {
                 return res.status(400).json({ error: 'data_fim deve estar em formato YYYY-MM-DD' });
             }
 
-            const query = aplicarPeriodo(supabase.from('logs_acesso').select('id, tipo, pessoas!inner(empresa_id, empresas(nome))').eq('evento_id', evento_id), req.query);
+            const query = aplicarPeriodo(supabase.from('logs_acesso').select('id, tipo, empresa_id, pessoas!inner(empresa_id)').eq('evento_id', evento_id), req.query);
 
             const { data: logs, error } = await buscarTodos(query);
             if (error) throw error;
 
             const { data: pessoasCount } = await buscarTodos(supabase.from('pessoas').select('id, empresa_id, status_acesso, bloqueado, empresas(nome)').eq('evento_id', evento_id));
+            // entrada/saída conta na empresa do acesso (período em que a pessoa estava nela)
+            const { data: empresasEvento } = await supabase.from('empresas').select('id, nome').eq('evento_id', evento_id);
+            const nomeEmpresa = Object.fromEntries((empresasEvento || []).map(e => [e.id, e.nome]));
 
             const stats = {};
             // Contar todas as pessoas por empresa (independente de terem logs no período)
@@ -435,7 +452,7 @@ class ReportController {
             });
 
             logs.forEach(log => {
-                const empNome = log.pessoas?.empresas?.nome || 'Sem Empresa';
+                const empNome = nomeEmpresa[log.empresa_id || log.pessoas?.empresa_id] || 'Sem Empresa';
                 if (!stats[empNome]) stats[empNome] = { empresa: empNome, pessoas: 0, entradas: 0, saidas: 0, bloqueados: 0, expulsos: 0 };
                 if (log.tipo === 'checkin' || log.tipo === 'entrada') stats[empNome].entradas++;
                 if (log.tipo === 'checkout' || log.tipo === 'saida') stats[empNome].saidas++;
@@ -581,7 +598,7 @@ class ReportController {
             let query = supabase
                 .from('logs_acesso')
                 .select(`
-                    id, tipo, metodo, area_id, numero_pulseira, observacao, created_at, pessoa_id,
+                    id, tipo, metodo, area_id, numero_pulseira, observacao, created_at, pessoa_id, empresa_id,
                     pessoas!inner(id, nome_completo, cpf, empresa_id, foto_url, numero_pulseira)
                 `, { count: 'exact' })
                 .eq('evento_id', evento_id)
@@ -590,14 +607,14 @@ class ReportController {
 
             query = aplicarPeriodo(query, req.query);
             if (pessoa_id) query = query.eq('pessoa_id', pessoa_id);
-            if (empresa_id) query = query.eq('pessoas.empresa_id', empresa_id);
+            if (empresa_id) query = query.eq('empresa_id', empresa_id);
             if (area_id) query = query.eq('area_id', area_id);
 
             const { data: logs, count, error } = await query.range(from, from + parseInt(limit) - 1);
             if (error) throw error;
 
             // Buscar nomes de empresas e áreas
-            const empIds = [...new Set((logs || []).map(l => l.pessoas?.empresa_id).filter(Boolean))];
+            const empIds = [...new Set((logs || []).map(empresaDoLog).filter(Boolean))];
             const areaIds = [...new Set((logs || []).map(l => l.area_id).filter(Boolean))];
 
             const [empRes, areaRes] = await Promise.all([
@@ -626,7 +643,7 @@ class ReportController {
                 pessoa: log.pessoas?.nome_completo,
                 cpf: log.pessoas?.cpf,
                 foto_url: log.pessoas?.foto_url,
-                empresa: empMap[log.pessoas?.empresa_id] || 'Sem Empresa'
+                empresa: empMap[empresaDoLog(log)] || 'Sem Empresa'
             }));
 
             res.json({ success: true, total: count || 0, data });
@@ -649,7 +666,7 @@ class ReportController {
             let query = supabase
                 .from('logs_acesso')
                 .select(`
-                    id, tipo, area_id, numero_pulseira, observacao, created_at, pessoa_id,
+                    id, tipo, area_id, numero_pulseira, observacao, created_at, pessoa_id, empresa_id,
                     pessoas!inner(id, nome_completo, cpf, empresa_id, numero_pulseira)
                 `)
                 .eq('evento_id', evento_id)
@@ -657,13 +674,14 @@ class ReportController {
                 .order('created_at', { ascending: true });
 
             query = aplicarPeriodo(query, req.query);
-            if (empresa_id) query = query.eq('pessoas.empresa_id', empresa_id);
             if (area_id) query = query.eq('area_id', area_id);
 
             const { data: logs, error } = await buscarTodos(query);
             if (error) throw error;
 
-            const turnos = montarTurnos(logs);
+            // o turno é separado por empresa em montarTurnos (saída fica com a empresa da entrada):
+            // o filtro de empresa vale sobre o turno, não sobre cada log
+            const turnos = montarTurnos(logs).filter(t => !empresa_id || t.empresa_id === empresa_id);
 
             // Resolver nomes de empresas
             const empIds = [...new Set(turnos.map(t => t.empresa_id).filter(Boolean))];
@@ -707,14 +725,14 @@ class ReportController {
         const diaAntes = new Date(`${inicio}T12:00:00Z`); diaAntes.setUTCDate(diaAntes.getUTCDate() - 1);
         const diaDepois = new Date(`${fim}T12:00:00Z`); diaDepois.setUTCDate(diaDepois.getUTCDate() + 1);
 
-        let pessoasQuery = supabase.from('pessoas')
+        // sem filtro de empresa aqui: a pessoa que trocou de empresa precisa aparecer em cada uma (ver pares abaixo)
+        const pessoasQuery = supabase.from('pessoas')
             .select('id, nome_completo, cpf, funcao, empresa_id, dias_acesso, dias_trabalho')
             .eq('evento_id', evento_id);
-        if (empresa_id) pessoasQuery = pessoasQuery.eq('empresa_id', empresa_id);
 
         // a janela pega o dia anterior (saída de turno aberto antes) e o seguinte (turno que vira a madrugada)
         let logsQuery = supabase.from('logs_acesso')
-            .select('id, tipo, numero_pulseira, observacao, created_at, pessoa_id, pessoas!inner(id, nome_completo, cpf, empresa_id)')
+            .select('id, tipo, numero_pulseira, observacao, created_at, pessoa_id, empresa_id, pessoas!inner(id, nome_completo, cpf, empresa_id)')
             .eq('evento_id', evento_id)
             .in('tipo', ['checkin', 'checkout', 'entrada', 'saida'])
             .order('created_at', { ascending: true });
@@ -722,7 +740,6 @@ class ReportController {
             data_inicio: diaAntes.toISOString().slice(0, 10),
             data_fim: diaDepois.toISOString().slice(0, 10)
         });
-        if (empresa_id) logsQuery = logsQuery.eq('pessoas.empresa_id', empresa_id);
 
         const [pessoasRes, empresasRes, logsRes, regras] = await Promise.all([
             buscarTodos(pessoasQuery.order('nome_completo')),
@@ -745,21 +762,39 @@ class ReportController {
 
         const regrasPorId = Object.fromEntries((regras || []).map(r => [r.id, r]));
         const empMap = Object.fromEntries((empresas || []).map(e => [e.id, e]));
+        // pessoa → empresa → dia: cada empresa leva só o tempo em que a pessoa esteve nela
         const turnosPorPessoa = {};
         montarTurnos(logsRes.data).forEach(t => {
             if (t.dia < inicio || t.dia > fim) return;
-            (turnosPorPessoa[t.pessoa_id] || (turnosPorPessoa[t.pessoa_id] = {}))[t.dia] = t;
+            const porEmpresa = turnosPorPessoa[t.pessoa_id] || (turnosPorPessoa[t.pessoa_id] = {});
+            const chave = t.empresa_id || '';
+            (porEmpresa[chave] || (porEmpresa[chave] = {}))[t.dia] = t;
         });
 
         const linhas = [];
+        // pares pessoa × empresa do período: uma linha por empresa em que a pessoa trabalhou
+        const pares = [];
         for (const p of pessoasRes.data || []) {
-            const turnos = turnosPorPessoa[p.id] || {};
+            const porEmpresa = turnosPorPessoa[p.id] || {};
             const escalados = Array.isArray(p.dias_acesso) && p.dias_acesso.length ? p.dias_acesso
                 : (Array.isArray(p.dias_trabalho) ? p.dias_trabalho : []);
             const faltaNoDia = (d) => d < hoje && escalados.includes(d);
-            if (Object.keys(turnos).length === 0 && !dias.some(faltaNoDia)) continue;
+            const temFalta = dias.some(faltaNoDia);
+            // faltas (escalado que não veio) ficam com a empresa atual da pessoa
+            const empresasDaPessoa = new Set(Object.keys(porEmpresa));
+            if (temFalta) empresasDaPessoa.add(p.empresa_id || '');
+            for (const emp of empresasDaPessoa) {
+                if (empresa_id && emp !== empresa_id) continue;
+                const faltasAqui = temFalta && emp === (p.empresa_id || '');
+                const turnosEmp = porEmpresa[emp] || {};
+                if (Object.keys(turnosEmp).length === 0 && !faltasAqui) continue;
+                pares.push({ p, emp, turnos: turnosEmp, faltasAqui, faltaNoDia });
+            }
+        }
 
-            const empresa = empMap[p.empresa_id];
+        for (const { p, emp, turnos, faltasAqui, faltaNoDia } of pares) {
+            const empresaId = emp || null;
+            const empresa = empMap[empresaId];
             const regra = regraDaPessoa(p, empresa, regrasPorId);
             const tot = { dias_trabalhados: 0, faltas: 0, a_conferir: 0, minutos: 0, diarias: 0, extras_minutos: 0, valor_diarias: 0, valor_extras: 0, valor_total: 0 };
             const porDia = {};
@@ -767,7 +802,7 @@ class ReportController {
             dias.forEach(d => {
                 const t = turnos[d];
                 if (!t) {
-                    if (faltaNoDia(d)) { porDia[d] = { codigo: 'F', minutos: 0 }; tot.faltas++; }
+                    if (faltasAqui && faltaNoDia(d)) { porDia[d] = { codigo: 'F', minutos: 0 }; tot.faltas++; }
                     return;
                 }
                 const base = { minutos: t.permanencia_minutos, checkin: t.primeira_entrada, checkout: t.ultima_saida, observacao: t.observacao, pulseira: t.pulseira };
@@ -798,7 +833,7 @@ class ReportController {
             const centavos = (v) => Math.round(v * 100) / 100;
             linhas.push({
                 pessoa_id: p.id,
-                empresa_id: p.empresa_id,
+                empresa_id: empresaId,
                 empresa: empresa?.nome || 'Sem Empresa',
                 colaborador: p.nome_completo || 'Sem Nome',
                 cpf: this._formatarCPF(p.cpf),
@@ -2043,10 +2078,10 @@ class ReportController {
                 carregar: async () => {
                     let query = supabase
                         .from('logs_acesso')
-                        .select('id, tipo, metodo, dispositivo_id, confianca, observacao, numero_pulseira, created_at, pessoa_id, pessoas!inner(id, nome_completo, cpf, empresa_id)')
+                        .select('id, tipo, metodo, dispositivo_id, confianca, observacao, numero_pulseira, created_at, pessoa_id, empresa_id, pessoas!inner(id, nome_completo, cpf, empresa_id)')
                         .eq('evento_id', req.event.id);
                     query = aplicarPeriodo(query, req.query);
-                    if (req.query.empresa_id) query = query.eq('pessoas.empresa_id', req.query.empresa_id);
+                    if (req.query.empresa_id) query = query.eq('empresa_id', req.query.empresa_id);
                     const { data, error } = await buscarTodos(query.order('created_at', { ascending: true }));
                     if (error) throw error;
                     return formatarLogs(data, req.event.id);
@@ -2302,3 +2337,5 @@ class ReportController {
 }
 
 module.exports = new ReportController();
+// exportado para teste: a separação de turnos por empresa é a regra mais sensível do relatório
+module.exports.montarTurnos = montarTurnos;
