@@ -739,6 +739,20 @@ docker system prune -af
 **Registre cada deploy aqui:**
 
 ```
+2026-11-11 - Deploy be7de3a (câmeras sob demanda)
+├─ Mudanças: vídeo das câmeras via go2rtc no agente (sem motor de IA), IA por câmera
+│            (só monitorar / ao assistir / 24 h), chave do motor por evento, gravação local
+│            no PC do evento, leitor + confirmação 1:1 da IA, leitor como câmera; motor só em
+│            127.0.0.1 com chave interna, biometria via API (sem service role no PC), ingresso
+│            de vídeo de 2 min no lugar do token na URL
+├─ Migrations: 20261111_cameras_modos_gravacao.sql PENDENTE (usuária aplica no Supabase;
+│              código funciona sem ela; cria índice em pessoas → fora do horário de evento)
+├─ Status: ✅ OK (GitHub Actions run 42974560986; 1ª tentativa SSH timeout, rerun ok)
+├─ Teste: /health 200 (database connected), rotas novas 401 sem login, painel 200
+├─ Rollback: tag antes-deploy-20261111 (d23719e)
+└─ Próximo: aplicar migration; no PC do evento rodar ligar-ia-facial.bat (baixa go2rtc/ffmpeg
+            com SHA-256 e reinicia motor e agente na versão nova)
+
 2026-10-30 - Deploy 23ff24f (relatórios, etapas 1–5)
 ├─ Mudanças: Excel das abas, aba Ponto, diárias/fechamento por regra de remuneração,
 │            histórico de pulseiras, Dashboard "operação de hoje" (fluxo, lotação, alertas)
