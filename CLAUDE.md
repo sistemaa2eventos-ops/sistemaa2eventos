@@ -739,6 +739,13 @@ docker system prune -af
 **Registre cada deploy aqui:**
 
 ```
+2026-11-12 - Deploy f7394b7 (página inicial escolhida por quem administra)
+├─ Mudanças: Usuários > "Página inicial ao entrar" (vazio = primeira página permitida); a escolha só vale
+│            se o usuário ainda tem acesso à página; sem migration
+├─ Status: ✅ OK (GitHub Actions run 43087119496); /health 200, banco conectado, painel 200
+├─ Rollback: tag antes-deploy-20261112e (c009bb4)
+└─ Próximo: etapa 3 (quiosque com bloqueio em Check-in, Check-out, Monitor e Câmeras)
+
 2026-11-12 - Deploy 40cdccd (acesso: operador só opera os eventos da lista; dashboard opcional)
 ├─ Mudanças: operador só troca entre eventos da sua lista (supervisor global mantém todos; admin inalterado);
 │            dashboard deixa de ser obrigatório (padrão desligado para operador novo); página "/" sem
