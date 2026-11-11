@@ -1,6 +1,10 @@
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const crypto = require('crypto');
+const { extractRole } = require('../../middleware/auth');
+
+// Só o admin_master vê e altera senhas e tokens (ele é quem os cadastra).
+const souAdminMaster = (req) => extractRole(req.user) === 'admin_master';
 
 // ── Whitelist de campos permitidos para system_settings (previne mass-assignment)
 const SETTINGS_ALLOWED_FIELDS = [
@@ -58,19 +62,23 @@ const SETTINGS_LEGACY_CONFIG_FIELDS = [
     'email_from', 'email_from_name', 'whatsapp_api_url', 'whatsapp_api_key'
 ];
 
-// Segredos: nunca voltam para o navegador. O painel recebe só se estão configurados.
+// Segredos: só o admin_master recebe os valores. Os demais recebem só se estão configurados.
 // Campo vazio no PUT significa "manter o que já está gravado".
 const CAMPOS_SECRETOS = ['smtp_pass', 'wpp_token', 'telegram_bot_token', 'whatsapp_api_key'];
 
-function ocultarSegredos(registro) {
+function ocultarSegredos(registro, verValores = false) {
     if (!registro || typeof registro !== 'object') return registro;
     const saida = { ...registro };
     const config = saida.config && typeof saida.config === 'object' ? { ...saida.config } : null;
     for (const campo of CAMPOS_SECRETOS) {
         const gravado = saida[campo] || (config && config[campo]);
         saida[`${campo}_configurado`] = !!gravado;
-        saida[campo] = '';
-        if (config) delete config[campo];
+        if (verValores) {
+            if (gravado) saida[campo] = gravado;
+        } else {
+            saida[campo] = '';
+            if (config) delete config[campo];
+        }
     }
     if (config) saida.config = config;
     return saida;
@@ -139,7 +147,7 @@ class SettingsController {
                 }
             }
 
-            res.json({ success: true, data: ocultarSegredos(settings) });
+            res.json({ success: true, data: ocultarSegredos(settings, souAdminMaster(req)) });
         } catch (error) {
             logger.error('Erro ao buscar system_settings no Supabase:', error);
             res.status(500).json({ error: 'Erro ao buscar configurações globais' });
@@ -150,14 +158,15 @@ class SettingsController {
     async updateSettings(req, res) {
         try {
             const payload = pickAllowed(req.body, SETTINGS_ALLOWED_FIELDS);
-            // Segredo vazio ou ausente não sobrescreve o valor gravado
+            // Segredos: só o admin_master grava. Campo vazio ou de outro perfil não sobrescreve o valor gravado
+            const podeGravarSegredos = souAdminMaster(req);
             for (const campo of CAMPOS_SECRETOS) {
-                if (payload[campo] === '' || payload[campo] === null) delete payload[campo];
+                if (!podeGravarSegredos || payload[campo] === '' || payload[campo] === null) delete payload[campo];
             }
             if (payload.config && typeof payload.config === 'object') {
                 payload.config = { ...payload.config };
                 for (const campo of CAMPOS_SECRETOS) {
-                    if (payload.config[campo] === '' || payload.config[campo] === null) delete payload.config[campo];
+                    if (!podeGravarSegredos || payload.config[campo] === '' || payload.config[campo] === null) delete payload.config[campo];
                 }
             }
 
@@ -217,7 +226,7 @@ class SettingsController {
                 }
             }
 
-            res.json({ success: true, message: 'Configurações atualizadas com sucesso', data: ocultarSegredos(data) });
+            res.json({ success: true, message: 'Configurações atualizadas com sucesso', data: ocultarSegredos(data, souAdminMaster(req)) });
         } catch (error) {
             logger.error('Erro ao atualizar system_settings no Supabase:', error);
             res.status(500).json({ error: 'Erro ao atualizar configurações' });
