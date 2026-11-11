@@ -143,8 +143,10 @@ const smtpValidators = {
       .notEmpty().withMessage('Usuário SMTP é obrigatório')
       .trim(),
 
+    // A senha não é obrigatória aqui: campo vazio usa a senha já gravada (o controller confere se existe)
     body('pass')
-      .notEmpty().withMessage('Senha SMTP é obrigatória')
+      .optional({ values: 'falsy' })
+      .isString().withMessage('Senha SMTP inválida')
   ]
 };
 
