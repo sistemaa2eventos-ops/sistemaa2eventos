@@ -573,36 +573,57 @@ const ConfigEtiquetas = () => {
 
     const ocuparPranchetaInteira = (id) => updateElement(id, { x: 0, y: 0, width: canvasWidth, height: canvasHeight });
 
-    // ---------- Atalhos de teclado ----------
+    // ---------- Atalhos de teclado (estáveis, sem churn de listeners) ----------
+    const actionsRef = useRef({});
+    actionsRef.current = {
+        selecionarTodos,
+        setSelectedIds,
+        excluirSelecionados,
+        duplicarSelecionados,
+        desagrupar,
+        agrupar,
+        reordenar,
+        moverSelecionados,
+        selectedIds
+    };
+
     useEffect(() => {
         const handleKeyDown = (e) => {
             const tag = e.target?.tagName?.toLowerCase();
             if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target?.isContentEditable) return;
             const ctrl = e.ctrlKey || e.metaKey;
             const tecla = e.key.toLowerCase();
+            const act = actionsRef.current;
 
-            if (ctrl && tecla === 'a') { e.preventDefault(); selecionarTodos(); return; }
-            if (e.key === 'Escape') { setSelectedIds([]); return; }
-            if (!selectedIds.length) return;
+            if (ctrl && tecla === 'a') { e.preventDefault(); act.selecionarTodos(); return; }
+            if (e.key === 'Escape') { act.setSelectedIds([]); return; }
+            if (!act.selectedIds?.length) return;
 
-            if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); excluirSelecionados(); return; }
-            if (ctrl && tecla === 'd') { e.preventDefault(); duplicarSelecionados(); return; }
-            if (ctrl && tecla === 'g') { e.preventDefault(); if (e.shiftKey) desagrupar(); else agrupar(); return; }
-            if (ctrl && (e.key === ']' || e.key === '}')) { e.preventDefault(); reordenar(e.shiftKey ? 'frente' : 'avancar'); return; }
-            if (ctrl && (e.key === '[' || e.key === '{')) { e.preventDefault(); reordenar(e.shiftKey ? 'tras' : 'recuar'); return; }
+            if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); act.excluirSelecionados(); return; }
+            if (ctrl && tecla === 'd') { e.preventDefault(); act.duplicarSelecionados(); return; }
+            if (ctrl && tecla === 'g') { e.preventDefault(); if (e.shiftKey) act.desagrupar(); else act.agrupar(); return; }
+            if (ctrl && (e.key === ']' || e.key === '}')) { e.preventDefault(); act.reordenar(e.shiftKey ? 'frente' : 'avancar'); return; }
+            if (ctrl && (e.key === '[' || e.key === '{')) { e.preventDefault(); act.reordenar(e.shiftKey ? 'tras' : 'recuar'); return; }
 
             const setas = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
             if (setas[e.key]) {
                 e.preventDefault();
                 const passo = e.shiftKey ? 10 : 1;
-                moverSelecionados(setas[e.key][0] * passo, setas[e.key][1] * passo);
+                act.moverSelecionados(setas[e.key][0] * passo, setas[e.key][1] * passo);
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    });
+    }, []);
 
     // ---------- Seleção por área (arrastar o mouse no vazio) ----------
+    const marqueeCleanupRef = useRef(null);
+    useEffect(() => {
+        return () => {
+            if (marqueeCleanupRef.current) marqueeCleanupRef.current();
+        };
+    }, []);
+
     const handleWorkspaceMouseDown = (e) => {
         if (e.button !== 0) return;
         const alvo = e.target;
@@ -634,9 +655,14 @@ const ConfigEtiquetas = () => {
             });
         };
 
-        const onUp = (ev) => {
+        const cleanup = () => {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
+            marqueeCleanupRef.current = null;
+        };
+
+        const onUp = (ev) => {
+            cleanup();
             setMarquee(null);
             const lista = elementsRef.current;
             if (!estado.moveu) {
@@ -656,6 +682,7 @@ const ConfigEtiquetas = () => {
             setSelectedIds(expandirGrupos([...estado.base, ...idsNaArea(lista, area)], lista));
         };
 
+        marqueeCleanupRef.current = cleanup;
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
     };

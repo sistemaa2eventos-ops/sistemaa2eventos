@@ -171,7 +171,7 @@ export const PreviewEtiquetaDialog = ({
                                 border: '1px solid #D1D5DB'
                             }}
                         >
-                            {elementos.map((el, idx) => {
+                            {elementos.filter(el => !el.apenasReferencia && !el.oculto).map((el, idx) => {
                                 const left = (Number(el.x) / 3) * ESCALA_PREVIEW;
                                 const top = (Number(el.y) / 3) * ESCALA_PREVIEW;
                                 const width = (Number(el.width) / 3) * ESCALA_PREVIEW;
@@ -255,7 +255,8 @@ export const PreviewEtiquetaDialog = ({
                                             sx={{
                                                 position: 'absolute',
                                                 left, top, width, height, zIndex,
-                                                objectFit: 'contain',
+                                                objectFit: el.objectFit || 'contain',
+                                                borderRadius: el.borderRadius ? `${el.borderRadius}px` : 0,
                                                 opacity: el.opacity != null ? el.opacity : 1
                                             }}
                                         />
