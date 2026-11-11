@@ -37,7 +37,15 @@ import { useTranslation } from 'react-i18next';
  * 5. Base: Últimos participantes cadastrados.
  */
 const Dashboard = () => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const [, forceUpdate] = React.useState({});
+
+    React.useEffect(() => {
+        const handleLangChange = () => forceUpdate({});
+        window.addEventListener('languagechange', handleLangChange);
+        return () => window.removeEventListener('languagechange', handleLangChange);
+    }, []);
+
     const confirmar = useConfirmacao();
     const navigate = useNavigate();
     const {

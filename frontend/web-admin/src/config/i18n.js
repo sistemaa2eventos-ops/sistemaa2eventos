@@ -27,6 +27,9 @@ i18n
         interpolation: {
             escapeValue: false
         },
+        react: {
+            useSuspense: false
+        },
         detection: {
             // Ordem de detecção: se já foi definido no navegador, respeita; caso contrário cai no fallback
             order: ['localStorage', 'queryString', 'cookie'],

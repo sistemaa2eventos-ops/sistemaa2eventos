@@ -141,7 +141,7 @@ const Sidebar = ({ open, onClose }) => {
     const { user, hasMenuAccess, changeActiveEvento } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const [openSubMenus, setOpenSubMenus] = useState({});
     const [eventAnchorEl, setEventAnchorEl] = useState(null);
     const [availableEvents, setAvailableEvents] = useState([]);
@@ -152,8 +152,13 @@ const Sidebar = ({ open, onClose }) => {
 
     React.useEffect(() => {
         const handleStorageChange = () => forceUpdate({});
+        const handleLangChange = () => forceUpdate({});
         window.addEventListener('storage', handleStorageChange);
-        return () => window.removeEventListener('storage', handleStorageChange);
+        window.addEventListener('languagechange', handleLangChange);
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            window.removeEventListener('languagechange', handleLangChange);
+        };
     }, []);
 
     // changeActiveEvento é recriada a cada render do AuthContext: como dependência, refazia

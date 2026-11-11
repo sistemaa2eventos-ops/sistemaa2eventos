@@ -45,7 +45,8 @@ import App from './App.jsx'
 import { CssBaseline, ThemeProvider } from '@mui/material'
 import theme from './styles/theme'
 import './index.css'
-import './config/i18n' // Global i18next initialization
+import i18n from './config/i18n' // Global i18next initialization
+import { I18nextProvider } from 'react-i18next'
 import * as Sentry from "@sentry/react";
 
 Sentry.init({
@@ -61,9 +62,11 @@ Sentry.init({
 
 ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
-        <ThemeProvider theme={theme}>
-            <CssBaseline />
-            <App />
-        </ThemeProvider>
+        <I18nextProvider i18n={i18n}>
+            <ThemeProvider theme={theme}>
+                <CssBaseline />
+                <App />
+            </ThemeProvider>
+        </I18nextProvider>
     </React.StrictMode>,
 )
