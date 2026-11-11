@@ -739,6 +739,17 @@ docker system prune -af
 **Registre cada deploy aqui:**
 
 ```
+2026-11-11 - Deploy 8d56b76 (estação por câmera com IA, sem leitor)
+├─ Mudanças: janela da estação (check-in/check-out) escolhe leitor (opcional) e/ou câmeras com IA;
+│            sessoes_operador.camera_ids; câmera reconhece → conferência/saída na estação;
+│            estação ativa filtrada pelo evento em foco (estação antiga de outro evento quebrava o vínculo)
+│            (a parte principal saiu junto no commit c69702c da outra sessão, pulseiras)
+├─ Migrations: 20261111c_sessao_cameras.sql (aplicada pela usuária antes)
+├─ Status: ✅ OK (GitHub Actions run 43027395448)
+├─ Teste: /health 200 (uptime 31 s), sessao/ativa 401 sem login; sem teste com câmera real
+├─ Rollback: tag antes-deploy-20261111f (419a75a); antes de c69702c: antes-deploy-20261111e (1bb3314)
+└─ Próximo: vincular Webcam PC Local na Baia 01 e testar com pessoa cadastrada
+
 2026-11-11 - Deploy 3f75232 (câmeras com IA vinculadas à estação de check-in/check-out)
 ├─ Mudanças: câmera com IA reconhecida avisa as estações vinculadas (config.cameras_vinculadas
 │            do dispositivo) pelo mesmo evento credenciamento_abrir do leitor; repete no máx. 1x/20 s
