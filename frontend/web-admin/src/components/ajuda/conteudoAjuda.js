@@ -287,23 +287,26 @@ const AJUDAS = {
 
     '/config/etiquetas': {
         titulo: 'Etiquetas e crachás',
-        objetivo: 'Editor visual completo para crachás PVC, credenciais e etiquetas térmicas com grade inteligente e guias magnéticas.',
+        objetivo: 'Editor visual completo para crachás PVC, credenciais e etiquetas térmicas com seleção por área, grupos, camadas reais e guias magnéticas.',
         passos: [
-            'Aba "Formato": selecione o padrão da impressora ou informe as dimensões (mm); envie a arte de fundo do crachá.',
-            'Modo Gabarito (crachás pré-impressos): ative "Modo Gabarito (Não Imprimir)" para usar a arte do cliente como orientação na tela sem enviá-la para a impressora.',
+            'Aba "Formato": selecione o padrão da impressora ou informe as dimensões (mm); envie a arte do evento (que entra como camada com ordem e trava).',
+            'Só Referência (crachás pré-impressos): marque a arte como "Só referência" para orientar os dados na tela sem enviá-la para a impressora.',
             'Aba "Elementos": adicione textos/variáveis, QR Code, Código de Barras 1D vetorial, foto, logos ou formas geométricas.',
-            'Aba "Propriedades": use os botões de alinhamento rápido (Centro X, Centro Y, Centro Total, Bordas) e trave a proporção real para fotos e QR codes.',
-            'Aba "Camadas": ordene o nível de profundidade (Z-Index) trazendo elementos para frente ou enviando para trás.',
+            'Aba "Camadas": ordene o nível de profundidade (Z-Index) trazendo para frente ou enviando para trás com efeito visual imediato.',
+            'Painel "Propriedades": trave proporção de fotos/logos ou ative redimensionamento livre para esticar para cima e para os lados.',
             'Use "Imprimir Teste" para validar a saída física e "Salvar Layout" para fixar o desenho no evento.'
         ],
         atencao: [
             'Variáveis dinâmicas aceitas: {nome_pessoa}, {nome_completo}, {empresa}, {funcao}, {cpf}, {pulseira}, {evento}, {data}.',
-            'No Modo Gabarito, a arte fica com opacidade regulável na tela mas é excluída automaticamente da impressão.',
+            'Elementos marcados como "Só referência" ou ocultados na aba Camadas não saem na impressão.',
             'No cadastro do evento, ative "Habilitar impressão de etiquetas" para imprimir direto no credenciamento.'
         ],
         dicas: [
-            'Multi-seleção: segure Shift ou Ctrl e clique nos elementos (ou na aba Camadas) para selecionar vários e arrastá-los juntos sem perder a escala e o alinhamento.',
-            'Atalhos de teclado: use as setas para mover os elementos selecionados com precisão de 1 px (Shift + setas move 10 px) e Delete ou Backspace para excluir.',
+            'Seleção por área: clique e arraste o mouse no vazio da prancheta para selecionar múltiplos elementos de uma vez só.',
+            'Escala em grupo: puxe as alças verdes da seleção para redimensionar todos juntos ou use os botões de −10% / +10%.',
+            'Grupos (Ctrl+G): trave elementos juntos na mesma camada para se moverem e escalarem em bloco. Desagrupe com Ctrl+Shift+G.',
+            'Grade visível: selecione a cor (azul, magenta, branca, preta) e intensidade no menu superior para enxergar sobre qualquer arte.',
+            'Atalhos: setas para ajuste milimétrico (1 px ou 10 px com Shift), Delete para exclusão em lote e Ctrl+] / Ctrl+[ para avançar/recuar camada.',
             'Para impressão instantânea sem diálogo do Windows na recepção, inicie o Chrome com o parâmetro --kiosk-printing.'
         ]
     },

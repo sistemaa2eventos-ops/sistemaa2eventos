@@ -95,7 +95,9 @@ export function montarHtmlEtiqueta(layout, dados) {
     const bgUrl = !ehApenasReferencia ? (papel.background_url || papel.bg_url || null) : null;
     const bgStyle = bgUrl ? `background-image: url('${bgUrl}'); background-size: cover; background-position: center; background-repeat: no-repeat;` : 'background-color: #ffffff;';
 
-    const elementos = (layout?.elementos || []).map((el, index) => {
+    const elementos = (layout?.elementos || [])
+        .filter(el => !el.apenasReferencia && !el.oculto)
+        .map((el, index) => {
         const zIndex = el.zIndex != null ? el.zIndex : (index + 2);
         const caixa = `left:${mm(el.x)};top:${mm(el.y)};width:${mm(el.width)};height:${mm(el.height)};z-index:${zIndex}`;
         const borda = el.borderRadius ? `border-radius: ${el.borderRadius}px;` : '';
@@ -124,7 +126,8 @@ export function montarHtmlEtiqueta(layout, dados) {
         if (el.type === 'image') {
             const imgSrc = el.content || el.url;
             if (imgSrc) {
-                return `<img class="el" style="${caixa};object-fit:contain;${borda}${opacidade}" src="${imgSrc}" alt="Elemento">`;
+                const fit = el.objectFit || 'contain';
+                return `<img class="el" style="${caixa};object-fit:${fit};${borda}${opacidade}" src="${imgSrc}" alt="Elemento">`;
             }
             return '';
         }
