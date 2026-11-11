@@ -317,6 +317,8 @@ export const useCheckin = (defaultMode, options = {}) => {
 
     // Quiosque: se o navegador sair da tela cheia (Esc, gesto de voltar), sai do quiosque junto
     useEffect(() => ouvirTelaCheia((cheia) => {
+        // Quiosque bloqueado (configurado em Usuários): só o desbloqueio com senha tira o modo
+        if (document.body.classList.contains('quiosque-bloqueado')) return;
         if (!cheia && telaCheiaDoQuiosqueRef.current) {
             telaCheiaDoQuiosqueRef.current = false;
             setModoQuiosque(false);
@@ -673,6 +675,7 @@ export const useCheckin = (defaultMode, options = {}) => {
 
     // No iPhone não há tela cheia do navegador: o quiosque só esconde menu e barra
     const toggleQuiosque = async () => {
+        if (modoQuiosque && document.body.classList.contains('quiosque-bloqueado')) return; // bloqueado: não sai
         if (!modoQuiosque) {
             telaCheiaDoQuiosqueRef.current = await entrarTelaCheia();
             setModoQuiosque(true);

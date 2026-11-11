@@ -529,6 +529,24 @@ const Usuarios = () => {
                             </Select>
                         </FormControl>
 
+                        {/* MODO DE TELA: normal (menu), tela cheia (só a página) ou quiosque (só a página, bloqueado) */}
+                        <FormControl fullWidth size="small">
+                            <InputLabel id="modo-tela-label">Modo de tela</InputLabel>
+                            <Select
+                                labelId="modo-tela-label"
+                                label="Modo de tela"
+                                value={formData.permissions?.modo_tela || 'normal'}
+                                onChange={(e) => setFormData({
+                                    ...formData,
+                                    permissions: { ...formData.permissions, modo_tela: e.target.value }
+                                })}
+                            >
+                                <MenuItem value="normal">Normal (menu completo)</MenuItem>
+                                <MenuItem value="tela_cheia">Tela cheia (só a página, sem menu)</MenuItem>
+                                <MenuItem value="quiosque">Quiosque (tela cheia bloqueada: sair exige senha de administrador ou supervisor)</MenuItem>
+                            </Select>
+                        </FormControl>
+
                         {/* CASO 1: VÍNCULO GLOBAL - CONFIGURAÇÃO ÚNICA DE PERMISSÕES */}
                         {formData.vinculo_tipo === 'global' && (
                             <Box sx={{ p: 2.5, borderRadius: 1.5, background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>

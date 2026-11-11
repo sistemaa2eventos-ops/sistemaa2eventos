@@ -1,5 +1,8 @@
 const express = require('express');
+const { createClient } = require('@supabase/supabase-js');
 const router = express.Router();
+const { supabase } = require('../../config/supabase');
+const logger = require('../../services/logger');
 const authController = require('./auth.controller');
 const { authenticate, authorize } = require('../../middleware/auth');
 const { validateLogin, validateRegister } = require('../../middleware/validator');
@@ -8,7 +11,7 @@ const authCache = require('../../services/authCache');
 
 // Alterações de usuário (papel, status, evento ativo, e-mail, logout...) limpam o cache de
 // validação de token na hora, para valerem já na próxima requisição.
-const ROTAS_SEM_INVALIDACAO = ['/login', '/register', '/forgot-password', '/definir-senha', '/refresh'];
+const ROTAS_SEM_INVALIDACAO = ['/login', '/register', '/forgot-password', '/definir-senha', '/refresh', '/quiosque/desbloquear'];
 router.use((req, res, next) => {
     if (req.method === 'GET' || ROTAS_SEM_INVALIDACAO.includes(req.path)) return next();
     res.on('finish', () => {
@@ -26,6 +29,35 @@ router.use((req, res, next) => {
 router.post('/login', rateLimiter.auth, validateLogin, authController.login);
 router.post('/forgot-password', rateLimiter.auth, (req, res) => authController.forgotPassword(req, res));
 router.post('/definir-senha', rateLimiter.auth, authController.definirSenha); // link do e-mail (convite / esqueci a senha)
+
+// Sair do modo quiosque: confere a senha de um administrador ou supervisor. Não cria sessão
+// (cliente sem persistência), não altera nada e não devolve token.
+router.post('/quiosque/desbloquear', rateLimiter.auth, async (req, res) => {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const senha = String(req.body?.senha || '');
+    if (!email || !senha) {
+        return res.status(400).json({ error: 'Informe o e-mail e a senha de um administrador ou supervisor.' });
+    }
+    try {
+        const anon = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+            auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+        });
+        const { data, error } = await anon.auth.signInWithPassword({ email, password: senha });
+        if (error || !data?.user) {
+            return res.status(401).json({ error: 'E-mail ou senha incorretos.' });
+        }
+        const { data: perfil } = await supabase.from('perfis')
+            .select('nivel_acesso, status').eq('id', data.user.id).maybeSingle();
+        if (!perfil || !['admin_master', 'admin', 'supervisor'].includes(perfil.nivel_acesso) || perfil.status === 'inativo') {
+            return res.status(403).json({ error: 'Esta conta não pode liberar o quiosque.' });
+        }
+        logger.info(`🔓 Quiosque liberado por ${email} (${perfil.nivel_acesso})`);
+        return res.json({ success: true, liberado_por: email });
+    } catch (err) {
+        logger.error(`[Quiosque] desbloqueio: ${err.message}`);
+        return res.status(500).json({ error: 'Não foi possível verificar agora. Tente de novo.' });
+    }
+});
 router.post('/refresh', rateLimiter.public, (req, res) => authController.refreshSession(req, res));
 
 // ============================================

@@ -15,6 +15,7 @@ import { setGlobalSnackbar } from './services/api';
 // Layout
 import MainLayout from './components/layout/MainLayout';
 import ProtectedRoute from './components/common/ProtectedRoute'; // FIX I-09
+import QuiosqueGuard from './components/common/QuiosqueGuard';
 
 // Services
 import localCheckinService from './services/LocalCheckinService';
@@ -151,6 +152,7 @@ const AppContent = () => {
 
   return (
     <MainLayout>
+      <QuiosqueGuard />
       <Suspense fallback={<LoadingOverlay />}>
         <Routes>
           <Route path="/" element={<ProtectedRoute modulo="dashboard" irParaPrimeiraPermitida><Dashboard /></ProtectedRoute>} />
