@@ -299,8 +299,12 @@ const handlers = {
                 retencao_dias: evento.gravacao_retencao_dias,
                 cameras
             });
-            if ((evento.motor_ia_ativo !== false) === motorDesligadoPeloPainel()) {
-                definirMotor(evento.motor_ia_ativo !== false).catch(err => log('warn', `motor de IA: ${err.message}`));
+            // Sob demanda: o motor só roda se alguma câmera usa IA ou algum leitor pede confirmação da IA.
+            // O interruptor do painel ("Motor de IA do evento") continua mandando por cima.
+            const precisa = cameras.some(c => c.ia_ativa !== false) || Number(evento.leitores_ia || 0) > 0;
+            const deveLigar = evento.motor_ia_ativo !== false && precisa;
+            if (deveLigar === motorDesligadoPeloPainel()) {
+                definirMotor(deveLigar).catch(err => log('warn', `motor de IA: ${err.message}`));
             }
         }
         vigilancia.cameras = camerasParaMotor(cameras);

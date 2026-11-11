@@ -59,10 +59,14 @@ async function configurarAgente(agentId, eventoId) {
         return;
     }
     try {
-        const [cameras, evento] = await Promise.all([
+        const [cameras, evento, leitores] = await Promise.all([
             camerasDoEvento(eventoId),
-            require('./gravacao.service').configEvento(eventoId).catch(() => null)
+            require('./gravacao.service').configEvento(eventoId).catch(() => null),
+            // Leitores com confirmação da IA (config.ia_confirmacao): precisam do motor para conferir a foto
+            supabase.from('dispositivos_acesso').select('config').eq('evento_id', eventoId)
+                .then(({ data }) => (data || []).filter(d => d.config?.ia_confirmacao === true).length).catch(() => 0)
         ]);
+        if (evento) evento.leitores_ia = leitores;
         const r = await agentService.sendCommand(agentId, 'vigilancia_configurar', { cameras, evento }, 15000);
         logger.info(`👁️ [Vigilância] agente ${agentId}: ${r?.cameras ?? cameras.length} câmera(s), ${r?.ia ?? '?'} com IA${r?.video_local ? ', vídeo local' : ''}`);
     } catch (err) {
