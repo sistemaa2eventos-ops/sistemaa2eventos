@@ -144,6 +144,9 @@ const ConfigCameras = ({ abaInicial = null }) => {
             const payload = {
                 ...editingCamera,
                 evento_id: eventoId,
+                area_id: editingCamera.area_id || null,
+                snapshot_url: editingCamera.snapshot_url || null,
+                url_substream: editingCamera.url_substream || null,
                 porta: parseInt(editingCamera.porta, 10) || (editingCamera.protocolo === 'rtsp' ? 554 : 80)
             };
 

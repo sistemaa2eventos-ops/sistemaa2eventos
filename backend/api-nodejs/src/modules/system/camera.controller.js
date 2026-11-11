@@ -359,11 +359,18 @@ class CameraController {
             const evento_id = req.body.evento_id || req.headers['x-evento-id'];
             const cameraData = { ...req.body };
 
+            // Sanitizar campos UUID e opcionais vazios para evitar erro 22P02 no Postgres
+            if (!cameraData.area_id || String(cameraData.area_id).trim() === '') {
+                cameraData.area_id = null;
+            }
+            if (cameraData.snapshot_url === '') cameraData.snapshot_url = null;
+            if (cameraData.url_substream === '') cameraData.url_substream = null;
+
             // Se for RTSP ou snapshot_url contiver rtsp://
             if (cameraData.snapshot_url && cameraData.snapshot_url.startsWith('rtsp://')) {
                 cameraData.stream_url = cameraData.snapshot_url;
                 cameraData.protocolo = 'rtsp';
-            } else if (cameraData.fabricante === 'RTSP / OBS' || cameraData.porta === 8554 || cameraData.protocolo === 'rtsp') {
+            } else if (cameraData.fabricante === 'RTSP / OBS' || cameraData.fabricante === 'RTSP / OBS / Webcam' || cameraData.porta === 8554 || cameraData.protocolo === 'rtsp') {
                 cameraData.protocolo = 'rtsp';
                 if (!cameraData.stream_url) {
                     const authPart = cameraData.usuario && cameraData.senha ? `${cameraData.usuario}:${cameraData.senha}@` : '';
@@ -412,6 +419,8 @@ class CameraController {
             }
             if (updateData.prioridade !== undefined) updateData.prioridade = Math.min(3, Math.max(0, parseInt(updateData.prioridade, 10) || 0));
             if (updateData.url_substream === '') updateData.url_substream = null;
+            if (updateData.snapshot_url === '') updateData.snapshot_url = null;
+            if (updateData.area_id === '') updateData.area_id = null;
 
             const atualizar = (dados) => supabase.from('cameras_ip').update(dados).eq('id', id).eq('evento_id', evento_id).select().single();
             let { data, error } = await atualizar(updateData);
