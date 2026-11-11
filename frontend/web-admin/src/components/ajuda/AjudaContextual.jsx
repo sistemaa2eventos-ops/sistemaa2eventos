@@ -90,6 +90,9 @@ const AjudaContextual = () => {
                 <DialogContent dividers>
                     <Typography variant="body2" sx={{ color: cores.textoForte, lineHeight: 1.6 }}>{ajuda.objetivo}</Typography>
                     <Bloco icone={PassoIcon} cor={cores.sucesso} titulo={ajuda.tituloPassos || 'Passo a passo'} itens={ajuda.passos} numerado />
+                    {ajuda.passosConferir && (
+                        <Bloco icone={PassoIcon} cor={cores.primaria} titulo={ajuda.tituloConferir || 'Conferir'} itens={ajuda.passosConferir} numerado />
+                    )}
                     <Bloco icone={AtencaoIcon} cor={cores.alerta} titulo="Atenção" itens={ajuda.atencao} />
                     <Bloco icone={DicaIcon} cor={cores.primaria} titulo="Dicas" itens={ajuda.dicas} />
                 </DialogContent>

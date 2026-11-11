@@ -251,8 +251,14 @@ const AJUDAS = {
     '/config/pulseiras': {
         titulo: 'Pulseiras',
         objetivo: 'Lotes de pulseiras: cor, faixa de números, áreas liberadas e fase do evento (Montagem, Evento, Desmontagem).',
-        passos: ['"Provisionar lote": nome, cor, etapa/fase de validade, data específica (opcional), número inicial e final, método de leitura e "Zonas de acesso permitidas".', '"Criar lote".'],
-        atencao: ['Crie as áreas antes: lote sem zona fica "Sem acesso".', 'Lotes de fases diferentes podem repetir números e cores; ao rodar o reset de turnos as pulseiras anteriores são liberadas automaticamente.', 'Excluir um lote é irreversível.']
+        passos: ['"Provisionar lote": nome, cor, etapa/fase de validade, data específica (opcional), início e fim de uso (opcional), número inicial e final, método de leitura e "Zonas de acesso permitidas".', '"Criar lote".'],
+        atencao: ['Crie as áreas antes: lote sem zona fica "Sem acesso".', 'Lotes de fases diferentes podem repetir números e cores; ao rodar o reset de turnos as pulseiras anteriores são liberadas automaticamente.', 'Excluir um lote é irreversível.', 'Fora da fase, data ou horário de uso do lote, a pulseira é recusada no credenciamento e no check-in.'],
+        tituloConferir: 'Conferir antes do evento',
+        passosConferir: [
+            'Janela de horário: crie um lote com "Início uso" 16:00 e "Fim uso" 02:00. Tente vincular uma pulseira desse lote fora desse horário: o sistema deve recusar com aviso.',
+            'Devolução: no credenciamento, com uma pessoa que já tem pulseira, clique em "Marcar como Devolvida". A pulseira sai da pessoa e aparece no histórico como devolvida.',
+            'Lotes sobrepostos: crie dois lotes com a mesma faixa de números, um de "Montagem" e outro de "Evento (Showday)". No dia de cada fase, a leitura deve usar o lote certo.'
+        ]
     },
     '/config/dispositivos': {
         titulo: 'Leitores e dispositivos',
