@@ -157,7 +157,7 @@ class PessoaService {
         // Passo 2: Buscar pessoas com filtro de texto (ou todas do pivot se sem filtro)
         const pIds = [...new Set(pivots.map(p => p.pessoa_id))];
         let pesQuery = supabaseClient.from('pessoas')
-            .select('id, nome_completo, nome_credencial, cpf, funcao, status_acesso, foto_url, qr_code, ativo, created_at')
+            .select('id, nome_completo, nome_credencial, cpf, funcao, status_acesso, foto_url, qr_code, ativo, created_at, numero_pulseira')
             .in('id', pIds);
 
         if (queryText) {

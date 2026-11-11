@@ -2,6 +2,7 @@ const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const { limiteFiltro } = require('../../utils/dateUtils');
 const { buscarTodos, buscarPorIdsEmLotes } = require('../../utils/buscarTodos');
+const { buscarLotesDaFaixa, escolherLote } = require('./loteSelecao');
 
 // logs_acesso.created_at é UTC gravado sem fuso
 const instante = (ts) => (ts ? Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(ts) ? ts : `${ts}Z`) : NaN);
@@ -341,6 +342,62 @@ class PulseiraService {
         if (tabelaAusente(error)) return null; // sem a migration, a checagem fica desligada (como antes)
         if (error) throw error;
         return data?.[0] ? { motivo: data[0].motivo_encerramento } : null;
+    }
+
+    /**
+     * Correção feita na tela de check-in: o número digitado errado é anulado (não conta como entrega)
+     * e a pessoa recebe o número certo, sem registrar entrada. Mesmas regras de lote e duplicidade da entrega.
+     */
+    async corrigirNumero(eventoId, pessoaId, numeroDigitado, usuarioId = null, observacao = null) {
+        const texto = String(numeroDigitado ?? '').trim();
+        if (!/^\d+$/.test(texto) || parseInt(texto, 10) <= 0) throw Object.assign(new Error('Número de pulseira inválido.'), { status: 400 });
+        const numero = String(parseInt(texto, 10));
+
+        const { data: pessoa, error: pErr } = await supabase.from('pessoas')
+            .select('id, nome_completo, numero_pulseira')
+            .eq('id', pessoaId)
+            .eq('evento_id', eventoId)
+            .maybeSingle();
+        if (pErr) throw pErr;
+        if (!pessoa) throw Object.assign(new Error('Pessoa não encontrada neste evento.'), { status: 404 });
+        if (pessoa.numero_pulseira === numero) throw Object.assign(new Error('Esta pessoa já está com essa pulseira.'), { status: 400 });
+
+        const candidatos = await buscarLotesDaFaixa(supabase, eventoId, parseInt(numero, 10));
+        const escolha = await escolherLote(candidatos, eventoId);
+        if (escolha.bloqueado) throw Object.assign(new Error(escolha.motivo), { status: 403 });
+        if (!escolha.lote) throw Object.assign(new Error('Este número não está em nenhum lote de pulseira do evento.'), { status: 400 });
+
+        const { data: outra, error: oErr } = await supabase.from('pessoas')
+            .select('nome_completo')
+            .eq('evento_id', eventoId)
+            .eq('numero_pulseira', numero)
+            .neq('id', pessoaId)
+            .limit(1);
+        if (oErr) throw oErr;
+        if (outra?.length) throw Object.assign(new Error(`Pulseira ${numero} já está com ${outra[0].nome_completo}.`), { status: 409 });
+
+        const bloqueio = await this.numeroBloqueado(eventoId, numero, escolha.lote.id);
+        if (bloqueio) throw Object.assign(new Error(`Pulseira ${numero} não pode ser entregue de novo neste lote (${STATUS[bloqueio.motivo] || bloqueio.motivo}).`), { status: 409 });
+
+        // desfaz o número errado (o histórico guarda como anulado); depois grava o certo
+        let anulado = false;
+        if (pessoa.numero_pulseira) {
+            await this.anularUltimo(eventoId, pessoaId, { observacao: observacao || 'Correção de número no check-in' }, usuarioId);
+            anulado = true;
+        }
+
+        const { error: uErr } = await supabase.from('pessoas')
+            .update({ numero_pulseira: numero, tipo_pulseira_id: escolha.lote.id, updated_at: new Date().toISOString() })
+            .eq('id', pessoaId)
+            .eq('evento_id', eventoId);
+        if (uErr) {
+            throw Object.assign(new Error(anulado
+                ? 'O número errado foi desfeito, mas o número certo não foi gravado. Entregue a pulseira de novo.'
+                : uErr.message), { status: 500 });
+        }
+        this.registrarEntrega(pessoaId, usuarioId);
+
+        return { numero_pulseira: numero, tipo: escolha.lote.nome_tipo, numero_anulado: anulado ? pessoa.numero_pulseira : null };
     }
 
     /** Quem entregou: o trigger não sabe o operador, o credenciamento completa (sem bloquear) */

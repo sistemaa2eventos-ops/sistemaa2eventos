@@ -50,4 +50,19 @@ router.post('/anular', checkPermission('checkin', 'escrita'), async (req, res) =
     }
 });
 
+// Correção feita na tela de check-in: o número errado é anulado e a pessoa recebe o certo (sem entrada)
+router.post('/corrigir', checkPermission('checkin', 'escrita'), async (req, res) => {
+    try {
+        const { pessoa_id, numero_pulseira, observacao } = req.body || {};
+        if (!pessoa_id || !numero_pulseira) return ApiResponse.error(res, 'pessoa_id e numero_pulseira são obrigatórios.', 400);
+        const r = await pulseiraService.corrigirNumero(req.event.id, pessoa_id, numero_pulseira, req.user?.id || null, observacao);
+        await auditService.logEntity(req, 'BRACELET_CORRECTED', 'PESSOA', pessoa_id,
+            { ...r, observacao: String(observacao || '').trim() || null });
+        return ApiResponse.success(res, r);
+    } catch (error) {
+        logger.error('Erro ao corrigir número de pulseira:', error.message);
+        return ApiResponse.error(res, error.status ? error.message : 'Não foi possível corrigir a pulseira.', error.status || 500);
+    }
+});
+
 module.exports = router;

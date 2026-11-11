@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import {
   Box, Typography, Grid, TextField,
-  List, ListItemText,
+  List, ListItem, ListItemText,
   ListItemButton, Zoom, Tooltip
 } from '@mui/material';
 import {
@@ -21,6 +21,7 @@ import PreviewEtiquetaDialog from '../components/credenciamento/PreviewEtiquetaD
 import RecentAccessList from '../components/credenciamento/RecentAccessList';
 import { useCheckin } from '../hooks/useCheckin';
 import CorrigirTurnoDialog from '../components/checkin/CorrigirTurnoDialog';
+import AcoesPulseiraCheckin from '../components/checkin/AcoesPulseiraCheckin';
 import RelogioSincronizado from '../components/common/RelogioSincronizado';
 
 const FeedbackOverlay = styled(Box, { shouldForwardProp: (p) => p !== 'status' })(({ status }) => ({
@@ -185,12 +186,18 @@ const Checkin = () => {
                     {searchResults.length > 0 ? (
                         <List disablePadding>
                             {searchResults.map(p => (
-                                <ListItemButton
+                                <ListItem
                                     key={p.id}
+                                    disablePadding
+                                    sx={{ mb: 1, pr: p.numero_pulseira ? 5 : 0 }}
+                                    secondaryAction={p.numero_pulseira
+                                        ? <AcoesPulseiraCheckin pessoa={{ id: p.id, nome: p.nome, numero_pulseira: p.numero_pulseira }} onAtualizado={() => handleSearch(searchQuery)} />
+                                        : null}
+                                >
+                                <ListItemButton
                                     onClick={() => setSelectedPessoa(p)}
                                     sx={{
                                         borderRadius: 1.5,
-                                        mb: 1,
                                         p: 1.15,
                                         border: '1px solid rgba(255,255,255,0.06)',
                                         bgcolor: 'rgba(255,255,255,0.02)',
@@ -211,11 +218,12 @@ const Checkin = () => {
                                     </Box>
                                     <ListItemText
                                         primary={p.nome}
-                                        secondary={[p.cpf || 'Sem CPF', p.empresa_nome].filter(Boolean).join(' – ')}
+                                        secondary={[p.cpf || 'Sem CPF', p.numero_pulseira ? `Pulseira ${p.numero_pulseira}` : null, p.empresa_nome].filter(Boolean).join(' – ')}
                                         primaryTypographyProps={{ fontWeight: 700, fontSize: '0.9rem', noWrap: true }}
                                         secondaryTypographyProps={{ fontSize: '0.78rem', noWrap: true }}
                                     />
                                 </ListItemButton>
+                                </ListItem>
                             ))}
                         </List>
                     ) : (
