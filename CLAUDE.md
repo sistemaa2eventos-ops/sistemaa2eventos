@@ -739,6 +739,14 @@ docker system prune -af
 **Registre cada deploy aqui:**
 
 ```
+2026-11-11 - Deploy 3f75232 (câmeras com IA vinculadas à estação de check-in/check-out)
+├─ Mudanças: câmera com IA reconhecida avisa as estações vinculadas (config.cameras_vinculadas
+│            do dispositivo) pelo mesmo evento credenciamento_abrir do leitor; repete no máx. 1x/20 s
+├─ Status: ✅ OK (GitHub Actions run 43021383533; "Deploy para VPS" não confirmado pelo log)
+├─ Teste: /health 200 (uptime 42 s, banco conectado), rotas novas 401 sem login; sem teste com câmera real
+├─ Rollback: tag antes-deploy-20261111c (7a83205)
+└─ Próximo: testar com câmera IA + estação vinculada antes de usar em portaria
+
 2026-11-11 - Deploy 29fd7f1 (webcam pelo retransmissor)
 ├─ Mudanças: webcam USB / OBS local fechado via go2rtc (H.264, teto ~0,9 Mbit/s); go2rtc chama
 │            ffmpeg pelo PATH (caminho com espaço quebrava foto/reserva); fecha filhos ao parar
