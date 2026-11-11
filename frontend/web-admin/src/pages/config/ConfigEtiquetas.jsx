@@ -113,7 +113,9 @@ const ConfigEtiquetas = () => {
         { id: '4', type: 'foto', content: '{foto_url}', x: 80, y: 200, width: 80, height: 80, borderRadius: 8, borderColor: '#00D4FF', borderWidth: 2, lockAspectRatio: true, zIndex: 7 }
     ]);
 
-    const [selectedId, setSelectedId] = useState(null);
+    const [selectedIds, setSelectedIds] = useState([]);
+    const dragStartPositionsRef = useRef(null);
+    const selectedId = selectedIds[0] || null;
     const [_loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const { enqueueSnackbar } = useSnackbar();
@@ -279,7 +281,7 @@ const ConfigEtiquetas = () => {
         }
 
         setElements(prev => [...prev, newEl]);
-        setSelectedId(id);
+        setSelectedIds([id]);
         setSidebarTab(2); // Muda direto para propriedades
     };
 
@@ -304,7 +306,7 @@ const ConfigEtiquetas = () => {
                 zIndex: maxZ + 1
             };
             setElements(prev => [...prev, newEl]);
-            setSelectedId(newEl.id);
+            setSelectedIds([newEl.id]);
             setSidebarTab(2);
             enqueueSnackbar('Imagem adicionada ao crachá!', { variant: 'success' });
         };
@@ -317,10 +319,18 @@ const ConfigEtiquetas = () => {
 
     const deleteElement = useCallback((id) => {
         setElements(prev => prev.filter(el => el.id !== id));
-        setSelectedId(prev => (prev === id ? null : prev));
+        setSelectedIds(prev => prev.filter(item => item !== id));
     }, []);
 
-    // Atalhos de Teclado: Setas para ajuste milimétrico e Delete para excluir elemento selecionado
+    const deleteSelectedElements = useCallback(() => {
+        if (selectedIds.length === 0) return;
+        const qtd = selectedIds.length;
+        setElements(prev => prev.filter(el => !selectedIds.includes(el.id)));
+        setSelectedIds([]);
+        enqueueSnackbar(qtd > 1 ? `${qtd} elementos excluídos!` : 'Elemento excluído!', { variant: 'info', autoHideDuration: 1500 });
+    }, [selectedIds, enqueueSnackbar]);
+
+    // Atalhos de Teclado: Setas para ajuste milimétrico e Delete para excluir elementos selecionados (inclusive multi-seleção)
     useEffect(() => {
         const handleKeyDown = (e) => {
             // Ignora se o foco estiver digitando dentro de campos de formulário
@@ -329,39 +339,36 @@ const ConfigEtiquetas = () => {
                 return;
             }
 
-            if (!selectedId) return;
+            if (selectedIds.length === 0) return;
 
-            // Teclas Delete ou Backspace: exclui o elemento selecionado
+            // Teclas Delete ou Backspace: exclui todos os elementos selecionados
             if (e.key === 'Delete' || e.key === 'Backspace') {
                 e.preventDefault();
-                deleteElement(selectedId);
-                enqueueSnackbar('Elemento excluído!', { variant: 'info', autoHideDuration: 1500 });
+                deleteSelectedElements();
                 return;
             }
 
-            // Setas do teclado: movimentação milimétrica (1px normal, 10px com Shift)
+            // Setas do teclado: movimentação milimétrica em bloco (1px normal, 10px com Shift)
             if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
                 e.preventDefault();
                 const step = e.shiftKey ? 10 : 1;
+                let dx = 0;
+                let dy = 0;
+                if (e.key === 'ArrowUp') dy = -step;
+                if (e.key === 'ArrowDown') dy = step;
+                if (e.key === 'ArrowLeft') dx = -step;
+                if (e.key === 'ArrowRight') dx = step;
 
-                setElements(prevElements => {
-                    const el = prevElements.find(item => item.id === selectedId);
-                    if (!el) return prevElements;
-
-                    let dx = 0;
-                    let dy = 0;
-                    if (e.key === 'ArrowUp') dy = -step;
-                    if (e.key === 'ArrowDown') dy = step;
-                    if (e.key === 'ArrowLeft') dx = -step;
-                    if (e.key === 'ArrowRight') dx = step;
-
-                    const novoX = Math.round(Math.max(0, Math.min(canvasWidth - el.width, el.x + dx)));
-                    const novoY = Math.round(Math.max(0, Math.min(canvasHeight - el.height, el.y + dy)));
-
-                    return prevElements.map(item =>
-                        item.id === selectedId ? { ...item, x: novoX, y: novoY } : item
-                    );
-                });
+                setElements(prevElements =>
+                    prevElements.map(item => {
+                        if (selectedIds.includes(item.id)) {
+                            const novoX = Math.round(Math.max(0, Math.min(canvasWidth - item.width, item.x + dx)));
+                            const novoY = Math.round(Math.max(0, Math.min(canvasHeight - item.height, item.y + dy)));
+                            return { ...item, x: novoX, y: novoY };
+                        }
+                        return item;
+                    })
+                );
             }
         };
 
@@ -369,21 +376,36 @@ const ConfigEtiquetas = () => {
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [selectedId, canvasWidth, canvasHeight, deleteElement, enqueueSnackbar]);
+    }, [selectedIds, canvasWidth, canvasHeight, deleteSelectedElements]);
+
+    const duplicateSelectedElements = () => {
+        if (selectedIds.length === 0) return;
+        const maxZ = elements.reduce((max, el) => Math.max(max, el.zIndex || 1), 1);
+        const novos = [];
+        const novosIds = [];
+
+        elements.forEach((el, index) => {
+            if (selectedIds.includes(el.id)) {
+                const newId = `${Date.now()}_${index}`;
+                novos.push({
+                    ...el,
+                    id: newId,
+                    x: el.x + 15,
+                    y: el.y + 15,
+                    zIndex: maxZ + 1 + index
+                });
+                novosIds.push(newId);
+            }
+        });
+
+        setElements(prev => [...prev, ...novos]);
+        setSelectedIds(novosIds);
+        enqueueSnackbar(novos.length > 1 ? `${novos.length} elementos duplicados em grupo!` : 'Elemento duplicado!', { variant: 'info' });
+    };
 
     const duplicateElement = (elToDup) => {
         if (!elToDup) return;
-        const maxZ = elements.reduce((max, el) => Math.max(max, el.zIndex || 1), 1);
-        const newEl = {
-            ...elToDup,
-            id: Date.now().toString(),
-            x: elToDup.x + 15,
-            y: elToDup.y + 15,
-            zIndex: maxZ + 1
-        };
-        setElements(prev => [...prev, newEl]);
-        setSelectedId(newEl.id);
-        enqueueSnackbar('Elemento duplicado!', { variant: 'info' });
+        duplicateSelectedElements();
     };
 
     // Ordenação de Camadas (Z-Index)
@@ -397,39 +419,141 @@ const ConfigEtiquetas = () => {
         updateElement(id, { zIndex: Math.max(1, minZ - 1) });
     };
 
-    // Alinhamento Rápido estilo Canva
+    // Alinhamento Rápido estilo Canva (suporta elemento único ou grupo selecionado)
     const alinharElemento = (posicao) => {
-        if (!selectedId) return;
-        const el = elements.find(item => item.id === selectedId);
-        if (!el) return;
+        if (selectedIds.length === 0) return;
 
-        let novosDados = {};
-        if (posicao === 'centro-x') {
-            novosDados.x = Math.round((canvasWidth - el.width) / 2);
-            setSmartGuides({ vertical: canvasWidth / 2, horizontal: null });
-        } else if (posicao === 'centro-y') {
-            novosDados.y = Math.round((canvasHeight - el.height) / 2);
-            setSmartGuides({ vertical: null, horizontal: canvasHeight / 2 });
-        } else if (posicao === 'centro-total') {
-            novosDados.x = Math.round((canvasWidth - el.width) / 2);
-            novosDados.y = Math.round((canvasHeight - el.height) / 2);
-            setSmartGuides({ vertical: canvasWidth / 2, horizontal: canvasHeight / 2 });
-        } else if (posicao === 'esquerda') {
-            novosDados.x = 10;
-        } else if (posicao === 'direita') {
-            novosDados.x = Math.max(0, canvasWidth - el.width - 10);
-        } else if (posicao === 'topo') {
-            novosDados.y = 10;
-        } else if (posicao === 'base') {
-            novosDados.y = Math.max(0, canvasHeight - el.height - 10);
+        // Se for elemento único
+        if (selectedIds.length === 1) {
+            const el = elements.find(item => item.id === selectedId);
+            if (!el) return;
+
+            let novosDados = {};
+            if (posicao === 'centro-x') {
+                novosDados.x = Math.round((canvasWidth - el.width) / 2);
+                setSmartGuides({ vertical: canvasWidth / 2, horizontal: null });
+            } else if (posicao === 'centro-y') {
+                novosDados.y = Math.round((canvasHeight - el.height) / 2);
+                setSmartGuides({ vertical: null, horizontal: canvasHeight / 2 });
+            } else if (posicao === 'centro-total') {
+                novosDados.x = Math.round((canvasWidth - el.width) / 2);
+                novosDados.y = Math.round((canvasHeight - el.height) / 2);
+                setSmartGuides({ vertical: canvasWidth / 2, horizontal: canvasHeight / 2 });
+            } else if (posicao === 'esquerda') {
+                novosDados.x = 10;
+            } else if (posicao === 'direita') {
+                novosDados.x = Math.max(0, canvasWidth - el.width - 10);
+            } else if (posicao === 'topo') {
+                novosDados.y = 10;
+            } else if (posicao === 'base') {
+                novosDados.y = Math.max(0, canvasHeight - el.height - 10);
+            }
+
+            updateElement(selectedId, novosDados);
+            setTimeout(() => setSmartGuides({ vertical: null, horizontal: null }), 1200);
+            return;
         }
 
-        updateElement(selectedId, novosDados);
+        // Se for grupo de múltiplos elementos: move o bloco inteiro mantendo distância relativa
+        const grupo = elements.filter(el => selectedIds.includes(el.id));
+        if (grupo.length === 0) return;
+
+        const minX = Math.min(...grupo.map(e => e.x));
+        const maxX = Math.max(...grupo.map(e => e.x + e.width));
+        const minY = Math.min(...grupo.map(e => e.y));
+        const maxY = Math.max(...grupo.map(e => e.y + e.height));
+        const groupWidth = maxX - minX;
+        const groupHeight = maxY - minY;
+
+        let deltaX = 0;
+        let deltaY = 0;
+
+        if (posicao === 'centro-x') {
+            const targetX = Math.round((canvasWidth - groupWidth) / 2);
+            deltaX = targetX - minX;
+            setSmartGuides({ vertical: canvasWidth / 2, horizontal: null });
+        } else if (posicao === 'centro-y') {
+            const targetY = Math.round((canvasHeight - groupHeight) / 2);
+            deltaY = targetY - minY;
+            setSmartGuides({ vertical: null, horizontal: canvasHeight / 2 });
+        } else if (posicao === 'centro-total') {
+            const targetX = Math.round((canvasWidth - groupWidth) / 2);
+            const targetY = Math.round((canvasHeight - groupHeight) / 2);
+            deltaX = targetX - minX;
+            deltaY = targetY - minY;
+            setSmartGuides({ vertical: canvasWidth / 2, horizontal: canvasHeight / 2 });
+        } else if (posicao === 'esquerda') {
+            deltaX = 10 - minX;
+        } else if (posicao === 'direita') {
+            deltaX = (canvasWidth - groupWidth - 10) - minX;
+        } else if (posicao === 'topo') {
+            deltaY = 10 - minY;
+        } else if (posicao === 'base') {
+            deltaY = (canvasHeight - groupHeight - 10) - minY;
+        }
+
+        setElements(prev => prev.map(item => {
+            if (selectedIds.includes(item.id)) {
+                return {
+                    ...item,
+                    x: Math.round(item.x + deltaX),
+                    y: Math.round(item.y + deltaY)
+                };
+            }
+            return item;
+        }));
+
         setTimeout(() => setSmartGuides({ vertical: null, horizontal: null }), 1200);
     };
 
-    // Detecção de Guias Magnéticas Inteligentes (Canva Smart Guides)
+    // Detecção de Início de Arrasto com Suporte a Múltiplos Elementos Selecionados
+    const handleDragStart = (_e, d, el) => {
+        let currentSelected = selectedIds;
+        // Se o elemento arrastado não fazia parte da seleção atual, seleciona apenas ele
+        if (!selectedIds.includes(el.id)) {
+            currentSelected = [el.id];
+            setSelectedIds([el.id]);
+            setSidebarTab(2);
+        }
+
+        // Armazena posições iniciais de cada elemento do grupo
+        const initialMap = {};
+        elements.forEach(item => {
+            if (currentSelected.includes(item.id)) {
+                initialMap[item.id] = { x: item.x, y: item.y };
+            }
+        });
+
+        dragStartPositionsRef.current = {
+            leaderId: el.id,
+            startX: d.x,
+            startY: d.y,
+            initialPositions: initialMap
+        };
+    };
+
+    // Detecção de Guias Magnéticas e Arrasto em Bloco
     const handleDrag = (_e, d, el) => {
+        const dragData = dragStartPositionsRef.current;
+
+        // Se estiver arrastando múltiplos elementos, move todos juntos em tempo real
+        if (dragData && dragData.leaderId === el.id && Object.keys(dragData.initialPositions).length > 1) {
+            const dx = d.x - dragData.startX;
+            const dy = d.y - dragData.startY;
+            const initialMap = dragData.initialPositions;
+
+            setElements(prev => prev.map(item => {
+                if (initialMap[item.id] && item.id !== el.id) {
+                    return {
+                        ...item,
+                        x: Math.round(initialMap[item.id].x + dx),
+                        y: Math.round(initialMap[item.id].y + dy)
+                    };
+                }
+                return item;
+            }));
+        }
+
         const elCenterX = d.x + el.width / 2;
         const elCenterY = d.y + el.height / 2;
         const canvasCenterX = canvasWidth / 2;
@@ -443,7 +567,7 @@ const ConfigEtiquetas = () => {
         if (Math.abs(elCenterY - canvasCenterY) <= threshold) guideH = canvasCenterY;
 
         elements.forEach(other => {
-            if (other.id === el.id) return;
+            if (selectedIds.includes(other.id)) return;
             const otherCenterX = other.x + other.width / 2;
             const otherCenterY = other.y + other.height / 2;
 
@@ -458,15 +582,34 @@ const ConfigEtiquetas = () => {
 
     const handleDragStop = (_e, d, elId) => {
         setSmartGuides({ vertical: null, horizontal: null });
-        let finalX = d.x;
-        let finalY = d.y;
+        const dragData = dragStartPositionsRef.current;
+
+        let finalLeaderX = d.x;
+        let finalLeaderY = d.y;
 
         if (snapToGrid) {
-            finalX = Math.round(d.x / gridSize) * gridSize;
-            finalY = Math.round(d.y / gridSize) * gridSize;
+            finalLeaderX = Math.round(d.x / gridSize) * gridSize;
+            finalLeaderY = Math.round(d.y / gridSize) * gridSize;
         }
 
-        updateElement(elId, { x: finalX, y: finalY });
+        if (dragData && dragData.leaderId === elId && Object.keys(dragData.initialPositions).length > 1) {
+            const dx = finalLeaderX - dragData.startX;
+            const dy = finalLeaderY - dragData.startY;
+            const initialMap = dragData.initialPositions;
+
+            setElements(prev => prev.map(item => {
+                if (initialMap[item.id]) {
+                    const nx = Math.round(initialMap[item.id].x + dx);
+                    const ny = Math.round(initialMap[item.id].y + dy);
+                    return { ...item, x: nx, y: ny };
+                }
+                return item;
+            }));
+        } else {
+            updateElement(elId, { x: finalLeaderX, y: finalLeaderY });
+        }
+
+        dragStartPositionsRef.current = null;
     };
 
     const handleSave = async () => {
@@ -850,10 +993,107 @@ const ConfigEtiquetas = () => {
                             </Stack>
                         )}
 
-                        {/* ABA 2: PROPRIEDADES DA SELEÇÃO */}
+                        {/* ABA 2: PROPRIEDADES DA SELEÇÃO (SUPORTA ELEMENTO ÚNICO OU MULTI-SELEÇÃO) */}
                         {sidebarTab === 2 && (
                             <Box>
-                                {selectedElement ? (
+                                {selectedIds.length > 1 ? (
+                                    /* INTERFACE DE MULTI-SELEÇÃO (GRUPO DE ELEMENTOS) */
+                                    <Stack spacing={2}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                                            <Chip
+                                                size="small"
+                                                label={`${selectedIds.length} ITENS SELECIONADOS (GRUPO)`}
+                                                sx={{ bgcolor: 'rgba(0, 255, 136, 0.2)', color: '#00FF88', fontWeight: 700, fontSize: '0.7rem' }}
+                                            />
+                                            <Button
+                                                size="small"
+                                                variant="text"
+                                                onClick={() => setSelectedIds([])}
+                                                sx={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.6)', textTransform: 'none' }}
+                                            >
+                                                Desmarcar
+                                            </Button>
+                                        </Box>
+
+                                        {/* Barra de Instruções para Grupo */}
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1.2, bgcolor: 'rgba(0, 255, 136, 0.06)', borderRadius: 1.5, border: '1px dashed rgba(0, 255, 136, 0.3)' }}>
+                                            <KeyboardIcon sx={{ fontSize: 20, color: '#00FF88' }} />
+                                            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.7rem', lineHeight: 1.3 }}>
+                                                <strong>Arraste qualquer item selecionado</strong> ou use as <strong>Setas</strong> para mover todo o grupo junto mantendo posições, escala e ordem relativas!
+                                            </Typography>
+                                        </Box>
+
+                                        {/* Ações em Grupo: Duplicar e Excluir */}
+                                        <Stack direction="row" spacing={1}>
+                                            <Button
+                                                fullWidth
+                                                size="small"
+                                                variant="outlined"
+                                                startIcon={<DuplicateIcon />}
+                                                onClick={duplicateSelectedElements}
+                                                sx={{ ...botaoSecundario, fontSize: '0.72rem', py: 0.8 }}
+                                            >
+                                                Duplicar Grupo
+                                            </Button>
+                                            <Button
+                                                fullWidth
+                                                size="small"
+                                                variant="outlined"
+                                                color="error"
+                                                startIcon={<DeleteIcon />}
+                                                onClick={deleteSelectedElements}
+                                                sx={{ fontSize: '0.72rem', py: 0.8, color: '#FF3366', borderColor: 'rgba(255, 51, 102, 0.3)' }}
+                                            >
+                                                Excluir Grupo
+                                            </Button>
+                                        </Stack>
+
+                                        {/* Alinhamento do Bloco Inteiro */}
+                                        <Box sx={{ p: 1, bgcolor: 'rgba(0,0,0,0.3)', borderRadius: 1.5, border: '1px solid rgba(0, 255, 136, 0.2)' }}>
+                                            <Typography variant="caption" sx={{ color: '#00FF88', fontWeight: 700, display: 'block', mb: 0.8 }}>
+                                                Alinhamento do Bloco na Prancheta:
+                                            </Typography>
+                                            <Stack direction="row" spacing={0.5} flexWrap="wrap" justifyContent="space-between">
+                                                <Tooltip title="Alinhar Bloco à Esquerda">
+                                                    <IconButton size="small" onClick={() => alinharElemento('esquerda')} sx={{ color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                                        <AlignLeftIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                                <Tooltip title="Centro Horizontal do Bloco">
+                                                    <Button size="small" onClick={() => alinharElemento('centro-x')} sx={{ minWidth: 28, px: 0.8, fontSize: '0.68rem', color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                                        CX
+                                                    </Button>
+                                                </Tooltip>
+                                                <Tooltip title="Centro Total do Bloco">
+                                                    <IconButton size="small" onClick={() => alinharElemento('centro-total')} sx={{ color: '#00FF88', border: '1px solid rgba(0, 255, 136, 0.4)' }}>
+                                                        <CenterIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                                <Tooltip title="Centro Vertical do Bloco">
+                                                    <Button size="small" onClick={() => alinharElemento('centro-y')} sx={{ minWidth: 28, px: 0.8, fontSize: '0.68rem', color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                                        CY
+                                                    </Button>
+                                                </Tooltip>
+                                                <Tooltip title="Alinhar Bloco à Direita">
+                                                    <IconButton size="small" onClick={() => alinharElemento('direita')} sx={{ color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                                        <AlignRightIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                                <Tooltip title="Alinhar Bloco ao Topo">
+                                                    <IconButton size="small" onClick={() => alinharElemento('topo')} sx={{ color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                                        <AlignTopIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                                <Tooltip title="Alinhar Bloco à Base">
+                                                    <IconButton size="small" onClick={() => alinharElemento('base')} sx={{ color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                                        <AlignBottomIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            </Stack>
+                                        </Box>
+                                    </Stack>
+                                ) : selectedElement ? (
+                                    /* INTERFACE DE ELEMENTO ÚNICO */
                                     <Stack spacing={2}>
                                         {/* Cabeçalho do Elemento Selecionado */}
                                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
@@ -1244,15 +1484,39 @@ const ConfigEtiquetas = () => {
                         {/* ABA 3: LISTA DE CAMADAS (LAYERS) */}
                         {sidebarTab === 3 && (
                             <Stack spacing={1}>
-                                <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, textTransform: 'uppercase' }}>
-                                    Camadas na Prancheta ({elements.length})
-                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                                    <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, textTransform: 'uppercase' }}>
+                                        Camadas na Prancheta ({elements.length})
+                                    </Typography>
+                                    <Stack direction="row" spacing={0.5}>
+                                        <Button
+                                            size="small"
+                                            onClick={() => setSelectedIds(elements.map(e => e.id))}
+                                            sx={{ fontSize: '0.65rem', py: 0.1, px: 0.8, color: '#00FF88', textTransform: 'none' }}
+                                        >
+                                            Todas
+                                        </Button>
+                                        {selectedIds.length > 0 && (
+                                            <Button
+                                                size="small"
+                                                onClick={() => setSelectedIds([])}
+                                                sx={{ fontSize: '0.65rem', py: 0.1, px: 0.8, color: 'rgba(255,255,255,0.5)', textTransform: 'none' }}
+                                            >
+                                                Limpar
+                                            </Button>
+                                        )}
+                                    </Stack>
+                                </Box>
 
                                 {elementosOrdenados.map((el) => (
                                     <Box
                                         key={el.id}
-                                        onClick={() => {
-                                            setSelectedId(el.id);
+                                        onClick={(e) => {
+                                            if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                                                setSelectedIds(prev => prev.includes(el.id) ? prev.filter(i => i !== el.id) : [...prev, el.id]);
+                                            } else {
+                                                setSelectedIds([el.id]);
+                                            }
                                             setSidebarTab(2);
                                         }}
                                         sx={{
@@ -1261,8 +1525,12 @@ const ConfigEtiquetas = () => {
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'space-between',
-                                            bgcolor: selectedId === el.id ? 'rgba(0, 212, 255, 0.15)' : 'rgba(0,0,0,0.2)',
-                                            border: selectedId === el.id ? '1px solid #00D4FF' : '1px solid rgba(255,255,255,0.06)',
+                                            bgcolor: selectedIds.includes(el.id)
+                                                ? (selectedIds.length > 1 ? 'rgba(0, 255, 136, 0.2)' : 'rgba(0, 212, 255, 0.15)')
+                                                : 'rgba(0,0,0,0.2)',
+                                            border: selectedIds.includes(el.id)
+                                                ? (selectedIds.length > 1 ? '1px solid #00FF88' : '1px solid #00D4FF')
+                                                : '1px solid rgba(255,255,255,0.06)',
                                             cursor: 'pointer',
                                             '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.1)' }
                                         }}
@@ -1277,7 +1545,7 @@ const ConfigEtiquetas = () => {
                                             {el.type === 'circle' && <CircleIcon sx={{ fontSize: 16, color: '#00D4FF' }} />}
                                             {el.type === 'line' && <LineIcon sx={{ fontSize: 16, color: '#00D4FF' }} />}
 
-                                            <Typography variant="caption" sx={{ color: '#FFFFFF', fontWeight: selectedId === el.id ? 700 : 400 }}>
+                                            <Typography variant="caption" sx={{ color: '#FFFFFF', fontWeight: selectedIds.includes(el.id) ? 700 : 400 }}>
                                                 {el.content ? String(el.content).slice(0, 20) : el.type}
                                             </Typography>
                                         </Stack>
@@ -1425,15 +1693,19 @@ const ConfigEtiquetas = () => {
                                 transformOrigin: 'center center',
                                 transition: 'transform 0.15s ease'
                             }}>
-                                <Paper elevation={16} sx={{
-                                    width: canvasWidth,
-                                    height: canvasHeight,
-                                    backgroundColor: '#FFFFFF',
-                                    position: 'relative',
-                                    overflow: 'hidden',
-                                    borderRadius: config.layout?.includes('cr80') ? '12px' : '4px',
-                                    boxShadow: '0 12px 40px rgba(0,0,0,0.8), 0 0 20px rgba(0, 212, 255, 0.2)'
-                                }}>
+                                <Paper
+                                    elevation={16}
+                                    onClick={() => setSelectedIds([])}
+                                    sx={{
+                                        width: canvasWidth,
+                                        height: canvasHeight,
+                                        backgroundColor: '#FFFFFF',
+                                        position: 'relative',
+                                        overflow: 'hidden',
+                                        borderRadius: config.layout?.includes('cr80') ? '12px' : '4px',
+                                        boxShadow: '0 12px 40px rgba(0,0,0,0.8), 0 0 20px rgba(0, 212, 255, 0.2)'
+                                    }}
+                                >
                                     {/* Arte de Fundo / Gabarito de Referência Visual (Situação C) */}
                                     {config.background_url && !ocultarGabarito && (
                                         <Box sx={{
@@ -1499,39 +1771,55 @@ const ConfigEtiquetas = () => {
                                     )}
 
                                     {/* Renderização dos Elementos na Prancheta */}
-                                    {elements.map(el => (
-                                        <Rnd
-                                            key={el.id}
-                                            scale={zoom}
-                                            size={{ width: el.width, height: el.height }}
-                                            position={{ x: el.x, y: el.y }}
-                                            lockAspectRatio={Boolean(el.lockAspectRatio)}
-                                            onDrag={(_e, d) => handleDrag(_e, d, el)}
-                                            onDragStop={(_e, d) => handleDragStop(_e, d, el.id)}
-                                            onResizeStop={(_e, _direction, ref, _delta, position) => {
-                                                updateElement(el.id, {
-                                                    width: parseInt(ref.style.width, 10),
-                                                    height: parseInt(ref.style.height, 10),
-                                                    ...position
-                                                });
-                                            }}
-                                            bounds="parent"
-                                            onClick={() => {
-                                                setSelectedId(el.id);
-                                                setSidebarTab(2); // Muda para aba de propriedades
-                                            }}
-                                            style={{
-                                                border: selectedId === el.id ? '2px dashed #00D4FF' : '1px dashed rgba(0,0,0,0.15)',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                overflow: 'hidden',
-                                                cursor: 'move',
-                                                borderRadius: el.borderRadius ? `${el.borderRadius}px` : 0,
-                                                opacity: el.opacity != null ? el.opacity : 1,
-                                                zIndex: selectedId === el.id ? 100 : (el.zIndex || 3)
-                                            }}
-                                        >
+                                    {elements.map(el => {
+                                        const isSel = selectedIds.includes(el.id);
+                                        const isMulti = selectedIds.length > 1;
+                                        return (
+                                            <Rnd
+                                                key={el.id}
+                                                scale={zoom}
+                                                size={{ width: el.width, height: el.height }}
+                                                position={{ x: el.x, y: el.y }}
+                                                lockAspectRatio={Boolean(el.lockAspectRatio)}
+                                                onDragStart={(e, d) => handleDragStart(e, d, el)}
+                                                onDrag={(_e, d) => handleDrag(_e, d, el)}
+                                                onDragStop={(_e, d) => handleDragStop(_e, d, el.id)}
+                                                onResizeStop={(_e, _direction, ref, _delta, position) => {
+                                                    updateElement(el.id, {
+                                                        width: parseInt(ref.style.width, 10),
+                                                        height: parseInt(ref.style.height, 10),
+                                                        ...position
+                                                    });
+                                                }}
+                                                bounds="parent"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                                                        setSelectedIds(prev => prev.includes(el.id) ? prev.filter(i => i !== el.id) : [...prev, el.id]);
+                                                    } else {
+                                                        if (!selectedIds.includes(el.id) || selectedIds.length > 1) {
+                                                            setSelectedIds([el.id]);
+                                                        }
+                                                    }
+                                                    setSidebarTab(2); // Muda para aba de propriedades
+                                                }}
+                                                style={{
+                                                    border: isSel
+                                                        ? (isMulti ? '2px dashed #00FF88' : '2px dashed #00D4FF')
+                                                        : '1px dashed rgba(0,0,0,0.15)',
+                                                    boxShadow: isSel
+                                                        ? (isMulti ? '0 0 10px rgba(0, 255, 136, 0.45)' : '0 0 10px rgba(0, 212, 255, 0.35)')
+                                                        : 'none',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    overflow: 'hidden',
+                                                    cursor: 'move',
+                                                    borderRadius: el.borderRadius ? `${el.borderRadius}px` : 0,
+                                                    opacity: el.opacity != null ? el.opacity : 1,
+                                                    zIndex: isSel ? 100 : (el.zIndex || 3)
+                                                }}
+                                            >
                                             {/* RENDERIZAÇÃO: TEXTO */}
                                             {el.type === 'text' && (
                                                 <Typography variant="body1" sx={{
@@ -1638,8 +1926,9 @@ const ConfigEtiquetas = () => {
                                                     }}
                                                 />
                                             )}
-                                        </Rnd>
-                                    ))}
+                                            </Rnd>
+                                        );
+                                    })}
                                 </Paper>
                             </Box>
                         </Box>

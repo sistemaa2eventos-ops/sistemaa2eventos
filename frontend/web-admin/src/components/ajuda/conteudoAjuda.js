@@ -302,7 +302,8 @@ const AJUDAS = {
             'No cadastro do evento, ative "Habilitar impressão de etiquetas" para imprimir direto no credenciamento.'
         ],
         dicas: [
-            'Atalhos de teclado: use as setas para mover o elemento selecionado com precisão de 1 px (Shift + setas move 10 px) e Delete ou Backspace para excluir.',
+            'Multi-seleção: segure Shift ou Ctrl e clique nos elementos (ou na aba Camadas) para selecionar vários e arrastá-los juntos sem perder a escala e o alinhamento.',
+            'Atalhos de teclado: use as setas para mover os elementos selecionados com precisão de 1 px (Shift + setas move 10 px) e Delete ou Backspace para excluir.',
             'Para impressão instantânea sem diálogo do Windows na recepção, inicie o Chrome com o parâmetro --kiosk-printing.'
         ]
     },
