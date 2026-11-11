@@ -287,15 +287,21 @@ const AJUDAS = {
 
     '/config/etiquetas': {
         titulo: 'Etiquetas e crachás',
-        objetivo: 'Desenhar a etiqueta que sai na impressora do computador do operador no check-in.',
+        objetivo: 'Editor visual completo para crachás PVC, credenciais e etiquetas térmicas com grade inteligente e guias magnéticas.',
         passos: [
-            'Defina "Largura (mm)" e "Altura (mm)" do papel (o "Modelo" não muda o tamanho sozinho).',
-            'Adicione "Texto / variável" e "QR code" e arraste no desenho.',
-            '"Salvar layout do evento" e depois "Imprimir teste".',
-            'No cadastro do evento, ligue "Habilitar impressão de etiquetas".'
+            'Aba "Formato": selecione o padrão da impressora ou informe as dimensões (mm); envie a arte de fundo do crachá.',
+            'Modo Gabarito (crachás pré-impressos): ative "Modo Gabarito (Não Imprimir)" para usar a arte do cliente como orientação na tela sem enviá-la para a impressora.',
+            'Aba "Elementos": adicione textos/variáveis, QR Code, Código de Barras 1D vetorial, foto, logos ou formas geométricas.',
+            'Aba "Propriedades": use os botões de alinhamento rápido (Centro X, Centro Y, Centro Total, Bordas) e trave a proporção real para fotos e QR codes.',
+            'Aba "Camadas": ordene o nível de profundidade (Z-Index) trazendo elementos para frente ou enviando para trás.',
+            'Use "Imprimir Teste" para validar a saída física e "Salvar Layout" para fixar o desenho no evento.'
         ],
-        atencao: ['Variáveis: {nome_pessoa}, {nome_completo}, {empresa}, {funcao}, {cpf}, {pulseira}, {evento}, {data}.'],
-        dicas: ['Para não abrir a janela de impressão a cada pessoa, abra o navegador da recepção com a opção --kiosk-printing.']
+        atencao: [
+            'Variáveis dinâmicas aceitas: {nome_pessoa}, {nome_completo}, {empresa}, {funcao}, {cpf}, {pulseira}, {evento}, {data}.',
+            'No Modo Gabarito, a arte fica com opacidade regulável na tela mas é excluída automaticamente da impressão.',
+            'No cadastro do evento, ative "Habilitar impressão de etiquetas" para imprimir direto no credenciamento.'
+        ],
+        dicas: ['Para impressão instantânea sem diálogo do Windows na recepção, inicie o Chrome com o parâmetro --kiosk-printing.']
     },
     '/config/veiculos': {
         titulo: 'Veículos e estacionamento',

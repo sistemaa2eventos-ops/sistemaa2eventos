@@ -448,7 +448,7 @@ class ConfigController {
             const evento_id = req.event?.id || req.query.evento_id;
             const { data: pessoa, error } = await supabase
                 .from('pessoas')
-                .select('id, nome_completo, nome_credencial, cpf, funcao, qr_code, numero_pulseira, empresas(nome), eventos(nome)')
+                .select('id, nome_completo, nome_credencial, cpf, funcao, qr_code, numero_pulseira, foto_url, empresas(nome), eventos(nome)')
                 .eq('id', req.params.pessoaId)
                 .eq('evento_id', evento_id)
                 .maybeSingle();
@@ -472,7 +472,8 @@ class ConfigController {
                     evento: pessoa.eventos?.nome || '',
                     data: new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
                     qr_code: pessoa.qr_code || '',
-                    qr_imagem
+                    qr_imagem,
+                    foto_url: pessoa.foto_url || null
                 }
             });
         } catch (error) {

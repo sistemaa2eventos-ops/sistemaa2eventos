@@ -9,7 +9,7 @@ import {
     Style as StyleIcon
 } from '@mui/icons-material';
 import NeonButton from '../common/NeonButton';
-import { carregarConfigEtiqueta, montarHtmlEtiqueta, imprimirHtml, preencher } from '../../services/etiquetaService';
+import { carregarConfigEtiqueta, montarHtmlEtiqueta, imprimirHtml, preencher, gerarBarcodeSvg } from '../../services/etiquetaService';
 import api from '../../services/api';
 
 const ESCALA_PREVIEW = 2.8; // Fator de escala para preview na tela (mm -> px)
@@ -33,6 +33,7 @@ export const PreviewEtiquetaDialog = ({
         if (!open || (!pessoaId && !dadosIniciais) || !eventoId) return;
 
         let ativo = true;
+        let timerPrint = null;
         const carregar = async () => {
             try {
                 setLoading(true);
@@ -57,7 +58,7 @@ export const PreviewEtiquetaDialog = ({
 
                 // Se autoPrint for true, já dispara logo após carregar
                 if (autoPrint && dados && cfg?.layout) {
-                    setTimeout(() => {
+                    timerPrint = setTimeout(() => {
                         handleImprimir(cfg.layout, dados);
                     }, 500);
                 }
@@ -69,7 +70,10 @@ export const PreviewEtiquetaDialog = ({
         };
 
         carregar();
-        return () => { ativo = false; };
+        return () => {
+            ativo = false;
+            if (timerPrint) clearTimeout(timerPrint);
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, pessoaId, eventoId, dadosIniciais]);
 
@@ -158,18 +162,22 @@ export const PreviewEtiquetaDialog = ({
                                 minWidth: larguraPx,
                                 minHeight: alturaPx,
                                 bgcolor: '#FFFFFF',
+                                backgroundImage: (!papel.fundo_como_referencia && !papel.modo_referencia && papel.imprimir_fundo !== false && (papel.background_url || papel.bg_url)) ? `url('${papel.background_url || papel.bg_url}')` : 'none',
+                                backgroundSize: 'cover',
+                                backgroundPosition: 'center',
                                 position: 'relative',
                                 overflow: 'hidden',
                                 borderRadius: '4px',
                                 border: '1px solid #D1D5DB'
                             }}
                         >
-                            {elementos.map(el => {
+                            {elementos.map((el, idx) => {
                                 const left = (Number(el.x) / 3) * ESCALA_PREVIEW;
                                 const top = (Number(el.y) / 3) * ESCALA_PREVIEW;
                                 const width = (Number(el.width) / 3) * ESCALA_PREVIEW;
                                 const height = (Number(el.height) / 3) * ESCALA_PREVIEW;
                                 const fontSize = ((Number(el.fontSize) || 14) / 3) * ESCALA_PREVIEW;
+                                const zIndex = el.zIndex != null ? el.zIndex : (idx + 1);
 
                                 if (el.type === 'qrcode') {
                                     return (
@@ -177,7 +185,7 @@ export const PreviewEtiquetaDialog = ({
                                             key={el.id}
                                             sx={{
                                                 position: 'absolute',
-                                                left, top, width, height,
+                                                left, top, width, height, zIndex,
                                                 display: 'flex', alignItems: 'center', justifyContent: 'center'
                                             }}
                                         >
@@ -197,17 +205,121 @@ export const PreviewEtiquetaDialog = ({
                                     );
                                 }
 
+                                if (el.type === 'barcode') {
+                                    const cod = preencher(el.content || '{pulseira}', dadosPessoa) || '123456';
+                                    const svg = gerarBarcodeSvg(cod, el.exibirTexto !== false);
+                                    return (
+                                        <Box
+                                            key={el.id}
+                                            sx={{
+                                                position: 'absolute',
+                                                left, top, width, height, zIndex,
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                            }}
+                                            dangerouslySetInnerHTML={{ __html: svg }}
+                                        />
+                                    );
+                                }
+
+                                if (el.type === 'foto') {
+                                    const fotoUrl = dadosPessoa?.foto_url || dadosPessoa?.foto || null;
+                                    return (
+                                        <Box
+                                            key={el.id}
+                                            sx={{
+                                                position: 'absolute',
+                                                left, top, width, height, zIndex,
+                                                backgroundImage: fotoUrl ? `url('${fotoUrl}')` : 'none',
+                                                backgroundColor: fotoUrl ? 'transparent' : 'rgba(0,0,0,0.06)',
+                                                backgroundSize: 'cover',
+                                                backgroundPosition: 'center',
+                                                border: `${el.borderWidth || 1}px solid ${el.borderColor || '#00D4FF'}`,
+                                                borderRadius: el.borderRadius ? `${el.borderRadius}px` : 0,
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                fontSize: 10, color: '#777'
+                                            }}
+                                        >
+                                            {!fotoUrl && 'Foto'}
+                                        </Box>
+                                    );
+                                }
+
+                                if (el.type === 'image') {
+                                    const imgSrc = el.content || el.url;
+                                    return imgSrc ? (
+                                        <Box
+                                            key={el.id}
+                                            component="img"
+                                            src={imgSrc}
+                                            alt="Elemento"
+                                            sx={{
+                                                position: 'absolute',
+                                                left, top, width, height, zIndex,
+                                                objectFit: 'contain',
+                                                opacity: el.opacity != null ? el.opacity : 1
+                                            }}
+                                        />
+                                    ) : null;
+                                }
+
+                                if (el.type === 'circle') {
+                                    return (
+                                        <Box
+                                            key={el.id}
+                                            sx={{
+                                                position: 'absolute',
+                                                left, top, width, height, zIndex,
+                                                bgcolor: el.backgroundColor || '#00D4FF',
+                                                borderRadius: '50%',
+                                                border: el.borderColor ? `${el.borderWidth || 1}px solid ${el.borderColor}` : 'none',
+                                                opacity: el.opacity != null ? el.opacity : 1
+                                            }}
+                                        />
+                                    );
+                                }
+
+                                if (el.type === 'line') {
+                                    return (
+                                        <Box
+                                            key={el.id}
+                                            sx={{
+                                                position: 'absolute',
+                                                left, top, width, height, zIndex,
+                                                borderTop: `${el.borderWidth || 2}px solid ${el.borderColor || el.color || '#000000'}`,
+                                                opacity: el.opacity != null ? el.opacity : 1
+                                            }}
+                                        />
+                                    );
+                                }
+
+                                if (el.type === 'shape') {
+                                    return (
+                                        <Box
+                                            key={el.id}
+                                            sx={{
+                                                position: 'absolute',
+                                                left, top, width, height, zIndex,
+                                                bgcolor: el.backgroundColor || '#00D4FF',
+                                                borderRadius: el.borderRadius ? `${el.borderRadius}px` : 0,
+                                                border: el.borderColor ? `${el.borderWidth || 1}px solid ${el.borderColor}` : 'none',
+                                                opacity: el.opacity != null ? el.opacity : 1
+                                            }}
+                                        />
+                                    );
+                                }
+
                                 const textoFormatado = preencher(el.content, dadosPessoa);
                                 return (
                                     <Box
                                         key={el.id}
                                         sx={{
                                             position: 'absolute',
-                                            left, top, width, height,
+                                            left, top, width, height, zIndex,
                                             overflow: 'hidden',
-                                            color: '#000000',
+                                            color: el.color || '#000000',
                                             fontWeight: el.fontWeight === 'bold' ? 700 : 400,
                                             fontSize: `${fontSize}px`,
+                                            textAlign: el.textAlign || 'left',
                                             lineHeight: 1.15,
                                             whiteSpace: 'nowrap',
                                             textOverflow: 'ellipsis'

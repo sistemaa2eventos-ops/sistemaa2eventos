@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
     Box, Typography, Grid, TextField, IconButton, Paper, Stack,
     Button, Tooltip, MenuItem, FormControl, InputLabel, Select,
-    Divider, Slider, Switch, FormControlLabel
+    Divider, Slider, Switch, FormControlLabel, Tabs, Tab,
+    Chip, Alert
 } from '@mui/material';
 import {
     Save as SaveIcon,
@@ -20,7 +21,23 @@ import {
     GridOff as GridOffIcon,
     Lock as LockIcon,
     LockOpen as LockOpenIcon,
-    CenterFocusStrong as CenterIcon
+    CenterFocusStrong as CenterIcon,
+    QrCodeScanner as BarcodeIcon,
+    RadioButtonUnchecked as CircleIcon,
+    HorizontalRule as LineIcon,
+    ContentCopy as DuplicateIcon,
+    VerticalAlignTop as AlignTopIcon,
+    VerticalAlignBottom as AlignBottomIcon,
+    AlignHorizontalLeft as AlignLeftIcon,
+    AlignHorizontalRight as AlignRightIcon,
+    Layers as LayersIcon,
+    Visibility as VisibilityIcon,
+    VisibilityOff as VisibilityOffIcon,
+    ZoomIn as ZoomInIcon,
+    ZoomOut as ZoomOutIcon,
+    RestartAlt as ResetZoomIcon,
+    Tune as TuneIcon,
+    AddCircleOutline as AddElementIcon
 } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import { Rnd } from 'react-rnd';
@@ -29,7 +46,7 @@ import api from '../../services/api';
 import GlassCard from '../../components/common/GlassCard';
 import NeonButton from '../../components/common/NeonButton';
 import PageHeader from '../../components/common/PageHeader';
-import { montarHtmlEtiqueta, imprimirHtml, limparCacheEtiqueta } from '../../services/etiquetaService';
+import { montarHtmlEtiqueta, imprimirHtml, limparCacheEtiqueta, gerarBarcodeSvg } from '../../services/etiquetaService';
 import { botaoSecundario } from '../../styles/tokens';
 
 const DADOS_EXEMPLO = {
@@ -57,24 +74,42 @@ const PRESETS = [
     { label: 'Customizado...', width: 100, height: 150, value: 'custom' }
 ];
 
+const CORES_PALETA = [
+    { label: 'Preto', hex: '#000000' },
+    { label: 'Branco', hex: '#FFFFFF' },
+    { label: 'Ciano Neon', hex: '#00D4FF' },
+    { label: 'Verde Neon', hex: '#00FF88' },
+    { label: 'Rosa Neon', hex: '#FF0077' },
+    { label: 'Amarelo Ouro', hex: '#FFD700' },
+    { label: 'Azul Escuro', hex: '#0A1628' },
+    { label: 'Cinza', hex: '#666666' }
+];
+
 const ConfigEtiquetas = () => {
     const [searchParams] = useSearchParams();
     const eventoId = searchParams.get('evento_id') || localStorage.getItem('active_evento_id');
     const fileBgInputRef = useRef(null);
     const fileElementInputRef = useRef(null);
 
+    // Aba ativa da coluna lateral de ferramentas: 0: Formato & Arte, 1: Elementos, 2: Propriedades, 3: Camadas
+    const [sidebarTab, setSidebarTab] = useState(0);
+
     const [config, setConfig] = useState({
         layout: 'zebra_tlp2844',
         width: 100,
         height: 150,
-        background_url: ''
+        background_url: '',
+        fundo_como_referencia: false, // Situação C: arte de guia visual (não imprime)
+        imprimir_fundo: true,          // Se falso, não imprime a arte
+        opacidade_referencia: 0.5,     // Opacidade do gabarito visual
+        travar_referencia: true
     });
 
     const [elements, setElements] = useState([
-        { id: '1', type: 'text', content: '{nome_pessoa}', x: 10, y: 15, width: 220, height: 35, fontSize: 18, fontWeight: 'bold', color: '#000000', textAlign: 'center' },
-        { id: '2', type: 'text', content: '{funcao}', x: 10, y: 55, width: 220, height: 25, fontSize: 14, fontWeight: 'normal', color: '#555555', textAlign: 'center' },
-        { id: '3', type: 'qrcode', content: '{qr_code}', x: 75, y: 95, width: 90, height: 90 },
-        { id: '4', type: 'foto', content: '{foto_url}', x: 80, y: 200, width: 80, height: 80, borderRadius: 8, borderColor: '#00D4FF', borderWidth: 2, lockAspectRatio: true }
+        { id: '1', type: 'text', content: '{nome_pessoa}', x: 10, y: 15, width: 220, height: 35, fontSize: 18, fontWeight: 'bold', color: '#000000', textAlign: 'center', zIndex: 10 },
+        { id: '2', type: 'text', content: '{funcao}', x: 10, y: 55, width: 220, height: 25, fontSize: 14, fontWeight: 'normal', color: '#555555', textAlign: 'center', zIndex: 9 },
+        { id: '3', type: 'qrcode', content: '{qr_code}', x: 75, y: 95, width: 90, height: 90, lockAspectRatio: true, zIndex: 8 },
+        { id: '4', type: 'foto', content: '{foto_url}', x: 80, y: 200, width: 80, height: 80, borderRadius: 8, borderColor: '#00D4FF', borderWidth: 2, lockAspectRatio: true, zIndex: 7 }
     ]);
 
     const [selectedId, setSelectedId] = useState(null);
@@ -82,15 +117,17 @@ const ConfigEtiquetas = () => {
     const [saving, setSaving] = useState(false);
     const { enqueueSnackbar } = useSnackbar();
 
-    // Recursos de Design estilo Canva / Figma
+    // Recursos estilo Canva / Figma
     const [showGrid, setShowGrid] = useState(true);
     const [gridSize, setGridSize] = useState(10); // pixels
     const [snapToGrid, setSnapToGrid] = useState(true);
     const [smartGuides, setSmartGuides] = useState({ vertical: null, horizontal: null });
+    const [zoom, setZoom] = useState(1.0); // 0.6 a 1.5
+    const [ocultarGabarito, setOcultarGabarito] = useState(false);
 
-    const scaleFactor = 3;
-    const canvasWidth = config.width * scaleFactor;
-    const canvasHeight = config.height * scaleFactor;
+    const scaleFactor = 3; // 1mm = 3px
+    const canvasWidth = (Number(config.width) || 100) * scaleFactor;
+    const canvasHeight = (Number(config.height) || 150) * scaleFactor;
 
     useEffect(() => {
         if (!eventoId) return;
@@ -100,7 +137,10 @@ const ConfigEtiquetas = () => {
                 const response = await api.get('/config/etiquetas', { params: { evento_id: eventoId } });
                 if (response.data.data) {
                     if (response.data.data.papel_config) {
-                        setConfig(response.data.data.papel_config);
+                        setConfig(prev => ({
+                            ...prev,
+                            ...response.data.data.papel_config
+                        }));
                     }
                     if (response.data.data.elementos && Array.isArray(response.data.data.elementos)) {
                         setElements(response.data.data.elementos);
@@ -140,7 +180,7 @@ const ConfigEtiquetas = () => {
         reader.onload = (event) => {
             const base64 = event.target.result;
             setConfig(prev => ({ ...prev, background_url: base64 }));
-            enqueueSnackbar('Arte de fundo carregada com sucesso!', { variant: 'success' });
+            enqueueSnackbar('Arte de crachá carregada!', { variant: 'success' });
         };
         reader.readAsDataURL(file);
     };
@@ -149,8 +189,10 @@ const ConfigEtiquetas = () => {
         setConfig(prev => ({ ...prev, background_url: '' }));
     };
 
+    // Adiciona novos elementos ao Canvas
     const addElement = (type) => {
         const id = Date.now().toString();
+        const maxZ = elements.reduce((max, el) => Math.max(max, el.zIndex || 1), 1);
         let newEl = {
             id,
             type,
@@ -158,7 +200,8 @@ const ConfigEtiquetas = () => {
             y: 20,
             width: 150,
             height: 35,
-            lockAspectRatio: false
+            lockAspectRatio: false,
+            zIndex: maxZ + 1
         };
 
         if (type === 'text') {
@@ -178,13 +221,22 @@ const ConfigEtiquetas = () => {
                 height: 80,
                 lockAspectRatio: true
             };
+        } else if (type === 'barcode') {
+            newEl = {
+                ...newEl,
+                content: '{pulseira}',
+                width: 160,
+                height: 55,
+                exibirTexto: true,
+                lockAspectRatio: false
+            };
         } else if (type === 'foto') {
             newEl = {
                 ...newEl,
                 content: '{foto_url}',
-                width: 75,
-                height: 75,
-                borderRadius: 6,
+                width: 80,
+                height: 80,
+                borderRadius: 8,
                 borderColor: '#00D4FF',
                 borderWidth: 2,
                 lockAspectRatio: true
@@ -193,10 +245,32 @@ const ConfigEtiquetas = () => {
             newEl = {
                 ...newEl,
                 width: 200,
-                height: 25,
+                height: 30,
                 backgroundColor: '#00D4FF',
                 borderRadius: 4,
                 opacity: 1
+            };
+        } else if (type === 'circle') {
+            newEl = {
+                ...newEl,
+                width: 60,
+                height: 60,
+                backgroundColor: '#00FF88',
+                borderRadius: 50,
+                borderColor: '#000000',
+                borderWidth: 0,
+                opacity: 1,
+                lockAspectRatio: true
+            };
+        } else if (type === 'line') {
+            newEl = {
+                ...newEl,
+                width: 200,
+                height: 4,
+                borderColor: '#000000',
+                borderWidth: 2,
+                opacity: 1,
+                lockAspectRatio: false
             };
         } else if (type === 'image') {
             fileElementInputRef.current?.click();
@@ -205,6 +279,7 @@ const ConfigEtiquetas = () => {
 
         setElements(prev => [...prev, newEl]);
         setSelectedId(id);
+        setSidebarTab(2); // Muda direto para propriedades
     };
 
     const handleUploadElementImage = (e) => {
@@ -213,20 +288,23 @@ const ConfigEtiquetas = () => {
         const reader = new FileReader();
         reader.onload = (event) => {
             const base64 = event.target.result;
+            const maxZ = elements.reduce((max, el) => Math.max(max, el.zIndex || 1), 1);
             const newEl = {
                 id: Date.now().toString(),
                 type: 'image',
                 content: base64,
                 x: 20,
                 y: 20,
-                width: 80,
-                height: 80,
+                width: 90,
+                height: 90,
                 borderRadius: 0,
                 opacity: 1,
-                lockAspectRatio: true
+                lockAspectRatio: true,
+                zIndex: maxZ + 1
             };
             setElements(prev => [...prev, newEl]);
             setSelectedId(newEl.id);
+            setSidebarTab(2);
             enqueueSnackbar('Imagem adicionada ao crachá!', { variant: 'success' });
         };
         reader.readAsDataURL(file);
@@ -241,68 +319,86 @@ const ConfigEtiquetas = () => {
         if (selectedId === id) setSelectedId(null);
     };
 
-    // Alinhamento Inteligente ao Centro
-    const centralizarElemento = (eixo = 'horizontal') => {
+    const duplicateElement = (elToDup) => {
+        if (!elToDup) return;
+        const maxZ = elements.reduce((max, el) => Math.max(max, el.zIndex || 1), 1);
+        const newEl = {
+            ...elToDup,
+            id: Date.now().toString(),
+            x: elToDup.x + 15,
+            y: elToDup.y + 15,
+            zIndex: maxZ + 1
+        };
+        setElements(prev => [...prev, newEl]);
+        setSelectedId(newEl.id);
+        enqueueSnackbar('Elemento duplicado!', { variant: 'info' });
+    };
+
+    // Ordenação de Camadas (Z-Index)
+    const bringToFront = (id) => {
+        const maxZ = elements.reduce((max, el) => Math.max(max, el.zIndex || 1), 1);
+        updateElement(id, { zIndex: maxZ + 1 });
+    };
+
+    const sendToBack = (id) => {
+        const minZ = elements.reduce((min, el) => Math.min(min, el.zIndex || 1), 1);
+        updateElement(id, { zIndex: Math.max(1, minZ - 1) });
+    };
+
+    // Alinhamento Rápido estilo Canva
+    const alinharElemento = (posicao) => {
         if (!selectedId) return;
         const el = elements.find(item => item.id === selectedId);
         if (!el) return;
 
-        if (eixo === 'horizontal') {
-            const newX = Math.round((canvasWidth - el.width) / 2);
-            updateElement(selectedId, { x: newX });
+        let novosDados = {};
+        if (posicao === 'centro-x') {
+            novosDados.x = Math.round((canvasWidth - el.width) / 2);
             setSmartGuides({ vertical: canvasWidth / 2, horizontal: null });
-            setTimeout(() => setSmartGuides({ vertical: null, horizontal: null }), 1200);
-        } else if (eixo === 'vertical') {
-            const newY = Math.round((canvasHeight - el.height) / 2);
-            updateElement(selectedId, { y: newY });
+        } else if (posicao === 'centro-y') {
+            novosDados.y = Math.round((canvasHeight - el.height) / 2);
             setSmartGuides({ vertical: null, horizontal: canvasHeight / 2 });
-            setTimeout(() => setSmartGuides({ vertical: null, horizontal: null }), 1200);
-        } else if (eixo === 'ambos') {
-            const newX = Math.round((canvasWidth - el.width) / 2);
-            const newY = Math.round((canvasHeight - el.height) / 2);
-            updateElement(selectedId, { x: newX, y: newY });
+        } else if (posicao === 'centro-total') {
+            novosDados.x = Math.round((canvasWidth - el.width) / 2);
+            novosDados.y = Math.round((canvasHeight - el.height) / 2);
             setSmartGuides({ vertical: canvasWidth / 2, horizontal: canvasHeight / 2 });
-            setTimeout(() => setSmartGuides({ vertical: null, horizontal: null }), 1200);
+        } else if (posicao === 'esquerda') {
+            novosDados.x = 10;
+        } else if (posicao === 'direita') {
+            novosDados.x = Math.max(0, canvasWidth - el.width - 10);
+        } else if (posicao === 'topo') {
+            novosDados.y = 10;
+        } else if (posicao === 'base') {
+            novosDados.y = Math.max(0, canvasHeight - el.height - 10);
         }
+
+        updateElement(selectedId, novosDados);
+        setTimeout(() => setSmartGuides({ vertical: null, horizontal: null }), 1200);
     };
 
-    // Detecção de Linhas Magnéticas (Guia Inteligente estilo Canva)
+    // Detecção de Guias Magnéticas Inteligentes (Canva Smart Guides)
     const handleDrag = (_e, d, el) => {
         const elCenterX = d.x + el.width / 2;
         const elCenterY = d.y + el.height / 2;
         const canvasCenterX = canvasWidth / 2;
         const canvasCenterY = canvasHeight / 2;
-
         const threshold = 6;
+
         let guideV = null;
         let guideH = null;
 
-        // Alinhamento com o Centro do Canvas
-        if (Math.abs(elCenterX - canvasCenterX) <= threshold) {
-            guideV = canvasCenterX;
-        }
-        if (Math.abs(elCenterY - canvasCenterY) <= threshold) {
-            guideH = canvasCenterY;
-        }
+        if (Math.abs(elCenterX - canvasCenterX) <= threshold) guideV = canvasCenterX;
+        if (Math.abs(elCenterY - canvasCenterY) <= threshold) guideH = canvasCenterY;
 
-        // Alinhamento com outros elementos
         elements.forEach(other => {
             if (other.id === el.id) return;
             const otherCenterX = other.x + other.width / 2;
             const otherCenterY = other.y + other.height / 2;
 
-            if (Math.abs(elCenterX - otherCenterX) <= threshold) {
-                guideV = otherCenterX;
-            }
-            if (Math.abs(d.x - other.x) <= threshold) {
-                guideV = other.x;
-            }
-            if (Math.abs(elCenterY - otherCenterY) <= threshold) {
-                guideH = otherCenterY;
-            }
-            if (Math.abs(d.y - other.y) <= threshold) {
-                guideH = other.y;
-            }
+            if (Math.abs(elCenterX - otherCenterX) <= threshold) guideV = otherCenterX;
+            if (Math.abs(d.x - other.x) <= threshold) guideV = other.x;
+            if (Math.abs(elCenterY - otherCenterY) <= threshold) guideH = otherCenterY;
+            if (Math.abs(d.y - other.y) <= threshold) guideH = other.y;
         });
 
         setSmartGuides({ vertical: guideV, horizontal: guideH });
@@ -337,9 +433,9 @@ const ConfigEtiquetas = () => {
             setSaving(true);
             await api.post('/config/etiquetas', payload);
             limparCacheEtiqueta(eventoId);
-            enqueueSnackbar(`Layout salvo com sucesso para ${localStorage.getItem('active_evento_nome') || 'o evento'}!`, { variant: 'success' });
+            enqueueSnackbar(`Layout salvo com sucesso para o evento ativo!`, { variant: 'success' });
         } catch (error) {
-            enqueueSnackbar('Falha ao salvar o layout da etiqueta. ' + (error.response?.data?.details || ''), { variant: 'error' });
+            enqueueSnackbar('Falha ao salvar layout: ' + (error.response?.data?.details || ''), { variant: 'error' });
         } finally {
             setSaving(false);
         }
@@ -351,12 +447,36 @@ const ConfigEtiquetas = () => {
 
     const selectedElement = elements.find(el => el.id === selectedId);
 
+    // Lista de camadas ordenada de cima para baixo
+    const elementosOrdenados = useMemo(() => {
+        return [...elements].sort((a, b) => (b.zIndex || 0) - (a.zIndex || 0));
+    }, [elements]);
+
     return (
-        <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 4 } }}>
+        <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 } }}>
             <PageHeader
                 title="Etiquetas e crachás"
-                subtitle="Editor visual estilo Canva: grade inteligente, alinhamento magnético e artes completas de crachá."
-                breadcrumbs={[{ text: 'Configurações' }, { text: 'Impressão & etiquetas' }]}
+                subtitle="Design e impressão de credenciais, crachás PVC e etiquetas térmicas."
+                breadcrumbs={[{ text: 'Configurações' }, { text: 'Credenciais físicas' }, { text: 'Etiquetas e crachás' }]}
+                action={
+                    <Stack direction="row" spacing={1.5}>
+                        <NeonButton
+                            startIcon={<PrintIcon />}
+                            variant="outlined"
+                            onClick={handleImprimirTeste}
+                        >
+                            Imprimir Teste
+                        </NeonButton>
+                        <NeonButton
+                            startIcon={<SaveIcon />}
+                            onClick={handleSave}
+                            loading={saving}
+                            neonColor="#00FF88"
+                        >
+                            Salvar Layout
+                        </NeonButton>
+                    </Stack>
+                }
             />
 
             {/* Inputs de arquivo ocultos */}
@@ -375,20 +495,48 @@ const ConfigEtiquetas = () => {
                 onChange={handleUploadElementImage}
             />
 
-            <Grid container spacing={3} sx={{ mt: 0.5 }}>
-                {/* COLUNA ESQUERDA: CONFIGURAÇÕES, FERRAMENTAS E PROPRIEDADES */}
+            <Grid container spacing={2.5} sx={{ mt: 0.5 }}>
+                {/* COLUNA ESQUERDA: FERRAMENTAS ORGANIZADAS EM ABAS ESTILO CANVA */}
                 <Grid item xs={12} md={4.5} lg={4}>
-                    <Stack spacing={2.5}>
-                        {/* 1. PARÂMETROS DO CRACHÁ / PAPEL */}
-                        <GlassCard sx={{ p: 2.5 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1.5 }}>
-                                <StyleIcon sx={{ color: '#00D4FF', fontSize: 22 }} />
-                                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
-                                    Formato e Dimensões
-                                </Typography>
-                            </Box>
+                    <GlassCard sx={{ p: 2 }}>
+                        {/* Seletor de Abas de Ferramentas */}
+                        <Tabs
+                            value={sidebarTab}
+                            onChange={(_, val) => setSidebarTab(val)}
+                            variant="fullWidth"
+                            sx={{
+                                minHeight: 38,
+                                mb: 2,
+                                '& .MuiTab-root': {
+                                    minHeight: 36,
+                                    fontSize: '0.74rem',
+                                    fontWeight: 700,
+                                    textTransform: 'none',
+                                    color: 'rgba(255,255,255,0.6)',
+                                    px: 0.5
+                                },
+                                '& .Mui-selected': {
+                                    color: '#00D4FF !important'
+                                },
+                                '& .MuiTabs-indicator': {
+                                    backgroundColor: '#00D4FF',
+                                    height: 3
+                                }
+                            }}
+                        >
+                            <Tab icon={<StyleIcon sx={{ fontSize: 16 }} />} iconPosition="start" label="Formato" />
+                            <Tab icon={<AddElementIcon sx={{ fontSize: 16 }} />} iconPosition="start" label="Elementos" />
+                            <Tab icon={<TuneIcon sx={{ fontSize: 16 }} />} iconPosition="start" label="Propriedades" />
+                            <Tab icon={<LayersIcon sx={{ fontSize: 16 }} />} iconPosition="start" label="Camadas" />
+                        </Tabs>
 
+                        {/* ABA 0: FORMATO E ARTE DO EVENTO (SITUAÇÕES A & C) */}
+                        {sidebarTab === 0 && (
                             <Stack spacing={2}>
+                                <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, textTransform: 'uppercase' }}>
+                                    Dimensões do Papel / Crachá
+                                </Typography>
+
                                 <FormControl fullWidth size="small">
                                     <InputLabel id="preset-label" sx={{ color: 'rgba(255,255,255,0.7)' }}>Padrão / Impressora</InputLabel>
                                     <Select
@@ -427,14 +575,15 @@ const ConfigEtiquetas = () => {
                                     </Grid>
                                 </Grid>
 
-                                <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)' }} />
+                                <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)', my: 1 }} />
 
-                                {/* Upload da Arte de Fundo */}
+                                {/* SEÇÃO: ARTE DO EVENTO & MODO GABARITO (SITUAÇÃO C) */}
                                 <Box>
-                                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', fontWeight: 700, display: 'block', mb: 1 }}>
-                                        Arte do Evento / Fundo do Crachá:
+                                    <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, textTransform: 'uppercase', display: 'block', mb: 1 }}>
+                                        Arte do Evento / Imagem de Fundo
                                     </Typography>
-                                    <Stack direction="row" spacing={1}>
+
+                                    <Stack direction="row" spacing={1} sx={{ mb: 1.5 }}>
                                         <Button
                                             variant="outlined"
                                             size="small"
@@ -465,223 +614,412 @@ const ConfigEtiquetas = () => {
                                             </Tooltip>
                                         )}
                                     </Stack>
+
                                     {config.background_url && (
-                                        <Typography variant="caption" sx={{ color: '#00FF88', fontSize: '0.7rem', mt: 0.5, display: 'block' }}>
-                                            ✓ Arte do crachá ativa no fundo
-                                        </Typography>
+                                        <Stack spacing={1.5} sx={{ p: 1.5, bgcolor: 'rgba(0, 212, 255, 0.05)', borderRadius: 1.5, border: '1px solid rgba(0, 212, 255, 0.2)' }}>
+                                            {/* SITUAÇÃO C: Usar como Gabarito de Referência Visual */}
+                                            <FormControlLabel
+                                                control={
+                                                    <Switch
+                                                        size="small"
+                                                        checked={Boolean(config.fundo_como_referencia)}
+                                                        onChange={(e) => {
+                                                            const ativo = e.target.checked;
+                                                            handleChangeConfig('fundo_como_referencia', ativo);
+                                                            handleChangeConfig('imprimir_fundo', !ativo);
+                                                        }}
+                                                    />
+                                                }
+                                                label={
+                                                    <Typography sx={{ fontSize: '0.78rem', color: '#00FF88', fontWeight: 700 }}>
+                                                        Modo Gabarito (Não Imprimir)
+                                                    </Typography>
+                                                }
+                                            />
+
+                                            <Alert severity="info" sx={{ bgcolor: 'rgba(0, 212, 255, 0.08)', color: '#FFFFFF', fontSize: '0.72rem', py: 0.5 }}>
+                                                {config.fundo_como_referencia
+                                                    ? '📌 A arte serve de orientação na tela para alinhar os dados, mas NÃO sairá na impressora (ideal para crachás pré-impressos).'
+                                                    : '🖨️ A arte será enviada para impressão junto com os textos.'}
+                                            </Alert>
+
+                                            {/* Slider de Transparência da Referência */}
+                                            <Box sx={{ px: 0.5 }}>
+                                                <Stack direction="row" justifyContent="space-between">
+                                                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.72rem' }}>
+                                                        Opacidade do Gabarito:
+                                                    </Typography>
+                                                    <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, fontSize: '0.72rem' }}>
+                                                        {Math.round((config.opacidade_referencia || 0.5) * 100)}%
+                                                    </Typography>
+                                                </Stack>
+                                                <Slider
+                                                    size="small"
+                                                    value={config.opacidade_referencia != null ? config.opacidade_referencia : 0.5}
+                                                    min={0.1}
+                                                    max={1}
+                                                    step={0.05}
+                                                    onChange={(_, v) => handleChangeConfig('opacidade_referencia', v)}
+                                                />
+                                            </Box>
+
+                                            <FormControlLabel
+                                                control={
+                                                    <Switch
+                                                        size="small"
+                                                        checked={Boolean(config.travar_referencia)}
+                                                        onChange={(e) => handleChangeConfig('travar_referencia', e.target.checked)}
+                                                    />
+                                                }
+                                                label={
+                                                    <Typography sx={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.8)' }}>
+                                                        Travar imagem na prancheta
+                                                    </Typography>
+                                                }
+                                            />
+                                        </Stack>
                                     )}
                                 </Box>
                             </Stack>
-                        </GlassCard>
+                        )}
 
-                        {/* 2. ADICIONAR ELEMENTOS */}
-                        <GlassCard sx={{ p: 2.5 }}>
-                            <Typography variant="subtitle2" sx={{ color: '#00D4FF', fontWeight: 700, mb: 1.5 }}>
-                                Adicionar Elementos
-                            </Typography>
-                            <Grid container spacing={1}>
-                                <Grid item xs={6}>
-                                    <Button
-                                        fullWidth
-                                        variant="outlined"
-                                        size="small"
-                                        startIcon={<TextIcon sx={{ fontSize: 18 }} />}
-                                        onClick={() => addElement('text')}
-                                        sx={{ ...botaoSecundario, fontSize: '0.75rem', py: 0.8 }}
-                                    >
-                                        Texto / Dado
-                                    </Button>
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <Button
-                                        fullWidth
-                                        variant="outlined"
-                                        size="small"
-                                        startIcon={<QrIcon sx={{ fontSize: 18 }} />}
-                                        onClick={() => addElement('qrcode')}
-                                        sx={{ ...botaoSecundario, fontSize: '0.75rem', py: 0.8 }}
-                                    >
-                                        QR Code
-                                    </Button>
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <Button
-                                        fullWidth
-                                        variant="outlined"
-                                        size="small"
-                                        startIcon={<FotoIcon sx={{ fontSize: 18 }} />}
-                                        onClick={() => addElement('foto')}
-                                        sx={{ ...botaoSecundario, fontSize: '0.75rem', py: 0.8 }}
-                                    >
-                                        Foto da Pessoa
-                                    </Button>
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <Button
-                                        fullWidth
-                                        variant="outlined"
-                                        size="small"
-                                        startIcon={<ImageIcon sx={{ fontSize: 18 }} />}
-                                        onClick={() => addElement('image')}
-                                        sx={{ ...botaoSecundario, fontSize: '0.75rem', py: 0.8 }}
-                                    >
-                                        Logo / Imagem
-                                    </Button>
-                                </Grid>
-                                <Grid item xs={12}>
-                                    <Button
-                                        fullWidth
-                                        variant="outlined"
-                                        size="small"
-                                        startIcon={<ShapeIcon sx={{ fontSize: 18 }} />}
-                                        onClick={() => addElement('shape')}
-                                        sx={{ ...botaoSecundario, fontSize: '0.75rem', py: 0.8 }}
-                                    >
-                                        Tarja / Barra Colorida (Setor)
-                                    </Button>
-                                </Grid>
-                            </Grid>
-                        </GlassCard>
-
-                        {/* 3. PROPRIEDADES DO ELEMENTO SELECIONADO */}
-                        <GlassCard sx={{ p: 2.5 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-                                <Typography variant="subtitle2" sx={{ color: 'rgba(255,255,255,0.7)', fontWeight: 700 }}>
-                                    Propriedades da Seleção
+                        {/* ABA 1: ADICIONAR ELEMENTOS (SITUAÇÃO B) */}
+                        {sidebarTab === 1 && (
+                            <Stack spacing={1.5}>
+                                <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, textTransform: 'uppercase' }}>
+                                    Dados Dinâmicos & Textos
                                 </Typography>
-                                {selectedElement && (
-                                    <IconButton
-                                        size="small"
-                                        color="error"
-                                        onClick={() => deleteElement(selectedElement.id)}
-                                        title="Excluir elemento"
-                                        sx={{ bgcolor: 'rgba(255, 51, 102, 0.1)' }}
-                                    >
-                                        <DeleteIcon fontSize="small" />
-                                    </IconButton>
-                                )}
-                            </Box>
 
-                            {selectedElement ? (
-                                <Stack spacing={1.5} sx={{ p: 1.5, background: 'rgba(0,0,0,0.3)', borderRadius: 1.5, border: '1px solid rgba(0, 212, 255, 0.2)' }}>
-                                    {/* Botões de Alinhamento Rápido estilo Canva */}
-                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 0.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 1 }}>
-                                        <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700 }}>
-                                            Alinhamento Rápido:
-                                        </Typography>
-                                        <Stack direction="row" spacing={0.5}>
-                                            <Tooltip title="Centralizar Horizontalmente">
-                                                <Button size="small" onClick={() => centralizarElemento('horizontal')} sx={{ minWidth: 32, px: 0.8, fontSize: '0.7rem', color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.2)' }}>
-                                                    Centro X
-                                                </Button>
-                                            </Tooltip>
-                                            <Tooltip title="Centralizar Verticalmente">
-                                                <Button size="small" onClick={() => centralizarElemento('vertical')} sx={{ minWidth: 32, px: 0.8, fontSize: '0.7rem', color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.2)' }}>
-                                                    Centro Y
-                                                </Button>
-                                            </Tooltip>
-                                            <Tooltip title="Centro Total">
-                                                <IconButton size="small" onClick={() => centralizarElemento('ambos')} sx={{ color: '#00D4FF', border: '1px solid rgba(0, 212, 255, 0.3)' }}>
-                                                    <CenterIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
-                                        </Stack>
-                                    </Box>
+                                <Grid container spacing={1}>
+                                    <Grid item xs={6}>
+                                        <Button
+                                            fullWidth
+                                            variant="outlined"
+                                            size="small"
+                                            startIcon={<TextIcon sx={{ fontSize: 18 }} />}
+                                            onClick={() => addElement('text')}
+                                            sx={{ ...botaoSecundario, fontSize: '0.75rem', py: 1 }}
+                                        >
+                                            Texto / Dado
+                                        </Button>
+                                    </Grid>
+                                    <Grid item xs={6}>
+                                        <Button
+                                            fullWidth
+                                            variant="outlined"
+                                            size="small"
+                                            startIcon={<QrIcon sx={{ fontSize: 18 }} />}
+                                            onClick={() => addElement('qrcode')}
+                                            sx={{ ...botaoSecundario, fontSize: '0.75rem', py: 1 }}
+                                        >
+                                            QR Code
+                                        </Button>
+                                    </Grid>
+                                    <Grid item xs={6}>
+                                        <Button
+                                            fullWidth
+                                            variant="outlined"
+                                            size="small"
+                                            startIcon={<BarcodeIcon sx={{ fontSize: 18 }} />}
+                                            onClick={() => addElement('barcode')}
+                                            sx={{ ...botaoSecundario, fontSize: '0.75rem', py: 1 }}
+                                        >
+                                            Cód. Barras 1D
+                                        </Button>
+                                    </Grid>
+                                    <Grid item xs={6}>
+                                        <Button
+                                            fullWidth
+                                            variant="outlined"
+                                            size="small"
+                                            startIcon={<FotoIcon sx={{ fontSize: 18 }} />}
+                                            onClick={() => addElement('foto')}
+                                            sx={{ ...botaoSecundario, fontSize: '0.75rem', py: 1 }}
+                                        >
+                                            Foto da Pessoa
+                                        </Button>
+                                    </Grid>
+                                </Grid>
 
-                                    {/* Proporção Real / Livre para Fotos e Imagens */}
-                                    {(selectedElement.type === 'foto' || selectedElement.type === 'image' || selectedElement.type === 'qrcode') && (
-                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: 'rgba(0, 212, 255, 0.05)', p: 1, borderRadius: 1 }}>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                {selectedElement.lockAspectRatio ? <LockIcon sx={{ fontSize: 18, color: '#00FF88' }} /> : <LockOpenIcon sx={{ fontSize: 18, color: '#FFB800' }} />}
-                                                <Typography variant="caption" sx={{ color: '#FFFFFF', fontWeight: 600 }}>
-                                                    {selectedElement.lockAspectRatio ? 'Proporção Real Travada' : 'Redimensionamento Livre (Esticar)'}
+                                <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, textTransform: 'uppercase', pt: 1 }}>
+                                    Elementos Gráficos & Formas
+                                </Typography>
+
+                                <Grid container spacing={1}>
+                                    <Grid item xs={6}>
+                                        <Button
+                                            fullWidth
+                                            variant="outlined"
+                                            size="small"
+                                            startIcon={<ImageIcon sx={{ fontSize: 18 }} />}
+                                            onClick={() => addElement('image')}
+                                            sx={{ ...botaoSecundario, fontSize: '0.75rem', py: 1 }}
+                                        >
+                                            Logo / Imagem
+                                        </Button>
+                                    </Grid>
+                                    <Grid item xs={6}>
+                                        <Button
+                                            fullWidth
+                                            variant="outlined"
+                                            size="small"
+                                            startIcon={<ShapeIcon sx={{ fontSize: 18 }} />}
+                                            onClick={() => addElement('shape')}
+                                            sx={{ ...botaoSecundario, fontSize: '0.75rem', py: 1 }}
+                                        >
+                                            Tarja / Retângulo
+                                        </Button>
+                                    </Grid>
+                                    <Grid item xs={6}>
+                                        <Button
+                                            fullWidth
+                                            variant="outlined"
+                                            size="small"
+                                            startIcon={<CircleIcon sx={{ fontSize: 18 }} />}
+                                            onClick={() => addElement('circle')}
+                                            sx={{ ...botaoSecundario, fontSize: '0.75rem', py: 1 }}
+                                        >
+                                            Círculo / Selo
+                                        </Button>
+                                    </Grid>
+                                    <Grid item xs={6}>
+                                        <Button
+                                            fullWidth
+                                            variant="outlined"
+                                            size="small"
+                                            startIcon={<LineIcon sx={{ fontSize: 18 }} />}
+                                            onClick={() => addElement('line')}
+                                            sx={{ ...botaoSecundario, fontSize: '0.75rem', py: 1 }}
+                                        >
+                                            Linha Divisória
+                                        </Button>
+                                    </Grid>
+                                </Grid>
+                            </Stack>
+                        )}
+
+                        {/* ABA 2: PROPRIEDADES DA SELEÇÃO */}
+                        {sidebarTab === 2 && (
+                            <Box>
+                                {selectedElement ? (
+                                    <Stack spacing={2}>
+                                        {/* Cabeçalho do Elemento Selecionado */}
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                                            <Stack direction="row" spacing={1} alignItems="center">
+                                                <Chip
+                                                    size="small"
+                                                    label={selectedElement.type.toUpperCase()}
+                                                    sx={{ bgcolor: 'rgba(0, 212, 255, 0.15)', color: '#00D4FF', fontWeight: 700, fontSize: '0.65rem' }}
+                                                />
+                                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                                                    X: {Math.round(selectedElement.x / scaleFactor)}mm | Y: {Math.round(selectedElement.y / scaleFactor)}mm
                                                 </Typography>
-                                            </Box>
+                                            </Stack>
+                                            <Stack direction="row" spacing={0.5}>
+                                                <Tooltip title="Duplicar elemento">
+                                                    <IconButton size="small" onClick={() => duplicateElement(selectedElement)} sx={{ color: '#00D4FF' }}>
+                                                        <DuplicateIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                                <Tooltip title="Excluir elemento">
+                                                    <IconButton size="small" color="error" onClick={() => deleteElement(selectedElement.id)} sx={{ bgcolor: 'rgba(255, 51, 102, 0.1)' }}>
+                                                        <DeleteIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            </Stack>
+                                        </Box>
+
+                                        {/* Barra de Alinhamento Rápido estilo Canva */}
+                                        <Box sx={{ p: 1, bgcolor: 'rgba(0,0,0,0.3)', borderRadius: 1.5, border: '1px solid rgba(0, 212, 255, 0.15)' }}>
+                                            <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, display: 'block', mb: 0.8 }}>
+                                                Alinhamento na Prancheta:
+                                            </Typography>
+                                            <Stack direction="row" spacing={0.5} flexWrap="wrap" justifyContent="space-between">
+                                                <Tooltip title="Alinhar à Esquerda">
+                                                    <IconButton size="small" onClick={() => alinharElemento('esquerda')} sx={{ color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                                        <AlignLeftIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                                <Tooltip title="Centro Horizontal">
+                                                    <Button size="small" onClick={() => alinharElemento('centro-x')} sx={{ minWidth: 28, px: 0.8, fontSize: '0.68rem', color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                                        CX
+                                                    </Button>
+                                                </Tooltip>
+                                                <Tooltip title="Centro Total">
+                                                    <IconButton size="small" onClick={() => alinharElemento('centro-total')} sx={{ color: '#00D4FF', border: '1px solid rgba(0, 212, 255, 0.3)' }}>
+                                                        <CenterIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                                <Tooltip title="Centro Vertical">
+                                                    <Button size="small" onClick={() => alinharElemento('centro-y')} sx={{ minWidth: 28, px: 0.8, fontSize: '0.68rem', color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                                        CY
+                                                    </Button>
+                                                </Tooltip>
+                                                <Tooltip title="Alinhar à Direita">
+                                                    <IconButton size="small" onClick={() => alinharElemento('direita')} sx={{ color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                                        <AlignRightIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                                <Tooltip title="Alinhar ao Topo">
+                                                    <IconButton size="small" onClick={() => alinharElemento('topo')} sx={{ color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                                        <AlignTopIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                                <Tooltip title="Alinhar à Base">
+                                                    <IconButton size="small" onClick={() => alinharElemento('base')} sx={{ color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                                        <AlignBottomIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            </Stack>
+                                        </Box>
+
+                                        {/* Trava de Proporção Real vs Esticar Livre */}
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: 'rgba(0, 212, 255, 0.05)', p: 1, borderRadius: 1.5 }}>
+                                            <Stack direction="row" spacing={1} alignItems="center">
+                                                {selectedElement.lockAspectRatio ? <LockIcon sx={{ fontSize: 18, color: '#00FF88' }} /> : <LockOpenIcon sx={{ fontSize: 18, color: '#FFB800' }} />}
+                                                <Box>
+                                                    <Typography variant="caption" sx={{ color: '#FFFFFF', fontWeight: 600, display: 'block', lineHeight: 1.2 }}>
+                                                        {selectedElement.lockAspectRatio ? 'Proporção Travada' : 'Redimensionar Livre'}
+                                                    </Typography>
+                                                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem' }}>
+                                                        {selectedElement.lockAspectRatio ? 'Mantém aspecto ao puxar' : 'Estica altura/largura livres'}
+                                                    </Typography>
+                                                </Box>
+                                            </Stack>
                                             <Button
                                                 size="small"
                                                 variant="outlined"
                                                 onClick={() => updateElement(selectedElement.id, { lockAspectRatio: !selectedElement.lockAspectRatio })}
                                                 sx={{ fontSize: '0.68rem', py: 0.2, px: 1, color: '#00D4FF', borderColor: 'rgba(0,212,255,0.3)', textTransform: 'none' }}
                                             >
-                                                {selectedElement.lockAspectRatio ? 'Permitir Esticar' : 'Travar Proporção'}
+                                                {selectedElement.lockAspectRatio ? 'Liberar' : 'Travar'}
                                             </Button>
                                         </Box>
-                                    )}
 
-                                    {/* Propriedades para TEXTO */}
-                                    {selectedElement.type === 'text' && (
-                                        <>
+                                        {/* Propriedades Específicas: TEXTO */}
+                                        {selectedElement.type === 'text' && (
+                                            <Stack spacing={1.5}>
+                                                <TextField
+                                                    label="Conteúdo / Tag do Participante"
+                                                    fullWidth
+                                                    size="small"
+                                                    value={selectedElement.content}
+                                                    onChange={e => updateElement(selectedElement.id, { content: e.target.value })}
+                                                />
+
+                                                {/* Tags Rápidas de Inserção */}
+                                                <Box>
+                                                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.68rem', display: 'block', mb: 0.5 }}>
+                                                        Inserir tag rápida:
+                                                    </Typography>
+                                                    <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                                                        {['{nome_pessoa}', '{funcao}', '{empresa}', '{cpf}', '{pulseira}', '{evento}'].map(tag => (
+                                                            <Chip
+                                                                key={tag}
+                                                                label={tag}
+                                                                size="small"
+                                                                onClick={() => updateElement(selectedElement.id, { content: tag })}
+                                                                sx={{ fontSize: '0.65rem', height: 22, bgcolor: 'rgba(255,255,255,0.06)', cursor: 'pointer', mb: 0.5 }}
+                                                            />
+                                                        ))}
+                                                    </Stack>
+                                                </Box>
+
+                                                <Grid container spacing={1}>
+                                                    <Grid item xs={6}>
+                                                        <TextField
+                                                            label="Tamanho Fonte"
+                                                            type="number"
+                                                            fullWidth
+                                                            size="small"
+                                                            value={selectedElement.fontSize || 14}
+                                                            onChange={e => updateElement(selectedElement.id, { fontSize: Number(e.target.value) })}
+                                                        />
+                                                    </Grid>
+                                                    <Grid item xs={6}>
+                                                        <FormControl fullWidth size="small">
+                                                            <InputLabel id="weight-label">Peso</InputLabel>
+                                                            <Select
+                                                                labelId="weight-label"
+                                                                label="Peso"
+                                                                value={selectedElement.fontWeight || 'normal'}
+                                                                onChange={e => updateElement(selectedElement.id, { fontWeight: e.target.value })}
+                                                            >
+                                                                <MenuItem value="normal">Normal</MenuItem>
+                                                                <MenuItem value="bold">Negrito</MenuItem>
+                                                            </Select>
+                                                        </FormControl>
+                                                    </Grid>
+                                                </Grid>
+
+                                                <Grid container spacing={1}>
+                                                    <Grid item xs={6}>
+                                                        <FormControl fullWidth size="small">
+                                                            <InputLabel id="align-label">Alinhar</InputLabel>
+                                                            <Select
+                                                                labelId="align-label"
+                                                                label="Alinhar"
+                                                                value={selectedElement.textAlign || 'left'}
+                                                                onChange={e => updateElement(selectedElement.id, { textAlign: e.target.value })}
+                                                            >
+                                                                <MenuItem value="left">Esquerda</MenuItem>
+                                                                <MenuItem value="center">Centro</MenuItem>
+                                                                <MenuItem value="right">Direita</MenuItem>
+                                                            </Select>
+                                                        </FormControl>
+                                                    </Grid>
+                                                    <Grid item xs={6}>
+                                                        <TextField
+                                                            label="Cor do Texto"
+                                                            type="color"
+                                                            fullWidth
+                                                            size="small"
+                                                            value={selectedElement.color || '#000000'}
+                                                            onChange={e => updateElement(selectedElement.id, { color: e.target.value })}
+                                                        />
+                                                    </Grid>
+                                                </Grid>
+                                            </Stack>
+                                        )}
+
+                                        {/* Propriedades Específicas: QR CODE */}
+                                        {selectedElement.type === 'qrcode' && (
                                             <TextField
-                                                label="Conteúdo / Tag"
+                                                label="Conteúdo do QR Code"
                                                 fullWidth
                                                 size="small"
                                                 value={selectedElement.content}
                                                 onChange={e => updateElement(selectedElement.id, { content: e.target.value })}
-                                                helperText="Tags: {nome_pessoa}, {funcao}, {empresa}, {cpf}, {pulseira}"
+                                                helperText="Tags: {qr_code}, {cpf} ou texto fixo"
                                             />
-                                            <Grid container spacing={1}>
-                                                <Grid item xs={6}>
-                                                    <TextField
-                                                        label="Tamanho Fonte"
-                                                        type="number"
-                                                        fullWidth
-                                                        size="small"
-                                                        value={selectedElement.fontSize || 14}
-                                                        onChange={e => updateElement(selectedElement.id, { fontSize: Number(e.target.value) })}
-                                                    />
-                                                </Grid>
-                                                <Grid item xs={6}>
-                                                    <TextField
-                                                        label="Cor do Texto"
-                                                        type="color"
-                                                        fullWidth
-                                                        size="small"
-                                                        value={selectedElement.color || '#000000'}
-                                                        onChange={e => updateElement(selectedElement.id, { color: e.target.value })}
-                                                    />
-                                                </Grid>
-                                            </Grid>
+                                        )}
 
-                                            <Grid container spacing={1}>
-                                                <Grid item xs={6}>
-                                                    <FormControl fullWidth size="small">
-                                                        <InputLabel id="weight-label">Peso</InputLabel>
-                                                        <Select
-                                                            labelId="weight-label"
-                                                            label="Peso"
-                                                            value={selectedElement.fontWeight || 'normal'}
-                                                            onChange={e => updateElement(selectedElement.id, { fontWeight: e.target.value })}
-                                                        >
-                                                            <MenuItem value="normal">Normal</MenuItem>
-                                                            <MenuItem value="bold">Negrito</MenuItem>
-                                                        </Select>
-                                                    </FormControl>
-                                                </Grid>
-                                                <Grid item xs={6}>
-                                                    <FormControl fullWidth size="small">
-                                                        <InputLabel id="align-label">Alinhar</InputLabel>
-                                                        <Select
-                                                            labelId="align-label"
-                                                            label="Alinhar"
-                                                            value={selectedElement.textAlign || 'left'}
-                                                            onChange={e => updateElement(selectedElement.id, { textAlign: e.target.value })}
-                                                        >
-                                                            <MenuItem value="left">Esquerda</MenuItem>
-                                                            <MenuItem value="center">Centro</MenuItem>
-                                                            <MenuItem value="right">Direita</MenuItem>
-                                                        </Select>
-                                                    </FormControl>
-                                                </Grid>
-                                            </Grid>
-                                        </>
-                                    )}
+                                        {/* Propriedades Específicas: CÓDIGO DE BARRAS 1D */}
+                                        {selectedElement.type === 'barcode' && (
+                                            <Stack spacing={1.5}>
+                                                <TextField
+                                                    label="Conteúdo do Código de Barras"
+                                                    fullWidth
+                                                    size="small"
+                                                    value={selectedElement.content}
+                                                    onChange={e => updateElement(selectedElement.id, { content: e.target.value })}
+                                                    helperText="Tags: {pulseira}, {cpf} ou número"
+                                                />
+                                                <FormControlLabel
+                                                    control={
+                                                        <Switch
+                                                            size="small"
+                                                            checked={selectedElement.exibirTexto !== false}
+                                                            onChange={(e) => updateElement(selectedElement.id, { exibirTexto: e.target.checked })}
+                                                        />
+                                                    }
+                                                    label={<Typography variant="caption" sx={{ color: '#FFFFFF' }}>Exibir número legível abaixo das barras</Typography>}
+                                                />
+                                            </Stack>
+                                        )}
 
-                                    {/* Propriedades para FOTO */}
-                                    {selectedElement.type === 'foto' && (
-                                        <>
-                                            <Typography variant="caption" sx={{ color: '#00D4FF' }}>
-                                                A foto real do colaborador cadastrado sairá neste campo.
-                                            </Typography>
+                                        {/* Propriedades Específicas: FOTO */}
+                                        {selectedElement.type === 'foto' && (
                                             <Grid container spacing={1}>
                                                 <Grid item xs={6}>
                                                     <TextField
@@ -705,78 +1043,237 @@ const ConfigEtiquetas = () => {
                                                     />
                                                 </Grid>
                                             </Grid>
-                                        </>
-                                    )}
+                                        )}
 
-                                    {/* Propriedades para TARJA / SHAPE */}
-                                    {selectedElement.type === 'shape' && (
-                                        <>
-                                            <TextField
-                                                label="Cor de Fundo da Tarja"
-                                                type="color"
-                                                fullWidth
-                                                size="small"
-                                                value={selectedElement.backgroundColor || '#00D4FF'}
-                                                onChange={e => updateElement(selectedElement.id, { backgroundColor: e.target.value })}
-                                            />
-                                            <Box sx={{ px: 1 }}>
-                                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>Opacidade:</Typography>
-                                                <Slider
+                                        {/* Propriedades Específicas: FORMAS / SHAPES / CÍRCULOS */}
+                                        {(selectedElement.type === 'shape' || selectedElement.type === 'circle') && (
+                                            <Stack spacing={1.5}>
+                                                <TextField
+                                                    label="Cor de Preenchimento"
+                                                    type="color"
+                                                    fullWidth
                                                     size="small"
-                                                    value={selectedElement.opacity != null ? selectedElement.opacity : 1}
-                                                    min={0.1}
-                                                    max={1}
-                                                    step={0.05}
-                                                    onChange={(_, v) => updateElement(selectedElement.id, { opacity: v })}
+                                                    value={selectedElement.backgroundColor || '#00D4FF'}
+                                                    onChange={e => updateElement(selectedElement.id, { backgroundColor: e.target.value })}
                                                 />
-                                            </Box>
-                                        </>
-                                    )}
 
-                                    {/* Propriedades para QR CODE */}
-                                    {selectedElement.type === 'qrcode' && (
-                                        <TextField
-                                            label="Conteúdo do QR"
-                                            fullWidth
-                                            size="small"
-                                            value={selectedElement.content}
-                                            onChange={e => updateElement(selectedElement.id, { content: e.target.value })}
-                                            helperText="Padrão: {qr_code} ou {cpf}"
-                                        />
-                                    )}
-                                </Stack>
-                            ) : (
-                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' }}>
-                                    Clique em qualquer item no crachá ao lado para ajustar tamanho, fonte ou cores.
+                                                {/* Paleta Rápida de Cores */}
+                                                <Stack direction="row" spacing={0.5} flexWrap="wrap">
+                                                    {CORES_PALETA.map(c => (
+                                                        <Box
+                                                            key={c.hex}
+                                                            onClick={() => updateElement(selectedElement.id, { backgroundColor: c.hex })}
+                                                            sx={{
+                                                                width: 22,
+                                                                height: 22,
+                                                                borderRadius: '50%',
+                                                                bgcolor: c.hex,
+                                                                cursor: 'pointer',
+                                                                border: '1px solid rgba(255,255,255,0.3)',
+                                                                '&:hover': { transform: 'scale(1.15)' }
+                                                            }}
+                                                            title={c.label}
+                                                        />
+                                                    ))}
+                                                </Stack>
+
+                                                <Box sx={{ px: 0.5 }}>
+                                                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>Opacidade da Forma:</Typography>
+                                                    <Slider
+                                                        size="small"
+                                                        value={selectedElement.opacity != null ? selectedElement.opacity : 1}
+                                                        min={0.1}
+                                                        max={1}
+                                                        step={0.05}
+                                                        onChange={(_, v) => updateElement(selectedElement.id, { opacity: v })}
+                                                    />
+                                                </Box>
+                                            </Stack>
+                                        )}
+
+                                        {/* Propriedades Específicas: LINHA DIVISÓRIA */}
+                                        {selectedElement.type === 'line' && (
+                                            <Stack spacing={1.5}>
+                                                <TextField
+                                                    label="Cor da Linha"
+                                                    type="color"
+                                                    fullWidth
+                                                    size="small"
+                                                    value={selectedElement.borderColor || selectedElement.color || '#000000'}
+                                                    onChange={e => updateElement(selectedElement.id, { borderColor: e.target.value, color: e.target.value })}
+                                                />
+
+                                                <Stack direction="row" spacing={0.5} flexWrap="wrap">
+                                                    {CORES_PALETA.map(c => (
+                                                        <Box
+                                                            key={c.hex}
+                                                            onClick={() => updateElement(selectedElement.id, { borderColor: c.hex, color: c.hex })}
+                                                            sx={{
+                                                                width: 22,
+                                                                height: 22,
+                                                                borderRadius: '50%',
+                                                                bgcolor: c.hex,
+                                                                cursor: 'pointer',
+                                                                border: '1px solid rgba(255,255,255,0.3)',
+                                                                '&:hover': { transform: 'scale(1.15)' }
+                                                            }}
+                                                            title={c.label}
+                                                        />
+                                                    ))}
+                                                </Stack>
+
+                                                <TextField
+                                                    label="Espessura do Traço (px)"
+                                                    type="number"
+                                                    fullWidth
+                                                    size="small"
+                                                    value={selectedElement.borderWidth || 2}
+                                                    onChange={e => updateElement(selectedElement.id, { borderWidth: Number(e.target.value) })}
+                                                />
+
+                                                <Box sx={{ px: 0.5 }}>
+                                                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>Opacidade da Linha:</Typography>
+                                                    <Slider
+                                                        size="small"
+                                                        value={selectedElement.opacity != null ? selectedElement.opacity : 1}
+                                                        min={0.1}
+                                                        max={1}
+                                                        step={0.05}
+                                                        onChange={(_, v) => updateElement(selectedElement.id, { opacity: v })}
+                                                    />
+                                                </Box>
+                                            </Stack>
+                                        )}
+
+                                        {/* Ordenação de Camadas do Elemento */}
+                                        <Box sx={{ pt: 1, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                                            <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, display: 'block', mb: 1 }}>
+                                                Nível de Camada (Z-Index):
+                                            </Typography>
+                                            <Stack direction="row" spacing={1}>
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    onClick={() => bringToFront(selectedElement.id)}
+                                                    sx={{ ...botaoSecundario, fontSize: '0.7rem', flex: 1 }}
+                                                >
+                                                    Trazer para Frente
+                                                </Button>
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    onClick={() => sendToBack(selectedElement.id)}
+                                                    sx={{ ...botaoSecundario, fontSize: '0.7rem', flex: 1 }}
+                                                >
+                                                    Enviar para Trás
+                                                </Button>
+                                            </Stack>
+                                        </Box>
+                                    </Stack>
+                                ) : (
+                                    <Box sx={{ p: 3, textAlign: 'center' }}>
+                                        <TuneIcon sx={{ fontSize: 36, color: 'rgba(255,255,255,0.2)', mb: 1 }} />
+                                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                                            Selecione qualquer elemento na prancheta para ver e editar suas propriedades.
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </Box>
+                        )}
+
+                        {/* ABA 3: LISTA DE CAMADAS (LAYERS) */}
+                        {sidebarTab === 3 && (
+                            <Stack spacing={1}>
+                                <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, textTransform: 'uppercase' }}>
+                                    Camadas na Prancheta ({elements.length})
                                 </Typography>
-                            )}
 
-                            {/* BOTOES DE ACAO */}
-                            <Stack spacing={1.5} sx={{ mt: 3 }}>
-                                <NeonButton startIcon={<SaveIcon />} fullWidth onClick={handleSave} loading={saving}>
-                                    Salvar Layout do Evento
-                                </NeonButton>
-                                <NeonButton startIcon={<PrintIcon />} fullWidth variant="outlined" onClick={handleImprimirTeste}>
-                                    Imprimir Teste de Crachá
-                                </NeonButton>
+                                {elementosOrdenados.map((el) => (
+                                    <Box
+                                        key={el.id}
+                                        onClick={() => {
+                                            setSelectedId(el.id);
+                                            setSidebarTab(2);
+                                        }}
+                                        sx={{
+                                            p: 1,
+                                            borderRadius: 1.5,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            bgcolor: selectedId === el.id ? 'rgba(0, 212, 255, 0.15)' : 'rgba(0,0,0,0.2)',
+                                            border: selectedId === el.id ? '1px solid #00D4FF' : '1px solid rgba(255,255,255,0.06)',
+                                            cursor: 'pointer',
+                                            '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.1)' }
+                                        }}
+                                    >
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                            {el.type === 'text' && <TextIcon sx={{ fontSize: 16, color: '#00D4FF' }} />}
+                                            {el.type === 'qrcode' && <QrIcon sx={{ fontSize: 16, color: '#00D4FF' }} />}
+                                            {el.type === 'barcode' && <BarcodeIcon sx={{ fontSize: 16, color: '#00D4FF' }} />}
+                                            {el.type === 'foto' && <FotoIcon sx={{ fontSize: 16, color: '#00D4FF' }} />}
+                                            {el.type === 'image' && <ImageIcon sx={{ fontSize: 16, color: '#00D4FF' }} />}
+                                            {el.type === 'shape' && <ShapeIcon sx={{ fontSize: 16, color: '#00D4FF' }} />}
+                                            {el.type === 'circle' && <CircleIcon sx={{ fontSize: 16, color: '#00D4FF' }} />}
+                                            {el.type === 'line' && <LineIcon sx={{ fontSize: 16, color: '#00D4FF' }} />}
+
+                                            <Typography variant="caption" sx={{ color: '#FFFFFF', fontWeight: selectedId === el.id ? 700 : 400 }}>
+                                                {el.content ? String(el.content).slice(0, 20) : el.type}
+                                            </Typography>
+                                        </Stack>
+
+                                        <IconButton
+                                            size="small"
+                                            color="error"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                deleteElement(el.id);
+                                            }}
+                                            sx={{ p: 0.3 }}
+                                        >
+                                            <DeleteIcon sx={{ fontSize: 15 }} />
+                                        </IconButton>
+                                    </Box>
+                                ))}
                             </Stack>
-                        </GlassCard>
-                    </Stack>
+                        )}
+                    </GlassCard>
                 </Grid>
 
-                {/* COLUNA DIREITA: CANVAS VISUAL DO CRACHÁ COM GRADE E GUIAS INTELIGENTES */}
+                {/* COLUNA DIREITA: PRANCHETA / MESA DE TRABALHO COM ZOOM, GRADE E GUIAS */}
                 <Grid item xs={12} md={7.5} lg={8}>
-                    <GlassCard sx={{ p: { xs: 1.5, sm: 3 }, height: '100%', display: 'flex', flexDirection: 'column' }}>
-                        {/* Barra de Ferramentas da Grade e Guias */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+                    <GlassCard sx={{ p: { xs: 1.5, sm: 2.5 }, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                        {/* BARRA SUPERIOR DA MESA DE TRABALHO: GRADE, ZOOM E GABARITO */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1.5 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
-                                    Pré-visualização do Crachá ({config.width} × {config.height} mm)
+                                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                                    Prancheta: {config.width} × {config.height} mm
                                 </Typography>
+                                {config.background_url && config.fundo_como_referencia && (
+                                    <Chip
+                                        size="small"
+                                        label="Modo Gabarito Ativo"
+                                        sx={{ bgcolor: 'rgba(0, 255, 136, 0.15)', color: '#00FF88', fontWeight: 700, fontSize: '0.65rem' }}
+                                    />
+                                )}
                             </Box>
 
-                            {/* Controles de Grade e Snap */}
-                            <Stack direction="row" spacing={1.5} alignItems="center">
+                            {/* Controles de Visualização: Zoom, Grade e Gabarito */}
+                            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                                {/* Ocultar/Exibir Gabarito */}
+                                {config.background_url && (
+                                    <Tooltip title={ocultarGabarito ? 'Exibir gabarito de fundo' : 'Ocultar temporariamente gabarito de fundo'}>
+                                        <IconButton
+                                            size="small"
+                                            onClick={() => setOcultarGabarito(!ocultarGabarito)}
+                                            sx={{ color: ocultarGabarito ? '#FF3366' : '#00FF88', border: '1px solid rgba(255,255,255,0.1)' }}
+                                        >
+                                            {ocultarGabarito ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                                        </IconButton>
+                                    </Tooltip>
+                                )}
+
+                                {/* Grade */}
                                 <FormControlLabel
                                     control={
                                         <Switch
@@ -786,7 +1283,7 @@ const ConfigEtiquetas = () => {
                                         />
                                     }
                                     label={
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.78rem', color: '#FFFFFF' }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.75rem', color: '#FFFFFF' }}>
                                             {showGrid ? <GridOnIcon sx={{ fontSize: 16, color: '#00D4FF' }} /> : <GridOffIcon sx={{ fontSize: 16 }} />}
                                             Grade
                                         </Box>
@@ -803,8 +1300,8 @@ const ConfigEtiquetas = () => {
                                         />
                                     }
                                     label={
-                                        <Typography sx={{ fontSize: '0.78rem', color: '#FFFFFF' }}>
-                                            Alinhamento Automático
+                                        <Typography sx={{ fontSize: '0.75rem', color: '#FFFFFF' }}>
+                                            Alinhar ao Soltar
                                         </Typography>
                                     }
                                     sx={{ m: 0 }}
@@ -819,186 +1316,272 @@ const ConfigEtiquetas = () => {
                                     >
                                         <MenuItem value={5}>5px</MenuItem>
                                         <MenuItem value={10}>10px</MenuItem>
+                                        <MenuItem value={15}>15px</MenuItem>
                                         <MenuItem value={20}>20px</MenuItem>
                                     </Select>
                                 )}
+
+                                <Divider orientation="vertical" flexItem sx={{ borderColor: 'rgba(255,255,255,0.1)' }} />
+
+                                {/* Controles de Zoom */}
+                                <Stack direction="row" spacing={0.5} alignItems="center">
+                                    <Tooltip title="Diminuir Zoom">
+                                        <IconButton size="small" onClick={() => setZoom(prev => Math.max(0.4, Number((prev - 0.1).toFixed(1))))} sx={{ color: '#FFFFFF' }}>
+                                            <ZoomOutIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
+                                    <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, minWidth: 36, textAlign: 'center' }}>
+                                        {Math.round(zoom * 100)}%
+                                    </Typography>
+                                    <Tooltip title="Aumentar Zoom">
+                                        <IconButton size="small" onClick={() => setZoom(prev => Math.min(1.5, Number((prev + 0.1).toFixed(1))))} sx={{ color: '#FFFFFF' }}>
+                                            <ZoomInIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Resetar Zoom (100%)">
+                                        <IconButton size="small" onClick={() => setZoom(1.0)} sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                                            <ResetZoomIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
+                                </Stack>
                             </Stack>
                         </Box>
 
+                        {/* MESA DE TRABALHO DA PRANCHETA COM ZOOM FLUIDO */}
                         <Box sx={{
                             flex: 1,
                             minHeight: '620px',
                             display: 'flex',
-                            p: { xs: 1.5, sm: 4 },
-                            background: 'rgba(0,0,0,0.6)',
+                            p: { xs: 1.5, sm: 3 },
+                            background: '#050B18',
                             borderRadius: 2,
-                            border: '1px dashed rgba(0, 212, 255, 0.3)',
+                            border: '1px solid rgba(0, 212, 255, 0.2)',
                             overflow: 'auto',
                             position: 'relative'
                         }}>
-                            <Paper elevation={16} sx={{
+                            <Box sx={{
                                 m: 'auto',
-                                flexShrink: 0,
-                                width: canvasWidth,
-                                height: canvasHeight,
-                                backgroundColor: '#FFFFFF',
-                                backgroundImage: config.background_url ? `url('${config.background_url}')` : 'none',
-                                backgroundSize: 'cover',
-                                backgroundPosition: 'center',
-                                backgroundRepeat: 'no-repeat',
-                                position: 'relative',
-                                overflow: 'hidden',
-                                borderRadius: config.layout?.includes('cr80') ? '12px' : '4px',
-                                boxShadow: '0 12px 40px rgba(0,0,0,0.8), 0 0 20px rgba(0, 212, 255, 0.2)'
+                                transform: `scale(${zoom})`,
+                                transformOrigin: 'center center',
+                                transition: 'transform 0.15s ease'
                             }}>
-                                {/* Camada de Grade Visual Ativável / Desativável */}
-                                {showGrid && (
-                                    <Box sx={{
-                                        position: 'absolute',
-                                        top: 0,
-                                        left: 0,
-                                        right: 0,
-                                        bottom: 0,
-                                        pointerEvents: 'none',
-                                        backgroundImage: `
-                                            linear-gradient(to right, rgba(0, 212, 255, 0.08) 1px, transparent 1px),
-                                            linear-gradient(to bottom, rgba(0, 212, 255, 0.08) 1px, transparent 1px)
-                                        `,
-                                        backgroundSize: `${gridSize}px ${gridSize}px`,
-                                        zIndex: 1
-                                    }} />
-                                )}
+                                <Paper elevation={16} sx={{
+                                    width: canvasWidth,
+                                    height: canvasHeight,
+                                    backgroundColor: '#FFFFFF',
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    borderRadius: config.layout?.includes('cr80') ? '12px' : '4px',
+                                    boxShadow: '0 12px 40px rgba(0,0,0,0.8), 0 0 20px rgba(0, 212, 255, 0.2)'
+                                }}>
+                                    {/* Arte de Fundo / Gabarito de Referência Visual (Situação C) */}
+                                    {config.background_url && !ocultarGabarito && (
+                                        <Box sx={{
+                                            position: 'absolute',
+                                            top: 0,
+                                            left: 0,
+                                            right: 0,
+                                            bottom: 0,
+                                            backgroundImage: `url('${config.background_url}')`,
+                                            backgroundSize: 'cover',
+                                            backgroundPosition: 'center',
+                                            backgroundRepeat: 'no-repeat',
+                                            opacity: config.fundo_como_referencia ? (config.opacidade_referencia || 0.5) : 1,
+                                            pointerEvents: config.travar_referencia ? 'none' : 'auto',
+                                            zIndex: 1
+                                        }} />
+                                    )}
 
-                                {/* Guias Inteligentes Magnéticas estilo Canva (Rosa / Ciano) */}
-                                {smartGuides.vertical !== null && (
-                                    <Box sx={{
-                                        position: 'absolute',
-                                        top: 0,
-                                        bottom: 0,
-                                        left: smartGuides.vertical,
-                                        width: '1.5px',
-                                        backgroundColor: '#FF0077',
-                                        boxShadow: '0 0 6px #FF0077',
-                                        zIndex: 999,
-                                        pointerEvents: 'none'
-                                    }} />
-                                )}
-                                {smartGuides.horizontal !== null && (
-                                    <Box sx={{
-                                        position: 'absolute',
-                                        left: 0,
-                                        right: 0,
-                                        top: smartGuides.horizontal,
-                                        height: '1.5px',
-                                        backgroundColor: '#FF0077',
-                                        boxShadow: '0 0 6px #FF0077',
-                                        zIndex: 999,
-                                        pointerEvents: 'none'
-                                    }} />
-                                )}
+                                    {/* Camada de Grade Visual Ativável */}
+                                    {showGrid && (
+                                        <Box sx={{
+                                            position: 'absolute',
+                                            top: 0,
+                                            left: 0,
+                                            right: 0,
+                                            bottom: 0,
+                                            pointerEvents: 'none',
+                                            backgroundImage: `
+                                                linear-gradient(to right, rgba(0, 212, 255, 0.1) 1px, transparent 1px),
+                                                linear-gradient(to bottom, rgba(0, 212, 255, 0.1) 1px, transparent 1px)
+                                            `,
+                                            backgroundSize: `${gridSize}px ${gridSize}px`,
+                                            zIndex: 2
+                                        }} />
+                                    )}
 
-                                {elements.map(el => (
-                                    <Rnd
-                                        key={el.id}
-                                        size={{ width: el.width, height: el.height }}
-                                        position={{ x: el.x, y: el.y }}
-                                        lockAspectRatio={Boolean(el.lockAspectRatio)}
-                                        onDrag={(_e, d) => handleDrag(_e, d, el)}
-                                        onDragStop={(_e, d) => handleDragStop(_e, d, el.id)}
-                                        onResizeStop={(_e, _direction, ref, _delta, position) => {
-                                            updateElement(el.id, {
-                                                width: parseInt(ref.style.width, 10),
-                                                height: parseInt(ref.style.height, 10),
-                                                ...position
-                                            });
-                                        }}
-                                        bounds="parent"
-                                        onClick={() => setSelectedId(el.id)}
-                                        style={{
-                                            border: selectedId === el.id ? '2px dashed #00D4FF' : '1px dashed rgba(0,0,0,0.1)',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            overflow: 'hidden',
-                                            cursor: 'move',
-                                            borderRadius: el.borderRadius ? `${el.borderRadius}px` : 0,
-                                            opacity: el.opacity != null ? el.opacity : 1,
-                                            zIndex: selectedId === el.id ? 10 : 2
-                                        }}
-                                    >
-                                        {/* RENDERIZAÇÃO: TEXTO */}
-                                        {el.type === 'text' && (
-                                            <Typography variant="body1" sx={{
-                                                width: '100%',
-                                                height: '100%',
-                                                fontSize: el.fontSize || 14,
-                                                fontWeight: el.fontWeight || 'normal',
-                                                color: el.color || '#000000',
-                                                textAlign: el.textAlign || 'left',
-                                                wordWrap: 'break-word',
-                                                lineHeight: 1.15,
-                                                p: 0.2
-                                            }}>
-                                                {el.content}
-                                            </Typography>
-                                        )}
+                                    {/* Guias Inteligentes Magnéticas estilo Canva (Rosa / Magenta) */}
+                                    {smartGuides.vertical !== null && (
+                                        <Box sx={{
+                                            position: 'absolute',
+                                            top: 0,
+                                            bottom: 0,
+                                            left: smartGuides.vertical,
+                                            width: '2px',
+                                            backgroundColor: '#FF0077',
+                                            boxShadow: '0 0 6px #FF0077',
+                                            zIndex: 999,
+                                            pointerEvents: 'none'
+                                        }} />
+                                    )}
+                                    {smartGuides.horizontal !== null && (
+                                        <Box sx={{
+                                            position: 'absolute',
+                                            left: 0,
+                                            right: 0,
+                                            top: smartGuides.horizontal,
+                                            height: '2px',
+                                            backgroundColor: '#FF0077',
+                                            boxShadow: '0 0 6px #FF0077',
+                                            zIndex: 999,
+                                            pointerEvents: 'none'
+                                        }} />
+                                    )}
 
-                                        {/* RENDERIZAÇÃO: QR CODE */}
-                                        {el.type === 'qrcode' && (
-                                            <Box sx={{
-                                                width: '100%',
-                                                height: '100%',
+                                    {/* Renderização dos Elementos na Prancheta */}
+                                    {elements.map(el => (
+                                        <Rnd
+                                            key={el.id}
+                                            scale={zoom}
+                                            size={{ width: el.width, height: el.height }}
+                                            position={{ x: el.x, y: el.y }}
+                                            lockAspectRatio={Boolean(el.lockAspectRatio)}
+                                            onDrag={(_e, d) => handleDrag(_e, d, el)}
+                                            onDragStop={(_e, d) => handleDragStop(_e, d, el.id)}
+                                            onResizeStop={(_e, _direction, ref, _delta, position) => {
+                                                updateElement(el.id, {
+                                                    width: parseInt(ref.style.width, 10),
+                                                    height: parseInt(ref.style.height, 10),
+                                                    ...position
+                                                });
+                                            }}
+                                            bounds="parent"
+                                            onClick={() => {
+                                                setSelectedId(el.id);
+                                                setSidebarTab(2); // Muda para aba de propriedades
+                                            }}
+                                            style={{
+                                                border: selectedId === el.id ? '2px dashed #00D4FF' : '1px dashed rgba(0,0,0,0.15)',
                                                 display: 'flex',
-                                                flexDirection: 'column',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
-                                                background: 'rgba(255,255,255,0.85)',
-                                                border: '1px solid #000'
-                                            }}>
-                                                <QrIcon sx={{ fontSize: Math.min(el.width, el.height) * 0.7, color: '#000000' }} />
-                                                <Typography variant="caption" sx={{ fontSize: 8, color: '#000000' }}>QR Code</Typography>
-                                            </Box>
-                                        )}
-
-                                        {/* RENDERIZAÇÃO: FOTO DA PESSOA */}
-                                        {el.type === 'foto' && (
-                                            <Box sx={{
-                                                width: '100%',
-                                                height: '100%',
-                                                backgroundImage: `url('${DADOS_EXEMPLO.foto_url}')`,
-                                                backgroundSize: 'cover',
-                                                backgroundPosition: 'center',
-                                                border: `${el.borderWidth || 1}px solid ${el.borderColor || '#00D4FF'}`,
-                                                borderRadius: el.borderRadius ? `${el.borderRadius}px` : 0
-                                            }} />
-                                        )}
-
-                                        {/* RENDERIZAÇÃO: SHAPE / TARJA */}
-                                        {el.type === 'shape' && (
-                                            <Box sx={{
-                                                width: '100%',
-                                                height: '100%',
-                                                backgroundColor: el.backgroundColor || '#00D4FF',
-                                                borderRadius: el.borderRadius ? `${el.borderRadius}px` : 0
-                                            }} />
-                                        )}
-
-                                        {/* RENDERIZAÇÃO: IMAGEM / LOGO */}
-                                        {el.type === 'image' && (
-                                            <Box
-                                                component="img"
-                                                src={el.content}
-                                                alt="Logo"
-                                                sx={{
+                                                overflow: 'hidden',
+                                                cursor: 'move',
+                                                borderRadius: el.borderRadius ? `${el.borderRadius}px` : 0,
+                                                opacity: el.opacity != null ? el.opacity : 1,
+                                                zIndex: selectedId === el.id ? 100 : (el.zIndex || 3)
+                                            }}
+                                        >
+                                            {/* RENDERIZAÇÃO: TEXTO */}
+                                            {el.type === 'text' && (
+                                                <Typography variant="body1" sx={{
                                                     width: '100%',
                                                     height: '100%',
-                                                    objectFit: 'contain'
-                                                }}
-                                            />
-                                        )}
-                                    </Rnd>
-                                ))}
-                            </Paper>
+                                                    fontSize: el.fontSize || 14,
+                                                    fontWeight: el.fontWeight || 'normal',
+                                                    color: el.color || '#000000',
+                                                    textAlign: el.textAlign || 'left',
+                                                    wordWrap: 'break-word',
+                                                    lineHeight: 1.15,
+                                                    p: 0.2
+                                                }}>
+                                                    {el.content}
+                                                </Typography>
+                                            )}
+
+                                            {/* RENDERIZAÇÃO: QR CODE */}
+                                            {el.type === 'qrcode' && (
+                                                <Box sx={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    background: 'rgba(255,255,255,0.85)',
+                                                    border: '1px solid #000'
+                                                }}>
+                                                    <QrIcon sx={{ fontSize: Math.min(el.width, el.height) * 0.7, color: '#000000' }} />
+                                                    <Typography variant="caption" sx={{ fontSize: 8, color: '#000000' }}>QR Code</Typography>
+                                                </Box>
+                                            )}
+
+                                            {/* RENDERIZAÇÃO: CÓDIGO DE BARRAS 1D */}
+                                            {el.type === 'barcode' && (
+                                                <Box
+                                                    sx={{
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center'
+                                                    }}
+                                                    dangerouslySetInnerHTML={{
+                                                        __html: gerarBarcodeSvg(el.content || '123456', el.exibirTexto !== false)
+                                                    }}
+                                                />
+                                            )}
+
+                                            {/* RENDERIZAÇÃO: FOTO DA PESSOA */}
+                                            {el.type === 'foto' && (
+                                                <Box sx={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    backgroundImage: `url('${DADOS_EXEMPLO.foto_url}')`,
+                                                    backgroundSize: 'cover',
+                                                    backgroundPosition: 'center',
+                                                    border: `${el.borderWidth || 1}px solid ${el.borderColor || '#00D4FF'}`,
+                                                    borderRadius: el.borderRadius ? `${el.borderRadius}px` : 0
+                                                }} />
+                                            )}
+
+                                            {/* RENDERIZAÇÃO: RETÂNGULO / TARJA */}
+                                            {el.type === 'shape' && (
+                                                <Box sx={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    backgroundColor: el.backgroundColor || '#00D4FF',
+                                                    borderRadius: el.borderRadius ? `${el.borderRadius}px` : 0
+                                                }} />
+                                            )}
+
+                                            {/* RENDERIZAÇÃO: CÍRCULO / SELO */}
+                                            {el.type === 'circle' && (
+                                                <Box sx={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    backgroundColor: el.backgroundColor || '#00FF88',
+                                                    borderRadius: '50%',
+                                                    border: `${el.borderWidth || 0}px solid ${el.borderColor || '#000000'}`
+                                                }} />
+                                            )}
+
+                                            {/* RENDERIZAÇÃO: LINHA DIVISÓRIA */}
+                                            {el.type === 'line' && (
+                                                <Box sx={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    borderTop: `${el.borderWidth || 2}px solid ${el.borderColor || '#000000'}`
+                                                }} />
+                                            )}
+
+                                            {/* RENDERIZAÇÃO: IMAGEM / LOGO */}
+                                            {el.type === 'image' && (
+                                                <Box
+                                                    component="img"
+                                                    src={el.content}
+                                                    alt="Logo"
+                                                    sx={{
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        objectFit: 'contain'
+                                                    }}
+                                                />
+                                            )}
+                                        </Rnd>
+                                    ))}
+                                </Paper>
+                            </Box>
                         </Box>
                     </GlassCard>
                 </Grid>
