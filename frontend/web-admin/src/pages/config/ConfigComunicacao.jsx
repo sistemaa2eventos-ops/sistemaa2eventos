@@ -80,7 +80,7 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
     const checkStatus = useCallback(async () => {
         try {
             const smtpConfigured = Boolean(
-                settings.smtp_host && settings.smtp_port && settings.smtp_user && settings.smtp_pass
+                settings.smtp_host && settings.smtp_port && settings.smtp_user && (settings.smtp_pass || settings.smtp_pass_configurado)
             );
 
             const [db, smtp] = await Promise.all([
@@ -99,8 +99,8 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                 database: db.data?.success ? 'online' : 'error',
                 storage: db.data?.success ? 'online' : 'error',
                 smtp: !smtpConfigured ? 'offline' : (smtp.data?.success ? 'online' : 'error'),
-                telegram: (settings.telegram_bot_token && settings.telegram_chat_id) ? 'configured' : (settings.telegram_bot_token ? 'partial' : 'offline'),
-                whatsapp: (settings.wpp_token || settings.whatsapp_api_url) ? 'configured' : 'offline'
+                telegram: ((settings.telegram_bot_token || settings.telegram_bot_token_configurado) && settings.telegram_chat_id) ? 'configured' : ((settings.telegram_bot_token || settings.telegram_bot_token_configurado) ? 'partial' : 'offline'),
+                whatsapp: (settings.wpp_token || settings.wpp_token_configurado || settings.whatsapp_api_key_configurado || settings.whatsapp_api_url) ? 'configured' : 'offline'
             });
         } catch (err) {
             console.error('Falha ao checar status:', err);
@@ -196,7 +196,8 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
     };
 
     const handleTestTelegram = async () => {
-        if (!settings.telegram_bot_token || !settings.telegram_chat_id) {
+        // Sem token digitado, o servidor usa o que já está gravado
+        if ((!settings.telegram_bot_token && !settings.telegram_bot_token_configurado) || !settings.telegram_chat_id) {
             enqueueSnackbar('Preencha o Token do Bot e o Chat ID antes de testar.', { variant: 'warning' });
             return;
         }
@@ -425,6 +426,7 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                                             size="small"
                                             type={showSmtpPass ? 'text' : 'password'}
                                             value={settings.smtp_pass || ''}
+                                            placeholder={settings.smtp_pass_configurado ? 'Já configurada: digite só para trocar' : ''}
                                             onChange={(e) => setSettings(prev => ({ ...prev, smtp_pass: e.target.value }))}
                                             InputProps={{
                                                 endAdornment: (
@@ -497,6 +499,7 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                                         placeholder="Ex: 7123456789:AAFlkjw89..."
                                         type={showTgToken ? 'text' : 'password'}
                                         value={settings.telegram_bot_token || ''}
+                                        placeholder={settings.telegram_bot_token_configurado ? 'Já configurado: digite só para trocar' : 'Ex: 7123456789:AAFlkjw89...'}
                                         onChange={(e) => setSettings(prev => ({ ...prev, telegram_bot_token: e.target.value }))}
                                         helperText="Token fornecido pelo @BotFather ao criar o seu robô no Telegram."
                                         InputProps={{
@@ -622,6 +625,7 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                                         size="small"
                                         type={showWppToken ? 'text' : 'password'}
                                         value={settings.wpp_token || settings.whatsapp_api_key || ''}
+                                        placeholder={(settings.wpp_token_configurado || settings.whatsapp_api_key_configurado) ? 'Já configurado: digite só para trocar' : ''}
                                         onChange={(e) => setSettings(prev => ({
                                             ...prev,
                                             wpp_token: e.target.value,

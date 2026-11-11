@@ -37,7 +37,7 @@ const situacaoCamera = (cam, status, isDesativada, st, iaErro, motorLigado) => {
     const chips = [];
     const modo = modoIaDe(cam);
     if (modo === 'monitorar') chips.push('Não usa o motor de IA');
-    else if (!motorLigado) chips.push('Motor de IA desligado no evento');
+    else if (motorLigado === false) chips.push('Motor de IA desligado no evento');
     else if (st?.ia_analisando) chips.push(st.rostos ? `IA analisando · ${st.rostos} rosto(s)` : 'IA analisando');
     else if (st) chips.push(modo === '24h' ? 'IA em espera (sem movimento)' : 'IA em espera (ninguém assistindo)');
     else if (iaErro) chips.push('Motor de IA do evento indisponível');
@@ -70,7 +70,8 @@ const ConfigCameras = ({ abaInicial = null }) => {
     // Situação ao vivo das câmeras com IA (vídeo chegando, fps, IA), atualizada a cada 15 s
     const temCameraComIa = cameras.some(c => c.ia_ativa === true);
     const { status: iaStatus, erro: iaErro } = useIaStatus(activeTab === 0 && temCameraComIa, 15000);
-    const [motorLigado, setMotorLigado] = useState(true);
+    // null = ainda não se sabe (não assume ligado nem desligado)
+    const [motorLigado, setMotorLigado] = useState(null);
 
     // Dialog de Câmera (Criar / Editar)
     const [cameraModalOpen, setCameraModalOpen] = useState(false);
@@ -113,7 +114,10 @@ const ConfigCameras = ({ abaInicial = null }) => {
     useEffect(() => {
         api.get('/cameras/evento-config', { hideDefaultError: true })
             .then(({ data }) => setMotorLigado(data.data?.motor_ia_ativo !== false))
-            .catch(() => {});
+            .catch(() => {
+                setMotorLigado(null);
+                enqueueSnackbar('Não foi possível verificar se o motor de IA do evento está ligado.', { variant: 'warning' });
+            });
     }, [activeTab]);
 
     // Abrir Modal de Câmera

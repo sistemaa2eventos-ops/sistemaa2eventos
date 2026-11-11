@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Typography, Grid, TextField, Button, List, ListItem, ListItemText, IconButton, CircularProgress, MenuItem } from '@mui/material';
+import { Box, Typography, Grid, TextField, Button, List, ListItem, ListItemText, IconButton, CircularProgress, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import { Code as CodeIcon, Delete as DeleteIcon, ContentCopy as CopyIcon, Add as AddIcon, Webhook as WebhookIcon } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import api from '../../services/api';
@@ -37,15 +37,28 @@ const ConfigWebhooks = () => {
         loadData();
     }, [loadData]);
 
-    const handleCreateApiKey = async () => {
-        const name = prompt("Nome da Nova Integração API (Ex: Zapier, PowerBI):");
+    const [chaveDialogo, setChaveDialogo] = useState(false);
+    const [novaChaveNome, setNovaChaveNome] = useState('');
+    const [salvandoChave, setSalvandoChave] = useState(false);
+
+    const handleCreateApiKey = () => {
+        setNovaChaveNome('');
+        setChaveDialogo(true);
+    };
+
+    const confirmarNovaChave = async () => {
+        const name = novaChaveNome.trim();
         if (!name) return;
+        setSalvandoChave(true);
         try {
             await api.post('/settings/apikeys', { name });
             enqueueSnackbar('API Key gerada!', { variant: 'success' });
+            setChaveDialogo(false);
             loadData();
         } catch (error) {
             enqueueSnackbar('Erro ao gerar API Key', { variant: 'error' });
+        } finally {
+            setSalvandoChave(false);
         }
     };
 
@@ -77,6 +90,7 @@ const ConfigWebhooks = () => {
     };
 
     const handleDeleteWebhook = async (id) => {
+        if (!(await confirmar({ titulo: 'Remover webhook', mensagem: 'Os eventos deixam de ser enviados para esta URL.', textoConfirmar: 'Remover' }))) return;
         try {
             await api.delete(`/settings/webhooks/${id}`);
             enqueueSnackbar('Webhook removido!', { variant: 'warning' });
@@ -223,6 +237,28 @@ const ConfigWebhooks = () => {
                 </Grid>
 
             </Grid>
+
+            <Dialog open={chaveDialogo} onClose={() => !salvandoChave && setChaveDialogo(false)} maxWidth="xs" fullWidth>
+                <DialogTitle>Nova integração de API</DialogTitle>
+                <DialogContent>
+                    <TextField
+                        autoFocus
+                        fullWidth
+                        margin="dense"
+                        label="Nome da integração"
+                        placeholder="Ex: Zapier, PowerBI"
+                        value={novaChaveNome}
+                        onChange={(e) => setNovaChaveNome(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') confirmarNovaChave(); }}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setChaveDialogo(false)} disabled={salvandoChave}>Cancelar</Button>
+                    <Button variant="contained" onClick={confirmarNovaChave} disabled={salvandoChave || !novaChaveNome.trim()}>
+                        {salvandoChave ? 'Gerando...' : 'Gerar chave'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

@@ -81,6 +81,7 @@ const ConfigCron = () => {
     };
 
     const handleManualSync = async () => {
+        if (!(await confirmar({ titulo: 'Sincronizar agora', mensagem: 'Envia agora os dados pendentes para os leitores e para a nuvem. Pode levar alguns minutos.', textoConfirmar: 'Sincronizar' }))) return;
         try {
             setRunningSync(true);
             await api.post('/sync/run');

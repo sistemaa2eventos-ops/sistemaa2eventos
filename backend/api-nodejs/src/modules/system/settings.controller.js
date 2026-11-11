@@ -58,6 +58,24 @@ const SETTINGS_LEGACY_CONFIG_FIELDS = [
     'email_from', 'email_from_name', 'whatsapp_api_url', 'whatsapp_api_key'
 ];
 
+// Segredos: nunca voltam para o navegador. O painel recebe só se estão configurados.
+// Campo vazio no PUT significa "manter o que já está gravado".
+const CAMPOS_SECRETOS = ['smtp_pass', 'wpp_token', 'telegram_bot_token', 'whatsapp_api_key'];
+
+function ocultarSegredos(registro) {
+    if (!registro || typeof registro !== 'object') return registro;
+    const saida = { ...registro };
+    const config = saida.config && typeof saida.config === 'object' ? { ...saida.config } : null;
+    for (const campo of CAMPOS_SECRETOS) {
+        const gravado = saida[campo] || (config && config[campo]);
+        saida[`${campo}_configurado`] = !!gravado;
+        saida[campo] = '';
+        if (config) delete config[campo];
+    }
+    if (config) saida.config = config;
+    return saida;
+}
+
 /** Extrai apenas campos permitidos do payload */
 function pickAllowed(body, allowedFields) {
     const result = {};
@@ -121,7 +139,7 @@ class SettingsController {
                 }
             }
 
-            res.json({ success: true, data: settings });
+            res.json({ success: true, data: ocultarSegredos(settings) });
         } catch (error) {
             logger.error('Erro ao buscar system_settings no Supabase:', error);
             res.status(500).json({ error: 'Erro ao buscar configurações globais' });
@@ -132,6 +150,16 @@ class SettingsController {
     async updateSettings(req, res) {
         try {
             const payload = pickAllowed(req.body, SETTINGS_ALLOWED_FIELDS);
+            // Segredo vazio ou ausente não sobrescreve o valor gravado
+            for (const campo of CAMPOS_SECRETOS) {
+                if (payload[campo] === '' || payload[campo] === null) delete payload[campo];
+            }
+            if (payload.config && typeof payload.config === 'object') {
+                payload.config = { ...payload.config };
+                for (const campo of CAMPOS_SECRETOS) {
+                    if (payload.config[campo] === '' || payload.config[campo] === null) delete payload.config[campo];
+                }
+            }
 
             // Sincronizar email_from e smtp_email para manter consistência
             if (payload.smtp_email && !payload.email_from) payload.email_from = payload.smtp_email;
@@ -189,7 +217,7 @@ class SettingsController {
                 }
             }
 
-            res.json({ success: true, message: 'Configurações atualizadas com sucesso', data });
+            res.json({ success: true, message: 'Configurações atualizadas com sucesso', data: ocultarSegredos(data) });
         } catch (error) {
             logger.error('Erro ao atualizar system_settings no Supabase:', error);
             res.status(500).json({ error: 'Erro ao atualizar configurações' });
