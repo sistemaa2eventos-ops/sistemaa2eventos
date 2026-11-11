@@ -7,6 +7,8 @@
         ligar-ia-facial.bat parar               desliga vigia, motor de IA e agente local
         ligar-ia-facial.bat instalar-autostart  ativa inicialização automática no login do Windows
         ligar-ia-facial.bat remover-autostart   remove inicialização automática
+        ligar-ia-facial.bat instalar-tarefa     (admin) sobe no login por tarefa agendada, reiniciada se falhar
+        ligar-ia-facial.bat remover-tarefa      (admin) remove a tarefa agendada
 
   Peças:
     1. Câmera      OBS com servidor RTSP em localhost:8554 ou leitura direta da Webcam USB (fallback automático)
@@ -192,6 +194,47 @@ if ($Acao -eq 'remover-autostart') {
     $atalho = Join-Path ([Environment]::GetFolderPath('Startup')) 'NZT-IA-Facial.lnk'
     if (Test-Path $atalho) { Remove-Item $atalho -Force; Escrever 'Inicialização automática removida.' 'Yellow' }
     else { Escrever 'Inicialização automática não estava instalada.' 'Gray' }
+    exit 0
+}
+
+# ---------------------------------------------------------------- tarefa agendada (recomendado)
+# No lugar do atalho de Inicialização: a tarefa sobe no login, sem janela, com privilégio de
+# administrador, e o Windows a reinicia sozinha se o vigia falhar. Precisa ser instalada como admin.
+$NomeTarefa = 'NZT-IA-Facial'
+$AtalhoAntigo = Join-Path ([Environment]::GetFolderPath('Startup')) 'NZT-IA-Facial.lnk'
+
+function Test-Administrador {
+    $p = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+    return $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+if ($Acao -eq 'instalar-tarefa') {
+    if (-not (Test-Administrador)) {
+        Escrever 'Esta ação precisa de administrador. Feche esta janela, clique com o botão direito em ligar-ia-facial.bat e escolha "Executar como administrador". Depois rode de novo: ligar-ia-facial.bat instalar-tarefa' 'Red'
+        exit 1
+    }
+    $usuario = "$env:USERDOMAIN\$env:USERNAME"
+    $acao = New-ScheduledTaskAction -Execute 'powershell.exe' `
+        -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`"" -WorkingDirectory $Raiz
+    $gatilho = New-ScheduledTaskTrigger -AtLogOn -User $usuario
+    $ajustes = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+        -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) `
+        -StartWhenAvailable -MultipleInstances IgnoreNew
+    $principal = New-ScheduledTaskPrincipal -UserId $usuario -LogonType Interactive -RunLevel Highest
+    Register-ScheduledTask -TaskName $NomeTarefa -Action $acao -Trigger $gatilho -Settings $ajustes `
+        -Principal $principal -Description 'NZT: motor de IA facial e agente local do evento' -Force | Out-Null
+    # Evita dois vigias: o atalho antigo sai quando a tarefa entra
+    if (Test-Path $AtalhoAntigo) { Remove-Item $AtalhoAntigo -Force }
+    Escrever "Tarefa '$NomeTarefa' instalada: sobe no login de $usuario e é reiniciada se falhar." 'Green'
+    Escrever 'Para subir agora sem reiniciar: Start-ScheduledTask -TaskName NZT-IA-Facial' 'DarkGray'
+    exit 0
+}
+if ($Acao -eq 'remover-tarefa') {
+    if (-not (Test-Administrador)) { Escrever 'Precisa de administrador para remover a tarefa.' 'Red'; exit 1 }
+    if (Get-ScheduledTask -TaskName $NomeTarefa -ErrorAction SilentlyContinue) {
+        Unregister-ScheduledTask -TaskName $NomeTarefa -Confirm:$false
+        Escrever "Tarefa '$NomeTarefa' removida." 'Yellow'
+    } else { Escrever 'A tarefa não estava instalada.' 'Gray' }
     exit 0
 }
 
