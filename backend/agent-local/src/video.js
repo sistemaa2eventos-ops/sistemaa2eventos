@@ -64,6 +64,72 @@ function derivarSubstream(url) {
     return null;
 }
 
+// ------------------------------------------------------------------ webcam USB
+// A webcam entra no retransmissor como as câmeras IP: o go2rtc abre o dispositivo (DirectShow) e
+// codifica em H.264 só enquanto alguém consome. Um único dono do dispositivo (antes o motor de IA o
+// abria e recomprimia em JPEG); o motor lê do RTSP local como qualquer câmera.
+const webcams = { lista: null, modos: new Map() }; // nomes DirectShow; nome → melhor "LxA"
+
+function listarWebcams() {
+    if (webcams.lista || process.platform !== 'win32' || !estado.ffmpeg) return webcams.lista || [];
+    try {
+        const r = require('child_process').spawnSync(estado.ffmpeg, ['-hide_banner', '-list_devices', 'true', '-f', 'dshow', '-i', 'dummy'],
+            { encoding: 'utf8', windowsHide: true, timeout: 10000 });
+        webcams.lista = [...String(r.stderr || '').matchAll(/"([^"]+)"\s+\(video\)/g)].map(m => m[1]);
+    } catch {
+        webcams.lista = [];
+    }
+    return webcams.lista;
+}
+
+/** Maior resolução que a webcam oferece (ex.: "640x480"), para não abrir abaixo do que ela entrega */
+function melhorModo(nome) {
+    if (webcams.modos.has(nome)) return webcams.modos.get(nome);
+    let melhor = null;
+    try {
+        const r = require('child_process').spawnSync(estado.ffmpeg, ['-hide_banner', '-list_options', 'true', '-f', 'dshow', '-i', `video=${nome}`],
+            { encoding: 'utf8', windowsHide: true, timeout: 10000 });
+        let area = 0;
+        for (const m of String(r.stderr || '').matchAll(/max s=(\d+)x(\d+)/g)) {
+            const a = Number(m[1]) * Number(m[2]);
+            if (a > area && Number(m[1]) <= 1920) { area = a; melhor = `${m[1]}x${m[2]}`; }
+        }
+    } catch { /* usa o padrão do dispositivo */ }
+    if (melhor) webcams.modos.set(nome, melhor); // dispositivo ocupado: tenta de novo na próxima vez
+    return melhor;
+}
+
+function portaAberta(porta) {
+    return new Promise((resolve) => {
+        const s = require('net').connect(porta, '127.0.0.1');
+        const fim = (ok) => { s.destroy(); resolve(ok); };
+        s.once('connect', () => fim(true));
+        s.once('error', () => fim(false));
+        setTimeout(() => fim(false), 400);
+    });
+}
+
+/**
+ * Origem da câmera no go2rtc. "webcam", "webcam:1", "usb:0" ou o RTSP local do OBS (127.0.0.1:8554)
+ * com o OBS fechado viram a webcam USB; o resto segue como RTSP.
+ */
+async function origemDaCamera(url) {
+    const u = String(url || '').trim();
+    const ehWebcam = /^(webcam|usb)\b/i.test(u) || /^\d+$/.test(u);
+    const obsLocal = /^rtsp:\/\/(127\.0\.0\.1|localhost):8554\b/i.test(u);
+    if (!ehWebcam && !obsLocal) return /^rtsps?:\/\//i.test(u) ? u : null;
+    if (obsLocal && await portaAberta(8554)) return u; // OBS ligado: usa o RTSP dele
+    if (!estado.ffmpeg) return null;
+    const lista = listarWebcams();
+    const indice = Number((u.match(/(\d+)\s*$/) || [])[1] || 0);
+    const nome = lista[indice] || lista[0];
+    if (!nome) return null;
+    const modo = melhorModo(nome);
+    const params = new URLSearchParams({ video: String(Math.max(0, lista.indexOf(nome))), framerate: '30', ...(modo ? { video_size: modo } : {}) });
+    // Teto de taxa: sem ele, o ruído do sensor (pouca luz) passava de 2 Mbit/s para 640x480
+    return `ffmpeg:device?${params}#video=h264#raw=-crf 26 -maxrate 900k -bufsize 1800k`;
+}
+
 const nomeStream = (cameraId, sub) => `c_${String(cameraId).replace(/[^a-zA-Z0-9]/g, '')}${sub ? '_sub' : ''}`;
 const aspas = (t) => `"${String(t).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 
@@ -90,7 +156,9 @@ function escreverConfig() {
         '  listen: ""',
         'log:',
         '  level: warn',
-        ...(estado.ffmpeg ? ['ffmpeg:', `  bin: ${aspas(estado.ffmpeg)}`] : []),
+        // Só o nome: o go2rtc corta o comando nos espaços ("C:\Users\Natália Alves\..." quebrava);
+        // a pasta do ffmpeg vai na frente do PATH do processo (ver iniciarProcesso)
+        ...(estado.ffmpeg ? ['ffmpeg:', '  bin: "ffmpeg"'] : []),
         'streams:',
         ...[...estado.streams].map(([nome, url]) => `  ${nome}: ${aspas(url)}`)
     ];
@@ -99,9 +167,29 @@ function escreverConfig() {
     fs.writeFileSync(ARQ_CONFIG, linhas.join('\n') + '\n', { mode: 0o600 });
 }
 
+/**
+ * Encerra o go2rtc com os filhos. No Windows, matar só o go2rtc deixava vivo o ffmpeg que ele abriu
+ * para a webcam, segurando o dispositivo (a próxima abertura falhava com "I/O error").
+ */
+function encerrarProcesso(proc) {
+    if (!proc) return;
+    if (process.platform === 'win32' && proc.pid) {
+        try {
+            execFileSync('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true, timeout: 10000 });
+            return;
+        } catch { /* já saiu */ }
+    }
+    proc.kill();
+}
+
 function iniciarProcesso() {
     escreverConfig();
-    const proc = spawn(estado.bin, ['-config', ARQ_CONFIG], { cwd: DIR_BIN, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    const env = { ...process.env };
+    if (estado.ffmpeg) {
+        const chave = Object.keys(env).find(k => k.toUpperCase() === 'PATH') || 'PATH';
+        env[chave] = `${path.dirname(estado.ffmpeg)}${path.delimiter}${env[chave] || ''}`;
+    }
+    const proc = spawn(estado.bin, ['-config', ARQ_CONFIG], { cwd: DIR_BIN, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
     estado.proc = proc;
     const registrar = (dados) => {
         const texto = dados.toString().trim();
@@ -180,17 +268,19 @@ async function chamarApi(caminho, params = {}, timeoutMs = 8000, extras = {}) {
  * Câmeras do evento (RTSP). Reinicia o go2rtc só se o conjunto de câmeras/URLs mudou
  * (cadastro ou edição): quem estava assistindo reconecta sozinho em segundos.
  */
-function configurarCameras(cameras = []) {
+async function configurarCameras(cameras = []) {
     if (!estado.bin) return;
     const streams = new Map();
     const camMap = new Map();
     for (const c of cameras) {
-        const url = String(c.stream_url || '');
-        if (!c.id || !/^rtsps?:\/\//i.test(url)) continue;
-        if (/^rtsp:\/\/(127\.0\.0\.1|localhost):8554\b/i.test(url)) continue; // OBS/webcam local: segue pelo motor
+        if (!c.id) continue;
+        const url = await origemDaCamera(c.stream_url);
+        if (!url) continue;
         const principal = nomeStream(c.id, false);
         streams.set(principal, url);
-        const subUrl = (c.url_substream && /^rtsps?:\/\//i.test(c.url_substream)) ? c.url_substream : derivarSubstream(url);
+        // Webcam não tem sub-stream: a miniatura usa o mesmo vídeo (já é leve)
+        const subUrl = url.startsWith('ffmpeg:') ? null
+            : (c.url_substream && /^rtsps?:\/\//i.test(c.url_substream)) ? c.url_substream : derivarSubstream(url);
         let sub = null;
         if (subUrl && subUrl !== url) {
             sub = nomeStream(c.id, true);
@@ -209,7 +299,7 @@ function configurarCameras(cameras = []) {
         const antigo = estado.proc;
         estado.proc = null;
         estado.pronto = false;
-        if (antigo) antigo.kill();
+        encerrarProcesso(antigo);
         setTimeout(iniciarProcesso, antigo ? 800 : 0);
     }, 1500);
 }
@@ -284,7 +374,7 @@ function status() {
 function parar() {
     const p = estado.proc;
     estado.proc = null;
-    if (p) p.kill();
+    encerrarProcesso(p);
 }
 
 module.exports = {

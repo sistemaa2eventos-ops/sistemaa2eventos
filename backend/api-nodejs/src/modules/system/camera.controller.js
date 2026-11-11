@@ -21,7 +21,8 @@ const gravacaoService = require('./gravacao.service');
 const jwt = require('jsonwebtoken');
 const qualidadeDe = (req) => (req.query.qualidade === 'mini' ? 'mini' : 'foco');
 const iaHeaders = () => (process.env.IA_CHAVE_INTERNA ? { 'X-IA-Chave': process.env.IA_CHAVE_INTERNA } : {});
-const ehRtsp = (cam) => cam.protocolo === 'rtsp' || /^rtsps?:\/\//i.test(cam.stream_url || '');
+// Câmera de vídeo contínuo (RTSP ou webcam USB do PC do evento), não só snapshot HTTP
+const ehRtsp = (cam) => cam.protocolo === 'rtsp' || /^(rtsps?:\/\/|webcam|usb)/i.test(cam.stream_url || '');
 const desativada = (cam) => cam.status === 'desativada' || cam.status === 'inativa';
 /** O PC do evento tem o retransmissor de vídeo (go2rtc)? Então o vídeo não depende do motor de IA. */
 const videoLocal = (rota) => rota?.tipo === 'agente' && !!agentService.recursos(rota.agentId).video_local;

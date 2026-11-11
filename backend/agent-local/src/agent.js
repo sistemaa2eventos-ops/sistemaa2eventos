@@ -288,7 +288,7 @@ const handlers = {
      */
     async vigilancia_configurar({ cameras = [], evento = null }) {
         if (evento) salvarConfigCameras({ cameras, evento });
-        video.configurarCameras(cameras);
+        await video.configurarCameras(cameras); // antes de montar a lista do motor (usa o RTSP local)
         if (evento) {
             vigilancia.evento = evento;
             gravador.configurar({

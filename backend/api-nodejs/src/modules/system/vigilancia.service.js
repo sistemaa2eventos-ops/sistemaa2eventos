@@ -25,7 +25,9 @@ const iaHeaders = () => (process.env.IA_CHAVE_INTERNA ? { 'X-IA-Chave': process.
  * motor e só as marcadas no gravador.
  */
 async function camerasDoEvento(eventoId) {
-    const consultar = (campos) => supabase.from('cameras_ip').select(campos).eq('evento_id', eventoId).like('stream_url', 'rtsp%');
+    // RTSP e webcam USB do PC do evento ("webcam", "webcam:1", "usb:0")
+    const consultar = (campos) => supabase.from('cameras_ip').select(campos).eq('evento_id', eventoId)
+        .or('stream_url.like.rtsp%,stream_url.like.webcam%,stream_url.like.usb%');
     let { data, error } = await consultar('id, nome, status, stream_url, ia_ativa, vigilancia_ativa, prioridade, url_substream, gravacao_modo, gravacao_stream');
     if (error && (error.code === '42703' || /column/i.test(error.message))) {
         // banco sem a migration 20261111 (gravação) ou 20261028 (IA por câmera)
