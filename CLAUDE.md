@@ -739,6 +739,21 @@ docker system prune -af
 **Registre cada deploy aqui:**
 
 ```
+2026-11-11 - Deploy b43ba55 (pulseiras: janelas de uso, fase e devolução; crachás)
+├─ Mudanças: lote de pulseira só vale na fase/data/horário do momento (novo loteSelecao.js; janela que vira
+│            a noite); fora disso check-in e credenciamento respondem 403; "Marcar como Devolvida" no
+│            credenciamento corrigido (rota /pulseiras/encerrar); lote com fase/horário sem a migration
+│            responde 409 (sem gravar em silêncio); notas_auditoria saiu do link público da empresa;
+│            ingresso de mídia do rate limiter com assinatura conferida; duplicidade sem maybeSingle;
+│            editor visual de crachás (ConfigEtiquetas)
+│            (o commit já estava no origin quando foi feita a revisão; a mensagem não descreve tudo)
+├─ Migrations: 20261111_pulseiras_fase_data.sql (aplicada pela usuária depois do deploy, antes do teste)
+├─ Status: ✅ OK (GitHub Actions run 43032376325, "Deploy Automático")
+├─ Teste: NÃO verificado nesta sessão. painel.nzt.app.br/health devolve a página do painel e /api/health dá 404;
+│          conferir "database connected" e as rotas de pulseira nos logs do container a2-eventos-api
+├─ Rollback: tag antes-deploy-20261111g (1e1db48)
+└─ Próximo: rodar os 3 testes de pulseira (janela, devolução, lotes sobrepostos) antes do evento
+
 2026-11-11 - Deploy 8d56b76 (estação por câmera com IA, sem leitor)
 ├─ Mudanças: janela da estação (check-in/check-out) escolhe leitor (opcional) e/ou câmeras com IA;
 │            sessoes_operador.camera_ids; câmera reconhece → conferência/saída na estação;
