@@ -70,7 +70,7 @@ class AgentService {
                 iaEmVoo++;
                 try {
                     const cfg = await require('../modules/system/gravacao.service').configEvento(eventoId).catch(() => null);
-                    if (cfg?.ia_onde !== 'auto') return ack({ indisponivel: true, local: true });
+                    if (cfg?.ia_onde !== 'auto' && cfg?.ia_onde !== 'direto_servidor') return ack({ indisponivel: true, local: true });
                     ack(await require('./iaCentral').reconhecer(eventoId, msg?.itens));
                 } catch {
                     ack({ indisponivel: true });

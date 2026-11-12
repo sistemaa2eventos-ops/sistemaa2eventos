@@ -496,7 +496,6 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                                         label="Bot Token (Telegram API)"
                                         fullWidth
                                         size="small"
-                                        placeholder="Ex: 7123456789:AAFlkjw89..."
                                         type={showTgToken ? 'text' : 'password'}
                                         value={settings.telegram_bot_token || ''}
                                         placeholder={settings.telegram_bot_token_configurado ? 'Já configurado: digite só para trocar' : 'Ex: 7123456789:AAFlkjw89...'}

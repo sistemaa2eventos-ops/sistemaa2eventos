@@ -1,14 +1,29 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     Box, Stack, Switch, FormControlLabel, Chip, TextField, Tooltip, Typography, CircularProgress, Button,
-    FormControl, InputLabel, Select, MenuItem
+    FormControl, InputLabel, Select, MenuItem, Collapse
 } from '@mui/material';
-import { Computer as PcIcon, Save as SaveIcon } from '@mui/icons-material';
+import {
+    Computer as PcIcon,
+    Save as SaveIcon,
+    Tune as TuneIcon,
+    ExpandMore as ExpandMoreIcon,
+    ExpandLess as ExpandLessIcon,
+    CloudDone as CloudIcon,
+    FlashOn as FlashIcon
+} from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import api from '../../services/api';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
+import SeletorArquiteturaIa from './SeletorArquiteturaIa';
 
 const gb = (bytes) => (bytes == null ? '—' : `${(bytes / 1024 ** 3).toFixed(bytes > 10 * 1024 ** 3 ? 0 : 1)} GB`);
+
+const MENSAGENS_MODO = {
+    local: 'Reconhecimento 100% no PC do evento (Super Operação Local).',
+    auto: 'Reconhecimento Híbrido no Servidor Central (com reserva no PC do evento).',
+    direto_servidor: 'Câmeras configuradas para envio direto ao Servidor Central (Central Remota / Fibra).'
+};
 
 /**
  * Chaves gerais das câmeras do evento: motor de IA, gravação, limite de espaço e prazo de guarda,
@@ -24,6 +39,7 @@ const CamerasEventoBarra = ({ podeEditar = true }) => {
     const [reconhecimento, setReconhecimento] = useState(null);
     const [salvando, setSalvando] = useState(false);
     const [limites, setLimites] = useState({ gravacao_limite_gb: 40, gravacao_retencao_dias: 30 });
+    const [mostrarArquitetura, setMostrarArquitetura] = useState(false);
 
     const carregar = useCallback(async () => {
         try {
@@ -54,12 +70,16 @@ const CamerasEventoBarra = ({ podeEditar = true }) => {
         try {
             const { data } = await api.put('/cameras/evento-config', campos);
             setCfg(data.data);
-            enqueueSnackbar(mensagem, { variant: 'success' });
+            enqueueSnackbar(mensagem || 'Configuração salva.', { variant: 'success' });
         } catch (err) {
             enqueueSnackbar(err.response?.data?.error || 'Não foi possível salvar.', { variant: 'error' });
         } finally {
             setSalvando(false);
         }
+    };
+
+    const alternarModoArquitetura = (novoModo) => {
+        salvar({ ia_onde: novoModo }, MENSAGENS_MODO[novoModo] || 'Modo de arquitetura alterado.');
     };
 
     const alternarMotor = async (ligar) => {
@@ -97,19 +117,51 @@ const CamerasEventoBarra = ({ podeEditar = true }) => {
                     control={<Switch id="evento-gravacao" checked={cfg.gravacao_ativa} onChange={(e) => alternarGravacao(e.target.checked)} />}
                     label={<Typography fontWeight={700} fontSize="0.875rem">Gravação do evento</Typography>}
                 />
-                <FormControl size="small" sx={{ minWidth: 280 }} disabled={!podeEditar || salvando || !cfg.motor_ia_ativo}>
+                <FormControl size="small" sx={{ minWidth: 290 }} disabled={!podeEditar || salvando || !cfg.motor_ia_ativo}>
                     <InputLabel id="evento-ia-onde-rotulo">Onde roda o reconhecimento</InputLabel>
-                    <Select labelId="evento-ia-onde-rotulo" id="evento-ia-onde" label="Onde roda o reconhecimento"
+                    <Select
+                        labelId="evento-ia-onde-rotulo"
+                        id="evento-ia-onde"
+                        label="Onde roda o reconhecimento"
                         value={cfg.ia_onde || 'local'}
-                        onChange={(e) => salvar({ ia_onde: e.target.value }, e.target.value === 'auto'
-                            ? 'Reconhecimento no servidor de IA central (o PC do evento fica de reserva).'
-                            : 'Reconhecimento no PC do evento.')}>
-                        <MenuItem value="local">Neste PC do evento</MenuItem>
-                        <MenuItem value="auto">Servidor de IA central (PC do evento de reserva)</MenuItem>
+                        onChange={(e) => alternarModoArquitetura(e.target.value)}
+                    >
+                        <MenuItem value="local">🖥️ Servidor no Evento (Local 100% Offline)</MenuItem>
+                        <MenuItem value="auto">⚡ Híbrido Inteligente (Notebook + Servidor)</MenuItem>
+                        <MenuItem value="direto_servidor">🌐 Central Remota / Fibra (Câmeras no Servidor)</MenuItem>
                     </Select>
                 </FormControl>
+
+                <Button
+                    size="small"
+                    variant={mostrarArquitetura ? 'contained' : 'outlined'}
+                    startIcon={<TuneIcon />}
+                    endIcon={mostrarArquitetura ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                    onClick={() => setMostrarArquitetura(v => !v)}
+                    sx={{
+                        fontSize: '0.78rem',
+                        textTransform: 'none',
+                        fontWeight: 700,
+                        height: 38,
+                        borderColor: 'rgba(255,255,255,0.18)'
+                    }}
+                >
+                    {mostrarArquitetura ? 'Ocultar Modos de IA' : 'Configurar 3 Modos de Operação'}
+                </Button>
+
                 {salvando && <CircularProgress size={16} />}
             </Stack>
+
+            {/* Painel expansível com os 3 cards visuais de arquitetura */}
+            <Collapse in={mostrarArquitetura} unmountOnExit>
+                <Box sx={{ pt: 1, pb: 0.5 }}>
+                    <SeletorArquiteturaIa
+                        valor={cfg.ia_onde || 'local'}
+                        onChange={alternarModoArquitetura}
+                        disabled={!podeEditar || salvando || !cfg.motor_ia_ativo}
+                    />
+                </Box>
+            </Collapse>
 
             <Stack direction="row" useFlexGap flexWrap="wrap" spacing={1} alignItems="center">
                 <Chip size="small" icon={<PcIcon sx={{ fontSize: 15 }} />}
@@ -122,17 +174,37 @@ const CamerasEventoBarra = ({ podeEditar = true }) => {
                             label={recursos.video_local ? 'Vídeo sem IA: pronto' : 'Vídeo sem IA: não instalado'} />
                     </Tooltip>
                 )}
+
+                {/* Status específico do modo de arquitetura ativo */}
+                {cfg.motor_ia_ativo && cfg.ia_onde === 'local' && (
+                    <Tooltip title="O processamento de IA roda diretamente na placa de vídeo do computador local no evento. Não depende de internet.">
+                        <Chip size="small" variant="outlined" icon={<PcIcon sx={{ fontSize: 14 }} />}
+                            color="success" sx={{ fontWeight: 700 }}
+                            label="Modo Local: Reconhecimento 100% no PC do Evento" />
+                    </Tooltip>
+                )}
+
+                {cfg.motor_ia_ativo && cfg.ia_onde === 'direto_servidor' && (
+                    <Tooltip title="As câmeras transmitem os vídeos diretamente via internet fibra até o Servidor de IA Central na sede.">
+                        <Chip size="small" variant="outlined" icon={<CloudIcon sx={{ fontSize: 14 }} />}
+                            sx={{ fontWeight: 700, borderColor: '#A855F7', color: '#C084FC' }}
+                            label="Modo Fibra: Câmeras conectadas ao Servidor Central" />
+                    </Tooltip>
+                )}
+
                 {pc?.conectado && cfg.ia_onde === 'auto' && cfg.motor_ia_ativo && (
                     <Tooltip title={reconhecimento?.modo !== 'auto'
                         ? 'O PC do evento ainda não recebeu a escolha (agente antigo ou motor reiniciando): rode ligar-ia-facial.bat nele.'
                         : 'O PC do evento acha os rostos e o servidor de IA central diz quem é. Sem resposta do servidor, o PC do evento reconhece sozinho.'}>
                         <Chip size="small" variant="outlined" sx={{ fontWeight: 700 }}
+                            icon={<FlashIcon sx={{ fontSize: 14 }} />}
                             color={reconhecimento?.usando_servidor ? 'success' : 'warning'}
-                            label={reconhecimento?.usando_servidor ? 'Reconhecendo no servidor central'
-                                : reconhecimento?.modo === 'auto' ? 'Servidor central indisponível: reserva no PC do evento'
-                                    : 'Servidor central ainda não ativo no PC do evento'} />
+                            label={reconhecimento?.usando_servidor ? 'Híbrido: Reconhecendo no Servidor Central'
+                                : reconhecimento?.modo === 'auto' ? 'Híbrido: Servidor indisponível (Reserva Local no PC)'
+                                    : 'Híbrido: Conectando motor no PC do evento'} />
                     </Tooltip>
                 )}
+
                 {pc?.conectado && !recursos.gravacao && (
                     <Chip size="small" variant="outlined" color="warning" sx={{ fontWeight: 700 }} label="Gravação: ffmpeg não instalado" />
                 )}

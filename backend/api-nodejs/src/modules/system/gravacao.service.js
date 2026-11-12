@@ -42,13 +42,13 @@ async function salvarConfigEvento(eventoId, dados = {}, usuario) {
         gravacao_ativa: dados.gravacao_ativa !== undefined ? dados.gravacao_ativa !== false : atual.gravacao_ativa,
         gravacao_limite_gb: inteiro(dados.gravacao_limite_gb, 2, 4000, atual.gravacao_limite_gb),
         gravacao_retencao_dias: inteiro(dados.gravacao_retencao_dias, 1, 365, atual.gravacao_retencao_dias),
-        ia_onde: ['local', 'auto'].includes(dados.ia_onde) ? dados.ia_onde : (atual.ia_onde || 'local'),
+        ia_onde: ['local', 'auto', 'direto_servidor'].includes(dados.ia_onde) ? dados.ia_onde : (atual.ia_onde || 'local'),
         atualizado_por: usuario?.email || usuario?.id || null,
         atualizado_em: new Date().toISOString()
     };
     let { data, error } = await supabase.from('cameras_evento_config').upsert(nova).select().single();
     if (error && /ia_onde/.test(error.message || '')) {
-        if (dados.ia_onde === 'auto') throw new Error('Para usar o servidor de IA central, aplique a migration 20261112_servidores_ia.sql no Supabase.');
+        if (dados.ia_onde === 'auto' || dados.ia_onde === 'direto_servidor') throw new Error('Para usar modos com servidor de IA central, aplique a migration 20261112_arquitetura_ia_tres_modos.sql no Supabase.');
         const { ia_onde: _sem, ...semIaOnde } = nova; // banco sem a migration 20261112: salva o resto
         ({ data, error } = await supabase.from('cameras_evento_config').upsert(semIaOnde).select().single());
     }
@@ -58,7 +58,7 @@ async function salvarConfigEvento(eventoId, dados = {}, usuario) {
     }
     cacheConfig.delete(eventoId);
     // Voltou a reconhecer no PC do evento: os servidores centrais perdem a permissão e a memória do evento
-    if (atual.ia_onde === 'auto' && (data?.ia_onde || 'local') !== 'auto') require('../../services/iaCentral').liberarEvento(eventoId);
+    if (atual.ia_onde !== 'local' && (data?.ia_onde || 'local') === 'local') require('../../services/iaCentral').liberarEvento(eventoId);
     require('./vigilancia.service').eventoAlterado(eventoId).catch(() => {});
     return { ...PADRAO_EVENTO, ...data };
 }
