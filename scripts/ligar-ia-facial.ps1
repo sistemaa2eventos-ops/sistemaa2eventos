@@ -1,4 +1,4 @@
-<#
+﻿<#
   NZT Intelligent Control System — liga os motores da IA de rastreamento facial
   no servidor local do evento e fica vigiando (religa o que cair).
 
@@ -221,20 +221,35 @@ if ($Acao -eq 'instalar-tarefa') {
         -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) `
         -StartWhenAvailable -MultipleInstances IgnoreNew
     $principal = New-ScheduledTaskPrincipal -UserId $usuario -LogonType Interactive -RunLevel Highest
-    Register-ScheduledTask -TaskName $NomeTarefa -Action $acao -Trigger $gatilho -Settings $ajustes `
-        -Principal $principal -Description 'NZT: motor de IA facial e agente local do evento' -Force | Out-Null
+    
+    try {
+        $task = New-ScheduledTask -Action $acao -Trigger $gatilho -Settings $ajustes -Principal $principal -Description 'NZT: motor de IA facial e agente local do evento'
+        Register-ScheduledTask -TaskName $NomeTarefa -InputObject $task -Force | Out-Null
+    } catch {
+        # Fallback nativo universal do Windows via schtasks.exe (evita inconsistências de tipos CIM no PowerShell)
+        $cmdTr = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`""
+        & schtasks.exe /Create /TN $NomeTarefa /TR $cmdTr /SC ONLOGON /RL HIGHEST /F | Out-Null
+    }
     # Evita dois vigias: o atalho antigo sai quando a tarefa entra
     if (Test-Path $AtalhoAntigo) { Remove-Item $AtalhoAntigo -Force }
     Escrever "Tarefa '$NomeTarefa' instalada: sobe no login de $usuario e é reiniciada se falhar." 'Green'
-    Escrever 'Para subir agora sem reiniciar: Start-ScheduledTask -TaskName NZT-IA-Facial' 'DarkGray'
+    Escrever 'Para subir agora sem reiniciar: Start-ScheduledTask -TaskName NZT-IA-Facial (ou schtasks /run /tn NZT-IA-Facial)' 'DarkGray'
     exit 0
 }
 if ($Acao -eq 'remover-tarefa') {
     if (-not (Test-Administrador)) { Escrever 'Precisa de administrador para remover a tarefa.' 'Red'; exit 1 }
-    if (Get-ScheduledTask -TaskName $NomeTarefa -ErrorAction SilentlyContinue) {
-        Unregister-ScheduledTask -TaskName $NomeTarefa -Confirm:$false
+    try {
+        if (Get-ScheduledTask -TaskName $NomeTarefa -ErrorAction SilentlyContinue) {
+            Unregister-ScheduledTask -TaskName $NomeTarefa -Confirm:$false
+            Escrever "Tarefa '$NomeTarefa' removida." 'Yellow'
+        } else {
+            & schtasks.exe /Delete /TN $NomeTarefa /F 2>&1 | Out-Null
+            Escrever "Tarefa '$NomeTarefa' removida." 'Yellow'
+        }
+    } catch {
+        & schtasks.exe /Delete /TN $NomeTarefa /F 2>&1 | Out-Null
         Escrever "Tarefa '$NomeTarefa' removida." 'Yellow'
-    } else { Escrever 'A tarefa não estava instalada.' 'Gray' }
+    }
     exit 0
 }
 
