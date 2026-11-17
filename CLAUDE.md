@@ -738,7 +738,77 @@ docker system prune -af
 
 **Registre cada deploy aqui:**
 
+### Situação em 2026-11-17 (revisão de VPS, GitHub e Supabase dos últimos 10 dias)
+
+- **Código:** 46 commits entre 10/11 e 12/11; nenhum commit depois de 5e6b336 (12/11 00:16). Local, origin e VPS no mesmo commit.
+- **VPS:** /root/Projeto_A2_Eventos em 5e6b336; 6 containers healthy (gateway, admin_web, portal, api,
+  api_intelbras há 5 dias; redis há 2 semanas); /health ok, banco conectado; disco 11% de 96 GB, RAM 1,3/7,8 GB.
+  Nos logs dos últimos 5 dias não há erros, só avisos: agente "PC IA Facial do Evento" e "SERVIDOR A2" (IA central)
+  caindo e voltando várias vezes por dia, e timeout em vigilancia_configurar (agente desligado).
+- **Supabase:** as 7 migrations do período estão aplicadas (20261111_cameras_modos_gravacao, 20261111_pulseiras_fase_data,
+  20261111c_sessao_cameras, 20261112_servidores_ia, 20261112b_operadores_eventos_permitidos,
+  20261112c_pulseira_correcao_empresa, 20261112_arquitetura_ia_tres_modos). Eventos ativos: HISTÓRIAS CURITIBA (09/11),
+  Evento de Teste (robôs), EVENTO GENÉRICO. Desde 07/11: 3 pessoas, 7 acessos, 1 evento e 1 empresa novos.
+- **GitHub Actions:** o run 43096686493 (push de 053315f) está "queued" desde 11/11 e nunca rodou; o deploy foi feito
+  pelo run manual 43098168407. Pode ser cancelado.
+- **Pendências encontradas:**
+  1. O modo de IA "Central Remota / Fibra" (`direto_servidor`) só existe na tela: o agente o trata como `local`
+     (backend/agent-local/src/agent.js:294) e o servidor de IA central não recebe vídeo RTSP. Escolher esse modo hoje
+     faz o PC do evento rodar a IA localmente.
+  2. Não verificados com pessoa real: quiosque bloqueado, câmera com IA vinculada à estação, 3 testes de pulseira.
+  3. Local sem commit: scripts/ligar-ia-facial.ps1 apenas reformatado pelo editor (sem mudança de lógica) e scripts
+     avulsos de diagnóstico (backend/api-nodejs/check_*/test_*/query_*, *.py, *.jpg na raiz), todos de abr–out/2026.
+
 ```
+2026-11-12 - Deploy 5e6b336 (3 modos de IA do evento: local, híbrido e central remota)
+├─ Mudanças: SeletorArquiteturaIa.jsx (cards com cenário, vantagens, requisitos e passos) na barra de câmeras do
+│            evento; ia_onde aceita 'direto_servidor'; voltar para 'local' libera o evento no servidor central
+├─ Migrations: 20261112_arquitetura_ia_tres_modos.sql (aplicada; conferido em 17/11)
+├─ Status: ✅ OK (GitHub Actions run 43147230217)
+├─ Atenção: 'direto_servidor' ainda não tem efeito no agente nem no servidor de IA (ver Situação em 2026-11-17)
+├─ Rollback: tag antes-deploy-20261111j (d5edb1f)
+└─ Próximo: implementar o modo central remota de verdade ou esconder o card até lá
+
+2026-11-12 - Deploy d5edb1f (tarefa agendada do motor de IA no Windows)
+├─ Mudanças: ligar-ia-facial.ps1 com Register-ScheduledTask compatível e reserva via schtasks
+├─ Status: ✅ OK (GitHub Actions run 43130199920); só script do PC do evento, nada muda na VPS
+└─ Rollback: commit anterior 26732c8
+
+2026-11-12 - Deploy 26732c8 (idiomas, SMTP e segredos só para admin_master)
+├─ Mudanças: I18nextProvider na raiz, ConfigIdiomas com cards e troca automática de idioma (26732c8); teste de
+│            SMTP aceita senha vazia e usa a gravada (a553e1d); senhas e tokens das configurações visíveis e
+│            editáveis só pelo admin_master (c78234f)
+├─ Status: ✅ OK (GitHub Actions run 43111691512)
+└─ Rollback: tag antes-deploy-20261111i (c78234f) ou commit 19b5e23
+
+2026-11-12 - Deploy 19b5e23 (configurações: segredos não voltam ao navegador)
+├─ Mudanças: settings.controller não devolve segredos; telas de Câmeras, Comunicação, Cron e Webhooks salvam só o
+│            campo alterado, pedem confirmação e mostram o erro
+├─ Status: ✅ OK (GitHub Actions run 43109551454)
+└─ Rollback: commit anterior 6ef973d
+
+2026-11-12 - Deploy 6ef973d (idiomas + corrigir pulseira no check-in)
+├─ Mudanças: motor de idiomas ligado (pt-BR, en, es, de) em dashboard, menu, operador e login (6ef973d);
+│            AcoesPulseiraCheckin.jsx na tela de check-in: trocar número, desfazer lançamento errado, marcar
+│            devolvida ou perdida (5db36d7)
+├─ Status: ✅ OK (GitHub Actions run 43108453962)
+└─ Rollback: tag antes-deploy-20261111h (94820d1)
+
+2026-11-12 - Deploy 94820d1 (fiscalização: horário do check-in sem 3 h de diferença)
+├─ Mudanças: Fiscalizacao.jsx lê o horário do check-in como UTC
+├─ Status: ✅ OK (GitHub Actions run 43103212211)
+└─ Rollback: commit anterior 053315f
+
+2026-11-12 - Deploy 053315f (pulseiras: desfazer lançamento errado; empresa da época nos relatórios)
+├─ Mudanças: RPC anular_ultimo_lancamento_pulseira (restaura a pulseira anterior com a mesma hora de entrada ou
+│            desfaz perdida/devolvida); pulseira anulada não bloqueia o número; histórico de troca de empresa
+│            (pessoa_empresa_historico) usado em acessos, vínculos e relatórios (ponto, resumo, fechamento, logs,
+│            estatísticas); troca de lote tira as áreas exclusivas do lote antigo; credenciamento mostra erro ao gravar
+├─ Migrations: 20261112c_pulseira_correcao_empresa.sql (aplicada pela usuária antes)
+├─ Status: ✅ OK (run manual 43098168407, 15 min; o run de push 43096686493 ficou preso em "queued")
+├─ Testes: turnosEmpresa.test.js novo
+└─ Rollback: commit anterior 5aae9a1 (b71d30d)
+
 2026-11-12 - Deploy b71d30d (editor de crachás: seleção por área, grupos, escala em bloco, arte como camada e grade visível)
 ├─ Mudanças: seleção por área arrastando o mouse (marquee), alças e botões de escala em bloco (-10%/+10%),
 │            agrupamento com Ctrl+G/Ctrl+Shift+G e Z-Index contíguo, exclusão em lote com Delete, arte do
@@ -867,5 +937,5 @@ docker system prune -af
 
 ---
 
-**Última verificação:** 2026-10-30  
+**Última verificação:** 2026-11-17  
 **Próxima revisão:** Quando adicionar novos serviços externos
