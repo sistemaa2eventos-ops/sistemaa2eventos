@@ -53,7 +53,8 @@ class IaCentral {
             const anterior = this.servidores.get(id);
             if (anterior) anterior.socket.disconnect(true); // reconectou: fica a conexão nova
             // eventos: evento_id → último reconhecimento pedido (ms). Só esses podem baixar biometria.
-            const reg = { socket, nome, info: {}, emVoo: 0, eventos: new Map(), listas: new Map(), atendidos: 0, desde: new Date().toISOString() };
+            // vigiando: eventos cuja vigilância direta (câmeras analisadas aqui) está com este servidor
+            const reg = { socket, nome, info: {}, emVoo: 0, eventos: new Map(), listas: new Map(), vigiando: new Set(), atendidos: 0, desde: new Date().toISOString() };
             this.servidores.set(id, reg);
             logger.info(`🧠 [IA central] servidor conectado: ${nome}`);
             const ip = String(socket.handshake.headers['x-forwarded-for'] || socket.handshake.address || '').split(',')[0].trim();
@@ -92,6 +93,16 @@ class IaCentral {
             });
 
             socket.on('servidor:descarregou', ({ evento_id } = {}) => { if (evento_id) reg.eventos.delete(evento_id); });
+
+            // Detecção da vigilância direta. Não exige que a atribuição esteja na memória desta conexão
+            // (ao reconectar ela é reenviada em até 20 s, e a detecção não pode se perder nesse intervalo);
+            // vigilancia.service confere que a câmera é mesmo do evento informado.
+            socket.on('servidor:deteccao', (d = {}, ack) => {
+                if (typeof ack === 'function') ack();
+                if (!d || !d.evento_id) return;
+                require('../modules/system/vigilancia.service').receberDeteccao(d.evento_id, d)
+                    .catch(err => logger.error(`[Vigilância] detecção do servidor ${nome}: ${err.message}`));
+            });
 
             socket.on('disconnect', () => {
                 if (this.servidores.get(id) === reg) {
@@ -158,6 +169,42 @@ class IaCentral {
             excluir = id; // tenta outro servidor uma vez, se ainda houver tempo
         }
         return { indisponivel: true };
+    }
+
+    /**
+     * Vigilância direta: manda ao servidor as câmeras do evento para o motor dele analisar. Usa o servidor
+     * que já vigia o evento; senão, o mais livre. Reenviar a mesma lista é seguro (o motor troca a lista).
+     */
+    async vigiar(eventoId, cameras) {
+        let alvo = [...this.servidores.values()].find(s => s.vigiando.has(eventoId) && s.socket.connected);
+        if (!alvo) {
+            const escolhido = this._escolher(eventoId, null);
+            alvo = escolhido?.s;
+        }
+        if (!alvo) return { indisponivel: true };
+        try {
+            const r = await alvo.socket.timeout(20000).emitWithAck('ia_vigilancia', { evento_id: eventoId, cameras });
+            if (!r?.ok) return { indisponivel: true, erro: r?.erro };
+            alvo.vigiando.add(eventoId);
+            return { ok: true, servidor: alvo.nome, cameras: r.cameras };
+        } catch (err) {
+            logger.warn(`[IA central] vigilância do evento ${eventoId.slice(0, 8)} não confirmada: ${err.message}`);
+            return { indisponivel: true };
+        }
+    }
+
+    /** Para a vigilância direta do evento (ex.: evento deixou de ser "servidor central") */
+    pararVigilancia(eventoId) {
+        for (const s of this.servidores.values()) {
+            if (s.vigiando.delete(eventoId)) s.socket.emit('ia_vigilancia_parar', { evento_id: eventoId });
+        }
+    }
+
+    /** Eventos que têm vigilância direta neste momento */
+    eventosVigiados() {
+        const ids = new Set();
+        for (const s of this.servidores.values()) for (const id of s.vigiando) ids.add(id);
+        return [...ids];
     }
 
     /** Evento voltou a reconhecer no próprio PC: tira a permissão e a memória dele de todos os servidores */

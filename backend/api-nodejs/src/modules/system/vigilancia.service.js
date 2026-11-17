@@ -39,6 +39,7 @@ async function camerasDoEvento(eventoId) {
         .filter(c => c.status !== 'desativada' && c.status !== 'inativa')
         .map(c => ({
             id: c.id,
+            evento_id: eventoId, // dono da câmera: o motor usa só o cadastro deste evento nela
             nome: c.nome,
             stream_url: c.stream_url,
             ia_ativa: c.ia_ativa !== false,
@@ -67,7 +68,7 @@ async function configurarAgente(agentId, eventoId) {
                 .then(({ data }) => (data || []).filter(d => d.config?.ia_confirmacao === true).length).catch(() => 0)
         ]);
         if (evento) evento.leitores_ia = leitores;
-        const r = await agentService.sendCommand(agentId, 'vigilancia_configurar', { cameras, evento }, 15000);
+        const r = await agentService.sendCommand(agentId, 'vigilancia_configurar', { cameras, evento, evento_id: eventoId }, 15000);
         logger.info(`👁️ [Vigilância] agente ${agentId}: ${r?.cameras ?? cameras.length} câmera(s), ${r?.ia ?? '?'} com IA${r?.video_local ? ', vídeo local' : ''}`);
     } catch (err) {
         if (/Comando desconhecido/.test(err.message)) {
@@ -138,9 +139,42 @@ async function cicloLocal() {
     }
 }
 
+/**
+ * Vigilância direta: eventos com ia_onde = 'direto_servidor' têm as câmeras analisadas pelo servidor
+ * central (via VPN). Eventos que deixaram esse modo saem do servidor.
+ */
+let sincronizandoDireto = false;
+async function sincronizarDireto() {
+    if (sincronizandoDireto) return;
+    sincronizandoDireto = true;
+    try {
+        const iaCentral = require('../../services/iaCentral');
+        const [{ data: ativos }, { data: configs }] = await Promise.all([
+            supabase.from('eventos').select('id').eq('status', 'ativo'),
+            supabase.from('cameras_evento_config').select('evento_id').eq('ia_onde', 'direto_servidor')
+        ]);
+        const diretos = new Set((configs || []).map(c => c.evento_id));
+        for (const e of ativos || []) {
+            if (!diretos.has(e.id)) continue;
+            const cameras = (await camerasDoEvento(e.id)).filter(c => c.ia_ativa);
+            const r = await iaCentral.vigiar(e.id, cameras);
+            if (r.indisponivel) logger.warn(`[Vigilância] evento ${e.id.slice(0, 8)}: nenhum servidor central disponível`);
+        }
+        for (const eventoId of iaCentral.eventosVigiados()) {
+            const ativo = (ativos || []).some(e => e.id === eventoId);
+            if (!ativo || !diretos.has(eventoId)) iaCentral.pararVigilancia(eventoId);
+        }
+    } catch (err) {
+        logger.warn(`[Vigilância] modo servidor central: ${err.message}`);
+    } finally {
+        sincronizandoDireto = false;
+    }
+}
+
 function iniciar() {
     // Biometrias pendentes (foto sem vetor) geradas pelo motor do evento, via agente
     require('./biometriaAgente.service').iniciar();
+    setInterval(sincronizarDireto, 20000).unref();
     if (IA_URL_DIRETA) {
         setInterval(cicloLocal, 1500).unref();
         logger.info(`👁️ [Vigilância] modo servidor local: motor em ${IA_URL_DIRETA}`);

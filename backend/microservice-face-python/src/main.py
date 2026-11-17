@@ -329,7 +329,9 @@ class Indice:
         return p1, s1, s2, cad1
 
 
-indice = Indice([], [], {})
+indice = Indice([], [], {})                    # todos os eventos juntos: só para contagem/diagnóstico
+_INDICE_VAZIO = Indice([], [], {})
+indices_evento: Dict[str, Indice] = {}         # evento_id → índice SÓ dos cadastrados desse evento
 aprendidos: Dict[str, List[np.ndarray]] = {}   # pessoa_id → vetores bons capturados ao vivo
 aprendidos_lock = threading.Lock()
 cadastro_por_id: Dict[str, np.ndarray] = {}
@@ -440,7 +442,36 @@ def _pessoa_da_linha(p: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return {
         "id": str(p['id']), "nome": p.get('nome_completo') or p.get('nome') or "Sem Nome", "cpf": p.get('cpf') or "",
         "status_acesso": p.get('status_acesso') or "liberado", "bloqueado": bool(p.get('bloqueado', False)),
-        "foto_url": p.get('foto_url'), "vec": vec / norma}
+        "foto_url": p.get('foto_url'), "evento_id": str(p['evento_id']) if p.get('evento_id') else None,
+        "vec": vec / norma}
+
+
+def _indices_por_evento(pessoas: List[Dict[str, Any]], vec_por_id: Dict[str, np.ndarray],
+                        aprendidos_: Dict[str, List[np.ndarray]]) -> Dict[str, "Indice"]:
+    """Um índice por evento. Eventos são independentes: quem está no evento A nunca é comparado com
+    o cadastro do evento B, mesmo que os dois rodem neste PC ao mesmo tempo."""
+    grupos: Dict[str, List[Dict[str, Any]]] = {}
+    for p in pessoas:
+        ev = p.get("evento_id")
+        if ev and p.get("id") in vec_por_id:
+            grupos.setdefault(str(ev), []).append(p)
+    return {
+        ev: Indice(ps, [vec_por_id[p["id"]] for p in ps], aprendidos_)
+        for ev, ps in grupos.items()
+    }
+
+
+def indice_do_evento(evento_id: Optional[str]) -> "Indice":
+    """Índice de quem pode ser reconhecido na câmera de um evento. Sem evento conhecido: ninguém
+    (nunca cair no cadastro de todos os eventos). No servidor central, o cadastro do evento vem
+    pela API e fica em centrais (ver /api/central/rostos)."""
+    if not evento_id:
+        return _INDICE_VAZIO
+    ev = str(evento_id)
+    central = centrais.get(ev)
+    if central is not None:
+        return central["indice"]
+    return indices_evento.get(ev, _INDICE_VAZIO)
 
 
 def _montar_indice_da_base():
@@ -459,6 +490,8 @@ def _montar_indice_da_base():
                 del aprendidos[pid]
         novo = Indice(pessoas, cadastro, aprendidos)
         indice, cadastro_por_id = novo, por_id
+        indices_evento.clear()
+        indices_evento.update(_indices_por_evento(pessoas, por_id, aprendidos))
     ultima_carga.update(ts=time.time(), ok=True, erro=None)
     logger.info(f"👥 Índice de rostos: {len(pessoas)} pessoas, {novo.index.ntotal} vetores.")
     return len(pessoas)
@@ -472,7 +505,7 @@ def reload_registered_faces() -> int:
         linhas, offset = [], 0
         while True:
             pagina = _supabase_get(
-                "pessoas?select=id,nome_completo,cpf,status_acesso,bloqueado,foto_url,face_encoding"
+                "pessoas?select=id,nome_completo,cpf,status_acesso,bloqueado,foto_url,face_encoding,evento_id"
                 f"&face_encoding=not.is.null&order=id&limit=1000&offset={offset}", timeout=30)
             linhas.extend(pagina)
             if len(pagina) < 1000:
@@ -518,6 +551,8 @@ def _reconstruir_indice_com_aprendidos():
     global indice
     atual = indice
     indice = Indice(atual.pessoas, [cadastro_por_id[p["id"]] for p in atual.pessoas], aprendidos)
+    indices_evento.clear()
+    indices_evento.update(_indices_por_evento(atual.pessoas, cadastro_por_id, aprendidos))
     _aprendizado.update(pendente=False, ultimo=time.time())
 
 
@@ -632,6 +667,7 @@ class Camera:
     def __init__(self, url: str):
         self.url = url
         self.camera_id: Optional[str] = None
+        self.evento_id: Optional[str] = None   # dono da câmera: define de quem é o cadastro usado nela
         self.nome: Optional[str] = None
         self.vigilancia = False
         self.ia_ativa = True
@@ -1105,7 +1141,7 @@ def _jpeg_b64(img: np.ndarray, qualidade: int) -> Optional[str]:
 
 def _aplicar_remotos(cam: "Camera"):
     """Respostas do servidor central que chegaram para esta câmera (aplicadas na thread da IA)."""
-    idx = indice
+    idx = indice_do_evento(cam.evento_id)
     while cam.remotos:
         res = cam.remotos.popleft()
         r = cam.rastreador.rastros.get(res["track"])
@@ -1127,7 +1163,7 @@ def analisar(cam: Camera, frame: np.ndarray, src: Leitor):
     boxes = [f[0] for f in faces]
     rastros = cam.rastreador.atualizar(boxes)
     agora = time.time()
-    idx = indice
+    idx = indice_do_evento(cam.evento_id)
 
     # Quem precisa de (novo) reconhecimento: rastro novo, sem confirmação ou com reconhecimento velho
     para_rec, avaliados = [], []
@@ -1306,6 +1342,7 @@ def registrar_deteccoes(cam: Camera, frame: np.ndarray, results: List[Dict[str, 
         deteccoes.append({
             "seq": deteccao_seq,
             "camera_id": cam.camera_id,
+            "evento_id": cam.evento_id,
             "ts": agora,
             "results": novos,
             "annotated_frame_base64": base64.b64encode(jpg).decode('utf-8'),
@@ -1521,8 +1558,11 @@ async def get_camera_stream(request: Request, stream_url: str = DEFAULT_RTSP_URL
 
 
 class VigilanciaConfig(BaseModel):
-    # [{ id, stream_url, nome?, url_substream?, ia_ativa?, vigilancia_ativa?, prioridade? }]
+    # [{ id, stream_url, nome?, url_substream?, ia_ativa?, vigilancia_ativa?, prioridade?, evento_id? }]
     cameras: List[Dict[str, Any]] = []
+    # Evento que enviou esta lista. Com ele, só as câmeras DESTE evento são trocadas: outro agente
+    # (outro evento no mesmo PC) não derruba as câmeras dele.
+    evento_id: Optional[str] = None
 
 
 @app.post("/api/vigilancia")
@@ -1534,8 +1574,10 @@ def configurar_vigilancia(cfg: VigilanciaConfig):
         url = str(c.get("stream_url") or "")
         if c.get("id") and url.lower().startswith(("rtsp", "webcam", "usb")):
             novas[url] = c
+    evento = str(cfg.evento_id) if cfg.evento_id else None
     for url, cam in list(cameras.items()):
-        if url not in novas:
+        dono_da_lista = evento is None or cam.evento_id in (None, evento)
+        if url not in novas and dono_da_lista:
             cam.vigilancia = False
             cam.camera_id = None
             with streams_lock:
@@ -1546,6 +1588,7 @@ def configurar_vigilancia(cfg: VigilanciaConfig):
     for url, c in novas.items():
         cam = camera_de(url)
         cam.camera_id = str(c["id"])
+        cam.evento_id = str(c["evento_id"]) if c.get("evento_id") else evento
         cam.nome = c.get("nome")
         cam.ia_ativa = c.get("ia_ativa", True) is not False
         cam.vigilancia = cam.ia_ativa and c.get("vigilancia_ativa", True) is not False

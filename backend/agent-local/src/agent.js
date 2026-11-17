@@ -286,11 +286,15 @@ const handlers = {
      * retransmissor (vídeo); só as com IA ligada vão ao motor, lendo do retransmissor; as marcadas
      * para gravar vão ao gravador. Servidor antigo (sem `evento`): mantém motor e gravação como estão.
      */
-    async vigilancia_configurar({ cameras = [], evento = null }) {
+    async vigilancia_configurar({ cameras = [], evento = null, evento_id = null }) {
         if (evento) salvarConfigCameras({ cameras, evento });
         await video.configurarCameras(cameras); // antes de montar a lista do motor (usa o RTSP local)
+        vigilancia.eventoId = evento_id || null; // o motor troca só as câmeras deste evento
         if (evento) {
             vigilancia.evento = evento;
+            // 'direto_servidor': o servidor central analisa as câmeras (a nuvem as manda por VPN);
+            // este PC não analisa câmera nenhuma, só confirma leitores se o evento pedir
+            const direto = evento.ia_onde === 'direto_servidor';
             iaCentral.modo = evento.ia_onde === 'auto' ? 'auto' : 'local';
             aplicarModoIa();
             gravador.configurar({
@@ -301,13 +305,13 @@ const handlers = {
             });
             // Sob demanda: o motor só roda se alguma câmera usa IA ou algum leitor pede confirmação da IA.
             // O interruptor do painel ("Motor de IA do evento") continua mandando por cima.
-            const precisa = cameras.some(c => c.ia_ativa !== false) || Number(evento.leitores_ia || 0) > 0;
+            const precisa = (!direto && cameras.some(c => c.ia_ativa !== false)) || Number(evento.leitores_ia || 0) > 0;
             const deveLigar = evento.motor_ia_ativo !== false && precisa;
             if (deveLigar === motorDesligadoPeloPainel()) {
                 definirMotor(deveLigar).catch(err => log('warn', `motor de IA: ${err.message}`));
             }
         }
-        vigilancia.cameras = camerasParaMotor(cameras);
+        vigilancia.cameras = (evento && evento.ia_onde === 'direto_servidor') ? [] : camerasParaMotor(cameras);
         await aplicarVigilancia().catch(() => {}); // motor desligado: a lista vai quando ele subir
         return { cameras: cameras.length, ia: vigilancia.cameras.length, video_local: video.disponivel() };
     },
@@ -583,7 +587,7 @@ async function postarNoMotor(caminho, corpo) {
 
 async function aplicarVigilancia() {
     if (!vigilancia.cameras) return;
-    await postarNoMotor('/api/vigilancia', { cameras: vigilancia.cameras });
+    await postarNoMotor('/api/vigilancia', { cameras: vigilancia.cameras, evento_id: vigilancia.eventoId || null });
 }
 
 async function aplicarConfigIa() {

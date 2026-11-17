@@ -143,9 +143,9 @@ const socket = io(`${VPS_URL}/ia-servidor`, {
 socket.on('connect', async () => {
     log('info', `Conectado a ${VPS_URL} como "${NOME}"`);
     geracao++;
-    // A nuvem perdeu a lista de eventos atribuídos ao reconectar: recomeça do zero
-    for (const eventoId of eventos.keys()) await motor('/api/central/descarregar', { evento_id: eventoId }).catch(() => {});
-    eventos.clear();
+    // Queda curta (segundos) NÃO apaga a memória dos eventos: recarregar todos os cadastrados levava
+    // minutos e o evento caía no reconhecimento local. A nuvem re-autoriza cada evento no próximo pedido
+    // (servidor:rostos aceita de novo) e a vigilância é reenviada pela API a cada 20 s.
     let hardware = null;
     try { hardware = (await motor('/api/central/status')).hardware; } catch { hardware = 'motor desligado'; }
     socket.emit('servidor:pronto', { nome: NOME, versao: VERSAO, hardware });
@@ -181,6 +181,69 @@ socket.on('ia_reconhecer', async ({ evento_id: eventoId, itens } = {}, ack) => {
         ack({ erro: 'motor indisponível' });
     }
 });
+
+// ------------------------------------------------------------------ vigilância direta (evento "servidor central")
+// A nuvem manda as câmeras RTSP do evento (alcançáveis por VPN); o motor deste PC as analisa com o
+// cadastro do evento e as detecções voltam para a nuvem pelo socket. Eventos independentes: cada um
+// tem as próprias câmeras e o próprio cadastro (ver /api/central/rostos).
+const vigiando = new Map();   // evento_id → [cameras]
+let vigilanciaSeq = 0;        // última detecção entregue à nuvem
+let vigilanciaInicio = null;  // identifica a execução do motor (muda se ele reiniciar)
+
+async function aplicarVigilancia(eventoId, cameras) {
+    await motor('/api/vigilancia', { cameras, evento_id: eventoId }, 15000);
+}
+
+async function pararVigilancia(eventoId) {
+    vigiando.delete(eventoId);
+    await aplicarVigilancia(eventoId, []).catch(() => {}); // lista vazia: só as câmeras deste evento saem
+    log('info', `evento ${eventoId.slice(0, 8)}: vigilância direta parada`);
+}
+
+socket.on('ia_vigilancia', async ({ evento_id: eventoId, cameras } = {}, ack) => {
+    if (typeof ack !== 'function') return;
+    if (!eventoId || !Array.isArray(cameras)) return ack({ ok: false, erro: 'pedido inválido' });
+    try {
+        await aplicarVigilancia(eventoId, cameras);
+        vigiando.set(eventoId, cameras);
+        log('info', `evento ${eventoId.slice(0, 8)}: ${cameras.length} câmera(s) na vigilância direta`);
+        ack({ ok: true, cameras: cameras.length });
+    } catch (err) {
+        log('warn', `vigilância do evento ${eventoId.slice(0, 8)}: ${err.message}`);
+        ack({ ok: false, erro: 'motor indisponível' });
+    }
+});
+
+socket.on('ia_vigilancia_parar', ({ evento_id: eventoId } = {}) => {
+    if (eventoId) pararVigilancia(eventoId);
+});
+
+// Detecções do motor → nuvem, na ordem; só avança quando a nuvem confirma (nada se perde na queda)
+let entregandoDeteccoes = false;
+setInterval(async () => {
+    if (entregandoDeteccoes || !socket.connected || !vigiando.size) return;
+    entregandoDeteccoes = true;
+    try {
+        const res = await motor(`/api/vigilancia/deteccoes?desde=${vigilanciaSeq}&max_idade_s=60`, null, 5000);
+        if (res.inicio !== undefined && res.inicio !== vigilanciaInicio) {
+            // Motor reiniciou (ou primeira vez): a configuração das câmeras se perdeu, reenvia tudo
+            vigilanciaInicio = res.inicio;
+            vigilanciaSeq = 0;
+            for (const [eventoId, cameras] of vigiando) await aplicarVigilancia(eventoId, cameras).catch(() => {});
+            return;
+        }
+        if (res.seq < vigilanciaSeq) { vigilanciaSeq = 0; return; }
+        for (const d of res.deteccoes || []) {
+            if (!vigiando.has(d.evento_id)) { vigilanciaSeq = d.seq; continue; }
+            await socket.timeout(10000).emitWithAck('servidor:deteccao', d);
+            vigilanciaSeq = d.seq;
+        }
+    } catch {
+        // motor ou nuvem fora: tenta de novo no próximo ciclo
+    } finally {
+        entregandoDeteccoes = false;
+    }
+}, 1000);
 
 const encerrar = () => { socket.disconnect(); process.exit(0); };
 process.on('SIGINT', encerrar);
