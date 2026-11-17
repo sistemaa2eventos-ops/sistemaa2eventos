@@ -20,6 +20,8 @@ $DirLogs     = Join-Path $Raiz 'logs\servidor-ia'
 $PortaMotor  = 8000
 $UrlSaude    = "http://127.0.0.1:$PortaMotor/health"
 $IntervaloVigia = 15
+$ArqMotorDesligado = Join-Path $DirMotor '.motor-desligado'  # gravado pelo painel: o vigia não religa o motor
+$NomeTarefa = 'NZT-Servidor-IA'
 
 try { $Host.UI.RawUI.WindowTitle = 'NZT - Servidor de IA central' } catch {}
 New-Item -ItemType Directory -Force $DirLogs | Out-Null
@@ -52,6 +54,22 @@ function Find-PythonIA {
         if ($LASTEXITCODE -eq 0) { return $py }
     }
     return $null
+}
+
+if ($Acao -eq 'instalar-tarefa') {
+    # Sobe sozinho no login do Windows, escondido (sem janela, sem barra de tarefas) e reinicia se cair
+    $cmd = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`""
+    & schtasks.exe /Create /TN $NomeTarefa /TR $cmd /SC ONLOGON /RL LIMITED /F | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Escrever "Tarefa '$NomeTarefa' instalada: o servidor de IA sobe escondido no login." 'Green'
+        Escrever "Para subir agora: schtasks /run /tn $NomeTarefa" 'DarkGray'
+    } else { Escrever "Não foi possível criar a tarefa '$NomeTarefa'." 'Red' }
+    exit 0
+}
+if ($Acao -eq 'remover-tarefa') {
+    & schtasks.exe /Delete /TN $NomeTarefa /F 2>&1 | Out-Null
+    Escrever "Tarefa '$NomeTarefa' removida (se existia)." 'Yellow'
+    exit 0
 }
 
 if ($Acao -eq 'parar') {
@@ -123,16 +141,17 @@ function Start-Servidor {
     Escrever 'Servidor: LIGADO (conectando na nuvem; nenhuma porta aberta neste PC).' 'Green'
 }
 
-Confirm-Motor
+if (Test-Path $ArqMotorDesligado) { Escrever 'Motor de IA: desligado pelo painel (não será religado até ligar no painel).' 'Yellow' } else { Confirm-Motor }
 if (-not (Get-ProcServidor)) { Start-Servidor } else { Escrever 'Servidor: já estava ligado.' 'Green' }
 
 Write-Host ''
-Escrever "Vigia ativo: verifica a cada $IntervaloVigia s e religa o que cair. Mantenha esta janela aberta." 'Cyan'
-Escrever "Logs em $DirLogs   |   Para desligar: ligar-servidor-ia.bat parar" 'DarkGray'
+Escrever "Vigia ativo: verifica a cada $IntervaloVigia s e religa o que cair. Pode fechar esta janela: o servidor segue rodando." 'Cyan'
+Escrever "Logs em $DirLogs   |   Para desligar tudo: ligar-servidor-ia.bat parar" 'DarkGray'
 $falhas = 0
 while ($true) {
     Start-Sleep $IntervaloVigia
-    if (Get-SaudeMotor) { $falhas = 0 } else {
+    if (Test-Path $ArqMotorDesligado) { $falhas = 0 }
+    elseif (Get-SaudeMotor) { $falhas = 0 } else {
         $falhas++
         if ($falhas -ge 4 -or -not (Get-PidNaPorta $PortaMotor)) { Escrever 'Motor sem resposta, reiniciando...' 'Yellow'; $falhas = 0; Confirm-Motor }
     }

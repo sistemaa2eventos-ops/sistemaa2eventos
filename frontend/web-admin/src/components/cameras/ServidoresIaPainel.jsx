@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     Box, Stack, Typography, Button, Chip, IconButton, Tooltip, TextField, Dialog, DialogTitle,
-    DialogContent, DialogActions, Alert, CircularProgress
+    DialogContent, DialogActions, Alert, CircularProgress, Switch, FormControlLabel
 } from '@mui/material';
 import { Add as AddIcon, Delete as RevogarIcon, ContentCopy as CopiarIcon, Dns as ServidorIcon } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
@@ -21,6 +21,7 @@ const ServidoresIaPainel = () => {
     const [novo, setNovo] = useState(null);      // { nome } no formulário
     const [criado, setCriado] = useState(null);  // { nome, token } recém-criado
     const [salvando, setSalvando] = useState(false);
+    const [motorBusy, setMotorBusy] = useState(null); // id do servidor cujo motor está sendo comandado
 
     const carregar = useCallback(async () => {
         try {
@@ -73,6 +74,27 @@ const ServidoresIaPainel = () => {
     if (erro === 'sem_permissao') return null; // só o Admin Master gerencia
     const ativos = (lista || []).filter(s => s.ativo);
 
+    // Liga/desliga só o motor deste servidor. O estado real vem no heartbeat (a cada 30 s).
+    const alternarMotor = async (s, ligar) => {
+        setMotorBusy(s.id);
+        try {
+            await api.post(`/ia-servidores/${s.id}/motor`, { acao: ligar ? 'ligar' : 'parar' });
+            enqueueSnackbar(ligar ? 'Motor de IA ligando no servidor (até 2 min).' : 'Motor de IA desligado no servidor.', { variant: 'success' });
+            carregar();
+        } catch (err) {
+            enqueueSnackbar(err.response?.data?.error || 'Não foi possível comandar o motor.', { variant: 'error' });
+        } finally {
+            setMotorBusy(null);
+        }
+    };
+
+    const rotuloMotor = (m) => {
+        if (!m) return 'Motor: sem informação';
+        if (m.iniciando) return 'Motor: ligando...';
+        if (m.motor_ligado) return `Motor ligado${m.engine ? ` · ${m.engine}` : ''}`;
+        return m.desligado_pelo_painel ? 'Motor desligado' : 'Motor parado';
+    };
+
     return (
         <GlassCard sx={{ p: { xs: 2, md: 2.5 }, mt: 2 }}>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="space-between" alignItems={{ sm: 'center' }} sx={{ mb: 1.5 }}>
@@ -107,6 +129,20 @@ const ServidoresIaPainel = () => {
                             </Typography>
                         </Box>
                         <Chip size="small" variant="outlined" color={s.online ? 'success' : 'default'} label={s.online ? 'Conectado' : 'Desconectado'} sx={{ fontWeight: 700 }} />
+                        {s.online && (
+                            <Stack direction="row" alignItems="center" spacing={0.5}>
+                                <Chip size="small" variant="outlined" color={s.online.motor?.motor_ligado ? 'success' : 'default'}
+                                    label={rotuloMotor(s.online.motor)} sx={{ fontWeight: 600 }} />
+                                <FormControlLabel
+                                    label={<Typography variant="caption" fontWeight={700}>IA</Typography>}
+                                    control={<Switch size="small" checked={!!s.online.motor?.motor_ligado || !!s.online.motor?.iniciando}
+                                        disabled={motorBusy === s.id || !!s.online.motor?.iniciando}
+                                        onChange={(e) => alternarMotor(s, e.target.checked)}
+                                        inputProps={{ 'aria-label': `Motor de IA de ${s.nome}` }} />}
+                                    sx={{ mr: 0 }}
+                                />
+                            </Stack>
+                        )}
                         <Tooltip title="Revogar (desconecta e invalida o token)">
                             <IconButton size="small" onClick={() => revogar(s)} aria-label={`Revogar ${s.nome}`}><RevogarIcon fontSize="small" /></IconButton>
                         </Tooltip>

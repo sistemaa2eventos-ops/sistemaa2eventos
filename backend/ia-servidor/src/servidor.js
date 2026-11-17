@@ -15,6 +15,7 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+const { spawn, execFile } = require('child_process');
 const { io } = require('socket.io-client');
 
 const VERSAO = '1.0.0';
@@ -199,6 +200,119 @@ async function pararVigilancia(eventoId) {
     await aplicarVigilancia(eventoId, []).catch(() => {}); // lista vazia: só as câmeras deste evento saem
     log('info', `evento ${eventoId.slice(0, 8)}: vigilância direta parada`);
 }
+
+// ------------------------------------------------------------------ motor de IA: ligar e desligar pelo painel
+// O processo deste servidor é sempre mantido pelo vigia (ligar-servidor-ia.bat, em segundo plano).
+// O painel liga e desliga só o MOTOR, que sobe escondido e não depende de janela aberta.
+const DIR_MOTOR = path.resolve(__dirname, '..', '..', 'microservice-face-python');
+const ARQ_MOTOR_DESLIGADO = path.join(DIR_MOTOR, '.motor-desligado'); // o vigia respeita este sinal
+const DIR_LOGS_MOTOR = path.resolve(__dirname, '..', '..', '..', 'logs', 'servidor-ia');
+const PORTA_MOTOR = 8000;
+let motorIniciando = false;
+
+const motorDesligadoPeloPainel = () => fs.existsSync(ARQ_MOTOR_DESLIGADO);
+
+function pythonDoMotor() {
+    for (const p of [path.join(DIR_MOTOR, 'venv-ia', 'Scripts', 'python.exe'), path.join(DIR_MOTOR, 'venv', 'Scripts', 'python.exe')]) {
+        if (fs.existsSync(p)) return p;
+    }
+    return null;
+}
+
+async function saudeDoMotor() {
+    try {
+        const r = await fetch(`${IA_URL}/health`, { signal: AbortSignal.timeout(4000) });
+        return r.ok ? await r.json() : null;
+    } catch {
+        return null;
+    }
+}
+
+function pidNaPorta(porta) {
+    return new Promise((resolve) => {
+        const cmd = `(Get-NetTCPConnection -LocalPort ${porta} -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess`;
+        execFile('powershell.exe', ['-NoProfile', '-Command', cmd], { windowsHide: true }, (err, out) => {
+            resolve(Number(String(out || '').trim()) || null);
+        });
+    });
+}
+
+function matarArvore(pid) {
+    return new Promise((resolve) => execFile('taskkill', ['/PID', String(pid), '/F', '/T'], { windowsHide: true }, () => resolve()));
+}
+
+/** Sobe o motor escondido, sem janela, em processo independente (sobrevive ao reinício deste servidor). */
+async function ligarMotor() {
+    fs.rmSync(ARQ_MOTOR_DESLIGADO, { force: true });
+    if (await saudeDoMotor()) return 'ja_ligado';
+    if (motorIniciando) return 'iniciando';
+    const py = pythonDoMotor();
+    if (!py) { log('error', 'Motor de IA: Python da IA não encontrado (venv-ia)'); return 'sem_python'; }
+    motorIniciando = true;
+    fs.mkdirSync(DIR_LOGS_MOTOR, { recursive: true });
+    const carimbo = new Date().toISOString().replace(/[:.]/g, '-');
+    const saida = fs.openSync(path.join(DIR_LOGS_MOTOR, `motor-${carimbo}.log`), 'a');
+    const erros = fs.openSync(path.join(DIR_LOGS_MOTOR, `motor-${carimbo}-erros.log`), 'a');
+    const env = { ...process.env, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' };
+    // Sem chave do banco: no servidor central os cadastrados chegam pela nuvem, só na memória
+    delete env.SUPABASE_SERVICE_ROLE_KEY; delete env.SUPABASE_URL; delete env.PYTHONPATH;
+    const filho = spawn(py, ['-I', 'src\\main.py'], {
+        cwd: DIR_MOTOR, env, detached: true, windowsHide: true, stdio: ['ignore', saida, erros]
+    });
+    filho.unref();
+    log('info', 'Motor de IA: iniciando (o modelo leva de 1 a 2 min para carregar)');
+    for (let i = 0; i < 60; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        if (await saudeDoMotor()) {
+            motorIniciando = false;
+            log('info', 'Motor de IA: LIGADO');
+            return 'ligado';
+        }
+    }
+    motorIniciando = false;
+    log('error', 'Motor de IA não respondeu em 180 s (veja logs/servidor-ia)');
+    return 'falhou';
+}
+
+/** Desliga o motor e marca o sinal para o vigia não religá-lo */
+async function desligarMotor() {
+    fs.writeFileSync(ARQ_MOTOR_DESLIGADO, new Date().toISOString());
+    const pid = await pidNaPorta(PORTA_MOTOR);
+    if (pid) await matarArvore(pid);
+    log('info', pid ? `Motor de IA desligado pelo painel (PID ${pid})` : 'Motor de IA já estava desligado');
+    return pid ? 'desligado' : 'ja_desligado';
+}
+
+/** Comando do painel: { acao: 'ligar' | 'parar' }. Responde na hora; o estado real vem no servidor:estado. */
+socket.on('ia_motor', (pedido = {}, ack) => {
+    if (typeof ack !== 'function') return;
+    if (pedido.acao === 'ligar') {
+        ligarMotor().catch((err) => log('error', `Motor de IA: ${err.message}`));
+        return ack({ ok: true, estado: 'iniciando' });
+    }
+    if (pedido.acao === 'parar') {
+        desligarMotor()
+            .then((estado) => ack({ ok: true, estado }))
+            .catch((err) => ack({ ok: false, erro: err.message }));
+        return;
+    }
+    ack({ ok: false, erro: 'ação inválida' });
+});
+
+/** Estado do motor a cada 30 s para o painel */
+setInterval(async () => {
+    if (!socket.connected) return;
+    const s = await saudeDoMotor();
+    socket.emit('servidor:estado', {
+        motor_ligado: !!s,
+        desligado_pelo_painel: motorDesligadoPeloPainel(),
+        iniciando: motorIniciando,
+        engine: s?.engine || null,
+        perfil: s?.perfil || null,
+        providers: Array.isArray(s?.providers) ? s.providers.slice(0, 4) : [],
+        cameras_em_uso: s?.cameras_em_uso ?? null
+    });
+}, 30000);
 
 socket.on('ia_vigilancia', async ({ evento_id: eventoId, cameras } = {}, ack) => {
     if (typeof ack !== 'function') return;

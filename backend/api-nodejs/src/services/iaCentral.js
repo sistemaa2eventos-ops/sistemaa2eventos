@@ -54,7 +54,7 @@ class IaCentral {
             if (anterior) anterior.socket.disconnect(true); // reconectou: fica a conexão nova
             // eventos: evento_id → último reconhecimento pedido (ms). Só esses podem baixar biometria.
             // vigiando: eventos cuja vigilância direta (câmeras analisadas aqui) está com este servidor
-            const reg = { socket, nome, info: {}, emVoo: 0, eventos: new Map(), listas: new Map(), vigiando: new Set(), atendidos: 0, desde: new Date().toISOString() };
+            const reg = { socket, nome, info: {}, emVoo: 0, eventos: new Map(), listas: new Map(), vigiando: new Set(), atendidos: 0, desde: new Date().toISOString(), estado: null };
             this.servidores.set(id, reg);
             logger.info(`🧠 [IA central] servidor conectado: ${nome}`);
             const ip = String(socket.handshake.headers['x-forwarded-for'] || socket.handshake.address || '').split(',')[0].trim();
@@ -93,6 +93,20 @@ class IaCentral {
             });
 
             socket.on('servidor:descarregou', ({ evento_id } = {}) => { if (evento_id) reg.eventos.delete(evento_id); });
+
+            // Estado do motor de IA do servidor (a cada 30 s), para o painel
+            socket.on('servidor:estado', (e = {}) => {
+                if (!e || typeof e !== 'object') return;
+                reg.estado = {
+                    motor_ligado: !!e.motor_ligado,
+                    desligado_pelo_painel: !!e.desligado_pelo_painel,
+                    iniciando: !!e.iniciando,
+                    engine: e.engine ? String(e.engine).slice(0, 40) : null,
+                    perfil: e.perfil ? String(e.perfil).slice(0, 20) : null,
+                    providers: Array.isArray(e.providers) ? e.providers.slice(0, 4).map(p => String(p).slice(0, 40)) : [],
+                    recebido_em: new Date().toISOString()
+                };
+            });
 
             // Detecção da vigilância direta. Não exige que a atribuição esteja na memória desta conexão
             // (ao reconectar ela é reenviada em até 20 s, e a detecção não pode se perder nesse intervalo);
@@ -218,7 +232,7 @@ class IaCentral {
     status() {
         return [...this.servidores.entries()].map(([id, s]) => ({
             id, nome: s.nome, conectado: s.socket.connected, desde: s.desde, info: s.info,
-            em_voo: s.emVoo, eventos: s.eventos.size, rostos_atendidos: s.atendidos
+            em_voo: s.emVoo, eventos: s.eventos.size, rostos_atendidos: s.atendidos, motor: s.estado || null
         }));
     }
 
@@ -244,6 +258,21 @@ class IaCentral {
             .select('id, nome').single();
         if (error) throw error;
         return { ...data, token };
+    }
+
+    /**
+     * Liga ou desliga o motor de IA do servidor pelo painel. A resposta é rápida (o motor leva até 2 min
+     * para carregar); o estado real chega no heartbeat servidor:estado.
+     */
+    async comandoMotor(id, acao) {
+        if (!['ligar', 'parar'].includes(acao)) return { ok: false, erro: 'ação inválida' };
+        const s = this.servidores.get(id);
+        if (!s || !s.socket.connected) return { ok: false, erro: 'servidor desconectado' };
+        try {
+            return await s.socket.timeout(15000).emitWithAck('ia_motor', { acao });
+        } catch (err) {
+            return { ok: false, erro: 'servidor não respondeu' };
+        }
     }
 
     async revogar(id) {
