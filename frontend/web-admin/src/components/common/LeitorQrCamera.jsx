@@ -1,10 +1,20 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { Box, Button, CircularProgress, Dialog, DialogContent, Typography, useMediaQuery } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { Cameraswitch as TrocarIcon } from '@mui/icons-material';
 import TituloModal from './TituloModal';
 import useFecharComVoltar from '../../hooks/useFecharComVoltar';
+
+// Só os formatos usados em pulseiras e crachás: menos formatos = menos leituras falsas
+const FORMATOS_SUPORTADOS = [
+    Html5QrcodeSupportedFormats?.QR_CODE,
+    Html5QrcodeSupportedFormats?.CODE_128,
+    Html5QrcodeSupportedFormats?.CODE_39
+].filter((f) => f !== undefined);
+
+// Leitura mais curta que isso é tratada como ruído (código de barras lido pela metade)
+const TAMANHO_MINIMO_CODIGO = 4;
 
 // Mensagem que a pessoa entende para cada falha do getUserMedia
 const mensagemErro = (err) => {
@@ -39,7 +49,14 @@ const AreaLeitura = ({ frontal, onLeitura, onErro }) => {
     erroRef.current = onErro;
 
     useEffect(() => {
-        const leitor = new Html5Qrcode(id, { experimentalFeatures: { useBarCodeDetectorIfSupported: true }, verbose: false });
+        const configLeitor = {
+            experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+            verbose: false
+        };
+        if (FORMATOS_SUPORTADOS.length > 0) {
+            configLeitor.formatsToSupport = FORMATOS_SUPORTADOS;
+        }
+        const leitor = new Html5Qrcode(id, configLeitor);
         let lido = false;
         let ativo = true;
         let falhou = false;
@@ -47,17 +64,20 @@ const AreaLeitura = ({ frontal, onLeitura, onErro }) => {
         const inicio = leitor.start(
             { facingMode: frontal ? 'user' : 'environment' },
             {
-                fps: 10,
-                // Quadro de mira proporcional à tela (70% do menor lado)
+                fps: 15,
+                // Quadro de mira amplo para acomodar tanto QR Code quanto Código de Barras de pulseiras
                 qrbox: (largura, altura) => {
-                    const lado = Math.max(150, Math.floor(Math.min(largura, altura) * 0.7));
-                    return { width: lado, height: lado };
+                    const w = Math.max(180, Math.floor(largura * 0.82));
+                    const h = Math.max(140, Math.floor(Math.min(largura, altura) * 0.6));
+                    return { width: w, height: h };
                 }
             },
             (texto) => {
                 if (lido) return;
+                const limpo = String(texto || '').trim();
+                if (limpo.length < TAMANHO_MINIMO_CODIGO) return; // ignora e segue lendo
                 lido = true;
-                leituraRef.current(String(texto).trim());
+                leituraRef.current(limpo);
             },
             () => {}
         ).then(() => {

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Box, Typography, Grid, Stack, TextField, CircularProgress,
+    Box, Typography, Grid, Stack,
     Chip, IconButton, Tooltip, FormControl, InputLabel, Select,
-    MenuItem, Divider, Autocomplete, Button, useTheme, useMediaQuery
+    MenuItem, Divider, Button, List, ListItem, ListItemButton, ListItemText,
+    useTheme, useMediaQuery, LinearProgress
 } from '@mui/material';
 import {
     CheckCircle as SuccessIcon,
@@ -12,8 +13,6 @@ import {
     FullscreenExit as FullscreenExitIcon,
     VolumeUp as SoundOnIcon,
     VolumeOff as SoundOffIcon,
-    CameraAlt as CameraIcon,
-    PersonSearch as PersonSearchIcon,
     AccessTime as AccessTimeIcon,
     Badge as BadgeIcon,
     CorporateFare as CompanyIcon,
@@ -27,7 +26,6 @@ import LeitorQrCamera from '../components/common/LeitorQrCameraSobDemanda';
 import KpiCard from '../components/common/KpiCard';
 import { cores } from '../styles/tokens';
 import { FactCheck as KpiFiscalizadosIcon, CheckCircle as KpiLiberadosIcon, Block as KpiNegadosIcon } from '@mui/icons-material';
-import NeonButton from '../components/common/NeonButton';
 import { UniversalPulseiraInput } from '../components/common/UniversalPulseiraInput';
 import PessoaFoto from '../components/common/PessoaFoto';
 import FiscalizacaoPessoaModal from '../components/credenciamento/FiscalizacaoPessoaModal';
@@ -81,14 +79,15 @@ const Fiscalizacao = () => {
         return localStorage.getItem('fiscal_area_id') || '';
     });
 
-    // Leitura e Fiscalização ao Vivo
+    // Leitura e Fiscalização ao Vivo (Campo Único Unificado)
     const [codigoInput, setCodigoInput] = useState('');
+    const [ultimoCodigoLido, setUltimoCodigoLido] = useState('');
     const [loading, setLoading] = useState(false);
     const [resultado, setResultado] = useState(null);
     const [soundEnabled, setSoundEnabled] = useState(true);
     const [isKiosk, setIsKiosk] = useState(false);
 
-    // Câmera Scanner QR
+    // Câmera Scanner QR / Barras
     const [cameraActive, setCameraActive] = useState(false);
 
     // Estatísticas da Sessão de Fiscalização
@@ -101,8 +100,7 @@ const Fiscalizacao = () => {
     // Modal de Detalhes da Pessoa (ao clicar na miniatura)
     const [cardPessoaModal, setCardPessoaModal] = useState(null);
 
-    // Busca por Nome (Autocomplete)
-    const [buscaNomeInput, setBuscaNomeInput] = useState('');
+    // Resultados de Busca por Nome / CPF / Pulseira no mesmo campo
     const [buscaNomeOptions, setBuscaNomeOptions] = useState([]);
     const [loadingBuscaNome, setLoadingBuscaNome] = useState(false);
 
@@ -141,10 +139,15 @@ const Fiscalizacao = () => {
         localStorage.setItem('fiscal_area_id', val);
     };
 
-    // 2. Processar Fiscalização (por Pulseira, CPF, Barcode ou Busca)
+    // 2. Processar Fiscalização (por Pulseira, QR Code, CPF, Barcode ou Busca)
     const handleProcessarCodigo = useCallback(async (codigoBruto, origem = 'scanner') => {
-        const codigoLimpo = (codigoBruto || '').trim();
+        const codigoLimpo = String(codigoBruto || '').trim();
         if (!codigoLimpo || loading) return;
+
+        setCodigoInput(''); // campo vazio: o próximo bipe não gruda no anterior
+        // Escolha na lista manda o id da pessoa: não é código lido, não vai para o aviso
+        if (origem !== 'busca_nome') setUltimoCodigoLido(codigoLimpo);
+        setBuscaNomeOptions([]);
 
         try {
             setLoading(true);
@@ -172,15 +175,16 @@ const Fiscalizacao = () => {
             playFeedbackSound('negado', soundEnabled);
         } finally {
             setLoading(false);
-            setCodigoInput('');
         }
     }, [selectedAreaId, loading, soundEnabled, enqueueSnackbar]);
 
-    // 3. Busca por Nome (Autocomplete)
+    // 3. Busca por Nome / CPF / Pulseira integrada ao campo único
     useEffect(() => {
-        const termo = buscaNomeInput.trim();
-        if (termo.length < 2) {
+        const termo = codigoInput.trim();
+        // Não abre lista de sugestões se o termo atual acabou de ser confirmado por leitura
+        if (termo.length < 2 || termo === ultimoCodigoLido) {
             setBuscaNomeOptions([]);
+            setLoadingBuscaNome(false);
             return;
         }
 
@@ -200,20 +204,27 @@ const Fiscalizacao = () => {
             } finally {
                 if (ativo) setLoadingBuscaNome(false);
             }
-        }, 300);
+        }, 280);
 
         return () => {
             ativo = false;
             clearTimeout(timer);
         };
-    }, [buscaNomeInput, activeEventoId]);
+    }, [codigoInput, ultimoCodigoLido, activeEventoId]);
 
     const handleSelectColaboradorNome = (colaborador) => {
-        if (!colaborador) return;
-        const codigo = colaborador.numero_pulseira || colaborador.cpf || colaborador.nome_completo;
-        handleProcessarCodigo(codigo, 'busca_nome');
-        setBuscaNomeInput('');
-        setBuscaNomeOptions([]);
+        if (!colaborador?.id) return;
+        // Pelo id: pulseira, CPF ou nome podem bater em outra pessoa (o servidor aceita UUID)
+        handleProcessarCodigo(colaborador.id, 'busca_nome');
+    };
+
+    // Enter/OK no campo: código lido, nº da pulseira ou CPF fiscaliza direto.
+    // Nome digitado nunca fiscaliza sozinho: a lista abaixo do campo mostra quem bate e o operador escolhe.
+    const confirmarCampo = (val, origem) => {
+        const texto = String(val || '').trim();
+        if (!texto) return;
+        if (origem !== 'barcode' && /[A-Za-zÀ-ÿ]/.test(texto)) return;
+        handleProcessarCodigo(texto, origem);
     };
 
     const areaAtual = areas.find(a => a.id === selectedAreaId);
@@ -348,113 +359,86 @@ const Fiscalizacao = () => {
                 </Grid>
             </Grid>
 
-            {/* Bloco de Entrada: Leitor Universal e Busca Rápida por Nome */}
+            {/* Bloco de Entrada Unificado: Leitor QR/Barras, Pulseira, CPF e Busca por Nome em um só campo */}
             <GlassCard sx={{ p: { xs: 1.75, sm: 2.5 }, mb: { xs: 2, sm: 2.5, md: 3 } }}>
-                <Grid container spacing={{ xs: 1.5, sm: 2 }} alignItems="flex-end">
-                    {/* Leitor de Pulseira / RFID / Barcode */}
-                    <Grid item xs={12} md={8}>
-                        <UniversalPulseiraInput
-                            value={codigoInput}
-                            onChange={setCodigoInput}
-                            onConfirm={(val, origem) => handleProcessarCodigo(val, origem)}
-                            loading={loading}
-                            autoFocus={true}
-                            label="Leitor de pulseira / crachá / RFID"
-                            placeholder="Bipe a pulseira ou digite o código"
-                            accentColor="#00D4FF"
-                        />
-                    </Grid>
+                <UniversalPulseiraInput
+                    value={codigoInput}
+                    onChange={(val) => {
+                        setCodigoInput(val);
+                        if (!val) {
+                            setUltimoCodigoLido('');
+                            setBuscaNomeOptions([]);
+                        }
+                    }}
+                    onClear={() => {
+                        setCodigoInput('');
+                        setUltimoCodigoLido('');
+                        setBuscaNomeOptions([]);
+                    }}
+                    onConfirm={confirmarCampo}
+                    // Só o loading da ação: a busca por nome não pode travar o campo no meio de um bipe
+                    loading={loading}
+                    autoFocus={true}
+                    ultimoCodigoLido={ultimoCodigoLido}
+                    label="Busca por nome, CPF ou leitura QR / Pulseira"
+                    placeholder="Bipe QR/barras, digite nº da pulseira, CPF ou nome..."
+                    helperText="Código, nº da pulseira ou CPF + Enter fiscaliza • Nome: escolha na lista"
+                    accentColor="#00D4FF"
+                    onAbrirCamera={() => setCameraActive(true)}
+                />
+                {/* Busca por nome em andamento: barra fina com altura fixa (nada pula) */}
+                <Box sx={{ height: 3, mt: 0.75 }} aria-live="polite">
+                    {loadingBuscaNome && <LinearProgress aria-label="Buscando" sx={{ height: 3, borderRadius: 2, bgcolor: 'rgba(0,212,255,0.12)', '& .MuiLinearProgress-bar': { bgcolor: '#00D4FF' } }} />}
+                </Box>
 
-                    {/* Botão Câmera QR */}
-                    <Grid item xs={12} md={4}>
-                        <Box sx={{ mb: { xs: 0, md: '28px' } }}>
-                            <NeonButton
-                                fullWidth
-                                neonColor="#00D4FF"
-                                onClick={() => setCameraActive(true)}
-                                sx={{ 
-                                    height: { xs: 48, sm: 58 }, 
-                                    minHeight: { xs: 48, sm: 58 },
-                                    fontSize: '0.875rem',
-                                    fontWeight: 700,
-                                    borderRadius: '12px'
-                                }}
-                            >
-                                <CameraIcon sx={{ mr: 1 }} />
-                                Ler pela câmera
-                            </NeonButton>
-                        </Box>
-                    </Grid>
-
-                    {/* Busca por Nome do Participante */}
-                    <Grid item xs={12}>
-                        <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)', my: 1 }} />
-                        <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: '0.6px', display: 'block', mb: 1, fontSize: '0.75rem' }}>
-                            Ou busque pelo nome do participante (controladores internos & portaria):
-                        </Typography>
-                        <Autocomplete
-                            freeSolo
-                            options={buscaNomeOptions}
-                            loading={loadingBuscaNome}
-                            inputValue={buscaNomeInput}
-                            onInputChange={(_, newInputValue) => setBuscaNomeInput(newInputValue)}
-                            onChange={(_, val) => {
-                                if (val && typeof val === 'object') {
-                                    handleSelectColaboradorNome(val);
-                                }
-                            }}
-                            getOptionLabel={(option) => typeof option === 'string' ? option : `${option.nome_completo || ''} - ${option.funcao || ''}`}
-                            renderOption={(props, option) => (
-                                <Box component="li" {...props} key={option.id} sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                                    <PessoaFoto src={option.foto_url} nome={option.nome_completo} width={38} />
-                                    <Box sx={{ minWidth: 0, flex: 1 }}>
-                                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            {option.nome_completo}
-                                        </Typography>
-                                        <Typography variant="caption" sx={{ color: '#94A3B8', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            {option.funcao || 'Participante'} • {option.empresas?.nome || 'Sem empresa'}
-                                        </Typography>
-                                    </Box>
-                                </Box>
-                            )}
-                            renderInput={(params) => (
-                                <TextField
-                                    {...params}
-                                    placeholder="Buscar participante pelo nome"
-                                    size="small"
-                                    InputProps={{
-                                        ...params.InputProps,
-                                        startAdornment: (
-                                            <PersonSearchIcon sx={{ color: '#00D4FF', mr: 1, ml: 0.5, fontSize: 20 }} />
-                                        ),
-                                        endAdornment: (
-                                            <>
-                                                {loadingBuscaNome ? <CircularProgress color="inherit" size={18} sx={{ mr: 1 }} /> : null}
-                                                {params.InputProps.endAdornment}
-                                            </>
-                                        )
-                                    }}
-                                    sx={{
-                                        bgcolor: 'rgba(0,0,0,0.3)',
-                                        borderRadius: 1.5,
-                                        '& .MuiOutlinedInput-root': {
-                                            color: '#FFFFFF',
-                                            height: 44,
-                                            fontSize: '0.875rem',
-                                            '& fieldset': { borderColor: 'rgba(0, 212, 255, 0.3)' },
-                                            '&:hover fieldset': { borderColor: '#00D4FF' }
-                                        }
-                                    }}
-                                />
-                            )}
-                        />
-                    </Grid>
-                </Grid>
+                {buscaNomeOptions.length > 0 && (
+                    <Box sx={{ mt: 1.5, maxHeight: 260, overflowY: 'auto' }}>
+                        <List disablePadding>
+                            {buscaNomeOptions.map((option) => (
+                                <ListItem key={option.id} disablePadding sx={{ mb: 0.75 }}>
+                                    <ListItemButton
+                                        onClick={() => handleSelectColaboradorNome(option)}
+                                        sx={{
+                                            borderRadius: 1.5,
+                                            p: 1.15,
+                                            border: '1px solid rgba(0, 212, 255, 0.2)',
+                                            bgcolor: 'rgba(255,255,255,0.02)',
+                                            '&:hover': {
+                                                bgcolor: 'rgba(0, 212, 255, 0.1)',
+                                                borderColor: '#00D4FF'
+                                            }
+                                        }}
+                                    >
+                                        <Box sx={{ mr: 1.5 }}>
+                                            <PessoaFoto src={option.foto_url} pessoaId={option.id} nome={option.nome_completo} width={40} borderRadius="8px" accentColor="#00D4FF" />
+                                        </Box>
+                                        <ListItemText
+                                            primary={option.nome_completo || option.nome}
+                                            secondary={[
+                                                option.cpf || 'Sem CPF',
+                                                option.numero_pulseira ? `Pulseira ${option.numero_pulseira}` : null,
+                                                option.funcao || 'Participante',
+                                                option.empresa_nome || option.empresas?.nome
+                                            ].filter(Boolean).join(' • ')}
+                                            primaryTypographyProps={{ fontWeight: 700, fontSize: '0.9rem', color: '#FFFFFF', noWrap: true }}
+                                            secondaryTypographyProps={{ fontSize: '0.78rem', color: '#94A3B8', noWrap: true }}
+                                        />
+                                    </ListItemButton>
+                                </ListItem>
+                            ))}
+                        </List>
+                    </Box>
+                )}
 
                 <LeitorQrCamera
                     open={cameraActive}
                     onClose={() => setCameraActive(false)}
-                    onLeitura={(cod) => handleProcessarCodigo(cod, 'camera_qr')}
+                    titulo="Fiscalização pela câmera"
+                    instrucao="Aponte a câmera para o QR Code ou código de barras da pulseira — a pessoa vinculada será buscada automaticamente."
+                    onLeitura={(cod) => {
+                        setCameraActive(false);
+                        handleProcessarCodigo(cod, 'camera_qr');
+                    }}
                 />
             </GlassCard>
 
@@ -524,6 +508,7 @@ const Fiscalizacao = () => {
                                     >
                                         <PessoaFoto
                                             src={resultado.pessoa.foto_url}
+                                            pessoaId={resultado.pessoa.id}
                                             nome={resultado.pessoa.nome_completo}
                                             width={isMobile ? 110 : 160}
                                             borderRadius="16px"

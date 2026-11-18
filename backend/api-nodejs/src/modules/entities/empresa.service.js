@@ -1,5 +1,6 @@
 const { supabase, deleteImage } = require('../../config/supabase');
 const logger = require('../../services/logger');
+const { caminhoDeStorage, BUCKETS_DOCUMENTO } = require('../../services/storageSeguro');
 const crypto = require('crypto');
 
 class EmpresaService {
@@ -140,15 +141,8 @@ class EmpresaService {
 
             if (empDocs && empDocs.length > 0) {
                 for (const doc of empDocs) {
-                    if (doc.url_arquivo) {
-                        const urlParts = doc.url_arquivo.split('/storage/v1/object/public/');
-                        if (urlParts.length === 2) {
-                            const fullPath = urlParts[1];
-                            const bucket = fullPath.split('/')[0];
-                            const path = fullPath.substring(bucket.length + 1);
-                            await deleteImage(bucket, path);
-                        }
-                    }
+                    const ref = caminhoDeStorage(doc.url_arquivo, { buckets: BUCKETS_DOCUMENTO });
+                    if (ref) await deleteImage(ref.bucket, ref.path);
                 }
                 // Limpar registros do DB
                 await supabaseClient.from('empresa_documentos').delete().eq('empresa_id', id);

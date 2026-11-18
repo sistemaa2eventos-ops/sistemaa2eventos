@@ -120,7 +120,7 @@ class PessoaController {
                 { err: error, person_name: req.body?.nome_completo, event_id: req.event?.id },
                 'Error creating person'
             );
-            return ApiResponse.error(res, error.message);
+            return ApiResponse.error(res, error.message, error.status || 500);
         }
     }
 
@@ -195,7 +195,7 @@ class PessoaController {
                 { err: error, person_id: req.params.id, event_id: req.event?.id },
                 'Error updating person'
             );
-            return ApiResponse.error(res, error.message);
+            return ApiResponse.error(res, error.message, error.status || 500);
         }
     }
 

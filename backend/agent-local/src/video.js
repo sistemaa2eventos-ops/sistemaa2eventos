@@ -110,24 +110,25 @@ function portaAberta(porta) {
 }
 
 /**
- * Origem da câmera no go2rtc. "webcam", "webcam:1", "usb:0" ou o RTSP local do OBS (127.0.0.1:8554)
- * com o OBS fechado viram a webcam USB; o resto segue como RTSP.
+ * Origem da câmera no go2rtc. "webcam", "webcam:1", "usb:0" ou o RTSP local do OBS (127.0.0.1:8554 / localhost:8554,
+ * com ou sem usuário:senha@) viram a webcam USB quando o OBS está fechado ou falha no SETUP.
  */
 async function origemDaCamera(url) {
     const u = String(url || '').trim();
     const ehWebcam = /^(webcam|usb)\b/i.test(u) || /^\d+$/.test(u);
-    const obsLocal = /^rtsp:\/\/(127\.0\.0\.1|localhost):8554\b/i.test(u);
+    const obsLocal = /^rtsps?:\/\/(?:[^@\/]+@)?(127\.0\.0\.1|localhost):8554\b/i.test(u);
     if (!ehWebcam && !obsLocal) return /^rtsps?:\/\//i.test(u) ? u : null;
-    if (obsLocal && await portaAberta(8554)) return u; // OBS ligado: usa o RTSP dele
-    if (!estado.ffmpeg) return null;
+    if (!estado.ffmpeg) return obsLocal ? u : null;
     const lista = listarWebcams();
-    const indice = Number((u.match(/(\d+)\s*$/) || [])[1] || 0);
+    const indice = ehWebcam ? Number((u.match(/(\d+)\s*$/) || [])[1] || 0) : 0;
     const nome = lista[indice] || lista[0];
-    if (!nome) return null;
+    if (!nome) return obsLocal ? u : null;
     const modo = melhorModo(nome);
     const params = new URLSearchParams({ video: String(Math.max(0, lista.indexOf(nome))), framerate: '30', ...(modo ? { video_size: modo } : {}) });
     // Teto de taxa: sem ele, o ruído do sensor (pouca luz) passava de 2 Mbit/s para 640x480
-    return `ffmpeg:device?${params}#video=h264#raw=-crf 26 -maxrate 900k -bufsize 1800k`;
+    const webcamDshow = `ffmpeg:device?${params}#video=h264#raw=-crf 26 -maxrate 900k -bufsize 1800k`;
+    if (obsLocal && await portaAberta(8554)) return [u, webcamDshow];
+    return webcamDshow;
 }
 
 const nomeStream = (cameraId, sub) => `c_${String(cameraId).replace(/[^a-zA-Z0-9]/g, '')}${sub ? '_sub' : ''}`;
@@ -160,7 +161,11 @@ function escreverConfig() {
         // a pasta do ffmpeg vai na frente do PATH do processo (ver iniciarProcesso)
         ...(estado.ffmpeg ? ['ffmpeg:', '  bin: "ffmpeg"'] : []),
         'streams:',
-        ...[...estado.streams].map(([nome, url]) => `  ${nome}: ${aspas(url)}`)
+        ...[...estado.streams].flatMap(([nome, url]) => (
+            Array.isArray(url)
+                ? [`  ${nome}:`, ...url.map(u => `    - ${aspas(u)}`)]
+                : [`  ${nome}: ${aspas(url)}`]
+        ))
     ];
     fs.mkdirSync(DIR_BIN, { recursive: true });
     // O arquivo leva as senhas das câmeras: só para o usuário do Windows que roda o agente
@@ -277,14 +282,19 @@ async function configurarCameras(cameras = []) {
         const url = await origemDaCamera(c.stream_url);
         if (!url) continue;
         const principal = nomeStream(c.id, false);
-        streams.set(principal, url);
+        const listaPrincipal = Array.isArray(url) ? [...url] : [url];
+        if (estado.ffmpeg) listaPrincipal.push(`ffmpeg:${principal}#video=mjpeg`);
+        streams.set(principal, listaPrincipal);
+        const primeiroUrl = Array.isArray(url) ? url[0] : url;
         // Webcam não tem sub-stream: a miniatura usa o mesmo vídeo (já é leve)
-        const subUrl = url.startsWith('ffmpeg:') ? null
-            : (c.url_substream && /^rtsps?:\/\//i.test(c.url_substream)) ? c.url_substream : derivarSubstream(url);
+        const subUrl = Array.isArray(url) || String(primeiroUrl).startsWith('ffmpeg:') ? null
+            : (c.url_substream && /^rtsps?:\/\//i.test(c.url_substream)) ? c.url_substream : derivarSubstream(primeiroUrl);
         let sub = null;
-        if (subUrl && subUrl !== url) {
+        if (subUrl && subUrl !== primeiroUrl) {
             sub = nomeStream(c.id, true);
-            streams.set(sub, subUrl);
+            const listaSub = [subUrl];
+            if (estado.ffmpeg) listaSub.push(`ffmpeg:${sub}#video=mjpeg`);
+            streams.set(sub, listaSub);
         }
         camMap.set(String(c.id), { principal, sub });
     }

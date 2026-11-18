@@ -85,6 +85,39 @@ class EmailService {
     }
 
     /**
+     * Pedido de exclusão/anonimização: link para o titular confirmar (vale 30 min).
+     * Nada é apagado antes da confirmação.
+     */
+    async sendForgetMeRequest(email, nome, link) {
+        const esc = (t) => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        try {
+            const mailOptions = {
+                from: `"CREDENCIAMENTO - LGPD" <${process.env.SMTP_FROM || 'no-reply@a2eventos.com.br'}>`,
+                to: email,
+                subject: 'Confirme o pedido de exclusão dos seus dados (LGPD) 🔒',
+                html: `
+                    <div style="font-family: Arial, sans-serif; padding: 20px;">
+                        <h2 style="color: #FF1744;">Confirmação de Direito ao Esquecimento</h2>
+                        <p>Olá, <strong>${esc(nome)}</strong>.</p>
+                        <p>Recebemos um pedido para anonimizar os seus dados pessoais (Art. 18, VI da LGPD). Para concluir, confirme pelo botão abaixo. O link vale por 30 minutos e só pode ser usado uma vez.</p>
+                        <p style="margin: 24px 0;">
+                            <a href="${esc(link)}" style="background-color: #FF1744; color: #ffffff; padding: 12px 20px; border-radius: 6px; text-decoration: none; font-weight: bold;">Confirmar exclusão dos meus dados</a>
+                        </p>
+                        <p>Depois de confirmada, a operação não pode ser desfeita: sua credencial deixa de funcionar e seus dados pessoais, foto e documentos são apagados.</p>
+                        <p>Se você não fez este pedido, ignore este e-mail. Nada será alterado.</p>
+                        <hr style="border: 0; border-top: 1px solid #ddd; margin: 20px 0;" />
+                        <p style="font-size: 11px; color: #888;">Controlador: A2 Eventos | Operador: CREDENCIAMENTO - A2 EVENTOS</p>
+                    </div>
+                `
+            };
+            await this.transporter.sendMail(mailOptions);
+            logger.info(`📧 [LGPD] E-mail de confirmação de exclusão enviado`);
+        } catch (error) {
+            logger.error(`❌ [LGPD] Falha ao enviar e-mail de confirmação de exclusão:`, error);
+        }
+    }
+
+    /**
      * Confirmação de pedido de exclusão/anonimização
      */
     async sendForgetMeConfirmation(email, nome) {

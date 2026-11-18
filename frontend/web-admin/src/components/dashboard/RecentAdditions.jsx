@@ -48,6 +48,7 @@ const RecentAdditions = ({ pessoas = [] }) => {
                 <Box sx={{ mr: 2, flexShrink: 0 }}>
                   <PessoaFoto
                     src={func.foto_url}
+                    pessoaId={func.id}
                     nome={func.nome}
                     width={48}
                     borderRadius="10px"

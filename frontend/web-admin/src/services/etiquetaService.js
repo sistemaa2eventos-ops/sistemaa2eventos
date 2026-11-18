@@ -1,4 +1,5 @@
 import api from './api';
+import { obterUrlFoto } from './fotosPessoa';
 
 /**
  * Impressão de etiqueta pelo navegador do operador: usa a impressora instalada no Windows
@@ -185,11 +186,25 @@ export function imprimirHtml(html) {
     });
 }
 
+/**
+ * Troca a foto guardada da pessoa pela URL assinada (bucket privado).
+ * Sem foto cadastrada não busca nada. Se a rota falhar ou devolver null, mantém a foto_url original
+ * (a etiqueta não sai sem foto quando a pessoa tem foto). O valor original fica em foto_url_guardada,
+ * para assinar de novo na hora de imprimir.
+ */
+export async function comFotoAssinada(dados, pessoaId) {
+    const original = dados?.foto_url_guardada ?? dados?.foto_url;
+    if (!original || !pessoaId) return dados;
+    const url = await obterUrlFoto(pessoaId, original).catch(() => null);
+    return { ...dados, foto_url: url || original, foto_url_guardada: original };
+}
+
 /** Imprime a etiqueta de uma pessoa com o layout do evento. */
 export async function imprimirEtiqueta(eventoId, pessoaId) {
     const { layout } = await carregarConfigEtiqueta(eventoId);
     const { data } = await api.get(`/config/etiquetas/pessoa/${pessoaId}`, { params: { evento_id: eventoId } });
-    return imprimirHtml(montarHtmlEtiqueta(layout, data.data));
+    const dados = await comFotoAssinada(data.data, pessoaId);
+    return imprimirHtml(montarHtmlEtiqueta(layout, dados));
 }
 
 /**

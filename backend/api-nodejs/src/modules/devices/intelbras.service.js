@@ -13,7 +13,8 @@ class IntelbrasService extends AccessDevice {
         this.ip = config.ip_address || config.ip;
         this.port = config.porta || config.port || 80;
         this.user = config.user_device || config.user || config.usuario || process.env.INTELBRAS_DEFAULT_USER || 'admin';
-        this.pass = config.password_device || config.password || config.senha || process.env.INTELBRAS_DEFAULT_PASS || 'admin123';
+        // Sem senha padrão no código: sem senha configurada, _request recusa a chamada com erro claro
+        this.pass = config.password_device || config.password || config.senha || process.env.INTELBRAS_DEFAULT_PASS || null;
         this.baseUrl = `http://${this.ip}:${this.port}`;
         this.digestClient = null;
     }
@@ -77,6 +78,7 @@ class IntelbrasService extends AccessDevice {
      * @returns {Promise<{ status: number, ok: boolean, text: string, buffer: Buffer|null }>}
      */
     async _request(method, path, params = {}, body = null, contentType = null, { binary = false, timeoutMs = TIMEOUT_CONFIG.DEVICE_CONNECTION } = {}) {
+        if (!this.pass) throw new Error(`Senha do leitor ${this.ip} não configurada. Cadastre a senha do dispositivo.`);
         const queryString = new URLSearchParams(params).toString();
         const fullPath = `${path}${queryString ? '?' + queryString : ''}`;
         // Na nuvem o leitor só é alcançável pelo agente. No servidor local do evento (PYTHON_MICROSERVICE_URL

@@ -29,7 +29,13 @@ export default function PrivacyPage() {
 
             if (!res.ok) throw new Error(data.error || 'Erro ao processar solicitação');
 
-            setMessage({ type: 'success', text: data.message });
+            // Esquecimento: o servidor só envia o e-mail de confirmação; nada é apagado neste passo
+            setMessage({
+                type: 'success',
+                text: action === 'forget-me'
+                    ? 'Se os dados conferirem, enviamos um e-mail com o link de confirmação. O link vale por 30 minutos.'
+                    : data.message
+            });
         } catch (error: unknown) {
             const messageText = error instanceof Error ? error.message : 'Falha ao processar solicitação';
             setMessage({ type: 'error', text: messageText });

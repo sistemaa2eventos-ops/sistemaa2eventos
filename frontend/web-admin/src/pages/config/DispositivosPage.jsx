@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box, Button, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, Select, MenuItem, FormControl, InputLabel, Grid,
@@ -119,34 +119,49 @@ export default function DispositivosPage() {
   // Formulário
   const [formData, setFormData] = useState(FORM_DEFAULT);
 
+  // ── Métricas: chamada separada, depois da lista, sem segurar o carregamento da tela.
+  // O teste de alcance leva até ~2 s por leitor; enquanto não chega, o cartão mostra "medindo...".
+  const [metricasCarregando, setMetricasCarregando] = useState(false);
+  const metricasEmVooRef = useRef(false);
+  const carregarMetricas = useCallback(async () => {
+    if (metricasEmVooRef.current) return; // uma medição por vez
+    metricasEmVooRef.current = true;
+    setMetricasCarregando(true);
+    try {
+      const eventoId = new URLSearchParams(window.location.search).get('evento_id') || localStorage.getItem('active_evento_id');
+      const { data } = await api.get('/dispositivos/metricas', { params: { evento_id: eventoId }, hideDefaultError: true, timeout: 20000 });
+      setMetricas(Object.fromEntries((data?.data ?? []).map(m => [m.dispositivo_id, m])));
+    } catch {
+      // Sem métricas o cartão segue com o status gravado; nada é desligado por isso
+    } finally {
+      metricasEmVooRef.current = false;
+      setMetricasCarregando(false);
+    }
+  }, []);
+
   // ── Carregamento
   // silencioso = atualização de fundo (sem indicador de carregamento)
   const carregarDados = useCallback(async (silencioso = false) => {
     try {
       if (!silencioso) setLoading(true);
       const eventoId = new URLSearchParams(window.location.search).get('evento_id') || localStorage.getItem('active_evento_id');
-      const [devRes, queueRes, areasRes, agentesRes, metricasRes] = await Promise.allSettled([
+      const [devRes, queueRes, areasRes, agentesRes] = await Promise.allSettled([
         api.get('/dispositivos', { params: { evento_id: eventoId } }),
         api.get('/dispositivos/queue', { params: { evento_id: eventoId } }),
         api.get('/config/areas', { params: { evento_id: eventoId } }),
-        api.get('/agentes', { hideDefaultError: true }),
-        // Teste de alcance em cada equipamento: o servidor responde em até ~2 s por leitor
-        api.get('/dispositivos/metricas', { params: { evento_id: eventoId }, hideDefaultError: true, timeout: 20000 })
+        api.get('/agentes', { hideDefaultError: true })
       ]);
       setAgentes(agentesRes.status === 'fulfilled' ? (agentesRes.value.data?.data ?? []) : []);
       setDispositivos(devRes.status === 'fulfilled' ? (devRes.value.data?.data ?? []) : []);
       setQueue(queueRes.status === 'fulfilled' ? (queueRes.value.data?.data ?? []) : []);
       setAreas(areasRes.status === 'fulfilled' ? (areasRes.value.data?.data ?? []) : []);
-      if (metricasRes.status === 'fulfilled') {
-        const lista = metricasRes.value.data?.data ?? [];
-        setMetricas(Object.fromEntries(lista.map(m => [m.dispositivo_id, m])));
-      }
     } catch (err) {
       enqueueSnackbar('Erro ao carregar dados: ' + err.message, { variant: 'error' });
     } finally {
       setLoading(false);
     }
-  }, [enqueueSnackbar]);
+    carregarMetricas(); // sem await: a lista já aparece; as métricas chegam depois
+  }, [enqueueSnackbar, carregarMetricas]);
 
   // Mede os equipamentos agora (ignora o cache curto do servidor), sem recarregar a lista inteira
   const medirAgora = async () => {
@@ -165,15 +180,26 @@ export default function DispositivosPage() {
     }
   };
 
+  // Carga inicial: uma vez ao abrir (a quantidade de equipamentos não recarrega a tela)
+  useEffect(() => { carregarDados(); }, [carregarDados]);
+
+  // Atualização automática: a cada 60 s (ou 90 s com mais de 6 equipamentos) e só com a aba visível.
+  // O intervalo lê a quantidade por ref e se reagenda sozinho, sem recriar o efeito.
+  const qtdDispositivosRef = useRef(0);
+  useEffect(() => { qtdDispositivosRef.current = dispositivos.length; }, [dispositivos.length]);
+  const intervaloRef = useRef(null);
   useEffect(() => {
-    carregarDados();
-    if (autoRefresh) {
-      // A cada 60 s (ou 90 s quando há muitos equipamentos) e só com a aba visível
-      const intervaloMs = dispositivos.length > 6 ? 90000 : 60000;
-      const interval = setInterval(() => { if (!document.hidden) carregarDados(true); }, intervaloMs);
-      return () => clearInterval(interval);
-    }
-  }, [autoRefresh, carregarDados, dispositivos.length]);
+    if (!autoRefresh) return undefined;
+    const agendar = () => {
+      const intervaloMs = qtdDispositivosRef.current > 6 ? 90000 : 60000;
+      intervaloRef.current = setTimeout(() => {
+        if (!document.hidden) carregarDados(true);
+        agendar();
+      }, intervaloMs);
+    };
+    agendar();
+    return () => clearTimeout(intervaloRef.current);
+  }, [autoRefresh, carregarDados]);
 
   // ── Auxiliar: loading por dispositivo
   const setDevLoading = (id, key, val) =>
@@ -199,9 +225,11 @@ export default function DispositivosPage() {
     const { name, value, type, checked } = e.target;
     if (name.startsWith('config.')) {
       const key = name.slice(7);
-      // Canal e porta RTSP são números: vazio fica como undefined (o servidor usa o padrão)
-      const valorNumerico = ['canal', 'rtsp_porta'].includes(key) ? (parseInt(value, 10) || undefined) : value;
-      setFormData(p => ({ ...p, config: { ...(p.config || {}), [key]: type === 'checkbox' ? checked : valorNumerico } }));
+      // Canal, porta e caminho RTSP vazios vão como null: o servidor volta ao padrão do equipamento
+      let valor = value;
+      if (['canal', 'rtsp_porta'].includes(key)) valor = String(value).trim() === '' ? null : (parseInt(value, 10) || null);
+      else if (key === 'rtsp_caminho') valor = String(value).trim() === '' ? null : value;
+      setFormData(p => ({ ...p, config: { ...(p.config || {}), [key]: type === 'checkbox' ? checked : valor } }));
     } else {
       setFormData(p => ({ ...p, [name]: name === 'porta' ? parseInt(value) || 0 : value }));
     }
@@ -218,12 +246,20 @@ export default function DispositivosPage() {
       enqueueSnackbar('A senha do leitor é obrigatória para este equipamento', { variant: 'warning' });
       return;
     }
+    // rtsp_url vem do servidor com a senha mascarada (rtsp://usuario:****@...): nunca reenviar.
+    // A tela não edita essa URL; o servidor a monta a partir de IP, usuário, senha, canal e porta.
+    const payload = { ...formData };
+    if (typeof payload.rtsp_url === 'string' && payload.rtsp_url.includes('****')) delete payload.rtsp_url;
+    if (typeof payload.config?.rtsp_url === 'string' && payload.config.rtsp_url.includes('****')) {
+      payload.config = { ...payload.config };
+      delete payload.config.rtsp_url;
+    }
     try {
       if (isEditing) {
-        await api.put(`/dispositivos/${formData.id}`, formData);
+        await api.put(`/dispositivos/${formData.id}`, payload);
         enqueueSnackbar('Dispositivo atualizado', { variant: 'success' });
       } else {
-        await api.post('/dispositivos', formData);
+        await api.post('/dispositivos', payload);
         enqueueSnackbar('Dispositivo criado', { variant: 'success' });
       }
       setOpenDialog(false);
@@ -326,20 +362,23 @@ export default function DispositivosPage() {
   const renderCard = (device) => {
     const expanded = !!expandedCards[device.id];
     const m = metricas[device.id];
-    // Com métricas: teste de alcance agora. Sem: último status gravado no banco.
-    const isOnline = m ? m.online : device.status_online === 'online';
+    // Ações (Sync, Câmera) dependem só do status gravado: a métrica nunca desliga botão.
+    const isOnline = device.status_online === 'online';
+    // A métrica só informa: pinta a borda com o teste de alcance de agora, quando existe.
+    const alcanceOk = m ? m.online : isOnline;
+    const medindoCartao = !m && metricasCarregando;
     const pending = queueCount(device.id);
 
     return (
       <Grid item xs={12} sm={6} lg={4} key={device.id}>
         <Card sx={{
           background: BG,
-          border: `1px solid ${isOnline ? GREEN : 'rgba(255,51,102,0.3)'}`,
+          border: `1px solid ${alcanceOk ? GREEN : 'rgba(255,51,102,0.3)'}`,
           backdropFilter: 'blur(12px)',
           borderRadius: 1.5,
           minHeight: 215, // Fix CLS: Reserva altura mínima do card
           transition: 'box-shadow 0.3s',
-          '&:hover': { boxShadow: `0 0 20px ${isOnline ? 'rgba(0,255,136,0.15)' : 'rgba(255,51,102,0.1)'}` }
+          '&:hover': { boxShadow: `0 0 20px ${alcanceOk ? 'rgba(0,255,136,0.15)' : 'rgba(255,51,102,0.1)'}` }
         }}>
 
           {/* ── Header do card */}
@@ -404,7 +443,7 @@ export default function DispositivosPage() {
             {/* ── Métricas do equipamento */}
             <Box sx={{ mt: 1.2, pt: 1, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.6 }}>
               <MetricaItem rotulo="Alcance"
-                valor={!m ? '–' : m.online ? `${m.latencia_ms} ms` : 'sem resposta'}
+                valor={medindoCartao ? 'medindo...' : !m ? '–' : m.online ? `${m.latencia_ms} ms` : 'sem resposta'}
                 cor={!m ? '#94A3B8' : m.online ? GREEN : RED} />
               <MetricaItem rotulo="Último evento" valor={m ? formatarMomento(m.ultimo_evento_at) : '–'} />
               <MetricaItem rotulo="Faces no leitor" valor={m?.faces_sincronizadas ?? '–'} />
@@ -413,7 +452,7 @@ export default function DispositivosPage() {
                 cor={m?.erros_24h > 0 ? RED : undefined}
                 dica={m?.ultimo_erro ? `${m.ultimo_erro.operacao}: ${m.ultimo_erro.mensagem || 'sem mensagem'} (${formatarMomento(m.ultimo_erro.at)})` : null} />
               <MetricaItem rotulo="Fila pendente" valor={m?.fila_pendente ?? pending} cor={(m?.fila_pendente ?? pending) > 0 ? '#FFB800' : undefined} />
-              <MetricaItem rotulo="Medido" valor={m ? formatarMomento(m.medido_em) : '–'} />
+              <MetricaItem rotulo="Medido" valor={m ? formatarMomento(m.medido_em) : medindoCartao ? 'medindo...' : '–'} />
             </Box>
           </CardContent>
 
@@ -770,16 +809,16 @@ export default function DispositivosPage() {
                   Integração do equipamento
                 </Typography>
                 <Grid container spacing={2}>
-                  <Grid item xs={4}>
+                  <Grid item xs={12} sm={4}>
                     <TextField label="Canal de vídeo" name="config.canal" type="number" value={formData.config?.canal ?? ''}
                       onChange={handleFormChange} fullWidth size="small" placeholder="1"
                       helperText="Canal da câmera no equipamento" />
                   </Grid>
-                  <Grid item xs={4}>
+                  <Grid item xs={12} sm={4}>
                     <TextField label="Porta RTSP" name="config.rtsp_porta" type="number" value={formData.config?.rtsp_porta ?? ''}
                       onChange={handleFormChange} fullWidth size="small" placeholder="554" />
                   </Grid>
-                  <Grid item xs={4}>
+                  <Grid item xs={12} sm={4}>
                     <TextField label="Caminho RTSP (opcional)" name="config.rtsp_caminho" value={formData.config?.rtsp_caminho ?? ''}
                       onChange={handleFormChange} fullWidth size="small"
                       placeholder={caminhoRtspPadrao(formData.marca, formData.config?.canal)} />

@@ -10,6 +10,7 @@ const watchlistService = require('../system/watchlist.service');
 const { COLUNAS_PESSOA_ACESSO } = require('./services/colunasPessoa');
 const pulseiraService = require('../pulseiras/pulseira.service');
 const { buscarLotesDaFaixa, escolherLote } = require('../pulseiras/loteSelecao');
+const { buscarPessoaPorCodigo } = require('./codigoLeitor');
 
 class AccessController {
     constructor() {
@@ -578,43 +579,11 @@ class AccessController {
                 return ApiResponse.error(res, 'Código ou identificador não informado', 400);
             }
 
-            const cleanCode = String(codigo).trim();
-            const cleanDigits = cleanCode.replace(/\D/g, '');
-
-            // 1. Tentar buscar a pessoa por: numero_pulseira, cpf, qr_code ou id
-            let query = supabaseClient
-                .from('pessoas')
-                .select(`${COLUNAS_PESSOA_ACESSO}, empresas(nome)`)
-                .eq('evento_id', eventoId);
-
-            let orConds = [`numero_pulseira.eq.${cleanCode}`, `qr_code.eq.${cleanCode}`];
-            if (cleanDigits.length === 11) {
-                const cpfFormatted = cleanDigits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-                orConds.push(`cpf.eq.${cleanDigits}`, `cpf.eq.${cpfFormatted}`);
-            } else if (cleanDigits.length > 0) {
-                orConds.push(`cpf.eq.${cleanDigits}`, `cpf.eq.${cleanCode}`);
-            }
-            if (/^[0-9a-fA-F-]{36}$/.test(cleanCode)) {
-                orConds.push(`id.eq.${cleanCode}`);
-            }
-
-            let { data: pessoas, error } = await query.or(orConds.join(',')).limit(1);
-
-            if (!pessoas || pessoas.length === 0) {
-                const { data: fallbackPessoas } = await supabaseClient
-                    .from('pessoas')
-                    .select(`${COLUNAS_PESSOA_ACESSO}, empresas(nome)`)
-                    .eq('evento_id', eventoId)
-                    .ilike('nome_completo', `%${cleanCode}%`)
-                    .limit(1);
-                pessoas = fallbackPessoas;
-            }
-
-            if (!pessoas || pessoas.length === 0) {
-                return ApiResponse.error(res, `Participante não encontrado para o código "${cleanCode}"`, 404);
-            }
-
-            const pessoa = pessoas[0];
+            // 1. Só código (pulseira, CPF, QR ou id). Nome nunca faz check-in: antes, um texto qualquer caía
+            // num "nome contém" e registrava a primeira pessoa que aparecesse. Pulseira repetida → 409.
+            const busca = await buscarPessoaPorCodigo(supabaseClient, eventoId, codigo, `${COLUNAS_PESSOA_ACESSO}, empresas(nome)`);
+            if (!busca.pessoa) return ApiResponse.error(res, busca.erro, busca.status);
+            const pessoa = busca.pessoa;
 
             // 2. Verificar Watchlist e Bloqueio Geral
             if (pessoa.cpf) {
@@ -660,7 +629,8 @@ class AccessController {
                 }
             });
         } catch (error) {
-            logger.error({ err: error, body: req.body }, 'Erro no leitorRapido');
+            // Sem o corpo no log: o código lido pode ser CPF ou o QR do crachá; só os nomes dos campos
+            logger.error({ err: error, campos: Object.keys(req.body || {}) }, 'Erro no leitorRapido');
             return ApiResponse.error(res, error.message || 'Erro ao processar leitura rápida');
         }
     }
@@ -917,41 +887,25 @@ class AccessController {
      */
     async consultarPulseira(req, res) {
         try {
+            // Express já decodifica o :codigo da URL (QR com pontos, CPF com máscara chegam inteiros).
+            // O tamanho é limitado no classificador (até 2048 caracteres; o JWT do crachá tem ~200).
             const { codigo } = req.params;
             const eventoId = req.event?.id;
             const supabaseClient = req.supabase || supabase;
 
-            // Só letras, números e hífen: o código entra num filtro do PostgREST
-            const safeCodigo = String(codigo || '').trim();
-            if (!/^[A-Za-z0-9-]{1,64}$/.test(safeCodigo)) {
-                return ApiResponse.error(res, 'Código inválido.', 400);
-            }
-            // Comparar com id (UUID) só quando o código for um UUID — senão o banco rejeita a consulta inteira
-            const filtros = [`numero_pulseira.eq.${safeCodigo}`, `qr_code.eq.${safeCodigo}`];
-            const cpfDigitos = safeCodigo.replace(/\D/g, '');
-            if (cpfDigitos.length === 11) {
-                const cpfFmt = cpfDigitos.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-                filtros.push(`cpf.eq.${cpfDigitos}`, `cpf.eq.${cpfFmt}`);
-            } else if (cpfDigitos.length > 0) {
-                filtros.push(`cpf.eq.${cpfDigitos}`);
-            }
-            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(safeCodigo)) filtros.push(`id.eq.${safeCodigo}`);
-
-            const { data: pessoas, error } = await supabaseClient
-                .from('pessoas')
-                .select('id, nome_completo, cpf, funcao, status_acesso, status_documentos, numero_pulseira, foto_url, tipo_pulseira_id, empresas(id, nome)')
-                .eq('evento_id', eventoId)
-                .or(filtros.join(','))
-                .limit(1);
-
-            if (error) throw error;
-            if (!pessoas || pessoas.length === 0) {
-                return ApiResponse.error(res, 'Pulseira / Colaborador não encontrado', 404);
+            // Mesma busca do leitor rápido: pulseira, CPF (com ou sem máscara), QR do crachá ou id.
+            // Texto que não é código → 400; pulseira repetida ou código em duas pessoas → 409.
+            const busca = await buscarPessoaPorCodigo(supabaseClient, eventoId, codigo,
+                'id, nome_completo, cpf, funcao, status_acesso, status_documentos, numero_pulseira, foto_url, tipo_pulseira_id, empresas(id, nome)');
+            if (!busca.pessoa) {
+                const erro = busca.status === 404 ? 'Pulseira / Colaborador não encontrado' : busca.erro;
+                return ApiResponse.error(res, erro, busca.status);
             }
 
-            return ApiResponse.success(res, pessoas[0]);
+            return ApiResponse.success(res, busca.pessoa);
         } catch (error) {
-            logger.error({ err: error, codigo: req.params?.codigo }, 'Erro ao consultar pulseira');
+            // Sem o código no log: pode ser CPF ou o QR do crachá
+            logger.error({ err: error }, 'Erro ao consultar pulseira');
             return ApiResponse.error(res, 'Erro ao consultar pulseira');
         }
     }
@@ -967,51 +921,21 @@ class AccessController {
             const eventoId = req.event?.id || req.headers['x-evento-id'] || req.query.evento_id;
             const supabaseClient = req.supabase || supabase;
 
-            const safeCodigo = (codigo || '').trim();
+            const safeCodigo = String(codigo || '').trim();
             if (!safeCodigo) {
-                return ApiResponse.error(res, 'Informe o código da pulseira, CPF ou nome do colaborador.', 400);
+                return ApiResponse.error(res, 'Informe o código da pulseira, o QR do crachá ou o CPF.', 400);
             }
 
-            // 1. Buscar a pessoa no evento atual:
-            // Suporta: número da pulseira, CPF (formatado ou limpo), ID direto (UUID), ou Nome (ilike)
-            const digitsOnly = safeCodigo.replace(/\D/g, '');
-            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(safeCodigo);
-
-            let conditions = [`numero_pulseira.eq.${safeCodigo}`];
-            if (digitsOnly.length === 11) {
-                conditions.push(`cpf.eq.${digitsOnly}`);
-            }
-            conditions.push(`cpf.eq.${safeCodigo}`);
-            if (isUuid) {
-                conditions.push(`id.eq.${safeCodigo}`);
+            // 1. Buscar a pessoa no evento: pulseira, CPF (com ou sem máscara), QR do crachá ou id (a escolha
+            // na lista da busca por nome manda o id). Sem "nome contém": nome solto não fiscaliza ninguém.
+            // Texto que não é código → 400; pulseira repetida ou código em duas pessoas → 409.
+            const busca = await buscarPessoaPorCodigo(supabaseClient, eventoId, safeCodigo,
+                'id, nome_completo, cpf, funcao, status_acesso, status_documentos, numero_pulseira, foto_url, tipo_pulseira_id, bloqueado, motivo_bloqueio, empresas(id, nome, ativo)');
+            if (!busca.pessoa && busca.status !== 404) {
+                return ApiResponse.error(res, busca.erro, busca.status);
             }
 
-            let { data: pessoas, error: findErr } = await supabaseClient
-                .from('pessoas')
-                .select('id, nome_completo, cpf, funcao, status_acesso, status_documentos, numero_pulseira, foto_url, tipo_pulseira_id, bloqueado, motivo_bloqueio, empresas(id, nome, ativo)')
-                .eq('evento_id', eventoId)
-                .or(conditions.join(','))
-                .limit(1);
-
-            if (findErr) {
-                logger.warn({ findErr, safeCodigo }, 'Falha na busca primária de pessoa por código/CPF');
-            }
-
-            // Se não encontrou por pulseira/CPF, tenta busca parcial por nome
-            if (!pessoas || pessoas.length === 0) {
-                const { data: porNome } = await supabaseClient
-                    .from('pessoas')
-                    .select('id, nome_completo, cpf, funcao, status_acesso, status_documentos, numero_pulseira, foto_url, tipo_pulseira_id, bloqueado, motivo_bloqueio, empresas(id, nome, ativo)')
-                    .eq('evento_id', eventoId)
-                    .ilike('nome_completo', `%${safeCodigo}%`)
-                    .limit(1);
-
-                if (porNome && porNome.length > 0) {
-                    pessoas = porNome;
-                }
-            }
-
-            const pessoa = pessoas?.[0];
+            const pessoa = busca.pessoa;
             if (!pessoa) {
                 return ApiResponse.success(res, {
                     autorizado: false,

@@ -64,6 +64,7 @@ const PessoasTable = ({
       format: (val, row) => (
         <PessoaFoto
           src={val}
+          pessoaId={row?.id}
           nome={row?.nome}
           width={42}
           borderRadius="8px"

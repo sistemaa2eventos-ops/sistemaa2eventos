@@ -342,7 +342,8 @@ export const useCheckin = (defaultMode, options = {}) => {
         setSearchQuery(val);
         clearTimeout(searchTimerRef.current);
         searchAbortRef.current?.abort();
-        if (val.length < 3) {
+        const termo = String(val || '').trim();
+        if (termo.length < 2) {
             setSearchResults([]);
             setSearchLoading(false);
             return;
@@ -352,14 +353,14 @@ export const useCheckin = (defaultMode, options = {}) => {
             const controller = new AbortController();
             searchAbortRef.current = controller;
             try {
-                const res = await api.get('/pessoas/search', { params: { q: val, evento_id: eventoId }, signal: controller.signal });
+                const res = await api.get('/pessoas/search', { params: { q: termo, evento_id: eventoId }, signal: controller.signal });
                 if (res.data.success) setSearchResults(res.data.data);
             } catch (error) {
                 if (error.name !== 'CanceledError' && error.code !== 'ERR_CANCELED') console.error('Erro na busca:', error);
             } finally {
                 if (searchAbortRef.current === controller) setSearchLoading(false);
             }
-        }, 300);
+        }, 280);
     };
 
     useEffect(() => () => {

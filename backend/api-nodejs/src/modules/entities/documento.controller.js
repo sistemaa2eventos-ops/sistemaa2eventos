@@ -126,12 +126,14 @@ class DocumentoController {
                 return ApiResponse.error(res, 'Entidade inválida. Use empresa ou pessoa.', 400);
             }
 
-            const data = await documentoService.listDocumentos(supabaseClient, entityType, safeEntityId);
+            const data = await documentoService.listDocumentos(supabaseClient, entityType, safeEntityId, req.tenantId || null);
 
             return ApiResponse.success(res, data);
         } catch (error) {
             logger.error('Erro ao buscar documentos:', error.message);
-            return ApiResponse.error(res, 'Erro ao buscar arquivos anexados.');
+            return error.status === 404
+                ? ApiResponse.error(res, 'Documento não encontrado', 404)
+                : ApiResponse.error(res, 'Erro ao buscar arquivos anexados.');
         }
     }
 
@@ -218,7 +220,7 @@ class DocumentoController {
         try {
             const eventoId = eventoDaRequisicao(req);
             if (!eventoId) return ApiResponse.error(res, 'Evento não identificado', 400);
-            const result = await documentoService.listarVencimentos(eventoId, req.query.dias);
+            const result = await documentoService.listarVencimentos(eventoId, req.query.dias, { assinar: true });
             return ApiResponse.success(res, result);
         } catch (error) {
             logger.error('Erro ao listar vencimentos:', error.message);
@@ -235,7 +237,7 @@ class DocumentoController {
             if (entityType !== 'empresa' && entityType !== 'pessoa') {
                 return ApiResponse.error(res, 'Entidade inválida. Use empresa ou pessoa.', 400);
             }
-            const result = await documentoService.gerarUrlAssinada(entityType, _s(docId));
+            const result = await documentoService.gerarUrlAssinada(entityType, _s(docId), req.tenantId || null);
             return ApiResponse.success(res, result);
         } catch (error) {
             logger.error('Erro ao gerar URL do documento:', error.message);

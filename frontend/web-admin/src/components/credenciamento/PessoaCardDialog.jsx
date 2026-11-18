@@ -168,6 +168,7 @@ const PessoaCardDialog = ({
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <PessoaFoto
                 src={fotoUrl}
+                pessoaId={pessoaDados.foto_url ? pessoaDados.id : undefined}
                 nome={nome}
                 width={190}
                 borderRadius="18px"

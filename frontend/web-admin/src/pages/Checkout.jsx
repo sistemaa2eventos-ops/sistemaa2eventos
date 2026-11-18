@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
-  Box, Typography, Grid, Stack, Button, Zoom, Tooltip
+  Box, Typography, Grid, Stack, Button, Zoom, Tooltip,
+  List, ListItem, ListItemButton, ListItemText, LinearProgress
 } from '@mui/material';
 import {
   Logout as LogoutIcon, ExitToApp as CheckoutIcon,
@@ -11,6 +12,7 @@ import { styled } from '@mui/material/styles';
 import GlassCard from '../components/common/GlassCard';
 import LeitorQrCamera from '../components/common/LeitorQrCameraSobDemanda';
 import UniversalPulseiraInput from '../components/common/UniversalPulseiraInput';
+import PessoaFoto from '../components/common/PessoaFoto';
 import PessoaCardDialog from '../components/credenciamento/PessoaCardDialog';
 import RecentAccessList from '../components/credenciamento/RecentAccessList';
 import CabecalhoOperacao, { BotaoJanelaRegistros } from '../components/credenciamento/CabecalhoOperacao';
@@ -91,8 +93,9 @@ const Checkout = () => {
   const {
     checkinResult, resultMessage, loading,
     modoQuiosque, toggleQuiosque,
+    searchQuery, handleSearch, searchResults, searchLoading,
     recentLogs,
-    areaId, changeAreaId, eventAreas,
+    areaId, changeAreaId, eventAreas, pulseiraTypes,
     executarLeituraRapida,
     // Vínculo Facial
     sessaoAtiva,
@@ -111,6 +114,7 @@ const Checkout = () => {
   const abrirCardLog = useCallback((log) => setCardLog(log), []);
   const acoesLista = useMemo(() => <BotaoJanelaRegistros tipo="checkout" cor={COR} />, []);
   const [pulseiraValue, setPulseiraValue] = useState('');
+  const [ultimoCodigoLido, setUltimoCodigoLido] = useState('');
   const [lendoCamera, setLendoCamera] = useState(false);
 
   useEffect(() => {
@@ -125,12 +129,27 @@ const Checkout = () => {
     return l.tipo === 'checkout' || l.metodo === 'checkout';
   }), [recentLogs]);
 
-  const registrarSaida = (valor) => {
-    const cod = (valor || pulseiraValue || '').trim();
+  const registrarSaida = useCallback((valor, metodo = 'barcode') => {
+    const cod = String(valor || pulseiraValue || '').trim();
     if (cod) {
-      executarLeituraRapida(cod, 'checkout', 'barcode');
-      setPulseiraValue('');
+      setPulseiraValue(''); // campo vazio: o próximo bipe não gruda no anterior
+      setUltimoCodigoLido(cod); // o código aparece só no aviso "Código lido"
+      handleSearch('');
+      executarLeituraRapida(cod, 'checkout', metodo);
     }
+  }, [pulseiraValue, executarLeituraRapida, handleSearch]);
+
+  // Enter/OK/"Registrar saída": código lido, nº da pulseira ou CPF dá a saída direto.
+  // Texto com letras digitado é nome: nunca dá saída automática; só lista para o operador escolher.
+  const confirmarCampo = (val, origem) => {
+    const texto = String(val || '').trim();
+    if (!texto) return;
+    if (origem !== 'barcode' && /[A-Za-zÀ-ÿ]/.test(texto)) {
+      if (searchQuery.trim() !== texto) handleSearch(texto);
+      setPulseiraValue('');
+      return;
+    }
+    registrarSaida(texto, origem === 'barcode' ? 'barcode' : 'manual');
   };
 
   return (
@@ -167,27 +186,82 @@ const Checkout = () => {
 
       <Grid container spacing={{ xs: 1.5, sm: 2 }} sx={{ flex: 1, minHeight: 0 }}>
 
-        {/* BAIXA: leitor, confirmação e resumo juntos no topo */}
-        <Grid item xs={12} lg={4}>
-            <GlassCard sx={{ p: { xs: 1.75, sm: 2.5 }, display: 'flex', flexDirection: 'column', gap: { xs: 1.5, sm: 2 } }}>
+        {/* BAIXA: campo único unificado (leitor QR/barras, pulseira, CPF e busca por nome) */}
+        <Grid item xs={12} lg={4} sx={{ height: { lg: '100%' } }}>
+            <GlassCard sx={{ p: { xs: 1.75, sm: 2.5 }, height: '100%', display: 'flex', flexDirection: 'column', gap: { xs: 1.5, sm: 2 }, minHeight: 0 }}>
                 <UniversalPulseiraInput
                     value={pulseiraValue}
-                    onChange={setPulseiraValue}
+                    onChange={(val) => {
+                        setPulseiraValue(val);
+                        handleSearch(val);
+                    }}
+                    onClear={() => {
+                        setPulseiraValue('');
+                        handleSearch('');
+                    }}
                     accentColor={COR}
-                    label="Leitor, CPF ou pulseira"
-                    placeholder="Bipe, digite ou toque no ícone"
-                    helperText="Enter registra a saída na hora"
-                    onConfirm={(val) => registrarSaida(val)}
+                    label="Busca por nome, CPF ou leitura QR / Pulseira"
+                    placeholder="Bipe QR/barras, digite nº da pulseira, CPF ou nome..."
+                    helperText="Código, nº da pulseira ou CPF + Enter dá a saída • Nome: escolha na lista"
+                    pulseiraTypes={pulseiraTypes}
+                    ultimoCodigoLido={ultimoCodigoLido}
+                    onConfirm={confirmarCampo}
+                    // Só o loading da ação: a busca por nome não pode travar o campo no meio de um bipe
                     loading={loading}
                     autoFocus={!modoQuiosque}
                     onAbrirCamera={() => setLendoCamera(true)}
                 />
+                {/* Busca por nome em andamento: barra fina com altura fixa (nada pula) */}
+                <Box sx={{ height: 3, mt: { xs: -0.75, sm: -1 } }} aria-live="polite">
+                    {searchLoading && <LinearProgress aria-label="Buscando" sx={{ height: 3, borderRadius: 2, bgcolor: tom(COR, 0.12), '& .MuiLinearProgress-bar': { bgcolor: COR } }} />}
+                </Box>
 
-                <BotaoSaida fullWidth startIcon={<LogoutIcon />} onClick={() => registrarSaida()} disabled={loading || !pulseiraValue.trim()}>
+                {searchResults.length > 0 && (
+                    <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 160, maxHeight: { xs: 260, lg: 'none' } }}>
+                        <List disablePadding>
+                            {searchResults.map(p => (
+                                <ListItem key={p.id} disablePadding sx={{ mb: 1 }}>
+                                    <ListItemButton
+                                        onClick={() => registrarSaida(p.id, 'manual')} // pelo id: sem 409 de pulseira repetida nem 404 de CPF fora do padrão
+                                        sx={{
+                                            borderRadius: 1.5,
+                                            p: 1.15,
+                                            border: '1px solid rgba(255,255,255,0.06)',
+                                            bgcolor: 'rgba(255,255,255,0.02)',
+                                            '&:hover': {
+                                                bgcolor: tom(COR, 0.12),
+                                                borderColor: tom(COR, 0.45)
+                                            }
+                                        }}
+                                    >
+                                        <Box sx={{ mr: 1.5 }}>
+                                            <PessoaFoto
+                                                src={p.foto_url}
+                                                pessoaId={p.id}
+                                                nome={p.nome}
+                                                width={40}
+                                                borderRadius="8px"
+                                                accentColor={COR}
+                                            />
+                                        </Box>
+                                        <ListItemText
+                                            primary={p.nome}
+                                            secondary={[p.cpf || 'Sem CPF', p.numero_pulseira ? `Pulseira ${p.numero_pulseira}` : null, p.empresa_nome || p.empresas?.nome].filter(Boolean).join(' – ')}
+                                            primaryTypographyProps={{ fontWeight: 700, fontSize: '0.9rem', noWrap: true }}
+                                            secondaryTypographyProps={{ fontSize: '0.78rem', noWrap: true }}
+                                        />
+                                    </ListItemButton>
+                                </ListItem>
+                            ))}
+                        </List>
+                    </Box>
+                )}
+
+                <BotaoSaida fullWidth startIcon={<LogoutIcon />} onClick={() => confirmarCampo(pulseiraValue, 'manual')} disabled={loading || !pulseiraValue.trim()}>
                     Registrar saída
                 </BotaoSaida>
 
-                <Stack spacing={0.75} sx={{ pt: 1.25, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <Stack spacing={0.75} sx={{ mt: 'auto', pt: 1.25, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                     <LinhaResumo rotulo="Saídas registradas" valor={checkoutLogs.length} cor={COR} />
                 </Stack>
             </GlassCard>
@@ -238,7 +312,11 @@ const Checkout = () => {
           open={lendoCamera}
           onClose={() => setLendoCamera(false)}
           titulo="Saída pela câmera"
-          onLeitura={(cod) => executarLeituraRapida(cod, 'checkout', 'qrcode')}
+          instrucao="Aponte a câmera para o QR Code ou código de barras da pulseira ou do crachá — a saída será registrada automaticamente."
+          onLeitura={(cod) => {
+              setLendoCamera(false);
+              registrarSaida(cod, 'qrcode');
+          }}
       />
 
       {/* DIALOG DETALHADO DO CARD DO PARTICIPANTE */}

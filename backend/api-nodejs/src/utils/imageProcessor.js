@@ -24,9 +24,15 @@ class ImageProcessor {
             // 1. Converter Base64 ou URL para Buffer se necessário
             if (typeof input === 'string') {
                 if (input.startsWith('http://') || input.startsWith('https://')) {
-                    const axios = require('axios');
-                    const resp = await axios.get(input, { responseType: 'arraybuffer', timeout: 7000 });
-                    buffer = Buffer.from(resp.data);
+                    // Storage do sistema: service role (bucket pode ser privado). Outra URL: download comum.
+                    const { ehDoNossoStorage, baixarArquivo, BUCKETS_FOTO } = require('../services/storageSeguro');
+                    if (ehDoNossoStorage(input)) {
+                        buffer = await baixarArquivo(input, { buckets: BUCKETS_FOTO });
+                    } else {
+                        const axios = require('axios');
+                        const resp = await axios.get(input, { responseType: 'arraybuffer', timeout: 7000 });
+                        buffer = Buffer.from(resp.data);
+                    }
                 } else {
                     const base64Data = input.replace(/^data:image\/\w+;base64,/, '');
                     buffer = Buffer.from(base64Data, 'base64');

@@ -47,13 +47,27 @@ export const diasAte = (iso) => {
 
 export const ehPdf = (url) => !!url && /\.pdf($|\?)|application\/pdf/i.test(url);
 
-/** URL assinada temporária (funciona com bucket público ou privado). */
+/**
+ * URL assinada temporária (600 s) de um documento. Nunca usa url_arquivo direto:
+ * o bucket é privado. Rejeita se o servidor não devolver a URL.
+ * @param {'pessoa'|'empresa'} origem
+ */
+export const obterUrlDocumentoAssinada = async (origem, id) => {
+    const resp = await api.get(`/documentos/${origem}/${id}/url`, { hideDefaultError: true });
+    // Resposta: { success, data: { url, assinada, expira_em_segundos } }
+    const url = resp.data?.data?.url;
+    if (!url) throw new Error('URL do documento indisponível');
+    return url;
+};
+
+/** Origem do documento para a rota de URL assinada ('pessoa' ou 'empresa'). */
+export const origemDocumento = (doc) => doc.tipo_entidade || (doc.empresa_id ? 'empresa' : 'pessoa');
+
+/** Versão para o visualizador: devolve null em erro (a tela mostra "Arquivo indisponível"). */
 export const obterUrlDocumento = async (doc) => {
-    const entidade = doc.tipo_entidade || (doc.empresa_id ? 'empresa' : 'pessoa');
     try {
-        const resp = await api.get(`/documentos/${entidade}/${doc.id}/url`);
-        return resp.data?.data?.url || doc.url_arquivo;
+        return await obterUrlDocumentoAssinada(origemDocumento(doc), doc.id);
     } catch {
-        return doc.url_arquivo;
+        return null;
     }
 };

@@ -204,6 +204,7 @@ app.use('/api/config', configRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/veiculos', veiculosRoutes);
 app.use('/api/documentos', documentosRoutes);
+app.use('/api/fotos', require('./modules/entities/foto.routes'));
 app.use('/api/excel', excelRoutes);
 app.use('/api/notificacoes', require('./modules/system/notificacao.routes'));
 app.use('/api/remuneracao', require('./modules/remuneracao/remuneracao.routes'));

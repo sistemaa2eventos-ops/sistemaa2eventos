@@ -12,7 +12,7 @@ async function runRetention() {
 
     try {
         // Configuração padrão: 90 dias após o fim do evento
-        const RETENTION_DAYS = process.env.LGPD_RETENTION_DAYS || 90;
+        const RETENTION_DAYS = Number(process.env.LGPD_RETENTION_DAYS) || 90;
         
         const result = await lgpdService.processRetentionBatch(RETENTION_DAYS);
         

@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography } from '@mui/material';
+import useFotoPessoa from '../../hooks/useFotoPessoa';
 
 /**
  * PessoaFoto: Componente padrão profissional para exibição de fotos de pessoas.
  * Utiliza moldura retangular portrait (proporção 3:4) com cantos arredondados,
  * borda de destaque (neon/accent), efeito hover e fallback elegante com inicial.
+ * Com `pessoaId`, a foto guardada vem por URL assinada (carregada ao aparecer na tela).
  */
 const PessoaFoto = ({
   src,
+  pessoaId,
   nome = '',
   width = 64,
   height,
@@ -19,9 +22,10 @@ const PessoaFoto = ({
   onClick,
   sx = {}
 }) => {
+  const { ref, url } = useFotoPessoa(pessoaId, src);
   const [hasError, setHasError] = useState(false);
   // Linha reaproveitada com outra pessoa: a foto nova não pode herdar o erro da anterior
-  useEffect(() => { setHasError(false); }, [src]);
+  useEffect(() => { setHasError(false); }, [url]);
   const initial = (nome || '').trim().charAt(0).toUpperCase() || '?';
 
   const defaultShadow = boxShadow !== undefined 
@@ -32,6 +36,7 @@ const PessoaFoto = ({
 
   return (
     <Box
+      ref={ref}
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
@@ -62,10 +67,10 @@ const PessoaFoto = ({
         ...sx
       }}
     >
-      {src && !hasError ? (
+      {url && !hasError ? (
         <Box
           component="img"
-          src={src}
+          src={url}
           alt={nome || 'Foto'}
           onError={() => setHasError(true)}
           sx={{

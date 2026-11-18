@@ -197,6 +197,7 @@ const CftvWall = () => {
                 pessoa: {
                     nome: pessoa.nome || alert.target_name || 'Alvo Detectado',
                     cpf: pessoa.cpf || '—',
+                    id: pessoa.id,
                     foto_url: pessoa.foto_url,
                     funcao: pessoa.funcao,
                     numero_pulseira: pessoa.numero_pulseira
@@ -692,6 +693,7 @@ const CftvWall = () => {
                                     <Box sx={{ display: 'flex', justifyContent: 'center' }}>
                                         <PessoaFoto
                                             src={activeAlert?.pessoa?.foto_url}
+                                            pessoaId={activeAlert?.pessoa?.id}
                                             nome={activeAlert?.pessoa?.nome}
                                             width={96}
                                             borderRadius="10px"

@@ -28,6 +28,7 @@ import NeonButton from '../components/common/NeonButton';
 import DataTable from '../components/common/DataTable';
 import api from '../services/api';
 import VisualizadorDocumento from '../components/documentos/VisualizadorDocumento';
+import { obterUrlDocumentoAssinada, origemDocumento } from '../components/documentos/documentosUtils';
 import AbaColaboradores from '../components/documentos/AbaColaboradores';
 import AbaEmpresas from '../components/documentos/AbaEmpresas';
 import AbaVencimentos from '../components/documentos/AbaVencimentos';
@@ -78,7 +79,6 @@ const AuditoriaDocumental = () => {
     const [searchParams] = useSearchParams();
     const [aba, setAba] = useState(() => ({ colaboradores: 1, empresas: 2, vencimentos: 3 }[searchParams.get('aba')] || 0));
     const [recarregarToken, setRecarregarToken] = useState(0);
-    const [previewUrl, setPreviewUrl] = useState(null);
 
     // Seleção em Lote
     const [selectedDocs, setSelectedDocs] = useState([]);
@@ -168,6 +168,20 @@ const AuditoriaDocumental = () => {
     const handleQuickPreview = (doc) => {
         setPreviewDoc(doc);
         setOpenPreview(true);
+    };
+
+    // Nova aba com URL assinada do documento aberto (a aba abre já no clique, antes da espera)
+    const abrirPreviewEmNovaAba = async () => {
+        if (!previewDoc) return;
+        const aba = window.open('', '_blank');
+        try {
+            const url = await obterUrlDocumentoAssinada(origemDocumento(previewDoc), previewDoc.id);
+            if (aba) aba.location.href = url;
+            else window.open(url, '_blank');
+        } catch {
+            aba?.close();
+            enqueueSnackbar('Não foi possível abrir o documento. Tente novamente.', { variant: 'error' });
+        }
     };
 
     // Confirmar Ação (Aprovar, Reprovar, Reenvio)
@@ -524,7 +538,7 @@ const AuditoriaDocumental = () => {
                             </Box>
                             <Stack direction="row" spacing={1} alignItems="center">
                                 <IconButton
-                                    onClick={() => window.open(previewUrl || previewDoc.url_arquivo, '_blank')}
+                                    onClick={abrirPreviewEmNovaAba}
                                     sx={{ }}
                                     title="Abrir em nova aba"
                                 >
@@ -540,7 +554,7 @@ const AuditoriaDocumental = () => {
                             <Grid container spacing={3} sx={{ height: '100%' }}>
                                 {/* Painel Esquerdo: Visualizador */}
                                 <Grid item xs={12} md={8}>
-                                    <VisualizadorDocumento doc={previewDoc} onUrl={setPreviewUrl} />
+                                    <VisualizadorDocumento doc={previewDoc} />
                                 </Grid>
 
                                 {/* Painel Direito: Dados e Ações Imediatas */}

@@ -225,6 +225,11 @@ export default function RegistrationForm({ token, company, branding, requiredFie
             setError(`Anexe ${faltando.length === 1 ? 'o documento' : 'os documentos'} ${faltando.join(' e ')} para enviar o cadastro.`);
             return;
         }
+        // Sem o aceite LGPD o cadastro não é enviado (o botão já fica desabilitado; esta é a segunda barreira)
+        if (!formData.aceite_lgpd) {
+            setError('Aceite os termos LGPD para enviar o cadastro.');
+            return;
+        }
         setLoading(true);
 
         try {
@@ -300,7 +305,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                     ...[...docsMinimos, ...docsDaFuncao].map(t => docsPorTipo[t.id]).filter(Boolean),
                     ...formData.documentos
                 ],
-                aceite_lgpd: true  // Always send as boolean
+                aceite_lgpd: formData.aceite_lgpd === true  // Só vai true se o aceite foi marcado
             };
 
             // Se obteve photoUrl via direct upload, remove o base64 gigante do payload

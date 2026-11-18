@@ -379,6 +379,49 @@ def avaliar_rosto_cadastro(img: np.ndarray) -> Dict[str, Any]:
     return {"ok": True, "embedding": emb, "det_score": score, "nitidez": nit, "lado_px": lado}
 
 
+_PREFIXOS_STORAGE = ("/storage/v1/object/public/", "/storage/v1/object/sign/", "/storage/v1/object/authenticated/")
+
+
+def _caminho_storage(url: Any) -> Optional[str]:
+    """'bucket/caminho' de uma foto do Supabase Storage, ou None se não é do nosso projeto (outro site:
+    baixa como antes, sem chave). Aceita /object/public, /object/sign (a query assinada é descartada)
+    e o caminho puro 'bucket/caminho'."""
+    s = str(url or "").strip()
+    if s.lower().startswith(("http://", "https://")):
+        if not SUPABASE_URL:
+            return None
+        alvo, base = urllib.parse.urlsplit(s), urllib.parse.urlsplit(SUPABASE_URL)
+        # A chave só vai para o host do nosso Supabase, nunca para outro site
+        if (alvo.scheme.lower(), alvo.netloc.lower()) != (base.scheme.lower(), base.netloc.lower()):
+            return None
+        for prefixo in _PREFIXOS_STORAGE:
+            if alvo.path.startswith(prefixo):
+                return urllib.parse.unquote(alvo.path[len(prefixo):]).lstrip("/") or None
+        return None
+    caminho = s.lstrip("/")
+    if "/" not in caminho or caminho.lower().startswith("storage/"):
+        return None
+    return urllib.parse.unquote(caminho)
+
+
+def _foto_baixavel(url: Any) -> bool:
+    s = str(url or "")
+    return s.lower().startswith("http") or _caminho_storage(s) is not None
+
+
+def _baixar_foto(url: str) -> bytes:
+    """Bucket privado: foto do nosso Supabase vai pelo endpoint autenticado (service role).
+    Outras URLs seguem o download comum. Nunca logar a URL: a assinada leva token."""
+    caminho = _caminho_storage(url)
+    if caminho is None:
+        alvo, cabecalhos = url, {"User-Agent": "Mozilla/5.0"}
+    else:
+        alvo = f"{SUPABASE_URL}/storage/v1/object/authenticated/{urllib.parse.quote(caminho, safe='/')}"
+        cabecalhos = {"User-Agent": "Mozilla/5.0", "apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
+    with urllib.request.urlopen(urllib.request.Request(alvo, headers=cabecalhos), timeout=10) as r:
+        return r.read()
+
+
 def sincronizar_biometrias_pendentes() -> int:
     """Modo Supabase: gera o embedding de quem tem foto_url mas ainda está sem face_encoding.
     (Sem a chave, a API pede cada biometria pendente pelo agente em /api/extract.)"""
@@ -389,7 +432,7 @@ def sincronizar_biometrias_pendentes() -> int:
     except Exception as e:
         logger.debug(f"Falha ao verificar biometrias pendentes: {e}")
         return 0
-    pendentes = [p for p in pendentes if str(p.get('foto_url') or '').startswith('http') and _falhas_biometria.get(p['id']) != p['foto_url']]
+    pendentes = [p for p in pendentes if _foto_baixavel(p.get('foto_url')) and _falhas_biometria.get(p['id']) != p['foto_url']]
     if not pendentes:
         return 0
     logger.info(f"🧬 Gerando biometria de {len(pendentes)} pessoa(s)...")
@@ -397,8 +440,7 @@ def sincronizar_biometrias_pendentes() -> int:
     for p in pendentes:
         pid, nome, url = p['id'], p.get('nome_completo') or p['id'], p['foto_url']
         try:
-            with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"}), timeout=10) as r:
-                img = cv2.imdecode(np.asarray(bytearray(r.read()), dtype=np.uint8), cv2.IMREAD_COLOR)
+            img = cv2.imdecode(np.asarray(bytearray(_baixar_foto(url)), dtype=np.uint8), cv2.IMREAD_COLOR)
             if img is None:
                 _falhas_biometria[pid] = url
                 continue
@@ -528,10 +570,11 @@ def reload_registered_faces() -> int:
 
 def aprender_vetor(pessoa_id: str, emb: np.ndarray):
     """Rosto confirmado com folga no CFTV: guarda o vetor (ângulo/luz reais da câmera) para a pessoa."""
-    cad = cadastro_por_id.get(pessoa_id)
-    if cad is None:
-        return
     with aprendidos_lock:
+        # Dentro do lock: cadastro_por_id e a limpeza de aprendidos mudam juntos (_montar_indice_da_base),
+        # então quem saiu da base não volta para aprendidos entre a checagem e a gravação
+        if pessoa_id not in cadastro_por_id:
+            return
         lista = aprendidos.setdefault(pessoa_id, [])
         if len(lista) >= APRENDIDOS_POR_PESSOA or any(float(np.dot(v, emb)) > 0.9 for v in lista):
             return

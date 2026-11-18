@@ -8,12 +8,14 @@ class HikvisionService extends AccessDevice {
         this.ip = config.ip_address;
         this.port = config.porta || 80;
         this.user = config.user_device || config.user || 'admin';
-        this.pass = config.password_device || config.password || 'admin123';
+        // Sem senha padrão no código: getDigestClient recusa a conexão sem senha configurada
+        this.pass = config.password_device || config.password || null;
         this.baseUrl = `http://${this.ip}:${this.port}`;
         this.digestClient = null;
     }
 
     async getDigestClient() {
+        if (!this.pass) throw new Error(`Senha do leitor ${this.ip} não configurada. Cadastre a senha do dispositivo.`);
         if (!this.digestClient) {
             const DigestFetchLib = await import('digest-fetch');
             const DigestFetch = DigestFetchLib.default || DigestFetchLib;

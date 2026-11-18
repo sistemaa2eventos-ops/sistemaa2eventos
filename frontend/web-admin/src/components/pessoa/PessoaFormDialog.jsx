@@ -17,6 +17,7 @@ import PhotoCapture from '../common/PhotoCapture';
 import NeonButton from '../common/NeonButton';
 import TituloModal from '../common/TituloModal';
 import useFecharComVoltar from '../../hooks/useFecharComVoltar';
+import useFotoPessoa from '../../hooks/useFotoPessoa';
 
 import { botaoSecundario } from '../../styles/tokens';
 const PessoaFormDialog = ({
@@ -47,6 +48,8 @@ const PessoaFormDialog = ({
 }) => {
   const [activePhaseTab, setActivePhaseTab] = React.useState('todas');
   useFecharComVoltar(open, onClose);
+  // Foto guardada da pessoa vem por URL assinada; captura ainda não salva (data:) segue direto
+  const { url: fotoFormUrl } = useFotoPessoa(formData?.id, formData?.foto_url, { preguicoso: false });
   return (
     <Dialog
       open={open}
@@ -94,7 +97,7 @@ const PessoaFormDialog = ({
                   </Box>
                   <PhotoCapture
                     onPhotoCaptured={(url) => setFormData({ ...formData, foto_url: url })}
-                    initialPhoto={formData.foto_url}
+                    initialPhoto={fotoFormUrl}
                   />
                   <Box sx={{ mt: { xs: 1.5, md: 'auto' }, pt: { xs: 1, md: 3 } }}>
                     <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center', display: 'block', fontStyle: 'italic' }}>
@@ -123,10 +126,10 @@ const PessoaFormDialog = ({
                   alignItems: 'center', 
                   gap: 1.5 
                 }}>
-                  {formData.foto_url ? (
+                  {fotoFormUrl ? (
                     <Box 
                       component="img" 
-                      src={formData.foto_url} 
+                      src={fotoFormUrl} 
                       alt="Foto" 
                       sx={{ width: 56, height: 56, borderRadius: 1.5, objectFit: 'cover', border: '2px solid #00D4FF' }} 
                     />
@@ -237,8 +240,8 @@ const PessoaFormDialog = ({
                   alignItems: 'center', 
                   gap: 1.5 
                 }}>
-                  {formData.foto_url && (
-                    <Box component="img" src={formData.foto_url} alt="Foto" sx={{ width: 52, height: 52, borderRadius: 1.5, objectFit: 'cover', border: '2px solid #00D4FF' }} />
+                  {fotoFormUrl && (
+                    <Box component="img" src={fotoFormUrl} alt="Foto" sx={{ width: 52, height: 52, borderRadius: 1.5, objectFit: 'cover', border: '2px solid #00D4FF' }} />
                   )}
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{formData.nome_completo}</Typography>

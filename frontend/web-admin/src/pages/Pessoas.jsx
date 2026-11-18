@@ -19,6 +19,7 @@ import PessoasTable from '../components/pessoa/PessoasTable';
 import PessoaFormDialog from '../components/pessoa/PessoaFormDialog';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import api from '../services/api';
+import { obterUrlDocumentoAssinada } from '../components/documentos/documentosUtils';
 import { useSnackbar } from 'notistack';
 import { botaoSecundario } from '../styles/tokens';
 
@@ -130,6 +131,20 @@ const Pessoas = () => {
       enqueueSnackbar(err.response?.data?.error || 'Erro ao enviar e-mail com QR Code.', { variant: 'error' });
     } finally {
       setEnviandoEmailQR(false);
+    }
+  };
+
+  // Documento em bucket privado: pede a URL assinada e só então abre. A aba é aberta já no clique
+  // para o navegador não bloquear o pop-up depois da espera.
+  const abrirDocumentoPessoa = async (doc) => {
+    const aba = window.open('', '_blank');
+    try {
+      const url = await obterUrlDocumentoAssinada('pessoa', doc.id);
+      if (aba) aba.location.href = url;
+      else window.open(url, '_blank');
+    } catch {
+      aba?.close();
+      enqueueSnackbar('Não foi possível abrir o documento. Tente novamente.', { variant: 'error' });
     }
   };
 
@@ -305,7 +320,7 @@ const Pessoas = () => {
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <StatusChip status={doc.status} label={doc.status} />
-                      <IconButton size="small" onClick={() => window.open(doc.url_arquivo, '_blank')}><DownloadIcon fontSize="small" /></IconButton>
+                      <IconButton size="small" onClick={() => abrirDocumentoPessoa(doc)} aria-label="Baixar documento"><DownloadIcon fontSize="small" /></IconButton>
                     </Box>
                   </Box>
                 ))

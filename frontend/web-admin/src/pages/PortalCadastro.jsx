@@ -29,7 +29,7 @@ const PortalCadastro = () => {
         email: '',
         funcao: '',
         dias_trabalho: ['Integral'],
-        aceite_lgpd: true,
+        aceite_lgpd: false,
         foto_base64: null,
         documentos: []
     });
@@ -235,7 +235,13 @@ const PortalCadastro = () => {
                             <Grid item xs={12}>
                                 <FormControlLabel 
                                     control={<Checkbox checked={true} disabled sx={{ color: '#00D4FF' }} />} 
-                                    label="Desejo acesso irrestrito conforme datas do evento programadas." 
+                                    label="Desejo acesso irrestrito conforme datas do evento programadas."
+                                />
+                            </Grid>
+                            <Grid item xs={12}>
+                                <FormControlLabel
+                                    control={<Checkbox checked={!!formData.aceite_lgpd} onChange={e => setFormData({...formData, aceite_lgpd: e.target.checked})} sx={{ color: '#00D4FF' }} />}
+                                    label="Aceito os termos de uso e a coleta de imagem para identificação (LGPD)."
                                 />
                             </Grid>
                         </Grid>

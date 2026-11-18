@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import {
-  Box, Typography, Grid, TextField,
+  Box, Typography, Grid,
   List, ListItem, ListItemText,
-  ListItemButton, Zoom, Tooltip
+  ListItemButton, Zoom, Tooltip, LinearProgress
 } from '@mui/material';
 import {
   QrCodeScanner as ScannerIcon,
-  CheckCircle as SuccessIcon, Cancel as ErrorIcon, Search as SearchIcon
+  CheckCircle as SuccessIcon, Cancel as ErrorIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 
@@ -20,6 +20,7 @@ import PessoaCardDialog from '../components/credenciamento/PessoaCardDialog';
 import PreviewEtiquetaDialog from '../components/credenciamento/PreviewEtiquetaDialog';
 import RecentAccessList from '../components/credenciamento/RecentAccessList';
 import { useCheckin } from '../hooks/useCheckin';
+import { carregarConfigEtiqueta } from '../services/etiquetaService';
 import CorrigirTurnoDialog from '../components/checkin/CorrigirTurnoDialog';
 import AcoesPulseiraCheckin from '../components/checkin/AcoesPulseiraCheckin';
 import RelogioSincronizado from '../components/common/RelogioSincronizado';
@@ -71,7 +72,37 @@ const Checkin = () => {
   const abrirCardLog = useCallback((log) => setCardLog(log), []);
   const acoesLista = useMemo(() => <BotaoJanelaRegistros tipo="checkin" cor="#00D4FF" />, []);
   const [barcodeValue, setBarcodeValue] = useState('');
+  const [ultimoCodigoLido, setUltimoCodigoLido] = useState('');
   const [lendoCamera, setLendoCamera] = useState(false);
+
+  // O campo único só LOCALIZA a pessoa; o check-in é sempre feito na janela de conferência.
+  // Código (QR/barras) ou CPF: abre a conferência da pessoa encontrada.
+  const localizarPorCodigo = (codigoBruto) => {
+    const cod = String(codigoBruto || '').trim();
+    if (!cod) return;
+    setBarcodeValue(''); // campo vazio: o próximo bipe não gruda no anterior
+    setUltimoCodigoLido(cod); // o código lido aparece só no aviso "Código lido"
+    handleSearch('');
+    abrirConferenciaPorCodigo(cod);
+  };
+
+  // Enter/OK no campo. Texto com letras digitado é nome: nunca faz check-in nem abre por código.
+  // Só abre a conferência se a busca deste mesmo texto já voltou com uma pessoa só; senão o operador escolhe na lista.
+  const confirmarCampo = (val, origem) => {
+    const texto = String(val || '').trim();
+    if (!texto) return;
+    if (origem !== 'barcode' && /[A-Za-zÀ-ÿ]/.test(texto)) {
+      const buscaDesteTexto = !searchLoading && searchQuery.trim() === texto;
+      if (buscaDesteTexto && searchResults.length === 1) {
+        setSelectedPessoa(searchResults[0]);
+      } else if (searchQuery.trim() !== texto) {
+        handleSearch(texto);
+      }
+      setBarcodeValue('');
+      return;
+    }
+    localizarPorCodigo(texto);
+  };
 
   // Controle de Impressão de Etiqueta / Cartão PVC no Check-in
   const [imprimirAtivo, setImprimirAtivo] = useState(() => {
@@ -96,9 +127,12 @@ const Checkin = () => {
       resultado = await performCheckin('manual', null, pessoa_id);
     }
 
-    // Se a impressão estiver ativada, abre o preview da etiqueta/cartão
-    if (imprimirAtivo) {
-      setPreviewEtiquetaPessoaId(pessoa_id);
+    // Etiqueta sai uma vez só: quando o evento imprime sozinho no check-in, o hook já imprimiu
+    // (imprimirSeEntrada); a prévia só abre se a impressão do evento estiver desligada.
+    // Vínculo de pulseira que falhou (false) não abre prévia.
+    if (imprimirAtivo && resultado !== false) {
+      const { imprimir } = await carregarConfigEtiqueta(eventoId).catch(() => ({ imprimir: false }));
+      if (!imprimir) setPreviewEtiquetaPessoaId(pessoa_id);
     }
     return resultado;
   };
@@ -139,48 +173,35 @@ const Checkin = () => {
 
       <Grid container spacing={{ xs: 1.5, sm: 2 }} sx={{ flex: 1, minHeight: 0 }}>
 
-        {/* OPERAÇÃO: leitor, busca e números do turno */}
+        {/* OPERAÇÃO: campo único unificado (leitor QR/barras, pulseira, CPF e busca por nome) */}
         <Grid item xs={12} lg={4} sx={{ height: { lg: '100%' } }}>
             <GlassCard sx={{ p: { xs: 1.75, sm: 2.5 }, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                 <UniversalPulseiraInput
                     value={barcodeValue}
-                    onChange={setBarcodeValue}
-                    accentColor="#00FF88"
-                    label="Leitor ou CPF"
-                    placeholder="Bipe, digite o CPF ou toque no ícone"
-                    helperText="Enter confere os dados do participante e abre para pulseira"
-                    onConfirm={(val) => {
-                        const cod = (val || barcodeValue || '').trim();
-                        if (cod) {
-                            abrirConferenciaPorCodigo(cod);
-                            setBarcodeValue('');
-                        }
+                    onChange={(val) => {
+                        setBarcodeValue(val);
+                        handleSearch(val);
                     }}
+                    onClear={() => {
+                        setBarcodeValue('');
+                        handleSearch('');
+                    }}
+                    accentColor="#00FF88"
+                    label="Leitor, CPF ou nome"
+                    placeholder="Bipe QR/barras, digite o CPF ou o nome..."
+                    helperText="Código ou CPF + Enter abre a conferência • Nome: escolha na lista"
+                    pulseiraTypes={pulseiraTypes}
+                    ultimoCodigoLido={ultimoCodigoLido}
+                    onConfirm={confirmarCampo}
+                    // Só o loading da ação: a busca por nome não pode travar o campo no meio de um bipe
                     loading={loading}
                     autoFocus={!modoQuiosque}
                     onAbrirCamera={() => setLendoCamera(true)}
                 />
-
-
-                <Box sx={{ display: 'flex', alignItems: 'center', my: { xs: 1.5, sm: 2 } }}>
-                    <Box sx={{ flex: 1, height: '1px', bgcolor: 'rgba(255,255,255,0.1)' }} />
-                    <Typography variant="caption" sx={{ px: 1.25, color: 'rgba(255,255,255,0.55)', textAlign: 'center' }}>
-                        ou procure pelo nome para vincular pulseira
-                    </Typography>
-                    <Box sx={{ flex: 1, height: '1px', bgcolor: 'rgba(255,255,255,0.1)' }} />
+                {/* Busca por nome em andamento: barra fina com altura fixa (nada pula) */}
+                <Box sx={{ height: 3, mt: 0.75 }} aria-live="polite">
+                    {searchLoading && <LinearProgress aria-label="Buscando" sx={{ height: 3, borderRadius: 2, bgcolor: 'rgba(0,255,136,0.12)', '& .MuiLinearProgress-bar': { bgcolor: '#00FF88' } }} />}
                 </Box>
-
-                <TextField
-                    fullWidth
-                    placeholder="Nome ou CPF (mínimo 3 letras)"
-                    value={searchQuery}
-                    onChange={(e) => handleSearch(e.target.value)}
-                    inputProps={{ 'aria-label': 'Procurar participante por nome ou CPF' }}
-                    InputProps={{
-                        startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />,
-                        sx: { borderRadius: 1.5, height: { xs: 44, sm: 48 }, fontSize: '1rem', bgcolor: 'rgba(255,255,255,0.03)' }
-                    }}
-                />
 
                 <Box sx={{ mt: 1.5, flex: 1, overflowY: 'auto', minHeight: { xs: searchResults.length > 0 ? 180 : 0, lg: 0 }, maxHeight: { xs: 280, lg: 'none' } }}>
                     {searchResults.length > 0 ? (
@@ -195,7 +216,10 @@ const Checkin = () => {
                                         : null}
                                 >
                                 <ListItemButton
-                                    onClick={() => setSelectedPessoa(p)}
+                                    onClick={() => {
+                                        setSelectedPessoa(p);
+                                        setBarcodeValue('');
+                                    }}
                                     sx={{
                                         borderRadius: 1.5,
                                         p: 1.15,
@@ -210,6 +234,7 @@ const Checkin = () => {
                                     <Box sx={{ mr: 1.5 }}>
                                         <PessoaFoto
                                             src={p.foto_url}
+                                            pessoaId={p.id}
                                             nome={p.nome}
                                             width={40}
                                             borderRadius="8px"
@@ -218,7 +243,7 @@ const Checkin = () => {
                                     </Box>
                                     <ListItemText
                                         primary={p.nome}
-                                        secondary={[p.cpf || 'Sem CPF', p.numero_pulseira ? `Pulseira ${p.numero_pulseira}` : null, p.empresa_nome].filter(Boolean).join(' – ')}
+                                        secondary={[p.cpf || 'Sem CPF', p.numero_pulseira ? `Pulseira ${p.numero_pulseira}` : null, p.empresa_nome || p.empresas?.nome].filter(Boolean).join(' – ')}
                                         primaryTypographyProps={{ fontWeight: 700, fontSize: '0.9rem', noWrap: true }}
                                         secondaryTypographyProps={{ fontSize: '0.78rem', noWrap: true }}
                                     />
@@ -227,7 +252,7 @@ const Checkin = () => {
                             ))}
                         </List>
                     ) : (
-                        searchQuery.length >= 3 && !searchLoading && (
+                        searchQuery.trim().length >= 2 && !searchLoading && (
                             <Typography variant="body2" sx={{ textAlign: 'center', opacity: 0.6, my: 2 }}>
                                 Ninguém encontrado para &quot;{searchQuery}&quot;.
                             </Typography>
@@ -307,9 +332,10 @@ const Checkin = () => {
           open={lendoCamera}
           onClose={() => setLendoCamera(false)}
           titulo="Entrada pela câmera"
+          instrucao="Aponte a câmera para o QR Code ou código de barras do crachá ou da pulseira. A conferência da pessoa abre em seguida."
           onLeitura={(cod) => {
               setLendoCamera(false);
-              abrirConferenciaPorCodigo(cod);
+              localizarPorCodigo(cod);
           }}
       />
 

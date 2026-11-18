@@ -406,6 +406,7 @@ export const useMonitor = ({ isAdminMaster = false } = {}) => {
             setActiveAreaAlert({
                 id,
                 pessoa_nome: alert.pessoa_nome || 'Indivíduo Não Autorizado',
+                pessoa_id: alert.pessoa_id,
                 pessoa_foto: alert.pessoa_foto,
                 area_nome: alert.area_nome || 'Área Restrita',
                 tipo: alert.tipo || 'tentativa_area_restrita',
@@ -426,6 +427,7 @@ export const useMonitor = ({ isAdminMaster = false } = {}) => {
                 pessoa: {
                     nome: pessoa.nome || alert.target_name || 'Alvo Detectado',
                     cpf: pessoa.cpf || '—',
+                    id: pessoa.id,
                     foto_url: pessoa.foto_url,
                     funcao: pessoa.funcao,
                     numero_pulseira: pessoa.numero_pulseira

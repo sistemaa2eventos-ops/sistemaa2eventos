@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useSyncExternalStore } from 'react';
 import Image from 'next/image';
 import api from '@/lib/api';
 
@@ -41,26 +41,18 @@ export default function ClientePortal() {
 
     // Transferência B2C State
     const [transferTokenUrl, setTransferTokenUrl] = useState('');
-    const [acceptToken, setAcceptToken] = useState<string | null>(null);
+    // Link mágico de transferência (?token=...): lido da URL no cliente; null no SSR (sem erro de hidratação)
+    const acceptToken = useSyncExternalStore(
+        (notificar) => {
+            window.addEventListener('popstate', notificar);
+            return () => window.removeEventListener('popstate', notificar);
+        },
+        () => new URLSearchParams(window.location.search).get('token'),
+        () => null,
+    );
 
-    useEffect(() => {
-        const token = localStorage.getItem('token') || '';
-        if (token) {
-            api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        }
-
-        // Verifica se é um link mágico de transferência
-        if (typeof window !== 'undefined') {
-            const params = new URLSearchParams(window.location.search);
-            const t = params.get('token');
-            if (t) setAcceptToken(t);
-        }
-
-        loadTicket();
-    }, []);
-
-    const loadTicket = async () => {
-        setIsLoading(true);
+    // Carga do ticket. Não liga o "carregando" de forma síncrona: na montagem ele já começa ligado.
+    const carregarTicket = async () => {
         try {
             const res = await api.get('/portal/cliente/meu-ticket');
             if (res.data.success) {
@@ -84,6 +76,40 @@ export default function ClientePortal() {
             setIsLoading(false);
         }
     };
+
+    // Recarga (após ações do usuário): mostra o "carregando" antes de buscar
+    const loadTicket = () => {
+        setIsLoading(true);
+        return carregarTicket();
+    };
+
+    useEffect(() => {
+        const token = localStorage.getItem('token') || '';
+        if (token) {
+            api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        }
+
+        // Carga inicial de dados da API (assíncrona): o padrão de buscar no efeito é aceito pelo React
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        carregarTicket();
+    }, []);
+
+    // Foto do ticket por URL assinada (rota pública do portal, mesma autenticação do ticket).
+    // Se a rota falhar, usa ticket.foto_url como reserva (o bucket ainda é público).
+    const fotoOriginal = ticket?.foto_url || null;
+    const [fotoTicket, setFotoTicket] = useState<{ origem: string; url: string } | null>(null);
+    useEffect(() => {
+        if (!fotoOriginal) return;
+        let ativo = true;
+        api.get('/portal/cliente/ticket/foto-url')
+            .then((res) => (res.data?.data?.url as string | undefined) || null)
+            .catch(() => null)
+            .then((url) => {
+                if (ativo) setFotoTicket({ origem: fotoOriginal, url: url || fotoOriginal });
+            });
+        return () => { ativo = false; };
+    }, [fotoOriginal]);
+    const fotoTicketUrl = fotoTicket?.origem === fotoOriginal ? fotoTicket.url : null;
 
     /**
      * Utiliza FileReader para extrair o Base64 imediato da câmera nativa HTML5
@@ -271,9 +297,9 @@ export default function ClientePortal() {
                     /* PASSO 2: INGRESSO LIBERADO E ÁREA B2C ATIVA */
                     <div className="p-8">
                         <div className="text-center mb-6">
-                            {ticket?.foto_url && (
+                            {fotoTicketUrl && (
                                 <Image
-                                    src={ticket.foto_url}
+                                    src={fotoTicketUrl}
                                     alt="Sua Biometria"
                                     width={80}
                                     height={80}

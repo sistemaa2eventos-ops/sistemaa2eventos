@@ -27,13 +27,13 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Raiz      = Split-Path -Parent $PSScriptRoot
-$DirMotor  = Join-Path $Raiz 'backend\microservice-face-python'
+$Raiz = Split-Path -Parent $PSScriptRoot
+$DirMotor = Join-Path $Raiz 'backend\microservice-face-python'
 $DirAgente = Join-Path $Raiz 'backend\agent-local'
-$DirLogs   = Join-Path $Raiz 'logs\ia-facial'
+$DirLogs = Join-Path $Raiz 'logs\ia-facial'
 $PortaMotor = 8000
 $PortaCamera = 8554
-$UrlSaude  = "http://127.0.0.1:$PortaMotor/health"
+$UrlSaude = "http://127.0.0.1:$PortaMotor/health"
 $IntervaloVigia = 15      # segundos entre verificações
 $FalhasParaReiniciar = 4  # verificações seguidas sem resposta antes de reiniciar o motor
 $EsperaCargaModelo = 180  # segundos para o InsightFace carregar
@@ -56,7 +56,8 @@ if ($Acao -match '^nzt-ia://') {
             }
         }
         $Acao = if ($caminho -eq 'verificar') { 'verificar' } elseif ($caminho -eq 'parar') { 'parar' } else { 'ligar' }
-    } catch {
+    }
+    catch {
         $Acao = 'ligar'
     }
 }
@@ -66,8 +67,8 @@ New-Item -ItemType Directory -Force $DirLogs | Out-Null
 $LogVigia = Join-Path $DirLogs ("vigia-{0:yyyyMMdd}.log" -f (Get-Date))
 # Logs com mais de 7 dias saem (cada reinício do motor cria um arquivo novo)
 Get-ChildItem $DirLogs -File -ErrorAction SilentlyContinue |
-    Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-7) } |
-    Remove-Item -Force -ErrorAction SilentlyContinue
+Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-7) } |
+Remove-Item -Force -ErrorAction SilentlyContinue
 
 function Escrever([string]$msg, [string]$cor = 'Gray') {
     $linha = "[{0:HH:mm:ss}] {1}" -f (Get-Date), $msg
@@ -78,13 +79,14 @@ function Escrever([string]$msg, [string]$cor = 'Gray') {
 function Register-ProtocoloNztIa {
     try {
         $chaveBase = 'HKCU:\Software\Classes\nzt-ia'
-        $chaveCmd  = 'HKCU:\Software\Classes\nzt-ia\shell\open\command'
+        $chaveCmd = 'HKCU:\Software\Classes\nzt-ia\shell\open\command'
         if (-not (Test-Path $chaveCmd)) { New-Item -Path $chaveCmd -Force | Out-Null }
         Set-ItemProperty -Path $chaveBase -Name '(Default)' -Value 'URL:NZT IA Facial Protocol' -Force
         Set-ItemProperty -Path $chaveBase -Name 'URL Protocol' -Value '' -Force
         $cmd = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" `"%1`""
         Set-ItemProperty -Path $chaveCmd -Name '(Default)' -Value $cmd -Force
-    } catch {}
+    }
+    catch {}
 }
 Register-ProtocoloNztIa
 
@@ -109,11 +111,11 @@ function Set-TokenAgenteLocal([string]$novoToken, [string]$novaVps, [string]$nov
     if (-not $novoToken) { return $false }
     $arqEnv = Join-Path $DirAgente '.env'
     $atuais = Read-ArquivoEnv $arqEnv
-    $vpsFinal  = if ($novaVps) { $novaVps.TrimEnd('/') } elseif ($atuais['VPS_URL']) { $atuais['VPS_URL'] } else { 'https://painel.nzt.app.br' }
+    $vpsFinal = if ($novaVps) { $novaVps.TrimEnd('/') } elseif ($atuais['VPS_URL']) { $atuais['VPS_URL'] } else { 'https://painel.nzt.app.br' }
     $nomeFinal = if ($novoNome) { $novoNome } elseif ($atuais['AGENT_NAME']) { $atuais['AGENT_NAME'] } else { "PC-IA-$env:COMPUTERNAME" }
-    $iaFinal   = if ($atuais['IA_URL']) { $atuais['IA_URL'] } else { "http://127.0.0.1:$PortaMotor" }
-    $mudou     = ($atuais['AGENT_TOKEN'] -ne $novoToken) -or ($atuais['VPS_URL'] -ne $vpsFinal)
-    $conteudo  = @(
+    $iaFinal = if ($atuais['IA_URL']) { $atuais['IA_URL'] } else { "http://127.0.0.1:$PortaMotor" }
+    $mudou = ($atuais['AGENT_TOKEN'] -ne $novoToken) -or ($atuais['VPS_URL'] -ne $vpsFinal)
+    $conteudo = @(
         "VPS_URL=$vpsFinal",
         "AGENT_TOKEN=$novoToken",
         "AGENT_NAME=$nomeFinal",
@@ -128,15 +130,15 @@ if ($Token) {
     if ($tokenMudou) {
         Escrever "Token do Agente Local atualizado para este evento em backend\agent-local\.env." 'Cyan'
         Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
-            Where-Object { $_.CommandLine -match 'agent\.js' } |
-            ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+        Where-Object { $_.CommandLine -match 'agent\.js' } |
+        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     }
 }
 
 if ($Acao -eq 'reiniciar-agente') {
     Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
-        Where-Object { $_.CommandLine -match 'agent\.js' } |
-        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    Where-Object { $_.CommandLine -match 'agent\.js' } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     $Acao = 'unico'
 }
 
@@ -172,20 +174,20 @@ function Find-PythonIA {
 # ---------------------------------------------------------------- autostart
 if ($Acao -eq 'instalar-autostart') {
     $startup = [Environment]::GetFolderPath('Startup')
-    $atalho  = Join-Path $startup 'NZT-IA-Facial.lnk'
-    $vbs     = Join-Path $PSScriptRoot 'iniciar-ia-oculto.vbs'
+    $atalho = Join-Path $startup 'NZT-IA-Facial.lnk'
+    $vbs = Join-Path $PSScriptRoot 'iniciar-ia-oculto.vbs'
     $conteudoVbs = @"
 Set WshShell = CreateObject("WScript.Shell")
 WshShell.CurrentDirectory = "$Raiz"
 WshShell.Run "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ""$PSCommandPath""", 0, False
 "@
     [System.IO.File]::WriteAllText($vbs, $conteudoVbs, [System.Text.Encoding]::ASCII)
-    $wsh     = New-Object -ComObject WScript.Shell
-    $lnk     = $wsh.CreateShortcut($atalho)
-    $lnk.TargetPath       = 'wscript.exe'
-    $lnk.Arguments        = "`"$vbs`""
+    $wsh = New-Object -ComObject WScript.Shell
+    $lnk = $wsh.CreateShortcut($atalho)
+    $lnk.TargetPath = 'wscript.exe'
+    $lnk.Arguments = "`"$vbs`""
     $lnk.WorkingDirectory = $Raiz
-    $lnk.Description      = 'NZT Intelligent Control System - IA de rastreamento facial e Agente Local'
+    $lnk.Description = 'NZT Intelligent Control System - IA de rastreamento facial e Agente Local'
     $lnk.Save()
     Escrever "Inicialização automática ativada em: $atalho" 'Green'
     exit 0
@@ -225,7 +227,8 @@ if ($Acao -eq 'instalar-tarefa') {
     try {
         $task = New-ScheduledTask -Action $acao -Trigger $gatilho -Settings $ajustes -Principal $principal -Description 'NZT: motor de IA facial e agente local do evento'
         Register-ScheduledTask -TaskName $NomeTarefa -InputObject $task -Force | Out-Null
-    } catch {
+    }
+    catch {
         # Fallback nativo universal do Windows via schtasks.exe (evita inconsistências de tipos CIM no PowerShell)
         $cmdTr = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`""
         & schtasks.exe /Create /TN $NomeTarefa /TR $cmdTr /SC ONLOGON /RL HIGHEST /F | Out-Null
@@ -242,11 +245,13 @@ if ($Acao -eq 'remover-tarefa') {
         if (Get-ScheduledTask -TaskName $NomeTarefa -ErrorAction SilentlyContinue) {
             Unregister-ScheduledTask -TaskName $NomeTarefa -Confirm:$false
             Escrever "Tarefa '$NomeTarefa' removida." 'Yellow'
-        } else {
+        }
+        else {
             & schtasks.exe /Delete /TN $NomeTarefa /F 2>&1 | Out-Null
             Escrever "Tarefa '$NomeTarefa' removida." 'Yellow'
         }
-    } catch {
+    }
+    catch {
         & schtasks.exe /Delete /TN $NomeTarefa /F 2>&1 | Out-Null
         Escrever "Tarefa '$NomeTarefa' removida." 'Yellow'
     }
@@ -258,7 +263,7 @@ function Get-OutrosVigias {
     $atual = Get-CimInstance Win32_Process -Filter "ProcessId=$PID" -ErrorAction SilentlyContinue
     if ($atual -and $atual.ParentProcessId) { $meusPids += [int]$atual.ParentProcessId }
     Get-CimInstance Win32_Process -Filter "Name='powershell.exe' or Name='pwsh.exe'" -ErrorAction SilentlyContinue |
-        Where-Object { $_.ProcessId -notin $meusPids -and $_.CommandLine -match 'ligar-ia-facial\.ps1' }
+    Where-Object { $_.ProcessId -notin $meusPids -and $_.CommandLine -match 'ligar-ia-facial\.ps1' }
 }
 
 # ---------------------------------------------------------------- parar
@@ -268,8 +273,8 @@ if ($Acao -eq 'parar') {
     if ($p) { Stop-Process -Id $p -Force; Escrever "Motor de IA desligado (PID $p)." 'Yellow' }
     else { Escrever 'Motor de IA já estava desligado.' }
     Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
-        Where-Object { $_.CommandLine -match 'agent\.js' } |
-        ForEach-Object { Stop-Process -Id $_.ProcessId -Force; Escrever "Agente local desligado (PID $($_.ProcessId))." 'Yellow' }
+    Where-Object { $_.CommandLine -match 'agent\.js' } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force; Escrever "Agente local desligado (PID $($_.ProcessId))." 'Yellow' }
     exit 0
 }
 
@@ -297,15 +302,15 @@ Write-Host ''
 function Invoke-VerificacaoCompatibilidade {
     Escrever '--- VERIFICAÇÃO DE COMPATIBILIDADE DESTE COMPUTADOR ---' 'Cyan'
     $cpu = Get-CimInstance Win32_Processor -ErrorAction SilentlyContinue | Select-Object -First 1
-    $cs  = Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue
-    $os  = Get-CimInstance Win32_OperatingSystem -ErrorAction SilentlyContinue
+    $cs = Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue
+    $os = Get-CimInstance Win32_OperatingSystem -ErrorAction SilentlyContinue
     $gpus = @(Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue)
     $disco = Get-PSDrive -Name ($Raiz.Substring(0, 1)) -ErrorAction SilentlyContinue
 
     $cpuNome = if ($cpu) { $cpu.Name.Trim() } else { 'Desconhecido' }
-    $cores   = if ($cpu) { [int]$cpu.NumberOfCores } else { 2 }
+    $cores = if ($cpu) { [int]$cpu.NumberOfCores } else { 2 }
     $threads = if ($cpu) { [int]$cpu.NumberOfLogicalProcessors } else { 4 }
-    $ramGb   = if ($cs) { [math]::Round($cs.TotalPhysicalMemory / 1GB, 1) } else { 0 }
+    $ramGb = if ($cs) { [math]::Round($cs.TotalPhysicalMemory / 1GB, 1) } else { 0 }
     $ramLivreGb = if ($os) { [math]::Round(($os.FreePhysicalMemory * 1KB) / 1GB, 1) } else { 0 }
     $discoLivreGb = if ($disco) { [math]::Round($disco.Free / 1GB, 1) } else { 0 }
 
@@ -327,13 +332,16 @@ function Invoke-VerificacaoCompatibilidade {
         if ($nomeGpu -match 'RTX|GTX 1[60]|GTX [2345]|Radeon RX') {
             $temGpuForte = $true
             Escrever "  • Placa de Vídeo (GPU): $nomeGpu (~$vramGb GB) [Dedicada Forte - DirectML]" 'Green'
-        } elseif ($nomeGpu -match 'GeForce MX|GTX|Quadro|Radeon') {
+        }
+        elseif ($nomeGpu -match 'GeForce MX|GTX|Quadro|Radeon') {
             $temGpuEntrada = $true
             Escrever "  • Placa de Vídeo (GPU): $nomeGpu (~$vramGb GB) [Dedicada Entrada - DirectML]" 'Yellow'
-        } elseif ($nomeGpu -match 'Intel|Iris|UHD|HD Graphics|Vega') {
+        }
+        elseif ($nomeGpu -match 'Intel|Iris|UHD|HD Graphics|Vega') {
             $temGpuIntegrada = $true
             Escrever "  • Placa de Vídeo (GPU): $nomeGpu [Integrada - DirectML básico]" 'Yellow'
-        } else {
+        }
+        else {
             Escrever "  • Placa de Vídeo (GPU): $nomeGpu" 'Gray'
         }
     }
@@ -341,17 +349,19 @@ function Invoke-VerificacaoCompatibilidade {
     $pyOk = Find-PythonIA
     if ($pyOk) {
         Escrever "  • Ambiente Python IA  : OK ($pyOk)" 'Green'
-    } else {
+    }
+    else {
         Escrever "  • Ambiente Python IA  : Pendente (venv-ia em backend\microservice-face-python)" 'Red'
     }
 
     $envAgente = Read-ArquivoEnv (Join-Path $DirAgente '.env')
-    $temToken  = [bool]$envAgente['AGENT_TOKEN']
+    $temToken = [bool]$envAgente['AGENT_TOKEN']
     if ($temToken) {
         Escrever '  • Biometrias          : enviadas pelo painel ao agente (sem chave do banco neste PC)' 'Green'
-    } else {
+    }
+    else {
         $envMotor = Read-ArquivoEnv (Join-Path $DirMotor '.env')
-        $temSupa  = [bool]$envMotor['SUPABASE_SERVICE_ROLE_KEY']
+        $temSupa = [bool]$envMotor['SUPABASE_SERVICE_ROLE_KEY']
         Escrever ("  • Chave Supabase      : " + $(if ($temSupa) { 'Configurada no .env do motor (modo sem agente)' } else { 'Ausente (configure o agente local)' })) $(if ($temSupa) { 'Yellow' } else { 'Red' })
     }
     $temGo2rtc = Test-Path (Join-Path $DirAgente 'bin\go2rtc.exe')
@@ -362,27 +372,29 @@ function Invoke-VerificacaoCompatibilidade {
 
     # Recomendações de configuração baseadas no hardware
     $perfilRec = 'leve'
-    $fpsRec    = '15 análises/s'
+    $fpsRec = '15 análises/s'
     $streamRec = 'Sempre o sub-stream (leve)'
     $videosRec = 'até 6 vídeos ao vivo no mosaico'
     $motivoRec = 'Computador de entrada/notebook ou sem GPU dedicada forte: o perfil Leve mantém o reconhecimento fluido sem travar o vídeo.'
 
     if ($temGpuForte -and $threads -ge 8 -and $ramGb -ge 15) {
         $perfilRec = 'maximo'
-        $fpsRec    = '45 análises/s'
+        $fpsRec = '45 análises/s'
         $streamRec = 'Sempre o stream principal (nítido)'
         $videosRec = 'até 16 vídeos ao vivo no mosaico'
         $motivoRec = 'Placa de vídeo dedicada forte + CPU de 8+ threads e 16+ GB RAM detectados.'
-    } elseif (($temGpuForte -or $temGpuEntrada) -and $threads -ge 4 -and $ramGb -ge 7.5) {
+    }
+    elseif (($temGpuForte -or $temGpuEntrada) -and $threads -ge 4 -and $ramGb -ge 7.5) {
         if ($temGpuEntrada -and $threads -le 4) {
             $perfilRec = 'leve'
-            $fpsRec    = '15 a 20 análises/s'
+            $fpsRec = '15 a 20 análises/s'
             $streamRec = 'Sempre o sub-stream (leve) ou Automático (até 3 câmeras)'
             $videosRec = 'até 6 vídeos ao vivo no mosaico'
             $motivoRec = 'Notebook com CPU de 4 threads e GPU MX dedicada: prefira o perfil Leve (ou Equilibrado até 3 câmeras) para não sobrecarregar o processador.'
-        } else {
+        }
+        else {
             $perfilRec = 'equilibrado'
-            $fpsRec    = '30 análises/s'
+            $fpsRec = '30 análises/s'
             $streamRec = 'Automático (sub-stream no mosaico, principal em tela grande)'
             $videosRec = 'até 9 vídeos ao vivo no mosaico'
             $motivoRec = 'Boa combinação de GPU DirectML e memória RAM para operação equilibrada.'
@@ -488,7 +500,7 @@ function Show-Motor {
     try { $faiss = Invoke-RestMethod "http://127.0.0.1:$PortaMotor/api/engine/status" -Headers $cab -TimeoutSec 5 } catch {}
     $hw = if ($faiss -and $faiss.hardware_acceleration) { $faiss.hardware_acceleration } else { 'CPU' }
     Escrever ("[2/3] Motor de IA: LIGADO em http://localhost:{0}  |  {1}  |  perfil {2}  |  {3} rostos indexados  |  {4}/{5} câmera(s) com vídeo" -f `
-        $PortaMotor, $hw, $s.perfil, $s.registered_persons, $s.cameras_com_video, $s.cameras_em_uso) 'Green'
+            $PortaMotor, $hw, $s.perfil, $s.registered_persons, $s.cameras_com_video, $s.cameras_em_uso) 'Green'
     if ($s.engine -ne 'insightface_onnx') { Escrever '      Atenção: InsightFace não carregou; o motor está em modo simulado.' 'Red' }
     if ($hw -eq 'CPU') { Escrever '      Atenção: IA rodando na CPU (lenta). Veja backend\microservice-face-python\requirements-windows-gpu.txt para usar a placa de vídeo.' 'Yellow' }
     if ($faiss -and $faiss.faiss_total_vectors -eq 0) { Escrever '      Atenção: nenhum rosto no índice. Confira a chave do Supabase e se há pessoas com biometria.' 'Yellow' }
@@ -499,7 +511,8 @@ function Test-ProcessoDesatualizado([int]$processId, [string]$arquivo) {
     try {
         $p = Get-CimInstance Win32_Process -Filter "ProcessId=$processId" -ErrorAction Stop
         return ((Get-Item $arquivo).LastWriteTime -gt $p.CreationDate)
-    } catch { return $false }
+    }
+    catch { return $false }
 }
 
 function Confirm-Motor {
@@ -557,7 +570,7 @@ function Confirm-Agente {
     $script:AgenteAtivo = $true
     # Agente antigo rodando com código novo no disco (ex.: motor novo exige a chave interna): reinicia
     $antigos = Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
-        Where-Object { $_.CommandLine -match 'agent\.js' -and (Test-ProcessoDesatualizado $_.ProcessId (Join-Path $DirAgente 'src\agent.js')) }
+    Where-Object { $_.CommandLine -match 'agent\.js' -and (Test-ProcessoDesatualizado $_.ProcessId (Join-Path $DirAgente 'src\agent.js')) }
     foreach ($a in $antigos) {
         Escrever '[3/3] Agente local: código atualizado no disco, reiniciando o agente para a versão nova...' 'Yellow'
         Stop-Process -Id $a.ProcessId -Force -ErrorAction SilentlyContinue
@@ -575,9 +588,11 @@ function Confirm-Agente {
 # Versões fixas, baixadas do GitHub e conferidas pelo SHA-256 publicado: arquivo diferente é recusado.
 $Binarios = @(
     @{ Nome = 'go2rtc.exe'; Url = 'https://github.com/AlexxIT/go2rtc/releases/download/v1.9.14/go2rtc_win64.zip';
-       Sha256 = 'dd4167d75cb04abe618855b7c71f8658bd009f60c1a71835d134d2c11c939907'; Descricao = 'go2rtc 1.9.14 (7 MB)' },
+        Sha256 = 'dd4167d75cb04abe618855b7c71f8658bd009f60c1a71835d134d2c11c939907'; Descricao = 'go2rtc 1.9.14 (7 MB)' 
+    },
     @{ Nome = 'ffmpeg.exe'; Url = 'https://github.com/GyanD/codexffmpeg/releases/download/8.0/ffmpeg-8.0-essentials_build.zip';
-       Sha256 = '647e467caf82b9fa200a562769b5ff4d736aaf725804ed2c64ea9752106fa569'; Descricao = 'ffmpeg 8.0 (100 MB)' }
+        Sha256 = '647e467caf82b9fa200a562769b5ff4d736aaf725804ed2c64ea9752106fa569'; Descricao = 'ffmpeg 8.0 (100 MB)' 
+    }
 )
 
 function Install-VideoLocal {
@@ -600,9 +615,11 @@ function Install-VideoLocal {
             if (-not $exe) { throw "$($b.Nome) não encontrado no pacote" }
             Copy-Item $exe.FullName $destino -Force
             Escrever "      $($b.Nome) instalado em backend\agent-local\bin." 'Green'
-        } catch {
+        }
+        catch {
             Escrever "      Não foi possível instalar $($b.Nome): $($_.Exception.Message)" 'Red'
-        } finally {
+        }
+        finally {
             Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
@@ -638,10 +655,12 @@ while ($true) {
 
     if (Test-MotorDesligadoPeloPainel) {
         $falhas = 0
-    } elseif (Get-SaudeMotor) {
+    }
+    elseif (Get-SaudeMotor) {
         if ($falhas -gt 0) { Escrever 'Motor de IA voltou a responder.' 'Green' }
         $falhas = 0
-    } else {
+    }
+    else {
         $falhas++
         Escrever "Motor de IA sem resposta ($falhas/$FalhasParaReiniciar)." 'Yellow'
         if ($falhas -ge $FalhasParaReiniciar -or -not (Get-PidNaPorta $PortaMotor)) {

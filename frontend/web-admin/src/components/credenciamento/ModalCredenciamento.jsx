@@ -40,6 +40,7 @@ export const ModalCredenciamento = ({
     permitirCamera = false
 }) => {
     const [numeroPulseira, setNumeroPulseira] = useState('');
+    const [ultimoCodigoCamera, setUltimoCodigoCamera] = useState('');
     const [lendoCamera, setLendoCamera] = useState(false);
     useFecharComVoltar(open, onClose);
     const [selectedTipoPulseira, setSelectedTipoPulseira] = useState('');
@@ -213,6 +214,7 @@ export const ModalCredenciamento = ({
                 setFiltroFase(loteIdentificado.fase);
             }
         }
+        return loteIdentificado || null;
     };
 
     if (!pessoa) return null;
@@ -283,6 +285,7 @@ export const ModalCredenciamento = ({
                             <Box sx={{ position: 'relative', display: 'inline-block', mb: 1.5 }}>
                                 <PessoaFoto
                                     src={pessoa.foto_url}
+                                    pessoaId={pessoa.id}
                                     nome={pessoa.nome_completo || pessoa.nome}
                                     width={130}
                                     borderRadius="16px"
@@ -469,9 +472,13 @@ export const ModalCredenciamento = ({
                                             value={numeroPulseira}
                                             onChange={handleNumeroPulseiraChange}
                                             onConfirm={handleConfirmar}
+                                            label="Número da pulseira"
+                                            placeholder="Bipe ou digite o número da pulseira"
+                                            helperText="Leitor confirma sozinho • Digitado: Enter ↵ ou o botão abaixo"
                                             pulseiraTypes={tiposPulseiraFiltrados.length > 0 ? tiposPulseiraFiltrados : pulseiraTypes}
                                             loading={loading}
                                             autoFocus={true}
+                                            ultimoCodigoLido={ultimoCodigoCamera}
                                             onAbrirCamera={permitirCamera ? () => setLendoCamera(true) : undefined}
                                         />
                                     </Grid>
@@ -569,8 +576,14 @@ export const ModalCredenciamento = ({
                 open={lendoCamera}
                 onClose={() => setLendoCamera(false)}
                 titulo="Pulseira pela câmera"
-                instrucao="Aponte a câmera para o código da pulseira que vai ser vinculada."
-                onLeitura={(cod) => { setNumeroPulseira(cod); setErroValidacao(''); }}
+                instrucao="Aponte a câmera para o QR Code ou código de barras da pulseira — o check-in será feito automaticamente."
+                onLeitura={(cod) => {
+                    setLendoCamera(false);
+                    setUltimoCodigoCamera(cod);
+                    const lote = handleNumeroPulseiraChange(cod);
+                    setErroValidacao('');
+                    handleConfirmar(cod, 'camera_qr', lote);
+                }}
             />
 
             {/* Sub-diálogo de Documentos Anexados do Colaborador */}

@@ -1,5 +1,35 @@
 const { supabase, uploadImage } = require('../../config/supabase');
 const logger = require('../../services/logger');
+const { fotoUrlAceitavel, documentoFotoAceitavel, formaCanonica } = require('../../services/storageSeguro');
+
+/** Valor aceito pela regra (novo e do nosso storage) vai na forma canônica; o resto (já gravado) fica igual. */
+const canonicoSeNovo = (valor, aceitavel) => (valor && aceitavel(valor) ? formaCanonica(valor) : valor);
+
+/**
+ * A pessoa deste CPF no evento já tem exatamente este valor gravado na coluna? (CPF com ou sem máscara)
+ * Reenvio do mesmo valor passa sem validar; só valor novo é validado.
+ */
+async function valorJaGravado(eventoId, cpf, coluna, valor) {
+    const d = String(cpf || '').replace(/\D/g, '');
+    if (!eventoId || !valor || d.length !== 11) return false;
+    const formas = [d, d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')];
+    const { data } = await supabase.from('pessoas').select(coluna).eq('evento_id', eventoId).in('cpf', formas).limit(5);
+    return (data || []).some(p => p[coluna] === valor);
+}
+
+/**
+ * foto_url e documento_foto vindos do cliente: valor novo só do nosso storage (ou data URI);
+ * igual ao já gravado para este CPF no evento, passa. Devolve a mensagem de erro ou null.
+ */
+async function arquivosDoCadastroInvalidos(eventoId, cpf, { foto_url, documento_foto }) {
+    if (!fotoUrlAceitavel(foto_url) && !(await valorJaGravado(eventoId, cpf, 'foto_url', foto_url))) {
+        return 'Foto inválida: envie a selfie pelo próprio formulário.';
+    }
+    if (!documentoFotoAceitavel(documento_foto) && !(await valorJaGravado(eventoId, cpf, 'documento_foto', documento_foto))) {
+        return 'Foto do documento inválida: envie o arquivo pelo próprio formulário.';
+    }
+    return null;
+}
 const qrGenerator = require('../../utils/qrGenerator');
 const emailService = require('../../services/emailService');
 const cacheService = require('../../services/cacheService');
@@ -478,8 +508,13 @@ class PublicController {
                 if (faltando.length) return respostaMinimoFaltando(res, faltando);
             }
 
-            // 3. Upload de Foto
-            let finalFotoUrl = foto_url || '';
+            // 3. Upload de Foto. foto_url e documento_foto do cliente: só data URI ou arquivo do nosso
+            // storage; o mesmo valor já gravado para este CPF (convite que completa cadastro) passa.
+            const erroArquivos = await arquivosDoCadastroInvalidos(eventoId, cpfLimpo, { foto_url, documento_foto });
+            if (erroArquivos) return res.status(400).json({ error: erroArquivos });
+            // Valor novo do storage vai na forma canônica (URL pública, sem query); igual ao gravado fica igual
+            let finalFotoUrl = canonicoSeNovo(foto_url, fotoUrlAceitavel) || '';
+            const documentoFotoFinal = canonicoSeNovo(documento_foto, documentoFotoAceitavel);
             if (!finalFotoUrl && foto_base64) {
                 const buffer = Buffer.from(foto_base64.split(',')[1], 'base64');
                 const uploadResult = await uploadImage('selfies', `event_${eventoId}/${cpfLimpo}_${Date.now()}.jpg`, buffer, 'image/jpeg');
@@ -526,7 +561,7 @@ class PublicController {
                 data_nascimento: data_nascimento || null,
                 funcao: funcao || null,
                 foto_url: finalFotoUrl || null,
-                documento_foto: documento_foto || null,
+                documento_foto: documentoFotoFinal || null,
                 qr_code: null,
                 status_acesso: 'pendente',
                 origem_cadastro: 'externo',
@@ -733,6 +768,12 @@ class PublicController {
             const cleanPessoa = { ...pessoa };
             delete cleanPessoa.foto_base64; // Remove huge payload part
             if (finalFotoUrl) cleanPessoa.foto_url = finalFotoUrl;
+            // foto_url e documento_foto enviados pelo cliente: só data URI ou arquivo do nosso storage.
+            // Igual ao já gravado para este CPF no evento (reenvio do lote) passa sem validar.
+            const erroArquivos = await arquivosDoCadastroInvalidos(empresa.evento_id, cleanPessoa.cpf, cleanPessoa);
+            if (erroArquivos) return res.status(400).json({ error: erroArquivos });
+            if (cleanPessoa.foto_url) cleanPessoa.foto_url = canonicoSeNovo(cleanPessoa.foto_url, fotoUrlAceitavel);
+            if (cleanPessoa.documento_foto) cleanPessoa.documento_foto = canonicoSeNovo(cleanPessoa.documento_foto, documentoFotoAceitavel);
 
             // --- 🛡️ Upload de Documentos Base64 Integrado ---
             const { salvos: documentosSalvos, falharam } = await enviarDocumentosPortal(

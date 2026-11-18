@@ -43,6 +43,7 @@ import {
 } from '@mui/icons-material';
 import api from '../services/api';
 import GlassCard from '../components/common/GlassCard';
+import AvatarPessoa from '../components/common/AvatarPessoa';
 import PageHeader from '../components/common/PageHeader';
 import NeonButton from '../components/common/NeonButton';
 import DataTable from '../components/common/DataTable';
@@ -174,8 +175,9 @@ const Veiculos = () => {
                 }
                 return (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Avatar 
-                            src={val.foto_url} 
+                        <AvatarPessoa
+                            src={val.foto_url}
+                            pessoaId={val.id}
                             alt={nome}
                             sx={{ 
                                 width: 34, 
@@ -187,7 +189,7 @@ const Veiculos = () => {
                             }}
                         >
                             {nome[0]}
-                        </Avatar>
+                        </AvatarPessoa>
                         <Box sx={{ minWidth: 0 }}>
                             <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }} noWrap>
                                 {nome}
@@ -835,8 +837,9 @@ const Veiculos = () => {
                                 {/* Foto Biométrica do Motorista */}
                                 <Grid item xs={12} sm="auto" sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                                     <Box sx={{ position: 'relative' }}>
-                                        <Avatar
+                                        <AvatarPessoa
                                             src={resultadoConsulta.veiculo.pessoas?.foto_url}
+                                            pessoaId={resultadoConsulta.veiculo.pessoas?.id}
                                             variant="rounded"
                                             sx={{
                                                 width: { xs: 85, sm: 95 },
@@ -848,7 +851,7 @@ const Veiculos = () => {
                                             }}
                                         >
                                             <PersonIcon sx={{ fontSize: 48, color: '#00D4FF' }} />
-                                        </Avatar>
+                                        </AvatarPessoa>
                                     </Box>
                                     <Typography variant="caption" sx={{ mt: 0.8, fontSize: '0.75rem', fontWeight: 700, color: '#00D4FF', letterSpacing: '1px' }}>
                                         Foto do motorista
@@ -1252,12 +1255,13 @@ const Veiculos = () => {
                             renderOption={(props, option) => (
                                 <li {...props} key={option.id}>
                                     <Stack direction="row" spacing={1.5} alignItems="center" sx={{ width: '100%', py: 0.5 }}>
-                                        <Avatar 
-                                            src={option.foto_url} 
+                                        <AvatarPessoa
+                                            src={option.foto_url}
+                                            pessoaId={option.id}
                                             sx={{ width: 34, height: 34, border: '1px solid rgba(0, 212, 255, 0.4)', bgcolor: 'rgba(0, 212, 255, 0.1)' }}
                                         >
                                             <PersonIcon sx={{ fontSize: 18, color: '#00D4FF' }} />
-                                        </Avatar>
+                                        </AvatarPessoa>
                                         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                                             <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }} noWrap>
                                                 {option.nome_completo || option.nome}

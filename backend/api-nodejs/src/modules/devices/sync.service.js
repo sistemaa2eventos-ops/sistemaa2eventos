@@ -3,6 +3,7 @@ const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const auditService = require('../../services/audit.service');
 const imageProcessor = require('../../utils/imageProcessor');
+const { ehDoNossoStorage, baixarArquivo, BUCKETS_FOTO } = require('../../services/storageSeguro');
 const { getHwUserIdCandidates } = require('./hwUserId');
 const { buscarTodos } = require('../../utils/buscarTodos');
 const { COLUNAS_PESSOA_ACESSO } = require('../checkin/services/colunasPessoa');
@@ -717,7 +718,15 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
         }
 
         try {
-            logger.info(`📥 Baixando foto de ${fotoInput}...`);
+            // URL do storage do sistema: service role (bucket pode ser privado). Não loga a URL.
+            if (ehDoNossoStorage(fotoInput)) {
+                logger.info(`📥 Baixando foto do armazenamento para o terminal...`);
+                const buffer = await baixarArquivo(fotoInput, { buckets: BUCKETS_FOTO });
+                return `data:image/jpeg;base64,${buffer.toString('base64')}`;
+            }
+
+            // Outra URL: download comum
+            logger.info(`📥 Baixando foto externa para o terminal...`);
             const response = await fetch(fotoInput);
             if (!response.ok) throw new Error(`Falha ao baixar imagem: ${response.statusText}`);
 

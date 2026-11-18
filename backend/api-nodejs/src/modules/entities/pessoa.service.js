@@ -1,5 +1,6 @@
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
+const { caminhoDeStorage, BUCKETS_DOCUMENTO, BUCKETS_FOTO, fotoUrlAceitavel, arquivoUsadoPorOutraPessoa, formaCanonica } = require('../../services/storageSeguro');
 const qrGenerator = require('../../utils/qrGenerator');
 const syncService = require('../devices/sync.service');
 const { v4: uuidv4 } = require('uuid');
@@ -161,7 +162,7 @@ class PessoaService {
             .in('id', pIds);
 
         if (queryText) {
-            pesQuery = pesQuery.or(`nome_completo.ilike.%${queryText}%,cpf.ilike.%${queryText}%,funcao.ilike.%${queryText}%`);
+            pesQuery = pesQuery.or(`nome_completo.ilike.%${queryText}%,cpf.ilike.%${queryText}%,numero_pulseira.ilike.%${queryText}%,funcao.ilike.%${queryText}%`);
         }
 
         if (statusParam) {
@@ -196,6 +197,7 @@ class PessoaService {
                 ...pessoa,
                 nome: pessoa.nome_completo,
                 status: pessoa.status_acesso,
+                empresa_nome: empMap[p.empresa_id]?.nome || null,
                 empresas: empMap[p.empresa_id] || { nome: 'Sem Empresa' },
                 vinculo_id: p.id,
                 status_pivot: p.status_aprovacao,
@@ -235,6 +237,9 @@ class PessoaService {
         const safeOtherData = Object.fromEntries(
             Object.entries(otherData).filter(([key]) => ALLOWED_INSERT.has(key))
         );
+        this.validarFotoUrl(safeOtherData.foto_url);
+        // Foto nova do storage gravada na forma canônica (URL pública, sem query)
+        if (safeOtherData.foto_url) safeOtherData.foto_url = formaCanonica(safeOtherData.foto_url);
 
         if (!nome_completo || !empresa_id) {
             throw new Error('Nome Completo e Empresa são obrigatórios.');
@@ -512,6 +517,16 @@ class PessoaService {
         };
     }
 
+    /**
+     * foto_url vinda do cliente: vazio, data URI de imagem, ou arquivo do storage deste projeto em
+     * bucket de foto (selfies, avatars, fotos-perfil). Outro endereço → 400.
+     */
+    validarFotoUrl(fotoUrl) {
+        if (!fotoUrlAceitavel(fotoUrl)) {
+            throw Object.assign(new Error('Foto inválida: envie a foto pelo próprio sistema (upload de selfie).'), { status: 400 });
+        }
+    }
+
     async update(supabaseClient, id, updateData, tenantId) {
         // --- SANITIZAÇÃO PII ---
         const sanitizedData = this.sanitizePII(updateData);
@@ -540,6 +555,21 @@ class PessoaService {
         if (Object.keys(safeData).length === 0) {
             throw new Error('Nenhum campo válido para atualizar.');
         }
+        // O painel reenvia o objeto inteiro: foto igual à gravada (inclusive endereço antigo) passa;
+        // só a foto nova é validada
+        if (safeData.foto_url !== undefined) {
+            const { data: atual } = await supabaseClient
+                .from('pessoas')
+                .select('foto_url')
+                .eq('id', id)
+                .eq('evento_id', tenantId)
+                .maybeSingle();
+            if (!atual || safeData.foto_url !== atual.foto_url) {
+                this.validarFotoUrl(safeData.foto_url);
+                // Foto nova do storage gravada na forma canônica (URL pública, sem query)
+                safeData.foto_url = formaCanonica(safeData.foto_url);
+            }
+        }
 
         const { data, error } = await supabaseClient
             .from('pessoas')
@@ -566,7 +596,7 @@ class PessoaService {
         // 1. Buscar dados necessários para cleanup ANTES de deletar
         const { data: pessoa, error: getErr } = await supabaseClient
             .from('pessoas')
-            .select('id, cpf, nome_completo, evento_id, foto_url, face_encoding')
+            .select('id, cpf, nome_completo, evento_id, foto_url, documento_foto, face_encoding')
             .eq('id', id)
             .eq('evento_id', tenantId)
             .single();
@@ -581,15 +611,8 @@ class PessoaService {
 
             if (docs && docs.length > 0) {
                 for (const doc of docs) {
-                    if (doc.url_arquivo) {
-                        const urlParts = doc.url_arquivo.split('/storage/v1/object/public/');
-                        if (urlParts.length === 2) {
-                            const fullPath = urlParts[1];
-                            const bucket = fullPath.split('/')[0];
-                            const path = fullPath.substring(bucket.length + 1);
-                            await deleteImage(bucket, path);
-                        }
-                    }
+                    const ref = caminhoDeStorage(doc.url_arquivo, { buckets: BUCKETS_DOCUMENTO });
+                    if (ref) await deleteImage(ref.bucket, ref.path);
                 }
                 // Limpar registros do DB
                 await supabaseClient.from('pessoa_documentos').delete().eq('pessoa_id', id);
@@ -599,20 +622,26 @@ class PessoaService {
             logger.error(`[LGPD] Error cleaning documents for person ${id}:`, docErr);
         }
 
-        // 2. LGPD: Apagar foto biométrica do Supabase Storage
-        if (pessoa.foto_url) {
+        // 2. LGPD: Apagar do Storage a foto biométrica e a foto do documento.
+        // Se outro cadastro usa o mesmo arquivo, ele fica (a linha desta pessoa é excluída de qualquer forma).
+        const arquivos = [
+            { valor: pessoa.foto_url, buckets: BUCKETS_FOTO, nome: 'Foto biométrica' },
+            { valor: pessoa.documento_foto, buckets: [...BUCKETS_FOTO, ...BUCKETS_DOCUMENTO], nome: 'Foto do documento' }
+        ];
+        for (const arq of arquivos) {
+            if (!arq.valor) continue;
             try {
-                // Extrair o path relativo do Storage a partir da URL pública
-                const urlParts = pessoa.foto_url.split('/storage/v1/object/public/');
-                if (urlParts.length === 2) {
-                    const fullPath = urlParts[1]; // ex: "selfies/event_xxx/cpf_123.jpg"
-                    const bucket = fullPath.split('/')[0];
-                    const path = fullPath.substring(bucket.length + 1);
-                    await deleteImage(bucket, path);
-                    logger.info(`🗑️ [LGPD] Foto biométrica removida do Storage para pessoa ${id}`);
+                // Caminho do Storage a partir da URL (public, sign ou authenticated); ex.: "selfies/event_xxx/cpf_123.jpg"
+                const ref = caminhoDeStorage(arq.valor, { buckets: arq.buckets });
+                if (!ref) continue;
+                if (await arquivoUsadoPorOutraPessoa(arq.valor, id)) {
+                    logger.warn(`[LGPD] ${arq.nome} da pessoa ${id} é usada por outro cadastro; arquivo mantido no Storage`);
+                    continue;
                 }
+                await deleteImage(ref.bucket, ref.path);
+                logger.info(`🗑️ [LGPD] ${arq.nome} removida do Storage para pessoa ${id}`);
             } catch (storageErr) {
-                logger.error(`[LGPD] Falha ao remover foto do Storage para ${id}:`, storageErr);
+                logger.error(`[LGPD] Falha ao remover ${arq.nome.toLowerCase()} do Storage para ${id}:`, storageErr);
                 // Continua a deleção mesmo se o Storage falhar
             }
         }

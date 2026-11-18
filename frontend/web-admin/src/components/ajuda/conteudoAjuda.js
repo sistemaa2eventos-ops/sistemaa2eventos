@@ -87,19 +87,20 @@ const AJUDAS = {
     },
     '/checkin': {
         titulo: 'Check-in',
-        objetivo: 'Registrar a entrada: por leitor de código, CPF, QR, busca por nome com pulseira, ou pela ficha aberta pelo leitor facial.',
+        objetivo: 'Registrar a entrada sempre pela ficha de conferência: primeiro localize a pessoa (leitor de código, QR, CPF, nome ou leitor facial), depois confira os dados e informe a pulseira.',
         passos: [
             'Em "Conectar leitor facial", escolha o leitor da sua baia e dê o "Nome da estação".',
             'Escolha a área (ou "Todas as áreas (global)").',
-            'Bipe ou digite no campo "Leitor ou CPF" e aperte Enter — ou busque pelo nome, informe a pulseira e clique "Vincular pulseira & autorizar".'
+            'No campo "Leitor, CPF ou nome", bipe o crachá/QR ou digite o CPF e aperte Enter: abre a ficha da pessoa. Digitando o nome, escolha a pessoa na lista.',
+            'Na ficha, bipe a pulseira em "Número da pulseira" (o leitor confirma sozinho) ou digite o número e aperte Enter ou "Vincular pulseira & autorizar".'
         ],
         atencao: [
-            'Enter no campo libera a entrada na hora, sem pulseira.',
+            'O campo de busca nunca faz a entrada sozinho: a entrada só é registrada na ficha.',
             'Com o leitor facial vinculado, a ficha da pessoa abre sozinha quando ela passa o rosto — só na estação ligada àquele leitor.',
             'Sem internet, a entrada fica guardada no aparelho ("Aguardando envio") e sobe sozinha depois.'
         ],
         dicas: [
-            'Com "Imprimir etiqueta" ligado no evento, a etiqueta sai sozinha a cada entrada nova.',
+            'Com "Imprimir etiqueta" ligado no evento, a etiqueta sai sozinha a cada entrada nova. "Imprimir etiqueta: ON" na tela abre a prévia só quando o evento não imprime sozinho (a etiqueta nunca sai duas vezes).',
             '"Modo quiosque (tela cheia)" esconde o menu para a estação de atendimento.'
         ]
     },
@@ -108,7 +109,8 @@ const AJUDAS = {
         objetivo: 'Registrar a saída por leitor, CPF, pulseira, QR ou leitor facial.',
         passos: [
             'Vincule a estação e escolha a área, como no check-in.',
-            'Bipe ou digite no campo "Leitor, CPF ou pulseira" e aperte Enter (ou "Registrar saída").'
+            'Bipe ou digite o número da pulseira ou o CPF no campo "Busca por nome, CPF ou leitura QR / Pulseira" e aperte Enter (ou "Registrar saída").',
+            'Digitando o nome, a saída não é registrada sozinha: escolha a pessoa na lista.'
         ],
         atencao: [
             'Com leitor facial vinculado, o reconhecimento já registra a saída, sem confirmação.',
@@ -121,7 +123,7 @@ const AJUDAS = {
         objetivo: 'Conferir pulseiras e credenciais nos postos internos, sem registrar entrada nem saída.',
         passos: [
             'Escolha o "Posto de fiscalização" (a área onde você está).',
-            'Bipe a pulseira/crachá, use "Ler pela câmera" ou busque pelo nome.',
+            'Bipe a pulseira/crachá, digite o número ou o CPF e aperte Enter, ou toque no ícone do leitor para usar a câmera. Pelo nome, escolha a pessoa na lista (Enter com nome não fiscaliza).',
             'Veja o resultado: LIBERADO, NÃO AUTORIZADO ou BLOQUEADO, com as áreas permitidas.'
         ],
         dicas: ['O posto fica salvo neste navegador. Os contadores valem só para esta sessão da tela.']
@@ -283,9 +285,15 @@ const AJUDAS = {
             '"Se a IA não responder": "Vale o reconhecimento do leitor" mantém a fila andando; "Negar" é para áreas restritas. Com o motor desligado no painel, vale sempre o leitor.',
             '"Usar também como câmera" cria uma câmera com o vídeo do leitor (em Câmeras, escolha IA e gravação dela).',
             'Para entrada e saída pelo rosto (sem pulseira), use "Modo de operação: Bidirecional" e "Fluxo de acesso: Toggle": a primeira passagem do dia é entrada, a seguinte é saída.',
-            'Reserve um IP fixo para cada leitor no roteador.'
+            'Reserve um IP fixo para cada leitor no roteador.',
+            'As métricas do card só informam: um leitor com "sem resposta" no "Alcance" continua com os botões ligados. O que liga e desliga "Sync" e "Câmera" é o status online/offline do leitor.'
         ],
-        dicas: ['A "Fila de Sincronização" mostra os rostos que falharam; use "Reenviar".']
+        dicas: [
+            'A "Fila de Sincronização" mostra os rostos que falharam; use "Reenviar".',
+            'Métricas do card: "Alcance" é o tempo que o leitor levou para responder agora ("sem resposta" = não respondeu); "Último evento" é a última passagem recebida; "Faces no leitor" são os rostos gravados nele; "Erros (24 h)" conta as falhas do dia (passe o mouse para ver a última); "Fila pendente" são envios esperando; "Medido" diz quando foi a medição.',
+            'Ao abrir a tela, a lista aparece primeiro e as métricas chegam alguns segundos depois ("medindo..."). "Medir agora" mede todos os equipamentos na hora.',
+            '"Integração do equipamento" (no cadastro de leitor facial, catraca ou câmera) diz de onde vem o vídeo: "Canal de vídeo" é a câmera dentro do aparelho (normalmente 1), "Porta RTSP" é a porta do vídeo (normalmente 554) e "Caminho RTSP (opcional)" só se o fabricante pedir outro caminho. Deixe em branco para usar o padrão; a linha "Vídeo" mostra como fica o endereço, com a senha escondida.'
+        ]
     },
 
     '/config/etiquetas': {

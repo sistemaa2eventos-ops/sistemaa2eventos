@@ -1,54 +1,96 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
     Box, TextField, Typography, Stack, Chip, InputAdornment,
-    CircularProgress, Tooltip, Fade, IconButton
+    CircularProgress, Tooltip, Fade, IconButton, Button
 } from '@mui/material';
 import {
     QrCodeScanner as BarcodeIcon,
     Keyboard as KeyboardIcon,
     WarningAmber as WarningIcon,
-    FlashOn as FlashIcon
+    FlashOn as FlashIcon,
+    Close as ClearIcon
 } from '@mui/icons-material';
 
 /**
  * UniversalPulseiraInput
- * Input universal para credenciamento e baixa de pulseiras no evento.
+ * Campo único padronizado para Check-in, Check-out, Credenciamento e Fiscalização.
  * Suporta:
- * 1. Leitor de Código de Barras (CODE39 / CODE128 / 2D) via USB HID (< 50ms/char + Enter)
- * 2. Leitor QR Code
- * 3. Digitação Manual convencional
- * Identifica em tempo real a faixa numérica e o tipo/cor do lote correspondente.
+ * 1. Leitor de Código de Barras / QR Code via USB/Bluetooth (< 50ms/char) -> Disparo AUTOMÁTICO sem precisar de Enter
+ * 2. Leitor de QR Code / Código de Barras pela Câmera Mobile/Web -> Exibe o código lido e dispara AUTOMÁTICO
+ * 3. Digitação Manual de número da pulseira ou CPF -> Exige Enter ou clique no botão OK
+ * 4. Busca por Nome no mesmo campo -> Dispara busca em tempo real conforme digita
  */
+
+// Confirmação automática (leitor sem Enter) só a partir destes tamanhos: digitação rápida não confirma pela metade.
+// Só dígitos: 2 (pulseiras de numeração curta). Com letras ou outros sinais: 4.
+const TAMANHO_MINIMO_AUTOMATICO_DIGITOS = 2;
+const TAMANHO_MINIMO_AUTOMATICO = 4;
+// Enter do mesmo valor logo depois da confirmação automática é o Enter do próprio leitor: ignora
+const JANELA_ENTER_REPETIDO_MS = 1500;
+const temLetras = (texto) => /[A-Za-zÀ-ÿ]/.test(texto);
+const minimoAutomatico = (texto) => (/^\d+$/.test(texto) ? TAMANHO_MINIMO_AUTOMATICO_DIGITOS : TAMANHO_MINIMO_AUTOMATICO);
 export const UniversalPulseiraInput = ({
     value = '',
     onChange,
     onConfirm,
+    onClear,
     pulseiraTypes = [],
     loading = false,
     autoFocus = true,
+    // Padrões antigos (campo de pulseira); telas de busca passam os textos delas
     placeholder = 'Aproxime o leitor ou digite o código...',
     label = 'Código ou número da pulseira',
     disabled = false,
     helperText,
     accentColor = '#00D4FF',
-    // Quando informado, o ícone dentro da caixa vira o botão que abre a câmera do aparelho
-    onAbrirCamera
+    // Quando informado, o ícone dentro da caixa abre a câmera do aparelho
+    onAbrirCamera,
+    ultimoCodigoLido = ''
 }) => {
     const inputRef = useRef(null);
     const keyTimestampsRef = useRef([]);
-    const [origemLeitura, setOrigemLeitura] = useState(null); // 'barcode' | 'manual' | null
+    const autoScanTimerRef = useRef(null);
+    const ultimaAutomaticaRef = useRef({ valor: '', em: 0 });
+    // `loading` é só da AÇÃO (registro/consulta), nunca da busca por nome. Durante a ação o campo continua
+    // aceitando teclas (sem readOnly, que descartaria o bipe seguinte); só a confirmação espera:
+    // fica guardada em pendenteRef e dispara quando a ação termina.
+    const loadingRef = useRef(loading);
+    const pendenteRef = useRef(null);
+    const dispararRef = useRef(null);
+    const valueRef = useRef(value);
+    const ultimaConfirmadaRef = useRef('');
+    const [origemLeitura, setOrigemLeitura] = useState(null); // 'barcode' | 'camera' | 'manual' | null
+    const [codigoLidoBadge, setCodigoLidoBadge] = useState('');
     const [pulseAnimation, setPulseAnimation] = useState(false);
+
+    // Quando o componente pai informa um código lido pela câmera/leitor, exibe o badge
+    useEffect(() => {
+        if (ultimoCodigoLido) {
+            setCodigoLidoBadge(String(ultimoCodigoLido).trim());
+            setOrigemLeitura('barcode');
+            setPulseAnimation(true);
+            const t = setTimeout(() => setPulseAnimation(false), 600);
+            return () => clearTimeout(t);
+        }
+    }, [ultimoCodigoLido]);
+
+    // Limpar timer ao desmontar
+    useEffect(() => () => {
+        if (autoScanTimerRef.current) clearTimeout(autoScanTimerRef.current);
+    }, []);
 
     // No celular/touch, evita abrir o teclado virtual automaticamente sem o operador tocar no campo
     useEffect(() => {
         const isTouchMobile = typeof window !== 'undefined' && (
             window.innerWidth < 768 || window.matchMedia?.('(pointer: coarse)').matches
         );
-        // Também ao terminar uma leitura (loading → false): o próximo bip do leitor já cai no campo
+        // Também ao terminar uma leitura (loading → false): devolve o foco ao campo. Só seleciona o texto se ele
+        // ainda for o código já confirmado (o próximo bipe sobrescreve); texto novo digitado não é selecionado.
         if (autoFocus && !isTouchMobile && inputRef.current && !disabled && !loading) {
             const timer = setTimeout(() => {
                 inputRef.current?.focus();
-                inputRef.current?.select();
+                const atual = String(valueRef.current || '').trim();
+                if (atual && atual === ultimaConfirmadaRef.current) inputRef.current?.select();
             }, 80);
             return () => clearTimeout(timer);
         }
@@ -57,7 +99,9 @@ export const UniversalPulseiraInput = ({
     // Identificar tipo de pulseira correspondente à faixa numérica
     const tipoPulseiraCorrespondente = useMemo(() => {
         if (!value) return null;
-        const num = parseInt(String(value).trim(), 10);
+        const limpo = String(value).trim();
+        if (!/^\d+$/.test(limpo)) return null;
+        const num = parseInt(limpo, 10);
         if (isNaN(num)) return null;
 
         return (pulseiraTypes || []).find(tipo => {
@@ -70,48 +114,134 @@ export const UniversalPulseiraInput = ({
         });
     }, [value, pulseiraTypes]);
 
+    const dispararConfirmacao = useCallback((textoBruto, tipoOrigem, automatica = false) => {
+        if (autoScanTimerRef.current) {
+            clearTimeout(autoScanTimerRef.current);
+            autoScanTimerRef.current = null;
+        }
+        const val = String(textoBruto || '').trim();
+        if (!val || disabled) return;
+        // Ação em curso: guarda a confirmação (a última vence) e dispara quando a ação terminar
+        if (loadingRef.current) {
+            pendenteRef.current = { val, tipoOrigem, automatica };
+            return;
+        }
+
+        ultimaConfirmadaRef.current = val;
+        if (automatica) ultimaAutomaticaRef.current = { valor: val, em: Date.now() };
+        setOrigemLeitura(tipoOrigem);
+        // "Código lido" só para código: nome digitado não é código
+        setCodigoLidoBadge(tipoOrigem === 'manual' && temLetras(val) ? '' : val);
+        setPulseAnimation(true);
+        setTimeout(() => setPulseAnimation(false), 500);
+        keyTimestampsRef.current = [];
+
+        if (onConfirm) {
+            onConfirm(val, tipoOrigem, tipoPulseiraCorrespondente);
+        }
+    }, [disabled, onConfirm, tipoPulseiraCorrespondente]);
+
+    useEffect(() => { valueRef.current = value; }, [value]);
+    useEffect(() => { dispararRef.current = dispararConfirmacao; }, [dispararConfirmacao]);
+
+    // Fim da ação: dispara a confirmação que chegou enquanto ela rodava
+    useEffect(() => {
+        loadingRef.current = loading;
+        if (loading || !pendenteRef.current) return;
+        const { val, tipoOrigem, automatica } = pendenteRef.current;
+        pendenteRef.current = null;
+        dispararRef.current?.(val, tipoOrigem, automatica);
+    }, [loading]);
+
     const handleKeyDown = (e) => {
-        if (disabled || loading) return;
+        // Sem checar loading: teclas durante a ação entram no campo e a confirmação vai para a fila
+        if (disabled) return;
 
         const now = Date.now();
         const timestamps = keyTimestampsRef.current;
-        timestamps.push(now);
 
-        // Manter apenas os últimos 8 timestamps para média móvel
-        if (timestamps.length > 8) timestamps.shift();
+        // Se for uma tecla de caractere imprimível, registra o tempo da tecla na rajada atual
+        if (e.key && e.key.length === 1) {
+            const lastTs = timestamps.length > 0 ? timestamps[timestamps.length - 1] : 0;
+            // Se demorou mais de 120ms desde a última tecla, inicia uma nova sequência
+            if (lastTs && (now - lastTs) > 120) {
+                keyTimestampsRef.current = [now];
+            } else {
+                timestamps.push(now);
+                if (timestamps.length > 12) timestamps.shift();
+            }
+        }
 
         if (e.key === 'Enter') {
             e.preventDefault();
             const val = String(value || '').trim();
             if (!val) return;
 
-            // Calcular intervalo médio entre teclas para detecção de scanner
+            // Leitor que manda Enter depois da pausa: a confirmação automática já foi feita
+            const ultima = ultimaAutomaticaRef.current;
+            if (ultima.valor === val && now - ultima.em < JANELA_ENTER_REPETIDO_MS) {
+                keyTimestampsRef.current = [];
+                return;
+            }
+
             let isScanner = false;
-            if (timestamps.length >= 3) {
-                const diffTotal = timestamps[timestamps.length - 1] - timestamps[0];
-                const mediaDiff = diffTotal / (timestamps.length - 1);
-                // Barcode scanners enviam teclas em rajada rápida (< 55ms de intervalo)
+            const ts = keyTimestampsRef.current;
+            if (ts.length >= 3) {
+                const diffTotal = ts[ts.length - 1] - ts[0];
+                const mediaDiff = diffTotal / (ts.length - 1);
                 if (mediaDiff < 55) {
                     isScanner = true;
                 }
             }
 
-            const tipoOrigem = isScanner ? 'barcode' : 'manual';
-            setOrigemLeitura(tipoOrigem);
-            setPulseAnimation(true);
-            setTimeout(() => setPulseAnimation(false), 500);
-
-            keyTimestampsRef.current = [];
-
-            if (onConfirm) {
-                onConfirm(val, tipoOrigem, tipoPulseiraCorrespondente);
-            }
+            dispararConfirmacao(val, isScanner ? 'barcode' : 'manual');
         }
     };
 
     const handleChange = (e) => {
         const val = e.target.value;
         if (onChange) onChange(val);
+
+        if (autoScanTimerRef.current) {
+            clearTimeout(autoScanTimerRef.current);
+            autoScanTimerRef.current = null;
+        }
+
+        const limpo = String(val || '').trim();
+        if (!limpo) {
+            setCodigoLidoBadge('');
+            setOrigemLeitura(null);
+            return;
+        }
+
+        // Detecção automática de leitor de código de barras / QR Code que NÃO envia Enter ao final:
+        // Se pelo menos o mínimo de caracteres (2 só dígitos, 4 com letras) chegou em rajada (< 48ms por tecla)
+        // e não é um nome com espaço, dispara a confirmação automaticamente após 130ms de silêncio da rajada.
+        const ts = keyTimestampsRef.current;
+        const minimo = minimoAutomatico(limpo);
+        if (ts.length >= minimo && limpo.length >= minimo && !/\s/.test(limpo)) {
+            const diffTotal = ts[ts.length - 1] - ts[0];
+            const mediaDiff = diffTotal / (ts.length - 1);
+            const ehApenasLetrasCurto = /^[A-Za-zÀ-ÿ]{1,5}$/.test(limpo);
+            if (mediaDiff < 48 && !ehApenasLetrasCurto) {
+                autoScanTimerRef.current = setTimeout(() => {
+                    dispararConfirmacao(limpo, 'barcode', true);
+                }, 130);
+            }
+        }
+    };
+
+    const handleClear = () => {
+        if (autoScanTimerRef.current) {
+            clearTimeout(autoScanTimerRef.current);
+            autoScanTimerRef.current = null;
+        }
+        keyTimestampsRef.current = [];
+        setCodigoLidoBadge('');
+        setOrigemLeitura(null);
+        if (onChange) onChange('');
+        if (onClear) onClear();
+        inputRef.current?.focus();
     };
 
     return (
@@ -133,23 +263,25 @@ export const UniversalPulseiraInput = ({
                     {label}
                 </Typography>
 
-                {origemLeitura === 'barcode' && (
-                    <Fade in>
-                        <Chip
-                            icon={<FlashIcon sx={{ fontSize: '13px !important', color: '#00FF88 !important' }} />}
-                            label="Leitor detectado"
-                            size="small"
-                            sx={{
-                                bgcolor: 'rgba(0, 255, 136, 0.15)',
-                                color: '#00FF88',
-                                fontWeight: 700,
-                                fontSize: '0.75rem',
-                                height: 20,
-                                border: '1px solid rgba(0, 255, 136, 0.4)'
-                            }}
-                        />
-                    </Fade>
-                )}
+                <Stack direction="row" spacing={0.75} alignItems="center">
+                    {codigoLidoBadge && (
+                        <Fade in>
+                            <Chip
+                                icon={<FlashIcon sx={{ fontSize: '13px !important', color: '#00FF88 !important' }} />}
+                                label={`Código lido: ${codigoLidoBadge}`}
+                                size="small"
+                                sx={{
+                                    bgcolor: 'rgba(0, 255, 136, 0.15)',
+                                    color: '#00FF88',
+                                    fontWeight: 700,
+                                    fontSize: '0.75rem',
+                                    height: 22,
+                                    border: '1px solid rgba(0, 255, 136, 0.4)'
+                                }}
+                            />
+                        </Fade>
+                    )}
+                </Stack>
             </Box>
 
             <TextField
@@ -160,7 +292,8 @@ export const UniversalPulseiraInput = ({
                 onKeyDown={handleKeyDown}
                 // Durante a leitura fica só leitura (não desabilitado): desabilitar tira o foco do campo
                 disabled={disabled}
-                inputProps={{ readOnly: loading, 'aria-busy': loading }}
+                // Sem readOnly durante a ação: o leitor não perde caracteres (a confirmação espera a ação terminar)
+                inputProps={{ 'aria-busy': loading }}
                 placeholder={placeholder}
                 variant="outlined"
                 autoComplete="off"
@@ -176,16 +309,16 @@ export const UniversalPulseiraInput = ({
                                 }}
                             >
                                 {onAbrirCamera ? (
-                                    <Tooltip title="Ler pela câmera">
+                                    <Tooltip title="Ler QR Code ou Código de Barras pela câmera">
                                         <span>
                                             <IconButton
                                                 onClick={onAbrirCamera}
                                                 disabled={disabled || loading}
-                                                aria-label="Ler pela câmera"
+                                                aria-label="Ler QR Code ou Código de Barras pela câmera"
                                                 sx={{
-                                                    // Só o ícone; a área de toque de 44px fica invisível
                                                     width: 44, height: 44, ml: -1.25,
-                                                    color: 'inherit'
+                                                    color: 'inherit',
+                                                    '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' }
                                                 }}
                                             >
                                                 <BarcodeIcon sx={{ fontSize: { xs: 22, sm: 26 } }} />
@@ -196,7 +329,7 @@ export const UniversalPulseiraInput = ({
                                     <BarcodeIcon sx={{ fontSize: { xs: 22, sm: 26 } }} />
                                 )}
                                 {origemLeitura === 'barcode' && (
-                                    <Tooltip title="Leitura ultra-rápida via código de barras">
+                                    <Tooltip title="Leitura automática via QR Code / Código de Barras">
                                         <FlashIcon sx={{ fontSize: 16, color: '#00FF88' }} />
                                     </Tooltip>
                                 )}
@@ -205,38 +338,77 @@ export const UniversalPulseiraInput = ({
                     ),
                     endAdornment: (
                         <InputAdornment position="end">
-                            {loading ? (
-                                <CircularProgress size={22} sx={{ color: accentColor }} />
-                            ) : tipoPulseiraCorrespondente ? (
-                                <Fade in>
-                                    <Chip
-                                        label={tipoPulseiraCorrespondente.nome_tipo}
-                                        size="small"
-                                        sx={{
-                                            fontWeight: 700,
-                                            fontSize: '0.75rem',
-                                            bgcolor: tipoPulseiraCorrespondente.cor_hex 
-                                                ? `${tipoPulseiraCorrespondente.cor_hex}33` 
-                                                : `${accentColor}33`,
-                                            color: tipoPulseiraCorrespondente.cor_hex || accentColor,
-                                            border: `1px solid ${tipoPulseiraCorrespondente.cor_hex || accentColor}`
-                                        }}
-                                    />
-                                </Fade>
-                            ) : value && !isNaN(parseInt(value, 10)) && pulseiraTypes.length > 0 ? (
-                                <Tooltip title="Número não coincide com nenhuma faixa de lote pré-cadastrada">
-                                    <Chip
-                                        icon={<WarningIcon sx={{ fontSize: '14px !important' }} />}
-                                        label="Faixa avulsa"
-                                        size="small"
-                                        sx={{
-                                            fontSize: '0.75rem',
-                                            bgcolor: 'rgba(255, 170, 0, 0.15)',
-                                            color: '#FFB800'
-                                        }}
-                                    />
-                                </Tooltip>
-                            ) : null}
+                            <Stack direction="row" spacing={0.75} alignItems="center">
+                                {loading ? (
+                                    <CircularProgress size={22} sx={{ color: accentColor }} />
+                                ) : tipoPulseiraCorrespondente ? (
+                                    <Fade in>
+                                        <Chip
+                                            label={tipoPulseiraCorrespondente.nome_tipo}
+                                            size="small"
+                                            sx={{
+                                                fontWeight: 700,
+                                                fontSize: '0.75rem',
+                                                bgcolor: tipoPulseiraCorrespondente.cor_hex 
+                                                    ? `${tipoPulseiraCorrespondente.cor_hex}33` 
+                                                    : `${accentColor}33`,
+                                                color: tipoPulseiraCorrespondente.cor_hex || accentColor,
+                                                border: `1px solid ${tipoPulseiraCorrespondente.cor_hex || accentColor}`
+                                            }}
+                                        />
+                                    </Fade>
+                                ) : value && /^\d+$/.test(String(value).trim()) && pulseiraTypes.length > 0 ? (
+                                    <Tooltip title="Número não coincide com nenhuma faixa de lote pré-cadastrada">
+                                        <Chip
+                                            icon={<WarningIcon sx={{ fontSize: '14px !important' }} />}
+                                            label="Faixa avulsa"
+                                            size="small"
+                                            sx={{
+                                                fontSize: '0.75rem',
+                                                bgcolor: 'rgba(255, 170, 0, 0.15)',
+                                                color: '#FFB800'
+                                            }}
+                                        />
+                                    </Tooltip>
+                                ) : null}
+
+                                {Boolean(value) && !loading && (
+                                    <>
+                                        <Tooltip title="Limpar campo">
+                                            <IconButton
+                                                size="small"
+                                                onClick={handleClear}
+                                                disabled={disabled}
+                                                sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: '#FFFFFF' } }}
+                                            >
+                                                <ClearIcon fontSize="small" />
+                                            </IconButton>
+                                        </Tooltip>
+                                        <Tooltip title="Confirmar código / número digitado manualmente (Enter)">
+                                            <Button
+                                                variant="contained"
+                                                size="small"
+                                                onClick={() => dispararConfirmacao(value, 'manual')}
+                                                disabled={disabled || !String(value).trim()}
+                                                sx={{
+                                                    minWidth: 44,
+                                                    height: 34,
+                                                    px: 1.5,
+                                                    fontWeight: 800,
+                                                    fontSize: '0.78rem',
+                                                    borderRadius: 1,
+                                                    bgcolor: accentColor,
+                                                    color: '#000000',
+                                                    boxShadow: 'none',
+                                                    '&:hover': { bgcolor: accentColor, filter: 'brightness(1.1)', boxShadow: 'none' }
+                                                }}
+                                            >
+                                                OK
+                                            </Button>
+                                        </Tooltip>
+                                    </>
+                                )}
+                            </Stack>
                         </InputAdornment>
                     )
                 }}

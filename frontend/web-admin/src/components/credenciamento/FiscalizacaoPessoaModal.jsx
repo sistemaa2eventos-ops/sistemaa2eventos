@@ -179,6 +179,7 @@ const FiscalizacaoPessoaModal = ({
                         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                             <PessoaFoto
                                 src={fotoUrl}
+                                pessoaId={dados.foto_url ? dados.id : undefined}
                                 nome={nome}
                                 width={isMobile ? 130 : 180}
                                 borderRadius="16px"

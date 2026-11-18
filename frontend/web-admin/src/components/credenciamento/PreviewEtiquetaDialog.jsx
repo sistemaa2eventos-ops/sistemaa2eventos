@@ -9,7 +9,7 @@ import {
     Style as StyleIcon
 } from '@mui/icons-material';
 import NeonButton from '../common/NeonButton';
-import { carregarConfigEtiqueta, montarHtmlEtiqueta, imprimirHtml, preencher, gerarBarcodeSvg } from '../../services/etiquetaService';
+import { carregarConfigEtiqueta, montarHtmlEtiqueta, imprimirHtml, preencher, gerarBarcodeSvg, comFotoAssinada } from '../../services/etiquetaService';
 import api from '../../services/api';
 
 const ESCALA_PREVIEW = 2.8; // Fator de escala para preview na tela (mm -> px)
@@ -53,6 +53,8 @@ export const PreviewEtiquetaDialog = ({
                     dados = res.data?.data;
                 }
 
+                // Foto da pessoa: URL assinada (o endpoint de etiqueta só traz o caminho guardado)
+                dados = await comFotoAssinada(dados, pessoaId);
                 if (!ativo) return;
                 setDadosPessoa(dados);
 
@@ -79,7 +81,8 @@ export const PreviewEtiquetaDialog = ({
 
     const handleImprimir = async (layoutParam = null, dadosParam = null) => {
         const layoutFinal = layoutParam || config?.layout;
-        const dadosFinal = dadosParam || dadosPessoa;
+        // Refaz a assinatura na hora de imprimir: a URL do preview pode ter passado de 600 s
+        const dadosFinal = await comFotoAssinada(dadosParam || dadosPessoa, pessoaId);
         if (!layoutFinal || !dadosFinal) return;
 
         try {

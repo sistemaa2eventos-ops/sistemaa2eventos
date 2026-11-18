@@ -2,6 +2,7 @@
 
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
+const { caminhoDeStorage, baixarArquivo, BUCKETS_FOTO } = require('../../services/storageSeguro');
 
 /**
  * Biometrias para o motor de IA do evento SEM a chave de serviço do banco no PC do evento.
@@ -138,10 +139,9 @@ function fotoPermitida(url) {
 }
 
 async function fotoEmBase64(url) {
-    if (!fotoPermitida(url)) throw new Error('foto fora do armazenamento do sistema');
-    const r = await fetch(url, { signal: AbortSignal.timeout(10000), redirect: 'error' });
-    if (!r.ok) throw new Error(`foto HTTP ${r.status}`);
-    const buf = Buffer.from(await r.arrayBuffer());
+    // Só fotos do storage do sistema (regra mantida); baixadas com service role, valendo com bucket privado
+    if (!fotoPermitida(url) || !caminhoDeStorage(url, { buckets: BUCKETS_FOTO })) throw new Error('foto fora do armazenamento do sistema');
+    const buf = await baixarArquivo(url, { buckets: BUCKETS_FOTO });
     if (buf.length > 8e6) throw new Error('foto grande demais');
     return buf.toString('base64');
 }
@@ -194,4 +194,4 @@ function iniciar() {
     setInterval(ciclo, 60000).unref();
 }
 
-module.exports = { atender, iniciar };
+module.exports = { atender, iniciar, fotoEmBase64 };

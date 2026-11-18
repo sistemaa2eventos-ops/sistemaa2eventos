@@ -236,6 +236,7 @@ class WatchlistService {
             // 3. Montar objeto enriquecido de alerta
             const alertaData = {
                 alerta_id: alertaId,
+                pessoa_id: contexto.pessoa_id || null,
                 nome: contexto.nome || watchlistItem.nome || 'Alvo Monitorado',
                 cpf: watchlistItem.cpf || contexto.cpf || 'Não informado',
                 numero_pulseira: contexto.numero_pulseira || 'Sem pulseira vinculada',
@@ -278,6 +279,8 @@ class WatchlistService {
                     alerta_id: alertaId,
                     target_name: alertaData.nome,
                     pessoa: {
+                        // id: o painel busca a foto assinada (GET /api/fotos/:id/url)
+                        id: alertaData.pessoa_id,
                         nome: alertaData.nome,
                         cpf: alertaData.cpf,
                         foto_url: alertaData.foto_url,

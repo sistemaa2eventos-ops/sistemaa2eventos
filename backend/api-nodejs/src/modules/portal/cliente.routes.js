@@ -3,6 +3,9 @@ const router = express.Router();
 const { supabase, uploadImage } = require('../../config/supabase');
 const { authenticate } = require('../../middleware/auth');
 const logger = require('../../services/logger');
+const {
+    caminhoDeStorage, urlAssinada, fotoUrlAceitavel, SEGUNDOS_PADRAO, BUCKETS_FOTO
+} = require('../../services/storageSeguro');
 const syncService = require('../devices/sync.service');
 const multer = require('multer');
 
@@ -65,6 +68,39 @@ router.get('/meu-ticket', async (req, res) => {
 });
 
 /**
+ * GET /api/portal/cliente/ticket/foto-url
+ * Link assinado (600 s) da foto do próprio ticket. Mesma autenticação de /meu-ticket
+ * (Authorization: Bearer <token do cliente>, papel 'cliente'); a pessoa é o próprio usuário.
+ * Resposta: { success: true, data: { url } } (url null quando não há foto).
+ */
+router.get('/ticket/foto-url', async (req, res) => {
+    try {
+        const { data: pessoa, error } = await supabase
+            .from('pessoas')
+            .select('id, foto_url')
+            .eq('id', req.user.id)
+            .maybeSingle();
+        if (error) throw error;
+        if (!pessoa) return res.status(404).json({ success: false, error: 'Ticket não encontrado.' });
+        if (!pessoa.foto_url) return res.json({ success: true, data: { url: null } });
+
+        const ref = caminhoDeStorage(pessoa.foto_url, { buckets: BUCKETS_FOTO });
+        if (!ref) {
+            // Arquivo do storage fora dos buckets de foto: não assina nem devolve
+            if (caminhoDeStorage(pessoa.foto_url)) return res.status(422).json({ success: false, error: 'Foto fora do armazenamento de fotos.' });
+            // Data URI ou endereço de fora: não há arquivo do storage para assinar
+            return res.json({ success: true, data: { url: pessoa.foto_url } });
+        }
+
+        const url = await urlAssinada(ref.bucket, ref.path, SEGUNDOS_PADRAO);
+        res.json({ success: true, data: { url, expira_em_segundos: SEGUNDOS_PADRAO } });
+    } catch (error) {
+        logger.error(`Portal Cliente: Erro ao gerar link da foto: ${error.message}`);
+        res.status(502).json({ success: false, error: 'Não foi possível gerar o link da foto.' });
+    }
+});
+
+/**
  * 📸 POST /api/portal/cliente/selfie
  * Recebe a Base64 da WebCam HTML5, salva no Supabase Storage e manda pra Catraca
  */
@@ -88,14 +124,17 @@ router.post('/selfie', async (req, res) => {
 
         logger.info(`📸 B2C: Upload de Face recebido para pessoa ${pessoaId}. Tamanho: ${buffer.length} bytes`);
 
-        // Upload to Supabase Storage
-        const uploadResult = await uploadImage('fotos', path, buffer, 'image/jpeg');
+        // Upload to Supabase Storage (bucket 'fotos' não existe: selfies é o bucket de fotos do sistema)
+        const uploadResult = await uploadImage('selfies', path, buffer, 'image/jpeg');
 
-        if (!uploadResult) {
+        if (!uploadResult?.success || !uploadResult.url) {
             throw new Error('Falha ao gravar biometria facial no Storage.');
         }
 
         const fotoUrl = uploadResult.url;
+        if (!fotoUrlAceitavel(fotoUrl)) {
+            throw new Error('Endereço da selfie fora do armazenamento de fotos.');
+        }
 
         // Atualiza a tabela Pessoas com a nova foto
         const { error: updateError } = await supabase
@@ -137,10 +176,11 @@ router.post('/documento', upload.single('arquivo'), async (req, res) => {
         const ext = file.originalname.split('.').pop();
         const path = `documentos/pessoa_${pessoaId}_${Date.now()}.${ext}`;
 
-        // Faz o upload do arquivo para o Storage
-        const uploadResult = await uploadImage('docs', path, file.buffer, file.mimetype);
+        // Faz o upload do arquivo para o Storage (bucket 'docs' não existe: 'documentos' é o dos anexos
+        // enviados pelos portais, o mesmo de public.controller)
+        const uploadResult = await uploadImage('documentos', path, file.buffer, file.mimetype);
 
-        if (!uploadResult) {
+        if (!uploadResult?.success || !uploadResult.url) {
             throw new Error('Falha no upload para o Storage de Documentos.');
         }
 
@@ -152,7 +192,7 @@ router.post('/documento', upload.single('arquivo'), async (req, res) => {
                 pessoa_id: pessoaId,
                 titulo: titulo,
                 tipo_doc: tipo_doc, // 'meia_entrada', 'pcd', 'termo_responsabilidade'
-                url_arquivo: uploadResult.publicUrl,
+                url_arquivo: uploadResult.url, // uploadImage devolve { success, path, url }
                 status: 'pendente',
                 criado_por_user_id: pessoaId // Auditor do Upload
             }])

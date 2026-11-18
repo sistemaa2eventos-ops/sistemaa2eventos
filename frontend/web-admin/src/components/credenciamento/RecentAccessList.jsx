@@ -118,6 +118,7 @@ const RecentAccessList = ({
               >
                 <PessoaFoto
                   src={fotoUrl}
+                  pessoaId={pessoa.foto_url ? pessoa.id : undefined}
                   nome={nome}
                   width={42}
                   borderRadius="10px"

@@ -5,6 +5,7 @@ const { normalizarFuncao, FUNCAO_PADRAO } = require('./documentoRequisitos.servi
 const { getHojeLocal } = require('../../utils/dateUtils');
 const { emParalelo } = require('../../utils/lotes');
 const { buscarTodos } = require('../../utils/buscarTodos');
+const { caminhoDeStorage, urlAssinada, assinarLinhas, SEGUNDOS_PADRAO, BUCKETS_DOCUMENTO } = require('../../services/storageSeguro');
 
 const STATUS_AUDITORIA = ['aprovado', 'reprovado', 'reenvio_solicitado'];
 const STATUS_EM_FILA = ['pendente', 'em_analise'];
@@ -258,15 +259,35 @@ class DocumentoService {
         logger.info(`🔄 [Documentos] Situação documental recalculada para ${pessoas?.length || 0} pessoas do evento ${eventoId}`);
     }
 
-    async listDocumentos(supabaseClient, entityType, entityId) {
+    /**
+     * Pessoa/empresa precisa ser do evento (tenantId) para ver os documentos dela; senão 404.
+     * Sem tenantId (administrador geral sem evento selecionado), não restringe.
+     */
+    async _conferirEvento(entityType, entityId, tenantId) {
+        if (!tenantId) return;
+        const naoEncontrado = () => Object.assign(new Error('Documento não encontrado'), { status: 404 });
+        if (!entityId) throw naoEncontrado();
+        const { data: dono } = await supabase
+            .from(entityType === 'empresa' ? 'empresas' : 'pessoas')
+            .select('evento_id')
+            .eq('id', entityId)
+            .maybeSingle();
+        if (!dono || dono.evento_id !== tenantId) throw naoEncontrado();
+    }
+
+    async listDocumentos(supabaseClient, entityType, entityId, tenantId = null) {
         const tableName = entityType === 'empresa' ? 'empresa_documentos' : 'pessoa_documentos';
         const idCol = entityType === 'empresa' ? 'empresa_id' : 'pessoa_id';
+
+        // Mesma checagem de evento do gerarUrlAssinada, antes de devolver links assinados
+        await this._conferirEvento(entityType, entityId, tenantId);
 
         let query = supabaseClient.from(tableName).select('*').order('data_inclusao', { ascending: false });
         if (entityId) query = query.eq(idCol, entityId);
 
         const { data, error } = await query;
         if (error) throw error;
+        await assinarLinhas(data || []);
         return data;
     }
 
@@ -307,8 +328,10 @@ class DocumentoService {
             .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
         const from = (page - 1) * limit;
+        const pagina = filtradas.slice(from, from + limit);
+        await assinarLinhas(pagina);
         return {
-            data: filtradas.slice(from, from + limit).map(({ _busca, pessoas, empresas, ...resto }) => resto),
+            data: pagina.map(({ _busca, pessoas, empresas, ...resto }) => resto),
             total: filtradas.length,
             page: parseInt(page),
             limit: parseInt(limit)
@@ -377,7 +400,9 @@ class DocumentoService {
         if (somentePendentes) resultado = resultado.filter(p => p.situacao_documental !== 'aprovado');
 
         const from = (page - 1) * limit;
-        return { data: resultado.slice(from, from + limit), total: resultado.length, page: Number(page), limit: Number(limit) };
+        const pagina = resultado.slice(from, from + limit);
+        await assinarLinhas(pagina.flatMap(p => p.documentos || []));
+        return { data: pagina, total: resultado.length, page: Number(page), limit: Number(limit) };
     }
 
     /**
@@ -433,13 +458,16 @@ class DocumentoService {
         if (somentePendentes) resultado = resultado.filter(e => e.situacao_documental !== 'aprovado');
 
         const from = (page - 1) * limit;
-        return { data: resultado.slice(from, from + limit), total: resultado.length, page: Number(page), limit: Number(limit) };
+        const pagina = resultado.slice(from, from + limit);
+        await assinarLinhas(pagina.flatMap(e => e.documentos || []));
+        return { data: pagina, total: resultado.length, page: Number(page), limit: Number(limit) };
     }
 
     /**
      * Documentos vencidos e a vencer nos próximos `dias` (padrão: configuração do evento).
+     * assinar: só a rota HTTP pede links assinados; o cron de notificação e o resumo da operação não.
      */
-    async listarVencimentos(eventoId, dias = null) {
+    async listarVencimentos(eventoId, dias = null, { assinar = false } = {}) {
         const config = await requisitos.getConfig(eventoId);
         const janela = Number(dias) || config.aviso_vencimento_dias;
         const hoje = getHojeLocal();
@@ -453,6 +481,7 @@ class DocumentoService {
             ...pesDocs.map(d => ({ ...d, _entidade: 'pessoa', pessoas: pessoasPorId[d.pessoa_id] })),
             ...empDocs.map(d => ({ ...d, _entidade: 'empresa', empresas: empresasPorId[d.empresa_id] }))
         ].sort((a, b) => a.data_validade.localeCompare(b.data_validade));
+        if (assinar) await assinarLinhas(data);
 
         const tiposPorId = Object.fromEntries(config.tipos.map(t => [t.id, t]));
         return {
@@ -476,23 +505,28 @@ class DocumentoService {
     }
 
     /**
-     * URL assinada (10 min) para visualizar o arquivo, funcione o bucket público ou privado.
+     * URL assinada (10 min) para visualizar o arquivo. Funciona com bucket público ou privado.
+     * Com tenantId, o documento precisa ser de pessoa/empresa desse evento (senão 404).
+     * Não devolve a URL pública gravada: se a assinatura falhar, responde 502.
      */
-    async gerarUrlAssinada(entityType, docId) {
-        const tableName = entityType === 'empresa' ? 'empresa_documentos' : 'pessoa_documentos';
-        const { data: doc, error } = await supabase.from(tableName).select('url_arquivo').eq('id', docId).maybeSingle();
+    async gerarUrlAssinada(entityType, docId, tenantId = null) {
+        const tabela = entityType === 'empresa' ? 'empresa_documentos' : 'pessoa_documentos';
+        const colDono = entityType === 'empresa' ? 'empresa_id' : 'pessoa_id';
+        const { data: doc, error } = await supabase.from(tabela).select(`url_arquivo, ${colDono}`).eq('id', docId).maybeSingle();
         if (error || !doc) throw Object.assign(new Error('Documento não encontrado'), { status: 404 });
 
-        const match = String(doc.url_arquivo || '').match(/\/storage\/v1\/object\/(?:public|sign|authenticated)\/([^/]+)\/([^?]+)/);
-        if (!match) return { url: doc.url_arquivo, assinada: false };
+        await this._conferirEvento(entityType, doc[colDono], tenantId);
 
-        const [, bucket, path] = match;
-        const { data: signed, error: signErr } = await supabase.storage.from(bucket).createSignedUrl(decodeURIComponent(path), 600);
-        if (signErr || !signed?.signedUrl) {
-            logger.warn(`[Documentos] Falha ao assinar URL (${bucket}/${path}): ${signErr?.message}`);
-            return { url: doc.url_arquivo, assinada: false };
+        const ref = caminhoDeStorage(doc.url_arquivo, { buckets: BUCKETS_DOCUMENTO });
+        if (!ref) throw Object.assign(new Error('Arquivo fora do armazenamento de documentos'), { status: 422 });
+
+        try {
+            const url = await urlAssinada(ref.bucket, ref.path, SEGUNDOS_PADRAO);
+            return { url, assinada: true, expira_em_segundos: SEGUNDOS_PADRAO };
+        } catch (err) {
+            logger.warn(`[Documentos] Falha ao assinar arquivo do documento ${docId}: ${err.message}`);
+            throw Object.assign(new Error('Não foi possível gerar o link do documento. Tente de novo.'), { status: 502 });
         }
-        return { url: signed.signedUrl, assinada: true, expira_em_segundos: 600 };
     }
 
     /** Configuração documental do evento + funções em uso. */

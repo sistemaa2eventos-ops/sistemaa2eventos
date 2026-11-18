@@ -3,6 +3,12 @@ const logger = require('../../services/logger');
 const DeviceFactory = require('./adapters/DeviceFactory');
 const { TIMEOUT_CONFIG } = require('../../config/timeouts');
 
+// Dispositivos que autenticam com usuário/senha no cadastro (leitores de acesso)
+const LEITORES_COM_SENHA = Object.freeze({
+    tipos: ['terminal_facial', 'catraca'],
+    marcas: ['intelbras', 'dahua', 'hikvision']
+});
+
 class DeviceController {
 
     constructor() {
@@ -86,7 +92,13 @@ class DeviceController {
             const fallbackPasswordInput = typeof password === 'string' ? password.trim() : password;
 
             const normalizedUser = normalizedUserInput || fallbackUserInput || process.env.INTELBRAS_DEFAULT_USER || 'admin';
-            const normalizedPassword = normalizedPasswordInput || fallbackPasswordInput || process.env.INTELBRAS_DEFAULT_PASS || 'admin123';
+            // Sem senha padrão no código: vem do formulário ou de INTELBRAS_DEFAULT_PASS (servidor)
+            const normalizedPassword = normalizedPasswordInput || fallbackPasswordInput || process.env.INTELBRAS_DEFAULT_PASS || null;
+            // Só leitor de acesso Intelbras/Dahua/Hikvision exige senha (impressora, câmera etc. não)
+            const ehLeitor = LEITORES_COM_SENHA.tipos.includes(tipo) && LEITORES_COM_SENHA.marcas.includes(String(marca || '').toLowerCase());
+            if (ehLeitor && !normalizedPassword) {
+                return res.status(400).json({ error: 'Senha do leitor não informada. Preencha a senha do dispositivo (ou configure INTELBRAS_DEFAULT_PASS no servidor).' });
+            }
             const normalizedAreaId = area_id || config?.area_id || null;
             const normalizedPort = Number.isInteger(porta) ? porta : (parseInt(porta, 10) || 80);
             let rtsp_url = '';
@@ -102,7 +114,7 @@ class DeviceController {
                 password: normalizedPassword,
                 config: config || {}
             });
-            if (device.getRTSPUrl) {
+            if (device.getRTSPUrl && normalizedPassword) {
                 rtsp_url = device.getRTSPUrl();
             }
 
@@ -160,8 +172,8 @@ class DeviceController {
             require('./leitorCamera.service').sincronizar(data)
                 .catch(err => logger.warn(`[Leitor como câmera] ${err.message}`));
 
-            // Auto-configurar Push
-            if (marca === 'intelbras') {
+            // Auto-configurar Push (precisa da senha do leitor)
+            if (marca === 'intelbras' && normalizedPassword) {
                 try {
                     const deviceInst = DeviceFactory.getDevice({
                         ip_address,
@@ -630,18 +642,6 @@ class DeviceController {
             if (error) throw error;
             if (!data) return res.status(404).json({ error: 'Dispositivo não encontrado ou sem permissão' });
 
-            // "Usar também como câmera": cria, atualiza ou remove a câmera do leitor
-            require('./leitorCamera.service').sincronizar(data)
-                .catch(err => logger.warn(`[Leitor como câmera] ${err.message}`));
-
-            logger.info('Device updated', {
-                device_id: req.params.id,
-                event_id: req.event?.id,
-                user_id: req.user?.id,
-                updated_fields: Object.keys(req.body)
-            });
-
-            const { password_device: _omit, ...safeDevice } = data;
             // Atualizar rtsp_url se o dispositivo tiver senha configurada e mudaram parâmetros de vídeo/rede
             if (data.ip_address && data.password_device) {
                 try {
@@ -656,6 +656,18 @@ class DeviceController {
                 }
             }
 
+            // "Usar também como câmera": cria, atualiza ou remove a câmera do leitor
+            require('./leitorCamera.service').sincronizar(data)
+                .catch(err => logger.warn(`[Leitor como câmera] ${err.message}`));
+
+            logger.info('Device updated', {
+                device_id: req.params.id,
+                event_id: req.event?.id,
+                user_id: req.user?.id,
+                updated_fields: Object.keys(req.body)
+            });
+
+            const { password_device: _omit, ...safeDevice } = data;
             res.json({ success: true, data: { ...safeDevice, has_password: !!_omit } });
         } catch (error) {
             logger.error(

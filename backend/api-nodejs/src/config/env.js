@@ -15,14 +15,16 @@ const REQUIRED_ENV_VARS = [
 // Lista de variáveis OPCIONAIS (com fallback)
 const OPTIONAL_ENV_VARS = {
   'PORT': '3001',
-  'JWT_SECRET': 'dev-secret-change-in-production',
   'LOG_LEVEL': 'info',
   'SENTRY_DSN': null,
   'SMTP_HOST': 'smtp.gmail.com',
   'SMTP_PORT': '587',
-  'INTELBRAS_DEFAULT_USER': 'admin',
-  'INTELBRAS_DEFAULT_PASS': 'admin123'
+  'INTELBRAS_DEFAULT_USER': 'admin'
+  // INTELBRAS_DEFAULT_PASS não tem valor padrão: sem ela, o leitor precisa ter senha cadastrada
 };
+
+// Valor de desenvolvimento do JWT_SECRET: recusado em produção (lá JWT_SECRET é obrigatório).
+const JWT_SECRET_DEV = 'dev-secret-change-in-production';
 
 /**
  * Valida e retorna configuração de environment
@@ -58,6 +60,19 @@ function validateEnvironment() {
     missing.push('SUPABASE_URL (não é uma URL Supabase válida)');
   }
 
+  // JWT_SECRET obrigatório em produção (e nunca o valor de desenvolvimento)
+  if (process.env.NODE_ENV === 'production') {
+    if (!process.env.JWT_SECRET || process.env.JWT_SECRET === JWT_SECRET_DEV) {
+      const msg = '❌ ERRO CRÍTICO: JWT_SECRET ausente ou com o valor de desenvolvimento. '
+        + 'Defina um segredo forte e aleatório em JWT_SECRET no .env antes de iniciar em produção.';
+      logger.error(msg);
+      console.error('\n' + '='.repeat(80));
+      console.error(msg);
+      console.error('='.repeat(80) + '\n');
+      process.exit(1);
+    }
+  }
+
   // Validar API_URL em produção
   if (process.env.NODE_ENV === 'production' && process.env.API_URL) {
     if (!process.env.API_URL.startsWith('https://')) {
@@ -84,7 +99,6 @@ function validateEnvironment() {
     NODE_ENV: process.env.NODE_ENV,
     API_URL: process.env.API_URL,
     PORT: parseInt(process.env.PORT || OPTIONAL_ENV_VARS.PORT),
-    JWT_SECRET: process.env.JWT_SECRET || OPTIONAL_ENV_VARS.JWT_SECRET,
     LOG_LEVEL: process.env.LOG_LEVEL || OPTIONAL_ENV_VARS.LOG_LEVEL,
     SENTRY_DSN: process.env.SENTRY_DSN || null,
     SMTP_HOST: process.env.SMTP_HOST || OPTIONAL_ENV_VARS.SMTP_HOST,
@@ -92,8 +106,8 @@ function validateEnvironment() {
     SMTP_USER: process.env.SMTP_USER,
     SMTP_PASS: process.env.SMTP_PASS,
     SMTP_EMAIL: process.env.SMTP_EMAIL,
-    INTELBRAS_DEFAULT_USER: process.env.INTELBRAS_DEFAULT_USER || OPTIONAL_ENV_VARS.INTELBRAS_DEFAULT_USER,
-    INTELBRAS_DEFAULT_PASS: process.env.INTELBRAS_DEFAULT_PASS || OPTIONAL_ENV_VARS.INTELBRAS_DEFAULT_PASS
+    INTELBRAS_DEFAULT_USER: process.env.INTELBRAS_DEFAULT_USER || OPTIONAL_ENV_VARS.INTELBRAS_DEFAULT_USER
+    // JWT_SECRET e INTELBRAS_DEFAULT_PASS não voltam aqui: ninguém lê do ENV (os módulos usam process.env)
   };
 }
 

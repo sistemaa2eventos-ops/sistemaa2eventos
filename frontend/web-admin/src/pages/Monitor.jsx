@@ -47,6 +47,7 @@ import PageHeader from '../components/common/PageHeader';
 import NeonButton from '../components/common/NeonButton';
 import GlassCard from '../components/common/GlassCard';
 import PessoaFoto from '../components/common/PessoaFoto';
+import useFotoPessoa from '../hooks/useFotoPessoa';
 import { useMonitor } from '../hooks/useMonitor';
 import { useAuth } from '../contexts/AuthContext';
 import GerenciarCamerasModal from '../components/cameras/GerenciarCamerasModal';
@@ -374,6 +375,9 @@ const Monitor = () => {
     // Depende só de cpf/foto: com o objeto inteiro, cada atualização da foto dispararia de novo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeAlert?.pessoa?.cpf, activeAlert?.pessoa?.foto_url]);
+
+  // Foto do alvo na ocorrência: URL assinada da pessoa (uma foto só, então sem carregamento preguiçoso)
+  const { url: fotoAlvoUrl } = useFotoPessoa(activeAlert?.pessoa?.id, activeAlert?.pessoa?.foto_url, { preguicoso: false });
 
   // Aba Saúde: carrega ao entrar e atualiza a cada 15 s enquanto estiver aberta
   const [saudeAtualizadaEm, setSaudeAtualizadaEm] = useState(null);
@@ -764,9 +768,9 @@ const Monitor = () => {
                   position: 'relative',
                   boxShadow: '0 4px 20px rgba(0,0,0,0.8), 0 0 15px rgba(0, 212, 255, 0.15)'
                 }}>
-                  {activeAlert?.pessoa?.foto_url ? (
+                  {fotoAlvoUrl ? (
                     <img
-                      src={activeAlert.pessoa.foto_url}
+                      src={fotoAlvoUrl}
                       alt="Cadastro Oficial"
                       style={{
                         width: '100%',
@@ -780,6 +784,7 @@ const Monitor = () => {
                   ) : (
                     <PessoaFoto
                       src={activeAlert?.pessoa?.foto_url}
+                      pessoaId={activeAlert?.pessoa?.id}
                       nome={activeAlert?.target_name || activeAlert?.pessoa?.nome}
                       width={120}
                       borderRadius="12px"
@@ -1136,6 +1141,7 @@ const Monitor = () => {
                  <Stack direction="row" spacing={2} mt={2} alignItems="center">
                     <PessoaFoto
                         src={activeAreaAlert?.pessoa_foto}
+                        pessoaId={activeAreaAlert?.pessoa_id}
                         nome={activeAreaAlert?.pessoa_nome}
                         width={64}
                         borderRadius="10px"
@@ -1304,6 +1310,7 @@ const Monitor = () => {
                                 <LogItem key={log.id || idx} tipo={isNegado ? 'negado' : log.tipo} monitorado={isWatchlist}>
                                     <PessoaFoto
                                         src={log.pessoas?.foto_url}
+                                        pessoaId={log.pessoa_id || log.pessoas?.id}
                                         nome={log.pessoas?.nome_completo || log.pessoas?.nome || log.pessoa_nome}
                                         width={44}
                                         borderRadius="8px"

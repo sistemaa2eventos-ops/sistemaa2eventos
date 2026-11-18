@@ -2,6 +2,7 @@ const axios = require('axios');
 const { supabase } = require('../../config/supabase');
 const DeviceFactory = require('./adapters/DeviceFactory');
 const logger = require('../../services/logger');
+const { ehDoNossoStorage, baixarArquivo, BUCKETS_FOTO } = require('../../services/storageSeguro');
 
 class TerminalSyncService {
     /**
@@ -159,9 +160,15 @@ class TerminalSyncService {
                 return fotoUrl;
             }
 
-            // 2. Se for URL completa (http/https), baixar usando fetch (mais robusto que axios para arrays de imagens)
+            // 2. URL do storage do projeto: baixa com service role (o bucket pode ser privado), só bucket de foto
+            if (ehDoNossoStorage(fotoUrl)) {
+                const buffer = await baixarArquivo(fotoUrl, { buckets: BUCKETS_FOTO });
+                return `data:image/jpeg;base64,${buffer.toString('base64')}`;
+            }
+
+            // 3. Outra URL completa (fora do storage do sistema): download comum
             if (fotoUrl.startsWith('http')) {
-                logger.info(`📥 Baixando foto externa: ${fotoUrl}`);
+                logger.info(`📥 Baixando foto externa`);
                 const response = await fetch(fotoUrl);
                 if (!response.ok) throw new Error(`Falha download: ${response.statusText}`);
 
@@ -170,19 +177,8 @@ class TerminalSyncService {
                 return `data:image/jpeg;base64,${buffer.toString('base64')}`;
             }
 
-            // 3. Se for apenas um path/filename, baixar do bucket 'avatars' (Padrão Supabase)
-            logger.info(`📥 Baixando do Storage Supabase: ${fotoUrl}`);
-            const { data, error } = await supabase.storage
-                .from('avatars')
-                .download(fotoUrl);
-
-            if (error) {
-                logger.error(`❌ Erro Storage (${fotoUrl}):`, error.message);
-                return null;
-            }
-
-            const arrayBuffer = await data.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
+            // 4. Caminho puro (sem bucket): padrão do bucket 'avatars'
+            const buffer = await baixarArquivo(fotoUrl, { bucketPadrao: 'avatars', buckets: BUCKETS_FOTO });
             return `data:image/jpeg;base64,${buffer.toString('base64')}`;
 
         } catch (error) {

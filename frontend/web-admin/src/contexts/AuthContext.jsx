@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { authService } from '../services/auth';
 import api from '../services/api';
 import { guardarSessao, limparSessao } from '../services/sessao';
+import { limparCacheFotos } from '../services/fotosPessoa';
 
 const log = import.meta.env.DEV ? console.log : () => {};
 
@@ -68,6 +69,7 @@ const clearAuthStorage = () => {
     sessionStorage.removeItem(key);
   });
   limparSessao();
+  limparCacheFotos(); // URLs de foto do usuário anterior não ficam para o próximo
 };
 
 const readStoredUser = () => {
@@ -235,6 +237,7 @@ export const AuthProvider = ({ children }) => {
         secondary.removeItem('token');
         secondary.removeItem('user');
         limparSessao();
+        limparCacheFotos(); // troca de usuário: não reaproveita fotos da sessão anterior
         if (payloadToken) primary.setItem('token', payloadToken);
         // refresh_token + validade: o painel renova a sessão sozinho (services/sessao.js)
         if (response.session) guardarSessao(response.session, primary);
