@@ -75,23 +75,23 @@ const Checkin = () => {
   const [ultimoCodigoLido, setUltimoCodigoLido] = useState('');
   const [lendoCamera, setLendoCamera] = useState(false);
 
-  // O campo único só LOCALIZA a pessoa; o check-in é sempre feito na janela de conferência.
-  // Código (QR/barras) ou CPF: abre a conferência da pessoa encontrada.
-  const localizarPorCodigo = (codigoBruto) => {
+  // Código (QR Code, código de barras, câmera, ou CPF/número digitado + Enter/OK) neste campo só LOCALIZA a pessoa
+  // e abre a janela de conferência. A entrada é registrada dentro da janela, pela leitura da pulseira.
+  const processarCheckinCodigo = (codigoBruto) => {
     const cod = String(codigoBruto || '').trim();
     if (!cod) return;
     setBarcodeValue(''); // campo vazio: o próximo bipe não gruda no anterior
-    setUltimoCodigoLido(cod); // o código lido aparece só no aviso "Código lido"
+    setUltimoCodigoLido(cod); // o código lido aparece no badge "Código lido"
     handleSearch('');
     abrirConferenciaPorCodigo(cod);
   };
 
-  // Enter/OK no campo. Texto com letras digitado é nome: nunca faz check-in nem abre por código.
-  // Só abre a conferência se a busca deste mesmo texto já voltou com uma pessoa só; senão o operador escolhe na lista.
+  // Enter/OK no campo. Texto com letras digitado é nome: só mostra a lista para escolher a pessoa.
+  // Código ou CPF digitado + Enter: localiza e abre a janela de conferência.
   const confirmarCampo = (val, origem) => {
     const texto = String(val || '').trim();
     if (!texto) return;
-    if (origem !== 'barcode' && /[A-Za-zÀ-ÿ]/.test(texto)) {
+    if (origem !== 'barcode' && origem !== 'camera' && /[A-Za-zÀ-ÿ]/.test(texto)) {
       const buscaDesteTexto = !searchLoading && searchQuery.trim() === texto;
       if (buscaDesteTexto && searchResults.length === 1) {
         setSelectedPessoa(searchResults[0]);
@@ -101,7 +101,7 @@ const Checkin = () => {
       setBarcodeValue('');
       return;
     }
-    localizarPorCodigo(texto);
+    processarCheckinCodigo(texto, origem);
   };
 
   // Controle de Impressão de Etiqueta / Cartão PVC no Check-in
@@ -189,7 +189,7 @@ const Checkin = () => {
                     accentColor="#00FF88"
                     label="Leitor, CPF ou nome"
                     placeholder="Bipe QR/barras, digite o CPF ou o nome..."
-                    helperText="Código ou CPF + Enter abre a conferência • Nome: escolha na lista"
+                    helperText="Bipe ou câmera: check-in automático • Digitação: Enter ou OK • Nome: escolha na lista"
                     pulseiraTypes={pulseiraTypes}
                     ultimoCodigoLido={ultimoCodigoLido}
                     onConfirm={confirmarCampo}
@@ -332,10 +332,10 @@ const Checkin = () => {
           open={lendoCamera}
           onClose={() => setLendoCamera(false)}
           titulo="Entrada pela câmera"
-          instrucao="Aponte a câmera para o QR Code ou código de barras do crachá ou da pulseira. A conferência da pessoa abre em seguida."
+          instrucao="Aponte a câmera para o QR Code ou código de barras da pulseira ou do crachá — o check-in será concluído automaticamente."
           onLeitura={(cod) => {
               setLendoCamera(false);
-              localizarPorCodigo(cod);
+              processarCheckinCodigo(cod, 'camera');
           }}
       />
 

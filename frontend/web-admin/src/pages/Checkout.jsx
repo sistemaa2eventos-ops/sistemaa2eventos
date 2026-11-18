@@ -200,9 +200,9 @@ const Checkout = () => {
                         handleSearch('');
                     }}
                     accentColor={COR}
-                    label="Busca por nome, CPF ou leitura QR / Pulseira"
+                    label="Leitor, pulseira, CPF ou nome"
                     placeholder="Bipe QR/barras, digite nº da pulseira, CPF ou nome..."
-                    helperText="Código, nº da pulseira ou CPF + Enter dá a saída • Nome: escolha na lista"
+                    helperText="Bipe ou câmera: saída automática • Digitação: Enter ou OK • Nome: escolha na lista"
                     pulseiraTypes={pulseiraTypes}
                     ultimoCodigoLido={ultimoCodigoLido}
                     onConfirm={confirmarCampo}

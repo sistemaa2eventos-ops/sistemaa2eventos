@@ -8,7 +8,8 @@ import {
     Keyboard as KeyboardIcon,
     WarningAmber as WarningIcon,
     FlashOn as FlashIcon,
-    Close as ClearIcon
+    Close as ClearIcon,
+    CameraAlt as CameraAltIcon
 } from '@mui/icons-material';
 
 /**
@@ -21,9 +22,9 @@ import {
  * 4. Busca por Nome no mesmo campo -> Dispara busca em tempo real conforme digita
  */
 
-// Confirmação automática (leitor sem Enter) só a partir destes tamanhos: digitação rápida não confirma pela metade.
-// Só dígitos: 2 (pulseiras de numeração curta). Com letras ou outros sinais: 4.
-const TAMANHO_MINIMO_AUTOMATICO_DIGITOS = 2;
+// Confirmação automática (leitor sem Enter) só a partir de 4 caracteres: digitação rápida não confirma pela metade.
+// Pulseira com menos de 4 dígitos precisa de Enter ou do botão.
+const TAMANHO_MINIMO_AUTOMATICO_DIGITOS = 4;
 const TAMANHO_MINIMO_AUTOMATICO = 4;
 // Enter do mesmo valor logo depois da confirmação automática é o Enter do próprio leitor: ignora
 const JANELA_ENTER_REPETIDO_MS = 1500;
@@ -45,6 +46,7 @@ export const UniversalPulseiraInput = ({
     accentColor = '#00D4FF',
     // Quando informado, o ícone dentro da caixa abre a câmera do aparelho
     onAbrirCamera,
+    mostrarBotaoCamera = true,
     ultimoCodigoLido = ''
 }) => {
     const inputRef = useRef(null);
@@ -284,7 +286,9 @@ export const UniversalPulseiraInput = ({
                 </Stack>
             </Box>
 
-            <TextField
+            <Box sx={{ display: 'flex', gap: { xs: 1, sm: 1.5 }, alignItems: 'stretch', width: '100%' }}>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <TextField
                 inputRef={inputRef}
                 fullWidth
                 value={value}
@@ -308,7 +312,7 @@ export const UniversalPulseiraInput = ({
                                     color: origemLeitura === 'barcode' ? '#00FF88' : accentColor
                                 }}
                             >
-                                {onAbrirCamera ? (
+                                {onAbrirCamera && !mostrarBotaoCamera ? (
                                     <Tooltip title="Ler QR Code ou Código de Barras pela câmera">
                                         <span>
                                             <IconButton
@@ -443,6 +447,37 @@ export const UniversalPulseiraInput = ({
                     }
                 }}
             />
+                </Box>
+
+                {onAbrirCamera && mostrarBotaoCamera && (
+                    <Button
+                        variant="contained"
+                        onClick={onAbrirCamera}
+                        disabled={disabled || loading}
+                        startIcon={<CameraAltIcon />}
+                        sx={{
+                            height: { xs: 48, sm: 58 },
+                            px: { xs: 1.75, sm: 2.75 },
+                            borderRadius: 1.5,
+                            bgcolor: accentColor,
+                            color: '#000000',
+                            fontWeight: 700,
+                            fontSize: { xs: '0.8125rem', sm: '0.9375rem' },
+                            fontFamily: '"Space Grotesk", sans-serif',
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0,
+                            boxShadow: `0 0 14px ${accentColor}33`,
+                            '&:hover': {
+                                bgcolor: accentColor,
+                                filter: 'brightness(1.15)',
+                                boxShadow: `0 0 20px ${accentColor}66`
+                            }
+                        }}
+                    >
+                        Ler pela câmera
+                    </Button>
+                )}
+            </Box>
 
             {/* Sub-informações e instrução de confirmação */}
             <Stack direction="row" justifyContent="space-between" alignItems="center" mt={0.85} px={0.5}>

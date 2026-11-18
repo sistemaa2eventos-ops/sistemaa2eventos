@@ -380,9 +380,9 @@ const Fiscalizacao = () => {
                     loading={loading}
                     autoFocus={true}
                     ultimoCodigoLido={ultimoCodigoLido}
-                    label="Busca por nome, CPF ou leitura QR / Pulseira"
+                    label="Leitor, pulseira, CPF ou nome"
                     placeholder="Bipe QR/barras, digite nº da pulseira, CPF ou nome..."
-                    helperText="Código, nº da pulseira ou CPF + Enter fiscaliza • Nome: escolha na lista"
+                    helperText="Bipe ou câmera: fiscalização automática • Digitação: Enter ou OK • Nome: escolha na lista"
                     accentColor="#00D4FF"
                     onAbrirCamera={() => setCameraActive(true)}
                 />

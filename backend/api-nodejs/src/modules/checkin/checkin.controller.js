@@ -363,7 +363,7 @@ class AccessController {
             return ApiResponse.success(res, result);
         } catch (error) {
             logger.error(
-                { err: error, qr_code: req.body?.qrCode, event_id: req.event?.id },
+                { err: error, tem_qr_code: !!req.body?.qrCode, event_id: req.event?.id },
                 'Error in QR code checkin'
             );
             return ApiResponse.error(res, 'Erro ao processar check-in QR Code');

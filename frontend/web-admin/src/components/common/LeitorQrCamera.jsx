@@ -6,14 +6,15 @@ import { Cameraswitch as TrocarIcon } from '@mui/icons-material';
 import TituloModal from './TituloModal';
 import useFecharComVoltar from '../../hooks/useFecharComVoltar';
 
-// Só os formatos usados em pulseiras e crachás: menos formatos = menos leituras falsas
+// Formatos suportados para leitura de pulseiras, crachás e ingressos (QR Code e Códigos de Barras)
+// Só QR e os códigos de barras usados nas pulseiras. EAN/UPC/ITF geram leituras falsas em texturas.
 const FORMATOS_SUPORTADOS = [
     Html5QrcodeSupportedFormats?.QR_CODE,
     Html5QrcodeSupportedFormats?.CODE_128,
     Html5QrcodeSupportedFormats?.CODE_39
 ].filter((f) => f !== undefined);
 
-// Leitura mais curta que isso é tratada como ruído (código de barras lido pela metade)
+// Leitura mais curta que isso é tratada como ruído (código lido pela metade)
 const TAMANHO_MINIMO_CODIGO = 4;
 
 // Mensagem que a pessoa entende para cada falha do getUserMedia
