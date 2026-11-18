@@ -825,6 +825,10 @@ class Leitor:
                     cap = cv2.VideoCapture(idx, backend)
                     if cap is not None and cap.isOpened():
                         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                        # MJPG antes da resolução: sem ele o USB transmite sem compressão e o fps cai (~15 em 720p).
+                        # Com MJPG a câmera chega a 30 fps; o driver baixa o fps sozinho só quando há pouca luz.
+                        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+                        cap.set(cv2.CAP_PROP_FPS, 30)
                         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
                         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
                         ret, frame = cap.read()

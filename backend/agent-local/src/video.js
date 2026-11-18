@@ -156,7 +156,7 @@ function obterEncoderH264() {
             encoderH264Detectado = 'h264_amf';
             return 'h264_amf';
         }
-    } catch {}
+    } catch { }
     encoderH264Detectado = 'libx264';
     return 'libx264';
 }
@@ -166,11 +166,13 @@ const aspas = (t) => `"${String(t).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"
 
 function escreverConfig() {
     const encoder = obterEncoderH264();
+    // Quadro-chave a cada 1 s (-g 30) e sem quadros B (-bf 0): o player do navegador só avança entre
+    // quadros-chave. Com o padrão (~250 quadros = 8 s) a imagem fica parada e depois salta.
     const h264Args = encoder === 'h264_nvenc'
-        ? '-c:v h264_nvenc -preset p1 -tune ull -pix_fmt yuv420p -b:v 1800k -maxrate 2500k -bufsize 3600k'
+        ? '-c:v h264_nvenc -preset p1 -tune ull -pix_fmt yuv420p -b:v 1800k -maxrate 2500k -bufsize 3600k -g 30 -bf 0'
         : (encoder === 'h264_amf'
-            ? '-c:v h264_amf -pix_fmt yuv420p -b:v 1800k'
-            : '-c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -crf 26 -maxrate 1200k -bufsize 2400k');
+            ? '-c:v h264_amf -pix_fmt yuv420p -b:v 1800k -g 30 -bf 0'
+            : '-c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -crf 26 -maxrate 1200k -bufsize 2400k -g 30 -keyint_min 30 -bf 0');
 
     const linhas = [
         'api:',
@@ -333,7 +335,12 @@ async function configurarCameras(cameras = []) {
             sub = nomeStream(c.id, true);
             streams.set(sub, subUrl);
         }
-        camMap.set(String(c.id), { principal, sub });
+        // Modo snapshot (MJPEG) / reserva precisa de JPEG, mas as câmeras IP e a webcam enviam H.264.
+        // O go2rtc precisa de um stream com ffmpeg:#video=mjpeg para gerar JPEG sob demanda quando solicitado.
+        let jpeg = `${principal}_jpeg`;
+        const fonteJpeg = sub || principal;
+        streams.set(jpeg, `ffmpeg:${fonteJpeg}#video=mjpeg`);
+        camMap.set(String(c.id), { principal, sub, jpeg });
     }
     estado.cameras = camMap;
     const assinatura = crypto.createHash('sha256').update(JSON.stringify([...streams])).digest('hex');
@@ -389,7 +396,8 @@ async function abrirMp4(cameraId, qualidade, userAgent, signal) {
 
 /** MJPEG (reserva para navegador sem MP4 ou câmera em H.265): exige ffmpeg */
 async function abrirMjpeg(cameraId, qualidade, signal) {
-    const nome = streamDa(cameraId, qualidade);
+    // Câmera com fonte H.264 (webcam) tem um stream JPEG próprio; as demais usam o de sempre
+    const nome = (estado.cameras.get(String(cameraId)) || {}).jpeg || streamDa(cameraId, qualidade);
     if (!nome) throw new Error('Câmera não está no retransmissor local');
     if (!estado.ffmpeg) throw new Error('ffmpeg ausente: sem MJPEG local');
     await esperarPronto();

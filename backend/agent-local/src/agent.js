@@ -663,6 +663,27 @@ setInterval(() => { sincronizarRostos(); }, 60000);
 setTimeout(() => { sincronizarRostos(); }, 8000);
 
 /**
+ * Saúde do vídeo para o painel (aba Saúde do sistema): a cada 10 s o motor informa fps, reconexões,
+ * resolução e análise de cada câmera. A VPS guarda só o último envio; sem envio há 30 s, o painel avisa.
+ */
+async function enviarSaudeVideo() {
+    if (!socket.connected) return;
+    const st = await fetchIa('/api/engine/status', { signal: AbortSignal.timeout(3000) }).then(r => r.json()).catch(() => null);
+    const cameras = (st?.cameras || []).slice(0, 32).map(c => ({
+        nome: String(c.nome || c.camera || '').slice(0, 80),
+        camera_id: c.camera_id || null,
+        fps: Number(c.video_fps) || 0,
+        conectada: !!c.conectada,
+        reconexoes: Number(c.reconexoes) || 0,
+        resolucao: String(c.resolucao?.principal || ''),
+        ia_ms: Number(c.ia_ms) || 0,
+        rostos: Number(c.rostos) || 0,
+    }));
+    socket.emit('agent:saude', { motor: !!st, retransmissor: video.disponivel(), cameras, ts: Date.now() });
+}
+setInterval(() => { enviarSaudeVideo().catch(() => {}); }, 10000).unref?.();
+
+/**
  * Reconhecimento no SERVIDOR DE IA CENTRAL (evento em "auto"): o motor deste PC acha e acompanha os
  * rostos e deixa numa fila só o rosto alinhado (~4 KB). Este laço leva a fila à nuvem (canal de
  * vídeo), que repassa a um servidor de IA, e devolve as respostas ao motor. Sem servidor, o motor

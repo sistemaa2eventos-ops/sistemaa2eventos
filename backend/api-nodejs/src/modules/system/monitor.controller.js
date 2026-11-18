@@ -365,6 +365,7 @@ class MonitorController {
                     agentes_locais: agentService.getConnectedAgents().map(a => a.nome)
                 },
                 fila_leitores: filaLeitores,
+                saude_video: require('../../services/saudeVideo').resumo(),
                 sync: {
                     lastSync: syncStats.lastSync,
                     pending: syncStats.pendingItems,

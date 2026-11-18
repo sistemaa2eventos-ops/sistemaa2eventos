@@ -108,6 +108,11 @@ class AgentService {
                 require('../modules/system/vigilancia.service').configurarAgente(agentId, socket.agentInfo.evento_id);
             });
 
+            // Saúde do vídeo (fps, reconexões e análise por câmera), a cada 10 s do agente
+            socket.on('agent:saude', (dados) => {
+                try { require('./saudeVideo').registrar(agentId, nome, dados || {}); } catch (_) { /* dado ruim não derruba o canal */ }
+            });
+
             // Pessoa reconhecida pela vigilância (motor local, sem ninguém assistindo)
             socket.on('agent:deteccao', (deteccao, ack) => {
                 if (typeof ack === 'function') ack();

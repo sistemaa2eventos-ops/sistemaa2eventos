@@ -32,6 +32,13 @@ const AbaSaude = ({ sysStatus, sysPerf, sysLogs = [], sysError, terminais = [], 
     const fila = sysStatus?.fila_leitores || { pendente: 0, erro: 0 };
     const agentes = sysStatus?.tempo_real?.agentes_locais || [];
     const memoriaPct = sysPerf?.os?.uso_memoria_pct;
+    const saudeVideo = sysStatus?.saude_video || [];
+    // Câmera sem sinal, ou abaixo de 10 fps (vídeo travado), aparece em destaque
+    const estadoCamera = (c) => {
+        if (!c.conectada) return { rotulo: 'sem sinal', cor: '#FF3366' };
+        if (c.fps < 10) return { rotulo: 'lento', cor: '#FFB800' };
+        return { rotulo: 'ok', cor: '#00FF88' };
+    };
 
     const logsFiltrados = useMemo(() => {
         const lista = [...sysLogs].reverse();
@@ -80,6 +87,38 @@ const AbaSaude = ({ sysStatus, sysPerf, sysLogs = [], sysError, terminais = [], 
                         <Linha rotulo="Agentes locais conectados" valor={agentes.length} />
                         {agentes.map(a => (
                             <Typography key={a} variant="caption" sx={{ color: '#00FF88', display: 'block' }}>● {a}</Typography>
+                        ))}
+                    </GlassCard>
+                </Grid>
+
+                <Grid item xs={12}>
+                    <GlassCard sx={{ p: 2.5 }}>
+                        <Titulo>Saúde do vídeo (PC do evento)</Titulo>
+                        {saudeVideo.length === 0 && (
+                            <Typography variant="body2" sx={{ color: '#FFB800' }}>Nenhum PC do evento enviando dados de vídeo.</Typography>
+                        )}
+                        {saudeVideo.map(a => (
+                            <Box key={a.agente_id} sx={{ mb: 2 }}>
+                                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+                                    <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 700 }}>{a.agente}</Typography>
+                                    <Chip size="small" label={a.ok ? `ao vivo · há ${a.idade_s}s` : `sem dados há ${a.idade_s}s`}
+                                        sx={{ fontWeight: 700, bgcolor: a.ok ? '#00FF8822' : '#FF336622', color: a.ok ? '#00FF88' : '#FF3366' }} />
+                                </Stack>
+                                <Linha rotulo="Motor de IA" valor={a.motor ? 'ligado' : 'desligado'} cor={a.motor ? undefined : '#FF3366'} />
+                                <Linha rotulo="Retransmissor de vídeo" valor={a.retransmissor ? 'ativo' : 'indisponível'} cor={a.retransmissor ? undefined : '#FFB800'} />
+                                {a.cameras.map(c => {
+                                    const est = estadoCamera(c);
+                                    return (
+                                        <Stack key={c.camera_id || c.nome} direction="row" justifyContent="space-between" alignItems="center" sx={{ py: 0.5 }}>
+                                            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>
+                                                {c.nome} · {c.resolucao || '—'} · {c.fps.toFixed(1)} fps · {c.reconexoes} reconexões · IA {c.ia_ms.toFixed(0)} ms
+                                            </Typography>
+                                            <Chip size="small" label={est.rotulo}
+                                                sx={{ fontWeight: 700, bgcolor: `${est.cor}22`, color: est.cor }} />
+                                        </Stack>
+                                    );
+                                })}
+                            </Box>
                         ))}
                     </GlassCard>
                 </Grid>

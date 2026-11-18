@@ -75,7 +75,6 @@ const CameraVideo = ({
     const [reconexao, setReconexao] = useState(0);
     const [quadro, setQuadro] = useState(() => Date.now());
     const [acesso, setAcesso] = useState(null);      // { ingresso, mp4, ia, em }
-    const [mp4Falhou, setMp4Falhou] = useState(false);
     const [caixas, setCaixas] = useState([]);
     const [dimensoes, setDimensoes] = useState(null); // { w, h } da imagem/vídeo
     const [, forcarDesenho] = useState(0);
@@ -91,13 +90,6 @@ const CameraVideo = ({
             .catch(() => { if (!cancelado) { setFalhas(n => n + 1); setErro(true); } });
         return () => { cancelado = true; };
     }, [ativo, camId, reconexao]);
-    useEffect(() => { setMp4Falhou(false); }, [camId]);
-    // Falha passageira (agente reconectou) não deixa a câmera presa no MJPEG, que gasta muito mais internet
-    useEffect(() => {
-        if (!mp4Falhou) return undefined;
-        const t = setTimeout(() => setMp4Falhou(false), 60000);
-        return () => clearTimeout(t);
-    }, [mp4Falhou]);
 
     // Snapshot: atualiza só enquanto aparece na tela (renovando o ingresso antes de vencer)
     useEffect(() => {
@@ -121,7 +113,8 @@ const CameraVideo = ({
         return () => clearTimeout(timer);
     }, [erro, ativo, falhas]);
 
-    const usarMp4 = modo === 'stream' && !!acesso?.mp4 && !mp4Falhou;
+    // Ao vivo só em MP4 (H.264, ~2 Mbit/s). O MJPEG custava ~7 Mbit/s por câmera e não é mais usado no ao vivo.
+    const usarMp4 = modo === 'stream' && !!acesso?.mp4;
     // Com vídeo do PC do evento, a IA é desenhada aqui; sem ele (agente antigo), vem queimada no MJPEG do motor
     const caixasNoNavegador = !!acesso?.ia && !!acesso?.mp4;
     const anotarNoServidor = !!acesso?.ia && !acesso?.mp4;
@@ -182,7 +175,7 @@ const CameraVideo = ({
     }, []);
 
     const falhou = () => {
-        if (usarMp4) { setMp4Falhou(true); return; } // tenta MJPEG antes de dar como offline
+        // Sem recuo para MJPEG: tenta de novo com as esperas de ESPERAS_MS
         setFalhas(n => n + 1);
         setErro(true);
     };
