@@ -1606,6 +1606,32 @@ def track_live_endpoint(stream_url: str = DEFAULT_RTSP_URL, threshold: float = 0
     }
 
 
+class LoteRequest(BaseModel):
+    foco: List[str] = []   # camera_id em tela grande
+    mini: List[str] = []   # camera_id em miniatura
+
+
+@app.post("/api/track/lote")
+def track_lote_endpoint(req: LoteRequest):
+    """Caixas da IA de várias câmeras numa chamada (Central de Monitoramento: 1 consulta por ciclo em vez
+    de 1 por câmera). Marca cada câmera como assistida, como /api/track/live. Câmera fora da lista do
+    motor (sem IA) não aparece na resposta."""
+    por_id = {c.camera_id: c for c in list(cameras.values()) if c.camera_id}
+    saida: Dict[str, Any] = {}
+    pedidos = [(i, "foco") for i in req.foco[:64]] + [(i, "mini") for i in req.mini[:64] if i not in req.foco]
+    for cid, qualidade in pedidos:
+        cam = por_id.get(cid)
+        if cam is None:
+            continue
+        lt = leitor_para(cam.url, qualidade)
+        saida[cid] = {
+            "conectada": lt.conectado(),
+            "ia_ms": round(cam.ia_ms, 1),
+            "results": [{k: v for k, v in r.items() if k != "face_crop_base64"} for r in cam.resultados_validos()],
+        }
+    return {"success": True, "timestamp": time.time(), "cameras": saida}
+
+
 @app.get("/api/camera/stream")
 async def get_camera_stream(request: Request, stream_url: str = DEFAULT_RTSP_URL, annotate: bool = True,
                             qualidade: str = "foco", max_width: int = 0, quality: int = 72, camera_id: str = ""):

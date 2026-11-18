@@ -4,7 +4,8 @@
   "description": "Agente local: conecta os leitores faciais da rede do evento ao servidor A2 Eventos na nuvem",
   "main": "src/agent.js",
   "scripts": {
-    "start": "node src/agent.js"
+    "start": "node src/agent.js",
+    "test": "node --test test/*.test.js"
   },
   "engines": {
     "node": ">=18"

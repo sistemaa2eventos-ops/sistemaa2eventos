@@ -14,6 +14,7 @@
 const http = require('http');
 const crypto = require('crypto');
 const video = require('./video');
+const central = require('./central');
 
 const PORTA = Number(process.env.VISOR_LOCAL_PORTA || 8766);
 const ORIGENS = new Set(['https://painel.nzt.app.br', 'http://localhost:5173', 'http://localhost:3000']);
@@ -70,6 +71,9 @@ const caixaParaPainel = (f) => ({
  */
 function iniciar(log, opcoes = {}) {
     const { fetchIa } = opcoes;
+    // CENTRAL_REDE=1: a Central também atende outros computadores da rede (com a chave de acesso)
+    const naRede = /^(1|true|sim)$/i.test(String(process.env.CENTRAL_REDE || ''));
+    central.iniciar({ log, fetchIa, porta: PORTA, soLocal: !naRede });
     const server = http.createServer(async (req, res) => {
         const url = new URL(req.url, 'http://127.0.0.1');
         const origem = req.headers.origin;
@@ -144,6 +148,15 @@ function iniciar(log, opcoes = {}) {
             }
         }
 
+        // Central de Monitoramento local (página própria, mesma origem do vídeo)
+        try {
+            if (await central.tratar(req, res, url)) return;
+        } catch (err) {
+            log('warn', `central: ${err.message}`);
+            if (!res.headersSent) { res.statusCode = 500; return res.end(); }
+            return;
+        }
+
         const m = url.pathname.match(/^\/camera\/([^/]+)\/mp4$/);
         if (req.method === 'GET' && m) {
             if (!sessaoValida(url.searchParams.get('t'))) { res.statusCode = 401; return res.end(); }
@@ -176,7 +189,8 @@ function iniciar(log, opcoes = {}) {
     });
 
     server.on('error', (err) => log('warn', `visor local: ${err.message}`));
-    server.listen(PORTA, '127.0.0.1', () => log('info', `Visor local pronto em 127.0.0.1:${PORTA} (vídeo sem passar pela VPS)`));
+    const host = naRede ? '0.0.0.0' : '127.0.0.1';
+    server.listen(PORTA, host, () => log('info', `Central de Monitoramento: http://localhost:${PORTA}/central/ (vídeo direto, sem passar pela VPS${naRede ? '; aberta para a rede local' : ''})`));
     return server;
 }
 

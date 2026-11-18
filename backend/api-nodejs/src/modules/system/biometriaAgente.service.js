@@ -77,6 +77,33 @@ async function idsWatchlistForaDoEvento(eventoId) {
     return ids;
 }
 
+/** Pessoas reconhecíveis por este evento (do evento ou trazidas pela watchlist) que estão na watchlist ativa */
+async function alvosDaWatchlist(eventoId) {
+    const { data: lista, error } = await supabase.from('watchlist').select('cpf, motivo, nivel_alerta')
+        .eq('ativo', true).limit(1000);
+    if (error) throw error;
+    const porCpf = new Map();
+    for (const w of lista || []) {
+        const c = soDigitos(w.cpf);
+        if (c.length >= 11) porCpf.set(c, { motivo: w.motivo || null, nivel: w.nivel_alerta || 'alto' });
+    }
+    if (!porCpf.size) return [];
+    const extras = new Set(await idsWatchlistForaDoEvento(eventoId));
+    const formas = [...porCpf.keys()].flatMap(c => [c, cpfFormatado(c)]);
+    const alvos = [];
+    for (let i = 0; i < formas.length; i += 300) {
+        const { data, error: erro } = await supabase.from('pessoas').select('id, cpf, evento_id')
+            .in('cpf', formas.slice(i, i + 300)).not('face_encoding', 'is', null);
+        if (erro) throw erro;
+        for (const p of data || []) {
+            if (p.evento_id !== eventoId && !extras.has(p.id)) continue;
+            const w = porCpf.get(soDigitos(p.cpf));
+            if (w) alvos.push({ pessoa_id: p.id, ...w });
+        }
+    }
+    return alvos;
+}
+
 async function idsDoEvento(eventoId) {
     const ids = [];
     for (let de = 0; ; de += 1000) {
@@ -110,6 +137,13 @@ async function atender(agentInfo, pedido = {}) {
         const ate = new Date(Date.now() - 5000).toISOString(); // margem para gravações simultâneas
         const [doEvento, extras] = await Promise.all([idsDoEvento(eventoId), idsWatchlistForaDoEvento(eventoId)]);
         return { ok: true, ids: [...doEvento, ...extras], ate };
+    }
+
+    if (pedido.modo === 'watchlist') {
+        // Quem, entre as pessoas que este agente reconhece, está na watchlist: a Central local marca o
+        // alerta no mesmo quadro, sem esperar a ida e volta pela VPS. Só ids de pessoa (o PC já tem os
+        // dados delas no motor), com motivo e nível do alerta.
+        return { ok: true, alvos: await alvosDaWatchlist(eventoId) };
     }
 
     if (pedido.modo === 'pessoas') {
@@ -218,4 +252,4 @@ function iniciar() {
     setInterval(ciclo, 60000).unref();
 }
 
-module.exports = { atender, iniciar, fotoEmBase64 };
+module.exports = { atender, iniciar, fotoEmBase64, alvosDaWatchlist };

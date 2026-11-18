@@ -291,6 +291,7 @@ const handlers = {
     async vigilancia_configurar({ cameras = [], evento = null, evento_id = null }) {
         if (evento) salvarConfigCameras({ cameras, evento });
         await video.configurarCameras(cameras); // antes de montar a lista do motor (usa o RTSP local)
+        require('./central').configurarCameras(cameras);
         vigilancia.eventoId = evento_id || null; // o motor troca só as câmeras deste evento
         if (evento) {
             vigilancia.evento = evento;
@@ -663,6 +664,27 @@ async function sincronizarRostos() {
 }
 setInterval(() => { sincronizarRostos(); }, 60000);
 setTimeout(() => { sincronizarRostos(); }, 8000);
+
+/**
+ * Alvos da watchlist para a Central de Monitoramento local: ela marca o alerta no próprio quadro,
+ * sem esperar a VPS. Só ids de pessoas que o motor já conhece; a lista fica em disco (sem internet,
+ * vale a última recebida).
+ */
+let avisouWatchlist = false;
+async function sincronizarWatchlist() {
+    if (!socket.connected) return;
+    try {
+        const r = await pedirRostos({ modo: 'watchlist' });
+        if (!r?.ok) throw new Error(r?.erro || 'servidor sem suporte (atualize a API)');
+        require('./central').definirAlvos(r.alvos || []);
+        avisouWatchlist = false;
+    } catch (err) {
+        if (!avisouWatchlist) log('warn', `watchlist para a Central: ${err.message}`);
+        avisouWatchlist = true;
+    }
+}
+setInterval(() => { sincronizarWatchlist(); }, 60000);
+setTimeout(() => { sincronizarWatchlist(); }, 10000);
 
 /**
  * Saúde do vídeo para o painel (aba Saúde do sistema): a cada 10 s o motor informa fps, reconexões,

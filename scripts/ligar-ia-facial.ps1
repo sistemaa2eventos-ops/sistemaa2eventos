@@ -642,6 +642,17 @@ if ($Acao -eq 'unico') {
 }
 
 Write-Host ''
+# Central de Monitoramento local (vídeo direto, sem atraso): o agente cria a chave no primeiro início
+if ($script:AgenteAtivo) {
+    $atalhoCentral = Join-Path $Raiz 'abrir-central.bat'
+    Escrever "[+] Central de Monitoramento em tempo real: http://localhost:8766/central/  (atalho: abrir-central.bat)" 'Green'
+    if ((Test-Path $atalhoCentral) -and -not $env:NAO_ABRIR_CENTRAL) {
+        Start-Sleep 3
+        if (Test-Path (Join-Path $Raiz 'backend\agent-local\.central-chave')) {
+            Start-Process -FilePath $atalhoCentral -WindowStyle Hidden -ErrorAction SilentlyContinue
+        }
+    }
+}
 Escrever "Vigia ativo: verifica a cada $IntervaloVigia s e religa o que cair. Mantenha esta janela aberta durante o evento." 'Cyan'
 Escrever "Logs em $DirLogs   |   Para desligar: rode 'ligar-ia-facial.bat parar'." 'DarkGray'
 Write-Host ''

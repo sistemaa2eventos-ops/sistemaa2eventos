@@ -317,6 +317,15 @@ const CameraVideo = ({
                     );
                 })}
             </Box>
+            {/* Pela VPS o vídeo tem segundos de atraso: avisa onde está o tempo real */}
+            {carregou && usarMp4 && !visorToken && qualidade === 'foco' && (
+                <Typography variant="caption" sx={{
+                    position: 'absolute', left: 8, bottom: 8, px: 1, py: 0.25, borderRadius: 1, pointerEvents: 'none',
+                    bgcolor: 'rgba(0,0,0,0.65)', color: '#FFD400', fontWeight: 600, fontSize: '0.7rem'
+                }}>
+                    Vídeo pela internet (com atraso) • tempo real na Central do PC do evento
+                </Typography>
+            )}
             {ativo && !erro && !carregou && (
                 <CircularProgress size={22} sx={{ position: 'absolute', color: 'rgba(0,212,255,0.7)' }} />
             )}

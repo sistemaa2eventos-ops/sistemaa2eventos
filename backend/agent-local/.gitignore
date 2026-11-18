@@ -7,3 +7,6 @@ bin/
 .gravacoes-reportadas.json
 .motor-desligado
 .config-cameras.json
+# Central de Monitoramento local: chave de acesso e alvos da watchlist (nunca no repositório)
+.central-chave
+.central-alvos.json

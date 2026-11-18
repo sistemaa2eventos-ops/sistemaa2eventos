@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Central de Monitoramento</title>
+    <link rel="stylesheet" href="/central/central.css">
+</head>
+<body>
+    <header class="barra">
+        <div class="marca">
+            <span class="logo">NZT</span>
+            <span class="titulo">Central de Monitoramento</span>
+        </div>
+        <div class="estados" id="estados"></div>
+        <div class="acoes">
+            <div class="grupo" id="layouts" role="group" aria-label="Layout da grade">
+                <button data-layout="auto" class="ativo" title="Automático (tecla A)">Auto</button>
+                <button data-layout="1" title="1 câmera">1</button>
+                <button data-layout="4" title="2 × 2">4</button>
+                <button data-layout="9" title="3 × 3">9</button>
+                <button data-layout="16" title="4 × 4">16</button>
+            </div>
+            <button id="som" class="botao" title="Som dos alertas">Ativar som</button>
+            <button id="telaCheia" class="botao" title="Tela cheia (tecla F)">Tela cheia</button>
+            <span class="relogio" id="relogio">--:--:--</span>
+        </div>
+    </header>
+
+    <main class="corpo">
+        <section class="grade" id="grade" aria-label="Câmeras"></section>
+        <aside class="lateral">
+            <div class="lateral-titulo">
+                <span>Alertas da watchlist</span>
+                <span class="contador" id="contAlertas">0</span>
+            </div>
+            <div class="lista alertas" id="alertas"><p class="vazio">Nenhum alvo localizado.</p></div>
+            <div class="lateral-titulo">
+                <span>Reconhecimentos</span>
+                <span class="contador" id="contRec">0</span>
+            </div>
+            <div class="lista" id="reconhecimentos"><p class="vazio">Aguardando reconhecimentos…</p></div>
+        </aside>
+    </main>
+
+    <div class="modal" id="modal" hidden>
+        <div class="modal-caixa" role="alertdialog" aria-labelledby="modalTitulo">
+            <div class="modal-topo"><span id="modalTitulo">ALVO DA WATCHLIST LOCALIZADO</span></div>
+            <div class="modal-corpo">
+                <img id="modalQuadro" alt="Cena do reconhecimento">
+                <div class="modal-info">
+                    <img id="modalRosto" alt="Rosto reconhecido">
+                    <h2 id="modalNome"></h2>
+                    <p id="modalMotivo"></p>
+                    <dl>
+                        <dt>Câmera</dt><dd id="modalCamera"></dd>
+                        <dt>Horário</dt><dd id="modalHora"></dd>
+                        <dt>Semelhança</dt><dd id="modalSemelhanca"></dd>
+                        <dt>Nível</dt><dd id="modalNivel"></dd>
+                    </dl>
+                </div>
+            </div>
+            <div class="modal-acoes">
+                <button id="modalVer" class="botao destaque">Ver câmera ao vivo</button>
+                <button id="modalCiente" class="botao">Ciente</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/central/central.js"></script>
+</body>
+</html>

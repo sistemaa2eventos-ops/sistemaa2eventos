@@ -35,7 +35,8 @@ import {
   Dvr as DvrIcon,
   VolumeUp as SomIcon, VolumeOff as SemSomIcon,
   Face as RostoIcon,
-  PowerSettingsNew as PowerIcon
+  PowerSettingsNew as PowerIcon,
+  OpenInNew as AbrirIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { format } from 'date-fns';
@@ -60,6 +61,9 @@ import AbaSaude from '../components/monitor/AbaSaude';
 
 import { botaoSecundario } from '../styles/tokens';
 import { comoRotulo } from '../utils/formatadores';
+
+// Central de Monitoramento servida pelo agente do PC do evento (vídeo por WebRTC direto, sem a VPS)
+const CENTRAL_LOCAL_URL = 'http://localhost:8766/central/';
 // Selo de conexão em tempo real
 const SELO_CONEXAO = {
   conectado: { label: 'Ao vivo', cor: '#00FF88' },
@@ -1742,6 +1746,19 @@ const Monitor = () => {
                             : 'Stream IP / RTSP • Detecção facial SCRFD • Reconhecimento ArcFace 512-D'}
                     </Typography>
                 </Box>
+                <Tooltip title="Vídeo direto do PC do evento, sem atraso e sem passar pela internet, com alertas da watchlist. Abre no PC do evento; na primeira vez, use o atalho abrir-central.bat (ele entra com a chave de acesso).">
+                    <Button
+                        component="a"
+                        href={CENTRAL_LOCAL_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        variant="contained"
+                        startIcon={<AbrirIcon />}
+                        sx={{ flexShrink: 0, whiteSpace: 'nowrap', fontWeight: 700, bgcolor: '#00D4FF', color: '#031018', '&:hover': { bgcolor: '#33DDFF' } }}
+                    >
+                        Central em tempo real
+                    </Button>
+                </Tooltip>
             </Stack>
 
             {/* BARRA DE FERRAMENTAS CFTV RESPONSIVA */}

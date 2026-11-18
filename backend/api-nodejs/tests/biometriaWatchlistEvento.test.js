@@ -86,3 +86,30 @@ test('sem evento no agente não envia ninguém', async () => {
     const r = await atender({}, { modo: 'pessoas', ids: ['p1'] });
     expect(r.ok).toBe(false);
 });
+
+describe('alvos da watchlist para a Central de Monitoramento local', () => {
+    test('marca só quem o agente reconhece (do evento ou trazido pela watchlist), com motivo e nível', async () => {
+        mockDb.watchlist[0].motivo = 'Furto no evento anterior';
+        mockDb.watchlist[0].nivel_alerta = 'critico';
+        const r = await atender({ evento_id: 'E1' }, { modo: 'watchlist' });
+        expect(r.ok).toBe(true);
+        const porId = Object.fromEntries(r.alvos.map(a => [a.pessoa_id, a]));
+        // p1: do evento e na watchlist · p2: trazida pela watchlist · p3: fora da watchlist · p4: duplicata de p1
+        expect(Object.keys(porId).sort()).toEqual(['p1', 'p2']);
+        expect(porId.p2).toMatchObject({ motivo: 'Furto no evento anterior', nivel: 'critico' });
+        expect(porId.p1.nivel).toBe('alto'); // sem nível cadastrado: alto
+        // Só ids, motivo e nível: nenhum CPF ou nome sai para o PC
+        for (const a of r.alvos) expect(Object.keys(a).sort()).toEqual(['motivo', 'nivel', 'pessoa_id']);
+    });
+
+    test('watchlist vazia: nenhum alvo', async () => {
+        mockDb.watchlist = [];
+        const r = await atender({ evento_id: 'E1' }, { modo: 'watchlist' });
+        expect(r).toEqual({ ok: true, alvos: [] });
+    });
+
+    test('sem evento no agente: não responde alvos', async () => {
+        const r = await atender({}, { modo: 'watchlist' });
+        expect(r.ok).toBe(false);
+    });
+});
