@@ -24,6 +24,7 @@ const { spawn, execFileSync } = require('child_process');
 const DIR_BIN = path.join(__dirname, '..', 'bin');
 const PORTA_API = Number(process.env.GO2RTC_PORTA_API || 1984);
 const PORTA_RTSP = Number(process.env.GO2RTC_PORTA_RTSP || 8555);
+const PORTA_WEBRTC = Number(process.env.GO2RTC_PORTA_WEBRTC || 8557);
 const ARQ_CONFIG = path.join(DIR_BIN, 'go2rtc.yaml');
 
 let log = (nivel, msg) => console.log(`[${new Date().toISOString()}] ${nivel.toUpperCase()} ${msg}`);
@@ -188,8 +189,11 @@ function escreverConfig() {
         `  username: ${aspas(estado.usuario)}`,
         `  password: ${aspas(estado.senha)}`,
         '  local_auth: true',
+        // WebRTC: vídeo ao vivo com ~30 ms de buffer no navegador (o MP4 progressivo segurava ~2,2 s).
+        // Esta porta só leva mídia: a negociação passa pela API (127.0.0.1, com senha) via visor local.
         'webrtc:',
-        '  listen: ""',
+        `  listen: ":${PORTA_WEBRTC}"`,
+        `  candidates: ["127.0.0.1:${PORTA_WEBRTC}"]`,
         'rtmp:',
         '  listen: ""',
         'srtp:',
@@ -307,6 +311,8 @@ function autorizacao() {
 async function chamarApi(caminho, params = {}, timeoutMs = 8000, extras = {}) {
     const query = new URLSearchParams(params).toString();
     return fetch(`http://127.0.0.1:${PORTA_API}${caminho}${query ? `?${query}` : ''}`, {
+        method: extras.method || 'GET',
+        body: extras.body,
         headers: { Authorization: autorizacao(), ...(extras.headers || {}) },
         signal: extras.signal || (timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined)
     });
@@ -394,6 +400,23 @@ async function abrirMp4(cameraId, qualidade, userAgent, signal) {
     return res;
 }
 
+/**
+ * Ao vivo sem atraso: recebe a oferta WebRTC (SDP) do navegador e devolve a resposta do go2rtc.
+ * O vídeo vai do go2rtc direto ao navegador (sem reempacotar em MP4 e sem buffer de reprodução).
+ */
+async function abrirWebrtc(cameraId, qualidade, ofertaSdp) {
+    const nome = streamDa(cameraId, qualidade);
+    if (!nome) throw new Error('Câmera não está no retransmissor local');
+    await esperarPronto();
+    const res = await chamarApi('/api/webrtc', { src: nome }, 10000, {
+        method: 'POST',
+        body: ofertaSdp,
+        headers: { 'Content-Type': 'application/sdp' }
+    });
+    if (!res.ok) throw new Error(`Retransmissor respondeu HTTP ${res.status}`);
+    return res.text();
+}
+
 /** MJPEG (reserva para navegador sem MP4 ou câmera em H.265): exige ffmpeg */
 async function abrirMjpeg(cameraId, qualidade, signal) {
     // Câmera com fonte H.264 (webcam) tem um stream JPEG próprio; as demais usam o de sempre
@@ -434,5 +457,5 @@ function parar() {
 
 module.exports = {
     iniciar, encerrarOrfaos, disponivel, temFfmpeg, caminhoFfmpeg, configurarCameras, conhece, streamDa, urlRtspLocal,
-    abrirMp4, abrirMjpeg, snapshot, status, parar, derivarSubstream
+    abrirMp4, abrirWebrtc, abrirMjpeg, snapshot, status, parar, derivarSubstream
 };

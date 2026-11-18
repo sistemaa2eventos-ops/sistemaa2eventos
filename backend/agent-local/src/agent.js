@@ -71,7 +71,7 @@ const motorDesligadoPeloPainel = () => fs.existsSync(ARQ_MOTOR_DESLIGADO);
 
 video.iniciar(log);
 // Visor local (central de operação na mesma rede): o vídeo não precisa passar pela VPS. Falha aqui não derruba o agente.
-try { require('./visor-local').iniciar(log); } catch (err) { log('warn', `visor local não iniciou: ${err.message}`); }
+try { require('./visor-local').iniciar(log, { fetchIa }); } catch (err) { log('warn', `visor local não iniciou: ${err.message}`); }
 gravador.iniciar({
     logger: log,
     reportador: async (evento, dados) => {

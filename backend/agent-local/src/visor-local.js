@@ -6,7 +6,10 @@
  *
  * Proteção: o painel pede uma sessão em GET /sessao. Esse pedido só é aceito de origens do próprio
  * sistema (CORS), e só essa origem consegue LER o token (outra página do navegador recebe erro de CORS).
- * Os vídeos exigem o token na URL (?t=...). A sessão vale 1 hora e é trocada a cada pedido de /sessao.
+ * Os vídeos exigem o token na URL (?t=...). A sessão vale 1 hora e é reaproveitada enquanto vale.
+ *
+ * Rotas: /camera/:id/webrtc (ao vivo sem atraso), /camera/:id/mp4 (reserva) e /camera/:id/deteccoes
+ * (caixas da IA lidas do motor deste PC).
  */
 const http = require('http');
 const crypto = require('crypto');
@@ -33,7 +36,40 @@ function cabecalhosCors(res, origem) {
     res.setHeader('Access-Control-Allow-Private-Network', 'true');
 }
 
-function iniciar(log) {
+const SDP_MAX = 64 * 1024;
+
+function lerCorpo(req, max) {
+    return new Promise((ok, falha) => {
+        const partes = [];
+        let total = 0;
+        req.on('data', (p) => {
+            total += p.length;
+            if (total > max) { falha(new Error('corpo grande demais')); req.destroy(); return; }
+            partes.push(p);
+        });
+        req.on('end', () => ok(Buffer.concat(partes).toString('utf8')));
+        req.on('error', falha);
+    });
+}
+
+/** Mesmo formato das caixas que a API da VPS devolve em /cameras/:id/deteccoes */
+const caixaParaPainel = (f) => ({
+    id: f.track_id,
+    caixa: f.bbox_n,
+    qualidade: f.quality_status,
+    pessoa: f.matched_person ? {
+        nome: f.matched_person.nome,
+        semelhanca: f.matched_person.similarity,
+        bloqueado: !!(f.matched_person.bloqueado || f.matched_person.status_acesso === 'bloqueado')
+    } : null
+});
+
+/**
+ * @param {Function} log
+ * @param {{ fetchIa?: Function }} opcoes  fetchIa: chamada ao motor de IA local (com a chave interna)
+ */
+function iniciar(log, opcoes = {}) {
+    const { fetchIa } = opcoes;
     const server = http.createServer(async (req, res) => {
         const url = new URL(req.url, 'http://127.0.0.1');
         const origem = req.headers.origin;
@@ -42,7 +78,8 @@ function iniciar(log) {
         if (req.method === 'OPTIONS') {
             if (!origemOk) { res.statusCode = 403; return res.end(); }
             cabecalhosCors(res, origem);
-            res.setHeader('Access-Control-Allow-Methods', 'GET');
+            res.setHeader('Access-Control-Allow-Methods', 'GET, POST');
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
             res.setHeader('Access-Control-Max-Age', '600');
             res.statusCode = 204;
             return res.end();
@@ -61,6 +98,50 @@ function iniciar(log) {
         if (req.method === 'GET' && url.pathname === '/health') {
             res.setHeader('Content-Type', 'application/json');
             return res.end(JSON.stringify({ ok: true, retransmissor: video.disponivel() }));
+        }
+
+        // Ao vivo sem atraso (WebRTC): oferta SDP no corpo, resposta SDP de volta
+        const mw = url.pathname.match(/^\/camera\/([^/]+)\/webrtc$/);
+        if (req.method === 'POST' && mw) {
+            if (origemOk) cabecalhosCors(res, origem);
+            if (!sessaoValida(url.searchParams.get('t'))) { res.statusCode = 401; return res.end(); }
+            const cameraId = decodeURIComponent(mw[1]);
+            if (!video.conhece(cameraId)) { res.statusCode = 404; return res.end(); }
+            const qualidade = url.searchParams.get('qualidade') === 'foco' ? 'foco' : 'mini';
+            try {
+                const oferta = await lerCorpo(req, SDP_MAX);
+                if (!oferta.startsWith('v=0')) { res.statusCode = 400; return res.end(); }
+                const resposta = await video.abrirWebrtc(cameraId, qualidade, oferta);
+                res.statusCode = 201;
+                res.setHeader('Content-Type', 'application/sdp');
+                res.setHeader('Cache-Control', 'no-store');
+                return res.end(resposta);
+            } catch (err) {
+                log('warn', `visor local (webrtc): ${err.message}`);
+                res.statusCode = 503;
+                return res.end();
+            }
+        }
+
+        // Caixas da IA direto do motor deste PC (pela VPS cada consulta fazia uma ida e volta pela internet)
+        const md = url.pathname.match(/^\/camera\/([^/]+)\/deteccoes$/);
+        if (req.method === 'GET' && md) {
+            if (origemOk) cabecalhosCors(res, origem);
+            if (!sessaoValida(url.searchParams.get('t'))) { res.statusCode = 401; return res.end(); }
+            const cameraId = decodeURIComponent(md[1]);
+            if (!video.conhece(cameraId) || !fetchIa) { res.statusCode = 404; return res.end(); }
+            const qualidade = url.searchParams.get('qualidade') === 'mini' ? 'mini' : 'foco';
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Cache-Control', 'no-store');
+            try {
+                const q = new URLSearchParams({ camera_id: cameraId, qualidade, quadro: 'false' });
+                const r = await fetchIa(`/api/track/live?${q}`, { signal: AbortSignal.timeout(3000) });
+                if (!r.ok) return res.end(JSON.stringify({ success: false, motor: r.status !== 404, results: [] }));
+                const j = await r.json();
+                return res.end(JSON.stringify({ success: true, motor: true, results: (j.results || []).map(caixaParaPainel) }));
+            } catch {
+                return res.end(JSON.stringify({ success: false, motor: false, results: [] }));
+            }
         }
 
         const m = url.pathname.match(/^\/camera\/([^/]+)\/mp4$/);
@@ -99,4 +180,4 @@ function iniciar(log) {
     return server;
 }
 
-module.exports = { iniciar, PORTA, ORIGENS };
+module.exports = { iniciar, PORTA, ORIGENS, caixaParaPainel };

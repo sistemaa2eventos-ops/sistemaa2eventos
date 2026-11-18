@@ -3,7 +3,7 @@ import { Box, Typography, CircularProgress } from '@mui/material';
 import { VideocamOff as SemVideoIcon, PauseCircleOutline as PausadoIcon } from '@mui/icons-material';
 import api from '../../services/api';
 import { pedirIngressoCamera, urlComIngresso } from '../../utils/cameraMedia';
-import { visorDisponivel, tokenVisor, urlVisorMp4, esquecerToken } from '../../utils/visorLocal';
+import { visorDisponivel, tokenVisor, urlVisorMp4, urlVisorDeteccoes, esquecerToken, abrirWebrtcVisor } from '../../utils/visorLocal';
 
 const IMAGEM_VAZIA = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 const ESPERAS_MS = [2000, 5000, 10000, 30000];
@@ -139,8 +139,51 @@ const CameraVideo = ({
     const caixasNoNavegador = !!acesso?.ia && !!acesso?.mp4;
     const anotarNoServidor = !!acesso?.ia && !acesso?.mp4;
 
+    // WebRTC pelo visor local (sem atraso). Se não abrir (agente antigo, navegador sem WebRTC), cai para o MP4
+    // local e fica nele até trocar de câmera.
+    const [rtcFalhou, setRtcFalhou] = useState(false);
+    useEffect(() => { setRtcFalhou(false); }, [camId]);
+    const viaRtc = ativo && !erro && !!acesso?.ingresso && usarMp4 && visorDecidido && !!visorToken && !rtcFalhou;
+
     // Sair da tela/pausar/trocar de câmera: fecha a conexão na hora (cada conexão é um elemento próprio)
-    const chave = `${camId}:${qualidade}:${modo}:${usarMp4 ? 'mp4' : 'img'}:${reconexao}`;
+    const chave = `${camId}:${qualidade}:${modo}:${viaRtc ? 'rtc' : usarMp4 ? 'mp4' : 'img'}:${reconexao}`;
+
+    useEffect(() => {
+        if (!viaRtc) return undefined;
+        let pc = null;
+        let encerrado = false;
+        let recebeu = false;
+        const el = midiaRef.current;
+        // Sem quadro em 8 s: desiste do WebRTC e usa o MP4 local
+        const prazo = setTimeout(() => { if (!recebeu && !encerrado) setRtcFalhou(true); }, 8000);
+        abrirWebrtcVisor(camId, visorToken, qualidade, (stream) => {
+            if (encerrado || !el) return;
+            recebeu = true;
+            el.srcObject = stream;
+            el.play?.().catch(() => { /* autoplay mudo: segue */ });
+        }).then((conexao) => {
+            if (encerrado) { conexao.close(); return; }
+            pc = conexao;
+            pc.addEventListener('connectionstatechange', () => {
+                if (encerrado) return;
+                const s = pc.connectionState;
+                if (s === 'failed' || s === 'closed') {
+                    if (recebeu) { setFalhas(n => n + 1); setErro(true); } else setRtcFalhou(true);
+                } else if (s === 'disconnected') {
+                    // Pode voltar sozinho; se não voltar em 3 s, reconecta
+                    setTimeout(() => {
+                        if (!encerrado && pc.connectionState === 'disconnected') { setFalhas(n => n + 1); setErro(true); }
+                    }, 3000);
+                }
+            });
+        }).catch(() => { if (!encerrado) setRtcFalhou(true); });
+        return () => {
+            encerrado = true;
+            clearTimeout(prazo);
+            if (pc) pc.close();
+            if (el) el.srcObject = null;
+        };
+    }, [viaRtc, chave, camId, visorToken, qualidade]);
     useEffect(() => {
         const el = midiaRef.current;
         return () => {
@@ -155,10 +198,18 @@ const CameraVideo = ({
         if (!ativo || !caixasNoNavegador || modo !== 'stream') { setCaixas([]); return undefined; }
         let parado = false;
         let timer;
-        const intervalo = qualidade === 'foco' ? 300 : 800;
+        // Com o visor local as caixas vêm do motor deste PC (sem internet no meio): dá para consultar bem mais rápido
+        const local = !!visorToken;
+        const intervalo = local ? (qualidade === 'foco' ? 120 : 400) : (qualidade === 'foco' ? 300 : 800);
         const consultar = async () => {
             try {
-                const { data } = await api.get(`/cameras/${camId}/deteccoes`, { params: { qualidade }, hideDefaultError: true, timeout: 5000 });
+                let data;
+                if (local) {
+                    const r = await fetch(urlVisorDeteccoes(camId, visorToken, qualidade), { cache: 'no-store', signal: AbortSignal.timeout(3000) });
+                    data = r.ok ? await r.json() : null;
+                } else {
+                    ({ data } = await api.get(`/cameras/${camId}/deteccoes`, { params: { qualidade }, hideDefaultError: true, timeout: 5000 }));
+                }
                 if (!parado) setCaixas(data?.results || []);
             } catch {
                 if (!parado) setCaixas([]);
@@ -167,7 +218,7 @@ const CameraVideo = ({
         };
         consultar();
         return () => { parado = true; clearTimeout(timer); };
-    }, [ativo, caixasNoNavegador, modo, camId, qualidade]);
+    }, [ativo, caixasNoNavegador, modo, camId, qualidade, visorToken]);
 
     // Recalcula a posição das caixas quando a caixa muda de tamanho
     useEffect(() => {
@@ -198,6 +249,7 @@ const CameraVideo = ({
     let src = null;
     if (ativo && !erro && acesso?.ingresso) {
         if (usarMp4 && !visorDecidido) src = null; // aguardando saber se o visor local responde (até 1,5 s)
+        else if (viaRtc) src = null; // vídeo chega por srcObject (WebRTC)
         else if (usarMp4 && visorToken) src = urlVisorMp4(camId, visorToken, qualidade);
         // Pela VPS, a tela grande cai para 720p: o principal (ex.: 2304x1296) não chega fluido pela internet
         else if (usarMp4) src = urlComIngresso(camId, 'video.mp4', acesso.ingresso, { qualidade: qualidade === 'foco' ? 'mini' : qualidade });
@@ -215,11 +267,11 @@ const CameraVideo = ({
             sx={{ position: 'relative', width: '100%', height: '100%', bgcolor: '#000000', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
         >
             <Box sx={{ position: 'absolute', inset: 0, transform, transformOrigin }}>
-                {src && usarMp4 && (
+                {(viaRtc || (src && usarMp4)) && (
                     <video
                         key={chave}
                         ref={midiaRef}
-                        src={src}
+                        src={viaRtc ? undefined : src}
                         autoPlay
                         muted
                         playsInline
