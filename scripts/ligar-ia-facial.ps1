@@ -1,4 +1,4 @@
-<#
+﻿<#
   NZT Intelligent Control System — liga os motores da IA de rastreamento facial
   no servidor local do evento e fica vigiando (religa o que cair).
 
@@ -424,7 +424,11 @@ function Confirm-Camera {
         for ($i = 0; $i -lt 15 -and -not (Get-PidNaPorta $PortaCamera); $i++) { Start-Sleep 1 }
     }
     if (Get-PidNaPorta $PortaCamera) { Escrever "[1/3] Câmera: vídeo RTSP disponível em localhost:$PortaCamera." 'Green' }
-    else { Escrever "[1/3] Câmera: RTSP em localhost:$PortaCamera indisponível; o Motor de IA usará leitura direta da Webcam USB (fallback automático)." 'Cyan' }
+    else {
+        # Se o OBS não abriu a porta RTSP, encerra o processo para não concorrer com a CPU e a webcam
+        Get-Process obs64 -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        Escrever "[1/3] Câmera: RTSP em localhost:$PortaCamera indisponível; o Motor de IA usará leitura direta da Webcam USB (fallback automático)." 'Cyan'
+    }
 }
 
 # ---------------------------------------------------------------- 2. motor de IA
