@@ -159,7 +159,7 @@ async function mapComLimite(itens, limite, fn) {
  */
 async function listarMetricas(req, res) {
     try {
-        const eventoId = req.event?.id;
+        const eventoId = req.event?.id || req.query?.evento_id || req.headers?.['x-evento-id'];
         if (!eventoId) return res.status(400).json({ error: 'Contexto de evento não identificado' });
 
         const emCache = cacheEvento.get(eventoId);

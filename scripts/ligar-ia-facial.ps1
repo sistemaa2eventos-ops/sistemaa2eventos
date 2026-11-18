@@ -1,4 +1,4 @@
-﻿<#
+<#
   NZT Intelligent Control System — liga os motores da IA de rastreamento facial
   no servidor local do evento e fica vigiando (religa o que cair).
 

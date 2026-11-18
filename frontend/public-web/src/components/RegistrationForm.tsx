@@ -119,7 +119,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
     }, [error]);
     const [rawPhoto, setRawPhoto] = useState<string | null>(null);
     const [employees, setEmployees] = useState<EmployeeSummary[]>([]);
-    const [loadingEmployees, setLoadingEmployees] = useState(true);
+    const [loadingEmployees, setLoadingEmployees] = useState(!preFilledData);
     const [showLGPDModal, setShowLGPDModal] = useState(false);
     const { t } = useTranslation('common');
 
@@ -127,10 +127,10 @@ export default function RegistrationForm({ token, company, branding, requiredFie
 
     // Fetch existing employees
     useEffect(() => {
-        if (!preFilledData) { // Apenas se for link de empresa (link global), ignora se for link nominal de pessoa
+        if (!preFilledData && token) { // Apenas se for link de empresa (link global), ignora se for link nominal de pessoa
             const fetchEmployees = async () => {
                 try {
-                    const cleanToken = token?.trim();
+                    const cleanToken = token.trim();
                     const res = await api.get(`/public/company/${cleanToken}/employees`);
                     setEmployees(res.data.employees || []);
                 } catch (err: unknown) {
@@ -142,8 +142,6 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                 }
             };
             fetchEmployees();
-        } else {
-            setLoadingEmployees(false);
         }
     }, [token, preFilledData]);
 
@@ -196,11 +194,8 @@ export default function RegistrationForm({ token, company, branding, requiredFie
 
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        let { name, value } = e.target;
-        
-        if (name === 'cpf') {
-            value = maskCPF(value);
-        }
+        const { name, value: rawValue } = e.target;
+        const value = name === 'cpf' ? maskCPF(rawValue) : rawValue;
 
         setFormData(prev => ({ ...prev, [name]: value }));
     };
@@ -266,9 +261,10 @@ export default function RegistrationForm({ token, company, branding, requiredFie
 
                         photoUrl = urlData.publicUrl || urlData.uploadUrl.split('?')[0];
                     }
-                } catch (err: any) {
+                } catch (err: unknown) {
                     // Auditoria: Erro na foto agora é fatal para evitar cadastros sem biometria
-                    setError(err.message || 'Erro ao processar sua foto facial. Tente novamente.');
+                    const msg = err instanceof Error ? err.message : 'Erro ao processar sua foto facial. Tente novamente.';
+                    setError(msg);
                     setLoading(false);
                     return;
                 }
