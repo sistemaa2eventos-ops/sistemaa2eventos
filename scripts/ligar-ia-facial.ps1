@@ -1,4 +1,4 @@
-﻿<#
+<#
   NZT Intelligent Control System — liga os motores da IA de rastreamento facial
   no servidor local do evento e fica vigiando (religa o que cair).
 
@@ -416,19 +416,11 @@ if ($Acao -eq 'verificar') {
 
 # ---------------------------------------------------------------- 1. câmera
 function Confirm-Camera {
-    if (Get-PidNaPorta $PortaCamera) { Escrever "[1/3] Câmera: vídeo RTSP disponível em localhost:$PortaCamera." 'Green'; return }
-    $obs = 'C:\Program Files\obs-studio\bin\64bit\obs64.exe'
-    if (Test-Path $obs) {
-        Escrever '[1/3] Câmera: abrindo o OBS (servidor RTSP)...' 'Yellow'
-        Start-Process -FilePath $obs -WorkingDirectory (Split-Path $obs) -ArgumentList '--minimize-to-tray' -WindowStyle Minimized
-        for ($i = 0; $i -lt 15 -and -not (Get-PidNaPorta $PortaCamera); $i++) { Start-Sleep 1 }
-    }
-    if (Get-PidNaPorta $PortaCamera) { Escrever "[1/3] Câmera: vídeo RTSP disponível em localhost:$PortaCamera." 'Green' }
-    else {
-        # Se o OBS não abriu a porta RTSP, encerra o processo para não concorrer com a CPU e a webcam
-        Get-Process obs64 -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-        Escrever "[1/3] Câmera: RTSP em localhost:$PortaCamera indisponível; o Motor de IA usará leitura direta da Webcam USB (fallback automático)." 'Cyan'
-    }
+    # Não abre nem encerra o OBS: quem decide a fonte é o painel (câmera com URL 127.0.0.1:8554 usa o OBS,
+    # e o motor cai sozinho na Webcam USB direto se a porta 8554 não estiver aberta — ver _abrir no motor).
+    # Antes o script subia o OBS sempre e matava o OBS quando a porta não abria, o que impedia a webcam direta.
+    if (Get-PidNaPorta $PortaCamera) { Escrever "[1/3] Câmera: vídeo RTSP disponível em localhost:$PortaCamera (OBS/go2rtc)." 'Green' }
+    else { Escrever "[1/3] Câmera: RTSP em localhost:$PortaCamera fechado; o motor usa a Webcam USB direto, sem OBS." 'Cyan' }
 }
 
 # ---------------------------------------------------------------- 2. motor de IA

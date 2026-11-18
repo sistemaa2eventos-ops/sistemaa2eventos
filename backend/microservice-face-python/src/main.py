@@ -650,7 +650,7 @@ def derivar_substream(url: str) -> Optional[str]:
 
 class Rastro:
     """Um rosto acompanhado entre análises (mesma pessoa andando na frente da câmera)."""
-    __slots__ = ("id", "box", "visto", "ultimo_rec", "votos", "pessoa", "sim", "qualidade", "crop_b64", "melhor_nitidez", "aguardando")
+    __slots__ = ("id", "box", "visto", "ultimo_rec", "votos", "pessoa", "sim", "qualidade", "crop_b64", "melhor_nitidez", "aguardando", "diag")
 
     def __init__(self, tid: int, box):
         self.id, self.box, self.visto = tid, box, time.time()
@@ -662,6 +662,8 @@ class Rastro:
         self.crop_b64: Optional[str] = None
         self.melhor_nitidez = 0.0
         self.aguardando = 0.0  # instante do pedido ao servidor central ainda sem resposta (0 = nenhum)
+        # Último diagnóstico da comparação com o cadastro (por que reconheceu ou não): ver analisar()
+        self.diag: Optional[Dict[str, Any]] = None
 
 
 def _iou(a, b) -> float:
@@ -1152,6 +1154,29 @@ def _expirar_pendentes():
         entrar_em_reserva(f"{len(velhos)} rosto(s) sem resposta em {PRAZO_REMOTO_S} s")
 
 
+def diagnostico_comparacao(idx: "Indice", pos: int, s1: float, s2: float, do_cadastro: bool, aceito: bool) -> Dict[str, Any]:
+    """Explica a decisão de um rosto, para diagnosticar falsos 'Desconhecido' sem adivinhar.
+    motivo: reconhecido | sem_cadastro_no_evento | abaixo_do_limiar | margem_insuficiente.
+    s1/s2: melhor e segunda similaridade (cosseno, 0 a 1); limiar e margem: os do perfil em uso."""
+    if idx.index.ntotal == 0:
+        motivo = "sem_cadastro_no_evento"
+    elif aceito:
+        motivo = "reconhecido"
+    elif s1 < CFG["limiar"]:
+        motivo = "abaixo_do_limiar"
+    else:
+        motivo = "margem_insuficiente"
+    return {
+        "motivo": motivo,
+        "melhor": round(float(s1), 3),
+        "segunda": round(float(s2), 3),
+        "limiar": CFG["limiar"],
+        "margem": CFG["margem"],
+        "candidato": idx.pessoas[pos]["nome"] if 0 <= pos < len(idx.pessoas) else None,
+        "vetor_do_cadastro": bool(do_cadastro),
+    }
+
+
 def aplicar_reconhecimento(r: "Rastro", p: Optional[str], s1: float, aceito: bool, nit: float, recorte_b64) -> bool:
     """Votação/confirmação de um rastro (mesma regra para reconhecimento local e no servidor).
     recorte_b64: str já pronto ou função que o gera (só chamada se precisar). True se confirmou."""
@@ -1260,6 +1285,7 @@ def analisar(cam: Camera, frame: np.ndarray, src: Leitor):
             pos, s1, s2, do_cadastro = idx.buscar(emb)
             aceito = pos >= 0 and s1 >= CFG["limiar"] and (s1 - s2 >= CFG["margem"])
             p = idx.pessoas[pos]["id"] if aceito else None
+            r.diag = diagnostico_comparacao(idx, pos, s1, s2, do_cadastro, aceito)
             confirmado = aplicar_reconhecimento(r, p, s1, aceito, nit, recorte_da_caixa(bbox))
             # Só aprende com folga, casando com o vetor do cadastro e já visto 2x (um erro aprendido erra para sempre)
             if (confirmado and CFG["aprender"] and do_cadastro and s1 >= CFG["limiar"] + 0.10
@@ -1280,6 +1306,8 @@ def analisar(cam: Camera, frame: np.ndarray, src: Leitor):
             "liveness_score": round(r.melhor_nitidez, 1),
             "is_live": r.melhor_nitidez > 50.0,
             "face_crop_base64": r.crop_b64 if pessoa else None,
+            # Por que foi ou não foi reconhecido: melhor e segunda similaridade, limiar e margem usados
+            "diagnostico": r.diag,
             "matched_person": {
                 "id": pessoa["id"], "nome": pessoa["nome"], "cpf": pessoa["cpf"], "similarity": round(r.sim, 3),
                 "status_acesso": pessoa["status_acesso"], "bloqueado": pessoa["bloqueado"], "foto_url": pessoa.get("foto_url"),
@@ -1730,6 +1758,9 @@ def get_engine_status():
         "cameras_em_uso": sum(1 for lt in list(leitores.values()) if lt.rodando),
         "cameras": lista,
         "registered_faces_indexed": len(indice.pessoas),
+        # Rostos por evento no índice que a câmera usa. Se o evento da câmera aparece com 0 aqui e o total
+        # não é 0, a câmera não reconhece ninguém (caso do cadastro sem evento_id vindo do agente).
+        "rostos_por_evento": {ev: len(ix.pessoas) for ev, ix in list(indices_evento.items())},
         "reconhecimento": {
             "modo": remoto["modo"], "servidor_disponivel": remoto["disponivel"], "usando_servidor": usar_remoto(),
             "em_reserva": remoto["modo"] == "auto" and time.time() < remoto["reserva_ate"],

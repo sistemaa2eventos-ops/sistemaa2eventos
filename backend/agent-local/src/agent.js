@@ -612,6 +612,16 @@ async function pedirRostos(pedido) {
     return socket.timeout(30000).emitWithAck('agent:rostos', pedido);
 }
 
+/**
+ * O servidor manda as pessoas sem o evento (paraMotor não inclui evento_id). O motor só põe no índice
+ * de uma câmera quem tem evento_id igual ao da câmera; sem ele, o índice fica vazio e ninguém é
+ * reconhecido. Este PC conhece o evento dele, então carimba aqui.
+ */
+function comEventoDoAgente(pessoas) {
+    const ev = vigilancia.eventoId || null;
+    return pessoas.map(p => ({ ...p, evento_id: p.evento_id || ev }));
+}
+
 async function sincronizarRostos() {
     if (rostos.rodando || !socket.connected || motorDesligadoPeloPainel()) return;
     rostos.rodando = true;
@@ -627,7 +637,7 @@ async function sincronizarRostos() {
             const faltando = r.faltando || [];
             for (let i = 0; i < faltando.length; i += 200) {
                 const lote = await pedirRostos({ modo: 'pessoas', ids: faltando.slice(i, i + 200) });
-                if (lote?.pessoas?.length) await postarNoMotor('/api/rostos', { pessoas: lote.pessoas });
+                if (lote?.pessoas?.length) await postarNoMotor('/api/rostos', { pessoas: comEventoDoAgente(lote.pessoas) });
             }
             rostos.desde = lista.ate;
             rostos.ultimoCompleto = Date.now();
@@ -636,7 +646,7 @@ async function sincronizarRostos() {
             for (let pagina = 0; pagina < 20; pagina++) {
                 const lote = await pedirRostos({ modo: 'desde', desde: rostos.desde });
                 if (!lote?.ok) break;
-                if (lote.pessoas?.length) await postarNoMotor('/api/rostos', { pessoas: lote.pessoas });
+                if (lote.pessoas?.length) await postarNoMotor('/api/rostos', { pessoas: comEventoDoAgente(lote.pessoas) });
                 rostos.desde = lote.ate || rostos.desde;
                 if (!lote.mais) break;
             }

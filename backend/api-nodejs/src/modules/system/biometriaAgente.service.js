@@ -39,10 +39,28 @@ async function cpfsDaWatchlist() {
 }
 
 /** Pessoas de outros eventos que estão na watchlist (uma por CPF, com biometria) */
+/** CPFs (só dígitos) de quem já está cadastrado neste evento */
+async function cpfsDoEvento(eventoId) {
+    const cpfs = new Set();
+    for (let de = 0; ; de += 1000) {
+        // Só quem tem rosto no índice conta: cadastro do evento sem biometria não pode tirar a versão da watchlist
+        const { data, error } = await supabase.from('pessoas').select('cpf')
+            .eq('evento_id', eventoId).not('face_encoding', 'is', null).order('id').range(de, de + 999);
+        if (error) throw error;
+        for (const p of data || []) { const c = soDigitos(p.cpf); if (c) cpfs.add(c); }
+        if (!data || data.length < 1000) break;
+    }
+    return cpfs;
+}
+
 async function idsWatchlistForaDoEvento(eventoId) {
     const cpfs = await cpfsDaWatchlist();
     if (!cpfs.length) return [];
-    const formas = cpfs.flatMap(c => [c, cpfFormatado(c)]);
+    // Quem já está no evento não entra de novo pela watchlist: duas entradas da mesma pessoa no índice
+    // deixam s1 e s2 iguais e a margem de reconhecimento nunca passa
+    const doEvento = await cpfsDoEvento(eventoId);
+    const formas = cpfs.filter(c => !doEvento.has(c)).flatMap(c => [c, cpfFormatado(c)]);
+    if (!formas.length) return [];
     const ids = [];
     const vistos = new Set();
     for (let i = 0; i < formas.length; i += 300) {
@@ -72,9 +90,15 @@ async function idsDoEvento(eventoId) {
     return ids;
 }
 
-const paraMotor = (p) => ({
+/**
+ * O motor põe cada pessoa no índice do evento indicado em evento_id (a câmera só compara com o próprio
+ * evento). Por isso TODA pessoa segue com o evento do agente: os da watchlist de outro evento entram
+ * como se fossem deste, que é o que a watchlist pede (reconhecer a pessoa neste evento também).
+ */
+const paraMotor = (p, eventoId) => ({
     id: p.id, nome_completo: p.nome_completo, cpf: p.cpf, status_acesso: p.status_acesso,
-    bloqueado: !!p.bloqueado, foto_url: p.foto_url, face_encoding: p.face_encoding
+    bloqueado: !!p.bloqueado, foto_url: p.foto_url, face_encoding: p.face_encoding,
+    evento_id: eventoId
 });
 
 async function atender(agentInfo, pedido = {}) {
@@ -94,7 +118,7 @@ async function atender(agentInfo, pedido = {}) {
         const { data, error } = await supabase.from('pessoas').select(CAMPOS_SEM_DATA).in('id', ids);
         if (error) throw error;
         const extras = new Set(await idsWatchlistForaDoEvento(eventoId));
-        const pessoas = (data || []).filter(p => p.evento_id === eventoId || extras.has(p.id)).map(paraMotor);
+        const pessoas = (data || []).filter(p => p.evento_id === eventoId || extras.has(p.id)).map(p => paraMotor(p, eventoId));
         return { ok: true, pessoas };
     }
 
@@ -116,7 +140,7 @@ async function atender(agentInfo, pedido = {}) {
         return {
             ok: true,
             // face_encoding nulo: o motor tira a pessoa do índice
-            pessoas: lista.map(paraMotor),
+            pessoas: lista.map(p => paraMotor(p, eventoId)),
             ate: lista.length ? lista[lista.length - 1].biometria_atualizada_em : pedido.desde,
             mais: lista.length === LOTE
         };
