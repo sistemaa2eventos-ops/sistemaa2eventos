@@ -9,6 +9,11 @@ const LEITORES_COM_SENHA = Object.freeze({
     marcas: ['intelbras', 'dahua', 'hikvision']
 });
 
+// rtsp_url guarda usuário e senha do leitor. Nunca vai ao navegador com a senha.
+const mascararRtsp = (url) => (typeof url === 'string' && url
+    ? url.replace(/^(\w+:\/\/[^:/@]+):[^@]*@/, '$1:****@')
+    : url);
+
 class DeviceController {
 
     constructor() {
@@ -48,6 +53,7 @@ class DeviceController {
             // Senha do terminal não vai para o navegador (a edição mantém a atual se vier vazia)
             const safeData = (data || []).map(({ password_device, ...rest }) => ({
                 ...rest,
+                rtsp_url: mascararRtsp(rest.rtsp_url),
                 has_password: !!password_device
             }));
 
@@ -668,7 +674,7 @@ class DeviceController {
             });
 
             const { password_device: _omit, ...safeDevice } = data;
-            res.json({ success: true, data: { ...safeDevice, has_password: !!_omit } });
+            res.json({ success: true, data: { ...safeDevice, rtsp_url: mascararRtsp(safeDevice.rtsp_url), has_password: !!_omit } });
         } catch (error) {
             logger.error(
                 { err: error, device_id: req.params.id },
