@@ -325,7 +325,6 @@ function Invoke-VerificacaoCompatibilidade {
 
     $temGpuForte = $false
     $temGpuEntrada = $false
-    $temGpuIntegrada = $false
     foreach ($g in $gpus) {
         $vramGb = if ($g.AdapterRAM -gt 0) { [math]::Round($g.AdapterRAM / 1GB, 1) } else { 0 }
         $nomeGpu = "$($g.Name)"
@@ -338,7 +337,6 @@ function Invoke-VerificacaoCompatibilidade {
             Escrever "  • Placa de Vídeo (GPU): $nomeGpu (~$vramGb GB) [Dedicada Entrada - DirectML]" 'Yellow'
         }
         elseif ($nomeGpu -match 'Intel|Iris|UHD|HD Graphics|Vega') {
-            $temGpuIntegrada = $true
             Escrever "  • Placa de Vídeo (GPU): $nomeGpu [Integrada - DirectML básico]" 'Yellow'
         }
         else {
