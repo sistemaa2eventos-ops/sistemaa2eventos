@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useSyncExternalStore } from 'react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 
 interface ClienteTicket {
@@ -29,6 +30,7 @@ const extractApiErrorMessage = (error: unknown, fallback: string) => {
 };
 
 export default function ClientePortal() {
+    const router = useRouter();
     const [ticket, setTicket] = useState<ClienteTicket | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isUploading, setIsUploading] = useState(false);
@@ -201,7 +203,8 @@ export default function ClientePortal() {
             const res = await api.post('/portal/cliente/aceitar-transferencia', { token: acceptToken });
             if (res.data.success) {
                 alert('TRANSFERÊNCIA ACEITA! O Ingresso agora é de sua titularidade.');
-                window.location.href = '/cliente'; // Limpa o token da URL
+                router.replace('/cliente'); // Limpa o token da URL sem recarregar a página inteira
+                loadTicket();
             }
         } catch (error: unknown) {
             alert(extractApiErrorMessage(error, 'Link inválido ou já expirado.'));
