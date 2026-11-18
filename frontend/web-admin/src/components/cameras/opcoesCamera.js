@@ -53,7 +53,18 @@ export const payloadCamera = (cam, eventoId) => {
     };
     if (!payload.stream_url && payload.ip_address) {
         const auth = payload.usuario && payload.senha ? `${encodeURIComponent(payload.usuario)}:${encodeURIComponent(payload.senha)}@` : '';
-        payload.stream_url = `rtsp://${auth}${payload.ip_address}:${porta}/live`;
+        if (payload.fabricante === 'Mercusys / Tapo') {
+            payload.stream_url = `rtsp://${auth}${payload.ip_address}:${porta}/stream1`;
+            if (!payload.url_substream) payload.url_substream = `rtsp://${auth}${payload.ip_address}:${porta}/stream2`;
+        } else if (payload.fabricante === 'Intelbras') {
+            payload.stream_url = `rtsp://${auth}${payload.ip_address}:${porta}/cam/realmonitor?channel=1&subtype=0`;
+            if (!payload.url_substream) payload.url_substream = `rtsp://${auth}${payload.ip_address}:${porta}/cam/realmonitor?channel=1&subtype=1`;
+        } else if (payload.fabricante === 'Hikvision') {
+            payload.stream_url = `rtsp://${auth}${payload.ip_address}:${porta}/Streaming/Channels/101`;
+            if (!payload.url_substream) payload.url_substream = `rtsp://${auth}${payload.ip_address}:${porta}/Streaming/Channels/102`;
+        } else {
+            payload.stream_url = `rtsp://${auth}${payload.ip_address}:${porta}/live`;
+        }
     }
     for (const campo of ['area', 'tem_senha', 'created_at', 'last_seen', 'id', 'evento']) delete payload[campo];
     return payload;

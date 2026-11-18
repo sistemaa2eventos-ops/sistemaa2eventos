@@ -11,7 +11,7 @@ import SeletorModo from './SeletorModo';
 import { MODOS_IA, MODOS_GRAVACAO, modoIaDe, camposDoModoIa, NOVA_CAMERA, payloadCamera, gbPorDia } from './opcoesCamera';
 import { botaoSecundario } from '../../styles/tokens';
 
-const FABRICANTES = ['RTSP / OBS / Webcam', 'Intelbras', 'Hikvision', 'Genérica'];
+const FABRICANTES = ['RTSP / OBS / Webcam', 'Mercusys / Tapo', 'Intelbras', 'Hikvision', 'Genérica'];
 
 /**
  * Cadastro/edição de câmera — o MESMO formulário em Configurações › Câmeras e no Monitor
@@ -74,7 +74,7 @@ const CameraFormDialog = ({ open, camera, areas = [], eventoId, onClose, onSalvo
                                         const fab = e.target.value;
                                         const extra = fab === 'RTSP / OBS / Webcam'
                                             ? { porta: 8554, protocolo: 'rtsp' }
-                                            : (fab === 'Intelbras' || fab === 'Hikvision') ? { porta: 554, protocolo: 'rtsp' } : {};
+                                            : (fab === 'Mercusys / Tapo' || fab === 'Intelbras' || fab === 'Hikvision') ? { porta: 554, protocolo: 'rtsp' } : {};
                                         mudar({ fabricante: fab, ...extra });
                                     }}>
                                     {FABRICANTES.map(f => <MenuItem key={f} value={f}>{f}</MenuItem>)}
