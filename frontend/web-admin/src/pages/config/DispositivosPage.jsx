@@ -443,7 +443,7 @@ export default function DispositivosPage() {
             {/* ── Métricas do equipamento */}
             <Box sx={{ mt: 1.2, pt: 1, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.6 }}>
               <MetricaItem rotulo="Alcance"
-                valor={medindoCartao ? 'medindo...' : !m ? '–' : m.online ? `${m.latencia_ms} ms` : 'sem resposta'}
+                valor={medindoCartao ? 'medindo...' : !m ? '–' : m.online ? (m.latencia_ms != null ? `${m.latencia_ms} ms` : 'online') : 'sem resposta'}
                 cor={!m ? '#94A3B8' : m.online ? GREEN : RED} />
               <MetricaItem rotulo="Último evento" valor={m ? formatarMomento(m.ultimo_evento_at) : '–'} />
               <MetricaItem rotulo="Faces no leitor" valor={m?.faces_sincronizadas ?? '–'} />

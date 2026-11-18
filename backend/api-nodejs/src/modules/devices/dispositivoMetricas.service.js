@@ -1,11 +1,10 @@
-const net = require('net');
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const DeviceFactory = require('./adapters/DeviceFactory');
+const deviceHealthCheck = require('./deviceHealthCheck.service');
 
 // Métricas por leitor/câmera/catraca do evento.
-// Não grava nada: só lê o banco, consulta a contagem real do leitor (com cache) e testa o alcance TCP.
-const PING_TIMEOUT_MS = 2000;
+// Não grava nada: só lê o banco, consulta a contagem real do leitor (com cache) e mede o alcance pelo caminho do status (keepalive, agente ou TCP).
 const JANELA_ERROS_MS = 24 * 60 * 60 * 1000;
 const CACHE_FACES_HW_MS = 60 * 1000;
 const CACHE_METRICAS_EVENTO_MS = 12 * 1000;
@@ -14,25 +13,20 @@ const CONCORRENCIA_MAX = 6;
 const cacheFacesHw = new Map(); // devId -> { valor, expiraEm }
 const cacheEvento = new Map(); // eventoId -> { data, expiraEm }
 
-/** Teste TCP de alcance: latência em ms ou online=false (sem lançar erro). */
-function testarAlcance(ip, porta) {
-    return new Promise((resolve) => {
-        if (!ip || !porta) return resolve({ online: false, latencia_ms: null });
-        const socket = new net.Socket();
-        const inicio = Date.now();
-        let feito = false;
-        const encerrar = (resultado) => {
-            if (feito) return;
-            feito = true;
-            socket.destroy();
-            resolve(resultado);
-        };
-        socket.setTimeout(PING_TIMEOUT_MS);
-        socket.once('connect', () => encerrar({ online: true, latencia_ms: Date.now() - inicio }));
-        socket.once('timeout', () => encerrar({ online: false, latencia_ms: null }));
-        socket.once('error', () => encerrar({ online: false, latencia_ms: null }));
-        socket.connect(Number(porta), ip);
-    });
+
+/**
+ * Alcance do leitor pelo mesmo caminho do status do sistema: keepalive do próprio leitor, agente local
+ * ou teste direto. Na nuvem (VPS) o teste direto não alcança a rede do evento, então o agente é o que vale.
+ */
+async function alcanceDoDispositivo(dev) {
+    try {
+        const r = await deviceHealthCheck.avaliarDispositivo(dev);
+        const online = !!r.online;
+        return { online, latencia_ms: online && typeof r.latency === 'number' ? r.latency : null, via: r.via || null };
+    } catch (err) {
+        logger.warn(`[Métricas] alcance do dispositivo ${dev.id} falhou: ${err.message}`);
+        return { online: false, latencia_ms: null, via: null };
+    }
 }
 
 /** Contagem exata com filtro; devolve null se a consulta falhar (sem derrubar a resposta toda). */
@@ -101,7 +95,7 @@ async function metricasDoDispositivo(dev) {
     const desde = new Date(Date.now() - JANELA_ERROS_MS).toISOString();
 
     const [alcance, cadastros, remocoes, filaSucesso, falhas24h, ultimoErro, ultimoAcesso, filaErro, filaPendente] = await Promise.all([
-        testarAlcance(dev.ip_address, dev.porta),
+        alcanceDoDispositivo(dev),
         contar('dispositivo_sync_log', { dispositivo_id: dev.id, operacao: 'enroll', status: 'sucesso' }),
         contar('dispositivo_sync_log', { dispositivo_id: dev.id, operacao: 'delete', status: 'sucesso' }),
         contar('terminal_sync_queue', { dispositivo_id: dev.id, tipo_comando: 'enroll_face', status: 'sucesso' }),
@@ -127,6 +121,7 @@ async function metricasDoDispositivo(dev) {
         porta: dev.porta,
         online: alcance.online,
         latencia_ms: alcance.latencia_ms,
+        alcance_via: alcance.via,
         ultimo_ping_banco: dev.ultimo_ping || null,
         ultimo_evento_at: ultimoAcesso?.created_at || null,
         faces_sincronizadas: faces,
@@ -184,4 +179,4 @@ async function listarMetricas(req, res) {
     }
 }
 
-module.exports = { listarMetricas, testarAlcance };
+module.exports = { listarMetricas };
