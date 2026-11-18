@@ -2288,8 +2288,9 @@ const Monitor = () => {
                     camId={activeStreamCam.id}
                     alt={activeStreamCam.nome}
                     modo="stream"
-                    // Tela grande em 720p (sub-stream): o principal (ex.: 2304x1296) não chega fluido pela internet do evento
-                    qualidade="mini"
+                    // Tela grande: alta resolução. Pelo visor local (central no PC do evento) vai o principal;
+                    // pela VPS o componente reduz para 720p (ver CameraVideo), porque a internet não aguenta o principal
+                    qualidade="foco"
                     // Preencher a tela (cortando bordas) só no celular deitado; no computador, imagem
                     // inteira — "cover" ampliava e cortava o vídeo, deixando-o com aspecto pior
                     fit={isMobileOrTablet && isLandscape ? 'cover' : 'contain'}

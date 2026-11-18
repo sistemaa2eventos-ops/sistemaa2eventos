@@ -3,6 +3,7 @@ import { Box, Typography, CircularProgress } from '@mui/material';
 import { VideocamOff as SemVideoIcon, PauseCircleOutline as PausadoIcon } from '@mui/icons-material';
 import api from '../../services/api';
 import { pedirIngressoCamera, urlComIngresso } from '../../utils/cameraMedia';
+import { visorDisponivel, tokenVisor, urlVisorMp4, esquecerToken } from '../../utils/visorLocal';
 
 const IMAGEM_VAZIA = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 const ESPERAS_MS = [2000, 5000, 10000, 30000];
@@ -115,6 +116,24 @@ const CameraVideo = ({
 
     // Ao vivo só em MP4 (H.264, ~2 Mbit/s). O MJPEG custava ~7 Mbit/s por câmera e não é mais usado no ao vivo.
     const usarMp4 = modo === 'stream' && !!acesso?.mp4;
+
+    // Visor local (central na mesma rede): vídeo direto do PC do evento, sem ida e volta pela VPS.
+    // Sem o agente neste PC, visorToken fica null e o vídeo segue pela VPS como antes.
+    const [visorToken, setVisorToken] = useState(null);
+    useEffect(() => {
+        if (!ativo || modo !== 'stream') { setVisorToken(null); return undefined; }
+        let cancelado = false;
+        (async () => {
+            if (!(await visorDisponivel())) { if (!cancelado) setVisorToken(null); return; }
+            try {
+                const t = await tokenVisor();
+                if (!cancelado) setVisorToken(t);
+            } catch {
+                if (!cancelado) setVisorToken(null);
+            }
+        })();
+        return () => { cancelado = true; };
+    }, [ativo, modo, camId, reconexao]);
     // Com vídeo do PC do evento, a IA é desenhada aqui; sem ele (agente antigo), vem queimada no MJPEG do motor
     const caixasNoNavegador = !!acesso?.ia && !!acesso?.mp4;
     const anotarNoServidor = !!acesso?.ia && !acesso?.mp4;
@@ -175,7 +194,9 @@ const CameraVideo = ({
     }, []);
 
     const falhou = () => {
-        // Sem recuo para MJPEG: tenta de novo com as esperas de ESPERAS_MS
+        // Sem recuo para MJPEG: tenta de novo com as esperas de ESPERAS_MS.
+        // Se veio pelo visor local, o token pode ter expirado: a próxima tentativa pega uma sessão nova.
+        if (visorToken) esquecerToken();
         setFalhas(n => n + 1);
         setErro(true);
     };
@@ -187,7 +208,9 @@ const CameraVideo = ({
 
     let src = null;
     if (ativo && !erro && acesso?.ingresso) {
-        if (usarMp4) src = urlComIngresso(camId, 'video.mp4', acesso.ingresso, { qualidade });
+        if (usarMp4 && visorToken) src = urlVisorMp4(camId, visorToken, qualidade);
+        // Pela VPS, a tela grande cai para 720p: o principal (ex.: 2304x1296) não chega fluido pela internet
+        else if (usarMp4) src = urlComIngresso(camId, 'video.mp4', acesso.ingresso, { qualidade: qualidade === 'foco' ? 'mini' : qualidade });
         else if (modo === 'stream') src = urlComIngresso(camId, 'stream', acesso.ingresso, { annotate: anotarNoServidor, qualidade, r: reconexao });
         else src = urlComIngresso(camId, 'snapshot', acesso.ingresso, { annotate: anotarNoServidor, qualidade, t: quadro });
     }
