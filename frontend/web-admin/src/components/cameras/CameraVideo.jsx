@@ -7,7 +7,6 @@ import { pedirIngressoCamera, urlComIngresso } from '../../utils/cameraMedia';
 const IMAGEM_VAZIA = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 const ESPERAS_MS = [2000, 5000, 10000, 30000];
 const INGRESSO_VALE_MS = 90000; // o servidor dá 2 min; renova antes
-const ATRASO_MAX_S = 2.5;       // vídeo ao vivo atrasou mais que isso: pula para o ponto ao vivo
 
 /** Visível na tela e com a aba do navegador aberta */
 function useVisivel(ref) {
@@ -143,7 +142,7 @@ const CameraVideo = ({
         if (!ativo || !caixasNoNavegador || modo !== 'stream') { setCaixas([]); return undefined; }
         let parado = false;
         let timer;
-        const intervalo = qualidade === 'foco' ? 700 : 1500;
+        const intervalo = qualidade === 'foco' ? 300 : 800;
         const consultar = async () => {
             try {
                 const { data } = await api.get(`/cameras/${camId}/deteccoes`, { params: { qualidade }, hideDefaultError: true, timeout: 5000 });
@@ -166,12 +165,20 @@ const CameraVideo = ({
         return () => obs.disconnect();
     }, []);
 
-    // MP4 ao vivo: se atrasou (internet oscilou), pula para o ponto ao vivo
+    // MP4 ao vivo: elimina lag de buffer do navegador para manter o vídeo colado no tempo real (< 300ms)
     const manterAoVivo = useCallback(() => {
         const v = midiaRef.current;
         if (!v || v.tagName !== 'VIDEO' || !v.buffered.length) return;
         const fim = v.buffered.end(v.buffered.length - 1);
-        if (fim - v.currentTime > ATRASO_MAX_S) v.currentTime = Math.max(0, fim - 0.3);
+        const atraso = fim - v.currentTime;
+        if (atraso > 0.9) {
+            v.currentTime = Math.max(0, fim - 0.08);
+            v.playbackRate = 1.0;
+        } else if (atraso > 0.25) {
+            v.playbackRate = 1.15; // acelera suavemente para zerar qualquer atraso sem pulo perceptível
+        } else {
+            v.playbackRate = 1.0;
+        }
     }, []);
 
     const falhou = () => {
@@ -215,6 +222,7 @@ const CameraVideo = ({
                         style={{ width: '100%', height: '100%', objectFit: fit, display: 'block', ...estiloMidia }}
                         onLoadedData={(e) => abriu(e.currentTarget.videoWidth, e.currentTarget.videoHeight)}
                         onProgress={manterAoVivo}
+                        onTimeUpdate={manterAoVivo}
                         onError={falhou}
                         onEnded={() => { setAcesso(null); setReconexao(n => n + 1); }}
                     />

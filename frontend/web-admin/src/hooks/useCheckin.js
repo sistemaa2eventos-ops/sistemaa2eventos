@@ -130,8 +130,7 @@ export const useCheckin = (defaultMode, options = {}) => {
             if (res.data?.success) {
                 setSessaoAtiva(res.data.data);
                 await carregarDispositivosDisponiveis();
-                return {
-        turnoAnterior, confirmarTurnoAnterior, cancelarTurnoAnterior: () => setTurnoAnterior(null), success: true, data: res.data.data };
+                return { success: true, data: res.data.data };
             }
             return { success: false, error: res.data?.error || 'Erro ao vincular leitor' };
         } catch (err) {
@@ -475,6 +474,18 @@ export const useCheckin = (defaultMode, options = {}) => {
                 return { success: true, offline: true };
             }
 
+            // Texto que não é código no aparelho sem servidor: nem entra na fila
+            if (res.status === 'invalido') {
+                setCheckinResult('negado');
+                setResultMessage(res.message);
+                clearTimeout(resetTimerRef.current);
+                resetTimerRef.current = setTimeout(() => {
+                    setCheckinResult(null);
+                    setResultMessage('');
+                }, 3500);
+                return { success: false, error: res.message };
+            }
+
             if (res.data?.success) {
                 const data = res.data.data;
                 tocarBipeNotificacao();
@@ -533,7 +544,7 @@ export const useCheckin = (defaultMode, options = {}) => {
             }
         }
 
-        if (!targetPessoa && metodo !== 'qrcode') return;
+        if (!targetPessoa && metodo !== 'qrcode') return { success: false, error: 'Pessoa não informada' };
 
         try {
             setManualSaving(true);
@@ -588,12 +599,26 @@ export const useCheckin = (defaultMode, options = {}) => {
 
             if (res.status === 'local') {
                 mostrarSalvoOffline(res.message);
-                return;
+                return { success: true, offline: true };
             }
 
-            if (res.status === 'erro_negocio' || (finalData && finalData.tipo === 'negado')) {
+            if (res.status === 'invalido') {
                 setCheckinResult('negado');
-                setResultMessage(finalData.erro || finalData.observacao || 'Acesso não autorizado.');
+                setResultMessage(res.message);
+                clearTimeout(resetTimerRef.current);
+                resetTimerRef.current = setTimeout(() => {
+                    setCheckinResult(null);
+                    setResultMessage('');
+                }, 3000);
+                return { success: false, error: res.message };
+            }
+
+            let resultadoAcao = { success: true };
+            if (res.status === 'erro_negocio' || (finalData && finalData.tipo === 'negado')) {
+                const motivo = finalData.erro || finalData.observacao || 'Acesso não autorizado.';
+                resultadoAcao = { success: false, error: motivo };
+                setCheckinResult('negado');
+                setResultMessage(motivo);
             } else {
                 setCheckinResult('sucesso');
                 setResultMessage(isCheckout ? 'SAÍDA LIBERADA' : 'CHECK-IN REALIZADO');
@@ -611,15 +636,18 @@ export const useCheckin = (defaultMode, options = {}) => {
             }, 3000);
 
             atualizarAposAcesso();
+            return resultadoAcao;
         } catch (error) {
-            if (pedeTurnoAnterior(error)) return;
+            if (pedeTurnoAnterior(error)) return { success: false, turnoAnterior: true };
+            const motivo = error.response?.data?.error || 'Falha na comunicação com o servidor.';
             setCheckinResult('negado');
-            setResultMessage(error.response?.data?.error || 'Falha na comunicação com o servidor.');
+            setResultMessage(motivo);
             clearTimeout(resetTimerRef.current);
             resetTimerRef.current = setTimeout(() => {
                 setCheckinResult(null);
                 setResultMessage('');
             }, 3000);
+            return { success: false, error: motivo };
         } finally {
             setManualSaving(false);
         }
@@ -705,6 +733,8 @@ export const useCheckin = (defaultMode, options = {}) => {
 
     return {
         selectedPessoa, setSelectedPessoa: handleSelectPessoa,
+        // Saída de um dia anterior (CorrigirTurnoDialog): as telas já esperam estes campos
+        turnoAnterior, confirmarTurnoAnterior, cancelarTurnoAnterior: () => setTurnoAnterior(null),
         checkinResult, setCheckinResult,
         resultMessage, setResultMessage,
         loading, manualSaving,

@@ -128,17 +128,50 @@ async function origemDaCamera(url) {
     const nome = lista[indice] || lista[0];
     if (!nome) return obsLocal ? u : null;
     const modo = melhorModo(nome);
-    const params = new URLSearchParams({ video: String(Math.max(0, lista.indexOf(nome))), ...(modo || {}) });
+    const params = new URLSearchParams({
+        video: String(Math.max(0, lista.indexOf(nome))),
+        rtbufsize: '256M',
+        pixel_format: 'nv12',
+        ...(modo || {})
+    });
     // Teto de resolução (1280px) e taxa: câmeras 2K/60fps abrem no formato nativo do DirectShow sem erro de opção
-    const webcamDshow = `ffmpeg:device?${params}#video=h264#raw=-vf scale=1280:-2 -r 20 -crf 26 -maxrate 900k -bufsize 1800k`;
+    // Usa aceleração NVENC (GPU) com buffer 256M para zerar latência e não afogar a CPU nem perder frames
+    const webcamDshow = `ffmpeg:device?${params}#video=h264#raw=-vf scale=1280:-2,fps=30`;
     if (obsLocal && await portaAberta(8554)) return [u, webcamDshow];
     return webcamDshow;
+}
+
+let encoderH264Detectado = null;
+function obterEncoderH264() {
+    if (encoderH264Detectado) return encoderH264Detectado;
+    if (!estado.ffmpeg) return 'libx264';
+    try {
+        const r = require('child_process').execFileSync(estado.ffmpeg, ['-hide_banner', '-encoders'],
+            { encoding: 'utf8', windowsHide: true, timeout: 5000 });
+        if (/h264_nvenc\b/.test(r)) {
+            encoderH264Detectado = 'h264_nvenc';
+            return 'h264_nvenc';
+        }
+        if (/h264_amf\b/.test(r)) {
+            encoderH264Detectado = 'h264_amf';
+            return 'h264_amf';
+        }
+    } catch {}
+    encoderH264Detectado = 'libx264';
+    return 'libx264';
 }
 
 const nomeStream = (cameraId, sub) => `c_${String(cameraId).replace(/[^a-zA-Z0-9]/g, '')}${sub ? '_sub' : ''}`;
 const aspas = (t) => `"${String(t).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 
 function escreverConfig() {
+    const encoder = obterEncoderH264();
+    const h264Args = encoder === 'h264_nvenc'
+        ? '-c:v h264_nvenc -preset p1 -tune ull -pix_fmt yuv420p -b:v 1800k -maxrate 2500k -bufsize 3600k'
+        : (encoder === 'h264_amf'
+            ? '-c:v h264_amf -pix_fmt yuv420p -b:v 1800k'
+            : '-c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -crf 26 -maxrate 1200k -bufsize 2400k');
+
     const linhas = [
         'api:',
         `  listen: "127.0.0.1:${PORTA_API}"`,
@@ -163,7 +196,11 @@ function escreverConfig() {
         '  level: warn',
         // Só o nome: o go2rtc corta o comando nos espaços ("C:\Users\Natália Alves\..." quebrava);
         // a pasta do ffmpeg vai na frente do PATH do processo (ver iniciarProcesso)
-        ...(estado.ffmpeg ? ['ffmpeg:', '  bin: "ffmpeg"'] : []),
+        ...(estado.ffmpeg ? [
+            'ffmpeg:',
+            '  bin: "ffmpeg"',
+            `  h264: "${h264Args}"`
+        ] : []),
         'streams:',
         ...[...estado.streams].flatMap(([nome, url]) => (
             Array.isArray(url)
@@ -233,10 +270,10 @@ function iniciarProcesso() {
  * Processos que sobraram de um agente anterior que caiu (no Windows o filho não morre com o pai):
  * go2rtc segurando a porta, ffmpeg gravando na mesma pasta. Só os que batem com o filtro.
  */
-function encerrarOrfaos(nomeExe, trechoLinhaDeComando) {
+function encerrarOrfaos(nomeExe, trechoLinhaDeComando = '') {
     if (process.platform !== 'win32') return;
-    const filtro = String(trechoLinhaDeComando).replace(/'/g, "''");
-    const script = `Get-CimInstance Win32_Process -Filter "Name='${nomeExe}'" | Where-Object { $_.CommandLine -and $_.CommandLine.Contains('${filtro}') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`;
+    const filtro = String(trechoLinhaDeComando || '').replace(/'/g, "''");
+    const script = `Get-CimInstance Win32_Process -Filter "Name='${nomeExe}'" | Where-Object { -not '${filtro}' -or ($_.CommandLine -and $_.CommandLine.Contains('${filtro}')) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`;
     try {
         execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { stdio: 'ignore', windowsHide: true, timeout: 15000 });
     } catch { /* nada a encerrar */ }
@@ -244,7 +281,7 @@ function encerrarOrfaos(nomeExe, trechoLinhaDeComando) {
 
 function iniciar(logger) {
     if (logger) log = logger;
-    encerrarOrfaos('go2rtc.exe', ARQ_CONFIG);
+    encerrarOrfaos('go2rtc.exe');
     estado.bin = acharBinario('go2rtc');
     estado.ffmpeg = acharBinario('ffmpeg');
     if (!estado.bin) {

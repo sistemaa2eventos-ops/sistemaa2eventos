@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
     Box, TextField, Typography, Stack, Chip, InputAdornment,
-    CircularProgress, Tooltip, Fade, IconButton, Button
+    CircularProgress, Tooltip, Fade, IconButton, Button, Alert
 } from '@mui/material';
 import {
     QrCodeScanner as BarcodeIcon,
@@ -20,6 +20,10 @@ import {
  * 2. Leitor de QR Code / Código de Barras pela Câmera Mobile/Web -> Exibe o código lido e dispara AUTOMÁTICO
  * 3. Digitação Manual de número da pulseira ou CPF -> Exige Enter ou clique no botão OK
  * 4. Busca por Nome no mesmo campo -> Dispara busca em tempo real conforme digita
+ *
+ * Fila de leituras: cada bipe vira um item da fila e o campo é limpo na hora. Uma leitura só é entregue
+ * ao pai (onConfirm) quando a anterior terminou (a promessa devolvida por onConfirm, ou o loading do pai).
+ * Se onConfirm devolver { success: false, error }, a recusa aparece na tela com o código recusado.
  */
 
 // Confirmação automática (leitor sem Enter) só a partir de 4 caracteres: digitação rápida não confirma pela metade.
@@ -28,8 +32,35 @@ const TAMANHO_MINIMO_AUTOMATICO_DIGITOS = 4;
 const TAMANHO_MINIMO_AUTOMATICO = 4;
 // Enter do mesmo valor logo depois da confirmação automática é o Enter do próprio leitor: ignora
 const JANELA_ENTER_REPETIDO_MS = 1500;
+// Teclas de uma mesma leitura chegam em menos de 48 ms (rajada do leitor)
+const INTERVALO_RAJADA_MS = 48;
+// Pausa acima disto entre duas teclas separa leituras; abaixo, pode ser só oscilação do leitor no meio do código
+const QUEBRA_ENTRE_LEITURAS_MS = 100;
+// Silêncio do leitor (sem Enter) até a leitura ser confirmada sozinha
+const SILENCIO_LEITOR_MS = 130;
+// Acima disso o operador é avisado na tela (nenhuma leitura é descartada)
+const LIMITE_FILA_AVISO = 20;
+const MAX_RECUSAS_NA_TELA = 5;
+
 const temLetras = (texto) => /[A-Za-zÀ-ÿ]/.test(texto);
 const minimoAutomatico = (texto) => (/^\d+$/.test(texto) ? TAMANHO_MINIMO_AUTOMATICO_DIGITOS : TAMANHO_MINIMO_AUTOMATICO);
+
+// Faixa de lote de pulseira que contém o número digitado/lido (ou null)
+const tipoDaFaixa = (texto, tipos = []) => {
+    const limpo = String(texto || '').trim();
+    if (!/^\d+$/.test(limpo)) return null;
+    const num = parseInt(limpo, 10);
+    if (isNaN(num)) return null;
+    return (tipos || []).find(tipo => {
+        const ini = tipo.numero_inicial != null ? parseInt(tipo.numero_inicial, 10) : null;
+        const fim = tipo.numero_final != null ? parseInt(tipo.numero_final, 10) : null;
+        if (ini != null && fim != null) {
+            return num >= ini && num <= fim;
+        }
+        return false;
+    }) || null;
+};
+
 export const UniversalPulseiraInput = ({
     value = '',
     onChange,
@@ -47,23 +78,41 @@ export const UniversalPulseiraInput = ({
     // Quando informado, o ícone dentro da caixa abre a câmera do aparelho
     onAbrirCamera,
     mostrarBotaoCamera = true,
-    ultimoCodigoLido = ''
+    ultimoCodigoLido = '',
+    // Recebe o total de leituras pendentes (na fila + em andamento), para o pai segurar o que depende disso
+    onFilaChange
 }) => {
     const inputRef = useRef(null);
     const keyTimestampsRef = useRef([]);
+    const ultimaTeclaRef = useRef(0);
     const autoScanTimerRef = useRef(null);
+    const autoPendenteRef = useRef(null); // { texto }: leitura que confirma sozinha após o silêncio do leitor
     const ultimaAutomaticaRef = useRef({ valor: '', em: 0 });
-    // `loading` é só da AÇÃO (registro/consulta), nunca da busca por nome. Durante a ação o campo continua
-    // aceitando teclas (sem readOnly, que descartaria o bipe seguinte); só a confirmação espera:
-    // fica guardada em pendenteRef e dispara quando a ação termina.
-    const loadingRef = useRef(loading);
-    const pendenteRef = useRef(null);
-    const dispararRef = useRef(null);
     const valueRef = useRef(value);
     const ultimaConfirmadaRef = useRef('');
+    // Fila: uma entrada por leitura, na ordem em que chegou
+    const filaRef = useRef([]);
+    const ocupadoRef = useRef(false); // a leitura atual ainda não terminou no pai
+    const loadingRef = useRef(loading);
+    const disabledRef = useRef(disabled);
+    const onConfirmRef = useRef(onConfirm);
+    const onChangeRef = useRef(onChange);
+    const onFilaChangeRef = useRef(onFilaChange);
+    const pulseiraTypesRef = useRef(pulseiraTypes);
+    const processarRef = useRef(null);
+    const recusaSeqRef = useRef(0);
+
     const [origemLeitura, setOrigemLeitura] = useState(null); // 'barcode' | 'camera' | 'manual' | null
     const [codigoLidoBadge, setCodigoLidoBadge] = useState('');
     const [pulseAnimation, setPulseAnimation] = useState(false);
+    const [pendentes, setPendentes] = useState(0);
+    const [recusas, setRecusas] = useState([]); // { id, codigo, motivo }
+
+    // Sempre a versão mais nova das props: a fila pode disparar uma leitura depois do render em que nasceu
+    onConfirmRef.current = onConfirm;
+    onChangeRef.current = onChange;
+    onFilaChangeRef.current = onFilaChange;
+    pulseiraTypesRef.current = pulseiraTypes;
 
     // Quando o componente pai informa um código lido pela câmera/leitor, exibe o badge
     useEffect(() => {
@@ -98,65 +147,102 @@ export const UniversalPulseiraInput = ({
         }
     }, [autoFocus, disabled, loading]);
 
+    useEffect(() => { valueRef.current = value; }, [value]);
+    useEffect(() => { onFilaChangeRef.current?.(pendentes); }, [pendentes]);
+
     // Identificar tipo de pulseira correspondente à faixa numérica
-    const tipoPulseiraCorrespondente = useMemo(() => {
-        if (!value) return null;
-        const limpo = String(value).trim();
-        if (!/^\d+$/.test(limpo)) return null;
-        const num = parseInt(limpo, 10);
-        if (isNaN(num)) return null;
+    const tipoPulseiraCorrespondente = useMemo(() => tipoDaFaixa(value, pulseiraTypes), [value, pulseiraTypes]);
 
-        return (pulseiraTypes || []).find(tipo => {
-            const ini = tipo.numero_inicial != null ? parseInt(tipo.numero_inicial, 10) : null;
-            const fim = tipo.numero_final != null ? parseInt(tipo.numero_final, 10) : null;
-            if (ini != null && fim != null) {
-                return num >= ini && num <= fim;
-            }
-            return false;
-        });
-    }, [value, pulseiraTypes]);
+    const atualizarPendentes = useCallback(() => {
+        setPendentes(filaRef.current.length + (ocupadoRef.current ? 1 : 0));
+    }, []);
 
-    const dispararConfirmacao = useCallback((textoBruto, tipoOrigem, automatica = false) => {
+    const registrarRecusa = useCallback((codigo, motivo) => {
+        recusaSeqRef.current += 1;
+        const id = recusaSeqRef.current;
+        setRecusas(prev => [{ id, codigo, motivo: motivo || 'Não autorizado pelo servidor' }, ...prev].slice(0, MAX_RECUSAS_NA_TELA));
+    }, []);
+
+    // Entrega uma leitura por vez ao pai. Só segue quando a anterior terminou e o pai não está em ação.
+    const processarFila = useCallback(() => {
+        if (ocupadoRef.current || loadingRef.current || disabledRef.current) return;
+        const item = filaRef.current.shift();
+        if (!item) {
+            atualizarPendentes();
+            return;
+        }
+
+        ocupadoRef.current = true;
+        atualizarPendentes();
+        ultimaConfirmadaRef.current = item.val;
+        setOrigemLeitura(item.origem);
+        // "Código lido" só para código: nome digitado não é código
+        setCodigoLidoBadge(item.origem === 'manual' && temLetras(item.val) ? '' : item.val);
+        setPulseAnimation(true);
+        setTimeout(() => setPulseAnimation(false), 500);
+
+        let retorno;
+        try {
+            retorno = onConfirmRef.current?.(item.val, item.origem, tipoDaFaixa(item.val, pulseiraTypesRef.current));
+        } catch (err) {
+            retorno = Promise.reject(err);
+        }
+        Promise.resolve(retorno)
+            .then((res) => {
+                if (res && res.success === false) registrarRecusa(item.val, res.error);
+            })
+            .catch((err) => registrarRecusa(item.val, err?.message))
+            .finally(() => {
+                ocupadoRef.current = false;
+                atualizarPendentes();
+                processarRef.current?.();
+            });
+    }, [atualizarPendentes, registrarRecusa]);
+
+    processarRef.current = processarFila;
+
+    // Fim da ação do pai (loading → false) ou da desabilitação: segue a fila
+    useEffect(() => {
+        loadingRef.current = loading;
+        disabledRef.current = disabled;
+        processarRef.current?.();
+    }, [loading, disabled]);
+
+    const cancelarAutoLeitura = () => {
         if (autoScanTimerRef.current) {
             clearTimeout(autoScanTimerRef.current);
             autoScanTimerRef.current = null;
         }
-        const val = String(textoBruto || '').trim();
-        if (!val || disabled) return;
-        // Ação em curso: guarda a confirmação (a última vence) e dispara quando a ação terminar
-        if (loadingRef.current) {
-            pendenteRef.current = { val, tipoOrigem, automatica };
-            return;
-        }
+        autoPendenteRef.current = null;
+    };
 
-        ultimaConfirmadaRef.current = val;
+    const enfileirarLeitura = (val, origem, automatica) => {
         if (automatica) ultimaAutomaticaRef.current = { valor: val, em: Date.now() };
-        setOrigemLeitura(tipoOrigem);
-        // "Código lido" só para código: nome digitado não é código
-        setCodigoLidoBadge(tipoOrigem === 'manual' && temLetras(val) ? '' : val);
-        setPulseAnimation(true);
-        setTimeout(() => setPulseAnimation(false), 500);
+        filaRef.current.push({ val, origem, automatica });
+        atualizarPendentes();
+        processarRef.current?.();
+    };
+
+    // Campo limpo no momento do bipe: a próxima leitura começa vazia
+    const limparCampo = () => {
         keyTimestampsRef.current = [];
+        cancelarAutoLeitura();
+        valueRef.current = '';
+        onChangeRef.current?.('');
+    };
 
-        if (onConfirm) {
-            onConfirm(val, tipoOrigem, tipoPulseiraCorrespondente);
-        }
-    }, [disabled, onConfirm, tipoPulseiraCorrespondente]);
-
-    useEffect(() => { valueRef.current = value; }, [value]);
-    useEffect(() => { dispararRef.current = dispararConfirmacao; }, [dispararConfirmacao]);
-
-    // Fim da ação: dispara a confirmação que chegou enquanto ela rodava
-    useEffect(() => {
-        loadingRef.current = loading;
-        if (loading || !pendenteRef.current) return;
-        const { val, tipoOrigem, automatica } = pendenteRef.current;
-        pendenteRef.current = null;
-        dispararRef.current?.(val, tipoOrigem, automatica);
-    }, [loading]);
+    // Uma leitura (bipe, Enter ou OK). Nome digitado (com letras) não limpa o campo: o pai cuida dele.
+    const confirmarLeitura = (texto, origem, automatica = false) => {
+        const val = String(texto || '').trim();
+        if (!val || disabledRef.current) return;
+        cancelarAutoLeitura();
+        keyTimestampsRef.current = [];
+        const ehNome = origem === 'manual' && temLetras(val);
+        if (!ehNome) limparCampo();
+        enfileirarLeitura(val, origem, automatica);
+    };
 
     const handleKeyDown = (e) => {
-        // Sem checar loading: teclas durante a ação entram no campo e a confirmação vai para a fila
         if (disabled) return;
 
         const now = Date.now();
@@ -176,15 +262,15 @@ export const UniversalPulseiraInput = ({
 
         if (e.key === 'Enter') {
             e.preventDefault();
-            const val = String(value || '').trim();
-            if (!val) return;
+            const val = String(valueRef.current || '').trim();
 
-            // Leitor que manda Enter depois da pausa: a confirmação automática já foi feita
+            // Enter do leitor depois da leitura automática: o campo já foi limpo (ou é o mesmo código). Ignora.
             const ultima = ultimaAutomaticaRef.current;
-            if (ultima.valor === val && now - ultima.em < JANELA_ENTER_REPETIDO_MS) {
+            if (ultima.em && (now - ultima.em) < JANELA_ENTER_REPETIDO_MS && (!val || val === ultima.valor)) {
                 keyTimestampsRef.current = [];
                 return;
             }
+            if (!val) return;
 
             let isScanner = false;
             const ts = keyTimestampsRef.current;
@@ -196,19 +282,30 @@ export const UniversalPulseiraInput = ({
                 }
             }
 
-            dispararConfirmacao(val, isScanner ? 'barcode' : 'manual');
+            confirmarLeitura(val, isScanner ? 'barcode' : 'manual');
         }
     };
 
     const handleChange = (e) => {
-        const val = e.target.value;
-        if (onChange) onChange(val);
+        const agora = Date.now();
+        const pausa = agora - ultimaTeclaRef.current;
+        ultimaTeclaRef.current = agora;
+        let val = e.target.value;
 
-        if (autoScanTimerRef.current) {
-            clearTimeout(autoScanTimerRef.current);
-            autoScanTimerRef.current = null;
+        // Leitura anterior ainda esperando o silêncio do leitor, e esta tecla veio depois de uma pausa:
+        // a anterior já estava completa. Ela entra na fila agora e a tecla nova começa outra leitura.
+        const pendente = autoPendenteRef.current;
+        if (pendente && pausa > QUEBRA_ENTRE_LEITURAS_MS && val.length > pendente.texto.length && val.startsWith(pendente.texto)) {
+            const resto = val.slice(pendente.texto.length);
+            cancelarAutoLeitura();
+            keyTimestampsRef.current = [agora];
+            enfileirarLeitura(pendente.texto, 'barcode', true);
+            val = resto;
         }
 
+        if (onChangeRef.current) onChangeRef.current(val);
+
+        cancelarAutoLeitura();
         const limpo = String(val || '').trim();
         if (!limpo) {
             setCodigoLidoBadge('');
@@ -218,26 +315,26 @@ export const UniversalPulseiraInput = ({
 
         // Detecção automática de leitor de código de barras / QR Code que NÃO envia Enter ao final:
         // Se pelo menos o mínimo de caracteres (2 só dígitos, 4 com letras) chegou em rajada (< 48ms por tecla)
-        // e não é um nome com espaço, dispara a confirmação automaticamente após 130ms de silêncio da rajada.
+        // e não é um nome com espaço, confirma a leitura após o silêncio do leitor.
         const ts = keyTimestampsRef.current;
         const minimo = minimoAutomatico(limpo);
         if (ts.length >= minimo && limpo.length >= minimo && !/\s/.test(limpo)) {
             const diffTotal = ts[ts.length - 1] - ts[0];
             const mediaDiff = diffTotal / (ts.length - 1);
             const ehApenasLetrasCurto = /^[A-Za-zÀ-ÿ]{1,5}$/.test(limpo);
-            if (mediaDiff < 48 && !ehApenasLetrasCurto) {
+            if (mediaDiff < INTERVALO_RAJADA_MS && !ehApenasLetrasCurto) {
+                autoPendenteRef.current = { texto: limpo };
                 autoScanTimerRef.current = setTimeout(() => {
-                    dispararConfirmacao(limpo, 'barcode', true);
-                }, 130);
+                    autoScanTimerRef.current = null;
+                    autoPendenteRef.current = null;
+                    confirmarLeitura(limpo, 'barcode', true);
+                }, SILENCIO_LEITOR_MS);
             }
         }
     };
 
     const handleClear = () => {
-        if (autoScanTimerRef.current) {
-            clearTimeout(autoScanTimerRef.current);
-            autoScanTimerRef.current = null;
-        }
+        cancelarAutoLeitura();
         keyTimestampsRef.current = [];
         setCodigoLidoBadge('');
         setOrigemLeitura(null);
@@ -245,6 +342,8 @@ export const UniversalPulseiraInput = ({
         if (onClear) onClear();
         inputRef.current?.focus();
     };
+
+    const leiturasAguardando = Math.max(0, pendentes - 1);
 
     return (
         <Box sx={{ width: '100%' }}>
@@ -266,6 +365,14 @@ export const UniversalPulseiraInput = ({
                 </Typography>
 
                 <Stack direction="row" spacing={0.75} alignItems="center">
+                    {leiturasAguardando > 0 && (
+                        <Chip
+                            label={`Aguardando: ${leiturasAguardando}`}
+                            size="small"
+                            aria-live="polite"
+                            sx={{ bgcolor: 'rgba(255, 184, 0, 0.15)', color: '#FFB800', fontWeight: 700, fontSize: '0.75rem', height: 22, border: '1px solid rgba(255, 184, 0, 0.4)' }}
+                        />
+                    )}
                     {codigoLidoBadge && (
                         <Fade in>
                             <Chip
@@ -296,7 +403,7 @@ export const UniversalPulseiraInput = ({
                 onKeyDown={handleKeyDown}
                 // Durante a leitura fica só leitura (não desabilitado): desabilitar tira o foco do campo
                 disabled={disabled}
-                // Sem readOnly durante a ação: o leitor não perde caracteres (a confirmação espera a ação terminar)
+                // Sem readOnly durante a ação: o leitor não perde caracteres (a leitura entra na fila)
                 inputProps={{ 'aria-busy': loading }}
                 placeholder={placeholder}
                 variant="outlined"
@@ -353,8 +460,8 @@ export const UniversalPulseiraInput = ({
                                             sx={{
                                                 fontWeight: 700,
                                                 fontSize: '0.75rem',
-                                                bgcolor: tipoPulseiraCorrespondente.cor_hex 
-                                                    ? `${tipoPulseiraCorrespondente.cor_hex}33` 
+                                                bgcolor: tipoPulseiraCorrespondente.cor_hex
+                                                    ? `${tipoPulseiraCorrespondente.cor_hex}33`
                                                     : `${accentColor}33`,
                                                 color: tipoPulseiraCorrespondente.cor_hex || accentColor,
                                                 border: `1px solid ${tipoPulseiraCorrespondente.cor_hex || accentColor}`
@@ -392,7 +499,7 @@ export const UniversalPulseiraInput = ({
                                             <Button
                                                 variant="contained"
                                                 size="small"
-                                                onClick={() => dispararConfirmacao(value, 'manual')}
+                                                onClick={() => confirmarLeitura(value, 'manual')}
                                                 disabled={disabled || !String(value).trim()}
                                                 sx={{
                                                     minWidth: 44,
@@ -429,11 +536,11 @@ export const UniversalPulseiraInput = ({
                         // O código digitado fica grande; o texto de ajuda, menor (antes saía cortado)
                         '& input::placeholder': { fontSize: { xs: '0.8125rem', sm: '0.9375rem' }, fontWeight: 500, letterSpacing: 0, opacity: 0.6 },
                         transition: 'all 0.25s ease',
-                        boxShadow: pulseAnimation 
-                            ? '0 0 25px rgba(0, 255, 136, 0.6)' 
+                        boxShadow: pulseAnimation
+                            ? '0 0 25px rgba(0, 255, 136, 0.6)'
                             : `0 0 10px ${accentColor}25`,
-                        border: pulseAnimation 
-                            ? '2px solid #00FF88' 
+                        border: pulseAnimation
+                            ? '2px solid #00FF88'
                             : `1px solid ${accentColor}55`,
                         '& fieldset': { border: 'none' },
                         '&:hover': {
@@ -479,10 +586,31 @@ export const UniversalPulseiraInput = ({
                 )}
             </Box>
 
+            {pendentes > LIMITE_FILA_AVISO && (
+                <Alert severity="warning" sx={{ mt: 1, py: 0, bgcolor: 'rgba(255, 184, 0, 0.12)', color: '#FFD27A' }}>
+                    {`${pendentes} leituras na fila. Cada uma será processada em ordem; nenhuma foi perdida.`}
+                </Alert>
+            )}
+
+            {recusas.length > 0 && (
+                <Stack spacing={0.75} mt={1} aria-live="polite">
+                    {recusas.map((r) => (
+                        <Alert
+                            key={r.id}
+                            severity="error"
+                            onClose={() => setRecusas(prev => prev.filter(x => x.id !== r.id))}
+                            sx={{ py: 0, bgcolor: 'rgba(255, 51, 102, 0.12)', color: '#FFB3C6', fontSize: '0.8125rem' }}
+                        >
+                            <strong>Recusado: {r.codigo}</strong> — {r.motivo}
+                        </Alert>
+                    ))}
+                </Stack>
+            )}
+
             {/* Sub-informações e instrução de confirmação */}
             <Stack direction="row" justifyContent="space-between" alignItems="center" mt={0.85} px={0.5}>
                 <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.55)', display: 'flex', alignItems: 'center', gap: 0.6, fontSize: '0.75rem', lineHeight: 1.3 }}>
-                    <KeyboardIcon sx={{ fontSize: 15, color: 'rgba(255,255,255,0.4)', flexShrink: 0 }} /> 
+                    <KeyboardIcon sx={{ fontSize: 15, color: 'rgba(255,255,255,0.4)', flexShrink: 0 }} />
                     {helperText || 'Pressione Enter ↵ após bipe ou digitação para confirmar'}
                 </Typography>
             </Stack>

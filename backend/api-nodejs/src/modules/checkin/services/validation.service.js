@@ -3,6 +3,7 @@ const { buscarTodos } = require('../../../utils/buscarTodos');
 const logger = require('../../../services/logger');
 const cacheService = require('../../../services/cacheService');
 const { getHojeLocal, getInicioHojeLocal, getLimitesDiaLocalUTC, ultimaOcorrenciaHorario, TIMEZONE } = require('../../../utils/dateUtils');
+const { buscarEntradaNaEtapa, erroEntradaDuplicada } = require('./entradaEtapa');
 
 // Logs gravados pelo credenciamento (entrega de pulseira) não contam como passagem em leitor
 const MARCADOR_CREDENCIAMENTO = 'CREDENCIAMENTO';
@@ -95,6 +96,11 @@ class ValidationService {
         }
 
         return resultado;
+    }
+
+    /** Último check-in/checkout da pessoa no evento, em qualquer área (base do replay offline). */
+    async ultimoLogPessoa(pessoa_id, evento_id) {
+        return buscarUltimoLog(pessoa_id, evento_id, null);
     }
 
     async getRealtimeStatsInternal(evento_id) {
@@ -422,6 +428,14 @@ class ValidationService {
             throw this._buildError(`Baixa confiança biométrica: ${confianca}% (Piso: ${targetConfidence}%)`);
         }
 
+        // 4b. Entrada única por etapa: uma entrada por pessoa, etapa, dia civil e área (409).
+        // ctx.entrada = { etapa, dia, area_id, credenciamento, logId } montado pelo checkin.service
+        if (tipo === 'checkin' && ctx && ctx.entrada) {
+            const ja = await buscarEntradaNaEtapa(supabase, { evento_id, pessoa_id: pessoa.id, ...ctx.entrada });
+            // Mesmo id = reenvio do mesmo acesso (idempotente): não é segunda entrada
+            if (ja && ja.id !== ctx.entrada.logId) throw erroEntradaDuplicada(ja.created_at);
+        }
+
         // 5. Anti-passback (cooldown por área)
         if ((tipo === 'checkin' || tipo === 'checkout') && cooldown > 0) {
             await this.validateAntiPassback(evento_id, pessoa.id, tipo, metodo, cooldown, area_id, timestamp,
@@ -475,9 +489,9 @@ class ValidationService {
         return true;
     }
 
-    _buildError(message) {
+    _buildError(message, status = 403) {
         const error = new Error(message);
-        error.status = 403;
+        error.status = status;
         return error;
     }
 }

@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { db } from './db';
 import api from './api';
+import { ehCodigoLeitor } from '../utils/codigoLeitor';
 
 const log = process.env.NODE_ENV === 'development' ? console.log : () => {};
 const warn = process.env.NODE_ENV === 'development' ? console.warn : () => {};
@@ -70,6 +71,12 @@ class LocalCheckinService {
      * Salva o registro na fila do IndexedDB
      */
     async salvarNaFila(endpoint, data, tipoOperacao) {
+        // Texto que não é código não vai para a fila: o servidor recusaria depois, e o operador precisa saber agora
+        const valorLido = data.codigo ?? data.numero_pulseira;
+        if (valorLido != null && !ehCodigoLeitor(valorLido)) {
+            return { status: 'invalido', message: 'Não é um código válido', data: null };
+        }
+
         const item = {
             payload: data,
             endpoint,
@@ -190,6 +197,18 @@ class LocalCheckinService {
 
     async getPendenteCount() {
         return await db.filaSincronizacao.where('status').equals('pendente').count();
+    }
+
+    /** Acessos que o servidor recusou ao sincronizar (erro_negocio), até o operador dispensar */
+    async listarRecusados() {
+        return await db.filaSincronizacao.where('status').equals('erro_negocio').toArray();
+    }
+
+    async dispensarRecusado(id) {
+        await db.filaSincronizacao.delete(id);
+        window.dispatchEvent(new CustomEvent('sync-status-changed', {
+            detail: { count: await this.getPendenteCount() }
+        }));
     }
 }
 

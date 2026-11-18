@@ -9,11 +9,11 @@
 const TIMEZONE = process.env.TZ || 'America/Sao_Paulo';
 
 /**
- * Retorna a data de HOJE no fuso local no formato YYYY-MM-DD
+ * Retorna a data de HOJE no fuso local no formato YYYY-MM-DD (ou o dia civil local de `agora`)
  * Correto para uso em queries de banco de dados (Supabase, SQL Server)
  */
-function getHojeLocal() {
-    const now = new Date();
+function getHojeLocal(agora = new Date()) {
+    const now = agora;
     // Usa Intl para formatar no timezone correto
     const partes = new Intl.DateTimeFormat('pt-BR', {
         timeZone: TIMEZONE,
@@ -130,7 +130,17 @@ function limiteFiltro(valor, fim = false) {
     return new Date(Date.parse(limites.start) + deslocamento + extra).toISOString();
 }
 
+/**
+ * Instante gravado em UTC (logs_acesso.created_at vem sem fuso) como Date. Texto com fuso explícito usa o próprio.
+ * @param {string} texto
+ */
+function parseUtcSemFuso(texto) {
+    const s = String(texto);
+    return new Date(/Z|[+-]d{2}:?d{2}$/.test(s) ? s : `${s}Z`);
+}
+
 module.exports = {
+    parseUtcSemFuso,
     limiteFiltro,
     proximaOcorrenciaHorario,
     ultimaOcorrenciaHorario,

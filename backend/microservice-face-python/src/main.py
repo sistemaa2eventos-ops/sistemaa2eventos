@@ -48,8 +48,8 @@ PERFIS: Dict[str, Dict[str, Any]] = {
                     "ia_stream": "sub", "limiar": 0.50, "margem": 0.06, "confirmacoes": 2, "video_fps_max": 12},
     "equilibrado": {"ia_fps_total": 30, "ia_fps_foco": 10, "ia_fps_mini": 4, "ia_fps_vigilancia": 3, "det_size": 640,
                     "ia_stream": "auto", "limiar": 0.48, "margem": 0.06, "confirmacoes": 2, "video_fps_max": 15},
-    "maximo":      {"ia_fps_total": 45, "ia_fps_foco": 15, "ia_fps_mini": 6, "ia_fps_vigilancia": 5, "det_size": 640,
-                    "ia_stream": "principal", "limiar": 0.46, "margem": 0.05, "confirmacoes": 2, "video_fps_max": 20},
+    "maximo":      {"ia_fps_total": 60, "ia_fps_foco": 25, "ia_fps_mini": 12, "ia_fps_vigilancia": 6, "det_size": 640,
+                    "ia_stream": "principal", "limiar": 0.46, "margem": 0.05, "confirmacoes": 2, "video_fps_max": 30},
 }
 COMUNS: Dict[str, Any] = {
     "min_face_px": 36,          # menor lado do rosto no quadro analisado (menor que isso: "distante")
@@ -66,9 +66,9 @@ COMUNS: Dict[str, Any] = {
 }
 # Faixas aceitas para cada ajuste vindo do painel (valores fora são limitados)
 FAIXAS: Dict[str, Tuple[float, float]] = {
-    "ia_fps_total": (2, 120), "ia_fps_foco": (1, 30), "ia_fps_mini": (0.5, 15), "ia_fps_vigilancia": (0.5, 15),
+    "ia_fps_total": (2, 120), "ia_fps_foco": (1, 60), "ia_fps_mini": (0.5, 30), "ia_fps_vigilancia": (0.5, 30),
     "det_size": (320, 1024), "limiar": (0.30, 0.75), "margem": (0.0, 0.20), "confirmacoes": (1, 3),
-    "video_fps_max": (5, 30), "min_face_px": (16, 200), "min_det_score": (0.3, 0.95), "min_nitidez": (0, 200),
+    "video_fps_max": (5, 60), "min_face_px": (16, 200), "min_det_score": (0.3, 0.95), "min_nitidez": (0, 200),
     "max_yaw": (15, 90), "reconhecer_s": (0.2, 10), "movimento_limiar": (0.0005, 0.05),
     "movimento_janela_s": (0.5, 30), "cena_parada_s": (0.5, 30), "vigilancia_repetir_s": (5, 3600),
 }

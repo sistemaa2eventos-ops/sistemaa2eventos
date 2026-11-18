@@ -525,7 +525,10 @@ function Confirm-Motor {
     $pidAtual = Get-PidNaPorta $PortaMotor
     if ($pidAtual -and (Test-ProcessoDesatualizado $pidAtual (Join-Path $DirMotor 'src\main.py'))) {
         Escrever '[2/3] Motor de IA: código atualizado no disco, reiniciando o motor para a versão nova...' 'Yellow'
-        Stop-Process -Id $pidAtual -Force -ErrorAction SilentlyContinue; Start-Sleep 2
+        Get-CimInstance Win32_Process -Filter "Name='python.exe'" -ErrorAction SilentlyContinue |
+            Where-Object { $_.CommandLine -match 'main\.py' -or $_.ProcessId -eq $pidAtual } |
+            ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+        Start-Sleep 3
     }
     if (Get-SaudeMotor) { Escrever '[2/3] Motor de IA: já estava ligado, mantendo.' 'Green'; Show-Motor; return }
     $ocupante = Get-PidNaPorta $PortaMotor

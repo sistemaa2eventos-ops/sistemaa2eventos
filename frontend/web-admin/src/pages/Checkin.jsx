@@ -23,6 +23,7 @@ import { useCheckin } from '../hooks/useCheckin';
 import { carregarConfigEtiqueta } from '../services/etiquetaService';
 import CorrigirTurnoDialog from '../components/checkin/CorrigirTurnoDialog';
 import AcoesPulseiraCheckin from '../components/checkin/AcoesPulseiraCheckin';
+import RecusadosSincronizacao from '../components/checkin/RecusadosSincronizacao';
 import RelogioSincronizado from '../components/common/RelogioSincronizado';
 
 const FeedbackOverlay = styled(Box, { shouldForwardProp: (p) => p !== 'status' })(({ status }) => ({
@@ -75,8 +76,8 @@ const Checkin = () => {
   const [ultimoCodigoLido, setUltimoCodigoLido] = useState('');
   const [lendoCamera, setLendoCamera] = useState(false);
 
-  // Código (QR Code, código de barras, câmera, ou CPF/número digitado + Enter/OK) neste campo só LOCALIZA a pessoa
-  // e abre a janela de conferência. A entrada é registrada dentro da janela, pela leitura da pulseira.
+  // Regra decidida: código (QR, código de barras, câmera, ou CPF/número digitado + Enter) neste campo só
+  // LOCALIZA a pessoa e abre a janela de conferência. A entrada é registrada dentro da janela.
   const processarCheckinCodigo = (codigoBruto) => {
     const cod = String(codigoBruto || '').trim();
     if (!cod) return;
@@ -90,7 +91,7 @@ const Checkin = () => {
   // Código ou CPF digitado + Enter: localiza e abre a janela de conferência.
   const confirmarCampo = (val, origem) => {
     const texto = String(val || '').trim();
-    if (!texto) return;
+    if (!texto) return undefined;
     if (origem !== 'barcode' && origem !== 'camera' && /[A-Za-zÀ-ÿ]/.test(texto)) {
       const buscaDesteTexto = !searchLoading && searchQuery.trim() === texto;
       if (buscaDesteTexto && searchResults.length === 1) {
@@ -99,9 +100,9 @@ const Checkin = () => {
         handleSearch(texto);
       }
       setBarcodeValue('');
-      return;
+      return undefined;
     }
-    processarCheckinCodigo(texto, origem);
+    return processarCheckinCodigo(texto, origem);
   };
 
   // Controle de Impressão de Etiqueta / Cartão PVC no Check-in
@@ -259,6 +260,9 @@ const Checkin = () => {
                         )
                     )}
                 </Box>
+
+                {/* Acessos feitos sem internet que o servidor recusou: ficam até o operador dispensar */}
+                <RecusadosSincronizacao />
 
                 {/* Números do turno */}
                 {!modoQuiosque && (

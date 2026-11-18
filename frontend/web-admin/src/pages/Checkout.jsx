@@ -18,6 +18,7 @@ import RecentAccessList from '../components/credenciamento/RecentAccessList';
 import CabecalhoOperacao, { BotaoJanelaRegistros } from '../components/credenciamento/CabecalhoOperacao';
 import { useCheckin } from '../hooks/useCheckin';
 import CorrigirTurnoDialog from '../components/checkin/CorrigirTurnoDialog';
+import ConferenciaSaidaDialog from '../components/checkin/ConferenciaSaidaDialog';
 import { funcao, tom } from '../styles/tokens';
 
 // Saída tem cor própria; vermelho fica só para acesso negado
@@ -96,7 +97,8 @@ const Checkout = () => {
     searchQuery, handleSearch, searchResults, searchLoading,
     recentLogs,
     areaId, changeAreaId, eventAreas, pulseiraTypes,
-    executarLeituraRapida,
+    selectedPessoa, setSelectedPessoa,
+    abrirConferenciaPorCodigo, performCheckin, manualSaving,
     // Vínculo Facial
     sessaoAtiva,
     dispositivosDisponiveis,
@@ -129,27 +131,43 @@ const Checkout = () => {
     return l.tipo === 'checkout' || l.metodo === 'checkout';
   }), [recentLogs]);
 
-  const registrarSaida = useCallback((valor, metodo = 'barcode') => {
-    const cod = String(valor || pulseiraValue || '').trim();
-    if (cod) {
-      setPulseiraValue(''); // campo vazio: o próximo bipe não gruda no anterior
-      setUltimoCodigoLido(cod); // o código aparece só no aviso "Código lido"
-      handleSearch('');
-      executarLeituraRapida(cod, 'checkout', metodo);
-    }
-  }, [pulseiraValue, executarLeituraRapida, handleSearch]);
+  // Janela de conferência da saída: guarda a pessoa até o operador fechar. O hook limpa selectedPessoa
+  // sozinho depois de cada ação, e isso não pode derrubar a janela no meio de uma leitura.
+  const [pessoaJanela, setPessoaJanela] = useState(null);
+  useEffect(() => { if (selectedPessoa) setPessoaJanela(selectedPessoa); }, [selectedPessoa]);
+  const fecharJanela = () => {
+    setPessoaJanela(null);
+    setSelectedPessoa(null);
+  };
 
-  // Enter/OK/"Registrar saída": código lido, nº da pulseira ou CPF dá a saída direto.
-  // Texto com letras digitado é nome: nunca dá saída automática; só lista para o operador escolher.
+  // A saída é registrada pela janela: pela pulseira lida (o servidor usa esse número) ou por CPF/QR desta pessoa
+  const registrarSaidaNaJanela = ({ pessoa, via, codigo }) => (
+    via === 'pulseira'
+      ? performCheckin('pulseira', codigo, pessoa.id)
+      : performCheckin('manual', null, pessoa.id)
+  );
+
+  // Código (QR, barras, câmera, CPF ou nº da pulseira + Enter/OK) só localiza a pessoa e abre a janela de
+  // conferência. A saída é registrada dentro da janela, pela leitura da pulseira. Igual ao Check-in.
+  const processarCodigo = (codigoBruto) => {
+    const cod = String(codigoBruto || '').trim();
+    if (!cod) return undefined;
+    setPulseiraValue(''); // campo vazio: o próximo bipe não gruda no anterior
+    setUltimoCodigoLido(cod); // o código aparece só no aviso "Código lido"
+    handleSearch('');
+    return abrirConferenciaPorCodigo(cod);
+  };
+
+  // Enter/OK: código abre a conferência. Texto com letras é nome: nunca abre sozinho; só mostra a lista.
   const confirmarCampo = (val, origem) => {
     const texto = String(val || '').trim();
-    if (!texto) return;
+    if (!texto) return undefined;
     if (origem !== 'barcode' && /[A-Za-zÀ-ÿ]/.test(texto)) {
       if (searchQuery.trim() !== texto) handleSearch(texto);
       setPulseiraValue('');
-      return;
+      return undefined;
     }
-    registrarSaida(texto, origem === 'barcode' ? 'barcode' : 'manual');
+    return processarCodigo(texto);
   };
 
   return (
@@ -202,13 +220,14 @@ const Checkout = () => {
                     accentColor={COR}
                     label="Leitor, pulseira, CPF ou nome"
                     placeholder="Bipe QR/barras, digite nº da pulseira, CPF ou nome..."
-                    helperText="Bipe ou câmera: saída automática • Digitação: Enter ou OK • Nome: escolha na lista"
+                    helperText="Bipe ou câmera: abre a conferência • Digitação: Enter ou OK • Nome: escolha na lista"
                     pulseiraTypes={pulseiraTypes}
                     ultimoCodigoLido={ultimoCodigoLido}
                     onConfirm={confirmarCampo}
                     // Só o loading da ação: a busca por nome não pode travar o campo no meio de um bipe
                     loading={loading}
-                    autoFocus={!modoQuiosque}
+                    // Com a janela aberta o foco fica nela: um bipe não pode cair neste campo por trás
+                    autoFocus={!modoQuiosque && !pessoaJanela}
                     onAbrirCamera={() => setLendoCamera(true)}
                 />
                 {/* Busca por nome em andamento: barra fina com altura fixa (nada pula) */}
@@ -222,7 +241,7 @@ const Checkout = () => {
                             {searchResults.map(p => (
                                 <ListItem key={p.id} disablePadding sx={{ mb: 1 }}>
                                     <ListItemButton
-                                        onClick={() => registrarSaida(p.id, 'manual')} // pelo id: sem 409 de pulseira repetida nem 404 de CPF fora do padrão
+                                        onClick={() => setSelectedPessoa(p)} // abre a conferência, como no Check-in
                                         sx={{
                                             borderRadius: 1.5,
                                             p: 1.15,
@@ -258,7 +277,7 @@ const Checkout = () => {
                 )}
 
                 <BotaoSaida fullWidth startIcon={<LogoutIcon />} onClick={() => confirmarCampo(pulseiraValue, 'manual')} disabled={loading || !pulseiraValue.trim()}>
-                    Registrar saída
+                    Abrir conferência
                 </BotaoSaida>
 
                 <Stack spacing={0.75} sx={{ mt: 'auto', pt: 1.25, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
@@ -315,8 +334,18 @@ const Checkout = () => {
           instrucao="Aponte a câmera para o QR Code ou código de barras da pulseira ou do crachá — a saída será registrada automaticamente."
           onLeitura={(cod) => {
               setLendoCamera(false);
-              registrarSaida(cod, 'qrcode');
+              processarCodigo(cod);
           }}
+      />
+
+      {/* CONFERÊNCIA DA SAÍDA: a saída é registrada aqui, pela pulseira desta pessoa */}
+      <ConferenciaSaidaDialog
+          open={!!pessoaJanela}
+          pessoa={pessoaJanela}
+          onClose={fecharJanela}
+          onRegistrar={registrarSaidaNaJanela}
+          ocupado={manualSaving}
+          accentColor={COR}
       />
 
       {/* DIALOG DETALHADO DO CARD DO PARTICIPANTE */}

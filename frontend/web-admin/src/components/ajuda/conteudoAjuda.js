@@ -96,8 +96,10 @@ const AJUDAS = {
         ],
         atencao: [
             'O campo de busca nunca faz a entrada sozinho: a entrada só é registrada na ficha.',
+            'Uma pulseira só registra uma entrada por etapa e por dia; a segunda leitura é recusada.',
             'Com o leitor facial vinculado, a ficha da pessoa abre sozinha quando ela passa o rosto — só na estação ligada àquele leitor.',
-            'Sem internet, a entrada fica guardada no aparelho ("Aguardando envio") e sobe sozinha depois.'
+            'Sem internet, a entrada fica guardada no aparelho ("Aguardando envio") e sobe sozinha depois. Se o servidor recusar um desses acessos, ele aparece em "Recusados pelo servidor" até você dispensar.',
+            'Texto que não é código (nome, palavra solta) não vai para a fila sem internet: aparece "Não é um código válido" na hora.'
         ],
         dicas: [
             'Com "Imprimir etiqueta" ligado no evento, a etiqueta sai sozinha a cada entrada nova. "Imprimir etiqueta: ON" na tela abre a prévia só quando o evento não imprime sozinho (a etiqueta nunca sai duas vezes).',
@@ -106,13 +108,16 @@ const AJUDAS = {
     },
     '/checkout': {
         titulo: 'Check-out',
-        objetivo: 'Registrar a saída por leitor, CPF, pulseira, QR ou leitor facial.',
+        objetivo: 'Registrar a saída pela ficha de conferência: localize a pessoa, confira os dados e bipe a pulseira dela.',
         passos: [
             'Vincule a estação e escolha a área, como no check-in.',
-            'Bipe ou digite o número da pulseira ou o CPF no campo "Busca por nome, CPF ou leitura QR / Pulseira" e aperte Enter (ou "Registrar saída").',
-            'Digitando o nome, a saída não é registrada sozinha: escolha a pessoa na lista.'
+            'No campo "Leitor, pulseira, CPF ou nome", bipe o QR/código de barras, use "Ler pela câmera", ou digite o número da pulseira ou o CPF e aperte Enter: abre a ficha da pessoa. Digitando o nome, escolha a pessoa na lista.',
+            'Na ficha, bipe a pulseira desta pessoa: a saída é registrada ali. Outra pulseira ou outra pessoa é recusada.'
         ],
         atencao: [
+            'O campo nunca registra a saída sozinho: a saída só sai pela leitura da pulseira na ficha (ou pelo CPF/QR da própria pessoa).',
+            'Uma pulseira só registra uma saída por etapa e por dia; a segunda leitura é recusada.',
+            'Sem internet não dá para abrir a ficha: a pessoa precisa ser localizada pelo servidor.',
             'Com leitor facial vinculado, o reconhecimento já registra a saída, sem confirmação.',
             'Se a pessoa entrou num dia anterior e não registrou a saída, abre a janela "Saída de um dia anterior": confira o horário sugerido (o da saída do dia anterior) e clique em "Corrigir saída". O turno antigo é corrigido e nada é lançado para hoje.',
             'Quem não registrar a saída fica "a conferir" no relatório quando o dia vira.'
@@ -123,10 +128,13 @@ const AJUDAS = {
         objetivo: 'Conferir pulseiras e credenciais nos postos internos, sem registrar entrada nem saída.',
         passos: [
             'Escolha o "Posto de fiscalização" (a área onde você está).',
-            'Bipe a pulseira/crachá, digite o número ou o CPF e aperte Enter, ou toque no ícone do leitor para usar a câmera. Pelo nome, escolha a pessoa na lista (Enter com nome não fiscaliza).',
+            'Bipe a pulseira/crachá, digite o número ou o CPF e aperte Enter, ou use "Ler pela câmera". Pelo nome, escolha a pessoa na lista (Enter com nome não fiscaliza).',
             'Veja o resultado: LIBERADO, NÃO AUTORIZADO ou BLOQUEADO, com as áreas permitidas.'
         ],
-        dicas: ['O posto fica salvo neste navegador. Os contadores valem só para esta sessão da tela.']
+        dicas: [
+            'O posto fica salvo neste navegador. Os contadores valem só para esta sessão da tela.',
+            'A fiscalização não registra entrada nem saída: a regra de uma leitura por etapa e por dia não se aplica aqui.'
+        ]
     },
     '/monitor': {
         titulo: 'Monitor em tempo real',
