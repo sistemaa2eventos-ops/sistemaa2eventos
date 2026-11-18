@@ -99,7 +99,8 @@ class DeviceController {
                 user_device: normalizedUser,
                 password_device: normalizedPassword,
                 user: normalizedUser,
-                password: normalizedPassword
+                password: normalizedPassword,
+                config: config || {}
             });
             if (device.getRTSPUrl) {
                 rtsp_url = device.getRTSPUrl();
@@ -641,6 +642,20 @@ class DeviceController {
             });
 
             const { password_device: _omit, ...safeDevice } = data;
+            // Atualizar rtsp_url se o dispositivo tiver senha configurada e mudaram parâmetros de vídeo/rede
+            if (data.ip_address && data.password_device) {
+                try {
+                    const inst = DeviceFactory.getDevice(data);
+                    const novaRtsp = inst.getRTSPUrl ? inst.getRTSPUrl() : data.rtsp_url;
+                    if (novaRtsp && novaRtsp !== data.rtsp_url) {
+                        data.rtsp_url = novaRtsp;
+                        await supabase.from('dispositivos_acesso').update({ rtsp_url: novaRtsp }).eq('id', id).eq('evento_id', req.event.id);
+                    }
+                } catch {
+                    // Mantém rtsp_url anterior se o adaptador não gerar RTSP
+                }
+            }
+
             res.json({ success: true, data: { ...safeDevice, has_password: !!_omit } });
         } catch (error) {
             logger.error(

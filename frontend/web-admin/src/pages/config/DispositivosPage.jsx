@@ -40,6 +40,39 @@ const statusColor = (s) => s === 'online' ? GREEN : RED;
 const statusLabel = (s) => s === 'online' ? '● Online' : '○ Offline';
 const queueChip = (s) => ({ sucesso: 'success', erro: 'error', pendente: 'warning', processando: 'info' }[s] ?? 'default');
 
+// Data/hora curta em pt-BR ('nunca' quando vazio)
+const formatarMomento = (iso) => {
+  if (!iso) return 'nunca';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '–';
+  return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+};
+
+// Caminho RTSP padrão por marca (só para mostrar como placeholder; o servidor usa o que estiver salvo)
+// Hikvision: canal N = /Streaming/Channels/N01 (stream principal). Intelbras/Dahua: /cam/realmonitor?channel=N
+const caminhoRtspPadrao = (marca, canal) => {
+  const n = Number(canal) || 1;
+  return marca === 'hikvision' ? `/Streaming/Channels/${n * 100 + 1}` : `/cam/realmonitor?channel=${n}&subtype=0`;
+};
+
+// Prévia da URL RTSP com a senha mascarada (a senha real nunca aparece na tela)
+const urlRtspPrevia = (f) => {
+  const c = f.config || {};
+  const caminho = c.rtsp_caminho || caminhoRtspPadrao(f.marca, c.canal);
+  return `rtsp://${f.user_device || 'usuario'}:****@${f.ip_address || 'ip'}:${c.rtsp_porta || 554}${caminho}`;
+};
+
+// Linha de métrica do card (rótulo + valor; dica opcional ao passar o mouse)
+const MetricaItem = ({ rotulo, valor, cor, dica }) => {
+  const conteudo = (
+    <Box>
+      <Typography variant="caption" sx={{ color: '#64748B', display: 'block', fontSize: '0.68rem', lineHeight: 1.2 }}>{rotulo}</Typography>
+      <Typography variant="body2" sx={{ color: cor || '#CBD5E1', fontSize: '0.78rem', fontWeight: 600, lineHeight: 1.3 }}>{valor}</Typography>
+    </Box>
+  );
+  return dica ? <Tooltip title={dica}><span>{conteudo}</span></Tooltip> : conteudo;
+};
+
 const FORM_DEFAULT = {
   id: null, nome: '', marca: 'intelbras', tipo: 'terminal_facial',
   ip_address: '', porta: 80, user_device: 'admin', password_device: '',
@@ -54,6 +87,9 @@ export default function DispositivosPage() {
   const [queue, setQueue] = useState([]);
   const [areas, setAreas] = useState([]);
   const [agentes, setAgentes] = useState([]);
+  // Métricas por dispositivo, indexadas por id (online, latência, último evento, faces, erros)
+  const [metricas, setMetricas] = useState({});
+  const [medindo, setMedindo] = useState(false);
   const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
 
@@ -89,16 +125,22 @@ export default function DispositivosPage() {
     try {
       if (!silencioso) setLoading(true);
       const eventoId = new URLSearchParams(window.location.search).get('evento_id') || localStorage.getItem('active_evento_id');
-      const [devRes, queueRes, areasRes, agentesRes] = await Promise.allSettled([
+      const [devRes, queueRes, areasRes, agentesRes, metricasRes] = await Promise.allSettled([
         api.get('/dispositivos', { params: { evento_id: eventoId } }),
         api.get('/dispositivos/queue', { params: { evento_id: eventoId } }),
         api.get('/config/areas', { params: { evento_id: eventoId } }),
-        api.get('/agentes', { hideDefaultError: true })
+        api.get('/agentes', { hideDefaultError: true }),
+        // Teste de alcance em cada equipamento: o servidor responde em até ~2 s por leitor
+        api.get('/dispositivos/metricas', { params: { evento_id: eventoId }, hideDefaultError: true, timeout: 20000 })
       ]);
       setAgentes(agentesRes.status === 'fulfilled' ? (agentesRes.value.data?.data ?? []) : []);
       setDispositivos(devRes.status === 'fulfilled' ? (devRes.value.data?.data ?? []) : []);
       setQueue(queueRes.status === 'fulfilled' ? (queueRes.value.data?.data ?? []) : []);
       setAreas(areasRes.status === 'fulfilled' ? (areasRes.value.data?.data ?? []) : []);
+      if (metricasRes.status === 'fulfilled') {
+        const lista = metricasRes.value.data?.data ?? [];
+        setMetricas(Object.fromEntries(lista.map(m => [m.dispositivo_id, m])));
+      }
     } catch (err) {
       enqueueSnackbar('Erro ao carregar dados: ' + err.message, { variant: 'error' });
     } finally {
@@ -106,14 +148,32 @@ export default function DispositivosPage() {
     }
   }, [enqueueSnackbar]);
 
+  // Mede os equipamentos agora (ignora o cache curto do servidor), sem recarregar a lista inteira
+  const medirAgora = async () => {
+    setMedindo(true);
+    try {
+      const eventoId = new URLSearchParams(window.location.search).get('evento_id') || localStorage.getItem('active_evento_id');
+      const { data } = await api.get('/dispositivos/metricas', {
+        params: { evento_id: eventoId, force: 'true' }, hideDefaultError: true, timeout: 20000
+      });
+      setMetricas(Object.fromEntries((data?.data ?? []).map(m => [m.dispositivo_id, m])));
+      enqueueSnackbar('Métricas atualizadas', { variant: 'success', autoHideDuration: 1500 });
+    } catch (err) {
+      enqueueSnackbar('Falha ao medir: ' + (err.response?.data?.error || err.message), { variant: 'error' });
+    } finally {
+      setMedindo(false);
+    }
+  };
+
   useEffect(() => {
     carregarDados();
     if (autoRefresh) {
-      // A cada 30 s e só com a aba visível (antes: 4 chamadas a cada 12 s, mesmo escondida)
-      const interval = setInterval(() => { if (!document.hidden) carregarDados(true); }, 30000);
+      // A cada 60 s (ou 90 s quando há muitos equipamentos) e só com a aba visível
+      const intervaloMs = dispositivos.length > 6 ? 90000 : 60000;
+      const interval = setInterval(() => { if (!document.hidden) carregarDados(true); }, intervaloMs);
       return () => clearInterval(interval);
     }
-  }, [autoRefresh, carregarDados]);
+  }, [autoRefresh, carregarDados, dispositivos.length]);
 
   // ── Auxiliar: loading por dispositivo
   const setDevLoading = (id, key, val) =>
@@ -139,7 +199,9 @@ export default function DispositivosPage() {
     const { name, value, type, checked } = e.target;
     if (name.startsWith('config.')) {
       const key = name.slice(7);
-      setFormData(p => ({ ...p, config: { ...(p.config || {}), [key]: type === 'checkbox' ? checked : value } }));
+      // Canal e porta RTSP são números: vazio fica como undefined (o servidor usa o padrão)
+      const valorNumerico = ['canal', 'rtsp_porta'].includes(key) ? (parseInt(value, 10) || undefined) : value;
+      setFormData(p => ({ ...p, config: { ...(p.config || {}), [key]: type === 'checkbox' ? checked : valorNumerico } }));
     } else {
       setFormData(p => ({ ...p, [name]: name === 'porta' ? parseInt(value) || 0 : value }));
     }
@@ -148,6 +210,12 @@ export default function DispositivosPage() {
   const handleSave = async () => {
     if (!formData.nome || !formData.ip_address) {
       enqueueSnackbar('Nome e IP são obrigatórios', { variant: 'warning' });
+      return;
+    }
+    const exigeSenha = ['terminal_facial', 'catraca'].includes(formData.tipo)
+      && ['intelbras', 'dahua', 'hikvision'].includes(formData.marca);
+    if (!isEditing && exigeSenha && !String(formData.password_device || '').trim()) {
+      enqueueSnackbar('A senha do leitor é obrigatória para este equipamento', { variant: 'warning' });
       return;
     }
     try {
@@ -257,7 +325,9 @@ export default function DispositivosPage() {
   // ── Render de um card de dispositivo
   const renderCard = (device) => {
     const expanded = !!expandedCards[device.id];
-    const isOnline = device.status_online === 'online';
+    const m = metricas[device.id];
+    // Com métricas: teste de alcance agora. Sem: último status gravado no banco.
+    const isOnline = m ? m.online : device.status_online === 'online';
     const pending = queueCount(device.id);
 
     return (
@@ -329,6 +399,21 @@ export default function DispositivosPage() {
                   Último ping: {new Date(device.ultimo_ping).toLocaleTimeString('pt-BR')}
                 </Box>
               )}
+            </Box>
+
+            {/* ── Métricas do equipamento */}
+            <Box sx={{ mt: 1.2, pt: 1, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.6 }}>
+              <MetricaItem rotulo="Alcance"
+                valor={!m ? '–' : m.online ? `${m.latencia_ms} ms` : 'sem resposta'}
+                cor={!m ? '#94A3B8' : m.online ? GREEN : RED} />
+              <MetricaItem rotulo="Último evento" valor={m ? formatarMomento(m.ultimo_evento_at) : '–'} />
+              <MetricaItem rotulo="Faces no leitor" valor={m?.faces_sincronizadas ?? '–'} />
+              <MetricaItem rotulo="Erros (24 h)"
+                valor={m?.erros_24h ?? '–'}
+                cor={m?.erros_24h > 0 ? RED : undefined}
+                dica={m?.ultimo_erro ? `${m.ultimo_erro.operacao}: ${m.ultimo_erro.mensagem || 'sem mensagem'} (${formatarMomento(m.ultimo_erro.at)})` : null} />
+              <MetricaItem rotulo="Fila pendente" valor={m?.fila_pendente ?? pending} cor={(m?.fila_pendente ?? pending) > 0 ? '#FFB800' : undefined} />
+              <MetricaItem rotulo="Medido" valor={m ? formatarMomento(m.medido_em) : '–'} />
             </Box>
           </CardContent>
 
@@ -471,6 +556,10 @@ export default function DispositivosPage() {
     );
   };
 
+  // Leitor de acesso Intelbras/Dahua/Hikvision: o backend exige senha no cadastro
+  const senhaObrigatoria = ['terminal_facial', 'catraca'].includes(formData.tipo)
+    && ['intelbras', 'dahua', 'hikvision'].includes(formData.marca);
+
   // ── Render principal
   return (
     <Box sx={{ p: { xs: 2, md: 4 } }}>
@@ -492,6 +581,10 @@ export default function DispositivosPage() {
           {loading ? 'Atualizando...' : 'Atualizar'}
         </NeonButton>
 
+        <NeonButton variant="outlined" startIcon={<PingIcon />} onClick={medirAgora} disabled={medindo}>
+          {medindo ? 'Medindo...' : 'Medir agora'}
+        </NeonButton>
+
         <Button variant="outlined"
           size="small"
           startIcon={<PingIcon />}
@@ -511,7 +604,7 @@ export default function DispositivosPage() {
                 inputProps={{ 'aria-label': 'Ativar atualização automática de terminais' }}
               />
             }
-            label={<Typography variant="caption" sx={{ color: '#94A3B8' }}>Atualização automática (30 s)</Typography>}
+            label={<Typography variant="caption" sx={{ color: '#94A3B8' }}>Atualização automática (60 s)</Typography>}
           />
         </Box>
       </Box>
@@ -662,10 +755,48 @@ export default function DispositivosPage() {
               <Grid item xs={6}>
                 <TextField label="Senha" id="password_device" name="password_device" type="password" value={formData.password_device}
                   onChange={handleFormChange} fullWidth size="small" autoComplete="new-password"
+                  required={!isEditing && senhaObrigatoria}
                   placeholder={isEditing && formData.has_password ? '•••••• (mantida)' : ''}
-                  helperText={isEditing ? 'Deixe em branco para manter a senha atual' : ''} />
+                  helperText={isEditing
+                    ? 'Deixe em branco para manter a senha atual'
+                    : (senhaObrigatoria ? 'Obrigatória: senha deste leitor' : '')} />
               </Grid>
             </Grid>
+
+            {/* ── Integração do equipamento: canal, vídeo RTSP e eventos */}
+            {['terminal_facial', 'catraca', 'camera'].includes(formData.tipo) && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, p: 1.5, border: `1px solid ${CYAN}22`, borderRadius: 1.5 }}>
+                <Typography variant="subtitle2" sx={{ color: CYAN, fontWeight: 700 }}>
+                  Integração do equipamento
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={4}>
+                    <TextField label="Canal de vídeo" name="config.canal" type="number" value={formData.config?.canal ?? ''}
+                      onChange={handleFormChange} fullWidth size="small" placeholder="1"
+                      helperText="Canal da câmera no equipamento" />
+                  </Grid>
+                  <Grid item xs={4}>
+                    <TextField label="Porta RTSP" name="config.rtsp_porta" type="number" value={formData.config?.rtsp_porta ?? ''}
+                      onChange={handleFormChange} fullWidth size="small" placeholder="554" />
+                  </Grid>
+                  <Grid item xs={4}>
+                    <TextField label="Caminho RTSP (opcional)" name="config.rtsp_caminho" value={formData.config?.rtsp_caminho ?? ''}
+                      onChange={handleFormChange} fullWidth size="small"
+                      placeholder={caminhoRtspPadrao(formData.marca, formData.config?.canal)} />
+                  </Grid>
+                </Grid>
+                <Typography variant="caption" sx={{ color: '#64748B', wordBreak: 'break-all' }}>
+                  Vídeo: <code style={{ color: '#94A3B8' }}>{urlRtspPrevia(formData)}</code>
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#94A3B8' }}>
+                  Eventos em tempo real (modo online): depois de salvar, use o botão <b>Config online</b> no cartão.
+                  {formData.marca === 'hikvision'
+                    ? ' Hikvision: o aparelho envia para o servidor pelo listening host (Event > httpHosts).'
+                    : ' Intelbras/Dahua: o aparelho envia pela configuração Plataforma > Online / POST eventos.'}
+                </Typography>
+              </Box>
+            )}
+
             {isEditing && formData.control_token && (
               <Box sx={{
                 background: 'rgba(0,212,255,0.05)', border: `1px solid ${CYAN}33`,

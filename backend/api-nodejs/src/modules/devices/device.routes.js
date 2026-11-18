@@ -8,6 +8,7 @@ const { deviceValidators, handleValidationErrors } = require('../../middleware/v
 
 const deviceController = require('./device.controller');
 const sessaoOperadorController = require('./sessaoOperador.controller');
+const dispositivoMetricas = require('./dispositivoMetricas.service');
 
 // Todas as rotas de dispositivos requerem autenticação e contexto de evento
 router.use(authenticate);
@@ -24,6 +25,9 @@ router.get('/', deviceController.list);
 
 // Obter fila de sincronização
 router.get('/queue', deviceController.getQueue);
+
+// Métricas por equipamento (online, latência, último evento, faces, erros) — Admin/Supervisor
+router.get('/metricas', authorize('admin', 'supervisor'), dispositivoMetricas.listarMetricas);
 
 // Cadastrar dispositivo (Admin/Supervisor)
 router.post('/',

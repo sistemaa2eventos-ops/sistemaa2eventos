@@ -44,14 +44,28 @@ class IntelbrasService extends AccessDevice {
         return this.digestClient;
     }
 
-    // Gerar URL RTSP
-    getRTSPUrl() {
-        return `rtsp://${this.user}:${this.pass}@${this.ip}:554/cam/realmonitor?channel=1&subtype=0`;
+    _videoConfig() {
+        const cfg = (this.config && typeof this.config.config === 'object' && this.config.config) || this.config || {};
+        const canal = Math.max(1, parseInt(cfg.canal, 10) || 1);
+        const rtspPorta = Math.max(1, parseInt(cfg.rtsp_porta, 10) || 554);
+        const caminhoCustom = typeof cfg.rtsp_caminho === 'string' ? cfg.rtsp_caminho.trim() : '';
+        const caminho = caminhoCustom
+            ? (caminhoCustom.startsWith('/') ? caminhoCustom : `/${caminhoCustom}`)
+            : `/cam/realmonitor?channel=${canal}&subtype=0`;
+        return { canal, rtspPorta, caminho };
     }
 
-    // Gerar URL de Snapshot
+    // Gerar URL RTSP respeitando config.canal, config.rtsp_porta e config.rtsp_caminho
+    getRTSPUrl() {
+        const { rtspPorta, caminho } = this._videoConfig();
+        // Usuário e senha codificados: senha com @ : / quebrava a URL
+        return `rtsp://${encodeURIComponent(this.user)}:${encodeURIComponent(this.pass)}@${this.ip}:${rtspPorta}${caminho}`;
+    }
+
+    // Gerar URL de Snapshot respeitando config.canal
     getSnapshotUrl() {
-        return `${this.baseUrl}/cgi-bin/snapshot.cgi`;
+        const { canal } = this._videoConfig();
+        return `${this.baseUrl}/cgi-bin/snapshot.cgi?channel=${canal}`;
     }
 
     /**
@@ -111,11 +125,13 @@ class IntelbrasService extends AccessDevice {
     }
 
     /**
-     * Obter Snapshot (Buffer JPEG)
+     * Obter Snapshot (Buffer JPEG) respeitando config.canal
      */
     async getSnapshot() {
         try {
-            const r = await this._request('GET', '/cgi-bin/snapshot.cgi', {}, null, null, { binary: true });
+            const { canal } = this._videoConfig();
+            const params = canal > 1 || this.config?.config?.canal ? { channel: String(canal) } : {};
+            const r = await this._request('GET', '/cgi-bin/snapshot.cgi', params, null, null, { binary: true });
             if (!r.ok) throw new Error(`Snapshot failed: ${r.status}`);
             return r.buffer;
         } catch (error) {
@@ -291,12 +307,28 @@ class IntelbrasService extends AccessDevice {
     }
 
     /**
-     * Quantidade de usuários cadastrados no terminal.
+     * Quantidade de usuários/faces cadastrados diretamente no terminal (inclui cadastros anteriores ao log).
      */
     async countUsers() {
-        const text = await this._get('/cgi-bin/recordFinder.cgi', { action: 'getQuerySize', name: 'AccessControlCard' });
-        const match = text.match(/count=(\d+)/);
-        return match ? parseInt(match[1], 10) : null;
+        try {
+            const text = await this._get('/cgi-bin/recordFinder.cgi', { action: 'getQuerySize', name: 'AccessControlCard' });
+            const match = text.match(/count=(\d+)/);
+            if (match) return parseInt(match[1], 10);
+        } catch {
+            // Firmware V2 pode não expor AccessControlCard no recordFinder; tenta AccessUser.cgi
+        }
+        try {
+            const text = await this._get('/cgi-bin/AccessUser.cgi', { action: 'list' });
+            const indices = new Set();
+            for (const m of text.matchAll(/Users\[(\d+)\]\.UserID/g)) indices.add(m[1]);
+            if (indices.size > 0) return indices.size;
+            const jsonMatches = [...text.matchAll(/"UserID"\s*:\s*"[^"]+"/g)];
+            if (jsonMatches.length > 0) return jsonMatches.length;
+            if (/^\s*$/.test(text)) return 0;
+        } catch {
+            // Ignora falha
+        }
+        return null;
     }
 
     /**

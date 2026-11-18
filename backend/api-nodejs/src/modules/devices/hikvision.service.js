@@ -22,8 +22,22 @@ class HikvisionService extends AccessDevice {
         return this.digestClient;
     }
 
+    _videoConfig() {
+        const cfg = (this.config && typeof this.config.config === 'object' && this.config.config) || this.config || {};
+        const canal = Math.max(1, parseInt(cfg.canal, 10) || 1);
+        const rtspPorta = Math.max(1, parseInt(cfg.rtsp_porta, 10) || 554);
+        const streamId = canal * 100 + 1;
+        const caminhoCustom = typeof cfg.rtsp_caminho === 'string' ? cfg.rtsp_caminho.trim() : '';
+        const caminho = caminhoCustom
+            ? (caminhoCustom.startsWith('/') ? caminhoCustom : `/${caminhoCustom}`)
+            : `/Streaming/Channels/${streamId}`;
+        return { canal, streamId, rtspPorta, caminho };
+    }
+
     getRTSPUrl() {
-        return `rtsp://${this.user}:${this.pass}@${this.ip}:554/Streaming/Channels/101`;
+        const { rtspPorta, caminho } = this._videoConfig();
+        // Usuário e senha codificados: senha com @ : / quebrava a URL
+        return `rtsp://${encodeURIComponent(this.user)}:${encodeURIComponent(this.pass)}@${this.ip}:${rtspPorta}${caminho}`;
     }
 
     // Gerar URL ISAPI (HTTP)
@@ -32,11 +46,12 @@ class HikvisionService extends AccessDevice {
     }
 
     /**
-     * Obter Snapshot (Buffer JPEG)
+     * Obter Snapshot (Buffer JPEG) respeitando config.canal
      */
     async getSnapshot() {
         try {
-            const path = '/ISAPI/Streaming/channels/101/picture';
+            const { streamId } = this._videoConfig();
+            const path = `/ISAPI/Streaming/channels/${streamId}/picture`;
             const url = `${this.baseUrl}${path}`;
             const client = await this.getDigestClient();
             const res = await client.fetch(url, { method: 'GET' });

@@ -10,15 +10,24 @@ const logger = require('../../services/logger');
  * Desligar a opção remove a câmera (excluir o leitor também, por ON DELETE CASCADE).
  */
 function urlRtsp(d) {
-    if (/^rtsps?:\/\//i.test(d.rtsp_url || '')) return d.rtsp_url; // informado no cadastro do leitor
+    const cfg = d.config || {};
+    const temConfigVideo = Boolean(cfg.canal || cfg.rtsp_porta || cfg.rtsp_caminho);
+    if (!temConfigVideo && /^rtsps?:\/\//i.test(d.rtsp_url || '')) return d.rtsp_url;
+
     const usuario = d.user_device || 'admin';
     const senha = d.password_device || '';
     const auth = `${encodeURIComponent(usuario)}${senha ? `:${encodeURIComponent(senha)}` : ''}@`;
     const marca = String(d.marca || '').toLowerCase();
-    const caminho = marca.includes('hik')
-        ? '/Streaming/Channels/101'
-        : '/cam/realmonitor?channel=1&subtype=0'; // Intelbras/Dahua
-    return `rtsp://${auth}${d.ip_address}:554${caminho}`;
+    const canal = Math.max(1, parseInt(cfg.canal, 10) || 1);
+    const rtspPorta = Math.max(1, parseInt(cfg.rtsp_porta, 10) || 554);
+    const caminhoCustom = typeof cfg.rtsp_caminho === 'string' ? cfg.rtsp_caminho.trim() : '';
+    const caminhoPadrao = marca.includes('hik')
+        ? `/Streaming/Channels/${canal * 100 + 1}`
+        : `/cam/realmonitor?channel=${canal}&subtype=0`; // Intelbras/Dahua
+    const caminho = caminhoCustom
+        ? (caminhoCustom.startsWith('/') ? caminhoCustom : `/${caminhoCustom}`)
+        : caminhoPadrao;
+    return `rtsp://${auth}${d.ip_address}:${rtspPorta}${caminho}`;
 }
 
 async function sincronizar(dispositivo) {
@@ -41,7 +50,7 @@ async function sincronizar(dispositivo) {
     const conexao = {
         nome: `${dispositivo.nome} (câmera do leitor)`.slice(0, 120),
         ip_address: dispositivo.ip_address,
-        porta: 554,
+        porta: Math.max(1, parseInt(dispositivo.config?.rtsp_porta, 10) || 554),
         protocolo: 'rtsp',
         fabricante: String(dispositivo.marca || '').toLowerCase().includes('hik') ? 'Hikvision' : 'Intelbras',
         usuario: dispositivo.user_device || 'admin',
