@@ -11,11 +11,16 @@ let estado = { disponivel: null, verificadoEm: 0, token: null, ate: 0 };
 /** Testa se o visor responde. Pedido "no-cors": só confirma que há um servidor ali, sem ler a resposta. */
 export async function visorDisponivel() {
     if (estado.disponivel !== null && Date.now() - estado.verificadoEm < VERIFICA_MS) return estado.disponivel;
+    // Limite curto: com a permissão de rede local pendente ou negada no navegador, não segura o vídeo
+    const ctrl = new AbortController();
+    const prazo = setTimeout(() => ctrl.abort(), 1500);
     try {
-        await fetch(`${BASE}/health`, { mode: 'no-cors', cache: 'no-store' });
+        await fetch(`${BASE}/health`, { mode: 'no-cors', cache: 'no-store', signal: ctrl.signal });
         estado.disponivel = true;
     } catch {
         estado.disponivel = false;
+    } finally {
+        clearTimeout(prazo);
     }
     estado.verificadoEm = Date.now();
     return estado.disponivel;

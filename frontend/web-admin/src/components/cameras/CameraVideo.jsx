@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Box, Typography, CircularProgress } from '@mui/material';
 import { VideocamOff as SemVideoIcon, PauseCircleOutline as PausadoIcon } from '@mui/icons-material';
 import api from '../../services/api';
@@ -120,17 +120,18 @@ const CameraVideo = ({
     // Visor local (central na mesma rede): vídeo direto do PC do evento, sem ida e volta pela VPS.
     // Sem o agente neste PC, visorToken fica null e o vídeo segue pela VPS como antes.
     const [visorToken, setVisorToken] = useState(null);
+    // Só escolhe o caminho depois de saber se o visor responde: antes abria pela VPS e trocava em seguida
+    const [visorDecidido, setVisorDecidido] = useState(false);
     useEffect(() => {
-        if (!ativo || modo !== 'stream') { setVisorToken(null); return undefined; }
+        if (!ativo || modo !== 'stream') { setVisorToken(null); setVisorDecidido(true); return undefined; }
         let cancelado = false;
+        setVisorDecidido(false);
         (async () => {
-            if (!(await visorDisponivel())) { if (!cancelado) setVisorToken(null); return; }
-            try {
-                const t = await tokenVisor();
-                if (!cancelado) setVisorToken(t);
-            } catch {
-                if (!cancelado) setVisorToken(null);
+            let token = null;
+            if (await visorDisponivel()) {
+                try { token = await tokenVisor(); } catch { token = null; }
             }
+            if (!cancelado) { setVisorToken(token); setVisorDecidido(true); }
         })();
         return () => { cancelado = true; };
     }, [ativo, modo, camId, reconexao]);
@@ -177,21 +178,9 @@ const CameraVideo = ({
         return () => obs.disconnect();
     }, []);
 
-    // MP4 ao vivo: elimina lag de buffer do navegador para manter o vídeo colado no tempo real (< 300ms)
-    const manterAoVivo = useCallback(() => {
-        const v = midiaRef.current;
-        if (!v || v.tagName !== 'VIDEO' || !v.buffered.length) return;
-        const fim = v.buffered.end(v.buffered.length - 1);
-        const atraso = fim - v.currentTime;
-        if (atraso > 0.9) {
-            v.currentTime = Math.max(0, fim - 0.08);
-            v.playbackRate = 1.0;
-        } else if (atraso > 0.25) {
-            v.playbackRate = 1.15; // acelera suavemente para zerar qualquer atraso sem pulo perceptível
-        } else {
-            v.playbackRate = 1.0;
-        }
-    }, []);
+    // Sem "perseguir" o fim do buffer: em MP4 progressivo o salto não reduz o atraso e, disparado a cada
+    // evento, reiniciava o decodificador centenas de vezes por segundo (medido: 4.704 saltos em 20 s),
+    // deixando a imagem praticamente parada. O navegador toca liso sozinho.
 
     const falhou = () => {
         // Sem recuo para MJPEG: tenta de novo com as esperas de ESPERAS_MS.
@@ -208,7 +197,8 @@ const CameraVideo = ({
 
     let src = null;
     if (ativo && !erro && acesso?.ingresso) {
-        if (usarMp4 && visorToken) src = urlVisorMp4(camId, visorToken, qualidade);
+        if (usarMp4 && !visorDecidido) src = null; // aguardando saber se o visor local responde (até 1,5 s)
+        else if (usarMp4 && visorToken) src = urlVisorMp4(camId, visorToken, qualidade);
         // Pela VPS, a tela grande cai para 720p: o principal (ex.: 2304x1296) não chega fluido pela internet
         else if (usarMp4) src = urlComIngresso(camId, 'video.mp4', acesso.ingresso, { qualidade: qualidade === 'foco' ? 'mini' : qualidade });
         else if (modo === 'stream') src = urlComIngresso(camId, 'stream', acesso.ingresso, { annotate: anotarNoServidor, qualidade, r: reconexao });
@@ -237,8 +227,6 @@ const CameraVideo = ({
                         aria-label={alt}
                         style={{ width: '100%', height: '100%', objectFit: fit, display: 'block', ...estiloMidia }}
                         onLoadedData={(e) => abriu(e.currentTarget.videoWidth, e.currentTarget.videoHeight)}
-                        onProgress={manterAoVivo}
-                        onTimeUpdate={manterAoVivo}
                         onError={falhou}
                         onEnded={() => { setAcesso(null); setReconexao(n => n + 1); }}
                     />
