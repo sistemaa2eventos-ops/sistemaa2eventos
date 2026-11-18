@@ -82,7 +82,7 @@ function listarWebcams() {
     return webcams.lista;
 }
 
-/** Maior resolução que a webcam oferece (ex.: "640x480"), para não abrir abaixo do que ela entrega */
+/** Maior resolução <= 1920 que a webcam oferece; se a câmera for 2K/4K (ex.: 2560x1440@59.9999), abre no modo nativo e redimensiona na saída */
 function melhorModo(nome) {
     if (webcams.modos.has(nome)) return webcams.modos.get(nome);
     let melhor = null;
@@ -90,9 +90,13 @@ function melhorModo(nome) {
         const r = require('child_process').spawnSync(estado.ffmpeg, ['-hide_banner', '-list_options', 'true', '-f', 'dshow', '-i', `video=${nome}`],
             { encoding: 'utf8', windowsHide: true, timeout: 10000 });
         let area = 0;
-        for (const m of String(r.stderr || '').matchAll(/max s=(\d+)x(\d+)/g)) {
-            const a = Number(m[1]) * Number(m[2]);
-            if (a > area && Number(m[1]) <= 1920) { area = a; melhor = `${m[1]}x${m[2]}`; }
+        for (const m of String(r.stderr || '').matchAll(/max s=(\d+)x(\d+)\s+fps=([\d.]+)/g)) {
+            const w = Number(m[1]), h = Number(m[2]), fps = Number(m[3]);
+            const a = w * h;
+            if (a > area && w <= 1920) {
+                area = a;
+                melhor = { video_size: `${w}x${h}`, ...(Math.round(fps) === 30 ? { framerate: '30' } : {}) };
+            }
         }
     } catch { /* usa o padrão do dispositivo */ }
     if (melhor) webcams.modos.set(nome, melhor); // dispositivo ocupado: tenta de novo na próxima vez
@@ -124,9 +128,9 @@ async function origemDaCamera(url) {
     const nome = lista[indice] || lista[0];
     if (!nome) return obsLocal ? u : null;
     const modo = melhorModo(nome);
-    const params = new URLSearchParams({ video: String(Math.max(0, lista.indexOf(nome))), framerate: '30', ...(modo ? { video_size: modo } : {}) });
-    // Teto de taxa: sem ele, o ruído do sensor (pouca luz) passava de 2 Mbit/s para 640x480
-    const webcamDshow = `ffmpeg:device?${params}#video=h264#raw=-crf 26 -maxrate 900k -bufsize 1800k`;
+    const params = new URLSearchParams({ video: String(Math.max(0, lista.indexOf(nome))), ...(modo || {}) });
+    // Teto de resolução (1280px) e taxa: câmeras 2K/60fps abrem no formato nativo do DirectShow sem erro de opção
+    const webcamDshow = `ffmpeg:device?${params}#video=h264#raw=-vf scale=1280:-2 -r 20 -crf 26 -maxrate 900k -bufsize 1800k`;
     if (obsLocal && await portaAberta(8554)) return [u, webcamDshow];
     return webcamDshow;
 }
@@ -282,9 +286,7 @@ async function configurarCameras(cameras = []) {
         const url = await origemDaCamera(c.stream_url);
         if (!url) continue;
         const principal = nomeStream(c.id, false);
-        const listaPrincipal = Array.isArray(url) ? [...url] : [url];
-        if (estado.ffmpeg) listaPrincipal.push(`ffmpeg:${principal}#video=mjpeg`);
-        streams.set(principal, listaPrincipal);
+        streams.set(principal, url);
         const primeiroUrl = Array.isArray(url) ? url[0] : url;
         // Webcam não tem sub-stream: a miniatura usa o mesmo vídeo (já é leve)
         const subUrl = Array.isArray(url) || String(primeiroUrl).startsWith('ffmpeg:') ? null
@@ -292,9 +294,7 @@ async function configurarCameras(cameras = []) {
         let sub = null;
         if (subUrl && subUrl !== primeiroUrl) {
             sub = nomeStream(c.id, true);
-            const listaSub = [subUrl];
-            if (estado.ffmpeg) listaSub.push(`ffmpeg:${sub}#video=mjpeg`);
-            streams.set(sub, listaSub);
+            streams.set(sub, subUrl);
         }
         camMap.set(String(c.id), { principal, sub });
     }
