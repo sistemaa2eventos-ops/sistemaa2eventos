@@ -685,7 +685,8 @@ class CameraController {
             rota = rotaDaCamera(cam);
             // Miniatura por padrão (sub-stream, reduzida): a grade em modo "Snapshots" não precisa de 1080p
             const qualidade = req.query.qualidade === 'foco' ? 'foco' : 'mini';
-            const anotar = req.query.annotate !== 'false' && cam.ia_ativa === true;
+            // Desenhar os quadros da IA só na tela grande: miniatura vai pelo retransmissor direto (rápido)
+            const anotar = req.query.annotate !== 'false' && cam.ia_ativa === true && qualidade === 'foco';
 
             // Sem IA para desenhar: imagem direto do retransmissor do PC do evento (motor pode estar desligado)
             if (isRtsp && videoLocal(rota) && !anotar) {

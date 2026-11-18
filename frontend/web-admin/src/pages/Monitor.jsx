@@ -222,8 +222,9 @@ const Monitor = () => {
   const [gridColumns, setGridColumns] = useState(() => {
     return localStorage.getItem('monitor_camera_grid_cols') || '3'; // '4', '3', '2', '1'
   });
+  // Padrão: miniaturas ao vivo (MP4 leve). Snapshot a cada 5 s parece slideshow; só sai do ao vivo se o usuário escolher.
   const [liveStreamInGrid, setLiveStreamInGrid] = useState(() => {
-    return localStorage.getItem('monitor_camera_live_in_grid') === 'true';
+    return localStorage.getItem('monitor_camera_live_in_grid') !== 'false';
   });
 
   // Câmera que gerou o último alerta fica destacada por 30 s (alertas chegam pelo tempo real)
@@ -2287,7 +2288,8 @@ const Monitor = () => {
                     camId={activeStreamCam.id}
                     alt={activeStreamCam.nome}
                     modo="stream"
-                    qualidade="foco"
+                    // Tela grande em 720p (sub-stream): o principal (ex.: 2304x1296) não chega fluido pela internet do evento
+                    qualidade="mini"
                     // Preencher a tela (cortando bordas) só no celular deitado; no computador, imagem
                     // inteira — "cover" ampliava e cortava o vídeo, deixando-o com aspecto pior
                     fit={isMobileOrTablet && isLandscape ? 'cover' : 'contain'}
