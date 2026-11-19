@@ -575,6 +575,10 @@ Esta seção reúne o que os testes desta conversa mostraram. Cada item diz o ta
 - Caminho para resolver (próxima fase, com o equipamento na mão): o leitor decide sozinho com os rostos que já recebe na sincronização, e o sistema recebe os eventos de passagem; ou configurar no próprio leitor a verificação local quando o servidor não responde. As duas mudam regras de acesso (área, antirretorno, pulseira) e precisam de teste no local.
 - A confirmação pela IA (`ia_confirmacao`) já libera pelo leitor quando o motor está fora, a menos que `ia_falha = 'negar'`.
 
+**Lista dentro do leitor sempre atualizada (20261119_fila_sync_leitores):** antes, expulsar, recusar, áreas gravadas no check-in, troca de pulseira e áreas de um lote não avisavam os leitores (só a varredura das 01:00 corrigia). Agora gatilhos no banco anotam a pessoa em `fila_sync_leitores` a cada mudança de status, bloqueio, ativo, pulseira, áreas (da pessoa ou do lote), foto ou evento, venha de qualquer tela. A API (`filaSyncLeitores.service.js`) esvazia a fila a cada 3 s: cadastra nos leitores das áreas, remove dos demais, remove de todos se bloqueado/expulso/recusado/inativo, e do evento antigo se trocou de evento. Leitor fora do ar recebe pela fila dele quando voltar. Isso é o pré-requisito para o leitor decidir sozinho sem internet: ele só pode decidir com uma lista que está sempre certa.
+
+Ainda não coberto: empresa bloqueada (o modo online nega, mas os funcionários continuam cadastrados no leitor).
+
 ### 9.8 Limites conhecidos do código
 
 - `Leitor` guarda um quadro (não uma fila). Isso é intencional (atualidade), mas significa que quadros antigos se perdem se a IA estiver lenta.

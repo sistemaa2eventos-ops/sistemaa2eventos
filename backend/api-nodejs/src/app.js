@@ -277,6 +277,8 @@ server.listen(PORT, async () => {
         // Alertas das câmeras com o painel fechado (agente local ou motor no próprio servidor)
         require('./modules/system/vigilancia.service').iniciar();
         syncScheduler.start();
+        // Mudanças de acesso (expulsão, bloqueio, áreas, pulseira) chegam aos leitores em segundos
+        require('./modules/devices/filaSyncLeitores.service').iniciar();
         require('./services/vigiaEvento').iniciar();
         cloudSyncWorker.start();
         healthService.start();
