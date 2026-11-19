@@ -356,6 +356,10 @@ async function configurarCameras(cameras = []) {
         // Áudio da câmera (escuta pelo botão "Ouvir" da Central): o navegador só toca Opus; o go2rtc converte
         // só o áudio, o vídeo segue copiado. O áudio ligado não muda nada para quem só usa o vídeo.
         streams.set(principal, typeof url === 'string' && /^rtsps?:\/\//i.test(url) ? `${url}#audio=opus` : url);
+        // Falar (voz de volta): em câmeras Mercusys/Tapo o canal fica no protocolo Tapo, não no RTSP. Fonte
+        // separada, só para quem fala (a conexão de vídeo e de ouvir não muda). Não consome nada sem uso.
+        const falaUrl = urlFalaTapo(c.stream_url, c.fabricante);
+        if (falaUrl) streams.set(`${principal}_fala`, falaUrl);
         const primeiroUrl = Array.isArray(url) ? url[0] : url;
         // Webcam não tem sub-stream: a miniatura usa o mesmo vídeo (já é leve)
         const subUrl = Array.isArray(url) || String(primeiroUrl).startsWith('ffmpeg:') ? null
@@ -428,8 +432,10 @@ async function abrirMp4(cameraId, qualidade, userAgent, signal) {
  * Ao vivo sem atraso: recebe a oferta WebRTC (SDP) do navegador e devolve a resposta do go2rtc.
  * O vídeo vai do go2rtc direto ao navegador (sem reempacotar em MP4 e sem buffer de reprodução).
  */
-async function abrirWebrtc(cameraId, qualidade, ofertaSdp) {
-    const nome = streamDa(cameraId, qualidade);
+async function abrirWebrtc(cameraId, qualidade, ofertaSdp, opcoes = {}) {
+    const base = streamDa(cameraId, qualidade);
+    // Quem fala usa a fonte Tapo (com o canal de voz de volta), se a câmera tiver
+    const nome = base && opcoes.fala && estado.streams.has(`${base}_fala`) ? `${base}_fala` : base;
     if (!nome) throw new Error('Câmera não está no retransmissor local');
     await esperarPronto();
     const res = await chamarApi('/api/webrtc', { src: nome }, 10000, {
@@ -481,6 +487,20 @@ function parar() {
 }
 
 /**
+ * Endereço da fonte Tapo do go2rtc (canal de voz de volta) a partir da URL RTSP da câmera. Só para
+ * Mercusys/Tapo. Usuário e senha vêm da própria URL da câmera.
+ */
+function urlFalaTapo(streamUrl, fabricante = '') {
+    if (!/mercusys|tapo/i.test(String(fabricante || ''))) return null;
+    let u;
+    try { u = new URL(String(streamUrl)); } catch { return null; }
+    if (!/^rtsps?:$/i.test(u.protocol) || !u.hostname || !u.password) return null;
+    const user = encodeURIComponent(decodeURIComponent(u.username || 'admin'));
+    const senha = encodeURIComponent(decodeURIComponent(u.password));
+    return `tapo://${user}:${senha}@${u.hostname}?backchannel=1&audio=pcma`;
+}
+
+/**
  * Faixas que o retransmissor tem para a câmera (diagnóstico do áudio). Para o som de volta (Falar)
  * chegar à câmera, precisa existir uma faixa de áudio com "sendonly" (canal de envio da câmera).
  */
@@ -505,5 +525,5 @@ module.exports = {
     midiasDaCamera,
     iniciar, encerrarOrfaos, disponivel, temFfmpeg, caminhoFfmpeg, configurarCameras, conhece, streamDa, urlRtspLocal,
     abrirMp4, abrirWebrtc, abrirMjpeg, snapshot, status, parar, derivarSubstream,
-    _estado: estado, MSG_PORTA_OCUPADA
+    _estado: estado, MSG_PORTA_OCUPADA, urlFalaTapo
 };

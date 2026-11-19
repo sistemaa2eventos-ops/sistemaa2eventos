@@ -31,7 +31,7 @@ async function camerasDoEvento(eventoId) {
     const consultar = (campos) => supabase.from('cameras_ip').select(campos).eq('evento_id', eventoId)
         .or('stream_url.like.rtsp%,stream_url.like.webcam%,stream_url.like.usb%')
         .order('id', { ascending: true });
-    let { data, error } = await consultar('id, nome, status, stream_url, ia_ativa, vigilancia_ativa, prioridade, url_substream, gravacao_modo, gravacao_stream');
+    let { data, error } = await consultar('id, nome, status, stream_url, ia_ativa, vigilancia_ativa, prioridade, url_substream, gravacao_modo, gravacao_stream, fabricante');
     if (error && (error.code === '42703' || /column/i.test(error.message))) {
         // banco sem a migration 20261111 (gravação) ou 20261028 (IA por câmera)
         ({ data, error } = await consultar('id, nome, status, stream_url, ia_ativa, vigilancia_ativa, prioridade, url_substream'));
@@ -56,6 +56,7 @@ async function camerasDoEvento(eventoId) {
             url_substream: c.url_substream || null,
             gravacao_modo: c.gravacao_modo || 'desligada',
             gravacao_stream: c.gravacao_stream || 'sub',
+            fabricante: c.fabricante || null, // Mercusys/Tapo: o retransmissor monta o canal de voz de volta
             ptz: giro.get(c.id) || null // giro ligado: IP e porta ONVIF (o usuário e a senha vêm da URL)
         }));
 }

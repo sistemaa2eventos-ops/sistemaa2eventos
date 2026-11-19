@@ -209,7 +209,7 @@
                     });
                 });
                 if (g !== this.geracao) return;
-                const r = await api(`/camera/${encodeURIComponent(this.cam.id)}/webrtc?qualidade=${qualidade}`, {
+                const r = await api(`/camera/${encodeURIComponent(this.cam.id)}/webrtc?qualidade=${qualidade}${this.falando ? '&fala=1' : ''}`, {
                     method: 'POST', headers: { 'Content-Type': 'application/sdp' }, body: pc.localDescription.sdp,
                     signal: AbortSignal.timeout(10000)
                 });

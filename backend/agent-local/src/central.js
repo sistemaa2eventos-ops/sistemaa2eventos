@@ -369,7 +369,7 @@ async function tratar(req, res, url) {
         try {
             const oferta = await lerCorpo(req, 64 * 1024);
             if (!oferta.startsWith('v=0')) { res.statusCode = 400; res.end(); return true; }
-            const resposta = await video.abrirWebrtc(mw[1], qualidade, oferta);
+            const resposta = await video.abrirWebrtc(mw[1], qualidade, oferta, { fala: url.searchParams.get('fala') === '1' });
             res.statusCode = 201;
             res.setHeader('Content-Type', 'application/sdp');
             res.setHeader('Cache-Control', 'no-store');
