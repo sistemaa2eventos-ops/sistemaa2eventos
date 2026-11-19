@@ -431,7 +431,9 @@ export default function DispositivosPage() {
                 <Box sx={{ fontSize: '0.75rem', color: '#FFB800' }}>Sem controle de relé (modo online)</Box>
               )}
               {device.offline_mode === 'fail_open' && (
-                <Box sx={{ fontSize: '0.75rem', color: RED }}>Libera a passagem se o sistema estiver fora do ar</Box>
+                <Box sx={{ fontSize: '0.75rem', color: '#FFB800' }}>
+                  Marcado para liberar sem servidor, mas o leitor ainda nega nesse caso (configuração não aplicada no equipamento)
+                </Box>
               )}
               {device.ultimo_ping && (
                 <Box sx={{ fontSize: '0.75rem', color: '#64748B', mt: 0.5 }}>
@@ -920,11 +922,16 @@ export default function DispositivosPage() {
               <Grid item xs={6}>
                 <FormControl fullWidth size="small">
                   <InputLabel id="offline-mode-label" htmlFor="offline-mode-select">Modo offline</InputLabel>
+                  {/* A escolha ainda não é enviada ao leitor: em modo online, sem resposta do servidor ele nega.
+                      Travado em "negar" até a configuração ser aplicada no equipamento (ver docs/sistema-cameras.md, 9.9). */}
                   <Select labelId="offline-mode-label" inputProps={{ id: 'offline-mode-select', name: 'offline_mode' }}
-                    value={formData.offline_mode || 'fail_closed'} onChange={handleFormChange} label="Modo offline">
-                    <MenuItem value="fail_closed">Fail Closed (negar acesso)</MenuItem>
-                    <MenuItem value="fail_open">Fail Open (liberar acesso)</MenuItem>
+                    value="fail_closed" disabled label="Modo offline">
+                    <MenuItem value="fail_closed">Negar acesso (sem servidor)</MenuItem>
+                    <MenuItem value="fail_open">Liberar acesso (sem servidor)</MenuItem>
                   </Select>
+                  <Box sx={{ fontSize: '0.72rem', color: '#94A3B8', mt: 0.5 }}>
+                    Em modo online, se o leitor não alcança o servidor, ele nega o acesso. Liberar sem servidor ainda não está disponível.
+                  </Box>
                 </FormControl>
               </Grid>
               <Grid item xs={12}>

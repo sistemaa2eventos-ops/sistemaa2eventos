@@ -26,8 +26,11 @@ const iaHeaders = () => (process.env.IA_CHAVE_INTERNA ? { 'X-IA-Chave': process.
  */
 async function camerasDoEvento(eventoId) {
     // RTSP e webcam USB do PC do evento ("webcam", "webcam:1", "usb:0")
+    // Ordem fixa: a lista vira a configuração do retransmissor no PC do evento, e uma ordem diferente a
+    // cada envio mudava a assinatura e reiniciava o go2rtc (todas as câmeras caíam por alguns segundos)
     const consultar = (campos) => supabase.from('cameras_ip').select(campos).eq('evento_id', eventoId)
-        .or('stream_url.like.rtsp%,stream_url.like.webcam%,stream_url.like.usb%');
+        .or('stream_url.like.rtsp%,stream_url.like.webcam%,stream_url.like.usb%')
+        .order('id', { ascending: true });
     let { data, error } = await consultar('id, nome, status, stream_url, ia_ativa, vigilancia_ativa, prioridade, url_substream, gravacao_modo, gravacao_stream');
     if (error && (error.code === '42703' || /column/i.test(error.message))) {
         // banco sem a migration 20261111 (gravação) ou 20261028 (IA por câmera)

@@ -100,8 +100,25 @@ function melhorModo(nome) {
             }
         }
     } catch { /* usa o padrão do dispositivo */ }
-    if (melhor) webcams.modos.set(nome, melhor); // dispositivo ocupado: tenta de novo na próxima vez
-    return melhor;
+    if (melhor) {
+        webcams.modos.set(nome, melhor);
+        salvarModosWebcam();
+        return melhor;
+    }
+    // Dispositivo ocupado (o próprio go2rtc está usando a webcam): vale o último modo conhecido. Sem isto a
+    // URL da webcam mudava, a assinatura da configuração mudava e o go2rtc reiniciava, derrubando as câmeras.
+    return modosSalvos()[nome] || null;
+}
+
+const ARQ_MODOS_WEBCAM = path.join(DIR_BIN, 'webcam-modos.json');
+function modosSalvos() {
+    try { return JSON.parse(fs.readFileSync(ARQ_MODOS_WEBCAM, 'utf8')) || {}; } catch { return {}; }
+}
+function salvarModosWebcam() {
+    try {
+        fs.mkdirSync(DIR_BIN, { recursive: true });
+        fs.writeFileSync(ARQ_MODOS_WEBCAM, JSON.stringify({ ...modosSalvos(), ...Object.fromEntries(webcams.modos) }));
+    } catch { /* só cache */ }
 }
 
 function portaAberta(porta) {

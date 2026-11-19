@@ -12,6 +12,7 @@
  * (caixas da IA lidas do motor deste PC).
  */
 const http = require('http');
+const os = require('os');
 const crypto = require('crypto');
 const video = require('./video');
 const central = require('./central');
@@ -73,7 +74,13 @@ function iniciar(log, opcoes = {}) {
     const { fetchIa } = opcoes;
     // CENTRAL_REDE=1: a Central também atende outros computadores da rede (com a chave de acesso)
     const naRede = /^(1|true|sim)$/i.test(String(process.env.CENTRAL_REDE || ''));
-    central.iniciar({ log, fetchIa, porta: PORTA, soLocal: !naRede });
+    // CENTRAL_TAILSCALE=1: a Central também atende pela interface do Tailscale (e só por ela, além do
+    // próprio PC). O operador remoto entra na rede virtual e vê ao vivo por WebRTC, sem vídeo pela VPS.
+    const comTailscale = !naRede && /^(1|true|sim)$/i.test(String(process.env.CENTRAL_TAILSCALE || ''));
+    const ts = comTailscale ? interfaceTailscale() : null;
+    if (comTailscale && !ts) log('warn', 'CENTRAL_TAILSCALE=1, mas o Tailscale não está conectado neste PC (sem endereço 100.64.0.0/10)');
+    central.iniciar({ log, fetchIa, porta: PORTA, soLocal: !naRede, tailscale: ts });
+    if (ts) servidorTailscale(ts, log);
     const server = http.createServer(async (req, res) => {
         const url = new URL(req.url, 'http://127.0.0.1');
         const origem = req.headers.origin;
@@ -194,4 +201,38 @@ function iniciar(log, opcoes = {}) {
     return server;
 }
 
-module.exports = { iniciar, PORTA, ORIGENS, caixaParaPainel };
+/** IPv4 do Tailscale neste PC (faixa CGNAT 100.64.0.0/10), ou null */
+function interfaceTailscale() {
+    for (const lista of Object.values(os.networkInterfaces())) {
+        for (const i of lista || []) {
+            if (i.family !== 'IPv4' && i.family !== 4) continue;
+            const [a, b] = i.address.split('.').map(Number);
+            if (a === 100 && b >= 64 && b <= 127) return { ip: i.address, nome: os.hostname().toLowerCase() };
+        }
+    }
+    return null;
+}
+
+/**
+ * Segundo servidor, só no IP do Tailscale e só com a Central (chave, sessão e Host conferidos). As rotas do
+ * painel da internet (/sessao, /camera/...) continuam só em 127.0.0.1.
+ */
+function servidorTailscale(ts, log) {
+    const srv = http.createServer(async (req, res) => {
+        try {
+            const url = new URL(req.url, 'http://127.0.0.1');
+            if (await central.tratar(req, res, url)) return;
+        } catch (err) {
+            log('warn', `central (tailscale): ${err.message}`);
+            if (!res.headersSent) { res.statusCode = 500; return res.end(); }
+            return;
+        }
+        res.statusCode = 404;
+        res.end();
+    });
+    srv.on('error', (err) => log('warn', `central (tailscale): ${err.message}`));
+    srv.listen(PORTA, ts.ip, () => log('info', `Central também pelo Tailscale: http://${ts.ip}:${PORTA}/central/ (ou http://${ts.nome}:${PORTA}/central/)`));
+    return srv;
+}
+
+module.exports = { iniciar, PORTA, ORIGENS, caixaParaPainel, interfaceTailscale };

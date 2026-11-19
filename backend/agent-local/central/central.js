@@ -266,8 +266,11 @@
                 const [x1, y1, x2, y2] = cx.caixa || [];
                 if (x2 === undefined) continue;
                 const p = cx.pessoa;
-                const alvo = p && (p.watchlist || p.bloqueado);
-                const cor = alvo ? '#FF3366' : p ? '#00E08A' : cx.qualidade === 'optimal' ? '#FFD400' : '#94A3B8';
+                const alvoMarcado = p && (p.watchlist || p.bloqueado);
+                // Sem confiança para alerta (rosto pequeno ou semelhança baixa): "possível", em amarelo e sem alarme
+                const alvo = alvoMarcado && p.alerta_ok !== false;
+                const possivel = alvoMarcado && !alvo;
+                const cor = alvo ? '#FF3366' : possivel ? '#FFB800' : p ? '#00E08A' : cx.qualidade === 'optimal' ? '#FFD400' : '#94A3B8';
                 const rx = ax + x1 * aw;
                 const ry = ay + y1 * ah;
                 const rw = (x2 - x1) * aw;
@@ -276,7 +279,8 @@
                 ctx.strokeStyle = cor;
                 ctx.strokeRect(rx, ry, rw, rh);
                 let txt;
-                if (p && p.watchlist) txt = `WATCHLIST · ${p.nome}`;
+                if (possivel) txt = `POSSÍVEL ${p.watchlist ? 'ALVO' : 'BLOQUEADO'} · ${p.nome}`;
+                else if (p && p.watchlist) txt = `WATCHLIST · ${p.nome}`;
                 else if (p && p.bloqueado) txt = `BLOQUEADO · ${p.nome}`;
                 else if (p) txt = `${p.nome} ${Math.round((p.semelhanca || 0) * 100)}%`;
                 else txt = ({ profile_view: 'De lado', low_resolution: 'Distante', blurry: 'Em movimento' })[cx.qualidade] || 'Desconhecido';
@@ -414,7 +418,7 @@
                     const d = j.cameras?.[t.cam.id];
                     t.definirCaixas(d ? d.caixas : []);
                     for (const cx of (d?.caixas || [])) {
-                        if (cx.pessoa && cx.pessoa.watchlist) alvoNaTela(t, cx.pessoa);
+                        if (cx.pessoa && cx.pessoa.watchlist && cx.pessoa.alerta_ok !== false) alvoNaTela(t, cx.pessoa);
                     }
                 }
             } catch {
@@ -465,14 +469,18 @@
 
     function registrar(it) {
         for (const p of it.pessoas || []) {
-            const alvo = !!(p.watchlist || p.bloqueado);
+            const marcado = !!(p.watchlist || p.bloqueado);
+            // Possível alvo (sem confiança para alerta): entra na lista de reconhecimentos, sem alarme
+            const alvo = marcado && p.alerta_ok !== false;
+            const possivel = marcado && !alvo;
             const item = el('div', `item${alvo ? ' alvo' : ''}`);
             const img = el('img');
             img.alt = '';
             if (p.rosto) img.src = imagem(p.rosto);
             const txt = el('div', 'txt');
             txt.append(
-                el('div', 'n', p.watchlist ? `WATCHLIST · ${p.nome}` : p.bloqueado ? `BLOQUEADO · ${p.nome}` : p.nome),
+                el('div', 'n', possivel ? `Possível ${p.watchlist ? 'alvo' : 'bloqueado'} · ${p.nome}`
+                    : p.watchlist ? `WATCHLIST · ${p.nome}` : p.bloqueado ? `BLOQUEADO · ${p.nome}` : p.nome),
                 el('div', 'd', `${it.camera} · ${hora(it.ts)} · ${Math.round((p.semelhanca || 0) * 100)}%`)
             );
             item.append(img, txt);

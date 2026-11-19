@@ -23,14 +23,14 @@ import ServidoresIaPainel from '../../components/cameras/ServidoresIaPainel';
 // Mesma tabela do motor (backend/microservice-face-python/src/main.py → PERFIS e COMUNS)
 const PERFIS_IA = {
     leve: { ia_fps_total: 15, ia_fps_foco: 6, ia_fps_mini: 3, ia_fps_vigilancia: 2, ia_stream: 'sub', limiar: 0.50, margem: 0.06, confirmacoes: 2 },
-    equilibrado: { ia_fps_total: 30, ia_fps_foco: 10, ia_fps_mini: 4, ia_fps_vigilancia: 3, ia_stream: 'auto', limiar: 0.48, margem: 0.06, confirmacoes: 2 },
-    maximo: { ia_fps_total: 45, ia_fps_foco: 15, ia_fps_mini: 6, ia_fps_vigilancia: 5, ia_stream: 'principal', limiar: 0.46, margem: 0.05, confirmacoes: 2 }
+    equilibrado: { ia_fps_total: 30, ia_fps_foco: 10, ia_fps_mini: 4, ia_fps_vigilancia: 3, ia_stream: 'sub', limiar: 0.48, margem: 0.06, confirmacoes: 2 },
+    maximo: { ia_fps_total: 45, ia_fps_foco: 15, ia_fps_mini: 6, ia_fps_vigilancia: 5, ia_stream: 'sub', limiar: 0.46, margem: 0.05, confirmacoes: 2 }
 };
 const COMUNS_IA = { min_face_px: 36, min_nitidez: 25, max_yaw: 45, reconhecer_s: 1, movimento: true, aprender: true };
 const DESCRICAO_PERFIL = {
     leve: 'Para computador modesto ou internet fraca: menos análises por segundo e vídeo mais leve.',
-    equilibrado: 'Recomendado. Boa precisão sem pesar: IA no stream principal só quando alguém olha a câmera em tela grande.',
-    maximo: 'Para placa de vídeo forte e boa internet: mais análises, vídeo mais nítido e IA sempre no stream principal.'
+    equilibrado: 'Recomendado. Boa precisão sem pesar: a IA lê o sub-stream de cada câmera.',
+    maximo: 'Para placa de vídeo forte: mais análises por segundo. A IA também lê o sub-stream (o vídeo ao vivo segue nítido na Central).'
 };
 const NOMES_STREAM = { sub: 'Sempre o sub-stream (leve)', auto: 'Automático', principal: 'Sempre o stream principal (nítido)' };
 
@@ -97,17 +97,17 @@ async function diagnosticarComputadorLocal(perfisServidor) {
     if (gpu.categoria === 'forte' && cpuThreads >= 8 && (!ramGb || ramGb >= 8)) {
         perfilRecomendado = 'maximo';
         fpsTotalRecomendado = 45;
-        streamRecomendado = 'principal';
+        streamRecomendado = 'sub';
         maxStreamsAoVivo = 16;
         limiarRecomendado = 0.46;
-        resumoMotivo = `Placa de vídeo dedicada forte (${gpu.nome}) e processador com ${cpuThreads} threads detectados. Este computador suporta máxima nitidez e até 45 análises/s.`;
+        resumoMotivo = `Placa de vídeo dedicada forte (${gpu.nome}) e processador com ${cpuThreads} threads detectados. Este computador suporta até 45 análises/s.`;
     } else if ((gpu.categoria === 'forte' || gpu.categoria === 'entrada') && cpuThreads >= 6 && (!ramGb || ramGb >= 8)) {
         perfilRecomendado = 'equilibrado';
         fpsTotalRecomendado = 30;
-        streamRecomendado = 'auto';
+        streamRecomendado = 'sub';
         maxStreamsAoVivo = 9;
         limiarRecomendado = 0.48;
-        resumoMotivo = `Boa combinação de placa de vídeo (${gpu.nome}) e ${cpuThreads} threads. O perfil Equilibrado usa o sub-stream no mosaico e o stream principal apenas na câmera em foco.`;
+        resumoMotivo = `Boa combinação de placa de vídeo (${gpu.nome}) e ${cpuThreads} threads. O perfil Equilibrado analisa o sub-stream de cada câmera.`;
     } else if (gpu.categoria === 'entrada' && cpuThreads <= 4) {
         perfilRecomendado = 'leve';
         fpsTotalRecomendado = 18;
@@ -689,10 +689,12 @@ const ConfigIAFacial = ({ embutido = false }) => {
                                     </Campo>
                                 </Grid>
                                 <Grid item xs={12} md={6}>
-                                    <Campo titulo="Qual vídeo a IA analisa" ajuda="Automático: sub-stream, e o principal quando alguém abre a câmera em tela grande.">
-                                        <Select size="small" value={ia('ia_stream')} onChange={e => setIa('ia_stream', e.target.value)}>
-                                            {Object.entries(NOMES_STREAM).map(([k, v]) => <MenuItem key={k} value={k}>{v}</MenuItem>)}
-                                        </Select>
+                                    <Campo titulo="Qual vídeo a IA analisa" ajuda="O vídeo ao vivo continua nítido na Central; só a análise usa o sub-stream.">
+                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{NOMES_STREAM.sub}</Typography>
+                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                            Configure o sub-stream de cada câmera, no app ou na página da própria câmera, em 720p e 8 a 10 quadros por segundo.
+                                            É o que mais alivia o processador do PC do evento.
+                                        </Typography>
                                     </Campo>
                                     <Campo titulo={`Diferença mínima para a 2ª pessoa mais parecida: ${Number(ia('margem')).toFixed(2)}`}
                                         ajuda="Evita confundir pessoas parecidas (irmãos, por exemplo).">

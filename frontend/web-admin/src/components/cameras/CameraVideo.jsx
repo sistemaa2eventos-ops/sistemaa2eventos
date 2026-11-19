@@ -92,33 +92,7 @@ const CameraVideo = ({
         return () => { cancelado = true; };
     }, [ativo, camId, reconexao]);
 
-    // Snapshot: atualiza só enquanto aparece na tela (renovando o ingresso antes de vencer)
-    useEffect(() => {
-        if (!ativo || modo !== 'snapshot') return undefined;
-        setQuadro(Date.now());
-        const timer = setInterval(() => {
-            if (acessoEmRef.current && Date.now() - acessoEmRef.current > INGRESSO_VALE_MS) setReconexao(n => n + 1);
-            else setQuadro(Date.now());
-        }, intervaloSnapshotMs);
-        return () => clearInterval(timer);
-    }, [ativo, modo, intervaloSnapshotMs]);
-
-    // Caiu: nova tentativa com espera crescente
-    useEffect(() => {
-        if (!erro || !ativo) return undefined;
-        const timer = setTimeout(() => {
-            setErro(false);
-            setAcesso(null);
-            setReconexao(n => n + 1);
-        }, ESPERAS_MS[Math.min(falhas, ESPERAS_MS.length - 1)]);
-        return () => clearTimeout(timer);
-    }, [erro, ativo, falhas]);
-
-    // Ao vivo só em MP4 (H.264, ~2 Mbit/s). O MJPEG custava ~7 Mbit/s por câmera e não é mais usado no ao vivo.
-    const usarMp4 = modo === 'stream' && !!acesso?.mp4;
-
     // Visor local (central na mesma rede): vídeo direto do PC do evento, sem ida e volta pela VPS.
-    // Sem o agente neste PC, visorToken fica null e o vídeo segue pela VPS como antes.
     const [visorToken, setVisorToken] = useState(null);
     // Só escolhe o caminho depois de saber se o visor responde: antes abria pela VPS e trocava em seguida
     const [visorDecidido, setVisorDecidido] = useState(false);
@@ -135,9 +109,42 @@ const CameraVideo = ({
         })();
         return () => { cancelado = true; };
     }, [ativo, modo, camId, reconexao]);
-    // Com vídeo do PC do evento, a IA é desenhada aqui; sem ele (agente antigo), vem queimada no MJPEG do motor
-    const caixasNoNavegador = !!acesso?.ia && !!acesso?.mp4;
-    const anotarNoServidor = !!acesso?.ia && !acesso?.mp4;
+
+    // Fora do PC do evento (sem visor): nada de vídeo pela internet. O vídeo pelo Socket.IO da VPS dividia
+    // um canal TCP com detecções e comandos, parava e pulava ("foto parada"). Agora: imagem a 1 quadro/s na
+    // tela grande e 1 a cada 2 s nas miniaturas, avisado na tela. Tempo real é na Central do PC do evento.
+    const remoto = modo === 'stream' && visorDecidido && !visorToken;
+    const modoImagem = modo === 'snapshot' || remoto;
+    const intervaloImagem = remoto ? (qualidade === 'foco' ? 1000 : 2000) : intervaloSnapshotMs;
+
+    // Imagem: atualiza só enquanto aparece na tela (renovando o ingresso antes de vencer)
+    useEffect(() => {
+        if (!ativo || !modoImagem) return undefined;
+        setQuadro(Date.now());
+        const timer = setInterval(() => {
+            if (acessoEmRef.current && Date.now() - acessoEmRef.current > INGRESSO_VALE_MS) setReconexao(n => n + 1);
+            else setQuadro(Date.now());
+        }, intervaloImagem);
+        return () => clearInterval(timer);
+    }, [ativo, modoImagem, intervaloImagem]);
+
+    // Caiu: nova tentativa com espera crescente
+    useEffect(() => {
+        if (!erro || !ativo) return undefined;
+        const timer = setTimeout(() => {
+            setErro(false);
+            setAcesso(null);
+            setReconexao(n => n + 1);
+        }, ESPERAS_MS[Math.min(falhas, ESPERAS_MS.length - 1)]);
+        return () => clearTimeout(timer);
+    }, [erro, ativo, falhas]);
+
+    // Vídeo ao vivo só pelo visor local: WebRTC e, se ele não abrir, o MP4 do próprio PC do evento
+    const usarMp4 = modo === 'stream' && !!acesso?.mp4 && !!visorToken;
+
+    // Com vídeo do PC do evento, a IA é desenhada aqui; pela internet (imagem), vem desenhada pelo servidor
+    const caixasNoNavegador = !!acesso?.ia && !!acesso?.mp4 && !remoto;
+    const anotarNoServidor = !!acesso?.ia && (!acesso?.mp4 || remoto);
 
     // WebRTC pelo visor local (sem atraso). Se não abrir (agente antigo, navegador sem WebRTC), cai para o MP4
     // local e fica nele até trocar de câmera.
@@ -248,12 +255,10 @@ const CameraVideo = ({
 
     let src = null;
     if (ativo && !erro && acesso?.ingresso) {
-        if (usarMp4 && !visorDecidido) src = null; // aguardando saber se o visor local responde (até 1,5 s)
+        if (modo === 'stream' && !visorDecidido) src = null; // aguardando saber se o visor local responde (até 1,5 s)
         else if (viaRtc) src = null; // vídeo chega por srcObject (WebRTC)
-        else if (usarMp4 && visorToken) src = urlVisorMp4(camId, visorToken, qualidade);
-        // Pela VPS, a tela grande cai para 720p: o principal (ex.: 2304x1296) não chega fluido pela internet
-        else if (usarMp4) src = urlComIngresso(camId, 'video.mp4', acesso.ingresso, { qualidade: qualidade === 'foco' ? 'mini' : qualidade });
-        else if (modo === 'stream') src = urlComIngresso(camId, 'stream', acesso.ingresso, { annotate: anotarNoServidor, qualidade, r: reconexao });
+        else if (usarMp4) src = urlVisorMp4(camId, visorToken, qualidade); // reserva local quando o WebRTC não abre
+        // Pela internet (ou modo imagem): uma imagem por vez, com a IA desenhada no servidor
         else src = urlComIngresso(camId, 'snapshot', acesso.ingresso, { annotate: anotarNoServidor, qualidade, t: quadro });
     }
 
@@ -317,13 +322,13 @@ const CameraVideo = ({
                     );
                 })}
             </Box>
-            {/* Pela VPS o vídeo tem segundos de atraso: avisa onde está o tempo real */}
-            {carregou && usarMp4 && !visorToken && qualidade === 'foco' && (
+            {/* Pela internet não há vídeo ao vivo: avisa onde está o tempo real */}
+            {carregou && remoto && qualidade === 'foco' && (
                 <Typography variant="caption" sx={{
                     position: 'absolute', left: 8, bottom: 8, px: 1, py: 0.25, borderRadius: 1, pointerEvents: 'none',
                     bgcolor: 'rgba(0,0,0,0.65)', color: '#FFD400', fontWeight: 600, fontSize: '0.7rem'
                 }}>
-                    Vídeo pela internet (com atraso) • tempo real na Central do PC do evento
+                    Pela internet: 1 imagem por segundo • tempo real na Central do PC do evento
                 </Typography>
             )}
             {ativo && !erro && !carregou && (

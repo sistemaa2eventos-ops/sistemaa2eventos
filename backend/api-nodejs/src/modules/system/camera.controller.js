@@ -185,12 +185,15 @@ async function processarDeteccoesCamera(cam, results, annotatedB64, { origem = '
             }
         }
         const faceCropImg = face.face_crop_base64 ? `data:image/jpeg;base64,${face.face_crop_base64}` : null;
+        // Alerta só com reconhecimento confiável (rosto grande e semelhança alta, decidido pelo motor).
+        // Motor antigo não manda o campo: vale como antes.
+        const alertaConfiavel = mp.alerta_ok !== false;
 
         // Detecção de câmera NÃO é passagem de acesso: não entra no feed nem nos contadores.
         // Pessoa bloqueada vista pela câmera: alerta no máximo 1x por minuto por câmera.
         const chaveAlerta = `${cam.id}:${mp.cpf || mp.id}`;
         const ultimoAlerta = ALERTAS_CAMERA.get(chaveAlerta) || 0;
-        if (eventoId && mp.bloqueado && Date.now() - ultimoAlerta > 60000) {
+        if (eventoId && mp.bloqueado && alertaConfiavel && Date.now() - ultimoAlerta > 60000) {
             podarAlertasCamera();
             ALERTAS_CAMERA.set(chaveAlerta, Date.now());
             io?.to(`evento_${eventoId}`).emit('area_alert', {
@@ -219,7 +222,12 @@ async function processarDeteccoesCamera(cam, results, annotatedB64, { origem = '
         if (mp.cpf && eventoId) {
             try {
                 const monitorado = await watchlistService.verificarCPF(mp.cpf, eventoId);
-                if (monitorado) {
+                if (monitorado && !alertaConfiavel) {
+                    // Rosto pequeno ou semelhança baixa: não dispara alerta (um falso alerta de watchlist
+                    // na frente do cliente é o pior erro). Fica marcado como "possível" para quem pode ver.
+                    mp.watchlist_possivel = true;
+                    logger.info(`[Watchlist] possível alvo na câmera '${cam.nome}' sem confiança para alerta (rosto ${face.rosto_px ?? '?'} px, ${Math.round((mp.similarity || 0) * 100)}%)`);
+                } else if (monitorado) {
                     mp.is_watchlist = true;
                     mp.watchlist = monitorado;
                     mp.foto_capturada = snapshotFrame;
@@ -900,6 +908,7 @@ class CameraController {
                         delete item.matched_person.is_watchlist;
                         delete item.matched_person.watchlist;
                         delete item.matched_person.em_rastreamento;
+                        delete item.matched_person.watchlist_possivel;
                     }
                 });
             }

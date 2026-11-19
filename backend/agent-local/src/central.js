@@ -32,6 +32,8 @@ const estado = {
     fetchIa: null,
     porta: 8766,
     soLocal: true,
+    tailscale: false,         // também atende pela interface do Tailscale (operador remoto na mesma rede virtual)
+    hostsExtras: new Set(),   // "100.x.y.z:8766", "nome-do-pc:8766"
     cameras: [],              // [{ id, nome, ia }]
     alvos: new Map(),         // pessoa_id → { motivo, nivel }
     alvosEm: 0,
@@ -123,7 +125,9 @@ function pessoaParaTela(mp) {
         nome: mp.nome,
         semelhanca: mp.similarity,
         bloqueado: !!(mp.bloqueado || mp.status_acesso === 'bloqueado'),
-        watchlist: alvo
+        watchlist: alvo,
+        // Rosto grande e semelhança alta (decidido pelo motor): só assim toca alarme. Motor antigo: vale.
+        alerta_ok: mp.alerta_ok !== false
     };
 }
 
@@ -154,7 +158,10 @@ function lerCorpo(req, max) {
 function hostPermitido(req) {
     if (!estado.soLocal) return true;
     const h = String(req.headers.host || '').toLowerCase();
-    return h === `127.0.0.1:${estado.porta}` || h === `localhost:${estado.porta}`;
+    if (h === `127.0.0.1:${estado.porta}` || h === `localhost:${estado.porta}`) return true;
+    // Acesso pelo Tailscale (CENTRAL_TAILSCALE=1): o IP 100.x deste PC, o nome da máquina ou o nome MagicDNS (*.ts.net)
+    if (estado.hostsExtras.has(h)) return true;
+    return estado.tailscale && new RegExp(`^[a-z0-9-]+(\\.[a-z0-9-]+)*\\.ts\\.net:${estado.porta}$`).test(h);
 }
 
 function cabecalhosSeguranca(res) {
@@ -325,7 +332,7 @@ async function tratar(req, res, url) {
             const nomes = new Map(estado.cameras.map(c => [c.id, c.nome]));
             const itens = (j.deteccoes || []).map(d => {
                 const pessoas = (d.results || []).map(f => ({ ...pessoaParaTela(f.matched_person), rosto: f.face_crop_base64 || null }));
-                const alerta = pessoas.some(x => x.watchlist || x.bloqueado);
+                const alerta = pessoas.some(x => (x.watchlist || x.bloqueado) && x.alerta_ok);
                 return {
                     seq: d.seq, ts: d.ts, camera_id: d.camera_id, camera: nomes.get(d.camera_id) || 'Câmera',
                     pessoas, alerta,
@@ -364,11 +371,13 @@ async function tratar(req, res, url) {
     return true;
 }
 
-function iniciar({ log, fetchIa, porta, soLocal }) {
+function iniciar({ log, fetchIa, porta, soLocal, tailscale = null }) {
     if (log) estado.log = log;
     estado.fetchIa = fetchIa || null;
     estado.porta = porta;
     estado.soLocal = soLocal !== false;
+    estado.tailscale = !!tailscale;
+    estado.hostsExtras = new Set(tailscale ? [`${tailscale.ip}:${porta}`, `${tailscale.nome}:${porta}`] : []);
     chaveDeAcesso();
     carregarAlvosSalvos();
 }

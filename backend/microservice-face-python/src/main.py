@@ -41,16 +41,22 @@ if IA_GPU == "off":
 #  ia_fps_total       teto de análises/s do motor inteiro (dividido entre as câmeras pelo escalonador)
 #  ia_fps_foco/mini   análises/s de uma câmera aberta em tela grande / em miniatura
 #  ia_fps_vigilancia  análises/s de câmera sem ninguém assistindo, só com movimento
-#  ia_stream          sub: IA sempre no sub-stream (leve) · auto: stream principal se alguém
-#                     assiste em tela grande · principal: sempre o stream principal (mais nítido)
+#  ia_stream          sub: IA sempre no sub-stream (padrão de todos os perfis). Com IA_STREAM_DIAGNOSTICO=1
+#                     também aceita auto (principal em tela grande) e principal, só para diagnóstico.
+#
+# Por que sempre o sub-stream: no OpenCV/FFmpeg a decodificação acontece no grab() (o retrieve() só
+# converte a cor), então o motor decodifica TODOS os quadros da fonte aberta. Com o principal de 4 MP a
+# 15 fps, uma câmera custava ~0,35 núcleo só para decodificar. O único jeito de cortar esse custo é um
+# vídeo menor na origem: o sub-stream configurado na própria câmera em 720p e 8 a 10 fps.
 PERFIS: Dict[str, Dict[str, Any]] = {
     "leve":        {"ia_fps_total": 15, "ia_fps_foco": 6,  "ia_fps_mini": 3, "ia_fps_vigilancia": 2, "det_size": 480,
                     "ia_stream": "sub", "limiar": 0.50, "margem": 0.06, "confirmacoes": 2, "video_fps_max": 12},
     "equilibrado": {"ia_fps_total": 30, "ia_fps_foco": 10, "ia_fps_mini": 4, "ia_fps_vigilancia": 3, "det_size": 640,
-                    "ia_stream": "auto", "limiar": 0.48, "margem": 0.06, "confirmacoes": 2, "video_fps_max": 15},
+                    "ia_stream": "sub", "limiar": 0.48, "margem": 0.06, "confirmacoes": 2, "video_fps_max": 15},
     "maximo":      {"ia_fps_total": 60, "ia_fps_foco": 25, "ia_fps_mini": 12, "ia_fps_vigilancia": 6, "det_size": 640,
-                    "ia_stream": "principal", "limiar": 0.46, "margem": 0.05, "confirmacoes": 2, "video_fps_max": 30},
+                    "ia_stream": "sub", "limiar": 0.46, "margem": 0.05, "confirmacoes": 2, "video_fps_max": 30},
 }
+STREAM_DIAGNOSTICO = os.getenv("IA_STREAM_DIAGNOSTICO", "").strip().lower() in ("1", "true", "sim")
 COMUNS: Dict[str, Any] = {
     "min_face_px": 36,          # menor lado do rosto no quadro analisado (menor que isso: "distante")
     "min_det_score": 0.60,      # confiança mínima do detector para tentar reconhecer
@@ -63,6 +69,11 @@ COMUNS: Dict[str, Any] = {
     "cena_parada_s": 2.0,       # com espectador e cena parada: 1 análise a cada N s
     "vigilancia_repetir_s": 30.0,  # mesma pessoa na mesma câmera: 1 detecção a cada N s
     "aprender": True,           # guarda até 5 vetores ao vivo por pessoa (melhora o acerto no CFTV)
+    # Alerta (watchlist e bloqueados) exige mais que o reconhecimento: abaixo de ~64 px o ArcFace perde
+    # muita precisão, e um falso alerta na frente do cliente é o pior erro do produto. Reconhecer e contar
+    # seguem com min_face_px/limiar; disparar alerta exige estes dois.
+    "alerta_min_face_px": 64,
+    "alerta_limiar": 0.55,
 }
 # Faixas aceitas para cada ajuste vindo do painel (valores fora são limitados)
 FAIXAS: Dict[str, Tuple[float, float]] = {
@@ -71,6 +82,7 @@ FAIXAS: Dict[str, Tuple[float, float]] = {
     "video_fps_max": (5, 60), "min_face_px": (16, 200), "min_det_score": (0.3, 0.95), "min_nitidez": (0, 200),
     "max_yaw": (15, 90), "reconhecer_s": (0.2, 10), "movimento_limiar": (0.0005, 0.05),
     "movimento_janela_s": (0.5, 30), "cena_parada_s": (0.5, 30), "vigilancia_repetir_s": (5, 3600),
+    "alerta_min_face_px": (36, 300), "alerta_limiar": (0.40, 0.90),
 }
 ESPECTADOR_S = 10.0                                                       # sem pedido há 10 s: ninguém assistindo
 CAMERA_OCIOSA_S = max(30, int(os.getenv("IA_CAMERA_OCIOSA_S", "120")))  # leitor sem uso desliga após N s
@@ -89,7 +101,8 @@ def montar_config(perfil: str, ajustes: Optional[Dict[str, Any]] = None) -> Dict
         if chave in ("movimento", "aprender"):
             cfg[chave] = bool(valor)
         elif chave == "ia_stream":
-            if valor in ("sub", "auto", "principal"):
+            # Fora do diagnóstico a IA fica no sub-stream, mesmo que o painel tenha um ajuste antigo salvo
+            if valor in ("sub", "auto", "principal") and (valor == "sub" or STREAM_DIAGNOSTICO):
                 cfg[chave] = valor
         else:
             try:
@@ -98,7 +111,7 @@ def montar_config(perfil: str, ajustes: Optional[Dict[str, Any]] = None) -> Dict
                 continue
             lo, hi = FAIXAS.get(chave, (-math.inf, math.inf))
             v = min(max(v, lo), hi)
-            cfg[chave] = round(v) if chave in ("det_size", "confirmacoes", "min_face_px") else v
+            cfg[chave] = round(v) if chave in ("det_size", "confirmacoes", "min_face_px", "alerta_min_face_px") else v
     det_sz: Any = cfg["det_size"]
     cfg["det_size"] = int(det_sz) // 32 * 32  # o detector exige múltiplos de 32
     return cfg
@@ -1038,9 +1051,11 @@ def _leitor(url: str, cam: Camera, eh_sub: bool) -> Leitor:
 
 
 def leitor_para(url: str, qualidade: str = "foco", uso: bool = True) -> Leitor:
-    """Leitor para quem assiste: miniatura usa o sub-stream (se houver), tela grande o principal."""
+    """Leitor para quem assiste: miniatura usa o sub-stream (se houver), tela grande o principal.
+    Com a IA no sub-stream (padrão), a tela grande também usa o sub: o vídeo ao vivo vem do retransmissor
+    (go2rtc), e abrir o principal aqui só para marcar 'alguém assistindo' decodificava 4 MP à toa."""
     cam = camera_de(url)
-    sub = cam.url_sub() if qualidade == "mini" else None
+    sub = cam.url_sub() if (qualidade == "mini" or CFG["ia_stream"] == "sub") else None
     lt = _leitor(sub, cam, True) if sub else _leitor(url, cam, False)
     if uso:
         agora = time.time()
@@ -1181,6 +1196,12 @@ def diagnostico_comparacao(idx: "Indice", pos: int, s1: float, s2: float, do_cad
     }
 
 
+def alerta_confiavel(rosto_px: float, similaridade: float) -> bool:
+    """Reconhecimento bom o bastante para disparar alerta (watchlist, bloqueado). Abaixo disso a pessoa
+    continua reconhecida e contada, mas o painel mostra 'possível' sem alarme."""
+    return rosto_px >= CFG["alerta_min_face_px"] and similaridade >= CFG["alerta_limiar"]
+
+
 def aplicar_reconhecimento(r: "Rastro", p: Optional[str], s1: float, aceito: bool, nit: float, recorte_b64) -> bool:
     """Votação/confirmação de um rastro (mesma regra para reconhecimento local e no servidor).
     recorte_b64: str já pronto ou função que o gera (só chamada se precisar). True se confirmou."""
@@ -1301,6 +1322,7 @@ def analisar(cam: Camera, frame: np.ndarray, src: Leitor):
         x1, y1, x2, y2 = [int(v) for v in bbox]
         pos = idx.pos_por_id.get(r.pessoa) if r.pessoa is not None else None
         pessoa = idx.pessoas[pos] if pos is not None else None
+        rosto_px = int(min(x2 - x1, y2 - y1))
         resultados.append({
             "track_id": r.id,
             "bbox": [x1, y1, x2, y2],
@@ -1312,9 +1334,12 @@ def analisar(cam: Camera, frame: np.ndarray, src: Leitor):
             "face_crop_base64": r.crop_b64 if pessoa else None,
             # Por que foi ou não foi reconhecido: melhor e segunda similaridade, limiar e margem usados
             "diagnostico": r.diag,
+            "rosto_px": rosto_px,
             "matched_person": {
                 "id": pessoa["id"], "nome": pessoa["nome"], "cpf": pessoa["cpf"], "similarity": round(r.sim, 3),
                 "status_acesso": pessoa["status_acesso"], "bloqueado": pessoa["bloqueado"], "foto_url": pessoa.get("foto_url"),
+                # Seguro para disparar alerta (watchlist/bloqueado): rosto grande e semelhança alta
+                "alerta_ok": alerta_confiavel(rosto_px, r.sim),
             } if pessoa else None,
         })
     with cam.lock:

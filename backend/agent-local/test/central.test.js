@@ -128,6 +128,18 @@ test('caixas: alvo da watchlist sai marcado com motivo e nível; fora da lista s
     assert.ok(!('face_crop_base64' in j.cameras.cam1.caixas[0]));
 });
 
+test('alerta só com reconhecimento confiável: alerta_ok do motor chega à tela; motor antigo vale como confiável', async () => {
+    const cookie = await entrar();
+    central.definirAlvos([{ pessoa_id: 'p-alvo', motivo: 'Teste', nivel: 'alto' }]);
+    pessoa.alerta_ok = false;
+    let p = JSON.parse((await pedir('/central/api/caixas?foco=cam1', { cookie })).corpo).cameras.cam1.caixas[0].pessoa;
+    assert.strictEqual(p.alerta_ok, false);
+    assert.ok(p.watchlist, 'continua marcado como alvo, para a tela mostrar "possível"');
+    delete pessoa.alerta_ok;
+    p = JSON.parse((await pedir('/central/api/caixas?foco=cam1', { cookie })).corpo).cameras.cam1.caixas[0].pessoa;
+    assert.strictEqual(p.alerta_ok, true);
+});
+
 test('alvos ficam em disco (Central segue alertando sem internet)', () => {
     central.definirAlvos([{ pessoa_id: 'p9', nivel: 'alto' }]);
     const salvo = JSON.parse(fs.readFileSync(process.env.CENTRAL_ALVOS_ARQ, 'utf8'));
@@ -145,6 +157,20 @@ test('sair encerra a sessão', async () => {
     const cookie = await entrar();
     assert.strictEqual((await pedir('/central/sair', { metodo: 'POST', cookie })).status, 200);
     assert.strictEqual((await pedir('/central/api/estado', { cookie })).status, 401);
+});
+
+test('Tailscale: aceita o IP 100.x, o nome do PC e *.ts.net; continua recusando outros nomes', async () => {
+    const cookie = await entrar();
+    central.iniciar({ log: () => {}, fetchIa, porta, soLocal: true, tailscale: { ip: '100.70.1.2', nome: 'pc-evento' } });
+    for (const host of [`100.70.1.2:${porta}`, `pc-evento:${porta}`, `pc-evento.tail1234.ts.net:${porta}`]) {
+        assert.strictEqual((await pedir('/central/api/estado', { host, cookie })).status, 200, host);
+    }
+    for (const host of [`atacante.exemplo:${porta}`, `ts.net.atacante.exemplo:${porta}`, `pc-evento.tail1234.ts.net:9999`]) {
+        assert.strictEqual((await pedir('/central/api/estado', { host, cookie })).status, 421, host);
+    }
+    // Sem Tailscale, só localhost
+    central.iniciar({ log: () => {}, fetchIa, porta, soLocal: true });
+    assert.strictEqual((await pedir('/central/api/estado', { host: `100.70.1.2:${porta}`, cookie })).status, 421);
 });
 
 test('muitas chaves erradas seguidas bloqueiam por 1 minuto', async () => {
