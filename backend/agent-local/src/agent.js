@@ -26,7 +26,7 @@ const VPS_URL = (process.env.VPS_URL || '').replace(/\/+$/, '');
 const AGENT_TOKEN = process.env.AGENT_TOKEN;
 const AGENT_NAME = process.env.AGENT_NAME || 'Agente Local';
 const IA_URL = (process.env.IA_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
-const VERSAO = '3.1.0';
+const VERSAO = '3.2.0';
 const RAIZ_PROJETO = path.resolve(__dirname, '..', '..', '..');
 // Motor de IA desligado pelo painel: o vigia (ligar-ia-facial.ps1) não o religa enquanto existir
 const ARQ_MOTOR_DESLIGADO = path.join(__dirname, '..', '.motor-desligado');
@@ -372,10 +372,15 @@ const handlers = {
     },
 
     /** Imagem de câmera HTTP da rede local (snapshot CGI), com autenticação Digest ou Basic */
-    async http({ url, user, password, timeoutMs = 5000 }) {
+    async http({ url, user, password, timeoutMs = 5000, method = 'GET', body, headers = {}, texto = false }) {
         const alvo = new URL(url);
         if (!['http:', 'https:'].includes(alvo.protocol)) throw new Error('URL inválida');
-        const opcoes = () => ({ signal: AbortSignal.timeout(timeoutMs) });
+        // POST (ex.: comandos ONVIF da câmera): só com corpo de texto, sem repasse de cabeçalhos livres
+        const metodo = method === 'POST' ? 'POST' : 'GET';
+        const extras = metodo === 'POST' && typeof body === 'string'
+            ? { method: 'POST', body, headers: { 'Content-Type': String(headers['Content-Type'] || 'text/plain').slice(0, 200) } }
+            : {};
+        const opcoes = () => ({ signal: AbortSignal.timeout(timeoutMs), ...extras });
         try {
             let res;
             if (user) {
@@ -388,6 +393,7 @@ const handlers = {
                 res = await fetch(url, opcoes());
             }
             const buffer = Buffer.from(await res.arrayBuffer());
+            if (texto) return { status: res.status, ok: res.ok, text: buffer.toString('utf8') };
             return { status: res.status, ok: res.ok, contentType: res.headers.get('content-type'), base64: buffer.toString('base64') };
         } catch (err) {
             throw new Error(`Câmera ${alvo.host} inacessível: ${err.name === 'TimeoutError' ? 'timeout' : err.message}`);
@@ -966,7 +972,7 @@ socket.on('connect', () => {
     socket.emit('agent:ready', {
         name: AGENT_NAME, version: VERSAO, ts: new Date().toISOString(),
         // O que este PC sabe fazer: o painel escolhe o caminho do vídeo e mostra o que falta instalar
-        recursos: { video_local: video.disponivel(), ffmpeg: video.temFfmpeg(), gravacao: video.temFfmpeg(), rostos_pelo_agente: true, rede_testar: true, central_acesso: true, central_chave: true }
+        recursos: { video_local: video.disponivel(), ffmpeg: video.temFfmpeg(), gravacao: video.temFfmpeg(), rostos_pelo_agente: true, rede_testar: true, central_acesso: true, central_chave: true, http_post: true }
     });
     setTimeout(() => { sincronizarRostos(); }, 5000);
 });

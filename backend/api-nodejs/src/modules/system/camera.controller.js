@@ -2,6 +2,7 @@ const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const axios = require('axios');
 const agentService = require('../../services/agentService');
+const ptzService = require('./ptz.service');
 
 // A IA facial (microservice-face-python) e as câmeras ficam na rede local do evento. A API chega até elas:
 //  1. direto, se PYTHON_MICROSERVICE_URL estiver definida (API rodando no próprio servidor do evento);
@@ -127,6 +128,32 @@ async function chamarIa(rota, path, params, { binary = false, timeout = 8000 } =
     return binary
         ? { data: Buffer.from(r.base64, 'base64'), contentType: r.contentType }
         : { data: r.json };
+}
+
+/**
+ * Envia uma mensagem SOAP (ONVIF) à câmera: pelo agente do PC do evento, ou direto se a API está no evento.
+ * A câmera responde com HTTP 500 quando recusa o comando (Fault): o texto volta mesmo assim, e quem lê é o ptz.service.
+ */
+function enviarOnvif(rota) {
+    const onvif = require('../../services/onvif');
+    return async (url, xml) => {
+        if (rota?.tipo === 'agente') {
+            if (!agentService.recursos(rota.agentId).http_post) {
+                throw Object.assign(new Error('O agente do PC do evento é de uma versão antiga. No PC do evento, rode ligar-ia-facial.bat para atualizar.'), { status: 409 });
+            }
+            let r;
+            try {
+                r = await agentService.sendCommand(rota.agentId, 'http',
+                    { url, method: 'POST', body: xml, headers: { 'Content-Type': onvif.CONTENT_TYPE }, texto: true, timeoutMs: 6000 }, 8000);
+            } catch (err) {
+                throw Object.assign(new Error(`A câmera não respondeu: ${err.message}`), { status: 502 });
+            }
+            if (typeof r?.text !== 'string') throw Object.assign(new Error('A câmera não respondeu'), { status: 502 });
+            return r.text;
+        }
+        const r = await axios.post(url, xml, { headers: { 'Content-Type': onvif.CONTENT_TYPE }, timeout: 6000, responseType: 'text', validateStatus: () => true });
+        return typeof r.data === 'string' ? r.data : '';
+    };
 }
 
 /** Imagem de câmera HTTP (snapshot CGI): pelo agente quando a API está na nuvem */
@@ -318,7 +345,7 @@ const mascararUrl = (url) => (typeof url === 'string' ? url.replace(/(\/\/[^:/@]
 const ALERTAS_CAMERA = new Map(); // `${camId}:${cpf}` → último alerta de pessoa bloqueada (ms)
 // Opções de IA por câmera (migration 20261028) e de gravação (migration 20261111)
 const CAMPOS_IA = ['ia_ativa', 'vigilancia_ativa', 'prioridade', 'url_substream', 'gravacao_modo', 'gravacao_stream', 'gravacao_drive'];
-const CAMPOS_EDITAVEIS = ['nome', 'area_id', 'fabricante', 'stream_url', 'snapshot_url', 'protocolo', 'ip_address', 'porta', 'usuario', 'senha', 'status', ...CAMPOS_IA];
+const CAMPOS_EDITAVEIS = ['nome', 'area_id', 'fabricante', 'stream_url', 'snapshot_url', 'protocolo', 'ip_address', 'porta', 'usuario', 'senha', 'status', 'ptz_ativo', 'ptz_porta', ...CAMPOS_IA];
 
 /** Normaliza os campos de IA/gravação vindos do painel (valor desconhecido sai, banco usa o padrão) */
 function normalizarOpcoes(dados) {
@@ -337,10 +364,16 @@ const colunaInexistente = (error) => error?.code === '42703' || error?.code === 
 const CAMPOS_GRAVACAO = ['gravacao_modo', 'gravacao_stream', 'gravacao_drive'];
 const semCampos = (dados, lista) => Object.fromEntries(Object.entries(dados).filter(([k]) => !lista.includes(k)));
 /** Grava; banco sem a migration 20261111 tira só os campos de gravação, sem a 20261028 tira os de IA */
+// Banco sem uma migração recente: tira as colunas que faltam (acumulando) e grava o resto
+const CAMPOS_PTZ = ['ptz_ativo', 'ptz_porta'];
 async function gravarComRecuo(operacao, dados) {
     let r = await operacao(dados);
-    if (colunaInexistente(r.error)) r = await operacao(semCampos(dados, CAMPOS_GRAVACAO));
-    if (colunaInexistente(r.error)) r = await operacao(semCampos(dados, CAMPOS_IA));
+    let retirados = [];
+    for (const grupo of [CAMPOS_GRAVACAO, CAMPOS_IA, CAMPOS_PTZ]) {
+        if (!colunaInexistente(r.error)) break;
+        retirados = [...retirados, ...grupo];
+        r = await operacao(semCampos(dados, retirados));
+    }
     return r;
 }
 
@@ -678,6 +711,30 @@ class CameraController {
     }
 
     /**
+     * Giro (PTZ, ONVIF): mover, parar, listar posições, ir a uma posição e gravar a posição atual.
+     * O envio sai pelo PC do evento (câmera na rede local) ou direto, se a API está no evento.
+     */
+    async ptz(req, res) {
+        try {
+            const cam = await cameraDoEvento(req, req.params.id);
+            if (!cam) return res.status(404).json({ error: 'Câmera não encontrada' });
+            if (!cam.ptz_ativo) return res.status(409).json({ error: 'Esta câmera não tem giro ligado. Ative em Editar câmera > Câmera com giro.' });
+            const corpo = req.body || {};
+            const num = (v) => { const n = Number(v); return Number.isFinite(n) ? Math.max(-1, Math.min(1, n)) : 0; };
+            const pedido = corpo.acao === 'mover' ? { acao: 'mover', pan: num(corpo.pan), tilt: num(corpo.tilt), zoom: num(corpo.zoom) }
+                : corpo.acao === 'gravar' ? { acao: 'gravar', nome: String(corpo.nome || '').slice(0, 40) }
+                : corpo.acao === 'ir' ? { acao: 'ir', token: String(corpo.token || '').slice(0, 40) }
+                : { acao: corpo.acao };
+            const r = await ptzService.executar(cam, enviarOnvif(rotaDaCamera(cam)), pedido);
+            res.json({ success: true, data: r });
+        } catch (error) {
+            if (error.status) return res.status(error.status).json({ error: error.message });
+            logger.error(`[ptz] ${error.message}`);
+            res.status(500).json({ error: 'Erro ao falar com o giro da câmera' });
+        }
+    }
+
+    /**
      * Diagnosticar: cadastro, PC do evento, rede, imagem, miniatura, IA e gravação, com a correção de
      * cada problema (mesmo formato do "Diagnosticar" dos leitores)
      */
@@ -688,7 +745,8 @@ class CameraController {
             const rota = rotaDaCamera(cam);
             const r = await require('./cameraDiagnostico.service').diagnosticarCamera(cam, {
                 rota, rtsp: ehRtsp(cam), videoLocal: videoLocal(rota), agentService, chamarIa, buscarImagemHttp,
-                redeTeste: require('../devices/redeTeste.service')
+                redeTeste: require('../devices/redeTeste.service'),
+                verificarGiro: cam.ptz_ativo ? () => ptzService.verificarGiro(cam, enviarOnvif(rota)) : null
             });
             const imagem = r.itens.find(i => i.chave === 'imagem');
             if (imagem && imagem.estado !== 'nao_testado') {

@@ -206,6 +206,17 @@ async function diagnosticarCamera(cam, deps) {
         }
     }
 
+    // 9. Giro (ONVIF): só quando a câmera tem giro ligado
+    if (cam.ptz_ativo && deps.verificarGiro) {
+        try {
+            await deps.verificarGiro();
+            itens.push(item('giro', 'Giro da câmera (ONVIF)', 'ok', 'O serviço de giro responde'));
+        } catch (err) {
+            itens.push(item('giro', 'Giro da câmera (ONVIF)', 'erro', err.message,
+                'Confira a porta ONVIF (2020 nas Mercusys/Tapo), o ONVIF ligado na câmera e a conta da câmera (usuário e senha).', 'editar'));
+        }
+    }
+
     const erros = itens.filter(i => i.estado === 'erro').length;
     const alertas = itens.filter(i => i.estado === 'alerta').length;
     const resumo = erros ? `${erros} problema(s) a corrigir` : alertas ? `${alertas} ponto(s) de atenção` : 'Tudo certo';

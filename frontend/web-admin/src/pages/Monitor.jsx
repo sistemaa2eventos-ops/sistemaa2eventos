@@ -60,6 +60,8 @@ import KpiCards from '../components/monitor/KpiCards';
 import AbaSaude from '../components/monitor/AbaSaude';
 
 import { botaoSecundario } from '../styles/tokens';
+import PainelGiro from '../components/cameras/PainelGiro';
+import useVisaoNoturna from '../hooks/useVisaoNoturna';
 import { comoRotulo } from '../utils/formatadores';
 
 // Central de Monitoramento servida pelo agente do PC do evento (vídeo por WebRTC direto, sem a VPS)
@@ -215,6 +217,8 @@ const Monitor = () => {
   // Dialogs States
   const [testResults, setTestResults] = useState({});
   const [activeStreamCam, setActiveStreamCam] = useState(null);
+  // Visão noturna (infravermelho) da câmera aberta em tela grande
+  const visaoNoturna = useVisaoNoturna(activeStreamCam?.id, !!activeStreamCam);
 
   // Watchlist Dialogs
   const [openTargetDialog, setOpenTargetDialog] = useState(false);
@@ -2322,6 +2326,23 @@ const Monitor = () => {
                 />
             )}
         </Box>
+
+        {/* Visão noturna: selo quando a câmera está em preto e branco (infravermelho) */}
+        {activeStreamCam && visaoNoturna?.noturno && (
+            <Box sx={{ position: 'absolute', top: 12, left: 12, zIndex: 5, pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: 0.75,
+                bgcolor: 'rgba(0,0,0,0.7)', border: '1px solid rgba(255,255,255,0.35)', borderRadius: 1.5, px: 1, py: 0.4 }}>
+                <Typography variant="caption" sx={{ color: '#FFFFFF', fontWeight: 700, fontSize: '0.75rem' }}>
+                    Visão noturna (infravermelho): IA reconhece menos sem luz
+                </Typography>
+            </Box>
+        )}
+
+        {/* Giro da câmera (setas, velocidade, posições): só com giro ligado e os controles visíveis */}
+        {activeStreamCam?.ptz_ativo && showPlayerControls && (
+            <Box sx={{ position: 'absolute', left: '50%', bottom: { xs: 12, sm: 16 }, transform: 'translateX(-50%)', zIndex: 5, maxWidth: 'calc(100% - 24px)' }}>
+                <PainelGiro cameraId={activeStreamCam.id} />
+            </Box>
+        )}
 
         {/* Com os controles escondidos, o fechar continua no mesmo lugar: o player nunca fica sem saída */}
         {!showPlayerControls && (

@@ -159,6 +159,18 @@ const CameraFormDialog = ({ open, camera, areas = [], eventoId, onClose, onSalvo
                             onChange={(e) => mudar({ status: e.target.checked ? 'offline' : 'desativada' })} />}
                         label="Câmera ativa (desligada: sem vídeo, IA e gravação)" />
 
+                    <FormControlLabel
+                        control={<Switch id="camera-ptz" checked={cam.ptz_ativo === true}
+                            onChange={(e) => mudar({ ptz_ativo: e.target.checked })} />}
+                        label="Câmera com giro (setas e posições, pelo padrão ONVIF)" />
+                    <Collapse in={cam.ptz_ativo === true}>
+                        <Stack spacing={1}>
+                            <TextField id="camera-ptz-porta" label="Porta ONVIF" type="number" fullWidth
+                                value={cam.ptz_porta || 2020} onChange={(e) => mudar({ ptz_porta: e.target.value })}
+                                helperText="Mercusys e Tapo: 2020. Usa a mesma conta da câmera (usuário e senha acima)." />
+                        </Stack>
+                    </Collapse>
+
                     <SeletorModo id="camera-modo-ia" rotulo="Inteligência" opcoes={MODOS_IA} valor={modoIaDe(cam)}
                         disabled={desativada} onChange={(m) => mudar(camposDoModoIa(m))} />
                     <Typography variant="caption" color="text.secondary" sx={{ mt: -1.5 }}>

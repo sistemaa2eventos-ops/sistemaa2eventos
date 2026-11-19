@@ -46,7 +46,7 @@ Pelo painel: **Leitores e dispositivos > Testar rede do evento**. Digite o IP, e
 - **Nada responde**: equipamento desligado, rede diferente ou IP errado.
 - Alguns equipamentos não respondem ao ping mesmo ligados: vale o resultado das portas.
 
-O agente do PC do evento precisa estar atualizado (versão 3.1, rode `ligar-ia-facial.bat`). Sem o painel, no Prompt de Comando: `ping 192.168.1.52`.
+O agente do PC do evento precisa estar atualizado (versão 3.2, rode `ligar-ia-facial.bat`). Sem o painel, no Prompt de Comando: `ping 192.168.1.52`.
 
 ### 2.4 Internet
 - Os leitores, hoje, **precisam do servidor para liberar** (modo online, seção 4.6). Sem internet, eles negam.
@@ -67,7 +67,7 @@ Dê dois cliques em `C:\Projetos\Projeto_A2_Eventos\ligar-ia-facial.bat`. Ele:
 - Painel > Monitor > aba **Saúde**: "Saúde do vídeo (PC do evento)" deve listar as câmeras com fps.
 - Central (`http://localhost:8766/central/`): selo verde "Câmeras ao vivo", "Vídeo direto (WebRTC)" e "IA na GPU".
 - Para abrir a Central de novo: `abrir-central.bat`.
-- **Central em outro computador**: Leitores e dispositivos > Agentes locais > botão **Central** do agente. Escolha *Só este PC* (padrão), *Rede local do evento* (outro computador da sala, com a chave de acesso) ou *Tailscale* (operador remoto). Vale na hora, fica gravado no PC e a janela mostra os endereços para abrir. Precisa do agente 3.1 (`ligar-ia-facial.bat`).
+- **Central em outro computador**: Leitores e dispositivos > Agentes locais > botão **Central** do agente. Escolha *Só este PC* (padrão), *Rede local do evento* (outro computador da sala, com a chave de acesso) ou *Tailscale* (operador remoto). Vale na hora, fica gravado no PC e a janela mostra os endereços para abrir. Precisa do agente 3.1 ou mais novo (`ligar-ia-facial.bat`).
 - **Chave de acesso** (na mesma janela, só administrador): **Mostrar chave** para copiar e enviar ao operador por canal seguro; **Gerar nova chave** quando alguém não deve mais entrar (a antiga para na hora e todos que estavam dentro saem). No outro computador, abra o endereço, cole a chave e clique em Entrar; vale 12 horas naquele navegador.
 
 ### 3.3 Energia e Windows
@@ -222,6 +222,27 @@ Escolha também a gravação: desligada, contínua ou só em alertas.
 - Central: a câmera aparece ao vivo, com fps e resolução no canto.
 - Fique na frente da câmera com o cadastro de teste: a caixa deve mostrar o nome (verde).
 - Alvo de watchlist aparece em vermelho, com alarme. Em **amarelo, "possível alvo"**, é rosto pequeno ou semelhança baixa: aproxime a câmera ou melhore a luz.
+
+### 5.4 Câmera com giro (Mercusys MC210, Tapo e similares)
+Câmeras que giram (Mercusys MC210, por exemplo) ganham controles na tela grande do Monitor.
+
+**Ligar:** Monitor > Gerenciar câmeras > editar a câmera > marque **Câmera com giro**. A porta ONVIF é **2020** nas Mercusys e Tapo. Usa a mesma **conta da câmera** (usuário e senha que você criou no aplicativo).
+
+**Usar:** abra a câmera em tela grande e toque no vídeo para mostrar os controles:
+- **Setas:** mantenha apertado para girar; solte para parar. A câmera também para sozinha em 1 segundo se a conexão cair.
+- **Zoom + e zoom -:** mesma regra das setas.
+- **Velocidade:** deslize para girar mais devagar (ex.: para acompanhar uma pessoa).
+- **Posições:** gire até o ponto desejado, escreva um nome e clique em **Gravar aqui**. Depois, toque no nome para a câmera ir até lá.
+- **Parar:** o botão amarelo interrompe qualquer movimento.
+
+**Antes do evento, teste** (o Diagnosticar da câmera mostra o item "Giro da câmera (ONVIF)"):
+- Gire para cima, baixo, esquerda e direita. Se uma direção não responde, atualize o firmware da câmera e confira se **"Inverter imagem" está desligado** no aplicativo.
+- Grave uma posição e volte a ela.
+- Se o giro não responde, a causa mais comum é a porta ONVIF ou a conta da câmera. O diagnóstico aponta a correção.
+
+**Visão noturna:** quando a câmera troca para o infravermelho (imagem em preto e branco), aparece o aviso **Visão noturna** no topo da tela. A IA reconhece menos sem luz: deixe luz na portaria sempre que possível.
+
+**Atenção:** a câmera Wi-Fi tem cerca de 1 segundo de atraso entre a imagem e o giro. Movimento contínuo gasta o motor: use posições salvas para rondas.
 
 ---
 

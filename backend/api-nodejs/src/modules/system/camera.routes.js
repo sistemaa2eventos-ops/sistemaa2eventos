@@ -36,5 +36,8 @@ router.put('/:id', checkPermission('monitor', 'escrita'), cameraController.updat
 router.delete('/:id', checkPermission('monitor', 'escrita'), cameraController.delete);
 router.post('/:id/testar', checkPermission('monitor', 'leitura'), cameraController.testarConexao);
 router.post('/:id/diagnosticar', checkPermission('monitor', 'leitura'), cameraController.diagnosticar);
+// Giro (ONVIF): mover/parar/gravar posição mexem na câmera; listar posições é só leitura
+router.post('/:id/ptz', checkPermission('monitor', 'escrita'), cameraController.ptz);
+router.get('/:id/ptz/presets', checkPermission('monitor', 'leitura'), (req, _res, next) => { req.body = { acao: 'listar' }; next(); }, cameraController.ptz);
 
 module.exports = router;
