@@ -102,8 +102,14 @@ Configurações > **Dispositivos** > novo dispositivo:
 | Pessoa bloqueada ou expulsa | **Manter cadastrada e suspensa** (padrão) ou Remover (ver 4.7) |
 | Usar também como câmera | Opcional: o vídeo do leitor aparece nas câmeras |
 
-Depois de salvar:
-1. **Config Online**: aponta o leitor para o servidor. A janela pede o endereço e a porta do servidor; deixe em branco para usar o padrão do sistema. Faça sempre depois de trocar IP, servidor ou firmware.
+**Uma vez por evento**, no cartão **Endereço do servidor para os leitores** (topo da mesma tela), informe para onde os leitores perguntam se liberam a pessoa:
+- servidor no PC do evento: o IP do PC na rede local e a porta **3001** (ex.: 192.168.1.129 e 3001);
+- servidor na VPS: **leitores.nzt.app.br** e porta **80**.
+
+O endereço fica salvo para este evento. "Padrão geral" vale para eventos sem endereço próprio. Em branco, o sistema usa a configuração do servidor (`.env`). O cartão mostra qual está **em uso agora**.
+
+Depois de salvar o leitor:
+1. **Config Online**: grava no leitor o endereço do cartão acima (deixe a janela em branco). Só digite um endereço na janela para um caso isolado. Faça sempre depois de trocar IP, servidor ou firmware.
 2. **Sync**: envia as pessoas das áreas deste leitor.
 3. **Diagnosticar** (botão no card do leitor): confere tudo de uma vez e mostra como corrigir.
 
@@ -152,6 +158,7 @@ O comportamento sem internet (o leitor decidir sozinho com a lista que já tem) 
 - **Remover do leitor:** o rosto sai do leitor; ao desbloquear, é cadastrado de novo.
 - Recusados e inativos sempre saem do leitor.
 - Leitor que não suporta suspensão (hoje: Hikvision) remove automaticamente.
+- **Empresa bloqueada:** todos os funcionários dela ficam suspensos nos leitores em poucos segundos (mesma regra acima). Ao reativar a empresa, voltam a passar — exceto quem estiver bloqueado individualmente.
 
 **Teste a suspensão no equipamento** (bloqueie, tente passar; desbloqueie, tente passar) antes de depender dela sem internet.
 
@@ -245,7 +252,9 @@ Escolha também a gravação: desligada, contínua ou só em alertas.
 - Firmware novo pode apagar a configuração: refaça os testes da seção 4.5.
 
 ### Fim do evento
-- **Esvaziar** os leitores alugados ou de terceiros: restaure o padrão de fábrica no próprio leitor (o botão "Limpar e sincronizar" apaga e **reenvia** as pessoas do evento, então não esvazia). Um botão "Esvaziar leitor" no painel está na lista da seção 8. Biometria é dado sensível (LGPD): não deixe rostos em equipamento que vai para outro lugar.
+- **Esvaziar os leitores:** no card do leitor, abra os controles (seta) e clique em **Esvaziar leitor** (só administrador; digite o nome do leitor para confirmar). Apaga todas as pessoas e rostos do equipamento e cancela os cadastros pendentes. Depois disso o leitor **não recebe mais ninguém** — nem pela varredura da madrugada — até alguém clicar em **Sync** ou **Limpar e sincronizar**. Se a mensagem disser que ainda restam cadastros, repita ou restaure o padrão de fábrica no próprio leitor.
+- "Limpar e sincronizar" **não** esvazia: apaga e reenvia as pessoas do evento.
+- Biometria é dado sensível (LGPD): não deixe rostos em equipamento alugado ou que vai para outro lugar.
 - As gravações ficam no PC do evento (`NZT-Gravacoes`) e são apagadas pelo prazo configurado.
 
 ---
@@ -256,12 +265,9 @@ O objetivo é que tudo seja configurado pelo painel. Hoje, estes pontos ainda de
 
 | O quê | Hoje | Plano |
 |---|---|---|
-| Endereço padrão do servidor para os leitores | Digitado em cada "Config Online"; o padrão vem do arquivo `.env` da VPS | Padrão editável em Configurações |
 | Leitores Hikvision | Não enviam a foto | Completar o adaptador e testar com um equipamento |
 | Outras marcas de leitor | Não suportadas | Cadastro de modelos + adaptador por marca |
 | Central pelo Tailscale / rede local | Arquivo `.env` do PC do evento | Opções na tela do agente |
 | Modo sem internet do leitor | A definir no teste com o equipamento | Opção por leitor no painel |
-| Empresa bloqueada | O servidor nega, mas os funcionários continuam no leitor | Suspender todos da empresa nos leitores |
 | Diagnóstico de câmera | Botão "Testar conexão" (só diz se abre) | "Diagnosticar" da câmera, como o dos leitores |
 | Teste de rede genérico (qualquer IP/porta) | Prompt de Comando | Ferramenta de rede no painel, pelo agente |
-| Esvaziar um leitor no fim do evento | Restaurar padrão no próprio leitor | Botão "Esvaziar leitor" no painel |

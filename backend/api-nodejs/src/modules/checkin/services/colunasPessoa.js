@@ -16,4 +16,10 @@ const COLUNAS_PESSOA_ACESSO = [
     'liberacao_manual_ate', 'liberacao_manual_por', 'liberacao_manual_motivo'
 ].join(',');
 
-module.exports = { COLUNAS_PESSOA_ACESSO };
+/**
+ * Sincronização dos leitores: as mesmas colunas + se a empresa está ativa.
+ * Empresa bloqueada (empresas.ativo = false) suspende os funcionários no leitor.
+ */
+const COLUNAS_PESSOA_SYNC = `${COLUNAS_PESSOA_ACESSO},empresas(ativo)`;
+
+module.exports = { COLUNAS_PESSOA_ACESSO, COLUNAS_PESSOA_SYNC };

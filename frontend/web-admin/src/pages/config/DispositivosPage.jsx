@@ -26,6 +26,7 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import api from '../../services/api';
 import AgentesLocais from '../../components/dispositivos/AgentesLocais';
 import ConfiancaFacial from '../../components/dispositivos/ConfiancaFacial';
+import ServidorLeitores from '../../components/dispositivos/ServidorLeitores';
 
 import { botaoSecundario } from '../../styles/tokens';
 // ── Paleta padronizada do sistema
@@ -116,6 +117,10 @@ export default function DispositivosPage() {
   const [testDialog, setTestDialog] = useState({ open: false, result: null, testing: false });
   const [testIp, setTestIp] = useState('');
   const [pushDialog, setPushDialog] = useState({ open: false, device: null, host: '', port: '' });
+  // Endereço dos leitores salvo no painel ({ efetivo, origem, ... }), mostrado na janela do Config online
+  const [servidorLeitores, setServidorLeitores] = useState(null);
+  // Esvaziar leitor (fim do evento): confirmação digitando o nome
+  const [esvaziar, setEsvaziar] = useState({ open: false, device: null, nome: '' });
   const [testPorta, setTestPorta] = useState(80);
 
   // Formulário
@@ -308,6 +313,22 @@ export default function DispositivosPage() {
   const handleCloseDoor = (id) => runAction(id, 'close', () => api.post(`/dispositivos/${id}/remote-close`), 'Porta retornada ao estado NORMAL');
   const handleForceQueue = (id) => runAction(id, 'queue', () => api.post(`/dispositivos/${id}/force-queue`), 'Fila de pendências reprocessada');
 
+  // Fim do evento: apaga todas as pessoas do equipamento e o leitor deixa de receber cadastros
+  const confirmarEsvaziar = async () => {
+    const { device } = esvaziar;
+    setEsvaziar({ open: false, device: null, nome: '' });
+    setDevLoading(device.id, 'esvaziar', true);
+    try {
+      const { data } = await api.post(`/dispositivos/${device.id}/esvaziar`, {}, { hideDefaultError: true, timeout: 60000 });
+      enqueueSnackbar(data?.message || `${device.nome} esvaziado`, { variant: data?.restantes > 0 ? 'warning' : 'success' });
+      carregarDados();
+    } catch (err) {
+      enqueueSnackbar(`Não esvaziou: ${err.response?.data?.error || err.message}`, { variant: 'error' });
+    } finally {
+      setDevLoading(device.id, 'esvaziar', false);
+    }
+  };
+
   const handleConfigurePush = (device) => {
     setPushDialog({ open: true, device, host: '', port: '' });
   };
@@ -462,6 +483,11 @@ export default function DispositivosPage() {
                   <Chip label={`Fluxo: ${({ toggle: 'entrada e saída', entrada: 'só entrada', saida: 'só saída' })[device.config.fluxo] || device.config.fluxo}`} size="small" variant="outlined" sx={{ fontSize: '0.75rem', borderColor: 'rgba(255,255,255,0.2)', color: '#CBD5E1' }} />
                 )}
               </Box>
+              {device.config?.esvaziado_em && (
+                <Box sx={{ fontSize: '0.75rem', color: '#FFB800' }}>
+                  Esvaziado em {formatarMomento(device.config.esvaziado_em)}: não recebe ninguém até um “Sync”
+                </Box>
+              )}
               {device.config?.controla_rele === false && (
                 <Box sx={{ fontSize: '0.75rem', color: '#FFB800' }}>Sem controle de relé (modo online)</Box>
               )}
@@ -632,6 +658,21 @@ export default function DispositivosPage() {
                 </span>
               </Tooltip>
 
+              {/* Fim do evento: apagar todas as pessoas do leitor (LGPD) */}
+              {device.tipo === 'terminal_facial' && (
+                <Tooltip title="Fim do evento: apaga todas as pessoas e rostos do leitor. Ele não recebe mais ninguém até um Sync.">
+                  <span>
+                    <Button variant="outlined" size="small"
+                      startIcon={isDevLoading(device.id, 'esvaziar') ? <CircularProgress size={10} /> : <DeleteIcon />}
+                      onClick={() => setEsvaziar({ open: true, device, nome: '' })}
+                      disabled={isDevLoading(device.id, 'esvaziar') || !isOnline}
+                      sx={{ color: RED, borderColor: `${RED}44`, fontSize: '0.75rem' }}>
+                      Esvaziar leitor
+                    </Button>
+                  </span>
+                </Tooltip>
+              )}
+
               {/* Forçar fila pendente */}
               {pending > 0 && (
                 <Tooltip title={`Reprocessar ${pending} comando(s) pendentes`}>
@@ -667,6 +708,7 @@ export default function DispositivosPage() {
 
       <AgentesLocais agentes={agentes} onChange={() => carregarDados()} />
       <ConfiancaFacial />
+      <ServidorLeitores onSalvo={setServidorLeitores} />
 
       {/* ── Barra de ações */}
       <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -1196,15 +1238,17 @@ export default function DispositivosPage() {
         <DialogContent sx={{ pt: 2 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
             <Alert severity="info">
-              Endereço que o LEITOR usa para falar com o servidor. Em branco = valor do servidor
-              (HARDWARE_CALLBACK_HOST / HARDWARE_CALLBACK_PORT).
+              Endereço que o LEITOR usa para falar com o servidor.{' '}
+              {servidorLeitores?.efetivo
+                ? <>Em branco = <b>{servidorLeitores.efetivo.host}{servidorLeitores.efetivo.porta ? `:${servidorLeitores.efetivo.porta}` : ''}</b> (o salvo em “Endereço do servidor para os leitores”).</>
+                : <>Em branco = configuração do servidor. Para não digitar sempre, salve o endereço no cartão “Endereço do servidor para os leitores”.</>}
             </Alert>
             <TextField label="Host do servidor (IP ou domínio)" value={pushDialog.host}
               onChange={e => setPushDialog(p => ({ ...p, host: e.target.value }))}
-              fullWidth size="small" placeholder="192.168.1.129" />
+              fullWidth size="small" placeholder={servidorLeitores?.efetivo?.host || '192.168.1.129'} />
             <TextField label="Porta" type="number" value={pushDialog.port}
               onChange={e => setPushDialog(p => ({ ...p, port: e.target.value }))}
-              fullWidth size="small" placeholder="3001" />
+              fullWidth size="small" placeholder={String(servidorLeitores?.efetivo?.porta || 3001)} />
           </Box>
         </DialogContent>
         <DialogActions>
@@ -1212,6 +1256,32 @@ export default function DispositivosPage() {
           <Button onClick={confirmConfigurePush} variant="contained"
             sx={{ background: CYAN, color: '#000000', fontWeight: 700 }}>
             Aplicar no leitor
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Dialog: Esvaziar leitor (fim do evento) */}
+      <Dialog open={esvaziar.open} onClose={() => setEsvaziar({ open: false, device: null, nome: '' })} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ color: RED, fontWeight: 700 }}>Esvaziar leitor — {esvaziar.device?.nome}</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            <Alert severity="warning">
+              Apaga <b>todas</b> as pessoas e rostos guardados no equipamento e cancela os cadastros pendentes.
+              A partir daí o leitor <b>não reconhece ninguém</b> e não recebe novos cadastros.
+              Use no fim do evento ou antes de devolver um equipamento alugado.
+              Para usar de novo, clique em “Sync”.
+            </Alert>
+            <TextField label="Digite o nome do leitor para confirmar" value={esvaziar.nome} autoFocus
+              onChange={e => setEsvaziar(s => ({ ...s, nome: e.target.value }))}
+              fullWidth size="small" placeholder={esvaziar.device?.nome || ''} />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button variant="outlined" onClick={() => setEsvaziar({ open: false, device: null, nome: '' })} sx={botaoSecundario}>Cancelar</Button>
+          <Button onClick={confirmarEsvaziar} variant="contained"
+            disabled={!esvaziar.device || esvaziar.nome.trim() !== String(esvaziar.device.nome).trim()}
+            sx={{ background: RED, color: '#FFFFFF', fontWeight: 700 }}>
+            Esvaziar
           </Button>
         </DialogActions>
       </Dialog>

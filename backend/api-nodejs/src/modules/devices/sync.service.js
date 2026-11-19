@@ -6,7 +6,7 @@ const imageProcessor = require('../../utils/imageProcessor');
 const { ehDoNossoStorage, baixarArquivo, BUCKETS_FOTO } = require('../../services/storageSeguro');
 const { getHwUserIdCandidates } = require('./hwUserId');
 const { buscarTodos } = require('../../utils/buscarTodos');
-const { COLUNAS_PESSOA_ACESSO } = require('../checkin/services/colunasPessoa');
+const { COLUNAS_PESSOA_SYNC: COLUNAS_PESSOA_ACESSO } = require('../checkin/services/colunasPessoa');
 const EventEmitter = require('events');
 require('dotenv').config();
 
@@ -786,6 +786,12 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
                 const d = item.dispositivos_acesso;
                 if (!d || d.status_online !== 'online') continue;
 
+                // Leitor esvaziado: cadastro/suspensão pendente não volta a encher o leitor
+                if (item.tipo_comando !== 'delete_face' && this._terminalEsvaziado(d)) {
+                    await supabase.from('terminal_sync_queue').delete().eq('id', item.id);
+                    continue;
+                }
+
                 try {
                     const terminal = {
                         id: item.dispositivo_id,
@@ -855,21 +861,37 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
     _statusRemoveDosTerminais(pessoa) {
         return !!pessoa?.bloqueado
             || pessoa?.ativo === false
+            || this._empresaBloqueada(pessoa)
             || ['bloqueado', 'recusado', 'expulso'].includes(pessoa?.status_acesso);
     }
 
+    /** Empresa desativada/bloqueada (empresas.ativo = false): a validação online já nega; o leitor também */
+    _empresaBloqueada(pessoa) {
+        const emp = Array.isArray(pessoa?.empresas) ? pessoa.empresas[0] : pessoa?.empresas;
+        return emp?.ativo === false;
+    }
+
     /**
-     * Bloqueado/expulso pode ser desbloqueado a qualquer momento (com motivo): fica no leitor com o rosto,
-     * SUSPENSO (validade vencida, o leitor nega até o sistema liberar de novo).
+     * Bloqueado/expulso (ou da empresa bloqueada) pode ser desbloqueado a qualquer momento (com motivo):
+     * fica no leitor com o rosto, SUSPENSO (validade vencida, o leitor nega até o sistema liberar de novo).
      */
     _statusSuspendeNosTerminais(pessoa) {
         return !this._statusSoRemoveDosTerminais(pessoa)
-            && (!!pessoa?.bloqueado || ['bloqueado', 'expulso'].includes(pessoa?.status_acesso));
+            && (!!pessoa?.bloqueado || this._empresaBloqueada(pessoa)
+                || ['bloqueado', 'expulso'].includes(pessoa?.status_acesso));
     }
 
     /** Inativo ou recusado: sai do leitor */
     _statusSoRemoveDosTerminais(pessoa) {
         return pessoa?.ativo === false || pessoa?.status_acesso === 'recusado';
+    }
+
+    /**
+     * Leitor esvaziado (fim do evento, botão "Esvaziar leitor"): nenhuma rotina automática cadastra
+     * ou suspende pessoas nele. Volta ao normal só com "Sync" / "Limpar e sincronizar".
+     */
+    _terminalEsvaziado(terminal) {
+        return !!terminal?.config?.esvaziado_em;
     }
 
     /** Leitor configurado para remover (em vez de suspender) quem está bloqueado: config.bloqueado_no_leitor */
@@ -955,7 +977,7 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
                 return this.deleteUserFromAllDevices(pessoa, pessoa.evento_id, ctx);
             }
             const suspenso = this._statusSuspendeNosTerminais(pessoa);
-            if (suspenso) logger.info(`🔄 [Sync] ${nome} está ${pessoa.status_acesso || 'bloqueado'} — suspenso nos terminais (rosto mantido, acesso negado).`);
+            if (suspenso) logger.info(`🔄 [Sync] ${nome} está ${this._empresaBloqueada(pessoa) ? 'com a empresa bloqueada' : (pessoa.status_acesso || 'bloqueado')} — suspenso nos terminais (rosto mantido, acesso negado).`);
 
             logger.debug(`🔄 Auto-Sync: Processando ${nome} para terminais...`);
 
@@ -977,6 +999,7 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
 
             for (const terminal of terminais) {
                 const online = terminal.status_online === 'online';
+                if (this._terminalEsvaziado(terminal)) { resultado.ignorados.push(terminal.nome); continue; }
 
                 // Terminal de outra área (ou leitor que remove bloqueados): garantir que a pessoa NÃO está nele
                 if (!this._terminalAceitaPessoa(terminal, areaIds) || (suspenso && this._terminalRemoveBloqueado(terminal))) {
@@ -1112,7 +1135,7 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
             // 1. Buscar dados da pessoa
             const { data: pessoa, error: pessoaError } = await supabase
                 .from('pessoas')
-                .select('id, nome_completo, cpf, evento_id, status_acesso, bloqueado, ativo, areas_autorizadas, tipo_pulseira_id, foto_url')
+                .select('id, nome_completo, cpf, evento_id, status_acesso, bloqueado, ativo, areas_autorizadas, tipo_pulseira_id, foto_url, empresas(ativo)')
                 .eq('id', pessoaId)
                 .single();
 
@@ -1162,6 +1185,7 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
 
             // 5. Iterar cada dispositivo e decidir se cadastra ou remove
             for (const dispositivo of dispositivos) {
+                if (this._terminalEsvaziado(dispositivo)) continue;
                 const pessoaTemAcessoNessaArea = this._terminalAceitaPessoa(dispositivo, areaSet);
 
                 try {
@@ -1280,7 +1304,7 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
             //     apagava o leitor sem recadastrar ninguém; e passava de 1000 pessoas sem aviso)
             const { data: pessoasAutorizadas, error: pessoasError } = await buscarTodos(supabase
                 .from('pessoas')
-                .select('id, nome_completo, cpf, evento_id, status_acesso, bloqueado, ativo, areas_autorizadas, tipo_pulseira_id, foto_url')
+                .select('id, nome_completo, cpf, evento_id, status_acesso, bloqueado, ativo, areas_autorizadas, tipo_pulseira_id, foto_url, empresas(ativo)')
                 .eq('evento_id', dispositivo.evento_id));
 
             if (pessoasError || !pessoasAutorizadas) {
@@ -1413,7 +1437,7 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
             // 1. Buscar dados da pessoa
             const { data: pessoa } = await supabase
                 .from('pessoas')
-                .select('id, nome_completo, cpf, evento_id, status_acesso, bloqueado, ativo, foto_url')
+                .select('id, nome_completo, cpf, evento_id, status_acesso, bloqueado, ativo, foto_url, empresas(ativo)')
                 .eq('id', pessoaId)
                 .single();
 

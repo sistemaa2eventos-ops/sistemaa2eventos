@@ -2,6 +2,7 @@ const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const DeviceFactory = require('./adapters/DeviceFactory');
 const { TIMEOUT_CONFIG } = require('../../config/timeouts');
+const servidorLeitores = require('./servidorLeitores.service');
 
 // Dispositivos que autenticam com usuário/senha no cadastro (leitores de acesso)
 const LEITORES_COM_SENHA = Object.freeze({
@@ -194,8 +195,9 @@ class DeviceController {
                         id: data.id,
                         agent_id: data.agent_id
                     });
-                    const callbackPort = process.env.HARDWARE_CALLBACK_PORT || process.env.SERVER_PORT || 80;
-                    const callbackHost = process.env.HARDWARE_CALLBACK_HOST || process.env.SERVER_IP;
+                    const salvo = await servidorLeitores.enderecoPara(data.evento_id || req.event?.id);
+                    const callbackPort = salvo?.porta || process.env.HARDWARE_CALLBACK_PORT || process.env.SERVER_PORT || 80;
+                    const callbackHost = salvo?.host || process.env.HARDWARE_CALLBACK_HOST || process.env.SERVER_IP;
                     const target = this._resolvePushTarget(req, callbackHost, callbackPort);
 
                     logger.info('Configuring device online mode', {
@@ -329,8 +331,11 @@ class DeviceController {
     async configurePush(req, res) {
         try {
             const { id } = req.params;
-            const { server_ip, server_port } = req.body; // Opcional, se não vier usa host público
-            const callbackPort = server_port || process.env.HARDWARE_CALLBACK_PORT || process.env.SERVER_PORT || 80;
+            const { server_ip, server_port } = req.body; // Opcional: em branco usa o endereço salvo no painel
+            // Endereço dos leitores salvo no painel (deste evento ou o padrão); sem ele, o .env do servidor
+            const salvo = server_ip ? null : await servidorLeitores.enderecoPara(req.event.id);
+            const callbackHost = server_ip || salvo?.host;
+            const callbackPort = server_port || salvo?.porta || process.env.HARDWARE_CALLBACK_PORT || process.env.SERVER_PORT || 80;
 
             const { data: deviceData, error } = await supabase
                 .from('dispositivos_acesso')
@@ -346,7 +351,7 @@ class DeviceController {
             }
 
             const device = DeviceFactory.getDevice(deviceData);
-            const target = this._resolvePushTarget(req, server_ip, callbackPort);
+            const target = this._resolvePushTarget(req, callbackHost, callbackPort);
             let success = false;
             let modeLabel = 'Push de Eventos';
 
@@ -967,6 +972,57 @@ class DeviceController {
             res.json({ success: true, message: `Relógio de ${dispositivo.nome} acertado` });
         } catch (error) {
             logger.error({ err: error, device_id: req.params.id }, 'Erro ao acertar o relógio do leitor');
+            res.status(500).json({ error: error.message });
+        }
+    }
+
+    /**
+     * Botão "Esvaziar leitor" (fim do evento / LGPD): apaga todas as pessoas e rostos do equipamento,
+     * cancela cadastros pendentes na fila e marca o leitor como esvaziado, para nenhuma rotina automática
+     * voltar a cadastrar ninguém. "Sync" ou "Limpar e sincronizar" reativa o leitor.
+     */
+    async esvaziar(req, res) {
+        try {
+            const dispositivo = await this._leitorDoEvento(req);
+            if (!dispositivo) return res.status(404).json({ error: 'Leitor não encontrado neste evento' });
+            const service = DeviceFactory.getDevice(dispositivo);
+            if (typeof service.clearAllFaces !== 'function') {
+                return res.status(400).json({ error: 'Este equipamento não permite esvaziar pelo sistema. Apague os usuários na tela do próprio leitor.' });
+            }
+
+            try {
+                await service.clearAllFaces();
+            } catch (err) {
+                return res.status(502).json({ error: `O leitor não respondeu (${err.message}). Ligue-o na rede e tente de novo; nada foi alterado.` });
+            }
+
+            let restantes = null;
+            if (typeof service.countUsers === 'function') {
+                try { restantes = await service.countUsers(); } catch (_) { /* informativo */ }
+            }
+
+            await supabase.from('terminal_sync_queue').delete()
+                .eq('dispositivo_id', dispositivo.id).neq('tipo_comando', 'delete_face');
+
+            const config = { ...(dispositivo.config || {}), esvaziado_em: new Date().toISOString(), esvaziado_por: req.user?.email || req.user?.id || null };
+            const { error } = await supabase.from('dispositivos_acesso')
+                .update({ config, faces_cadastradas: restantes ?? 0, sync_status: 'esvaziado' })
+                .eq('id', dispositivo.id);
+            if (error) {
+                // sync_status pode não aceitar o valor novo: grava o essencial
+                await supabase.from('dispositivos_acesso').update({ config, faces_cadastradas: restantes ?? 0 }).eq('id', dispositivo.id);
+            }
+
+            logger.info(`🧹 [Esvaziar] ${dispositivo.nome} esvaziado por ${config.esvaziado_por} (restam ${restantes ?? '?'})`);
+            res.json({
+                success: true,
+                restantes,
+                message: restantes > 0
+                    ? `${dispositivo.nome}: o leitor ainda informa ${restantes} cadastro(s). Confira na tela do equipamento.`
+                    : `${dispositivo.nome} esvaziado. Ele não recebe mais ninguém até você usar "Sync".`
+            });
+        } catch (error) {
+            logger.error({ err: error, device_id: req.params.id }, 'Erro ao esvaziar o leitor');
             res.status(500).json({ error: error.message });
         }
     }

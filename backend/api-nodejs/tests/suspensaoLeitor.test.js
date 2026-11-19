@@ -73,6 +73,31 @@ test('bloqueado: leitor de outra área continua sem a pessoa', async () => {
     expect(unicas(mockChamadas).sort()).toEqual(['delete:Camarim', 'suspend:Portaria']);
 });
 
+test('empresa bloqueada: funcionário fica suspenso no leitor', async () => {
+    mockTerminais = [terminal('Portaria')];
+    const r = await syncService.syncUserToAllDevices(pessoa({ empresas: { ativo: false } }), { terminais: mockTerminais, areasPorPessoa: new Map(), areasPorPulseira: new Map() });
+    expect(mockChamadas).toEqual(['suspend:Portaria']);
+    expect(r.suspensos).toEqual(['Portaria']);
+});
+
+test('empresa ativa ou sem empresa: não suspende', () => {
+    expect(syncService._statusSuspendeNosTerminais(pessoa({ empresas: { ativo: true } }))).toBe(false);
+    expect(syncService._statusSuspendeNosTerminais(pessoa({ empresas: null }))).toBe(false);
+    expect(syncService._statusSuspendeNosTerminais(pessoa({ empresas: [{ ativo: false }] }))).toBe(true);
+    // recusado continua saindo do leitor mesmo com a empresa bloqueada
+    expect(syncService._statusSuspendeNosTerminais(pessoa({ status_acesso: 'recusado', empresas: { ativo: false } }))).toBe(false);
+});
+
+test('leitor esvaziado (fim do evento): não recebe cadastro nem suspensão', async () => {
+    mockTerminais = [terminal('Portaria', { config: { esvaziado_em: '2026-11-19T20:00:00Z' } }), terminal('Camarim')];
+    await syncService.syncUserToAllDevices(pessoa({ foto_url: 'data:image/jpeg;base64,/9j/AAAA' }), { terminais: mockTerminais, areasPorPessoa: new Map(), areasPorPulseira: new Map() });
+    expect(mockChamadas).toEqual(['enroll:Camarim']);
+    mockChamadas.length = 0;
+    await syncService.syncUserToAllDevices(pessoa({ bloqueado: true }), { terminais: [mockTerminais[0]], areasPorPessoa: new Map(), areasPorPulseira: new Map() });
+    expect(mockChamadas).toEqual([]);
+    expect(mockFila).toEqual([]);
+});
+
 test('leitor configurado para remover bloqueados: remove', async () => {
     mockTerminais = [terminal('Portaria', { config: { bloqueado_no_leitor: 'remover' } })];
     await syncService.syncUserToAllDevices(pessoa({ bloqueado: true }), { terminais: mockTerminais, areasPorPessoa: new Map(), areasPorPulseira: new Map() });

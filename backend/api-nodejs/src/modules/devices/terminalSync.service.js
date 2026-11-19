@@ -60,6 +60,14 @@ class TerminalSyncService {
             if (tError || !data) throw new Error('Terminal não encontrado');
             terminal = data;
 
+            // "Sync" manual num leitor esvaziado: ele volta a receber as pessoas do evento
+            if (terminal.config?.esvaziado_em) {
+                const { esvaziado_em, esvaziado_por, ...resto } = terminal.config;
+                await supabase.from('dispositivos_acesso').update({ config: resto }).eq('id', terminalId);
+                terminal.config = resto;
+                logger.info(`♻️ Terminal ${terminal.nome} reativado (estava esvaziado desde ${esvaziado_em})`);
+            }
+
             const syncService = require('./sync.service');
             const { getHwUserIdCandidates } = require('./hwUserId');
 
@@ -68,10 +76,10 @@ class TerminalSyncService {
             // Pessoas primeiro (todas, sem o corte de 1000; sem face_encoding) e áreas do evento
             // de uma vez. Só depois limpa o terminal: falha na busca não deixa o leitor vazio.
             const { buscarTodos } = require('../../utils/buscarTodos');
-            const { COLUNAS_PESSOA_ACESSO } = require('../checkin/services/colunasPessoa');
+            const { COLUNAS_PESSOA_SYNC } = require('../checkin/services/colunasPessoa');
             const { data: pessoas, error: fError } = await buscarTodos(supabase
                 .from('pessoas')
-                .select(COLUNAS_PESSOA_ACESSO)
+                .select(COLUNAS_PESSOA_SYNC)
                 .eq('evento_id', terminal.evento_id));
 
             if (fError) throw fError;
@@ -147,6 +155,8 @@ class TerminalSyncService {
      */
     async pushToTerminal(pessoa, terminal) {
         try {
+            // Leitor esvaziado no fim do evento: não recebe ninguém até um "Sync" manual
+            if (terminal?.config?.esvaziado_em) return false;
             const fotoBase64 = await this.getFotoBase64(pessoa.foto_url);
             if (!fotoBase64) return false;
 

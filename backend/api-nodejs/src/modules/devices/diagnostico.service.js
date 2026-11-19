@@ -35,8 +35,8 @@ function lerTabela(texto) {
 /** Quantas pessoas deveriam estar neste leitor (mesma regra da sincronização; suspensos contam) */
 async function pessoasEsperadas(dispositivo, syncService) {
     const { buscarTodos } = require('../../utils/buscarTodos');
-    const { COLUNAS_PESSOA_ACESSO } = require('../checkin/services/colunasPessoa');
-    const { data: pessoas, error } = await buscarTodos(supabase.from('pessoas').select(COLUNAS_PESSOA_ACESSO).eq('evento_id', dispositivo.evento_id));
+    const { COLUNAS_PESSOA_SYNC } = require('../checkin/services/colunasPessoa');
+    const { data: pessoas, error } = await buscarTodos(supabase.from('pessoas').select(COLUNAS_PESSOA_SYNC).eq('evento_id', dispositivo.evento_id));
     if (error) throw error;
     const ctx = await syncService._carregarContextoSync(dispositivo.evento_id);
     if (!ctx) throw new Error('falha ao carregar as áreas do evento');
@@ -162,7 +162,19 @@ async function diagnosticarLeitor(dispositivo, deps) {
     }
 
     // 7. Pessoas no leitor x esperadas
-    if (alcancavel && typeof service.countUsers === 'function' && syncService) {
+    if (dispositivo.config?.esvaziado_em && alcancavel && typeof service.countUsers === 'function') {
+        // Esvaziado no fim do evento: o esperado é zero
+        try {
+            const noLeitor = await service.countUsers();
+            const quando = new Date(dispositivo.config.esvaziado_em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+            itens.push(item('pessoas', 'Pessoas no leitor', noLeitor ? 'erro' : 'alerta',
+                `Leitor esvaziado em ${quando}${noLeitor === null ? '' : ` · no leitor: ${noLeitor}`}. Ele não recebe ninguém.`,
+                noLeitor ? 'Ainda há cadastros no equipamento: use "Esvaziar leitor" de novo.' : 'Para usar de novo neste evento, clique em "Sync".',
+                'sync'));
+        } catch (err) {
+            itens.push(item('pessoas', 'Pessoas no leitor', 'nao_testado', `Não foi possível contar: ${err.message}`));
+        }
+    } else if (alcancavel && typeof service.countUsers === 'function' && syncService) {
         try {
             const [noLeitor, esperadas] = await Promise.all([service.countUsers(), pessoasEsperadas(dispositivo, syncService)]);
             if (noLeitor === null) {

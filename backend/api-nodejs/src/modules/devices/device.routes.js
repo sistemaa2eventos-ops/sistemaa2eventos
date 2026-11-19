@@ -29,6 +29,29 @@ router.get('/queue', deviceController.getQueue);
 // Métricas por equipamento (online, latência, último evento, faces, erros) — Admin/Supervisor
 router.get('/metricas', authorize('admin', 'supervisor'), dispositivoMetricas.listarMetricas);
 
+// Endereço que os leitores usam para chamar o servidor (por evento + padrão), editável no painel
+const servidorLeitores = require('./servidorLeitores.service');
+router.get('/servidor-leitores', authorize('admin', 'supervisor'), async (req, res) => {
+  try {
+    res.json({ success: true, data: await servidorLeitores.obter(req.event.id) });
+  } catch (err) {
+    logger.error({ err }, 'Erro ao ler o endereço dos leitores');
+    res.status(500).json({ error: 'Não foi possível ler o endereço dos leitores' });
+  }
+});
+router.put('/servidor-leitores', authorize('admin'), async (req, res) => {
+  try {
+    const dados = {};
+    if (req.body && 'evento' in req.body) dados.evento = req.body.evento;
+    if (req.body && 'padrao' in req.body) dados.padrao = req.body.padrao;
+    res.json({ success: true, data: await servidorLeitores.salvar(req.event.id, dados, req.user) });
+  } catch (err) {
+    if (err.status === 400) return res.status(400).json({ error: err.message });
+    logger.error({ err }, 'Erro ao salvar o endereço dos leitores');
+    res.status(500).json({ error: 'Não foi possível salvar o endereço dos leitores' });
+  }
+});
+
 // Cadastrar dispositivo (Admin/Supervisor)
 router.post('/',
   authorize('admin', 'supervisor'),
@@ -60,6 +83,9 @@ router.get('/:id/health', deviceController.getHealth);
 // Diagnóstico completo (só lê) e acerto do relógio do leitor
 router.post('/:id/diagnosticar', authorize('admin', 'supervisor'), (req, res) => deviceController.diagnosticar(req, res));
 router.post('/:id/acertar-relogio', authorize('admin', 'supervisor'), (req, res) => deviceController.acertarRelogio(req, res));
+
+// Esvaziar o leitor no fim do evento (apaga todas as pessoas do equipamento) — só Admin
+router.post('/:id/esvaziar', authorize('admin'), (req, res) => deviceController.esvaziar(req, res));
 
 // Configurar Push de Eventos (Intelbras)
 router.post('/:id/configure-push', authorize('admin', 'supervisor'), deviceController.configurePush);
