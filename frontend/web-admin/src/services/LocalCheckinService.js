@@ -6,7 +6,11 @@ import { ehCodigoLeitor } from '../utils/codigoLeitor';
 const log = process.env.NODE_ENV === 'development' ? console.log : () => {};
 const warn = process.env.NODE_ENV === 'development' ? console.warn : () => {};
 
+// Intervalo entre as novas tentativas de um acesso que não recebeu resposta do servidor
 const RETENTATIVA_MS = 30000;
+// Depois de tantas falhas sem resposta, o acesso sai da fila e vai para "recusados" (não trava a fila)
+const MAX_TENTATIVAS = 3;
+const MOTIVO_SEM_RESPOSTA = 'Não aceito: o servidor não respondeu (ou deu erro) em 3 tentativas.';
 
 /**
  * Sem resposta, timeout ou servidor fora (502/503/504 do nginx/Cloudflare) é "offline":
@@ -20,6 +24,10 @@ const ehFalhaDeConexao = (error) => {
 /**
  * LocalCheckinService: Gerenciamento offline-first de registros de acesso.
  * O sync_id único vira o id do log no servidor: o reenvio da fila não duplica o acesso.
+ *
+ * Estados da fila (filaSincronizacao.status):
+ * - pendente: aguarda envio (tentativas = falhas sem resposta até agora; proxima_tentativa = quando tentar de novo)
+ * - erro_negocio: "recusado" — o servidor recusou (4xx) ou não respondeu em MAX_TENTATIVAS. Sai da fila até o operador dispensar.
  */
 class LocalCheckinService {
     constructor() {
@@ -47,6 +55,16 @@ class LocalCheckinService {
 
         if (!navigator.onLine) {
             return await this.salvarNaFila(endpoint, data, tipoOperacao);
+        }
+
+        // Com rede, a fila sobe antes da leitura nova (FIFO): uma saída antiga não pode ficar atrás de
+        // uma entrada nova. Só entra no fim da fila o que ainda NÃO foi tentado (o servidor não chegou a
+        // responder). Acesso que já falhou (em nova tentativa) ou foi recusado não segura a leitura nova.
+        if (await this.getPendenteCount() > 0) {
+            await this.sincronizarFila();
+            if (await this.contarPendentesNaoTentados() > 0) {
+                return await this.salvarNaFila(endpoint, data, tipoOperacao);
+            }
         }
 
         try {
@@ -82,7 +100,10 @@ class LocalCheckinService {
             endpoint,
             tipo_operacao: tipoOperacao,
             data_criacao: new Date().toISOString(),
-            status: 'pendente'
+            status: 'pendente',
+            tentativas: 0,
+            proxima_tentativa: 0,
+            ultimo_erro: null
         };
 
         await db.filaSincronizacao.add(item);
@@ -101,15 +122,23 @@ class LocalCheckinService {
     }
 
     /**
-     * Processa a fila caso a internet volte (uma sincronização por vez)
+     * Processa a fila (uma sincronização por vez), na ordem em que os acessos foram lidos.
+     * - Recusa do servidor (4xx): vai para "recusados" na hora e não segura a fila.
+     * - Sem resposta, timeout ou erro 5xx: conta uma tentativa; depois de MAX_TENTATIVAS vai para "recusados".
+     *   Enquanto espera a nova tentativa, o acesso é pulado e não bloqueia os seguintes.
+     * - Servidor fora (sem resposta/502-504): a fila para aqui e volta a tentar depois.
+     * Devolve { conexaoFalhou }: true quando o servidor não respondeu e a fila parou.
      */
     async sincronizarFila() {
-        if (!navigator.onLine || this._sincronizando) return;
+        if (!navigator.onLine || this._sincronizando) return { conexaoFalhou: false };
         this._sincronizando = true;
+        let conexaoFalhou = false;
 
         try {
-            const pendentes = await db.filaSincronizacao.where('status').equals('pendente').toArray();
-            if (pendentes.length === 0) return;
+            const agora = Date.now();
+            const pendentes = (await db.filaSincronizacao.where('status').equals('pendente').toArray())
+                .filter((item) => (item.proxima_tentativa || 0) <= agora);
+            if (pendentes.length === 0) return { conexaoFalhou };
 
             log(`[LocalCheckinService] Sincronizando ${pendentes.length} registros pendentes...`);
 
@@ -126,15 +155,20 @@ class LocalCheckinService {
                     // Sucesso: deleta da fila local
                     await db.filaSincronizacao.delete(item.id);
                 } catch (error) {
+                    const status = error.response?.status;
+                    if (status >= 400 && status < 500) {
+                        // Regra de negócio (ex: já estava com check-in): recusado, sem travar a fila
+                        await this._marcarRecusado(item, error.response.data?.error);
+                        continue;
+                    }
+
+                    // Sem resposta, timeout ou erro do servidor: conta a tentativa
+                    await this._registrarFalha(item, error);
+
                     if (ehFalhaDeConexao(error)) {
+                        conexaoFalhou = true;
                         warn('[LocalCheckinService] Conexão perdida durante sync. Interrompendo fila.');
                         break;
-                    } else if (error.response && error.response.status >= 400 && error.response.status < 500) {
-                        // Erro de lógica (ex: Já estava com check-in). Marcamos para não travar a fila.
-                        await db.filaSincronizacao.update(item.id, {
-                            status: 'erro_negocio',
-                            observacao: error.response.data?.error
-                        });
                     }
                 }
             }
@@ -145,10 +179,37 @@ class LocalCheckinService {
 
             // F-02: Notifica UI de que os dados mudaram (necessário refresh de listas)
             window.dispatchEvent(new CustomEvent('offline-sync-completed'));
+            return { conexaoFalhou };
         } finally {
             this._sincronizando = false;
             if (await this.getPendenteCount() > 0) this._agendarRetentativa();
         }
+    }
+
+    async _marcarRecusado(item, motivo) {
+        await db.filaSincronizacao.update(item.id, {
+            status: 'erro_negocio',
+            observacao: motivo || 'Recusado pelo servidor'
+        });
+    }
+
+    async _registrarFalha(item, error) {
+        const tentativas = (item.tentativas || 0) + 1;
+        const ultimo_erro = error.response?.data?.error || error.message || 'Sem resposta do servidor';
+        if (tentativas >= MAX_TENTATIVAS) {
+            await db.filaSincronizacao.update(item.id, {
+                status: 'erro_negocio',
+                tentativas,
+                ultimo_erro,
+                observacao: MOTIVO_SEM_RESPOSTA
+            });
+            return;
+        }
+        await db.filaSincronizacao.update(item.id, {
+            tentativas,
+            ultimo_erro,
+            proxima_tentativa: Date.now() + RETENTATIVA_MS
+        });
     }
 
     /**
@@ -195,11 +256,19 @@ class LocalCheckinService {
         }
     }
 
+    /** Só o que está aguardando envio (status pendente). Recusados não entram aqui. */
     async getPendenteCount() {
         return await db.filaSincronizacao.where('status').equals('pendente').count();
     }
 
-    /** Acessos que o servidor recusou ao sincronizar (erro_negocio), até o operador dispensar */
+    /** Pendentes que ainda não receberam nenhuma resposta do servidor: só eles seguram a ordem de uma leitura nova */
+    async contarPendentesNaoTentados() {
+        return await db.filaSincronizacao.where('status').equals('pendente')
+            .filter((item) => !(item.tentativas > 0))
+            .count();
+    }
+
+    /** Acessos que o servidor recusou (ou não respondeu em MAX_TENTATIVAS) ao sincronizar, até o operador dispensar */
     async listarRecusados() {
         return await db.filaSincronizacao.where('status').equals('erro_negocio').toArray();
     }

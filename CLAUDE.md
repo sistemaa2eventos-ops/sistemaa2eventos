@@ -752,20 +752,77 @@ docker system prune -af
 - **GitHub Actions:** o run 43096686493 (push de 053315f) está "queued" desde 11/11 e nunca rodou; o deploy foi feito
   pelo run manual 43098168407. Pode ser cancelado.
 - **Pendências encontradas:**
-  1. O modo de IA "Central Remota / Fibra" (`direto_servidor`) só existe na tela: o agente o trata como `local`
-     (backend/agent-local/src/agent.js:294) e o servidor de IA central não recebe vídeo RTSP. Escolher esse modo hoje
-     faz o PC do evento rodar a IA localmente.
+  1. ~~O modo de IA "Central Remota / Fibra" (`direto_servidor`) só existe na tela~~ — RESOLVIDO no mesmo dia em
+     f25ee11 (17/11 16:54): a nuvem envia as câmeras ao servidor central e o PC do evento não analisa nesse modo.
   2. Não verificados com pessoa real: quiosque bloqueado, câmera com IA vinculada à estação, 3 testes de pulseira.
   3. Local sem commit: scripts/ligar-ia-facial.ps1 apenas reformatado pelo editor (sem mudança de lógica) e scripts
      avulsos de diagnóstico (backend/api-nodejs/check_*/test_*/query_*, *.py, *.jpg na raiz), todos de abr–out/2026.
 
 ```
+2026-11-19 - Deploy 5a598dd (giro ONVIF, visão noturna)
+├─ Mudanças: câmera com giro (cameras_ip.ptz_ativo/ptz_porta, porta ONVIF 2020); PainelGiro na tela grande do Monitor
+│            (setas que seguem enquanto apertadas, zoom, velocidade, posições salvas); POST /api/cameras/:id/ptz;
+│            GET /api/cameras/:id/ptz/presets; Diagnosticar confere o giro; selo "Visão noturna" (useVisaoNoturna.js)
+├─ Migrations: 20261119e_cameras_ptz.sql PENDENTE (usuária aplica; sem ela os controles de giro ficam ocultos)
+├─ Agente: 3.2.0 (comando http aceita POST) — PC do evento precisa de ligar-ia-facial.bat
+├─ Status: ✅ OK (GitHub Actions run 44619992829); painel 200, rotas novas 401 sem login
+├─ Testes: 11 novos (onvif/ptz, sem câmera real); lint e build ok; setas testadas no navegador com API simulada
+│          5 suítes de pulseira/permissão falham desde antes: dependem de checkAnyPermission em auth.js (trabalho sem commit)
+└─ Rollback: tag antes-deploy-20261119-ptz (ccb4190)
+   Pendente: Fase 3 (seguir pessoa automaticamente) e forçar dia/noite — aguardam teste com a MC210 real.
+
+2026-11-19 - Deploy ccb4190 (manual de equipamentos dentro do painel)
+├─ Mudanças: página /manual-equipamentos (índice, busca, imprimir), botão "Manual" em Dispositivos e Câmeras;
+│            manual agora em frontend/web-admin/src/conteudo/MANUAL_EQUIPAMENTOS.md (docs/ só aponta para lá)
+├─ Status: ✅ OK (GitHub Actions run 44605166946); /manual-equipamentos 200, página no bundle
+└─ Rollback: tag antes-deploy-20261119-manual (803d31d)
+
+2026-11-19 - Deploy 803d31d (chave da Central pelo painel)
+├─ Mudanças: Agentes locais > Central: "Mostrar chave" e "Gerar nova chave" (derruba as entradas abertas);
+│            POST /api/agentes/:id/central/chave (só admin, auditado, sem cache)
+├─ Status: ✅ OK (GitHub Actions run 44602075902); painel 200, rota nova 401 sem login
+└─ Rollback: tag antes-deploy-20261119-central-chave (3d7637c)
+
+2026-11-19 - Deploy 3d7637c (Central: quem abre escolhido no painel)
+├─ Mudanças: Agentes locais > botão "Central": só este PC / rede local / Tailscale, aplicado sem reiniciar,
+│            gravado no PC (backend/agent-local/.central-acesso.json); .env antigo vale sem escolha no painel;
+│            GET/PUT /api/agentes/:id/central (troca só admin, auditada)
+├─ Agente: precisa de ligar-ia-facial.bat no PC do evento (agente antigo: botão desativado)
+├─ Status: ✅ OK (GitHub Actions run 44589766281); painel 200, rota nova 401 sem login
+├─ Testes: agente 15 (2 novos, troca real de servidor); backend 339; tela com API simulada
+└─ Rollback: tag antes-deploy-20261119-central-acesso (de2b8df)
+
+2026-11-19 - Deploy de2b8df (Diagnosticar câmera + Testar rede do evento)
+├─ Mudanças: "Diagnosticar" da câmera (cameraDiagnostico.service.js: cadastro, PC do evento, retransmissor,
+│            ping/porta, imagem, miniatura, IA, gravação) em Configurações > Câmeras e Gerenciar câmeras;
+│            cartão "Testar rede do evento" em Dispositivos (POST /api/agentes/rede-testar, ping + até 10 portas)
+├─ Agente: 3.1.0 com comando rede_testar — PC do evento precisa rodar ligar-ia-facial.bat; agente antigo
+│          responde "versão antiga" no teste de rede (o resto do diagnóstico funciona)
+├─ Status: ✅ OK (GitHub Actions run 44587748062); painel 200, rotas novas 401 sem login
+├─ Testes: 339 do backend (11 novos); telas testadas no navegador com API simulada; sem câmera real
+└─ Rollback: tag antes-deploy-20261119-diag-camera (43bf6ed)
+
+2026-11-19 - Deploy 903c5f8 (empresa bloqueada nos leitores, endereço dos leitores no painel, esvaziar leitor)
+├─ Mudanças: empresa com ativo=false suspende os funcionários nos leitores (gatilho na fila); cartão
+│            "Endereço do servidor para os leitores" por evento + padrão (Config online em branco usa o salvo);
+│            botão "Esvaziar leitor" (admin, fim do evento) — leitor esvaziado não recebe ninguém até um Sync
+├─ Migrations: 20261119d_fila_sync_empresa.sql PENDENTE (usuária aplica; precisa da 20261119_fila_sync_leitores)
+├─ Status: ✅ OK (GitHub Actions run 44553264913); painel 200, /api/pessoas 401, rota nova 401 sem login
+├─ Testes: 325 do backend; tela testada no navegador com API simulada; NÃO testado com leitor real
+└─ Rollback: tag antes-deploy-20261119-empresa-leitores (6511e4d)
+
+2026-11-19 - Deploys do dia anterior a 903c5f8 (mesma sessão): 77aa7b6 Central de Monitoramento local,
+│            c687206 IA no sub-stream, deb557a fila no banco para os leitores (20261119_fila_sync_leitores.sql),
+│            0774798 bloqueado fica suspenso no leitor + docs/MANUAL_EQUIPAMENTOS.md,
+│            6511e4d Diagnosticar leitor + modelos de câmera (20261119b_modelos_camera.sql). Migrations aplicadas.
+└─ Rollback: tags antes-deploy-20261118-central, antes-deploy-20261119-fase1, -fila-leitores, -suspensao, -modelos
+
 2026-11-12 - Deploy 5e6b336 (3 modos de IA do evento: local, híbrido e central remota)
 ├─ Mudanças: SeletorArquiteturaIa.jsx (cards com cenário, vantagens, requisitos e passos) na barra de câmeras do
 │            evento; ia_onde aceita 'direto_servidor'; voltar para 'local' libera o evento no servidor central
 ├─ Migrations: 20261112_arquitetura_ia_tres_modos.sql (aplicada; conferido em 17/11)
 ├─ Status: ✅ OK (GitHub Actions run 43147230217)
-├─ Atenção: 'direto_servidor' ainda não tem efeito no agente nem no servidor de IA (ver Situação em 2026-11-17)
+├─ Atenção: 'direto_servidor' passou a funcionar em f25ee11 (17/11)
 ├─ Rollback: tag antes-deploy-20261111j (d5edb1f)
 └─ Próximo: implementar o modo central remota de verdade ou esconder o card até lá
 

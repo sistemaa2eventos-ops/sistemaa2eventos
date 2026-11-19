@@ -86,7 +86,7 @@ export default defineConfig({
                     // Bibliotecas pesadas usadas só por algumas telas ficam fora do vendor:
                     // são baixadas junto com a tela que as usa (tabela avançada ~360 KB,
                     // leitor de QR ~330 KB, webcam, arrastar/redimensionar).
-                    if (/node_modules[/\\](@mui[/\\]x-data-grid|html5-qrcode|react-webcam|react-rnd|re-resizable|react-draggable)[/\\]/.test(id)) {
+                    if (/node_modules[/\\](@mui[/\\]x-data-grid|html5-qrcode|react-webcam|react-rnd|re-resizable|react-draggable|pdfjs-dist)[/\\]/.test(id)) {
                         return undefined;
                     }
                     return 'vendor';

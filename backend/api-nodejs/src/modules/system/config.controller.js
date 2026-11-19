@@ -41,14 +41,21 @@ class ConfigController {
     async createArea(req, res) {
         try {
             const evento_id = req.event?.id || req.body.evento_id;
-            const { nome_area } = req.body;
+            const { nome_area, controla_entrada } = req.body;
 
             if (!nome_area) return res.status(400).json({ error: 'Nome da área é obrigatório' });
             if (!evento_id) return res.status(400).json({ error: 'Contexto de evento não identificado' });
+            if (controla_entrada !== undefined && controla_entrada !== null && typeof controla_entrada !== 'boolean') {
+                return res.status(400).json({ error: 'controla_entrada deve ser true ou false' });
+            }
+
+            // Área nova controla entrada (portão) por padrão; só grava o campo se foi informado
+            const linha = { evento_id, nome_area };
+            if (typeof controla_entrada === 'boolean') linha.controla_entrada = controla_entrada;
 
             const { data, error } = await supabase
                 .from('evento_areas')
-                .insert([{ evento_id, nome_area }])
+                .insert([linha])
                 .select()
                 .single();
 
@@ -77,12 +84,17 @@ class ConfigController {
     async updateArea(req, res) {
         try {
             const { id } = req.params;
-            const { nome_area, capacidade_maxima } = req.body;
+            const { nome_area, capacidade_maxima, controla_entrada } = req.body;
             const eventoId = req.event?.id;
+
+            if (controla_entrada !== undefined && controla_entrada !== null && typeof controla_entrada !== 'boolean') {
+                return res.status(400).json({ error: 'controla_entrada deve ser true ou false' });
+            }
 
             const updateData = { atualizado_em: new Date() };
             if (nome_area !== undefined && nome_area !== null) updateData.nome_area = nome_area;
             if (capacidade_maxima !== undefined && capacidade_maxima !== null) updateData.capacidade_maxima = capacidade_maxima;
+            if (typeof controla_entrada === 'boolean') updateData.controla_entrada = controla_entrada;
 
             const { data, error } = await supabase
                 .from('evento_areas')

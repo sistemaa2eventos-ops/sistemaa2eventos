@@ -293,7 +293,8 @@ function checkPermission(recurso, acao) {
             'checkout': 'checkout',
             'fiscalizacao': 'fiscalizacao',
             'monitor': 'monitoramento',
-            'veiculos': 'veiculos'
+            'veiculos': 'veiculos',
+            'producao': 'producao'
         };
         const moduloPerm = moduloMap[recurso] || recurso;
 
@@ -331,6 +332,77 @@ function checkPermission(recurso, acao) {
 }
 
 /**
+ * Módulos de operação (checkin, checkout, fiscalizacao): passa quem tem UM dos módulos pedidos ligado no evento.
+ * Módulo explicitamente desligado (=== false) em todos os pedidos → 403 SEM consultar o PolicyEngine:
+ * linhas de sys_event_role_permissions não contornam o desligamento feito em Usuários.
+ * Campo ausente (undefined) segue para o PolicyEngine (papéis como supervisor).
+ */
+function checkAnyPermission(recursos, acao = 'escrita') {
+    const lista = Array.isArray(recursos) ? recursos : [recursos];
+    return async (req, res, next) => {
+        if (!req.user) {
+            return res.status(401).json({ error: 'Não autenticado' });
+        }
+
+        const userRole = extractRole(req.user);
+
+        // Admin passa sempre (mesma regra de checkPermission)
+        if (userRole === 'admin_master' || userRole === 'admin') {
+            const _s = (v) => (v && v !== 'undefined' && v !== 'null') ? v : null;
+            req.tenantId = _s(req.headers['x-evento-id']) ||
+                _s(req.query?.evento_id) ||
+                _s(req.body?.evento_id);
+            return next();
+        }
+
+        const _safe = (v) => (v && v !== 'undefined' && v !== 'null') ? v : null;
+        const requestedEventId = _safe(req.headers['x-evento-id']) || _safe(req.query?.evento_id) || _safe(req.body?.evento_id);
+        const tenantId = requestedEventId || _safe(req.user.evento_id) || _safe(req.tenantId);
+
+        if (!tenantId) {
+            logger.warn(`⚠️ Sessão sem Evento vinculado: ${req.user.id}`);
+            return res.status(400).json({ error: 'Sua sessão não possui um ID de Evento vinculado. Refaça o login.' });
+        }
+
+        if (typeof req.user.isAllowedEvent === 'function' && !req.user.isAllowedEvent(tenantId)) {
+            logger.warn(`🚨 EVENTO NÃO AUTORIZADO: Operador ${req.user.id} tentou acessar evento ${tenantId}`);
+            return res.status(403).json({ error: 'Acesso negado: Você não possui autorização para operar este evento.' });
+        }
+
+        req.tenantId = tenantId;
+
+        const efetivas = typeof req.user.getEffectivePermissions === 'function'
+            ? req.user.getEffectivePermissions(tenantId)
+            : null;
+
+        if (efetivas) {
+            if (lista.some(r => efetivas[r] === true)) return next();
+
+            // Desligado explicitamente: negação final, a política não entra
+            if (lista.every(r => efetivas[r] === false)) {
+                logger.warn(`Acesso bloqueado: Operador '${req.user.id}' com módulo(s) ${lista.join(', ')} desligado(s) no evento '${tenantId}'`);
+                return res.status(403).json({
+                    error: 'Acesso negado: Sem permissão para esta operação neste evento.',
+                    required_policy: { recurso: lista, acao }
+                });
+            }
+        }
+
+        for (const recurso of lista) {
+            if (await policyEngine.hasPermission(userRole, recurso, acao, tenantId)) {
+                return next();
+            }
+        }
+
+        logger.warn(`Acesso bloqueado pelo PolicyEngine: Role '${userRole}' não possui '{${lista.join('|')}, ${acao}}'`);
+        return res.status(403).json({
+            error: 'Acesso negado: Perfil sem permissão para realizar esta ação.',
+            required_policy: { recurso: lista, acao }
+        });
+    };
+}
+
+/**
  * Restringe a rota ao Admin Master (watchlist é sigilosa, inclusive para admin comum).
  */
 function requireAdminMaster(req, res, next) {
@@ -349,6 +421,7 @@ module.exports = {
     validateInternalApiKey,
     validateApiKey,
     checkPermission,
+    checkAnyPermission,
     normalize,
     extractRole
 };

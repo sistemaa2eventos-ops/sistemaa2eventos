@@ -14,7 +14,8 @@ export const MODULOS = [
   { key: 'relatorios', label: 'Relatórios' },
   { key: 'veiculos', label: 'Veículos LPR' },
   { key: 'auditoria_documentos', label: 'Auditoria Documental' },
-  { key: 'dispositivos', label: 'Terminais / Dispositivos' }
+  { key: 'dispositivos', label: 'Terminais / Dispositivos' },
+  { key: 'producao', label: 'Produção' }
 ];
 
 export const DEFAULT_PERMISSIONS = {
@@ -29,6 +30,7 @@ export const DEFAULT_PERMISSIONS = {
   veiculos: false,
   auditoria_documentos: false,
   dispositivos: false,
+  producao: false,
   usuarios: false
 };
 

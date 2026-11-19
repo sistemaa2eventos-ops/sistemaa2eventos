@@ -7,6 +7,7 @@
 const chamadas = [];
 let falharInsert = null;
 let logMaisNovo = [];
+let idsGravados = []; // ids já existentes em logs_acesso (consulta por id após um 23505)
 
 // Cliente Supabase simulado: registra cada operação e responde conforme o cenário
 const tabela = (nome) => {
@@ -19,7 +20,8 @@ const tabela = (nome) => {
         eq: (c, v) => { op.filtros[c] = v; return op.acao === 'update' ? Promise.resolve({ error: null }) : builder; },
         neq: () => builder,
         gt: () => builder,
-        limit: () => Promise.resolve({ data: logMaisNovo, error: null })
+        limit: () => Promise.resolve({ data: logMaisNovo, error: null }),
+        maybeSingle: () => Promise.resolve({ data: idsGravados.includes(op.filtros.id) ? { id: op.filtros.id } : null, error: null })
     };
     return builder;
 };
@@ -68,9 +70,11 @@ describe('registerAccessTransaction', () => {
         expect(publicados[0]).toMatchObject({ id: 'log-2', pessoa_id: 'p1', tipo: 'checkin', _status_pessoa: 'checkin_feito' });
     });
 
-    it('duplicidade (reenvio com o mesmo sync_id) não vai para a fila', async () => {
+    it('duplicidade (reenvio com o mesmo sync_id: o id já está gravado) não vai para a fila', async () => {
         falharInsert = { code: '23505', message: 'duplicate key' };
+        idsGravados = ['log-3'];
         const r = await DatabaseService.registerAccessTransaction('log-3', new Date(), payload, pessoa, 'checkin_feito');
+        idsGravados = [];
         expect(r).toEqual({ success: true, already_done: true });
         expect(publicados).toHaveLength(0);
     });

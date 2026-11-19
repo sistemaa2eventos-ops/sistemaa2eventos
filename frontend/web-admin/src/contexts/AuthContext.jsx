@@ -31,7 +31,8 @@ export const MODULOS = [
   { key: 'relatorios', label: 'Relatórios', icon: 'BarChart' },
   { key: 'veiculos', label: 'Veículos', icon: 'Truck' },
   { key: 'checkin', label: 'Check-in', icon: 'LogIn' },
-  { key: 'checkout', label: 'Check-out', icon: 'LogOut' }
+  { key: 'checkout', label: 'Check-out', icon: 'LogOut' },
+  { key: 'producao', label: 'Produção', icon: 'Engineering' }
 ];
 
 // Chaves antigas do menu granular de produção usadas pelo Sidebar
@@ -57,6 +58,7 @@ export const CANONICAL_RECURSO_MAP = {
   fiscalizacao: 'fiscalizacao',
   relatorios: 'relatorios',
   dispositivos: 'dispositivos',
+  producao: 'producao',
   usuarios: 'usuarios',
   dashboard: 'dashboard'
 };
@@ -443,7 +445,7 @@ export const AuthProvider = ({ children }) => {
       // A API e algumas telas leem o evento do sessionStorage primeiro: mantém os dois iguais
       sessionStorage.setItem('active_evento_id', eventoId);
       if (eventoNome) localStorage.setItem('active_evento_nome', eventoNome);
-      
+
       const res = await authService.setActiveEvent(eventoId);
       if (res && res.effectivePermissions) {
         setUser(prev => prev ? {

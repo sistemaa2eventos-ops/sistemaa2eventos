@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
     Box, Typography, Grid, TextField, IconButton, Paper, Stack,
     Button, Tooltip, MenuItem, FormControl, InputLabel, Select,
-    Divider, Slider, Switch, FormControlLabel, Tabs, Tab, Chip, Alert
+    Divider, Slider, Switch, FormControlLabel, Tabs, Tab, Chip, Alert,
+    Dialog, DialogTitle, DialogContent, DialogActions, Card, CardActionArea, CardContent
 } from '@mui/material';
 import {
     Save as SaveIcon,
@@ -53,7 +54,11 @@ import {
     Grid4x4 as ImaIcon,
     OpenInFull as AumentarIcon,
     CloseFullscreen as DiminuirIcon,
-    AspectRatio as PreencherIcon
+    Straighten as RulerIcon,
+    DashboardCustomize as TemplateIcon,
+    BookmarkAdd as BookmarkAddIcon,
+    Star as IconeShapeIcon,
+    CheckCircleOutline as SafeMarginIcon
 } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import { Rnd } from 'react-rnd';
@@ -62,28 +67,43 @@ import api from '../../services/api';
 import GlassCard from '../../components/common/GlassCard';
 import NeonButton from '../../components/common/NeonButton';
 import PageHeader from '../../components/common/PageHeader';
-import { montarHtmlEtiqueta, imprimirHtml, limparCacheEtiqueta, gerarBarcodeSvg } from '../../services/etiquetaService';
+import { montarHtmlEtiqueta, imprimirHtml, limparCacheEtiqueta } from '../../services/etiquetaService';
+import {
+    ESCALA_EDITOR,
+    enriquecerDados,
+    FONTES,
+    FORMAS,
+    ICONES
+} from '../../services/etiquetaRender';
 import { botaoSecundario, cores } from '../../styles/tokens';
 import {
     Z_BASE, ordenarPorCamada, normalizarCamadas, expandirGrupos, reordenarCamadas,
     agruparElementos, desagruparElementos, caixaDoGrupo, idsNaArea, escalarItem,
     arredondarItem, alinharEntreSi
 } from './etiquetas/camadas';
+import ReguaEditor from './etiquetas/ReguaEditor';
+import ElementoVisual from './etiquetas/ElementoVisual';
+import {
+    MODELOS_SISTEMA,
+    lerModelosSalvos,
+    salvarModeloPersonalizado,
+    excluirModeloPersonalizado
+} from './etiquetas/modelosPreProntos';
 
-const ESCALA = 3; // 1 mm = 3 px na prancheta (mesma escala da impressão)
+const ESCALA = ESCALA_EDITOR; // 1 mm = 3 px
 
 const DADOS_EXEMPLO = {
     nome_pessoa: 'MARIA DA SILVA',
     nome_completo: 'MARIA DA SILVA SANTOS',
-    empresa: 'EMPRESA EXEMPLO',
-    funcao: 'COORDENADORA',
+    empresa: 'NZT TECH EVENTS',
+    funcao: 'COORDENADORA GERAL',
     cpf: '123.456.789-09',
-    pulseira: '1024',
-    evento: 'HISTÓRIAS CURITIBA',
+    pulseira: '102488',
+    evento: 'HISTÓRIAS CURITIBA 2026',
     data: new Date().toLocaleDateString('pt-BR'),
-    qr_code: 'EXEMPLO-1024',
+    qr_code: 'EXEMPLO-102488',
     qr_imagem: null,
-    foto_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop&q=80',
+    foto_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=240&auto=format&fit=crop&q=80',
     exemplo: true
 };
 
@@ -111,18 +131,18 @@ const CORES_PALETA = [
 const CORES_GRADE = [
     { label: 'Azul', hex: '#0080FF' },
     { label: 'Magenta', hex: '#FF0077' },
-    { label: 'Branca (artes escuras)', hex: '#FFFFFF' },
+    { label: 'Branca', hex: '#FFFFFF' },
     { label: 'Preta', hex: '#000000' }
 ];
 
 const TIPO_ROTULO = {
     text: 'Texto', qrcode: 'QR Code', barcode: 'Cód. barras', foto: 'Foto',
-    image: 'Imagem', shape: 'Retângulo', circle: 'Círculo', line: 'Linha'
+    image: 'Imagem', shape: 'Forma / Tarja', circle: 'Círculo', line: 'Linha', icone: 'Ícone'
 };
 
 const TIPO_ICONE = {
     text: TextIcon, qrcode: QrIcon, barcode: BarcodeIcon, foto: FotoIcon,
-    image: ImageIcon, shape: ShapeIcon, circle: CircleIcon, line: LineIcon
+    image: ImageIcon, shape: ShapeIcon, circle: CircleIcon, line: LineIcon, icone: IconeShapeIcon
 };
 
 const nomeDoElemento = (el) => {
@@ -139,7 +159,6 @@ const ELEMENTOS_INICIAIS = normalizarCamadas([
     { id: '4', type: 'foto', content: '{foto_url}', x: 80, y: 200, width: 80, height: 80, borderRadius: 8, borderColor: '#00D4FF', borderWidth: 2, lockAspectRatio: true, zIndex: 7 }
 ]);
 
-// Alças de redimensionamento: cantos visíveis + barrinhas no meio das bordas (esticar livre)
 const alcasDeRedimensionar = (cor, redondo) => {
     const canto = {
         width: 12, height: 12, background: '#FFFFFF', border: `2px solid ${cor}`,
@@ -190,7 +209,7 @@ const idDoNo = (node) => {
     return classe ? classe.slice(7) : null;
 };
 
-// ---------- Pequenos blocos visuais no padrão do NZT ----------
+// UI Helpers
 const Secao = ({ children, sx }) => (
     <Typography
         variant="caption"
@@ -256,19 +275,19 @@ const ConfigEtiquetas = () => {
     const fileElementInputRef = useRef(null);
     const workspaceRef = useRef(null);
     const paperRef = useRef(null);
-    const dragRef = useRef(null);          // arraste em bloco
-    const grupoResizeRef = useRef(null);   // escala do grupo
+    const dragRef = useRef(null);
+    const grupoResizeRef = useRef(null);
     const elementsRef = useRef([]);
 
-    // Abas da coluna esquerda: 0 Formato & arte, 1 Elementos, 2 Camadas
     const [sidebarTab, setSidebarTab] = useState(0);
 
     const [config, setConfig] = useState({
         layout: 'zebra_tlp2844',
         width: 100,
         height: 150,
+        corFundo: '#FFFFFF',
         background_url: '',
-        fundo_como_referencia: false, // Situação C (modo antigo): arte de guia visual (não imprime)
+        fundo_como_referencia: false,
         imprimir_fundo: true,
         opacidade_referencia: 0.5,
         travar_referencia: true
@@ -278,19 +297,31 @@ const ConfigEtiquetas = () => {
     const [selectedIds, setSelectedIds] = useState([]);
     const [saving, setSaving] = useState(false);
 
-    // Preferências de visualização (lembradas neste navegador)
+    // Diálogos de modelos
+    const [modalModelosAberto, setModalModelosAberto] = useState(false);
+    const [modalSalvarModeloAberto, setModalSalvarModeloAberto] = useState(false);
+    const [nomeNovoModelo, setNomeNovoModelo] = useState('');
+    const [descNovoModelo, setDescNovoModelo] = useState('');
+    const [modelosCustomizados, setModelosCustomizados] = useState(lerModelosSalvos());
+
+    // Preferências gráficas
     const prefs = useMemo(lerPrefs, []);
     const [showGrid, setShowGrid] = useState(prefs.showGrid ?? true);
     const [gridSize, setGridSize] = useState(prefs.gridSize ?? 10);
     const [gridColor, setGridColor] = useState(prefs.gridColor ?? '#0080FF');
-    const [gridIntensity, setGridIntensity] = useState(prefs.gridIntensity ?? 0.7);
-    const [snapToGrid, setSnapToGrid] = useState(prefs.snapToGrid ?? true);
+    const [gridIntensity, setGridIntensity] = useState(prefs.gridIntensity ?? 0.6);
+    const [snapToGrid, setSnapToGrid] = useState(prefs.snapToGrid ?? false);
+    const [showRulers, setShowRulers] = useState(prefs.showRulers ?? true);
+    const [showGuides, setShowGuides] = useState(prefs.showGuides ?? true);
     const [escalaProporcional, setEscalaProporcional] = useState(true);
 
     const [smartGuides, setSmartGuides] = useState({ vertical: null, horizontal: null });
+    const smartGuidesTimerRef = useRef(null);
     const [zoom, setZoom] = useState(1);
-    const [ocultarGabarito, setOcultarGabarito] = useState(false);
     const [marquee, setMarquee] = useState(null);
+
+    // Cursor em tempo real para réguas
+    const [cursorCoords, setCursorCoords] = useState({ x: null, y: null });
 
     const canvasWidth = (Number(config.width) || 100) * ESCALA;
     const canvasHeight = (Number(config.height) || 150) * ESCALA;
@@ -298,8 +329,10 @@ const ConfigEtiquetas = () => {
     useEffect(() => { elementsRef.current = elements; }, [elements]);
 
     useEffect(() => {
-        localStorage.setItem(PREFS_KEY, JSON.stringify({ showGrid, gridSize, gridColor, gridIntensity, snapToGrid }));
-    }, [showGrid, gridSize, gridColor, gridIntensity, snapToGrid]);
+        localStorage.setItem(PREFS_KEY, JSON.stringify({
+            showGrid, gridSize, gridColor, gridIntensity, snapToGrid, showRulers, showGuides
+        }));
+    }, [showGrid, gridSize, gridColor, gridIntensity, snapToGrid, showRulers, showGuides]);
 
     useEffect(() => {
         if (!eventoId) return;
@@ -315,13 +348,13 @@ const ConfigEtiquetas = () => {
         })();
     }, [eventoId, enqueueSnackbar]);
 
-    // ---------- Zoom ----------
     const ajustarATela = useCallback(() => {
         const ws = workspaceRef.current;
         if (!ws) return;
-        const fit = Math.min((ws.clientWidth - 72) / canvasWidth, (ws.clientHeight - 72) / canvasHeight);
+        const extraRuler = showRulers ? 30 : 0;
+        const fit = Math.min((ws.clientWidth - 80 - extraRuler) / canvasWidth, (ws.clientHeight - 80 - extraRuler) / canvasHeight);
         setZoom(Math.max(0.25, Math.min(3, Math.floor(fit * 20) / 20)));
-    }, [canvasWidth, canvasHeight]);
+    }, [canvasWidth, canvasHeight, showRulers]);
 
     useEffect(() => {
         const id = requestAnimationFrame(ajustarATela);
@@ -330,7 +363,6 @@ const ConfigEtiquetas = () => {
 
     const mudarZoom = (delta) => setZoom(z => Math.max(0.25, Math.min(3, Math.round((z + delta) * 100) / 100)));
 
-    // Ctrl + roda do mouse = zoom
     useEffect(() => {
         const ws = workspaceRef.current;
         if (!ws) return undefined;
@@ -343,7 +375,19 @@ const ConfigEtiquetas = () => {
         return () => ws.removeEventListener('wheel', onWheel);
     }, []);
 
-    // ---------- Seleção derivada ----------
+    const handleWorkspaceMouseMove = (e) => {
+        if (!paperRef.current || !showRulers) return;
+        const pr = paperRef.current.getBoundingClientRect();
+        const curX = (e.clientX - pr.left) / zoom;
+        const curY = (e.clientY - pr.top) / zoom;
+        if (curX >= 0 && curX <= canvasWidth && curY >= 0 && curY <= canvasHeight) {
+            setCursorCoords({ x: Math.round(curX), y: Math.round(curY) });
+        } else {
+            setCursorCoords({ x: null, y: null });
+        }
+    };
+
+    // Seleção derivada
     const selecionados = useMemo(() => elements.filter(el => selectedIds.includes(el.id)), [elements, selectedIds]);
     const moveis = useMemo(() => selecionados.filter(el => !el.locked && !el.oculto), [selecionados]);
     const caixaSelecao = useMemo(() => (moveis.length > 1 ? caixaDoGrupo(moveis) : null), [moveis]);
@@ -353,7 +397,6 @@ const ConfigEtiquetas = () => {
     const elementosOrdenados = useMemo(() => [...ordenarPorCamada(elements)].reverse(), [elements]);
     const camadasDeArte = elements.filter(el => el.papel === 'arte');
 
-    // ---------- Configuração do papel ----------
     const handleChangePreset = (presetValue) => {
         const found = PRESETS.find(p => p.value === presetValue);
         setConfig(prev => (found ? { ...prev, layout: presetValue, width: found.width, height: found.height } : { ...prev, layout: presetValue }));
@@ -361,7 +404,6 @@ const ConfigEtiquetas = () => {
 
     const handleChangeConfig = (field, value) => setConfig(prev => ({ ...prev, [field]: value }));
 
-    // ---------- Criação de elementos ----------
     const maiorZ = (lista) => lista.reduce((max, el) => Math.max(max, el.zIndex || 0), Z_BASE - 1);
 
     const inserir = (novo) => {
@@ -369,22 +411,23 @@ const ConfigEtiquetas = () => {
         setSelectedIds([novo.id]);
     };
 
-    const addElement = (type) => {
+    const addElement = (type, extra = {}) => {
         if (type === 'image') {
             fileElementInputRef.current?.click();
             return;
         }
         const base = { id: Date.now().toString(), type, x: 20, y: 20, width: 150, height: 35, lockAspectRatio: false };
         const porTipo = {
-            text: { content: '{nome_pessoa}', fontSize: 16, fontWeight: 'bold', color: '#000000', textAlign: 'left' },
-            qrcode: { content: '{qr_code}', width: 80, height: 80, lockAspectRatio: true },
-            barcode: { content: '{pulseira}', width: 160, height: 55, exibirTexto: true },
+            text: { content: '{nome_pessoa}', fontSize: 16, fontWeight: 'bold', color: '#000000', textAlign: 'left', autoAjuste: true },
+            qrcode: { content: '{qr_code}', width: 80, height: 80, lockAspectRatio: true, color: '#000000' },
+            barcode: { content: '{pulseira}', width: 160, height: 55, exibirTexto: true, color: '#000000' },
             foto: { content: '{foto_url}', width: 80, height: 80, borderRadius: 8, borderColor: '#00D4FF', borderWidth: 2, lockAspectRatio: true },
-            shape: { width: 200, height: 30, backgroundColor: '#00D4FF', borderRadius: 4, opacity: 1 },
-            circle: { width: 60, height: 60, backgroundColor: '#00FF88', borderRadius: 50, borderColor: '#000000', borderWidth: 0, opacity: 1, lockAspectRatio: true },
-            line: { width: 200, height: 4, borderColor: '#000000', borderWidth: 2, opacity: 1 }
+            shape: { width: 200, height: 35, backgroundColor: '#00D4FF', semPreenchimento: false, forma: 'retangulo', borderColor: '#000000', borderWidth: 0, borderRadius: 4, opacity: 1 },
+            circle: { width: 60, height: 60, backgroundColor: '#00FF88', semPreenchimento: false, forma: 'elipse', borderColor: '#000000', borderWidth: 0, opacity: 1, lockAspectRatio: true },
+            line: { width: 200, height: 4, borderColor: '#000000', borderWidth: 2, opacity: 1 },
+            icone: { width: 40, height: 40, icone: 'estrela', color: '#00D4FF', lockAspectRatio: true }
         };
-        inserir({ ...base, ...(porTipo[type] || {}) });
+        inserir({ ...base, ...(porTipo[type] || {}), ...extra });
     };
 
     const handleUploadElementImage = async (e) => {
@@ -403,7 +446,6 @@ const ConfigEtiquetas = () => {
         enqueueSnackbar('Imagem adicionada ao crachá!', { variant: 'success' });
     };
 
-    // Arte do evento entra como CAMADA (pode ir para frente/trás, travar, ocultar e virar referência)
     const novaCamadaDeArte = (src, extra = {}) => ({
         id: `arte_${Date.now()}`,
         type: 'image',
@@ -433,22 +475,9 @@ const ConfigEtiquetas = () => {
         if (!file) return;
         const src = await lerArquivoComoDataUrl(file);
         colocarArteNoFundo(novaCamadaDeArte(src));
-        enqueueSnackbar('Arte do evento inserida como camada (travada no fundo).', { variant: 'success' });
+        enqueueSnackbar('Arte do evento inserida como camada no fundo.', { variant: 'success' });
     };
 
-    const converterFundoEmCamada = () => {
-        if (!config.background_url) return;
-        const ref = Boolean(config.fundo_como_referencia);
-        colocarArteNoFundo(novaCamadaDeArte(config.background_url, {
-            apenasReferencia: ref,
-            opacity: ref ? (config.opacidade_referencia || 0.5) : 1,
-            locked: config.travar_referencia !== false
-        }));
-        setConfig(prev => ({ ...prev, background_url: '', fundo_como_referencia: false, imprimir_fundo: true }));
-        enqueueSnackbar('Fundo convertido em camada. Agora ele aparece na aba Camadas.', { variant: 'success' });
-    };
-
-    // ---------- Edição ----------
     const updateElement = (id, newProps) => {
         setElements(prev => prev.map(el => (el.id === id ? { ...el, ...newProps } : el)));
     };
@@ -461,12 +490,12 @@ const ConfigEtiquetas = () => {
         if (!selecionados.length) return;
         const apagar = selecionados.filter(el => !el.locked).map(el => el.id);
         if (!apagar.length) {
-            enqueueSnackbar('Elemento travado: destrave (cadeado) para excluir.', { variant: 'warning' });
+            enqueueSnackbar('Elemento travado: destrave para excluir.', { variant: 'warning' });
             return;
         }
         setElements(prev => prev.filter(el => !apagar.includes(el.id)));
         setSelectedIds(prev => prev.filter(id => !apagar.includes(id)));
-        enqueueSnackbar(apagar.length > 1 ? `${apagar.length} elementos excluídos.` : 'Elemento excluído.', { variant: 'info', autoHideDuration: 1500 });
+        enqueueSnackbar(`${apagar.length} excluído(s).`, { variant: 'info', autoHideDuration: 1500 });
     };
 
     const excluirElemento = (id) => {
@@ -491,16 +520,65 @@ const ConfigEtiquetas = () => {
         setSelectedIds(novos.map(n => n.id));
     };
 
-    const moverSelecionados = (dx, dy) => {
-        setElements(prev => prev.map(el => {
-            if (!selectedIds.includes(el.id) || el.locked) return el;
-            return {
-                ...el,
-                x: Math.round(Math.max(0, Math.min(canvasWidth - el.width, el.x + dx))),
-                y: Math.round(Math.max(0, Math.min(canvasHeight - el.height, el.y + dy)))
-            };
-        }));
-    };
+    // Calcula linhas guias magnéticas para qualquer posição testada
+    const calcularGuiasAlinhamento = useCallback((alvo, todosElementos) => {
+        const cx = alvo.x + alvo.width / 2;
+        const cy = alvo.y + alvo.height / 2;
+        const t = 6;
+        let gv = null;
+        let gh = null;
+
+        // Centro do canvas
+        if (Math.abs(cx - canvasWidth / 2) <= t) gv = canvasWidth / 2;
+        if (Math.abs(cy - canvasHeight / 2) <= t) gh = canvasHeight / 2;
+
+        for (const o of todosElementos) {
+            if (o.id === alvo.id || o.oculto) continue;
+            const ocx = o.x + o.width / 2;
+            const ocy = o.y + o.height / 2;
+
+            if (Math.abs(cx - ocx) <= t) gv = ocx;
+            else if (Math.abs(alvo.x - o.x) <= t) gv = o.x;
+            else if (Math.abs(alvo.x + alvo.width - (o.x + o.width)) <= t) gv = o.x + o.width;
+            else if (Math.abs(alvo.x - (o.x + o.width)) <= t) gv = o.x + o.width;
+            else if (Math.abs(alvo.x + alvo.width - o.x) <= t) gv = o.x;
+
+            if (Math.abs(cy - ocy) <= t) gh = ocy;
+            else if (Math.abs(alvo.y - o.y) <= t) gh = o.y;
+            else if (Math.abs(alvo.y + alvo.height - (o.y + o.height)) <= t) gh = o.y + o.height;
+            else if (Math.abs(alvo.y - (o.y + o.height)) <= t) gh = o.y + o.height;
+            else if (Math.abs(alvo.y + alvo.height - o.y) <= t) gh = o.y;
+        }
+
+        return { vertical: gv, horizontal: gh };
+    }, [canvasWidth, canvasHeight]);
+
+    // Movimentação pelas setas do teclado: atualiza posição e ativa as linhas guias
+    const moverSelecionados = useCallback((dx, dy) => {
+        setElements(prev => {
+            const atualizados = prev.map(el => {
+                if (!selectedIds.includes(el.id) || el.locked) return el;
+                return {
+                    ...el,
+                    x: Math.round(Math.max(0, Math.min(canvasWidth - el.width, el.x + dx))),
+                    y: Math.round(Math.max(0, Math.min(canvasHeight - el.height, el.y + dy)))
+                };
+            });
+
+            // Se tiver um elemento ou grupo selecionado, calcula e exibe as guias
+            const selecionadoPrincipal = atualizados.find(el => selectedIds.includes(el.id) && !el.locked);
+            if (selecionadoPrincipal) {
+                const guias = calcularGuiasAlinhamento(selecionadoPrincipal, atualizados);
+                setSmartGuides(guias);
+                if (smartGuidesTimerRef.current) clearTimeout(smartGuidesTimerRef.current);
+                smartGuidesTimerRef.current = setTimeout(() => {
+                    setSmartGuides({ vertical: null, horizontal: null });
+                }, 1000);
+            }
+
+            return atualizados;
+        });
+    }, [selectedIds, canvasWidth, canvasHeight, calcularGuiasAlinhamento]);
 
     const selecionarTodos = () => {
         setSelectedIds(elements.filter(el => !el.locked && !el.oculto).map(el => el.id));
@@ -509,7 +587,7 @@ const ConfigEtiquetas = () => {
     const agrupar = () => {
         if (selectedIds.length < 2) return;
         setElements(prev => agruparElementos(prev, selectedIds));
-        enqueueSnackbar('Elementos agrupados: agora se movem, escalam e mudam de camada juntos.', { variant: 'success' });
+        enqueueSnackbar('Elementos agrupados com sucesso!', { variant: 'success' });
     };
 
     const desagrupar = () => {
@@ -529,10 +607,10 @@ const ConfigEtiquetas = () => {
 
     const mostrarGuias = (vertical, horizontal) => {
         setSmartGuides({ vertical, horizontal });
-        setTimeout(() => setSmartGuides({ vertical: null, horizontal: null }), 1200);
+        if (smartGuidesTimerRef.current) clearTimeout(smartGuidesTimerRef.current);
+        smartGuidesTimerRef.current = setTimeout(() => setSmartGuides({ vertical: null, horizontal: null }), 1200);
     };
 
-    // Alinha a seleção (1 item ou o bloco inteiro) em relação à prancheta
     const alinharNaPrancheta = (posicao) => {
         const caixa = caixaDoGrupo(moveis);
         if (!caixa) return;
@@ -557,7 +635,6 @@ const ConfigEtiquetas = () => {
         setElements(prev => prev.map(el => (mapa[el.id] ? { ...el, ...mapa[el.id] } : el)));
     };
 
-    // Escala o grupo pelo centro (botões −10% / +10%)
     const escalarSelecao = (fator) => {
         const caixa = caixaDoGrupo(moveis);
         if (!caixa) return;
@@ -571,9 +648,7 @@ const ConfigEtiquetas = () => {
         setElements(prev => prev.map(el => (mapa[el.id] ? arredondarItem({ ...el, ...escalarItem(mapa[el.id], caixa, nova) }) : el)));
     };
 
-    const ocuparPranchetaInteira = (id) => updateElement(id, { x: 0, y: 0, width: canvasWidth, height: canvasHeight });
-
-    // ---------- Atalhos de teclado (estáveis, sem churn de listeners) ----------
+    // Atalhos de teclado
     const actionsRef = useRef({});
     actionsRef.current = {
         selecionarTodos,
@@ -616,20 +691,16 @@ const ConfigEtiquetas = () => {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
-    // ---------- Seleção por área (arrastar o mouse no vazio) ----------
+    // Seleção por área
     const marqueeCleanupRef = useRef(null);
-    useEffect(() => {
-        return () => {
-            if (marqueeCleanupRef.current) marqueeCleanupRef.current();
-        };
-    }, []);
+    useEffect(() => () => { if (marqueeCleanupRef.current) marqueeCleanupRef.current(); }, []);
 
     const handleWorkspaceMouseDown = (e) => {
         if (e.button !== 0) return;
         const alvo = e.target;
         if (alvo.closest?.('.etq-group')) return;
         const noElemento = alvo.closest?.('.etq-el');
-        if (noElemento && !noElemento.classList.contains('etq-locked')) return; // o próprio elemento cuida
+        if (noElemento && !noElemento.classList.contains('etq-locked')) return;
         e.preventDefault();
 
         const ws = workspaceRef.current;
@@ -666,7 +737,6 @@ const ConfigEtiquetas = () => {
             setMarquee(null);
             const lista = elementsRef.current;
             if (!estado.moveu) {
-                // clique simples num elemento travado: seleciona ele (para destravar/editar)
                 if (estado.travado) setSelectedIds(expandirGrupos([...estado.base, estado.travado], lista));
                 return;
             }
@@ -687,13 +757,12 @@ const ConfigEtiquetas = () => {
         window.addEventListener('mouseup', onUp);
     };
 
-    // Duplo clique num membro de grupo: edita só ele
     const handleWorkspaceDoubleClick = (e) => {
         const id = idDoNo(e.target.closest?.('.etq-el'));
         if (id) setSelectedIds([id]);
     };
 
-    // ---------- Arraste (1 item ou bloco) ----------
+    // Arraste com resposta imediata
     const handleDragStart = (e, d, el) => {
         const aditivo = e.shiftKey || e.ctrlKey || e.metaKey;
         const doGrupo = expandirGrupos([el.id], elements);
@@ -706,13 +775,15 @@ const ConfigEtiquetas = () => {
         } else if (!selectedIds.includes(el.id)) {
             atual = doGrupo;
         } else if (atual.length > doGrupo.length) {
-            interacao.soEle = doGrupo; // clique sem arrastar dentro de uma seleção maior
+            interacao.soEle = doGrupo;
         }
         if (atual !== selectedIds) setSelectedIds(atual);
 
         const iniciais = {};
         elements.forEach(item => {
-            if (atual.includes(item.id) && !item.locked) iniciais[item.id] = { x: item.x, y: item.y, width: item.width, height: item.height };
+            if (atual.includes(item.id) && !item.locked) {
+                iniciais[item.id] = { x: item.x, y: item.y, width: item.width, height: item.height };
+            }
         });
         const caixa = caixaDoGrupo(Object.values(iniciais));
         dragRef.current = { leaderId: el.id, startX: d.x, startY: d.y, iniciais, caixa, ...interacao };
@@ -730,39 +801,30 @@ const ConfigEtiquetas = () => {
     const handleDrag = (_e, d, el) => {
         const drag = dragRef.current;
         if (!drag || drag.leaderId !== el.id) return;
-        let dx = d.x - drag.startX;
-        let dy = d.y - drag.startY;
+        const dx = d.x - drag.startX;
+        const dy = d.y - drag.startY;
         if (Math.abs(dx) + Math.abs(dy) > 1) drag.moveu = true;
-        [dx, dy] = limitarDelta(drag, dx, dy);
 
-        setElements(prev => prev.map(item => (drag.iniciais[item.id]
-            ? { ...item, x: drag.iniciais[item.id].x + dx, y: drag.iniciais[item.id].y + dy }
-            : item)));
+        // Movimentação sincronizada de elementos agrupados usando transform nativa
+        const outrosIds = Object.keys(drag.iniciais).filter(id => id !== el.id);
+        if (outrosIds.length > 0) {
+            const [ldx, ldy] = limitarDelta(drag, dx, dy);
+            outrosIds.forEach(id => {
+                const domEl = document.querySelector(`.etq-id-${id}`);
+                if (domEl) {
+                    const orig = drag.iniciais[id];
+                    domEl.style.transform = `translate(${orig.x + ldx}px, ${orig.y + ldy}px)`;
+                }
+            });
+        }
 
-        // Guias magnéticas: centro da prancheta, centros e bordas dos outros elementos
+        // Calcula guias inteligentes em tempo real
         const lider = drag.iniciais[el.id];
-        if (!lider) return;
-        const x = lider.x + dx;
-        const y = lider.y + dy;
-        const cx = x + el.width / 2;
-        const cy = y + el.height / 2;
-        const t = 6;
-        let gv = null;
-        let gh = null;
-        if (Math.abs(cx - canvasWidth / 2) <= t) gv = canvasWidth / 2;
-        if (Math.abs(cy - canvasHeight / 2) <= t) gh = canvasHeight / 2;
-        elements.forEach(o => {
-            if (drag.iniciais[o.id] || o.oculto) return;
-            const ocx = o.x + o.width / 2;
-            const ocy = o.y + o.height / 2;
-            if (Math.abs(cx - ocx) <= t) gv = ocx;
-            if (Math.abs(x - o.x) <= t) gv = o.x;
-            if (Math.abs(x + el.width - (o.x + o.width)) <= t) gv = o.x + o.width;
-            if (Math.abs(cy - ocy) <= t) gh = ocy;
-            if (Math.abs(y - o.y) <= t) gh = o.y;
-            if (Math.abs(y + el.height - (o.y + o.height)) <= t) gh = o.y + o.height;
-        });
-        setSmartGuides({ vertical: gv, horizontal: gh });
+        if (lider) {
+            const posAtual = { ...el, x: lider.x + dx, y: lider.y + dy };
+            const guias = calcularGuiasAlinhamento(posAtual, elements);
+            setSmartGuides(guias);
+        }
     };
 
     const handleDragStop = (_e, d, el) => {
@@ -774,9 +836,6 @@ const ConfigEtiquetas = () => {
         if (!drag.moveu) {
             if (drag.desmarcar) setSelectedIds(prev => prev.filter(id => !drag.desmarcar.includes(id)));
             else if (drag.soEle) setSelectedIds(drag.soEle);
-            if (drag.iniciais[el.id]) {
-                setElements(prev => prev.map(item => (drag.iniciais[item.id] ? { ...item, x: drag.iniciais[item.id].x, y: drag.iniciais[item.id].y } : item)));
-            }
             return;
         }
 
@@ -787,12 +846,18 @@ const ConfigEtiquetas = () => {
             ly = Math.round(ly / gridSize) * gridSize;
         }
         const [dx, dy] = limitarDelta(drag, lx - drag.startX, ly - drag.startY);
+
+        // Limpa transforms inline de outros elementos agrupados
+        Object.keys(drag.iniciais).forEach(id => {
+            const domEl = document.querySelector(`.etq-id-${id}`);
+            if (domEl) domEl.style.transform = '';
+        });
+
         setElements(prev => prev.map(item => (drag.iniciais[item.id]
             ? { ...item, x: Math.round(drag.iniciais[item.id].x + dx), y: Math.round(drag.iniciais[item.id].y + dy) }
             : item)));
     };
 
-    // ---------- Escala do grupo pelas alças ----------
     const handleGrupoResizeStart = () => {
         grupoResizeRef.current = { caixa: caixaSelecao, itens: Object.fromEntries(moveis.map(el => [el.id, { ...el }])) };
     };
@@ -810,7 +875,6 @@ const ConfigEtiquetas = () => {
         if (final) grupoResizeRef.current = null;
     };
 
-    // ---------- Salvar / imprimir ----------
     const handleSave = async () => {
         if (!eventoId) {
             enqueueSnackbar('Selecione primeiro um evento ativo no menu superior.', { variant: 'warning' });
@@ -820,7 +884,7 @@ const ConfigEtiquetas = () => {
             setSaving(true);
             await api.post('/config/etiquetas', { evento_id: eventoId, papel_config: config, elementos: elements });
             limparCacheEtiqueta(eventoId);
-            enqueueSnackbar('Layout salvo com sucesso para o evento ativo!', { variant: 'success' });
+            enqueueSnackbar('Layout profissional salvo com sucesso!', { variant: 'success' });
         } catch (error) {
             enqueueSnackbar('Falha ao salvar layout: ' + (error.response?.data?.details || ''), { variant: 'error' });
         } finally {
@@ -832,55 +896,34 @@ const ConfigEtiquetas = () => {
         imprimirHtml(montarHtmlEtiqueta({ papel_config: config, elementos: elements }, DADOS_EXEMPLO));
     };
 
-    // ---------- Renderização do conteúdo de cada elemento ----------
-    const renderConteudo = (el) => {
-        switch (el.type) {
-            case 'text':
-                return (
-                    <Typography sx={{
-                        width: '100%', height: '100%', fontSize: el.fontSize || 14, fontWeight: el.fontWeight || 'normal',
-                        color: el.color || '#000000', textAlign: el.textAlign || 'left', wordWrap: 'break-word',
-                        lineHeight: 1.15, p: 0.2, fontFamily: 'Arial, Helvetica, sans-serif'
-                    }}>
-                        {el.content}
-                    </Typography>
-                );
-            case 'qrcode':
-                return (
-                    <Box sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.9)', border: '1px solid #000' }}>
-                        <QrIcon sx={{ fontSize: Math.min(el.width, el.height) * 0.7, color: '#000000' }} />
-                    </Box>
-                );
-            case 'barcode':
-                return (
-                    <Box
-                        sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        dangerouslySetInnerHTML={{ __html: gerarBarcodeSvg(el.content || '123456', el.exibirTexto !== false) }}
-                    />
-                );
-            case 'foto':
-                return (
-                    <Box sx={{
-                        width: '100%', height: '100%', backgroundImage: `url('${DADOS_EXEMPLO.foto_url}')`,
-                        backgroundSize: 'cover', backgroundPosition: 'center',
-                        border: `${el.borderWidth || 1}px solid ${el.borderColor || '#00D4FF'}`,
-                        borderRadius: el.borderRadius ? `${el.borderRadius}px` : 0, boxSizing: 'border-box'
-                    }} />
-                );
-            case 'shape':
-                return <Box sx={{ width: '100%', height: '100%', backgroundColor: el.backgroundColor || '#00D4FF', borderRadius: el.borderRadius ? `${el.borderRadius}px` : 0 }} />;
-            case 'circle':
-                return <Box sx={{ width: '100%', height: '100%', backgroundColor: el.backgroundColor || '#00FF88', borderRadius: '50%', border: `${el.borderWidth || 0}px solid ${el.borderColor || '#000000'}`, boxSizing: 'border-box' }} />;
-            case 'line':
-                return <Box sx={{ width: '100%', height: '100%', borderTop: `${el.borderWidth || 2}px solid ${el.borderColor || el.color || '#000000'}` }} />;
-            case 'image':
-                return <Box component="img" src={el.content} alt="" draggable={false} sx={{ width: '100%', height: '100%', objectFit: el.objectFit || 'contain', display: 'block' }} />;
-            default:
-                return null;
-        }
+    const aplicarModelo = (modelo) => {
+        setConfig(prev => ({ ...prev, ...modelo.papel_config }));
+        setElements(normalizarCamadas(modelo.elementos));
+        setSelectedIds([]);
+        setModalModelosAberto(false);
+        enqueueSnackbar(`Modelo "${modelo.nome}" carregado com sucesso!`, { variant: 'success' });
     };
 
-    // ---------- Campos de posição/tamanho em milímetros ----------
+    const handleSalvarComoModelo = () => {
+        if (!nomeNovoModelo.trim()) {
+            enqueueSnackbar('Informe um nome para o modelo.', { variant: 'warning' });
+            return;
+        }
+        salvarModeloPersonalizado(nomeNovoModelo, descNovoModelo, config, elements);
+        setModelosCustomizados(lerModelosSalvos());
+        setNomeNovoModelo('');
+        setDescNovoModelo('');
+        setModalSalvarModeloAberto(false);
+        enqueueSnackbar('Modelo salvo na sua galeria personalizada!', { variant: 'success' });
+    };
+
+    const handleExcluirModeloCustom = (id, e) => {
+        e.stopPropagation();
+        const atualizados = excluirModeloPersonalizado(id);
+        setModelosCustomizados(atualizados);
+        enqueueSnackbar('Modelo personalizado removido.', { variant: 'info' });
+    };
+
     const CampoMm = ({ rotulo, campo, el }) => (
         <TextField
             label={rotulo}
@@ -963,7 +1006,7 @@ const ConfigEtiquetas = () => {
         </Box>
     );
 
-    // ---------- Painel direito: propriedades ----------
+    // Render do Painel Direito
     const renderPropriedades = () => {
         if (selecionados.length > 1) {
             return (
@@ -1079,23 +1122,81 @@ const ConfigEtiquetas = () => {
                         />
                     </Stack>
 
-                    <Box sx={{ px: 0.5 }}>
-                        <Stack direction="row" justifyContent="space-between">
-                            <Typography sx={{ fontSize: '0.75rem', color: cores.textoSecundario }}>Opacidade</Typography>
-                            <Typography sx={{ fontSize: '0.75rem', color: cores.primaria, fontWeight: 700 }}>{Math.round((el.opacity ?? 1) * 100)}%</Typography>
+                    {/* Propriedades Específicas */}
+                    {(el.type === 'shape' || el.type === 'circle') && (
+                        <Stack spacing={1.25} sx={{ p: 1.25, borderRadius: '8px', bgcolor: 'rgba(0,0,0,0.25)', border: `1px solid ${cores.borda}` }}>
+                            <Secao>Estilo do Elemento / Contorno</Secao>
+                            <FormControl fullWidth size="small">
+                                <InputLabel id="forma-label">Forma</InputLabel>
+                                <Select labelId="forma-label" label="Forma" value={el.forma || (el.type === 'circle' ? 'elipse' : 'retangulo')} onChange={e => updateElement(el.id, { forma: e.target.value })}>
+                                    {Object.entries(FORMAS).map(([k, v]) => <MenuItem key={k} value={k}>{v}</MenuItem>)}
+                                </Select>
+                            </FormControl>
+
+                            <SwitchLinha
+                                checked={Boolean(el.semPreenchimento)}
+                                onChange={v => updateElement(el.id, { semPreenchimento: v })}
+                                rotulo="Sem preenchimento (Só contorno)"
+                                ajuda="Fundo vazado/transparente com apenas a borda visível"
+                            />
+
+                            {!el.semPreenchimento && (
+                                <>
+                                    <TextField label="Cor do Fundo" type="color" fullWidth size="small" value={el.backgroundColor || '#00D4FF'} onChange={e => updateElement(el.id, { backgroundColor: e.target.value })} />
+                                    <Paleta onEscolher={hex => updateElement(el.id, { backgroundColor: hex })} />
+                                </>
+                            )}
+
+                            <Divider sx={{ borderColor: cores.borda }} />
+                            <Secao>Borda / Contorno</Secao>
+                            <Grid container spacing={1}>
+                                <Grid item xs={6}>
+                                    <TextField label="Espessura (px)" type="number" fullWidth size="small" value={el.borderWidth ?? (el.semPreenchimento ? 2 : 0)} onChange={e => updateElement(el.id, { borderWidth: Number(e.target.value) })} />
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <TextField label="Cor da borda" type="color" fullWidth size="small" value={el.borderColor || '#000000'} onChange={e => updateElement(el.id, { borderColor: e.target.value })} />
+                                </Grid>
+                            </Grid>
+                            <Paleta onEscolher={hex => updateElement(el.id, { borderColor: hex })} />
                         </Stack>
-                        <Slider size="small" value={el.opacity ?? 1} min={0.1} max={1} step={0.05} onChange={(_, v) => updateElement(el.id, { opacity: v })} />
-                    </Box>
+                    )}
 
                     {el.type === 'text' && (
                         <Stack spacing={1.5}>
-                            <Secao>Texto</Secao>
-                            <TextField label="Conteúdo / tag do participante" fullWidth size="small" value={el.content} onChange={e => updateElement(el.id, { content: e.target.value })} />
+                            <Secao>Conteúdo do Texto</Secao>
+                            <TextField label="Texto ou Marcador" fullWidth size="small" value={el.content} onChange={e => updateElement(el.id, { content: e.target.value })} />
+                            
+                            <Secao>Campos dinâmicos do participante</Secao>
                             <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-                                {['{nome_pessoa}', '{funcao}', '{empresa}', '{cpf}', '{pulseira}', '{evento}', '{data}'].map(tag => (
-                                    <Chip key={tag} label={tag} size="small" onClick={() => updateElement(el.id, { content: tag })} sx={{ fontSize: '0.75rem', bgcolor: 'rgba(255,255,255,0.06)', cursor: 'pointer' }} />
+                                {[
+                                    { tag: '{nome_pessoa}', label: 'Nome Credencial' },
+                                    { tag: '{nome_completo}', label: 'Nome Completo' },
+                                    { tag: '{primeiro_nome}', label: 'Primeiro Nome' },
+                                    { tag: '{funcao}', label: 'Cargo / Função' },
+                                    { tag: '{empresa}', label: 'Empresa' },
+                                    { tag: '{cpf}', label: 'CPF' },
+                                    { tag: '{cpf_parcial}', label: 'CPF LGPD' },
+                                    { tag: '{pulseira}', label: 'Nº Pulseira' },
+                                    { tag: '{evento}', label: 'Evento' },
+                                    { tag: '{data}', label: 'Data Hoje' }
+                                ].map(item => (
+                                    <Chip
+                                        key={item.tag}
+                                        label={item.label}
+                                        size="small"
+                                        onClick={() => updateElement(el.id, { content: item.tag })}
+                                        sx={{ fontSize: '0.75rem', bgcolor: 'rgba(0, 212, 255, 0.08)', color: cores.primaria, cursor: 'pointer', border: '1px solid rgba(0, 212, 255, 0.25)' }}
+                                    />
                                 ))}
                             </Stack>
+
+                            <FormControl fullWidth size="small">
+                                <InputLabel id="fonte-label">Tipografia</InputLabel>
+                                <Select labelId="fonte-label" label="Tipografia" value={el.fontFamily || 'arial'} onChange={e => updateElement(el.id, { fontFamily: e.target.value })}>
+                                    {FONTES.map(f => <MenuItem key={f.valor} value={f.valor}>{f.rotulo}</MenuItem>)}
+                                </Select>
+                            </FormControl>
+
                             <Grid container spacing={1}>
                                 <Grid item xs={6}>
                                     <TextField label="Tamanho" type="number" fullWidth size="small" value={el.fontSize || 14} onChange={e => updateElement(el.id, { fontSize: Number(e.target.value) })} />
@@ -1123,7 +1224,37 @@ const ConfigEtiquetas = () => {
                                     <TextField label="Cor" type="color" fullWidth size="small" value={el.color || '#000000'} onChange={e => updateElement(el.id, { color: e.target.value })} />
                                 </Grid>
                             </Grid>
+
+                            <SwitchLinha
+                                checked={Boolean(el.autoAjuste)}
+                                onChange={v => updateElement(el.id, { autoAjuste: v })}
+                                rotulo="Auto-ajuste de fonte"
+                                ajuda="Diminui a letra automaticamente se o nome for grande demais para a caixa"
+                            />
                             <Paleta onEscolher={hex => updateElement(el.id, { color: hex })} />
+                        </Stack>
+                    )}
+
+                    {el.type === 'foto' && (
+                        <Stack spacing={1.25}>
+                            <Secao>Formato da Foto</Secao>
+                            <SwitchLinha
+                                checked={Boolean(el.circular)}
+                                onChange={v => updateElement(el.id, { circular: v })}
+                                rotulo="Foto Circular / Redonda"
+                                ajuda="Aplica máscara de corte redonda perfeita"
+                            />
+                            {!el.circular && (
+                                <TextField label="Cantos arredondados (px)" type="number" fullWidth size="small" value={el.borderRadius || 0} onChange={e => updateElement(el.id, { borderRadius: Number(e.target.value) })} />
+                            )}
+                            <Grid container spacing={1}>
+                                <Grid item xs={6}>
+                                    <TextField label="Borda (px)" type="number" fullWidth size="small" value={el.borderWidth ?? 1} onChange={e => updateElement(el.id, { borderWidth: Number(e.target.value) })} />
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <TextField label="Cor" type="color" fullWidth size="small" value={el.borderColor || '#00D4FF'} onChange={e => updateElement(el.id, { borderColor: e.target.value })} />
+                                </Grid>
+                            </Grid>
                         </Stack>
                     )}
 
@@ -1138,55 +1269,17 @@ const ConfigEtiquetas = () => {
                         </Stack>
                     )}
 
-                    {el.type === 'foto' && (
-                        <Grid container spacing={1}>
-                            <Grid item xs={4}>
-                                <TextField label="Cantos" type="number" fullWidth size="small" value={el.borderRadius || 0} onChange={e => updateElement(el.id, { borderRadius: Number(e.target.value) })} />
-                            </Grid>
-                            <Grid item xs={4}>
-                                <TextField label="Borda" type="number" fullWidth size="small" value={el.borderWidth ?? 1} onChange={e => updateElement(el.id, { borderWidth: Number(e.target.value) })} />
-                            </Grid>
-                            <Grid item xs={4}>
-                                <TextField label="Cor" type="color" fullWidth size="small" value={el.borderColor || '#00D4FF'} onChange={e => updateElement(el.id, { borderColor: e.target.value })} />
-                            </Grid>
-                        </Grid>
-                    )}
-
-                    {el.type === 'image' && (
+                    {el.type === 'icone' && (
                         <Stack spacing={1.25}>
-                            <Secao>{el.papel === 'arte' ? 'Arte do evento' : 'Imagem'}</Secao>
+                            <Secao>Escolher Ícone</Secao>
                             <FormControl fullWidth size="small">
-                                <InputLabel id="fit-label">Encaixe da imagem</InputLabel>
-                                <Select labelId="fit-label" label="Encaixe da imagem" value={el.objectFit || 'contain'} onChange={e => updateElement(el.id, { objectFit: e.target.value })}>
-                                    <MenuItem value="contain">Conter (imagem inteira)</MenuItem>
-                                    <MenuItem value="cover">Cobrir (recorta sobras)</MenuItem>
-                                    <MenuItem value="fill">Esticar (preenche a caixa)</MenuItem>
+                                <InputLabel id="icone-label">Ícone</InputLabel>
+                                <Select labelId="icone-label" label="Ícone" value={el.icone || 'estrela'} onChange={e => updateElement(el.id, { icone: e.target.value })}>
+                                    {Object.entries(ICONES).map(([k, v]) => <MenuItem key={k} value={k}>{v.rotulo}</MenuItem>)}
                                 </Select>
                             </FormControl>
-                            <Button size="small" variant="outlined" startIcon={<PreencherIcon fontSize="small" />} onClick={() => ocuparPranchetaInteira(el.id)} sx={{ ...botaoSecundario, minHeight: 34, fontSize: '0.75rem', textTransform: 'none' }}>
-                                Ocupar o crachá inteiro
-                            </Button>
-                            <TextField label="Cantos arredondados (px)" type="number" fullWidth size="small" value={el.borderRadius || 0} onChange={e => updateElement(el.id, { borderRadius: Number(e.target.value) })} />
-                        </Stack>
-                    )}
-
-                    {(el.type === 'shape' || el.type === 'circle') && (
-                        <Stack spacing={1.25}>
-                            <Secao>Preenchimento</Secao>
-                            <TextField label="Cor" type="color" fullWidth size="small" value={el.backgroundColor || '#00D4FF'} onChange={e => updateElement(el.id, { backgroundColor: e.target.value })} />
-                            <Paleta onEscolher={hex => updateElement(el.id, { backgroundColor: hex })} />
-                            {el.type === 'shape' && (
-                                <TextField label="Cantos arredondados (px)" type="number" fullWidth size="small" value={el.borderRadius || 0} onChange={e => updateElement(el.id, { borderRadius: Number(e.target.value) })} />
-                            )}
-                        </Stack>
-                    )}
-
-                    {el.type === 'line' && (
-                        <Stack spacing={1.25}>
-                            <Secao>Traço</Secao>
-                            <TextField label="Cor" type="color" fullWidth size="small" value={el.borderColor || el.color || '#000000'} onChange={e => updateElement(el.id, { borderColor: e.target.value, color: e.target.value })} />
-                            <Paleta onEscolher={hex => updateElement(el.id, { borderColor: hex, color: hex })} />
-                            <TextField label="Espessura (px)" type="number" fullWidth size="small" value={el.borderWidth || 2} onChange={e => updateElement(el.id, { borderWidth: Number(e.target.value) })} />
+                            <TextField label="Cor do Ícone" type="color" fullWidth size="small" value={el.color || '#00D4FF'} onChange={e => updateElement(el.id, { color: e.target.value })} />
+                            <Paleta onEscolher={hex => updateElement(el.id, { color: hex })} />
                         </Stack>
                     )}
 
@@ -1201,25 +1294,21 @@ const ConfigEtiquetas = () => {
                 <Box sx={{ textAlign: 'center', py: 2 }}>
                     <TuneIcon sx={{ fontSize: 36, color: 'rgba(255,255,255,0.2)', mb: 1 }} />
                     <Typography sx={{ fontSize: '0.875rem', color: cores.textoSecundario }}>
-                        Clique em um elemento, ou arraste o mouse no vazio para selecionar vários.
+                        Selecione um elemento para editar ou use os botões da barra superior.
                     </Typography>
                 </Box>
                 <Box sx={{ p: 1.5, borderRadius: '8px', bgcolor: 'rgba(0, 212, 255, 0.05)', border: '1px dashed rgba(0, 212, 255, 0.25)' }}>
                     <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                         <KeyboardIcon sx={{ fontSize: 18, color: cores.primaria }} />
-                        <Secao>Atalhos</Secao>
+                        <Secao>Atalhos Profissionais</Secao>
                     </Stack>
                     {[
-                        ['Arrastar no vazio', 'selecionar por área'],
-                        ['Shift / Ctrl + clique', 'somar à seleção'],
-                        ['Setas (Shift)', 'mover 1 px (10 px)'],
-                        ['Delete', 'excluir selecionados'],
-                        ['Ctrl + A', 'selecionar tudo'],
+                        ['Arrastar no vazio', 'seleção em área'],
+                        ['Setas do teclado', 'ajuste fino de 1px com guias'],
+                        ['Shift + Setas', 'ajuste de 10px com guias'],
+                        ['Delete / Backspace', 'excluir selecionados'],
                         ['Ctrl + D', 'duplicar'],
-                        ['Ctrl + G / Ctrl + Shift + G', 'agrupar / desagrupar'],
-                        ['Ctrl + ] / Ctrl + [', 'avançar / recuar camada'],
-                        ['Duplo clique', 'editar item dentro do grupo'],
-                        ['Ctrl + roda do mouse', 'zoom']
+                        ['Ctrl + G', 'agrupar / desagrupar']
                     ].map(([tecla, acao]) => (
                         <Box key={tecla} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, py: 0.35 }}>
                             <Typography sx={{ fontSize: '0.75rem', color: cores.texto, fontWeight: 600 }}>{tecla}</Typography>
@@ -1231,24 +1320,40 @@ const ConfigEtiquetas = () => {
         );
     };
 
-    // ---------- Grade ----------
     const corGrade = (alfa) => {
         const n = parseInt(gridColor.replace('#', ''), 16);
         return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${Math.min(1, alfa)})`;
     };
     const passoMaior = gridSize * 5;
-
     const alturaPainel = { lg: 'calc(100vh - 230px)' };
     const isMulti = selecionados.length > 1;
+
+    const dadosVisualizacao = useMemo(() => enriquecerDados(DADOS_EXEMPLO), []);
 
     return (
         <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 4 } }}>
             <PageHeader
                 title="Etiquetas e crachás"
-                subtitle="Design e impressão de credenciais, crachás PVC e etiquetas térmicas."
+                subtitle="Editor profissional estilo gráfica: movimentação suave e imediata, réguas, guias e biblioteca de modelos."
                 breadcrumbs={[{ text: 'Configurações' }, { text: 'Credenciais físicas' }, { text: 'Etiquetas e crachás' }]}
                 action={
                     <Stack direction="row" spacing={1.5}>
+                        <Button
+                            variant="outlined"
+                            startIcon={<BookmarkAddIcon />}
+                            onClick={() => setModalSalvarModeloAberto(true)}
+                            sx={{ ...botaoSecundario, color: cores.sucesso, borderColor: 'rgba(0, 255, 136, 0.45)' }}
+                        >
+                            Salvar como modelo
+                        </Button>
+                        <Button
+                            variant="outlined"
+                            startIcon={<TemplateIcon />}
+                            onClick={() => setModalModelosAberto(true)}
+                            sx={{ ...botaoSecundario, color: cores.primaria, borderColor: 'rgba(0, 212, 255, 0.45)' }}
+                        >
+                            Modelos prontos
+                        </Button>
                         <NeonButton startIcon={<PrintIcon />} variant="outlined" onClick={handleImprimirTeste}>
                             Imprimir teste
                         </NeonButton>
@@ -1307,6 +1412,7 @@ const ConfigEtiquetas = () => {
                                             <TextField label="Altura (mm)" type="number" fullWidth size="small" value={config.height} onChange={(e) => handleChangeConfig('height', Number(e.target.value))} />
                                         </Grid>
                                     </Grid>
+                                    <TextField label="Cor de Fundo da Base" type="color" fullWidth size="small" value={config.corFundo || '#FFFFFF'} onChange={(e) => handleChangeConfig('corFundo', e.target.value)} />
                                 </Stack>
 
                                 <Divider sx={{ borderColor: cores.borda }} />
@@ -1314,7 +1420,7 @@ const ConfigEtiquetas = () => {
                                 <Stack spacing={1.5}>
                                     <Secao>Arte do evento</Secao>
                                     <Typography sx={{ fontSize: '0.8125rem', color: cores.textoSecundario, lineHeight: 1.45 }}>
-                                        A arte entra como uma <strong>camada</strong>: ocupa o crachá inteiro, fica travada no fundo e pode ir para frente/trás, ser ocultada ou virar só referência (não imprime).
+                                        A arte entra como uma <strong>camada</strong>: ocupa o crachá inteiro, fica no fundo e pode ser ocultada ou virar só gabarito de referência.
                                     </Typography>
                                     <Button
                                         variant="outlined"
@@ -1339,41 +1445,6 @@ const ConfigEtiquetas = () => {
                                             </Stack>
                                         </Box>
                                     ))}
-
-                                    {config.background_url && (
-                                        <Stack spacing={1.25} sx={{ p: 1.5, borderRadius: '8px', bgcolor: 'rgba(255, 184, 0, 0.06)', border: '1px solid rgba(255, 184, 0, 0.3)' }}>
-                                            <Typography sx={{ fontSize: '0.8125rem', color: cores.alerta, fontWeight: 700 }}>Fundo fixo (modo antigo)</Typography>
-                                            <Typography sx={{ fontSize: '0.75rem', color: cores.textoSuave, lineHeight: 1.4 }}>
-                                                Este layout usa a arte como fundo fixo, sem controle de camada. Converta para poder ordenar, travar e ocultar.
-                                            </Typography>
-                                            <Button size="small" variant="outlined" startIcon={<ArteIcon />} onClick={converterFundoEmCamada} sx={{ ...botaoSecundario, minHeight: 34, fontSize: '0.75rem', textTransform: 'none', color: cores.alerta, borderColor: 'rgba(255,184,0,0.45)' }}>
-                                                Converter em camada
-                                            </Button>
-                                            <FormControlLabel
-                                                control={
-                                                    <Switch size="small" checked={Boolean(config.fundo_como_referencia)} onChange={(e) => {
-                                                        const ativo = e.target.checked;
-                                                        handleChangeConfig('fundo_como_referencia', ativo);
-                                                        handleChangeConfig('imprimir_fundo', !ativo);
-                                                    }} />
-                                                }
-                                                label={<Typography sx={{ fontSize: '0.8125rem', color: cores.texto }}>Modo gabarito (não imprimir)</Typography>}
-                                            />
-                                            <Box sx={{ px: 0.5 }}>
-                                                <Typography sx={{ fontSize: '0.75rem', color: cores.textoSecundario }}>
-                                                    Opacidade do gabarito: {Math.round((config.opacidade_referencia || 0.5) * 100)}%
-                                                </Typography>
-                                                <Slider size="small" value={config.opacidade_referencia ?? 0.5} min={0.1} max={1} step={0.05} onChange={(_, v) => handleChangeConfig('opacidade_referencia', v)} />
-                                            </Box>
-                                            <Button size="small" color="error" onClick={() => handleChangeConfig('background_url', '')} sx={{ fontSize: '0.75rem', textTransform: 'none', alignSelf: 'flex-start' }}>
-                                                Remover fundo
-                                            </Button>
-                                        </Stack>
-                                    )}
-
-                                    <Alert severity="info" sx={{ bgcolor: 'rgba(0, 212, 255, 0.06)', color: cores.textoSuave, fontSize: '0.75rem', '& .MuiAlert-icon': { color: cores.primaria } }}>
-                                        Crachá pré-impresso? Ative <strong>Só referência</strong> na arte: ela guia o alinhamento na tela e fica fora da impressão.
-                                    </Alert>
                                 </Stack>
                             </Stack>
                         )}
@@ -1387,13 +1458,14 @@ const ConfigEtiquetas = () => {
                                     <Grid item xs={6}><BotaoAdicionar icone={QrIcon} rotulo="QR Code" onClick={() => addElement('qrcode')} /></Grid>
                                     <Grid item xs={6}><BotaoAdicionar icone={BarcodeIcon} rotulo="Código de barras" onClick={() => addElement('barcode')} /></Grid>
                                 </Grid>
-                                <Secao>Gráficos e imagens</Secao>
+                                <Secao>Gráficos, Formas e Contornos</Secao>
                                 <Grid container spacing={1}>
-                                    <Grid item xs={6}><BotaoAdicionar icone={ImageIcon} rotulo="Logo / imagem" onClick={() => addElement('image')} /></Grid>
-                                    <Grid item xs={6}><BotaoAdicionar icone={ArteIcon} rotulo="Arte do evento" onClick={() => fileArteInputRef.current?.click()} /></Grid>
-                                    <Grid item xs={6}><BotaoAdicionar icone={ShapeIcon} rotulo="Retângulo / tarja" onClick={() => addElement('shape')} /></Grid>
-                                    <Grid item xs={6}><BotaoAdicionar icone={CircleIcon} rotulo="Círculo / selo" onClick={() => addElement('circle')} /></Grid>
+                                    <Grid item xs={6}><BotaoAdicionar icone={ShapeIcon} rotulo="Formas / Tarjas" onClick={() => addElement('shape')} /></Grid>
+                                    <Grid item xs={6}><BotaoAdicionar icone={CircleIcon} rotulo="Círculo / Selo" onClick={() => addElement('circle')} /></Grid>
                                     <Grid item xs={6}><BotaoAdicionar icone={LineIcon} rotulo="Linha divisória" onClick={() => addElement('line')} /></Grid>
+                                    <Grid item xs={6}><BotaoAdicionar icone={IconeShapeIcon} rotulo="Ícones / Símbolos" onClick={() => addElement('icone')} /></Grid>
+                                    <Grid item xs={6}><BotaoAdicionar icone={ImageIcon} rotulo="Logo / Imagem" onClick={() => addElement('image')} /></Grid>
+                                    <Grid item xs={6}><BotaoAdicionar icone={ArteIcon} rotulo="Arte do evento" onClick={() => fileArteInputRef.current?.click()} /></Grid>
                                 </Grid>
                             </Stack>
                         )}
@@ -1475,59 +1547,29 @@ const ConfigEtiquetas = () => {
                     </Box>
                 </GlassCard>
 
-                {/* ===== CENTRO: BARRA DE FERRAMENTAS + PRANCHETA ===== */}
+                {/* ===== CENTRO: BARRA DE FERRAMENTAS + PRANCHETA GRÁFICA ===== */}
                 <GlassCard sx={{ display: 'flex', flexDirection: 'column', height: alturaPainel, minHeight: { xs: 620, lg: 560 } }}>
-                    {/* Linha 1: visualização */}
+                    {/* Linha 1: ferramentas gráficas */}
                     <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1, px: 2, py: 1.25, borderBottom: `1px solid ${cores.borda}` }}>
                         <Typography sx={{ fontSize: '0.875rem', fontWeight: 700, color: cores.textoForte, fontFamily: '"Space Grotesk", sans-serif', mr: 1 }}>
                             {config.width} × {config.height} mm
                         </Typography>
-                        {config.background_url && config.fundo_como_referencia && (
-                            <Chip size="small" label="Modo gabarito" sx={{ bgcolor: 'rgba(0, 255, 136, 0.15)', color: cores.sucesso, fontWeight: 700, fontSize: '0.75rem' }} />
-                        )}
-                        <Box sx={{ flex: 1 }} />
-
-                        {config.background_url && (
-                            <BotaoFerramenta titulo={ocultarGabarito ? 'Mostrar fundo' : 'Ocultar fundo'} onClick={() => setOcultarGabarito(v => !v)} ativo={!ocultarGabarito}>
-                                {ocultarGabarito ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                            </BotaoFerramenta>
-                        )}
+                        
+                        <BotaoFerramenta titulo={showRulers ? 'Ocultar réguas milimétricas' : 'Mostrar réguas milimétricas'} onClick={() => setShowRulers(v => !v)} ativo={showRulers}>
+                            <RulerIcon fontSize="small" />
+                        </BotaoFerramenta>
+                        <BotaoFerramenta titulo={showGuides ? 'Ocultar linhas guias de proporção' : 'Mostrar linhas guias de proporção'} onClick={() => setShowGuides(v => !v)} ativo={showGuides}>
+                            <SafeMarginIcon fontSize="small" />
+                        </BotaoFerramenta>
                         <BotaoFerramenta titulo={showGrid ? 'Esconder grade' : 'Mostrar grade'} onClick={() => setShowGrid(v => !v)} ativo={showGrid}>
                             {showGrid ? <GridOnIcon fontSize="small" /> : <GridOffIcon fontSize="small" />}
                         </BotaoFerramenta>
-                        <BotaoFerramenta titulo={snapToGrid ? 'Ímã da grade ligado (encaixa ao soltar)' : 'Ímã da grade desligado'} onClick={() => setSnapToGrid(v => !v)} ativo={snapToGrid} cor={cores.sucesso}>
+                        <BotaoFerramenta titulo={snapToGrid ? 'Ímã de grade ativado (encaixe magnético)' : 'Ímã de grade desligado (arraste livre e suave)'} onClick={() => setSnapToGrid(v => !v)} ativo={snapToGrid} cor={cores.sucesso}>
                             <ImaIcon fontSize="small" />
                         </BotaoFerramenta>
-                        {showGrid && (
-                            <>
-                                <Select
-                                    size="small"
-                                    value={gridSize}
-                                    onChange={(e) => setGridSize(Number(e.target.value))}
-                                    sx={{ height: 34, fontSize: '0.8125rem', minWidth: 76 }}
-                                >
-                                    {[5, 10, 15, 20, 30].map(v => <MenuItem key={v} value={v}>{v} px</MenuItem>)}
-                                </Select>
-                                <Stack direction="row" spacing={0.5} alignItems="center">
-                                    {CORES_GRADE.map(c => (
-                                        <Tooltip key={c.hex} title={`Grade ${c.label}`}>
-                                            <Box
-                                                onClick={() => setGridColor(c.hex)}
-                                                sx={{
-                                                    width: 18, height: 18, borderRadius: '50%', bgcolor: c.hex, cursor: 'pointer',
-                                                    border: gridColor === c.hex ? `2px solid ${cores.primaria}` : '1px solid rgba(255,255,255,0.35)',
-                                                    boxShadow: gridColor === c.hex ? `0 0 6px ${cores.primaria}` : 'none'
-                                                }}
-                                            />
-                                        </Tooltip>
-                                    ))}
-                                </Stack>
-                                <Tooltip title="Intensidade da grade">
-                                    <Slider size="small" value={gridIntensity} min={0.2} max={1} step={0.05} onChange={(_, v) => setGridIntensity(v)} sx={{ width: 80, mx: 1 }} />
-                                </Tooltip>
-                            </>
-                        )}
-                        <Divider orientation="vertical" flexItem sx={{ borderColor: cores.borda, mx: 0.5 }} />
+
+                        <Box sx={{ flex: 1 }} />
+
                         <BotaoFerramenta titulo="Diminuir zoom" onClick={() => mudarZoom(-0.1)}><ZoomOutIcon fontSize="small" /></BotaoFerramenta>
                         <Typography sx={{ fontSize: '0.8125rem', color: cores.primaria, fontWeight: 700, minWidth: 44, textAlign: 'center' }}>
                             {Math.round(zoom * 100)}%
@@ -1536,7 +1578,7 @@ const ConfigEtiquetas = () => {
                         <BotaoFerramenta titulo="Ajustar à tela" onClick={ajustarATela}><FitIcon fontSize="small" /></BotaoFerramenta>
                     </Box>
 
-                    {/* Linha 2: ações da seleção (sempre no lugar; desabilitadas sem seleção) */}
+                    {/* Linha 2: ações de contexto da seleção */}
                     <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0.75, px: 2, py: 1, borderBottom: `1px solid ${cores.borda}`, bgcolor: 'rgba(0,0,0,0.15)' }}>
                         <Typography sx={{ fontSize: '0.75rem', color: isMulti ? cores.sucesso : cores.textoSecundario, fontWeight: 600, minWidth: 110 }}>
                             {selecionados.length === 0 ? 'Nada selecionado' : isMulti ? `${selecionados.length} selecionados` : nomeDoElemento(selecionados[0])}
@@ -1548,19 +1590,18 @@ const ConfigEtiquetas = () => {
                             {todosTravados ? <LockIcon fontSize="small" /> : <LockOpenIcon fontSize="small" />}
                         </BotaoFerramenta>
                         <Divider orientation="vertical" flexItem sx={{ borderColor: cores.borda, mx: 0.5 }} />
-                        <BotaoFerramenta titulo="Trazer para frente (Ctrl+Shift+])" onClick={() => reordenar('frente')} disabled={!selecionados.length}><FrenteIcon fontSize="small" /></BotaoFerramenta>
-                        <BotaoFerramenta titulo="Avançar uma camada (Ctrl+])" onClick={() => reordenar('avancar')} disabled={!selecionados.length}><AvancarIcon fontSize="small" /></BotaoFerramenta>
-                        <BotaoFerramenta titulo="Recuar uma camada (Ctrl+[)" onClick={() => reordenar('recuar')} disabled={!selecionados.length}><RecuarIcon fontSize="small" /></BotaoFerramenta>
-                        <BotaoFerramenta titulo="Enviar para trás (Ctrl+Shift+[)" onClick={() => reordenar('tras')} disabled={!selecionados.length}><TrasIcon fontSize="small" /></BotaoFerramenta>
+                        <BotaoFerramenta titulo="Trazer para frente" onClick={() => reordenar('frente')} disabled={!selecionados.length}><FrenteIcon fontSize="small" /></BotaoFerramenta>
+                        <BotaoFerramenta titulo="Enviar para trás" onClick={() => reordenar('tras')} disabled={!selecionados.length}><TrasIcon fontSize="small" /></BotaoFerramenta>
                         <Divider orientation="vertical" flexItem sx={{ borderColor: cores.borda, mx: 0.5 }} />
                         <BotaoFerramenta titulo="Excluir (Delete)" onClick={excluirSelecionados} disabled={!selecionados.length} cor={cores.erro}><DeleteIcon fontSize="small" /></BotaoFerramenta>
                     </Box>
 
-                    {/* Mesa de trabalho */}
+                    {/* Mesa de trabalho / Prancheta */}
                     <Box
                         ref={workspaceRef}
                         onMouseDown={handleWorkspaceMouseDown}
                         onDoubleClick={handleWorkspaceDoubleClick}
+                        onMouseMove={handleWorkspaceMouseMove}
                         sx={{
                             flex: 1,
                             minHeight: 0,
@@ -1573,122 +1614,139 @@ const ConfigEtiquetas = () => {
                             userSelect: 'none'
                         }}
                     >
-                        <Box sx={{ m: 'auto', p: 4.5, flexShrink: 0 }}>
-                            <Box sx={{ width: canvasWidth * zoom, height: canvasHeight * zoom, position: 'relative' }}>
-                                <Box sx={{ position: 'absolute', top: 0, left: 0, width: canvasWidth, height: canvasHeight, transform: `scale(${zoom})`, transformOrigin: '0 0' }}>
-                                    <Paper
-                                        ref={paperRef}
-                                        elevation={0}
-                                        sx={{
-                                            width: canvasWidth,
-                                            height: canvasHeight,
-                                            backgroundColor: '#FFFFFF',
-                                            backgroundImage: 'none',
-                                            position: 'relative',
-                                            borderRadius: config.layout?.includes('cr80') ? '12px' : '4px',
-                                            boxShadow: '0 12px 40px rgba(0,0,0,0.8), 0 0 0 1px rgba(0, 212, 255, 0.25)',
-                                            '& .etq-el:hover': { outline: '1px solid rgba(0, 212, 255, 0.8)' }
-                                        }}
-                                    >
-                                        {/* Fundo fixo do modo antigo */}
-                                        {config.background_url && !ocultarGabarito && (
-                                            <Box sx={{
-                                                position: 'absolute', inset: 0, borderRadius: 'inherit',
-                                                backgroundImage: `url('${config.background_url}')`, backgroundSize: 'cover', backgroundPosition: 'center',
-                                                opacity: config.fundo_como_referencia ? (config.opacidade_referencia || 0.5) : 1,
-                                                pointerEvents: 'none', zIndex: 1
-                                            }} />
-                                        )}
+                        <Box sx={{ m: 'auto', p: showRulers ? 6 : 4, flexShrink: 0, position: 'relative' }}>
+                            <Box sx={{ position: 'relative', pt: showRulers ? '24px' : 0, pl: showRulers ? '24px' : 0 }}>
+                                {showRulers && (
+                                    <ReguaEditor
+                                        larguraMm={Number(config.width) || 100}
+                                        alturaMm={Number(config.height) || 150}
+                                        escala={ESCALA}
+                                        zoom={zoom}
+                                        cursorX={cursorCoords.x}
+                                        cursorY={cursorCoords.y}
+                                        tamanhoRegua={22}
+                                    />
+                                )}
 
-                                        {elements.filter(el => !el.oculto).map(el => {
-                                            const isSel = selectedIds.includes(el.id);
-                                            const podeRedimensionar = isSel && !isMulti && !el.locked;
-                                            let outline;
-                                            if (isSel) outline = el.locked ? `2px solid ${cores.alerta}` : (isMulti ? '1px dashed #00FF88' : '2px solid #00D4FF');
-                                            else if (el.apenasReferencia) outline = '1px dashed #FF0077';
-                                            return (
-                                                <Rnd
-                                                    key={el.id}
-                                                    className={`etq-el etq-id-${el.id}${el.locked ? ' etq-locked' : ''}`}
-                                                    scale={zoom}
-                                                    size={{ width: el.width, height: el.height }}
-                                                    position={{ x: el.x, y: el.y }}
-                                                    lockAspectRatio={Boolean(el.lockAspectRatio)}
-                                                    disableDragging={Boolean(el.locked)}
-                                                    enableResizing={podeRedimensionar}
-                                                    resizeHandleStyles={podeRedimensionar ? ALCAS_SIMPLES : undefined}
-                                                    bounds="parent"
-                                                    onDragStart={(e, d) => handleDragStart(e, d, el)}
-                                                    onDrag={(e, d) => handleDrag(e, d, el)}
-                                                    onDragStop={(e, d) => handleDragStop(e, d, el)}
-                                                    onResizeStop={(_e, _dir, ref, _delta, position) => {
-                                                        updateElement(el.id, {
-                                                            width: Math.round(parseFloat(ref.style.width)),
-                                                            height: Math.round(parseFloat(ref.style.height)),
-                                                            x: Math.round(position.x),
-                                                            y: Math.round(position.y)
-                                                        });
-                                                    }}
-                                                    style={{
-                                                        zIndex: el.zIndex || Z_BASE,
-                                                        outline,
-                                                        cursor: el.locked ? 'default' : 'move'
-                                                    }}
-                                                >
+                                <Box sx={{ width: canvasWidth * zoom, height: canvasHeight * zoom, position: 'relative' }}>
+                                    <Box sx={{ position: 'absolute', top: 0, left: 0, width: canvasWidth, height: canvasHeight, transform: `scale(${zoom})`, transformOrigin: '0 0' }}>
+                                        <Paper
+                                            ref={paperRef}
+                                            elevation={0}
+                                            sx={{
+                                                width: canvasWidth,
+                                                height: canvasHeight,
+                                                backgroundColor: config.corFundo || '#FFFFFF',
+                                                backgroundImage: 'none',
+                                                position: 'relative',
+                                                borderRadius: config.layout?.includes('cr80') ? '12px' : '4px',
+                                                boxShadow: '0 12px 40px rgba(0,0,0,0.8), 0 0 0 1px rgba(0, 212, 255, 0.25)',
+                                                '& .etq-el:hover': { outline: '1px solid rgba(0, 212, 255, 0.8)' }
+                                            }}
+                                        >
+                                            {elements.filter(el => !el.oculto).map(el => {
+                                                const isSel = selectedIds.includes(el.id);
+                                                const podeRedimensionar = isSel && !isMulti && !el.locked;
+                                                let outline;
+                                                if (isSel) outline = el.locked ? `2px solid ${cores.alerta}` : (isMulti ? '1px dashed #00FF88' : '2px solid #00D4FF');
+                                                else if (el.apenasReferencia) outline = '1px dashed #FF0077';
+
+                                                return (
+                                                    <Rnd
+                                                        key={el.id}
+                                                        className={`etq-el etq-id-${el.id}${el.locked ? ' etq-locked' : ''}`}
+                                                        scale={zoom}
+                                                        size={{ width: el.width, height: el.height }}
+                                                        position={{ x: el.x, y: el.y }}
+                                                        lockAspectRatio={Boolean(el.lockAspectRatio)}
+                                                        disableDragging={Boolean(el.locked)}
+                                                        enableResizing={podeRedimensionar}
+                                                        resizeHandleStyles={podeRedimensionar ? ALCAS_SIMPLES : undefined}
+                                                        bounds="parent"
+                                                        onDragStart={(e, d) => handleDragStart(e, d, el)}
+                                                        onDragStop={(e, d) => handleDragStop(e, d, el)}
+                                                        onResizeStop={(_e, _dir, ref, _delta, position) => {
+                                                            updateElement(el.id, {
+                                                                width: Math.round(parseFloat(ref.style.width)),
+                                                                height: Math.round(parseFloat(ref.style.height)),
+                                                                x: Math.round(position.x),
+                                                                y: Math.round(position.y)
+                                                            });
+                                                        }}
+                                                        style={{
+                                                            zIndex: isSel ? (Z_BASE + 900) : (el.zIndex || Z_BASE),
+                                                            outline,
+                                                            cursor: el.locked ? 'default' : 'move'
+                                                        }}
+                                                    >
+                                                        <Box
+                                                            sx={{
+                                                                width: '100%', height: '100%', overflow: 'hidden', pointerEvents: 'none',
+                                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                borderRadius: el.borderRadius && el.type !== 'circle' ? `${el.borderRadius}px` : 0,
+                                                                opacity: el.opacity ?? 1
+                                                            }}
+                                                        >
+                                                            <ElementoVisual el={el} dados={dadosVisualizacao} />
+                                                        </Box>
+                                                    </Rnd>
+                                                );
+                                            })}
+                                        </Paper>
+
+                                        {/* Sobreposição: Grade e Linhas Guias de Proporções Reais */}
+                                        <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5000 }}>
+                                            {showGrid && (
+                                                <Box sx={{
+                                                    position: 'absolute', inset: 0,
+                                                    pointerEvents: 'none',
+                                                    backgroundImage: `
+                                                        linear-gradient(to right, ${corGrade(gridIntensity)} 1px, transparent 1px),
+                                                        linear-gradient(to bottom, ${corGrade(gridIntensity)} 1px, transparent 1px),
+                                                        linear-gradient(to right, ${corGrade(gridIntensity * 0.45)} 1px, transparent 1px),
+                                                        linear-gradient(to bottom, ${corGrade(gridIntensity * 0.45)} 1px, transparent 1px)
+                                                    `,
+                                                    backgroundSize: `${passoMaior}px ${passoMaior}px, ${passoMaior}px ${passoMaior}px, ${gridSize}px ${gridSize}px, ${gridSize}px ${gridSize}px`
+                                                }} />
+                                            )}
+
+                                            {/* Linhas guias gráficas de proporção e margem de segurança */}
+                                            {showGuides && (
+                                                <>
                                                     <Box sx={{
-                                                        width: '100%', height: '100%', overflow: 'hidden', pointerEvents: 'none',
-                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                        borderRadius: el.borderRadius && el.type !== 'circle' ? `${el.borderRadius}px` : 0,
-                                                        opacity: el.opacity ?? 1
-                                                    }}>
-                                                        {renderConteudo(el)}
-                                                    </Box>
-                                                </Rnd>
-                                            );
-                                        })}
-                                    </Paper>
+                                                        position: 'absolute',
+                                                        top: 9, left: 9, right: 9, bottom: 9,
+                                                        border: '1px dashed rgba(0, 212, 255, 0.4)',
+                                                        pointerEvents: 'none'
+                                                    }} />
+                                                    <Box sx={{ position: 'absolute', top: 0, bottom: 0, left: canvasWidth / 2, borderLeft: '1px dashed rgba(255, 0, 119, 0.45)' }} />
+                                                    <Box sx={{ position: 'absolute', left: 0, right: 0, top: canvasHeight / 2, borderTop: '1px dashed rgba(255, 0, 119, 0.45)' }} />
+                                                </>
+                                            )}
 
-                                    {/* Camada de sobreposição: grade, guias e alças do grupo (acima de tudo, sem cortar nas bordas) */}
-                                    <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5000 }}>
-                                        {showGrid && (
-                                            <Box sx={{
-                                                position: 'absolute', inset: 0,
-                                                backgroundImage: `
-                                                    linear-gradient(to right, ${corGrade(gridIntensity)} 1px, transparent 1px),
-                                                    linear-gradient(to bottom, ${corGrade(gridIntensity)} 1px, transparent 1px),
-                                                    linear-gradient(to right, ${corGrade(gridIntensity * 0.45)} 1px, transparent 1px),
-                                                    linear-gradient(to bottom, ${corGrade(gridIntensity * 0.45)} 1px, transparent 1px)
-                                                `,
-                                                backgroundSize: `${passoMaior}px ${passoMaior}px, ${passoMaior}px ${passoMaior}px, ${gridSize}px ${gridSize}px, ${gridSize}px ${gridSize}px`
-                                            }}>
-                                                {/* Eixos centrais */}
-                                                <Box sx={{ position: 'absolute', top: 0, bottom: 0, left: canvasWidth / 2, borderLeft: `1px dashed ${corGrade(Math.min(1, gridIntensity + 0.25))}` }} />
-                                                <Box sx={{ position: 'absolute', left: 0, right: 0, top: canvasHeight / 2, borderTop: `1px dashed ${corGrade(Math.min(1, gridIntensity + 0.25))}` }} />
-                                            </Box>
-                                        )}
+                                            {smartGuides.vertical !== null && (
+                                                <Box sx={{ position: 'absolute', top: -2000, bottom: -2000, left: smartGuides.vertical, width: '1.5px', bgcolor: '#FF0077', boxShadow: '0 0 6px #FF0077' }} />
+                                            )}
+                                            {smartGuides.horizontal !== null && (
+                                                <Box sx={{ position: 'absolute', left: -2000, right: -2000, top: smartGuides.horizontal, height: '1.5px', bgcolor: '#FF0077', boxShadow: '0 0 6px #FF0077' }} />
+                                            )}
 
-                                        {smartGuides.vertical !== null && (
-                                            <Box sx={{ position: 'absolute', top: -2000, bottom: -2000, left: smartGuides.vertical, width: '1.5px', bgcolor: '#FF0077', boxShadow: '0 0 6px #FF0077' }} />
-                                        )}
-                                        {smartGuides.horizontal !== null && (
-                                            <Box sx={{ position: 'absolute', left: -2000, right: -2000, top: smartGuides.horizontal, height: '1.5px', bgcolor: '#FF0077', boxShadow: '0 0 6px #FF0077' }} />
-                                        )}
-
-                                        {caixaSelecao && (
-                                            <Rnd
-                                                className="etq-group"
-                                                scale={zoom}
-                                                position={{ x: caixaSelecao.x, y: caixaSelecao.y }}
-                                                size={{ width: caixaSelecao.width, height: caixaSelecao.height }}
-                                                disableDragging
-                                                lockAspectRatio={escalaProporcional}
-                                                resizeHandleStyles={ALCAS_GRUPO}
-                                                onResizeStart={handleGrupoResizeStart}
-                                                onResize={(_e, _d, ref, _delta, pos) => aplicarEscalaGrupo(ref, pos, false)}
-                                                onResizeStop={(_e, _d, ref, _delta, pos) => aplicarEscalaGrupo(ref, pos, true)}
-                                                style={{ pointerEvents: 'none', outline: '1.5px solid #00FF88', boxShadow: '0 0 12px rgba(0, 255, 136, 0.35)' }}
-                                            />
-                                        )}
+                                            {caixaSelecao && (
+                                                <Rnd
+                                                    className="etq-group"
+                                                    scale={zoom}
+                                                    position={{ x: caixaSelecao.x, y: caixaSelecao.y }}
+                                                    size={{ width: caixaSelecao.width, height: caixaSelecao.height }}
+                                                    disableDragging
+                                                    lockAspectRatio={escalaProporcional}
+                                                    resizeHandleStyles={ALCAS_GRUPO}
+                                                    onResizeStart={handleGrupoResizeStart}
+                                                    onResize={(_e, _d, ref, _delta, pos) => aplicarEscalaGrupo(ref, pos, false)}
+                                                    onResizeStop={(_e, _d, ref, _delta, pos) => aplicarEscalaGrupo(ref, pos, true)}
+                                                    style={{ pointerEvents: 'none', outline: '1.5px solid #00FF88', boxShadow: '0 0 12px rgba(0, 255, 136, 0.35)' }}
+                                                />
+                                            )}
+                                        </Box>
                                     </Box>
                                 </Box>
                             </Box>
@@ -1723,6 +1781,166 @@ const ConfigEtiquetas = () => {
                     </Box>
                 </GlassCard>
             </Box>
+
+            {/* Modal de Modelos Pré-Prontos */}
+            <Dialog
+                open={modalModelosAberto}
+                onClose={() => setModalModelosAberto(false)}
+                maxWidth="md"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        bgcolor: cores.superficie,
+                        border: '1px solid rgba(0, 212, 255, 0.3)',
+                        borderRadius: 2
+                    }
+                }}
+            >
+                <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: `1px solid ${cores.borda}` }}>
+                    <TemplateIcon sx={{ color: cores.primaria }} />
+                    <Box>
+                        <Typography variant="h6" fontWeight={700} color={cores.textoForte}>
+                            Galeria de Modelos de Crachás e Credenciais
+                        </Typography>
+                        <Typography variant="caption" color={cores.textoSecundario}>
+                            Escolha um modelo do sistema ou carregue um de seus layouts salvos.
+                        </Typography>
+                    </Box>
+                </DialogTitle>
+                <DialogContent sx={{ py: 3 }}>
+                    {/* Seção Modelos Personalizados */}
+                    {modelosCustomizados.length > 0 && (
+                        <Box sx={{ mb: 3 }}>
+                            <Secao sx={{ mb: 1.5 }}>Meus Modelos Salvos ({modelosCustomizados.length})</Secao>
+                            <Grid container spacing={2}>
+                                {modelosCustomizados.map(m => (
+                                    <Grid item xs={12} sm={6} md={4} key={m.id}>
+                                        <Card sx={{
+                                            bgcolor: 'rgba(0, 255, 136, 0.05)',
+                                            border: '1px solid rgba(0, 255, 136, 0.3)',
+                                            borderRadius: '8px',
+                                            transition: '0.2s',
+                                            position: 'relative',
+                                            '&:hover': { borderColor: cores.sucesso, transform: 'translateY(-2px)' }
+                                        }}>
+                                            <CardActionArea onClick={() => aplicarModelo(m)} sx={{ p: 2 }}>
+                                                <CardContent sx={{ p: 0 }}>
+                                                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                                                        <Chip size="small" label="Personalizado" sx={{ bgcolor: 'rgba(0, 255, 136, 0.15)', color: cores.sucesso, fontWeight: 700 }} />
+                                                        <Tooltip title="Excluir modelo">
+                                                            <IconButton size="small" onClick={(e) => handleExcluirModeloCustom(m.id, e)} sx={{ color: cores.erro, p: 0.5 }}>
+                                                                <DeleteIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    </Stack>
+                                                    <Typography variant="subtitle1" fontWeight={700} color={cores.textoForte}>
+                                                        {m.nome}
+                                                    </Typography>
+                                                    <Typography variant="body2" color={cores.textoSecundario} sx={{ fontSize: '0.8rem', mt: 0.5 }}>
+                                                        {m.descricao || `${m.papel_config.width} × ${m.papel_config.height} mm`}
+                                                    </Typography>
+                                                </CardContent>
+                                            </CardActionArea>
+                                        </Card>
+                                    </Grid>
+                                ))}
+                            </Grid>
+                            <Divider sx={{ my: 3, borderColor: cores.borda }} />
+                        </Box>
+                    )}
+
+                    {/* Modelos Padrão do Sistema */}
+                    <Secao sx={{ mb: 1.5 }}>Modelos Padrão do Sistema</Secao>
+                    <Grid container spacing={2}>
+                        {MODELOS_SISTEMA.map(m => (
+                            <Grid item xs={12} sm={6} md={4} key={m.id}>
+                                <Card sx={{
+                                    bgcolor: 'rgba(0,0,0,0.3)',
+                                    border: `1px solid ${cores.borda}`,
+                                    borderRadius: '8px',
+                                    transition: '0.2s',
+                                    '&:hover': { borderColor: cores.primaria, transform: 'translateY(-2px)' }
+                                }}>
+                                    <CardActionArea onClick={() => aplicarModelo(m)} sx={{ p: 2 }}>
+                                        <CardContent sx={{ p: 0 }}>
+                                            <Chip size="small" label={`${m.papel_config.width} × ${m.papel_config.height} mm`} sx={{ bgcolor: 'rgba(0, 212, 255, 0.15)', color: cores.primaria, fontWeight: 700, mb: 1.5 }} />
+                                            <Typography variant="subtitle1" fontWeight={700} color={cores.textoForte} gutterBottom>
+                                                {m.nome}
+                                            </Typography>
+                                            <Typography variant="body2" color={cores.textoSecundario} sx={{ fontSize: '0.8rem', lineHeight: 1.4 }}>
+                                                {m.descricao}
+                                            </Typography>
+                                        </CardContent>
+                                    </CardActionArea>
+                                </Card>
+                            </Grid>
+                        ))}
+                    </Grid>
+                </DialogContent>
+                <DialogActions sx={{ p: 2, borderTop: `1px solid ${cores.borda}` }}>
+                    <Button onClick={() => setModalModelosAberto(false)} sx={{ color: cores.textoSecundario }}>
+                        Fechar
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Modal Salvar como Modelo Personalizado */}
+            <Dialog
+                open={modalSalvarModeloAberto}
+                onClose={() => setModalSalvarModeloAberto(false)}
+                maxWidth="xs"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        bgcolor: cores.superficie,
+                        border: '1px solid rgba(0, 255, 136, 0.4)',
+                        borderRadius: 2
+                    }
+                }}
+            >
+                <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, borderBottom: `1px solid ${cores.borda}` }}>
+                    <BookmarkAddIcon sx={{ color: cores.sucesso }} />
+                    <Typography variant="h6" fontWeight={700} color={cores.textoForte}>
+                        Salvar como Modelo Pronto
+                    </Typography>
+                </DialogTitle>
+                <DialogContent sx={{ py: 2.5 }}>
+                    <Stack spacing={2}>
+                        <Typography variant="body2" color={cores.textoSecundario}>
+                            Este modelo ficará disponível na sua galeria para você criar crachás e etiquetas rapidamente a qualquer momento.
+                        </Typography>
+                        <TextField
+                            label="Nome do Modelo"
+                            fullWidth
+                            size="small"
+                            placeholder="Ex: Meu Crachá Padrão Empresa"
+                            value={nomeNovoModelo}
+                            onChange={(e) => setNomeNovoModelo(e.target.value)}
+                            autoFocus
+                        />
+                        <TextField
+                            label="Descrição (opcional)"
+                            fullWidth
+                            size="small"
+                            placeholder="Ex: Modelo com tarja superior e QR code para eventos 2026"
+                            value={descNovoModelo}
+                            onChange={(e) => setDescNovoModelo(e.target.value)}
+                        />
+                    </Stack>
+                </DialogContent>
+                <DialogActions sx={{ p: 2, borderTop: `1px solid ${cores.borda}`, gap: 1 }}>
+                    <Button onClick={() => setModalSalvarModeloAberto(false)} sx={{ color: cores.textoSecundario }}>
+                        Cancelar
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleSalvarComoModelo}
+                        sx={{ bgcolor: cores.sucesso, color: '#000', fontWeight: 700, '&:hover': { bgcolor: '#00cc6a' } }}
+                    >
+                        Salvar Modelo
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

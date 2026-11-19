@@ -49,7 +49,8 @@ import {
     Place as AreaIcon,
     QrCode2 as PulseiraIcon,
     Face as FaceIcon,
-    SwapHoriz as SwapHorizIcon
+    SwapHoriz as SwapHorizIcon,
+    Engineering as EngineeringIcon
 } from '@mui/icons-material';
 import { Collapse } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
@@ -308,6 +309,16 @@ const Sidebar = ({ open, onClose }) => {
             },
             roles: ['admin_master', 'operador']
         },
+        {
+            text: t('sidebar.producao', { defaultValue: 'Produção' }),
+            icon: <EngineeringIcon />,
+            menuKey: 'producao',
+            get path() {
+                const eid = localStorage.getItem('active_evento_id');
+                return eid ? `/producao?evento_id=${eid}` : '/producao';
+            },
+            roles: ['admin_master', 'operador']
+        },
 
         { divider: true },
         { 
@@ -384,7 +395,10 @@ const Sidebar = ({ open, onClose }) => {
         });
 
     const renderMenuItem = (item) => {
-        const isActive = location.pathname === item.path;
+        const basePath = (item.path || '').split('?')[0];
+        const isActive = basePath === '/producao'
+            ? location.pathname.startsWith('/producao')
+            : location.pathname === item.path;
         const hasChildren = item.children && item.children.length > 0;
         const itemKey = item.menuKey || item.path || item.text;
         const isOpen = openSubMenus[itemKey];

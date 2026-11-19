@@ -24,6 +24,7 @@ import { useSystemAlerts } from './hooks/useSystemAlerts';
 // Pages (Lazy Loaded for Bundle Splitting)
 const Login = lazy(() => import('./pages/Login'));
 const PortalCadastro = lazy(() => import('./pages/PortalCadastro'));
+const PortalProdutor = lazy(() => import('./pages/PortalProdutor'));
 const DefinirSenha = lazy(() => import('./pages/DefinirSenha'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const CftvWall = lazy(() => import('./pages/CftvWall'));
@@ -35,6 +36,7 @@ const Checkin = lazy(() => import('./pages/Checkin'));
 const Checkout = lazy(() => import('./pages/Checkout'));
 const Fiscalizacao = lazy(() => import('./pages/Fiscalizacao'));
 const Monitor = lazy(() => import('./pages/Monitor'));
+const Producao = lazy(() => import('./pages/Producao'));
 const Eventos = lazy(() => import('./pages/Eventos'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Veiculos = lazy(() => import('./pages/Veiculos'));
@@ -169,6 +171,7 @@ const AppContent = () => {
           <Route path="/checkout" element={<ProtectedRoute modulo="checkout"><Checkout /></ProtectedRoute>} />
           <Route path="/fiscalizacao" element={<ProtectedRoute modulo="fiscalizacao"><Fiscalizacao /></ProtectedRoute>} />
           <Route path="/monitor" element={<ProtectedRoute modulo="monitoramento"><Monitor /></ProtectedRoute>} />
+          <Route path="/producao/*" element={<ProtectedRoute modulo="producao"><Producao /></ProtectedRoute>} />
           <Route path="/usuarios" element={<ProtectedRoute role="admin_master"><Usuarios /></ProtectedRoute>} />
           <Route path="/audit-logs" element={<ProtectedRoute role="admin_master"><AuditoriaELogs aba="acoes" /></ProtectedRoute>} />
           <Route path="/configuracoes" element={<ProtectedRoute role="admin_master"><Configuracoes /></ProtectedRoute>} />
@@ -211,6 +214,29 @@ const AppContent = () => {
   );
 };
 
+const RootRouter = () => {
+  const location = useLocation();
+  const ehPortalProdutor = location.pathname === '/portal-produtor' || location.pathname.startsWith('/portal-produtor/');
+
+  if (ehPortalProdutor) {
+    return (
+      <ConfirmacaoProvider>
+        <Suspense fallback={<LoadingOverlay />}>
+          <PortalProdutor />
+        </Suspense>
+      </ConfirmacaoProvider>
+    );
+  }
+
+  return (
+    <AuthProvider>
+      <ConfirmacaoProvider>
+        <AppContent />
+      </ConfirmacaoProvider>
+    </AuthProvider>
+  );
+};
+
 function App() {
   return (
     <ThemeProvider theme={theme}>
@@ -218,11 +244,7 @@ function App() {
       <SnackbarProvider maxSnack={3}>
         <GlobalErrorBoundary>
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-            <AuthProvider>
-              <ConfirmacaoProvider>
-                <AppContent />
-              </ConfirmacaoProvider>
-            </AuthProvider>
+            <RootRouter />
           </BrowserRouter>
         </GlobalErrorBoundary>
       </SnackbarProvider>

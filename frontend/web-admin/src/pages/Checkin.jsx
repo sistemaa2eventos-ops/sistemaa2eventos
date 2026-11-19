@@ -20,10 +20,13 @@ import PessoaCardDialog from '../components/credenciamento/PessoaCardDialog';
 import PreviewEtiquetaDialog from '../components/credenciamento/PreviewEtiquetaDialog';
 import RecentAccessList from '../components/credenciamento/RecentAccessList';
 import { useCheckin } from '../hooks/useCheckin';
+import { useAuth } from '../contexts/AuthContext';
 import { carregarConfigEtiqueta } from '../services/etiquetaService';
 import CorrigirTurnoDialog from '../components/checkin/CorrigirTurnoDialog';
+import AvisoEntradaBloqueada from '../components/checkin/AvisoEntradaBloqueada';
 import AcoesPulseiraCheckin from '../components/checkin/AcoesPulseiraCheckin';
 import RecusadosSincronizacao from '../components/checkin/RecusadosSincronizacao';
+import PassagensRecusadas from '../components/checkin/PassagensRecusadas';
 import RelogioSincronizado from '../components/common/RelogioSincronizado';
 
 const FeedbackOverlay = styled(Box, { shouldForwardProp: (p) => p !== 'status' })(({ status }) => ({
@@ -33,6 +36,9 @@ const FeedbackOverlay = styled(Box, { shouldForwardProp: (p) => p !== 'status' }
     justifyContent: 'center', borderRadius: 12, border: status === 'sucesso' ? '4px solid #00FF88' : '4px solid #FF3366',
     backdropFilter: 'blur(8px)', animation: 'fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
 }));
+
+// Quem pode liberar a reentrada de quem saiu da área que controla entrada (o backend confere de novo)
+const PERFIS_LIBERAM_REENTRADA = ['admin_master', 'master', 'admin', 'supervisor', 'operador'];
 
 const NumeroTurno = ({ rotulo, valor, cor, dica }) => {
   const conteudo = (
@@ -65,7 +71,11 @@ const Checkin = () => {
     desvincularLeitor,
     carregarDispositivosDisponiveis,
     turnoAnterior, confirmarTurnoAnterior, cancelarTurnoAnterior,
+    // Entrada bloqueada numa área que controla entrada (409 ENTRADA_BLOQUEADA)
+    bloqueioEntrada, liberarReentrada, liberandoReentrada, registrarSaidaFicha, cancelarBloqueioEntrada,
   } = useCheckin(undefined, { logsTipo: 'checkin' });
+  const { user } = useAuth();
+  const podeLiberarReentrada = PERFIS_LIBERAM_REENTRADA.includes(user?.nivel_acesso);
 
 
   const [cardLog, setCardLog] = useState(null);
@@ -172,6 +182,17 @@ const Checkin = () => {
           onToggleImprimir={handleToggleImprimir}
       />
 
+      {/* Entrada pelo rosto bloqueada (área de portão): aviso sem abrir a ficha */}
+      {!selectedPessoa && bloqueioEntrada && (
+          <AvisoEntradaBloqueada
+              bloqueio={bloqueioEntrada}
+              podeLiberar={podeLiberarReentrada}
+              liberando={liberandoReentrada}
+              onLiberar={liberarReentrada}
+              onFechar={cancelarBloqueioEntrada}
+          />
+      )}
+
       <Grid container spacing={{ xs: 1.5, sm: 2 }} sx={{ flex: 1, minHeight: 0 }}>
 
         {/* OPERAÇÃO: campo único unificado (leitor QR/barras, pulseira, CPF e busca por nome) */}
@@ -261,6 +282,9 @@ const Checkin = () => {
                     )}
                 </Box>
 
+                {/* Passagens que o servidor recusou (pendentes neste evento): somem quando resolvidas */}
+                <PassagensRecusadas eventoId={eventoId} />
+
                 {/* Acessos feitos sem internet que o servidor recusou: ficam até o operador dispensar */}
                 <RecusadosSincronizacao />
 
@@ -330,6 +354,11 @@ const Checkin = () => {
           eventAreas={eventAreas}
           loading={manualSaving || loading}
           permitirCamera
+          bloqueioEntrada={selectedPessoa ? bloqueioEntrada : null}
+          onLiberarReentrada={liberarReentrada}
+          liberandoReentrada={liberandoReentrada}
+          podeLiberarReentrada={podeLiberarReentrada}
+          onRegistrarSaida={registrarSaidaFicha}
       />
 
       <LeitorQrCamera

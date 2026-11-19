@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, Box, Typography, Grid, Stack,
     Chip, CircularProgress, IconButton, FormControl,
-    InputLabel, Select, MenuItem, Tooltip, Divider, Button
+    InputLabel, Select, MenuItem, Tooltip, Divider, Button, Alert
 } from '@mui/material';
 import {
     Badge as BadgeIcon,
@@ -14,7 +14,8 @@ import {
     Cancel as CancelIcon,
     Description as DocIcon,
     LockOpen as LiberarIcon,
-    AssignmentReturn as DevolverIcon
+    AssignmentReturn as DevolverIcon,
+    Logout as SaidaIcon
 } from '@mui/icons-material';
 import GlassCard from '../common/GlassCard';
 import NeonButton from '../common/NeonButton';
@@ -37,7 +38,15 @@ export const ModalCredenciamento = ({
     eventAreas: _eventAreas = [],
     loading = false,
     // Mostra o botão que lê o número da pulseira pela câmera do aparelho
-    permitirCamera = false
+    permitirCamera = false,
+    // Entrada bloqueada (409 ENTRADA_BLOQUEADA) para esta pessoa: { mensagem, liberavel, erroLiberacao }
+    bloqueioEntrada = null,
+    onLiberarReentrada,
+    liberandoReentrada = false,
+    // Quem controla a entrada (admin, supervisor, operador de check-in) vê o botão de liberar
+    podeLiberarReentrada = false,
+    // Registra a saída de quem está dentro (aviso ENTRADA_BLOQUEADA sem liberação): retorna { success, error }
+    onRegistrarSaida = null
 }) => {
     const [numeroPulseira, setNumeroPulseira] = useState('');
     const [ultimoCodigoCamera, setUltimoCodigoCamera] = useState('');
@@ -54,6 +63,11 @@ export const ModalCredenciamento = ({
     // Situação documental (pendências por função) e liberação manual do turno
     const [situacao, setSituacao] = useState(null);
     const [liberando, setLiberando] = useState(false);
+
+    // Saída registrada nesta ficha (pessoa que estava dentro): troca o aviso por confirmação
+    const [saidaRegistrada, setSaidaRegistrada] = useState(null); // { pessoaId, offline }
+    const [registrandoSaida, setRegistrandoSaida] = useState(false);
+    const [erroSaida, setErroSaida] = useState('');
 
     const carregarSituacao = async () => {
         if (!pessoa?.id) return;
@@ -79,6 +93,19 @@ export const ModalCredenciamento = ({
         }
     };
 
+    const handleRegistrarSaida = async () => {
+        if (!pessoa?.id || !onRegistrarSaida || registrandoSaida) return;
+        setRegistrandoSaida(true);
+        setErroSaida('');
+        try {
+            const r = await onRegistrarSaida(pessoa.id, pessoa.numero_pulseira);
+            if (r?.success) setSaidaRegistrada({ pessoaId: pessoa.id, offline: !!r.offline });
+            else if (!r?.turnoAnterior) setErroSaida(r?.error || 'Não foi possível registrar a saída.');
+        } finally {
+            setRegistrandoSaida(false);
+        }
+    };
+
     const handleCarregarDocs = async () => {
         if (!pessoa?.id) return;
         try {
@@ -101,6 +128,8 @@ export const ModalCredenciamento = ({
             setNumeroPulseira(pessoa.numero_pulseira || '');
             setErroValidacao('');
             setSituacao(null);
+            setSaidaRegistrada(null);
+            setErroSaida('');
             carregarSituacao();
             
             // Auto-selecionar o tipo de pulseira se a pessoa já tiver ou se houver padrão
@@ -237,6 +266,8 @@ export const ModalCredenciamento = ({
         }
     };
 
+    // Quem teve a saída registrada nesta ficha aparece como fora até a ficha ser reaberta
+    const dentro = pessoa.status_acesso === 'checkin_feito' && saidaRegistrada?.pessoaId !== pessoa.id;
     const statusDocs = situacao?.situacao_documental || pessoa.status_documentos || 'pendente';
     const infoDocs = SITUACAO_DOCUMENTAL[statusDocs] || SITUACAO_DOCUMENTAL.pendente;
     const liberadoAte = situacao?.liberacao_ativa ? new Date(situacao.liberacao_manual_ate) : null;
@@ -278,6 +309,76 @@ export const ModalCredenciamento = ({
                         </IconButton>
                     </Box>
 
+                    {/* Entrada bloqueada: só a reentrada liberável tem botão; "dentro" é só aviso */}
+                    {bloqueioEntrada && (
+                        <Alert
+                            severity="warning"
+                            variant="outlined"
+                            sx={{ mb: { xs: 2, sm: 3 }, color: '#FFB800', borderColor: 'rgba(255, 184, 0, 0.5)', bgcolor: 'rgba(255, 184, 0, 0.06)', '& .MuiAlert-icon': { color: '#FFB800' } }}
+                        >
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                                {bloqueioEntrada.liberavel
+                                    ? (bloqueioEntrada.mensagem || 'Entrada bloqueada nesta área: a reentrada precisa de liberação do controlador.')
+                                    : 'Pessoa já está dentro'}
+                            </Typography>
+                            {bloqueioEntrada.liberavel && podeLiberarReentrada && (
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={onLiberarReentrada}
+                                    disabled={liberandoReentrada}
+                                    startIcon={liberandoReentrada ? <CircularProgress size={14} /> : <LiberarIcon sx={{ fontSize: 16 }} />}
+                                    sx={{ mt: 1, minHeight: 36, fontSize: '0.8rem', color: '#FFB800', borderColor: 'rgba(255, 184, 0, 0.6)', textTransform: 'none', borderRadius: 1.5 }}
+                                >
+                                    {liberandoReentrada ? 'Liberando...' : 'Liberar reentrada'}
+                                </Button>
+                            )}
+                            {bloqueioEntrada.erroLiberacao && (
+                                <Typography variant="caption" sx={{ display: 'block', mt: 1, color: '#FF3366', fontWeight: 700 }}>
+                                    {bloqueioEntrada.erroLiberacao}
+                                </Typography>
+                            )}
+                            {!bloqueioEntrada.liberavel && onRegistrarSaida && (
+                                pessoa.numero_pulseira ? (
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        onClick={handleRegistrarSaida}
+                                        disabled={registrandoSaida || loading}
+                                        startIcon={registrandoSaida ? <CircularProgress size={14} /> : <SaidaIcon sx={{ fontSize: 16 }} />}
+                                        sx={{ mt: 1, minHeight: 36, fontSize: '0.8rem', color: '#FFB800', borderColor: 'rgba(255, 184, 0, 0.6)', textTransform: 'none', borderRadius: 1.5 }}
+                                    >
+                                        {registrandoSaida ? 'Registrando saída...' : 'Registrar saída'}
+                                    </Button>
+                                ) : (
+                                    <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'rgba(255,255,255,0.75)' }}>
+                                        Sem pulseira em uso: a saída só é registrada pela leitura da pulseira.
+                                    </Typography>
+                                )
+                            )}
+                            {erroSaida && (
+                                <Typography variant="caption" sx={{ display: 'block', mt: 1, color: '#FF3366', fontWeight: 700 }}>
+                                    {erroSaida}
+                                </Typography>
+                            )}
+                        </Alert>
+                    )}
+
+                    {saidaRegistrada?.pessoaId === pessoa.id && (
+                        <Alert
+                            severity="success"
+                            variant="outlined"
+                            sx={{ mb: { xs: 2, sm: 3 }, color: '#00FF88', borderColor: 'rgba(0, 255, 136, 0.5)', bgcolor: 'rgba(0, 255, 136, 0.06)', '& .MuiAlert-icon': { color: '#00FF88' } }}
+                        >
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                                {saidaRegistrada.offline
+                                    ? 'Saída guardada neste aparelho: será enviada quando a conexão voltar.'
+                                    : 'Saída registrada.'}{' '}
+                                Pode confirmar a entrada de novo.
+                            </Typography>
+                        </Alert>
+                    )}
+
                     {/* Conteúdo Principal */}
                     <Grid container spacing={{ xs: 2, sm: 3.5 }} alignItems="flex-start">
                         {/* Coluna da Foto & Status */}
@@ -296,8 +397,8 @@ export const ModalCredenciamento = ({
 
                             <Stack spacing={1} alignItems="center">
                                 <Chip
-                                    label={pessoa.status_acesso === 'checkin_feito' ? 'DENTRO DO EVENTO' : 'AGUARDANDO CREDENCIAMENTO'}
-                                    color={pessoa.status_acesso === 'checkin_feito' ? 'success' : 'default'}
+                                    label={dentro ? 'DENTRO DO EVENTO' : 'AGUARDANDO CREDENCIAMENTO'}
+                                    color={dentro ? 'success' : 'default'}
                                     variant="outlined"
                                     sx={{ fontWeight: 700, fontSize: '0.75rem', letterSpacing: '0.5px' }}
                                 />

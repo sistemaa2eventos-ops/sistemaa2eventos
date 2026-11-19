@@ -15,6 +15,7 @@ export const MODULE_ROUTES = [
   { modulo: 'relatorios', path: '/reports', label: 'Relatórios' },
   { modulo: 'veiculos', path: '/veiculos', label: 'Veículos LPR' },
   { modulo: 'auditoria_documentos', path: '/auditoria', label: 'Auditoria' },
+  { modulo: 'producao', path: '/producao', label: 'Produção' },
   { modulo: 'dashboard', path: '/', label: 'Dashboard' }
 ];
 

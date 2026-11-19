@@ -425,15 +425,12 @@ class WatchlistController {
                 .select('id, nome_completo, cpf, funcao, numero_pulseira, foto_url, status_acesso, empresas(id, nome)')
                 .eq('evento_id', evento_id);
 
+            // Alvo casa com a pessoa só pelo CPF (nome gera homônimo). Sem CPF no alvo, não aparece como presente.
             const pessoaMapByCpf = new Map();
-            const pessoaMapByName = new Map();
             (pessoasEvent || []).forEach(p => {
                 if (p.cpf) {
                     const limpo = p.cpf.replace(/\D/g, '');
                     pessoaMapByCpf.set(limpo, p);
-                }
-                if (p.nome_completo) {
-                    pessoaMapByName.set(p.nome_completo.toLowerCase().trim(), p);
                 }
             });
 
@@ -471,7 +468,8 @@ class WatchlistController {
 
             // 4. Montar a lista enriquecida
             const result = watchItems.map(w => {
-                const p = pessoaMapByCpf.get(w.cpf) || pessoaMapByName.get((w.nome || '').toLowerCase().trim());
+                const cpfAlvo = String(w.cpf || '').replace(/\D/g, '');
+                const p = cpfAlvo ? pessoaMapByCpf.get(cpfAlvo) : undefined;
                 const logData = p ? logsMap.get(p.id) : null;
                 const estaPresente = logData ? (logData.ultimo_tipo === 'checkin') : false;
 

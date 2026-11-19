@@ -7,6 +7,19 @@ import { entrarTelaCheia, sairTelaCheia, ouvirTelaCheia } from '../utils/telaChe
 import { obterAudioContext } from '../utils/alertSound';
 import { imprimirSeAtivo } from '../services/etiquetaService';
 
+// Aviso de entrada bloqueada pelo rosto (sem ficha): tempo na tela
+const BLOQUEIO_VISIVEL_MS = 30000;
+// Mesma pessoa reconhecida de novo dentro deste tempo não registra outra entrada pelo rosto
+const ROSTO_REPETIDO_MS = 20000;
+// Pulseira lida na ficha que não é desta pessoa: o servidor recusa (409) e nada é registrado
+const CODIGO_PULSEIRA_OUTRA = 'PULSEIRA_DE_OUTRA_PESSOA';
+const MSG_PULSEIRA_OUTRA = 'Esta pulseira é de outra pessoa, não desta. Nada foi registrado.';
+const ehPulseiraDeOutra = (error) => {
+    const dados = error?.response?.data;
+    return error?.response?.status === 409
+        && (dados?.codigo === CODIGO_PULSEIRA_OUTRA || dados?.details?.codigo === CODIGO_PULSEIRA_OUTRA);
+};
+
 /**
  * useCheckin: Hook de controle para a operação de recepção (NZT).
  * Modificado para focar em Checkout Manual, QR Code e Pulseiras (Barcode).
@@ -21,6 +34,13 @@ export const useCheckin = (defaultMode, options = {}) => {
     const [checkinResult, setCheckinResult] = useState(null); // 'sucesso' | 'negado' | null
     // Saída de quem entrou num dia anterior: o servidor pede confirmação e o horário real
     const [turnoAnterior, setTurnoAnterior] = useState(null);
+    // Entrada bloqueada (409 ENTRADA_BLOQUEADA): { pessoaId, nome, mensagem, liberavel, etapa, repetir, erroLiberacao, token }
+    const [bloqueioEntrada, setBloqueioEntrada] = useState(null);
+    const [liberandoReentrada, setLiberandoReentrada] = useState(false);
+    // Aviso de entrada pelo rosto (sem ficha) some sozinho depois de um tempo; o da ficha fica
+    const bloqueioTimerRef = useRef(null);
+    // Último registro de entrada pelo rosto por pessoa: a câmera/leitor repete o reconhecimento
+    const rostoEntradaRef = useRef(new Map());
     const inicioAtendimentoRef = useRef(null);
     const [resultMessage, setResultMessage] = useState('');
     const [loading, setLoading] = useState(false);
@@ -212,6 +232,57 @@ export const useCheckin = (defaultMode, options = {}) => {
         return true;
     };
 
+    // 409 ENTRADA_BLOQUEADA: guarda o aviso (e a tentativa a repetir depois da liberação).
+    // temporario: aviso de entrada pelo rosto, sem ficha aberta; some sozinho depois de BLOQUEIO_VISIVEL_MS
+    const pedeEntradaBloqueada = (error, { pessoaId, nome = null, repetir, temporario = false }) => {
+        const dados = error?.response?.status === 409 ? error.response.data : null;
+        if (dados?.codigo !== 'ENTRADA_BLOQUEADA') return false;
+        clearTimeout(bloqueioTimerRef.current);
+        const token = {};
+        setBloqueioEntrada({
+            pessoaId,
+            nome,
+            mensagem: dados.error || '',
+            liberavel: dados.liberavel === true,
+            etapa: dados.etapa ?? null,
+            repetir,
+            erroLiberacao: null,
+            token
+        });
+        if (temporario) {
+            bloqueioTimerRef.current = setTimeout(() => {
+                setBloqueioEntrada(atual => (atual?.token === token ? null : atual));
+            }, BLOQUEIO_VISIVEL_MS);
+        }
+        return true;
+    };
+
+    const cancelarBloqueioEntrada = () => {
+        clearTimeout(bloqueioTimerRef.current);
+        setBloqueioEntrada(null);
+    };
+
+    // Controlador libera a reentrada e a entrada é tentada de novo uma vez (sem loop)
+    const liberarReentrada = async () => {
+        const bloqueio = bloqueioEntrada;
+        if (!bloqueio?.liberavel || liberandoReentrada) return;
+        try {
+            setLiberandoReentrada(true);
+            const corpo = { pessoa_id: bloqueio.pessoaId, area_id: areaId || null };
+            if (bloqueio.etapa) corpo.etapa = bloqueio.etapa;
+            await api.post('/checkin/liberar-reentrada', corpo);
+        } catch (error) {
+            const erro = error.response?.data?.error || 'Não foi possível liberar a reentrada.';
+            setBloqueioEntrada(atual => (atual ? { ...atual, erroLiberacao: erro } : atual));
+            return;
+        } finally {
+            setLiberandoReentrada(false);
+        }
+        setBloqueioEntrada(null);
+        // Se o servidor bloquear de novo, o aviso volta e exige novo clique (não repete em loop)
+        await bloqueio.repetir();
+    };
+
     const confirmarTurnoAnterior = async (saidaEm) => {
         const t = turnoAnterior;
         if (!t) return;
@@ -287,17 +358,25 @@ export const useCheckin = (defaultMode, options = {}) => {
 
         // 🎯 ABERTURA / IDENTIFICAÇÃO AUTOMÁTICA VIA LEITOR FACIAL (Fase 1)
         socket.on('credenciamento_abrir', (data) => {
-            const { operationMode: modoAtual, sessaoAtiva: sessao, handleSelectPessoa: selecionar, executarLeituraRapida: leituraRapida } = latestRef.current;
+            const { operationMode: modoAtual, sessaoAtiva: sessao, executarLeituraRapida: leituraRapida } = latestRef.current;
             // Só a estação vinculada a este leitor reage
             if (sessao?.dispositivo_id && data?.dispositivo_id && sessao.dispositivo_id !== data.dispositivo_id) return;
             console.log('📡 [WS] Leitor facial reconheceu:', data);
             if (data?.pessoa) {
                 tocarBipeNotificacao();
                 if (defaultMode === 'checkout' || modoAtual === 'checkout') {
-                    // Modo Checkout: baixa automática e imediata pelo leitor facial
+                    // Saída pelo rosto: registrada na hora, sem abrir a ficha (mesmo caminho da leitura rápida)
                     leituraRapida?.(data.pessoa.id, 'checkout', 'facial');
                 } else {
-                    selecionar?.(data.pessoa);
+                    // Entrada pelo rosto: registrada na hora, sem abrir a ficha. Em área que controla entrada,
+                    // o servidor decide (409 ENTRADA_BLOQUEADA) e o aviso aparece na tela.
+                    const agora = Date.now();
+                    const registros = rostoEntradaRef.current;
+                    const ultimo = registros.get(data.pessoa.id);
+                    if (ultimo && agora - ultimo < ROSTO_REPETIDO_MS) return;
+                    if (registros.size > 200) registros.clear();
+                    registros.set(data.pessoa.id, agora);
+                    leituraRapida?.(data.pessoa.id, 'checkin', 'facial', data.pessoa.nome_completo || data.pessoa.nome || null);
                 }
             }
         });
@@ -370,6 +449,8 @@ export const useCheckin = (defaultMode, options = {}) => {
     const handleSelectPessoa = (pessoa) => {
         // Início do atendimento (credenciamento): métrica de tempo por operador
         inicioAtendimentoRef.current = new Date().toISOString();
+        clearTimeout(bloqueioTimerRef.current);
+        setBloqueioEntrada(null); // aviso de bloqueio é de outra pessoa/atendimento
         setSelectedPessoa(pessoa);
         setSearchResults([]);
         setSearchQuery('');
@@ -382,29 +463,6 @@ export const useCheckin = (defaultMode, options = {}) => {
                     areas_info: areaNames.map(a => ({ area_id: a.id, nome_area: a.nome_area }))
                 }));
             }
-        }
-    };
-
-    const consultarPulseiraAPI = async (codigo) => {
-        if (!codigo || !eventoId) return;
-        try {
-            setLoading(true);
-            const res = await api.get(`/access/consultar-pulseira/${codigo}`, { params: { evento_id: eventoId } });
-            if (res.data.success) {
-                const pessoa = res.data.data;
-                handleSelectPessoa(pessoa);
-                performCheckin('pulseira', codigo, pessoa.id);
-            }
-        } catch (error) {
-            console.warn('Pulseira não encontrada:', codigo);
-            setResultMessage('Pulseira não cadastrada.');
-            setCheckinResult('negado');
-            setTimeout(() => {
-                setCheckinResult(null);
-                setResultMessage('');
-            }, 3000);
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -456,7 +514,8 @@ export const useCheckin = (defaultMode, options = {}) => {
         }, 3000);
     };
 
-    const executarLeituraRapida = async (codigo, tipoForcado = null, metodoForcado = 'barcode') => {
+    // Leitura rápida direta (sem ficha): saída pelo rosto e entrada pelo rosto. Só o rosto passa pessoa.id.
+    const executarLeituraRapida = async (codigo, tipoForcado = null, metodoForcado = 'barcode', nomePessoa = null) => {
         if (!codigo || !eventoId) return { success: false, error: 'Código ou evento ausente' };
         const tipoFinal = tipoForcado || (defaultMode === 'checkout' ? 'checkout' : 'checkin');
         try {
@@ -489,6 +548,7 @@ export const useCheckin = (defaultMode, options = {}) => {
             if (res.data?.success) {
                 const data = res.data.data;
                 tocarBipeNotificacao();
+                setBloqueioEntrada(null); // aviso de outra leitura não fica na tela
                 setCheckinResult('sucesso');
                 setResultMessage(tipoFinal === 'checkout'
                     ? `SAÍDA LIBERADA: ${data.pessoa?.nome || 'COLABORADOR'}`
@@ -516,6 +576,15 @@ export const useCheckin = (defaultMode, options = {}) => {
             }
         } catch (error) {
             if (pedeTurnoAnterior(error)) return { success: false, turnoAnterior: true };
+            // Entrada pelo rosto em área que controla entrada: aviso na tela (sem ficha), com liberação se couber
+            if (tipoFinal === 'checkin' && pedeEntradaBloqueada(error, {
+                pessoaId: codigo,
+                nome: nomePessoa,
+                temporario: true,
+                repetir: () => executarLeituraRapida(codigo, tipoForcado, metodoForcado, nomePessoa)
+            })) {
+                return { success: false, bloqueada: true };
+            }
             setCheckinResult('negado');
             setResultMessage(error.response?.data?.error || 'Participante não localizado ou sem autorização.');
             clearTimeout(resetTimerRef.current);
@@ -533,41 +602,30 @@ export const useCheckin = (defaultMode, options = {}) => {
         let targetPessoa = forcedPessoaId ? { id: forcedPessoaId } : selectedPessoa;
         const isCheckout = defaultMode === 'checkout' || operationMode === 'checkout';
 
-        // Se é pulseira/barcode e não tem pessoa selecionada:
+        // Bipe sem pessoa selecionada: só localiza e abre a ficha. Entrada e saída nunca saem daqui direto.
         if (!targetPessoa && (metodo === 'pulseira' || metodo === 'barcode') && extraValue) {
-            if (isCheckout) {
-                // No checkout direto por bipe, executar baixa rápida
-                return await executarLeituraRapida(extraValue, 'checkout', metodo);
-            } else {
-                await consultarPulseiraAPI(extraValue);
-                return;
-            }
+            return await abrirConferenciaPorCodigo(extraValue);
         }
 
         if (!targetPessoa && metodo !== 'qrcode') return { success: false, error: 'Pessoa não informada' };
+
+        // Saída só pela leitura da pulseira dentro da ficha (CPF, QR ou nome não registram saída)
+        if (isCheckout && metodo !== 'pulseira' && metodo !== 'barcode') {
+            return { success: false, error: 'A saída é registrada pela leitura da pulseira da pessoa.' };
+        }
 
         try {
             setManualSaving(true);
             let res;
 
             if (isCheckout) {
-                // OPERAÇÃO DE BAIXA / CHECKOUT
-                if (metodo === 'pulseira' || metodo === 'barcode') {
-                    res = await localCheckinService.enviar('/access/pulseira/checkout', {
-                        numero_pulseira: extraValue || targetPessoa?.numero_pulseira || targetPessoa?.cpf || targetPessoa?.id,
-                        area_id: areaId
-                    }, 'pulseira-checkout');
-                } else {
-                    const payload = {
-                        pessoa_id: targetPessoa.id,
-                        dispositivoId: 'web-dashboard',
-                        evento_id: eventoId,
-                        tipo: 'checkout',
-                        metodo: metodo || 'manual',
-                        area_id: areaId
-                    };
-                    res = await localCheckinService.realizarCheckin(payload, 'manual');
-                }
+                // BAIXA / CHECKOUT: a pulseira lida na ficha desta pessoa (validada acima)
+                // A saída vai sempre com a pessoa da ficha: o servidor recusa pulseira que não é dela
+                res = await localCheckinService.enviar('/access/pulseira/checkout', {
+                    pessoa_id: targetPessoa.id,
+                    numero_pulseira: extraValue,
+                    area_id: areaId
+                }, 'pulseira-checkout');
             } else if (metodo === 'pulseira') {
                 // CREDENCIAMENTO via BARCODE/PULSEIRA: endpoint que vincula áreas + auto check-in
                 res = await localCheckinService.enviar('/access/credenciar-pulseira', {
@@ -639,7 +697,10 @@ export const useCheckin = (defaultMode, options = {}) => {
             return resultadoAcao;
         } catch (error) {
             if (pedeTurnoAnterior(error)) return { success: false, turnoAnterior: true };
-            const motivo = error.response?.data?.error || 'Falha na comunicação com o servidor.';
+            if (pedeEntradaBloqueada(error, { pessoaId: targetPessoa?.id, repetir: () => performCheckin(metodo, extraValue, forcedPessoaId) })) {
+                return { success: false, bloqueada: true };
+            }
+            const motivo = ehPulseiraDeOutra(error) ? MSG_PULSEIRA_OUTRA : (error.response?.data?.error || 'Falha na comunicação com o servidor.');
             setCheckinResult('negado');
             setResultMessage(motivo);
             clearTimeout(resetTimerRef.current);
@@ -689,6 +750,9 @@ export const useCheckin = (defaultMode, options = {}) => {
             atualizarAposAcesso();
             return true;
         } catch (error) {
+            if (pedeEntradaBloqueada(error, { pessoaId, repetir: () => handleLinkPulseiraAndCheckin(pessoaId, tipoPulseiraId, numeroPulseira) })) {
+                return false;
+            }
             setCheckinResult('negado');
             setResultMessage(error.response?.data?.error || 'Erro ao vincular pulseira');
             clearTimeout(resetTimerRef.current);
@@ -697,6 +761,37 @@ export const useCheckin = (defaultMode, options = {}) => {
                 setResultMessage('');
             }, 3000);
             return false;
+        } finally {
+            setManualSaving(false);
+        }
+    };
+
+    // Saída de quem está dentro (ficha, depois de ENTRADA_BLOQUEADA sem liberação). Usa a mesma chamada de
+    // saída pela pulseira do Check-out, mas não fecha a ficha: o operador vê a confirmação e pode tentar a entrada de novo.
+    const registrarSaidaFicha = async (pessoaId, numeroPulseira) => {
+        if (!pessoaId || !numeroPulseira) return { success: false, error: 'Pessoa sem pulseira em uso' };
+        try {
+            setManualSaving(true);
+            const res = await localCheckinService.enviar('/access/pulseira/checkout', {
+                pessoa_id: pessoaId,
+                numero_pulseira: numeroPulseira,
+                area_id: areaId
+            }, 'pulseira-checkout');
+
+            if (res.status === 'invalido') return { success: false, error: res.message };
+
+            // Saída registrada (ou guardada no aparelho): a entrada deixa de estar bloqueada por este aviso
+            setBloqueioEntrada(null);
+            if (res.status === 'local') {
+                updateOfflineCount();
+                return { success: true, offline: true };
+            }
+            tocarBipeNotificacao();
+            atualizarAposAcesso();
+            return { success: true, data: res.data?.data || res.data || null };
+        } catch (error) {
+            if (pedeTurnoAnterior(error)) return { success: false, turnoAnterior: true };
+            return { success: false, error: ehPulseiraDeOutra(error) ? MSG_PULSEIRA_OUTRA : (error.response?.data?.error || 'Não foi possível registrar a saída.') };
         } finally {
             setManualSaving(false);
         }
@@ -729,13 +824,18 @@ export const useCheckin = (defaultMode, options = {}) => {
         else localStorage.removeItem('nzt_area_id');
     };
 
-    latestRef.current = { operationMode, sessaoAtiva, handleSelectPessoa, executarLeituraRapida, eventAreas };
+    latestRef.current = {
+        operationMode, sessaoAtiva, handleSelectPessoa, executarLeituraRapida, eventAreas
+    };
 
     return {
         selectedPessoa, setSelectedPessoa: handleSelectPessoa,
         // Saída de um dia anterior (CorrigirTurnoDialog): as telas já esperam estes campos
         turnoAnterior, confirmarTurnoAnterior, cancelarTurnoAnterior: () => setTurnoAnterior(null),
         checkinResult, setCheckinResult,
+        // Entrada bloqueada (409): aviso na ficha e liberação da reentrada pelo controlador
+        bloqueioEntrada, liberarReentrada, liberandoReentrada, cancelarBloqueioEntrada,
+        registrarSaidaFicha,
         resultMessage, setResultMessage,
         loading, manualSaving,
         operationMode, changeOperationMode,
@@ -746,10 +846,8 @@ export const useCheckin = (defaultMode, options = {}) => {
         recentLogs, offlineCount, realtimeStats,
         refreshLogs,
         areaId, changeAreaId, eventAreas, pulseiraTypes,
-        consultarPulseiraAPI,
         abrirConferenciaPorCodigo,
         performCheckin,
-        executarLeituraRapida,
         handleLinkPulseiraAndCheckin,
         eventoId,
         // Sessão do Leitor Facial (Fase 1)

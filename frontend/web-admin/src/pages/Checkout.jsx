@@ -19,6 +19,8 @@ import CabecalhoOperacao, { BotaoJanelaRegistros } from '../components/credencia
 import { useCheckin } from '../hooks/useCheckin';
 import CorrigirTurnoDialog from '../components/checkin/CorrigirTurnoDialog';
 import ConferenciaSaidaDialog from '../components/checkin/ConferenciaSaidaDialog';
+import PassagensRecusadas from '../components/checkin/PassagensRecusadas';
+import RecusadosSincronizacao from '../components/checkin/RecusadosSincronizacao';
 import { funcao, tom } from '../styles/tokens';
 
 // Saída tem cor própria; vermelho fica só para acesso negado
@@ -108,6 +110,7 @@ const Checkout = () => {
     desvincularLeitor,
     carregarDispositivosDisponiveis,
     turnoAnterior, confirmarTurnoAnterior, cancelarTurnoAnterior,
+    eventoId,
   } = useCheckin('checkout', { logsTipo: 'checkout' });
 
 
@@ -140,12 +143,8 @@ const Checkout = () => {
     setSelectedPessoa(null);
   };
 
-  // A saída é registrada pela janela: pela pulseira lida (o servidor usa esse número) ou por CPF/QR desta pessoa
-  const registrarSaidaNaJanela = ({ pessoa, via, codigo }) => (
-    via === 'pulseira'
-      ? performCheckin('pulseira', codigo, pessoa.id)
-      : performCheckin('manual', null, pessoa.id)
-  );
+  // A saída é registrada pela janela, somente pela pulseira lida desta pessoa (o servidor usa esse número)
+  const registrarSaidaNaJanela = ({ pessoa, codigo }) => performCheckin('pulseira', codigo, pessoa.id);
 
   // Código (QR, barras, câmera, CPF ou nº da pulseira + Enter/OK) só localiza a pessoa e abre a janela de
   // conferência. A saída é registrada dentro da janela, pela leitura da pulseira. Igual ao Check-in.
@@ -275,6 +274,10 @@ const Checkout = () => {
                         </List>
                     </Box>
                 )}
+
+                <PassagensRecusadas eventoId={eventoId} />
+                {/* Saídas feitas sem internet que o servidor recusou: ficam até o operador dispensar */}
+                <RecusadosSincronizacao />
 
                 <BotaoSaida fullWidth startIcon={<LogoutIcon />} onClick={() => confirmarCampo(pulseiraValue, 'manual')} disabled={loading || !pulseiraValue.trim()}>
                     Abrir conferência

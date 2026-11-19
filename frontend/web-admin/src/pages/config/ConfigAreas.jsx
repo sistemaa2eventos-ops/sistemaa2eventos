@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
     Box, Typography, Stack, IconButton, Dialog, 
     DialogTitle, DialogContent, DialogActions, 
-    TextField, Button, CircularProgress, Grid
+    TextField, Button, CircularProgress, Grid,
+    Checkbox, FormControlLabel
 } from '@mui/material';
 import { useSnackbar } from 'notistack';
 import {
@@ -26,7 +27,7 @@ const ConfigAreas = () => {
     const [saving, setSaving] = useState(false);
     const [openDialog, setOpenDialog] = useState(false);
     const [editingId, setEditingId] = useState(null);
-    const [formData, setFormData] = useState({ nome_area: '', capacidade_maxima: '' });
+    const [formData, setFormData] = useState({ nome_area: '', capacidade_maxima: '', controla_entrada: true });
     const { enqueueSnackbar } = useSnackbar();
 
     const columns = [
@@ -105,11 +106,12 @@ const ConfigAreas = () => {
             setEditingId(area.id);
             setFormData({
                 nome_area: area.nome_area || '',
-                capacidade_maxima: area.capacidade_maxima || ''
+                capacidade_maxima: area.capacidade_maxima || '',
+                controla_entrada: area.controla_entrada !== false
             });
         } else {
             setEditingId(null);
-            setFormData({ nome_area: '', capacidade_maxima: '' });
+            setFormData({ nome_area: '', capacidade_maxima: '', controla_entrada: true });
         }
         setOpenDialog(true);
     };
@@ -121,13 +123,15 @@ const ConfigAreas = () => {
             if (editingId) {
                 await api.put(`/config/areas/${editingId}`, {
                     nome_area: formData.nome_area,
-                    capacidade_maxima: formData.capacidade_maxima ? parseInt(formData.capacidade_maxima) : null
+                    capacidade_maxima: formData.capacidade_maxima ? parseInt(formData.capacidade_maxima) : null,
+                    controla_entrada: formData.controla_entrada
                 });
                 enqueueSnackbar('Área atualizada!', { variant: 'success' });
             } else {
                 await api.post('/config/areas', {
                     nome_area: formData.nome_area,
-                    capacidade_maxima: formData.capacidade_maxima ? parseInt(formData.capacidade_maxima) : null
+                    capacidade_maxima: formData.capacidade_maxima ? parseInt(formData.capacidade_maxima) : null,
+                    controla_entrada: formData.controla_entrada
                 });
                 enqueueSnackbar('Área criada com sucesso!', { variant: 'success' });
             }
@@ -196,6 +200,20 @@ const ConfigAreas = () => {
                             value={formData.capacidade_maxima}
                             onChange={(e) => setFormData({ ...formData, capacidade_maxima: e.target.value })}
                         />
+                        <Box>
+                            <FormControlLabel
+                                control={
+                                    <Checkbox
+                                        checked={formData.controla_entrada}
+                                        onChange={(e) => setFormData({ ...formData, controla_entrada: e.target.checked })}
+                                    />
+                                }
+                                label="Controla entrada (portão)"
+                            />
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ml: 4 }}>
+                                Quem entra por esta área faz check-in e, ao sair, check-out. Reentrada só com liberação do controlador. Desmarque para áreas de circulação livre.
+                            </Typography>
+                        </Box>
                     </Stack>
                 </DialogContent>
                 <DialogActions sx={{ p: 3 }}>

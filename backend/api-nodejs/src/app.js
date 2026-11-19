@@ -222,6 +222,7 @@ app.use('/api/modelos-camera', require('./modules/system/modelosCamera.routes'))
 app.use('/api/cameras', cameraRoutes);
 app.use('/api/gravacoes', require('./modules/system/gravacao.routes'));
 app.use('/api/ia-servidores', require('./modules/system/iaServidores.routes'));
+app.use('/api/producao', require('./modules/producao/producao.routes'));
 app.use('/public', rateLimiter.public, publicRoutes);
 app.use('/api/public', rateLimiter.public, publicRoutes); // FIX I-10: rate limiter dedicado para rotas públicas
 

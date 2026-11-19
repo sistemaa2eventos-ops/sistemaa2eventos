@@ -5,6 +5,8 @@ const cacheService = require('../../services/cacheService');
 const ValidationService = require('./services/validation.service');
 const DatabaseService = require('./services/database.service');
 const { COLUNAS_PESSOA_ACESSO } = require('./services/colunasPessoa');
+const { etapaDaPessoa, diaDoAcesso, bloqueioDeEntrada } = require('./services/entradaEtapa');
+const { parseUtcSemFuso } = require('../../utils/dateUtils');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STATS_TTL_MS = 3000;
@@ -39,6 +41,22 @@ class CheckinService {
         const tipoFinal = await ValidationService.determineSmartAccessType(pessoa_id, evento_id, accessData.tipo, area_id, ctxValidacao);
         const timestamp = offline_timestamp ? new Date(offline_timestamp) : new Date();
 
+        // Etapa (fase do lote) e dia civil do acesso: a entrada usa para não repetir dentro da etapa (409),
+        // e a saída também grava a etapa para fechar essa janela.
+        const logId = UUID_RE.test(sync_id || '') ? sync_id : require('uuid').v4();
+        const etapa = accessData.etapa || await etapaDaPessoa(supabase, pessoa);
+        const dia = diaDoAcesso(timestamp);
+        if (tipoFinal === 'checkin') {
+            ctxValidacao.entrada = { etapa, dia, area_id: area_id || null, logId };
+        }
+
+        // Replay offline: acesso anterior ao último evento da pessoa vira só histórico (status não muda)
+        let atualizarStatus = true;
+        if (offline_timestamp) {
+            const ultimo = await ValidationService.ultimoLogPessoa(pessoa_id, evento_id);
+            if (ultimo && timestamp < parseUtcSemFuso(ultimo.created_at)) atualizarStatus = false;
+        }
+
         // Saída registrada por operador de quem entrou num dia anterior: pede confirmação e o
         // horário real (a correção é feita em /checkout/corrigir-turno). Leitor sozinho (sem operador) não tem quem confirme.
         if (tipoFinal === 'checkout' && created_by && !accessData.confirmar_turno_anterior && !offline_timestamp) {
@@ -60,7 +78,6 @@ class CheckinService {
             // 4. Sucesso: Persistir no Banco de Dados
             // sync_id do painel vira o id do log: o reenvio da fila offline (ou de um timeout que
             // na verdade gravou) cai na duplicidade e não gera um segundo acesso.
-            const logId = UUID_RE.test(sync_id || '') ? sync_id : require('uuid').v4();
             const new_status = tipoFinal === 'checkin' ? 'checkin_feito' : 'checkout_feito'; // FIX C-09: 'presente'/'saiu' violavam CHECK constraint
 
             const result = await DatabaseService.registerAccessTransaction(
@@ -69,16 +86,23 @@ class CheckinService {
                 {
                     evento_id, pessoa_id, tipo: tipoFinal, metodo,
                     dispositivo_id, created_by, sync_id, area_id,
+                    etapa, dia_civil: dia,
                     confianca: accessData.confianca || null,
                     foto_capturada: accessData.foto_capturada || null,
+                    // Texto informativo: bypass de cota e origem (ex.: CREDENCIAMENTO) juntos, sem efeito nas regras
                     observacao: (validation && validation.quotaBypassed)
-                        ? '⚠️ BYPASS_COTA (Capacidade Excedida)'
+                        ? (accessData.observacao
+                            ? `⚠️ BYPASS_COTA (Capacidade Excedida) · ${accessData.observacao}`
+                            : '⚠️ BYPASS_COTA (Capacidade Excedida)')
                         : (accessData.observacao || null)
                 },
                 pessoa,
-                new_status
+                new_status,
+                { atualizarStatus }
             );
 
+            // Segunda entrada na mesma etapa/dia (corrida entre duas leituras): 409 pelo caminho de negação
+            if (result.entrada_duplicada) throw result.erro;
             if (!result.success) return { error: 'Falha ao persistir acesso' };
             cacheService.invalidatePessoa(pessoa_id);
             const resultData = { id: logId, evento_id, pessoa_id, tipo: tipoFinal,
@@ -181,12 +205,33 @@ class CheckinService {
             })().catch(() => { /* silêncio */ });
 
             return {
-                error: valErr.message, 
-                status: valErr.status || 403, 
+                error: valErr.message,
+                status: valErr.status || 403,
                 action: 'deny',
-                data: resultNegado.data 
+                data: resultNegado.data,
+                // Bloqueio de entrada (409): codigo, liberavel e etapa vão em detalhes → corpo da resposta (ApiResponse.error)
+                ...(valErr.codigo ? { detalhes: { codigo: valErr.codigo, liberavel: valErr.liberavel === true, etapa: valErr.etapa ?? null } } : {})
             };
         }
+    }
+
+    /**
+     * Pré-checagem da regra de entrada (portão / entrada única) SEM gravar nada. Usada por quem grava outra coisa
+     * antes do acesso (credenciamento grava a pulseira e as áreas primeiro). Mesma decisão de registrarAcesso para
+     * um tipo 'checkin': etapa (lote ou da pessoa), dia civil do instante e área.
+     * @returns {Promise<Error|null>} erro 409 (ENTRADA_BLOQUEADA) se a entrada seria recusada; null se pode entrar
+     */
+    async verificarEntradaSemGravar({ evento_id, pessoa, etapa = null, area_id = null, sync_id = null, offline_timestamp = null }) {
+        const timestamp = offline_timestamp ? new Date(offline_timestamp) : new Date();
+        const etapaFinal = etapa || await etapaDaPessoa(supabase, pessoa);
+        return bloqueioDeEntrada(supabase, {
+            evento_id,
+            pessoa_id: pessoa.id,
+            etapa: etapaFinal,
+            dia: diaDoAcesso(timestamp),
+            area_id: area_id || null,
+            logId: UUID_RE.test(sync_id || '') ? sync_id : null
+        });
     }
 
     /**

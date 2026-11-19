@@ -7,18 +7,14 @@ import PessoaFoto from '../common/PessoaFoto';
 import UniversalPulseiraInput from '../common/UniversalPulseiraInput';
 import { tom } from '../../styles/tokens';
 
-const digitos = (texto) => String(texto || '').replace(/\D/g, '');
-
 /**
- * Diz o que foi lido e se pertence a esta pessoa: pulseira, QR do crachá ou CPF.
- * Qualquer outra coisa (outra pulseira, nome, outro CPF) devolve null: a saída não vai ao servidor.
+ * Diz se a leitura é a pulseira desta pessoa. Só ela registra a saída (CPF, QR do crachá ou nome não valem).
+ * Qualquer outra coisa (outra pulseira, outra pessoa, texto) devolve null: a saída não vai ao servidor.
  */
 export const identificarLeitura = (pessoa, codigo) => {
     const texto = String(codigo || '').trim();
     if (!pessoa || !texto) return null;
     if (pessoa.numero_pulseira && texto === String(pessoa.numero_pulseira).trim()) return 'pulseira';
-    if (pessoa.qr_code && texto === pessoa.qr_code) return 'qr';
-    if (pessoa.cpf && digitos(texto).length === 11 && digitos(texto) === digitos(pessoa.cpf)) return 'cpf';
     return null;
 };
 
@@ -62,7 +58,12 @@ export const ConferenciaSaidaDialog = ({
         const via = identificarLeitura(pessoa, codigo);
         if (!via) {
             const primeiro = (pessoa?.nome || pessoa?.nome_completo || '').split(' ')[0];
-            return { success: false, error: `Não confere com a pulseira, o CPF ou o QR de ${primeiro || 'esta pessoa'}.` };
+            const dono = primeiro ? `de ${primeiro}` : 'desta pessoa';
+            // Sem pulseira cadastrada não há outra pessoa a apontar. Nos dois casos nada vai ao servidor.
+            const motivo = pessoa?.numero_pulseira
+                ? `Esta pulseira é de outra pessoa, não ${dono}. Nada foi registrado.`
+                : `${primeiro || 'Esta pessoa'} não tem pulseira cadastrada. Nada foi registrado.`;
+            return { success: false, error: motivo };
         }
         const resultado = await onRegistrar({ pessoa, via, codigo: String(codigo).trim() });
         if (resultado?.turnoAnterior) {
@@ -131,7 +132,7 @@ export const ConferenciaSaidaDialog = ({
                         accentColor={accentColor}
                         label="Bipe a pulseira desta pessoa"
                         placeholder="Bipe a pulseira ou digite o número..."
-                        helperText="Bipe: saída automática • Digitação: Enter ou OK • CPF ou QR desta pessoa também valem"
+                        helperText="Bipe a pulseira: saída automática • Número digitado: Enter ou OK"
                     />
 
                     {sucesso && (

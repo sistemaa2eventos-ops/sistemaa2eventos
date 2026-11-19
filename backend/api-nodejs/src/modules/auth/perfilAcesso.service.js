@@ -13,7 +13,7 @@ const { supabase } = require('../../config/supabase');
 // Mesmas chaves da tela Usuários (frontend/web-admin/src/hooks/useUsuarios.js → MODULOS)
 const MODULOS = [
     'dashboard', 'checkin', 'checkout', 'fiscalizacao', 'monitoramento', 'pessoas',
-    'empresas', 'relatorios', 'veiculos', 'auditoria_documentos', 'dispositivos'
+    'empresas', 'relatorios', 'veiculos', 'auditoria_documentos', 'dispositivos', 'producao'
 ];
 
 // O banco só aceita admin_master e operador (perfis_nivel_acesso_check); admin_master vê tudo

@@ -11,6 +11,14 @@ const { COLUNAS_PESSOA_ACESSO } = require('./services/colunasPessoa');
 const pulseiraService = require('../pulseiras/pulseira.service');
 const { buscarLotesDaFaixa, escolherLote } = require('../pulseiras/loteSelecao');
 const { buscarPessoaPorCodigo } = require('./codigoLeitor');
+const { etapaDoLote } = require('./services/entradaEtapa');
+
+/**
+ * Origem INFORMATIVA do credenciamento (campo observacao do registro). Nenhuma regra lê este texto:
+ * entrada única, reentrada, portão, contagens, toggle, anti-passback e turno decidem pelo tipo, etapa e área.
+ */
+const OBSERVACAO_CREDENCIAMENTO = 'CREDENCIAMENTO';
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 class AccessController {
     constructor() {
@@ -434,6 +442,7 @@ class AccessController {
                 pessoa: { ...pessoa, numero_pulseira },
                 evento_id: eventoId,
                 tipo: req.body.tipo || null, // null = Smart Access decide
+                etapa: etapaDoLote(tipoPulseira), // fase do lote lido agora (entrada única por etapa)
                 metodo: 'pulseira',
                 dispositivo_id: 'web-dashboard',
                 created_by: req.user?.id,
@@ -492,44 +501,59 @@ class AccessController {
             eventoId = req.event?.id || req.headers['x-evento-id'] || req.query.evento_id;
             const area_id = req.body.area_id || null;
             const supabaseClient = req.supabase || supabase;
+            // Pessoa já localizada (credenciamento, ficha): a saída não depende de a pulseira estar correta
+            const pessoaIdCorpo = req.body.pessoa_id ? String(req.body.pessoa_id).trim() : null;
 
-            if (!numero_pulseira) {
+            if (!numero_pulseira && !pessoaIdCorpo) {
                 return ApiResponse.error(res, 'Identificador (pulseira, CPF ou código) é obrigatório', 400);
             }
 
-            const safeCode = String(numero_pulseira).trim();
-            const digits = safeCode.replace(/\D/g, '');
+            const safeCode = numero_pulseira ? String(numero_pulseira).trim() : '';
+            let pessoa = null;
 
-            // 1. Tentar buscar pessoa pela pulseira
-            let { data: pessoa, error: pessoaErr } = await supabaseClient
-                .from('pessoas')
-                .select(`${COLUNAS_PESSOA_ACESSO}, empresas(nome)`)
-                .eq('numero_pulseira', safeCode)
-                .eq('evento_id', eventoId)
-                .maybeSingle();
-
-            // 2. Se não encontrar por pulseira, buscar por CPF, QR Code ou ID
-            if (!pessoa) {
-                const orConds = [`qr_code.eq.${safeCode}`, `numero_pulseira.eq.${safeCode}`];
-                if (digits.length === 11) {
-                    const cpfFmt = digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-                    orConds.push(`cpf.eq.${digits}`, `cpf.eq.${cpfFmt}`);
-                } else if (digits.length > 0) {
-                    orConds.push(`cpf.eq.${digits}`, `cpf.eq.${safeCode}`);
+            if (pessoaIdCorpo) {
+                if (!UUID_RE.test(pessoaIdCorpo)) {
+                    return ApiResponse.error(res, 'pessoa_id inválido', 400);
                 }
-                if (/^[0-9a-fA-F-]{36}$/.test(safeCode)) {
-                    orConds.push(`id.eq.${safeCode}`);
-                }
-
-                const { data: pAlt } = await supabaseClient
+                // Só pessoa do evento em foco (outro evento = 404, sem revelar que existe)
+                const { data: porId, error: porIdErr } = await supabaseClient
                     .from('pessoas')
                     .select(`${COLUNAS_PESSOA_ACESSO}, empresas(nome)`)
+                    .eq('id', pessoaIdCorpo)
                     .eq('evento_id', eventoId)
-                    .or(orConds.join(','))
-                    .limit(1);
+                    .maybeSingle();
+                if (porIdErr) throw porIdErr;
+                pessoa = porId || null;
 
-                if (pAlt && pAlt.length > 0) {
-                    pessoa = pAlt[0];
+                // Pessoa informada + pulseira lida: a pulseira TEM de ser a dela no evento.
+                // Antes a pulseira era ignorada quando vinha pessoa_id, e a saída ia para quem a ficha dizia.
+                if (pessoa && safeCode && String(pessoa.numero_pulseira ?? '').trim() !== safeCode) {
+                    return ApiResponse.error(res,
+                        `A pulseira ${safeCode} não pertence a esta pessoa neste evento. Confira a pulseira antes de dar a saída.`,
+                        409,
+                        { codigo: 'PULSEIRA_DE_OUTRA_PESSOA', liberavel: false });
+                }
+            } else {
+                // 1. Tentar buscar pessoa pela pulseira
+                const { data: porPulseira } = await supabaseClient
+                    .from('pessoas')
+                    .select(`${COLUNAS_PESSOA_ACESSO}, empresas(nome)`)
+                    .eq('numero_pulseira', safeCode)
+                    .eq('evento_id', eventoId)
+                    .maybeSingle();
+                pessoa = porPulseira || null;
+
+                // 2. Se não encontrar por pulseira, buscar por CPF, QR Code ou ID — mesma busca do leitor rápido,
+                //    só com .eq/.in (o texto lido nunca entra num .or(): vírgula ou parêntese não muda o alvo).
+                //    Código em mais de uma pessoa → 409 (não escolhe uma); texto que não é código segue como não encontrado.
+                if (!pessoa) {
+                    const busca = await buscarPessoaPorCodigo(supabaseClient, eventoId, safeCode,
+                        `${COLUNAS_PESSOA_ACESSO}, empresas(nome)`);
+                    if (busca.pessoa) {
+                        pessoa = busca.pessoa;
+                    } else if (busca.status === 409) {
+                        return ApiResponse.error(res, busca.erro, 409);
+                    }
                 }
             }
 
@@ -543,7 +567,7 @@ class AccessController {
                 pessoa,
                 evento_id: eventoId,
                 tipo: 'checkout',
-                metodo: pessoa.numero_pulseira === safeCode ? 'pulseira' : 'barcode',
+                metodo: pessoaIdCorpo ? 'manual' : (pessoa.numero_pulseira === safeCode ? 'pulseira' : 'barcode'),
                 dispositivo_id: 'web-dashboard',
                 created_by: req.user?.id,
                 area_id,
@@ -689,7 +713,8 @@ class AccessController {
                     dispositivo_id: 'web-dashboard',
                     created_by: req.user?.id,
                     area_id: area_id || null,
-                    sync_id, offline_timestamp
+                    sync_id, offline_timestamp,
+                    observacao: OBSERVACAO_CREDENCIAMENTO
                 });
 
                 if (result.error) return ApiResponse.error(res, result.error, result.status || 400, result.detalhes || null);
@@ -714,7 +739,7 @@ class AccessController {
                 const { data: tp } = await supabaseClient
                     .from('evento_tipos_pulseira')
                     .select(`
-                        id, nome_tipo, cor_hex, alerta_duplicidade,
+                        id, nome_tipo, cor_hex, alerta_duplicidade, fase,
                         pulseira_areas_permitidas (
                             area_id,
                             evento_areas (id, nome_area)
@@ -758,6 +783,22 @@ class AccessController {
                 const acao = bloqueio.motivo === 'perdida' ? 'foi marcada como perdida' : 'já foi trocada';
                 return ApiResponse.error(res,
                     `Pulseira ${String(numero_pulseira).trim()} ${acao} neste lote e não pode ser entregue de novo.`, 409);
+            }
+
+            // 3c. Regra de entrada (portão / entrada única) ANTES de qualquer gravação de pulseira ou área.
+            // Quem está dentro na etapa/dia/área não recebe pulseira nova: 409 ENTRADA_BLOQUEADA, nada gravado.
+            // Só leitura; a decisão é a mesma que o registrarAcesso (passo 6) tomaria para esta entrada.
+            const etapaCredenciamento = etapaDoLote(tipoPulseira);
+            const bloqueioEntrada = await checkinService.verificarEntradaSemGravar({
+                evento_id: eventoId, pessoa, etapa: etapaCredenciamento,
+                area_id: area_id || null, sync_id, offline_timestamp
+            });
+            if (bloqueioEntrada) {
+                return ApiResponse.error(res, bloqueioEntrada.message, 409, {
+                    codigo: bloqueioEntrada.codigo,
+                    liberavel: bloqueioEntrada.liberavel === true,
+                    etapa: bloqueioEntrada.etapa ?? null
+                });
             }
 
             // 4. Vincular áreas de acesso (pessoa_areas_acesso) — uma única gravação para todas as áreas
@@ -819,8 +860,8 @@ class AccessController {
                 created_by: req.user?.id,
                 area_id: area_id || null,
                 sync_id, offline_timestamp,
-                // Marca o log para não contar no anti-passback dos leitores faciais
-                observacao: require('./services/validation.service').MARCADOR_CREDENCIAMENTO
+                etapa: etapaDoLote(tipoPulseira),
+                observacao: OBSERVACAO_CREDENCIAMENTO
             });
 
             if (result.error) return ApiResponse.error(res, result.error, result.status || 400, result.detalhes || null);
@@ -854,25 +895,39 @@ class AccessController {
 
     async buscarPessoaPulseira(req, res) {
         try {
-            const { codigo } = req.query;
+            const texto = String(req.query?.codigo ?? '').trim().slice(0, 100);
             const eventoId = req.event?.id;
             const supabaseClient = req.supabase || supabase;
+            const COLUNAS = 'id, nome_completo, cpf, funcao, status_acesso, numero_pulseira, foto_url, empresas(nome)';
+            const base = () => supabaseClient.from('pessoas').select(COLUNAS).eq('evento_id', eventoId);
 
-            // Buscar por numero_pulseira ou CPF ou nome
-            let query = supabaseClient
-                .from('pessoas')
-                .select('id, nome_completo, cpf, funcao, status_acesso, numero_pulseira, foto_url, empresas(nome)')
-                .eq('evento_id', eventoId);
-
-            if (codigo) {
-                query = query.or(`numero_pulseira.eq.${codigo},cpf.eq.${codigo},nome_completo.ilike.%${codigo}%`);
+            // Sem o filtro .or(): o texto digitado nunca vira parte de um filtro. Cada critério é uma consulta
+            // própria (pulseira = valor, CPF = lista de valores válidos, nome = .ilike com o texto escapado).
+            let consultas = [base().limit(10)];
+            if (texto) {
+                consultas = [base().eq('numero_pulseira', texto).limit(10)];
+                const digitos = texto.replace(/\D/g, '');
+                if (digitos.length === 11) {
+                    const cpfFmt = digitos.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+                    consultas.push(base().in('cpf', [digitos, cpfFmt]).limit(10));
+                }
+                if (/\p{L}/u.test(texto)) {
+                    const padrao = `%${texto.replace(/[\\%_]/g, '\\$&')}%`;
+                    consultas.push(base().ilike('nome_completo', padrao).limit(10));
+                }
             }
 
-            const { data, error } = await query.limit(10);
+            const resultados = await Promise.all(consultas);
+            const erro = resultados.find(r => r.error)?.error;
+            if (erro) throw erro;
 
-            if (error) throw error;
+            const vistos = new Map();
+            for (const r of resultados) {
+                for (const p of r.data || []) if (!vistos.has(p.id)) vistos.set(p.id, p);
+            }
+            const pessoas = [...vistos.values()].slice(0, 10);
 
-            return ApiResponse.success(res, { pessoas: data || [] });
+            return ApiResponse.success(res, { pessoas });
         } catch (error) {
             logger.error(
                 { err: error, bracelet_code: req.query?.codigo, event_id: req.event?.id },
@@ -1036,16 +1091,8 @@ class AccessController {
                     .limit(1);
                 if (wList && wList.length > 0) watchMatch = wList[0];
             }
-            if (!watchMatch && pessoa.nome_completo) {
-                const { data: wByName } = await supabaseClient
-                    .from('watchlist')
-                    .select('*')
-                    .ilike('nome', pessoa.nome_completo)
-                    .eq('ativo', true)
-                    .order('created_at', { ascending: false })
-                    .limit(1);
-                if (wByName && wByName.length > 0) watchMatch = wByName[0];
-            }
+            // Alerta de watchlist SÓ por CPF. Casar por nome (ilike) gerava alerta para homônimos e para
+            // alvos sem CPF cadastrado. Sem CPF, a pessoa não dispara alerta.
 
             if (watchMatch) {
                 // Alvo procurado identificado no evento durante abordagem!

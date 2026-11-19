@@ -87,19 +87,25 @@ const AJUDAS = {
     },
     '/checkin': {
         titulo: 'Check-in',
-        objetivo: 'Registrar a entrada sempre pela ficha de conferência: primeiro localize a pessoa (leitor de código, QR, CPF, nome ou leitor facial), depois confira os dados e informe a pulseira.',
+        objetivo: 'Registrar a entrada: pelo rosto, na hora (sem abrir a ficha), ou pela pulseira dentro da ficha de conferência. O campo de texto só localiza a pessoa e abre a ficha.',
         passos: [
-            'Em "Conectar leitor facial", escolha o leitor da sua baia e dê o "Nome da estação".',
+            'Em "Conectar estação", escolha o leitor facial e/ou as câmeras da sua baia e dê o "Nome da estação".',
             'Escolha a área (ou "Todas as áreas (global)").',
-            'No campo "Leitor, CPF ou nome", bipe o crachá/QR ou digite o CPF e aperte Enter: abre a ficha da pessoa. Digitando o nome, escolha a pessoa na lista.',
-            'Na ficha, bipe a pulseira em "Número da pulseira" (o leitor confirma sozinho) ou digite o número e aperte Enter ou "Vincular pulseira & autorizar".'
+            'No campo "Leitor, CPF ou nome", bipe o QR/código de barras, use "Ler pela câmera" ou digite o CPF e aperte Enter: abre a ficha da pessoa. Digitando o nome, escolha a pessoa na lista.',
+            'Na ficha, bipe a pulseira em "Número da pulseira" (a entrada sai sozinha) ou digite o número e aperte Enter ou "Vincular pulseira & autorizar".'
         ],
         atencao: [
-            'O campo de busca nunca faz a entrada sozinho: a entrada só é registrada na ficha.',
-            'Uma pulseira só registra uma entrada por etapa e por dia; a segunda leitura é recusada.',
-            'Com o leitor facial vinculado, a ficha da pessoa abre sozinha quando ela passa o rosto — só na estação ligada àquele leitor.',
-            'Sem internet, a entrada fica guardada no aparelho ("Aguardando envio") e sobe sozinha depois. Se o servidor recusar um desses acessos, ele aparece em "Recusados pelo servidor" até você dispensar.',
-            'Texto que não é código (nome, palavra solta) não vai para a fila sem internet: aparece "Não é um código válido" na hora.'
+            'O campo nunca registra a entrada sozinho, nem por código, CPF ou nome: a entrada só sai pela pulseira lida na ficha.',
+            'Uma pessoa não tem duas entradas na mesma etapa, dia e área enquanto estiver dentro: a segunda é recusada. Saída seguida de nova entrada é permitida (almoço, volta).',
+            'Sem pulseira, a entrada só sai pelo botão "Confirmar entrada sem pulseira" na ficha.',
+            'Os leitores físicos da portaria registram a entrada sozinhos, sem passar por esta tela.',
+            'Com o leitor facial vinculado, o rosto registra a entrada na hora, sem abrir a ficha, só na estação ligada àquele leitor. Vale em todas as áreas. A entrada aparece na lista de registros.',
+            'O rosto da mesma pessoa reconhecido de novo em até 20 s não registra outra entrada.',
+            'Área que controla entrada (portão): se a pessoa já está dentro, o rosto não registra e aparece um aviso no topo da tela ("Pessoa já está dentro"); o aviso some em 30 s ou com o X. Se ela saiu e não foi liberada, o aviso traz "Liberar reentrada" (só para admin, supervisor e operador; quem não tem o botão precisa pedir ao controlador). Depois de liberar, a entrada é tentada de novo uma vez.',
+            'Entrada bloqueada aberta na ficha (pela pulseira ou pela busca) continua na ficha: "Liberar reentrada" aparece quando a pessoa já saiu e a saída não foi liberada. "Pessoa já está dentro" tem o botão "Registrar saída": registra a saída pela pulseira da pessoa e, depois disso, a entrada pode ser confirmada de novo. Sem pulseira em uso, a saída não é registrada nesta ficha.',
+            'Sem internet, a entrada fica guardada no aparelho ("Aguardando envio") e sobe sozinha depois, na ordem em que foi lida. Se o servidor recusar um desses acessos, ou não responder em 3 tentativas, ele aparece em "Recusados pelo servidor" até você dispensar.',
+            'Texto que não é código (nome, palavra solta) não vai para a fila sem internet: aparece "Não é um código válido" na hora.',
+            'Passagens recusadas: quando o servidor não aceita uma entrada ou saída (por exemplo, pessoa que já estava dentro), ela aparece no bloco "Passagens recusadas", com nome, hora e motivo. Confira com a pessoa e clique em "Resolver" para tirar da lista. O bloco some quando não há mais pendências.'
         ],
         dicas: [
             'Com "Imprimir etiqueta" ligado no evento, a etiqueta sai sozinha a cada entrada nova. "Imprimir etiqueta: ON" na tela abre a prévia só quando o evento não imprime sozinho (a etiqueta nunca sai duas vezes).',
@@ -108,19 +114,21 @@ const AJUDAS = {
     },
     '/checkout': {
         titulo: 'Check-out',
-        objetivo: 'Registrar a saída pela ficha de conferência: localize a pessoa, confira os dados e bipe a pulseira dela.',
+        objetivo: 'Registrar a saída pela ficha de conferência: o campo só localiza a pessoa e abre a ficha; a saída é registrada pela pulseira dela dentro da ficha. Pelo leitor facial, o rosto registra a saída na hora, sem abrir a ficha.',
         passos: [
             'Vincule a estação e escolha a área, como no check-in.',
-            'No campo "Leitor, pulseira, CPF ou nome", bipe o QR/código de barras, use "Ler pela câmera", ou digite o número da pulseira ou o CPF e aperte Enter: abre a ficha da pessoa. Digitando o nome, escolha a pessoa na lista.',
-            'Na ficha, bipe a pulseira desta pessoa: a saída é registrada ali. Outra pulseira ou outra pessoa é recusada.'
+            'No campo "Leitor, pulseira, CPF ou nome", bipe o QR/código de barras, use "Ler pela câmera" ou digite o número da pulseira ou o CPF e aperte Enter: abre a ficha da pessoa. Digitando o nome, escolha a pessoa na lista.',
+            'Na ficha, bipe a pulseira desta pessoa (ou digite o número e aperte Enter ou OK): a saída é registrada ali. Pulseira de outra pessoa não registra a saída: a tela avisa "Esta pulseira é de outra pessoa" e nada é registrado.'
         ],
         atencao: [
-            'O campo nunca registra a saída sozinho: a saída só sai pela leitura da pulseira na ficha (ou pelo CPF/QR da própria pessoa).',
-            'Uma pulseira só registra uma saída por etapa e por dia; a segunda leitura é recusada.',
-            'Sem internet não dá para abrir a ficha: a pessoa precisa ser localizada pelo servidor.',
-            'Com leitor facial vinculado, o reconhecimento já registra a saída, sem confirmação.',
+            'O campo nunca registra a saída sozinho, nem por código, CPF ou nome: a saída sai pela pulseira lida na ficha ou pelo rosto no leitor facial.',
+            'Pessoa sem pulseira cadastrada não tem saída pela ficha ("Sem pulseira cadastrada"). Pelo rosto, a saída não depende de pulseira.',
+            'Com leitor facial vinculado à estação, a saída pelo rosto é registrada na hora, sem abrir a ficha. Só a estação ligada àquele leitor reage. Texto digitado e bipe de pulseira continuam abrindo a ficha.',
+            'Os leitores físicos da portaria registram sozinhos, sem passar por esta tela.',
+            'Sem internet, a ficha não abre: a pessoa precisa ser localizada pelo servidor. Uma saída lida na ficha fica guardada no aparelho e sobe sozinha depois. Se o servidor recusar ou não responder em 3 tentativas, ela aparece em "Recusados pelo servidor" até você dispensar; as leituras seguintes não esperam por ela.',
             'Se a pessoa entrou num dia anterior e não registrou a saída, abre a janela "Saída de um dia anterior": confira o horário sugerido (o da saída do dia anterior) e clique em "Corrigir saída". O turno antigo é corrigido e nada é lançado para hoje.',
-            'Quem não registrar a saída fica "a conferir" no relatório quando o dia vira.'
+            'Quem não registrar a saída fica "a conferir" no relatório quando o dia vira.',
+            'Passagens recusadas: quando o servidor não aceita uma entrada ou saída, ela aparece no bloco "Passagens recusadas", com nome, hora e motivo. Confira com a pessoa e clique em "Resolver" para tirar da lista. O bloco some quando não há mais pendências.'
         ]
     },
     '/fiscalizacao': {
@@ -128,7 +136,7 @@ const AJUDAS = {
         objetivo: 'Conferir pulseiras e credenciais nos postos internos, sem registrar entrada nem saída.',
         passos: [
             'Escolha o "Posto de fiscalização" (a área onde você está).',
-            'Bipe a pulseira/crachá, digite o número ou o CPF e aperte Enter, ou use "Ler pela câmera". Pelo nome, escolha a pessoa na lista (Enter com nome não fiscaliza).',
+            'No campo "Leitor, pulseira, CPF ou nome", bipe a pulseira ou o crachá, digite o número ou o CPF e aperte Enter, ou use "Ler pela câmera". Pelo nome, escolha a pessoa na lista (Enter com nome não fiscaliza).',
             'Veja o resultado: LIBERADO, NÃO AUTORIZADO ou BLOQUEADO, com as áreas permitidas.'
         ],
         dicas: [
@@ -255,8 +263,17 @@ const AJUDAS = {
     '/config/areas': {
         titulo: 'Áreas',
         objetivo: 'As áreas de acesso do evento (ex.: Palco, Backstage, Produção). São usadas por pulseiras, leitores e câmeras.',
-        passos: ['"Nova área": nome e "Capacidade máxima" (0 = ilimitada).', 'Crie as áreas antes de configurar pulseiras e leitores.'],
-        atencao: ['Cada leitor só recebe os rostos das pessoas autorizadas na área dele.']
+        passos: [
+            '"Nova área": nome e "Capacidade máxima" (0 = ilimitada).',
+            '"Controla entrada (portão)" vem marcado: quem entra por esta área faz check-in e, ao sair, check-out.',
+            'Crie as áreas antes de configurar pulseiras e leitores.'
+        ],
+        atencao: [
+            'Cada leitor só recebe os rostos das pessoas autorizadas na área dele.',
+            'Em área com portão, a reentrada depois de uma saída só acontece com "Liberar reentrada" no aviso ou na ficha do Check-in, feito por quem controla a entrada.',
+            'Em área com portão, o rosto registra a entrada na hora; se a pessoa já está dentro ou saiu sem liberação, o Check-in mostra o aviso em vez de registrar. No Check-out, a saída pelo rosto é registrada na hora, com ou sem portão.',
+            'Desmarque "Controla entrada" em áreas de circulação livre: nelas a reentrada não depende de liberação do controlador.'
+        ]
     },
     '/config/pulseiras': {
         titulo: 'Pulseiras',

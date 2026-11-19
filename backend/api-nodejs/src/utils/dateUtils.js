@@ -136,7 +136,7 @@ function limiteFiltro(valor, fim = false) {
  */
 function parseUtcSemFuso(texto) {
     const s = String(texto);
-    return new Date(/Z|[+-]d{2}:?d{2}$/.test(s) ? s : `${s}Z`);
+    return new Date(/Z|[+-]\d{2}:?\d{2}$/.test(s) ? s : `${s}Z`);
 }
 
 module.exports = {

@@ -1,6 +1,7 @@
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const { ultimaOcorrenciaHorario } = require('../../utils/dateUtils');
+const { etapaDaPessoa, diaDoAcesso, colunaInexistente } = require('./services/entradaEtapa');
 
 /**
  * Check-out de quem entrou num dia de operação anterior (esqueceu de sair ou de descredenciar).
@@ -28,8 +29,7 @@ async function ultimosLogs(pessoa_id, evento_id, limite = 20) {
         .in('tipo', ['checkin', 'checkout'])
         .order('created_at', { ascending: false }).limit(limite);
     if (error) throw error;
-    // entrega de pulseira no credenciamento não é passagem
-    return (data || []).filter(l => l.observacao !== 'CREDENCIAMENTO');
+    return data || [];
 }
 
 /**
@@ -92,11 +92,21 @@ async function corrigir({ pessoa_id, evento_id, saida_em, usuario_id }) {
     if (saida <= entrada) return { error: 'A saída precisa ser depois da entrada.', status: 400 };
     if (saida > new Date()) return { error: 'A saída não pode ser no futuro.', status: 400 };
 
+    // Etapa e dia civil da saída corrigida (a saída fecha a janela da etapa, como no check-out normal)
+    const { data: pessoaRow } = await supabase.from('pessoas').select('tipo_pulseira_id').eq('id', pessoa_id).maybeSingle();
+    const etapa = await etapaDaPessoa(supabase, pessoaRow);
     const registro = { created_at: saida.toISOString(), observacao: 'SAIDA_CORRIGIDA', created_by: usuario_id || null };
-    const q = turno.saida_forcada_id
-        ? supabase.from('logs_acesso').update(registro).eq('id', turno.saida_forcada_id)
-        : supabase.from('logs_acesso').insert({ ...registro, pessoa_id, evento_id, tipo: 'checkout', metodo: 'manual', dispositivo_id: 'web-dashboard' });
-    const { error } = await q;
+    const gravar = (comEtapa) => {
+        const linha = comEtapa ? { ...registro, etapa, dia_civil: diaDoAcesso(saida) } : registro;
+        return turno.saida_forcada_id
+            ? supabase.from('logs_acesso').update(linha).eq('id', turno.saida_forcada_id)
+            : supabase.from('logs_acesso').insert({ ...linha, pessoa_id, evento_id, tipo: 'checkout', metodo: 'manual', dispositivo_id: 'web-dashboard' });
+    };
+    let { error } = await gravar(true);
+    if (error && colunaInexistente(error)) {
+        logger.warn('[Turno] logs_acesso sem colunas etapa/dia_civil: rode a migration 20261118_logs_entrada_etapa.sql. Saída corrigida gravada sem etapa.');
+        ({ error } = await gravar(false));
+    }
     if (error) throw error;
 
     // Sem reset no meio, a pessoa ainda constava como dentro

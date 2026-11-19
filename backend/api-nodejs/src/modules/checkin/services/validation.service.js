@@ -3,11 +3,7 @@ const { buscarTodos } = require('../../../utils/buscarTodos');
 const logger = require('../../../services/logger');
 const cacheService = require('../../../services/cacheService');
 const { getHojeLocal, getInicioHojeLocal, getLimitesDiaLocalUTC, ultimaOcorrenciaHorario, TIMEZONE } = require('../../../utils/dateUtils');
-const { buscarEntradaNaEtapa, erroEntradaDuplicada } = require('./entradaEtapa');
-
-// Logs gravados pelo credenciamento (entrega de pulseira) não contam como passagem em leitor
-const MARCADOR_CREDENCIAMENTO = 'CREDENCIAMENTO';
-const semCredenciamento = (query) => query.or(`observacao.is.null,observacao.neq.${MARCADOR_CREDENCIAMENTO}`);
+const { bloqueioDeEntrada } = require('./entradaEtapa');
 
 // Evento com o mesmo cache de 15 s do requireEvent (antes: 2 consultas a `eventos` por acesso)
 const buscarEventoCache = async (evento_id) => {
@@ -31,8 +27,6 @@ const buscarUltimoLog = async (pessoa_id, evento_id, area_id) => {
         .order('created_at', { ascending: false })
         .limit(1);
     if (area_id) query = query.eq('area_id', area_id);
-    // Entrega de pulseira no credenciamento não é passagem em leitor
-    query = semCredenciamento(query);
     const { data } = await query.maybeSingle();
     return data || null;
 };
@@ -428,12 +422,16 @@ class ValidationService {
             throw this._buildError(`Baixa confiança biométrica: ${confianca}% (Piso: ${targetConfidence}%)`);
         }
 
-        // 4b. Entrada única por etapa: uma entrada por pessoa, etapa, dia civil e área (409).
-        // ctx.entrada = { etapa, dia, area_id, credenciamento, logId } montado pelo checkin.service
+        // 4b. Portão e entrada única por etapa (409). Só área que controla entrada: não entrar enquanto
+        // estiver DENTRO; depois de SAÍDA, só com liberação do controlador (liberacoes_reentrada).
+        // Reenvio do mesmo id não bloqueia. ctx.entrada = { etapa, dia, area_id, logId }
+        // montado pelo checkin.service. Leitura de área e liberação em cache por requisição (ctx.controleAreas).
         if (tipo === 'checkin' && ctx && ctx.entrada) {
-            const ja = await buscarEntradaNaEtapa(supabase, { evento_id, pessoa_id: pessoa.id, ...ctx.entrada });
-            // Mesmo id = reenvio do mesmo acesso (idempotente): não é segunda entrada
-            if (ja && ja.id !== ctx.entrada.logId) throw erroEntradaDuplicada(ja.created_at);
+            if (!ctx.controleAreas) ctx.controleAreas = new Map();
+            const erroEntrada = await bloqueioDeEntrada(supabase, {
+                evento_id, pessoa_id: pessoa.id, ...ctx.entrada, cache: ctx.controleAreas
+            });
+            if (erroEntrada) throw erroEntrada;
         }
 
         // 5. Anti-passback (cooldown por área)
@@ -497,4 +495,3 @@ class ValidationService {
 }
 
 module.exports = new ValidationService();
-module.exports.MARCADOR_CREDENCIAMENTO = MARCADOR_CREDENCIAMENTO;

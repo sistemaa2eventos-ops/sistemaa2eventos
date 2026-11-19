@@ -72,6 +72,19 @@ const accessLimiter = rateLimit({
     legacyHeaders: false
 });
 
+// Consulta de crachá/pulseira (conferência no check-in, fiscalização): por usuário, em balde próprio.
+// Não divide a cota de check-in/checkout (accessLimiter): cada leitura de crachá faz uma consulta.
+const consultaLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 300,
+    keyGenerator: chavePorUsuario,
+    message: {
+        error: 'Muitas consultas. Aguarde um momento.'
+    },
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
 // Limiter geral para API — por usuário logado (ou IP, sem login)
 const apiLimiter = rateLimit({
     windowMs: 60 * 1000,
@@ -109,6 +122,7 @@ const publicLimiter = rateLimit({
 module.exports = {
     auth: authLimiter,
     access: accessLimiter,
+    consulta: consultaLimiter,
     api: apiLimiter,
     public: publicLimiter
 };

@@ -69,7 +69,7 @@ const RecusadosSincronizacao = ({ cor = '#FF3366' }) => {
                 </Button>
             </Stack>
             <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.6)', mb: 0.75 }}>
-                Feitos sem internet e não aceitos quando a conexão voltou. Confira na pessoa e dispense.
+                Feitos sem internet e não aceitos pelo servidor (ou sem resposta em 3 tentativas). Confira na pessoa e dispense.
             </Typography>
             <Stack spacing={0.6}>
                 {itens.map((item) => (

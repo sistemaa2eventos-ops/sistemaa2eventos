@@ -6,6 +6,19 @@ const emailService = require('../../services/emailService');
 const { getHojeLocal, getNowLocal } = require('../../utils/dateUtils');
 const { buscarTodos } = require('../../utils/buscarTodos');
 const { emLotes, emParalelo } = require('../../utils/lotes');
+const { etapasDasPessoas, diaDoAcesso, colunaInexistente } = require('../checkin/services/entradaEtapa');
+
+/**
+ * Saídas automáticas (fechamento de turno e auto-checkout) com etapa e dia civil, para a saída fechar a
+ * janela da etapa. Não passam pela regra de entrada única (só entrada é checada).
+ * Sem as colunas (migration 20261118 não aplicada), grava sem elas e avisa.
+ */
+async function inserirSaidas(linhas) {
+    const { error } = await supabase.from('logs_acesso').insert(linhas);
+    if (!error || !colunaInexistente(error)) return { error };
+    logger.warn('[CRON] logs_acesso sem colunas etapa/dia_civil: rode a migration 20261118_logs_entrada_etapa.sql. Saídas gravadas sem etapa.');
+    return supabase.from('logs_acesso').insert(linhas.map(({ etapa, dia_civil, ...resto }) => resto));
+}
 
 class CronController {
     constructor() {
@@ -201,16 +214,20 @@ class CronController {
 
             logger.info(`🚨 [CRON] Aplicando Auto-Checkout em ${overstayed.length} pessoas (Timeout: ${timeoutMinutes}min)`);
 
+            const agoraAuto = new Date();
+            const etapasAuto = await etapasDasPessoas(supabase, overstayed.map(p => p.id));
             const checkoutLogs = overstayed.map(p => ({
                 pessoa_id: p.id,
                 evento_id: p.evento_id,
                 tipo: 'checkout',
                 metodo: 'manual',
                 observacao: 'AUTO_CHECKOUT_TIMEOUT',
-                created_at: new Date().toISOString()
+                created_at: agoraAuto.toISOString(),
+                etapa: etapasAuto.get(p.id),
+                dia_civil: diaDoAcesso(agoraAuto)
             }));
 
-            const { error: logsErr } = await supabase.from('logs_acesso').insert(checkoutLogs);
+            const { error: logsErr } = await inserirSaidas(checkoutLogs);
             if (logsErr) logger.error('[CRON] Erro ao salvar logs de timeout:', logsErr);
 
             const pessoasIds = overstayed.map(p => p.id);
@@ -275,15 +292,20 @@ class CronController {
 
             // 1. Saída forçada para quem ainda estava dentro (erro aqui interrompe: sem saída, o relatório mentiria)
             if (dentro.length > 0) {
-                const agora = new Date().toISOString();
+                const instante = new Date();
+                const agora = instante.toISOString();
+                const dia = diaDoAcesso(instante);
                 for (const lote of emLotes(dentro, 500)) {
-                    const { error: logsErr } = await supabase.from('logs_acesso').insert(lote.map(pessoa_id => ({
+                    const etapas = await etapasDasPessoas(supabase, lote);
+                    const { error: logsErr } = await inserirSaidas(lote.map(pessoa_id => ({
                         pessoa_id,
                         evento_id: eventoId,
                         tipo: 'checkout',
                         metodo: 'manual',
                         observacao: 'CHECKOUT_FORCADO_CRON',
-                        created_at: agora
+                        created_at: agora,
+                        etapa: etapas.get(pessoa_id),
+                        dia_civil: dia
                     })));
                     if (logsErr) throw logsErr;
                 }
