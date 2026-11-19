@@ -213,6 +213,7 @@
                     method: 'POST', headers: { 'Content-Type': 'application/sdp' }, body: pc.localDescription.sdp,
                     signal: AbortSignal.timeout(10000)
                 });
+                if (!r.ok && this.falando) this.desistirDeFalar('A voz não abriu: a câmera recusou o acesso do protocolo Tapo (conta na nuvem). Ouvir continua funcionando.');
                 if (!r.ok) throw new Error(r.status === 404 ? 'câmera fora do retransmissor' : `retransmissor ${r.status}`);
                 const resposta = await r.text();
                 if (g !== this.geracao) return;
@@ -268,6 +269,16 @@
             const q = this.qualidade || 'foco';
             this.desconectar();
             this.conectar(q);
+        }
+
+        /** Falar não abriu: desliga o microfone e volta a conectar só para ouvir */
+        desistirDeFalar(msg) {
+            this.falando = false;
+            if (this.micStream) { this.micStream.getTracks().forEach(tr => tr.stop()); this.micStream = null; }
+            this.comAudio = this.somLigado;
+            this.botaoFalar.textContent = 'Falar';
+            this.botaoFalar.classList.remove('ligado');
+            this.dizerFalar(msg);
         }
 
         dizerSom(txt) { if (this.avisoSom) this.avisoSom.textContent = txt; }
