@@ -602,6 +602,10 @@ const Sidebar = ({ open, onClose }) => {
                                             localStorage.setItem('active_evento_nome', ev.nome);
                                             window.dispatchEvent(new Event('storage'));
                                         }
+                                        // A URL também carrega o evento (?evento_id=): troca junto, mantendo os outros parâmetros
+                                        const params = new URLSearchParams(location.search);
+                                        params.set('evento_id', ev.id);
+                                        navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
                                         setEventAnchorEl(null);
                                     }}
                                     sx={{

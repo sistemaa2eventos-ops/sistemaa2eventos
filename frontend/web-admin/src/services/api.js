@@ -40,7 +40,8 @@ api.interceptors.request.use(async (config) => {
   }
 
   // Injetar evento ativo em TODAS as requisições que precisam de contexto de evento
-  let activeEventoId = sessionStorage.getItem('active_evento_id') || localStorage.getItem('active_evento_id');
+  // localStorage é a fonte da troca de evento no menu; o sessionStorage antigo não pode sobrepô-lo
+  let activeEventoId = localStorage.getItem('active_evento_id') || sessionStorage.getItem('active_evento_id');
 
   // Fallback: Tentar pegar da URL se não estiver no storage
   if (!activeEventoId || activeEventoId === 'undefined' || activeEventoId === 'null') {

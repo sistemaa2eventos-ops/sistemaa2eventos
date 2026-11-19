@@ -9,12 +9,14 @@ import nztEmblem from '../../assets/images/nzt-emblem.png';
 const MainLayout = ({ children }) => {
     const [mobileOpen, setMobileOpen] = useState(false);
     const [eventoNome, setEventoNome] = useState(() => localStorage.getItem('active_evento_nome') || 'NZT Eventos');
+    const [eventoId, setEventoId] = useState(() => localStorage.getItem('active_evento_id') || 'sem-evento');
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
     useEffect(() => {
         const syncEvento = () => {
             setEventoNome(localStorage.getItem('active_evento_nome') || 'NZT Eventos');
+            setEventoId(localStorage.getItem('active_evento_id') || 'sem-evento');
         };
         window.addEventListener('storage', syncEvento);
         return () => window.removeEventListener('storage', syncEvento);
@@ -100,7 +102,8 @@ const MainLayout = ({ children }) => {
                     overflowX: 'hidden'
                 }}
             >
-                {children}
+                {/* key pelo evento: trocar o evento em foco remonta a tela e ela busca os dados do novo evento */}
+                <React.Fragment key={eventoId}>{children}</React.Fragment>
                 <AjudaContextual />
             </Box>
         </Box>

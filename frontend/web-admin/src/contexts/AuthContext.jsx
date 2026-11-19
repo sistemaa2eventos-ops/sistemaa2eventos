@@ -440,6 +440,8 @@ export const AuthProvider = ({ children }) => {
     if (!eventoId) return;
     try {
       localStorage.setItem('active_evento_id', eventoId);
+      // A API e algumas telas leem o evento do sessionStorage primeiro: mantém os dois iguais
+      sessionStorage.setItem('active_evento_id', eventoId);
       if (eventoNome) localStorage.setItem('active_evento_nome', eventoNome);
       
       const res = await authService.setActiveEvent(eventoId);
