@@ -27,6 +27,7 @@ import api from '../../services/api';
 import AgentesLocais from '../../components/dispositivos/AgentesLocais';
 import ConfiancaFacial from '../../components/dispositivos/ConfiancaFacial';
 import ServidorLeitores from '../../components/dispositivos/ServidorLeitores';
+import FerramentaRede from '../../components/dispositivos/FerramentaRede';
 
 import { botaoSecundario } from '../../styles/tokens';
 // ── Paleta padronizada do sistema
@@ -709,6 +710,7 @@ export default function DispositivosPage() {
       <AgentesLocais agentes={agentes} onChange={() => carregarDados()} />
       <ConfiancaFacial />
       <ServidorLeitores onSalvo={setServidorLeitores} />
+      <FerramentaRede />
 
       {/* ── Barra de ações */}
       <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>

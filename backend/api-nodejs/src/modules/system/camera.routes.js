@@ -35,5 +35,6 @@ router.post('/', checkPermission('monitor', 'escrita'), cameraController.create)
 router.put('/:id', checkPermission('monitor', 'escrita'), cameraController.update);
 router.delete('/:id', checkPermission('monitor', 'escrita'), cameraController.delete);
 router.post('/:id/testar', checkPermission('monitor', 'leitura'), cameraController.testarConexao);
+router.post('/:id/diagnosticar', checkPermission('monitor', 'leitura'), cameraController.diagnosticar);
 
 module.exports = router;

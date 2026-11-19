@@ -26,7 +26,7 @@ const VPS_URL = (process.env.VPS_URL || '').replace(/\/+$/, '');
 const AGENT_TOKEN = process.env.AGENT_TOKEN;
 const AGENT_NAME = process.env.AGENT_NAME || 'Agente Local';
 const IA_URL = (process.env.IA_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
-const VERSAO = '3.0.0';
+const VERSAO = '3.1.0';
 const RAIZ_PROJETO = path.resolve(__dirname, '..', '..', '..');
 // Motor de IA desligado pelo painel: o vigia (ligar-ia-facial.ps1) não o religa enquanto existir
 const ARQ_MOTOR_DESLIGADO = path.join(__dirname, '..', '.motor-desligado');
@@ -247,6 +247,14 @@ const handlers = {
         }
     },
 
+    /**
+     * Teste de rede a partir do PC do evento (ferramenta de rede e "Diagnosticar" do painel): resolve o
+     * nome, faz ping e tenta abrir cada porta TCP. Substitui o Prompt de Comando da equipe de campo.
+     */
+    async rede_testar({ host, portas = [], timeoutMs = 2500 }) {
+        return testarRede(host, portas, timeoutMs);
+    },
+
     /** POST no motor de IA (biometria, verificação 1:1 dos leitores) */
     async ia_post({ path: caminho, body = {}, timeoutMs = 8000 }) {
         if (!['/api/verificar', '/api/extract', '/api/rostos'].includes(caminho)) throw new Error('Caminho inválido para a IA');
@@ -368,6 +376,56 @@ const handlers = {
         }
     }
 };
+
+// --- Teste de rede (rede_testar) ---
+const HOST_VALIDO = /^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$/;
+
+function tcpAbre(ip, porta, timeoutMs) {
+    return new Promise((resolve) => {
+        const inicio = Date.now();
+        const s = require('net').connect({ host: ip, port: porta });
+        let feito = false;
+        const fim = (aberta, erro = null) => {
+            if (feito) return;
+            feito = true;
+            s.destroy();
+            resolve({ porta, aberta, ms: aberta ? Date.now() - inicio : null, erro });
+        };
+        s.once('connect', () => fim(true));
+        s.once('error', (err) => fim(false, err.code === 'ECONNREFUSED' ? 'recusada' : (err.code || err.message)));
+        setTimeout(() => fim(false, 'sem resposta'), timeoutMs);
+    });
+}
+
+function pingar(ip) {
+    return new Promise((resolve) => {
+        const win = process.platform === 'win32';
+        const args = win ? ['-n', '1', '-w', '1500', ip] : ['-c', '1', '-W', '2', ip];
+        require('child_process').execFile('ping', args, { timeout: 4000, windowsHide: true }, (err, saida = '') => {
+            // No Windows, "Host de destino inacessível" também sai com código 0: a resposta válida tem TTL
+            const respondeu = /ttl=/i.test(saida);
+            const ms = (saida.match(/(?:tempo|time)[=<]\s*(\d+(?:[.,]\d+)?)\s*ms/i) || [])[1];
+            resolve({ ok: respondeu, ms: respondeu && ms ? Math.round(parseFloat(ms.replace(',', '.'))) : null, erro: respondeu ? null : (err?.killed ? 'sem resposta' : 'sem resposta ao ping') });
+        });
+    });
+}
+
+async function testarRede(host, portas, timeoutMs) {
+    const alvo = String(host || '').trim();
+    if (!HOST_VALIDO.test(alvo)) throw new Error('Endereço inválido');
+    const lista = [...new Set((Array.isArray(portas) ? portas : []).map(Number))].filter(p => Number.isInteger(p) && p > 0 && p < 65536).slice(0, 10);
+    const prazo = Math.min(Math.max(Number(timeoutMs) || 2500, 500), 8000);
+    let ip = alvo;
+    if (!require('net').isIP(alvo)) {
+        try {
+            ip = (await require('dns').promises.lookup(alvo)).address;
+        } catch {
+            return { host: alvo, ip: null, resolvido: false, ping: { ok: false, ms: null, erro: 'nome não encontrado' }, portas: lista.map(p => ({ porta: p, aberta: false, ms: null, erro: 'nome não encontrado' })) };
+        }
+    }
+    const [ping, ...resultado] = await Promise.all([pingar(ip), ...lista.map(p => tcpAbre(ip, p, prazo))]);
+    return { host: alvo, ip, resolvido: true, ping, portas: resultado, pc: AGENT_NAME };
+}
 
 // Vídeos sendo enviados ao servidor: streamId → { expiraEm, parar }
 const videos = new Map();
@@ -890,7 +948,7 @@ socket.on('connect', () => {
     socket.emit('agent:ready', {
         name: AGENT_NAME, version: VERSAO, ts: new Date().toISOString(),
         // O que este PC sabe fazer: o painel escolhe o caminho do vídeo e mostra o que falta instalar
-        recursos: { video_local: video.disponivel(), ffmpeg: video.temFfmpeg(), gravacao: video.temFfmpeg(), rostos_pelo_agente: true }
+        recursos: { video_local: video.disponivel(), ffmpeg: video.temFfmpeg(), gravacao: video.temFfmpeg(), rostos_pelo_agente: true, rede_testar: true }
     });
     setTimeout(() => { sincronizarRostos(); }, 5000);
 });

@@ -45,6 +45,20 @@ router.post('/', async (req, res) => {
     }
 });
 
+// Ferramenta de rede: ping + portas a partir do PC do evento (equipe de campo sem Prompt de Comando)
+router.post('/rede-testar', async (req, res) => {
+    try {
+        const { host, portas, agent_id } = req.body || {};
+        const r = await require('./redeTeste.service').testar({ eventoId: req.event.id, agentId: agent_id || null, host, portas });
+        logger.info(`[Rede] ${req.user?.email || req.user?.id} testou ${r.host} portas ${(r.portas || []).map(p => p.porta).join(',') || '-'} pelo ${r.origem}`);
+        return ApiResponse.success(res, r);
+    } catch (err) {
+        if (err.status) return ApiResponse.error(res, err.message, err.status);
+        logger.error(`[Rede] Falha no teste: ${err.message}`);
+        return ApiResponse.error(res, 'Erro ao testar a rede.');
+    }
+});
+
 // Desativa o agente (o token deixa de funcionar e a conexão atual é encerrada)
 router.delete('/:id', async (req, res) => {
     try {

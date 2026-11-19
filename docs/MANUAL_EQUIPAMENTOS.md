@@ -38,7 +38,13 @@ Sem acesso ao roteador do local (ex.: roteador do centro de convenções)? Leve 
 > **Atenção:** leitores com cabo e Wi-Fi ao mesmo tempo (ex.: SS 5541 MF W) podem ter **dois IPs**. Use só um e reserve esse.
 
 ### 2.3 Testar a rede
-No PC do evento, no Prompt de Comando: `ping 192.168.1.52` (troque pelo IP). Respostas com tempo baixo (< 10 ms no cabo) são o esperado. "Esgotado o tempo" significa equipamento desligado, rede diferente ou IP errado.
+Pelo painel: **Leitores e dispositivos > Testar rede do evento**. Digite o IP, escolha o atalho de portas (Leitor facial: 80; Câmera: 554 e 80; Servidor local: 3001) e clique em **Testar**. O teste sai do PC do evento, então mostra o que ele enxerga na rede local.
+- **Porta aberta**: o equipamento está na rede e o serviço responde.
+- **Ping responde, mas a porta não abre**: o equipamento está ligado, mas aquele serviço está desligado ou a porta é outra (ex.: RTSP desligado no menu da câmera).
+- **Nada responde**: equipamento desligado, rede diferente ou IP errado.
+- Alguns equipamentos não respondem ao ping mesmo ligados: vale o resultado das portas.
+
+O agente do PC do evento precisa estar atualizado (versão 3.1, rode `ligar-ia-facial.bat`). Sem o painel, no Prompt de Comando: `ping 192.168.1.52`.
 
 ### 2.4 Internet
 - Os leitores, hoje, **precisam do servidor para liberar** (modo online, seção 4.6). Sem internet, eles negam.
@@ -205,6 +211,10 @@ Depois de salvar: **Testar conexão**. Escolha o modo:
 Escolha também a gravação: desligada, contínua ou só em alertas.
 
 ### 5.3 Testar
+- **Diagnosticar** (Configurações > Câmeras, ou o ícone verde em Monitor > Gerenciar câmeras): testa, pela rede do evento, o cadastro, o PC do evento, o retransmissor de vídeo, a rede (ping e porta do vídeo), a imagem, o vídeo leve (miniatura), a IA e a gravação. Cada problema vem com a correção e, quando é cadastro, o botão **Editar câmera**. Leitura rápida:
+  - Rede com erro: câmera desligada, fora do switch do evento ou com IP trocado.
+  - Rede ok, imagem com erro: usuário, senha ou caminho do vídeo errado (confira o modelo em Configurações > Modelos de câmera).
+  - Miniatura com alerta: a câmera não tem sub-stream; preencha o endereço dele na câmera.
 - Central: a câmera aparece ao vivo, com fps e resolução no canto.
 - Fique na frente da câmera com o cadastro de teste: a caixa deve mostrar o nome (verde).
 - Alvo de watchlist aparece em vermelho, com alarme. Em **amarelo, "possível alvo"**, é rosto pequeno ou semelhança baixa: aproxime a câmera ou melhore a luz.
@@ -269,5 +279,3 @@ O objetivo é que tudo seja configurado pelo painel. Hoje, estes pontos ainda de
 | Outras marcas de leitor | Não suportadas | Cadastro de modelos + adaptador por marca |
 | Central pelo Tailscale / rede local | Arquivo `.env` do PC do evento | Opções na tela do agente |
 | Modo sem internet do leitor | A definir no teste com o equipamento | Opção por leitor no painel |
-| Diagnóstico de câmera | Botão "Testar conexão" (só diz se abre) | "Diagnosticar" da câmera, como o dos leitores |
-| Teste de rede genérico (qualquer IP/porta) | Prompt de Comando | Ferramenta de rede no painel, pelo agente |

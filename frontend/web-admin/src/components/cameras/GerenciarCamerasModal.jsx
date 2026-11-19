@@ -14,9 +14,11 @@ import {
     PlayArrow as TestIcon,
     CheckCircle as CheckCircleIcon,
     Error as ErrorIcon,
-    PowerSettingsNew as PowerIcon
+    PowerSettingsNew as PowerIcon,
+    FactCheck as DiagIcon
 } from '@mui/icons-material';
 import api from '../../services/api';
+import DiagnosticoCamera from './DiagnosticoCamera';
 import { useSnackbar } from 'notistack';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
 import CameraFormDialog from './CameraFormDialog';
@@ -38,6 +40,7 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
     const [testingId, setTestingId] = useState(null);
     const [togglingId, setTogglingId] = useState(null);
     const [togglingAll, setTogglingAll] = useState(false);
+    const [diagnosticando, setDiagnosticando] = useState(null);
 
     const temCameraAtiva = cameras.some(c => c.status !== 'desativada' && c.status !== 'inativa');
 
@@ -324,6 +327,19 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
                                                         </Tooltip>
                                                     )}
 
+                                                    {!isDesativada && (
+                                                        <Tooltip title="Diagnosticar: rede, imagem, IA e gravação, com a correção">
+                                                            <IconButton
+                                                                size="small"
+                                                                aria-label={`Diagnosticar ${c.nome}`}
+                                                                onClick={() => setDiagnosticando(c)}
+                                                                sx={{ color: '#00FF88', bgcolor: 'rgba(0, 255, 136, 0.08)' }}
+                                                            >
+                                                                <DiagIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    )}
+
                                                     <Tooltip title="Editar câmera">
                                                         <IconButton
                                                             size="small"
@@ -367,6 +383,12 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
                 eventoId={eventoId}
                 onClose={handleCloseForm}
                 onSalvo={triggerUpdate}
+            />
+
+            <DiagnosticoCamera
+                camera={diagnosticando}
+                onClose={() => setDiagnosticando(null)}
+                onEditar={handleOpenForm}
             />
         </Dialog>
     );

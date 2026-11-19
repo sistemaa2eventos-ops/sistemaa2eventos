@@ -678,6 +678,31 @@ class CameraController {
     }
 
     /**
+     * Diagnosticar: cadastro, PC do evento, rede, imagem, miniatura, IA e gravação, com a correção de
+     * cada problema (mesmo formato do "Diagnosticar" dos leitores)
+     */
+    async diagnosticar(req, res) {
+        try {
+            const cam = await cameraDoEvento(req, req.params.id);
+            if (!cam) return res.status(404).json({ error: 'Câmera não encontrada' });
+            const rota = rotaDaCamera(cam);
+            const r = await require('./cameraDiagnostico.service').diagnosticarCamera(cam, {
+                rota, rtsp: ehRtsp(cam), videoLocal: videoLocal(rota), agentService, chamarIa, buscarImagemHttp,
+                redeTeste: require('../devices/redeTeste.service')
+            });
+            const imagem = r.itens.find(i => i.chave === 'imagem');
+            if (imagem && imagem.estado !== 'nao_testado') {
+                await supabase.from('cameras_ip').update({ status: imagem.estado === 'erro' ? 'offline' : 'online', last_seen: new Date() })
+                    .eq('id', cam.id).eq('evento_id', cam.evento_id).or('status.is.null,status.not.in.(desativada,inativa)');
+            }
+            res.json({ success: true, data: r });
+        } catch (error) {
+            logger.error(`[diagnosticar câmera] ${error.message}`);
+            res.status(500).json({ error: 'Erro ao diagnosticar a câmera' });
+        }
+    }
+
+    /**
      * Proxy Snapshot (Evitar CORS e suportar streams RTSP)
      */
     async getSnapshot(req, res) {

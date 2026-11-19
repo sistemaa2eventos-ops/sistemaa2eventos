@@ -19,6 +19,7 @@ import PageHeader from '../../components/common/PageHeader';
 import ConfigIAFacial from './ConfigIAFacial';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
 import CameraFormDialog from '../../components/cameras/CameraFormDialog';
+import DiagnosticoCamera from '../../components/cameras/DiagnosticoCamera';
 import CamerasEventoBarra from '../../components/cameras/CamerasEventoBarra';
 import GravacoesPainel from '../../components/cameras/GravacoesPainel';
 import SeletorModo from '../../components/cameras/SeletorModo';
@@ -77,6 +78,7 @@ const ConfigCameras = ({ abaInicial = null }) => {
     const [cameraModalOpen, setCameraModalOpen] = useState(false);
     const [editingCamera, setEditingCamera] = useState(null);
     const [testingId, setTestingId] = useState(null);
+    const [diagnosticando, setDiagnosticando] = useState(null);
     const [testResults, setTestResults] = useState({});
     const [togglingId, setTogglingId] = useState(null);
     const [togglingAll, setTogglingAll] = useState(false);
@@ -411,12 +413,13 @@ const ConfigCameras = ({ abaInicial = null }) => {
                                                             variant="outlined"
                                                             size="small"
                                                             fullWidth
+                                                            title="Testa rede, imagem, IA e gravação e mostra como corrigir"
                                                             startIcon={isTesting ? <CircularProgress size={14} color="inherit" /> : <RefreshIcon />}
-                                                            onClick={() => handleTestCamera(cam.id)}
+                                                            onClick={() => setDiagnosticando(cam)}
                                                             disabled={isTesting}
                                                             sx={{ fontSize: '0.75rem', fontWeight: 700 }}
                                                         >
-                                                            Testar
+                                                            Diagnosticar
                                                         </Button>
                                                     )}
                                                     <Button
@@ -460,6 +463,19 @@ const ConfigCameras = ({ abaInicial = null }) => {
                 eventoId={eventoId}
                 onClose={() => setCameraModalOpen(false)}
                 onSalvo={fetchCameras}
+            />
+
+            <DiagnosticoCamera
+                camera={diagnosticando}
+                onClose={() => setDiagnosticando(null)}
+                onEditar={handleOpenModal}
+                onResultado={(cam, r) => {
+                    const imagem = r?.itens?.find(i => i.chave === 'imagem');
+                    if (!imagem || imagem.estado === 'nao_testado') return;
+                    const status = imagem.estado === 'erro' ? 'offline' : 'online';
+                    setTestResults(prev => ({ ...prev, [cam.id]: status }));
+                    setCameras(prev => prev.map(c => c.id === cam.id ? { ...c, status } : c));
+                }}
             />
         </Box>
     );
