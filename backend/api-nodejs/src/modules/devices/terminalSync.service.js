@@ -87,10 +87,15 @@ class TerminalSyncService {
 
             const enviar = [];
             const remover = [];
+            const suspender = []; // bloqueado/expulso: rosto fica no leitor, acesso negado
             for (const pessoa of pessoas) {
-                if (syncService._statusRemoveDosTerminais(pessoa)) { remover.push(pessoa); continue; }
+                if (syncService._statusSoRemoveDosTerminais(pessoa)) { remover.push(pessoa); continue; }
                 const areaIds = await syncService._getPessoaAreaIds(pessoa, ctxAreas);
                 if (!syncService._terminalAceitaPessoa(terminal, areaIds)) { remover.push(pessoa); continue; }
+                if (syncService._statusSuspendeNosTerminais(pessoa)) {
+                    (syncService._terminalRemoveBloqueado(terminal) ? remover : suspender).push(pessoa);
+                    continue;
+                }
                 if (pessoa.foto_url) enviar.push(pessoa);
             }
 
@@ -106,6 +111,12 @@ class TerminalSyncService {
                 for (const pessoa of remover) {
                     for (const id of getHwUserIdCandidates(pessoa)) await directService.deleteUser(id);
                 }
+                // Após limpar o leitor (reset) o bloqueado já não está nele: não há o que suspender
+                for (const pessoa of suspender) {
+                    try { await syncService._suspenderNoTerminal(directService, pessoa); } catch (err) {
+                        logger.warn(`⚠️ Não suspendeu ${pessoa.nome_completo} em ${terminal.nome}: ${err.message}`);
+                    }
+                }
             }
 
             let totalNoTerminal = null;
@@ -119,7 +130,7 @@ class TerminalSyncService {
                 faces_cadastradas: totalNoTerminal ?? successCount
             }).eq('id', terminalId);
 
-            return { success: true, count: successCount, total: enviar.length, removidos: remover.length, usuarios_no_terminal: totalNoTerminal };
+            return { success: true, count: successCount, total: enviar.length, removidos: remover.length, suspensos: suspender.length, usuarios_no_terminal: totalNoTerminal };
         } catch (error) {
             logger.error(`❌ Erro na sincronização do terminal ${terminalId}: ${error.message}`);
             if (terminal) {

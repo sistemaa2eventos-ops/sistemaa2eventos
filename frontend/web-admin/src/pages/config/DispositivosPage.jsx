@@ -295,6 +295,11 @@ export default function DispositivosPage() {
   };
 
   const handleSync = (id) => runAction(id, 'sync', () => api.post(`/dispositivos/${id}/sync`), 'Sincronização iniciada');
+  // Apaga todos os rostos do leitor e reenvia só quem tem acesso a ele (leitor bagunçado, fim de evento, equipamento alugado)
+  const handleReset = (device) => {
+    if (!window.confirm(`Apagar TODOS os rostos de "${device.nome}" e enviar de novo só quem tem acesso a ele?\n\nDurante alguns minutos o leitor pode não reconhecer as pessoas.`)) return;
+    runAction(device.id, 'reset', () => api.post(`/dispositivos/${device.id}/sync?reset=true`), 'Leitor limpo e sincronização iniciada');
+  };
   const handleOpenDoor = (id) => runAction(id, 'open', () => api.post(`/dispositivos/${id}/remote-open`), 'Porta ABERTA (pulso)');
   const handleUnlockDoor = (id) => runAction(id, 'unlock', () => api.post(`/dispositivos/${id}/remote-unlock`), 'Acesso LIBERADO permanentemente');
   const handleLockDoor = (id) => runAction(id, 'lock', () => api.post(`/dispositivos/${id}/remote-lock`), 'Porta TRAVADA (bloqueio total)');
@@ -469,6 +474,18 @@ export default function DispositivosPage() {
                   disabled={isDevLoading(device.id, 'sync') || !isOnline}
                   sx={{ color: CYAN, fontSize: '0.75rem', minWidth: 0 }}>
                   Sync
+                </Button>
+              </span>
+            </Tooltip>
+            <Tooltip title="Apagar todos os rostos do leitor e enviar de novo só quem tem acesso (leitor com pessoas erradas, fim de evento)">
+              <span>
+                <Button size="small"
+                  aria-label={`Limpar e sincronizar ${device.nome}`}
+                  startIcon={isDevLoading(device.id, 'reset') ? <CircularProgress size={12} /> : null}
+                  onClick={() => handleReset(device)}
+                  disabled={isDevLoading(device.id, 'reset') || !isOnline}
+                  sx={{ color: '#FFB800', fontSize: '0.75rem', minWidth: 0 }}>
+                  Limpar e sincronizar
                 </Button>
               </span>
             </Tooltip>
@@ -931,6 +948,22 @@ export default function DispositivosPage() {
                   </Select>
                   <Box sx={{ fontSize: '0.72rem', color: '#94A3B8', mt: 0.5 }}>
                     Em modo online, se o leitor não alcança o servidor, ele nega o acesso. Liberar sem servidor ainda não está disponível.
+                  </Box>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth size="small">
+                  <InputLabel id="bloqueado-leitor-label" htmlFor="bloqueado-leitor-select">Pessoa bloqueada ou expulsa neste leitor</InputLabel>
+                  <Select labelId="bloqueado-leitor-label" inputProps={{ id: 'bloqueado-leitor-select', name: 'bloqueado_no_leitor' }}
+                    value={formData.config?.bloqueado_no_leitor === 'remover' ? 'remover' : 'suspender'}
+                    onChange={e => setFormData(p => ({ ...p, config: { ...(p.config || {}), bloqueado_no_leitor: e.target.value } }))}
+                    label="Pessoa bloqueada ou expulsa neste leitor">
+                    <MenuItem value="suspender">Manter cadastrada e suspensa (desbloqueio volta na hora)</MenuItem>
+                    <MenuItem value="remover">Remover do leitor</MenuItem>
+                  </Select>
+                  <Box sx={{ fontSize: '0.72rem', color: '#94A3B8', mt: 0.5 }}>
+                    Suspensa: o rosto fica no leitor com a validade vencida e ele nega a passagem até o sistema desbloquear.
+                    Confira no equipamento (teste do manual) antes de usar sem internet. Leitor que não suporta suspensão remove a pessoa.
                   </Box>
                 </FormControl>
               </Grid>

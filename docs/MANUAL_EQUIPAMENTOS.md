@@ -1,0 +1,239 @@
+# Manual de equipamentos — configurar, testar e corrigir
+
+**Para quem é:** a equipe técnica que monta o evento (rede, PC do evento, câmeras e leitores faciais).
+Não é preciso saber programar. Tudo o que está aqui é feito pelo painel (`https://painel.nzt.app.br`), pela Central de Monitoramento do PC do evento ou no próprio equipamento.
+
+**Como usar:** siga as seções 1 a 5 na montagem, na ordem. A seção 6 é para quando algo dá errado. A seção 8 lista o que ainda exige um desenvolvedor.
+
+---
+
+## 1. Antes de sair para o evento
+
+- [ ] Evento criado no painel, com áreas cadastradas (ex.: Portaria, Produção, Camarim).
+- [ ] Lotes de pulseira com as áreas de cada um (Configurações > Pulseiras).
+- [ ] PC do evento com o sistema instalado (pasta `C:\Projetos\Projeto_A2_Eventos`) e o agente vinculado ao evento.
+- [ ] Usuário e senha de cada câmera e leitor anotados em local seguro (nunca no grupo de mensagens).
+- [ ] Um cadastro de teste com foto (você mesmo), para testar cada leitor e câmera.
+- [ ] Cabos de rede sobrando e um switch. Leitor e câmera **no cabo** sempre que possível; Wi-Fi só se não houver opção.
+
+---
+
+## 2. Rede e roteador
+
+Cada evento pode ter um roteador diferente. O que importa é o mesmo em todos:
+
+### 2.1 Tudo na mesma rede
+PC do evento, câmeras e leitores precisam estar na **mesma rede** (ex.: todos com IP `192.168.1.x`). Confira o IP do PC: no Windows, `ipconfig` no Prompt de Comando.
+
+### 2.2 IP fixo para cada equipamento (obrigatório)
+Se o roteador trocar o IP de um leitor ou câmera no meio do evento, ele some do sistema (já aconteceu: o leitor .51 virou .52).
+
+No roteador, procure **"Reserva de DHCP"**, **"Endereço IP estático"** ou **"Address Reservation"**. O nome muda conforme a marca; costuma ficar em LAN, DHCP ou Rede local. Para cada equipamento:
+1. Encontre-o na lista de clientes conectados (pelo nome ou pelo endereço MAC, que vem na etiqueta do equipamento).
+2. Reserve o IP atual dele.
+3. Anote numa tabela: nome, IP, MAC e local.
+
+Sem acesso ao roteador do local (ex.: roteador do centro de convenções)? Leve um roteador próprio e ligue os equipamentos nele.
+
+> **Atenção:** leitores com cabo e Wi-Fi ao mesmo tempo (ex.: SS 5541 MF W) podem ter **dois IPs**. Use só um e reserve esse.
+
+### 2.3 Testar a rede
+No PC do evento, no Prompt de Comando: `ping 192.168.1.52` (troque pelo IP). Respostas com tempo baixo (< 10 ms no cabo) são o esperado. "Esgotado o tempo" significa equipamento desligado, rede diferente ou IP errado.
+
+### 2.4 Internet
+- Os leitores, hoje, **precisam do servidor para liberar** (modo online, seção 4.6). Sem internet, eles negam.
+- O vídeo ao vivo **não** depende de internet: a Central roda no PC do evento.
+- Em local com internet instável, avise a coordenação antes do evento (ver seção 8, item "modo sem internet").
+
+---
+
+## 3. PC do evento
+
+### 3.1 Ligar
+Dê dois cliques em `C:\Projetos\Projeto_A2_Eventos\ligar-ia-facial.bat`. Ele:
+- liga o motor de IA, o agente e o retransmissor de vídeo;
+- abre a **Central de Monitoramento** no navegador;
+- fica vigiando e religa o que cair. **Deixe essa janela aberta** durante todo o evento.
+
+### 3.2 Conferir
+- Painel > Monitor > aba **Saúde**: "Saúde do vídeo (PC do evento)" deve listar as câmeras com fps.
+- Central (`http://localhost:8766/central/`): selo verde "Câmeras ao vivo", "Vídeo direto (WebRTC)" e "IA na GPU".
+- Para abrir a Central de novo: `abrir-central.bat`.
+
+### 3.3 Energia e Windows
+- No Windows, configure para **nunca suspender nem desligar a tela** quando estiver na tomada.
+- Desative a atualização automática do Windows nos dias do evento.
+- Ligue o PC na tomada (de preferência com nobreak).
+
+---
+
+## 4. Leitores faciais (catracas e portarias)
+
+### 4.1 Marcas suportadas
+
+| Marca | Situação |
+|---|---|
+| **Intelbras** (SS 5530, SS 5541 e similares) | Completa e testada |
+| **Dahua** | Mesma API da Intelbras; tratar como Intelbras |
+| **Hikvision** | **Limitada:** o sistema ainda não envia a foto ao leitor. Não usar para reconhecimento até ser corrigido (seção 8) |
+| Outras | Não suportadas: o sistema trataria como Hikvision. Não usar |
+
+### 4.2 Preparar o leitor (no próprio equipamento)
+1. Ligue o leitor no cabo de rede e reserve o IP no roteador (2.2).
+2. Acerte **data, hora e fuso** (GMT-3, Brasília). Relógio errado faz o leitor negar ou registrar horário errado.
+3. Anote usuário e senha de administrador.
+4. Leitor que já foi usado com outro sistema: veja 6.2 ("nega todo mundo").
+
+### 4.3 Cadastrar no painel
+Configurações > **Dispositivos** > novo dispositivo:
+
+| Campo | O que colocar |
+|---|---|
+| Nome | Onde está: "Portaria Principal", "Camarim" |
+| Marca | Intelbras ou Dahua |
+| IP e porta | IP reservado; porta 80 |
+| Usuário e senha | Os do leitor |
+| Área | A área que ele controla. **Sem área = todos os cadastrados entram nele** |
+| Modo | **Credenciamento** (só identifica e abre a ficha para o operador) ou acesso (libera a passagem) |
+| Fluxo | Entrada, saída ou alternado (entra e sai pelo mesmo leitor) |
+| Conexão com o leitor | O agente do PC do evento (quando a API está na nuvem) |
+| Controla relé | Ligado se o leitor abre a catraca/porta |
+| Confirmação pela IA | Deixe "o leitor decide". Use a IA só em área crítica |
+| Pessoa bloqueada ou expulsa | **Manter cadastrada e suspensa** (padrão) ou Remover (ver 4.7) |
+| Usar também como câmera | Opcional: o vídeo do leitor aparece nas câmeras |
+
+Depois de salvar:
+1. **Config Online**: aponta o leitor para o servidor. A janela pede o endereço e a porta do servidor; deixe em branco para usar o padrão do sistema. Faça sempre depois de trocar IP, servidor ou firmware.
+2. **Sync**: envia as pessoas das áreas deste leitor.
+3. Confira o status **online** no card do leitor.
+
+### 4.4 Quem vai para cada leitor
+- Leitor de **credenciamento**: todos do evento.
+- Leitor **sem área**: todos do evento.
+- Leitor **com área**: só quem tem aquela área (pela ficha da pessoa ou pelo lote da pulseira).
+
+Mudou alguma coisa (expulsão, bloqueio, área, pulseira, lote, foto)? O sistema atualiza os leitores **sozinho, em segundos**. Leitor desligado recebe as mudanças quando voltar.
+
+### 4.5 Testes obrigatórios (com o cadastro de teste)
+Faça em cada leitor, antes de abrir as portas:
+
+| Teste | Esperado |
+|---|---|
+| Pessoa liberada para a área passa | Libera e registra no Monitor |
+| Pessoa **sem** a área | Nega |
+| **Bloqueie** a pessoa no painel e tente passar | Nega em até alguns segundos |
+| **Desbloqueie** (com motivo) e tente de novo | Libera |
+| Dê uma área nova à pessoa e teste no leitor dessa área | Libera em até alguns segundos |
+| Leitor alternado: passe duas vezes | 1ª entrada, 2ª saída |
+
+### 4.6 Sem internet (modo online)
+Hoje os leitores ficam em **modo online**: a cada passagem perguntam ao servidor, que aplica todas as regras na hora (área, horário, antirretorno, bloqueio). Se o leitor não alcança o servidor, **ele nega**.
+
+O comportamento sem internet (o leitor decidir sozinho com a lista que já tem) **ainda vai ser testado no equipamento** e entrará aqui. Até lá, não prometa funcionamento sem internet.
+
+### 4.7 Bloqueado ou expulso
+- **Manter cadastrada e suspensa (padrão):** o rosto continua no leitor com a validade vencida, e ele nega a passagem. Ao desbloquear (com motivo), o sistema renova a validade e a pessoa volta a passar na hora.
+- **Remover do leitor:** o rosto sai do leitor; ao desbloquear, é cadastrado de novo.
+- Recusados e inativos sempre saem do leitor.
+- Leitor que não suporta suspensão (hoje: Hikvision) remove automaticamente.
+
+**Teste a suspensão no equipamento** (bloqueie, tente passar; desbloqueie, tente passar) antes de depender dela sem internet.
+
+---
+
+## 5. Câmeras
+
+### 5.1 Configurar na própria câmera (app ou página da câmera)
+- Usuário e senha para RTSP (na Mercusys/Tapo: "Conta da câmera" no app).
+- **Sub-stream em 720p e 8 a 10 quadros por segundo.** É o vídeo que a IA analisa; deixá-lo leve é o que mais alivia o PC do evento.
+- Stream principal na resolução máxima (é o que aparece na tela grande da Central).
+- Câmera apontada para onde os rostos passam de frente, na altura das pessoas, sem contraluz (porta com sol atrás é o pior caso).
+
+### 5.2 Cadastrar no painel
+Monitor > Câmeras > **Gerenciar câmeras** > nova câmera. Escolha o fabricante e preencha IP, porta, usuário e senha: o sistema monta o endereço sozinho.
+
+| Fabricante no painel | Endereço principal | Sub-stream |
+|---|---|---|
+| Mercusys / Tapo | `rtsp://IP:554/stream1` | `stream2` |
+| Intelbras (e Dahua) | `rtsp://IP:554/cam/realmonitor?channel=1&subtype=0` | `subtype=1` |
+| Hikvision | `rtsp://IP:554/Streaming/Channels/101` | `102` |
+| Genérica | Informe o endereço RTSP completo do manual da câmera | Informe o do sub-stream |
+| RTSP / OBS / Webcam | Webcam do PC: escreva `webcam` (ou `webcam:1` para a segunda) | — |
+
+Câmera de marca sem modelo pronto: use **Genérica** e descubra o endereço RTSP no manual do fabricante, ou com o programa gratuito *ONVIF Device Manager* (mostra os endereços de câmeras ONVIF da rede).
+
+Depois de salvar: **Testar conexão**. Escolha o modo:
+- **Só monitorar:** vídeo, sem IA.
+- **IA ao assistir:** reconhece só com alguém olhando.
+- **IA 24 h:** reconhece e alerta o tempo todo.
+
+Escolha também a gravação: desligada, contínua ou só em alertas.
+
+### 5.3 Testar
+- Central: a câmera aparece ao vivo, com fps e resolução no canto.
+- Fique na frente da câmera com o cadastro de teste: a caixa deve mostrar o nome (verde).
+- Alvo de watchlist aparece em vermelho, com alarme. Em **amarelo, "possível alvo"**, é rosto pequeno ou semelhança baixa: aproxime a câmera ou melhore a luz.
+
+---
+
+## 6. Problemas comuns
+
+### 6.1 Câmeras
+
+| Sintoma | Causa provável | O que fazer |
+|---|---|---|
+| "Senha incorreta" / sem imagem | Usuário/senha RTSP errados | Edite a câmera e digite a senha de novo (o painel não mostra a senha salva) |
+| Imagem travada ou "foto parada" no painel | Painel aberto fora do PC do evento: lá é 1 imagem/s de propósito | Use a **Central** no PC do evento para tempo real |
+| Imagem travando na Central | Wi-Fi fraco na câmera ou PC sem folga | Câmera no cabo; confira a aba Saúde (fps baixo); sub-stream em 720p/8-10 fps |
+| Sempre "Desconhecido" | Pessoa sem foto/biometria, de outro evento, ou rosto pequeno | Confira o cadastro; aproxime a câmera; veja o motivo no diagnóstico da IA (Configurações > IA facial) |
+| Câmera sumiu depois de um tempo | IP mudou | Reserve o IP no roteador (2.2) e corrija na câmera |
+
+### 6.2 Leitores
+
+| Sintoma | Causa provável | O que fazer |
+|---|---|---|
+| Leitor **offline** no painel | Desligado, IP mudou, rede diferente | `ping` no IP (2.3); reserve o IP; edite o IP no painel |
+| Nega todo mundo, mesmo cadastrado | Relógio errado ou configuração antiga de outro sistema | Acerte data/hora/fuso; firmware novo (SS 5541 MF W 3.x) com config antiga: restaurar padrão mantendo a rede e fazer **Config Online** de novo |
+| Não reconhece uma pessoa | Sem foto, sem a área do leitor, ou foto ruim | Confira a ficha (foto e áreas); **Sync** no leitor |
+| Ficha não abre para o operador (credenciamento) | Leitor sem operador vinculado | Vincule o leitor à estação do operador |
+| Libera quem não devia | Leitor sem área (todos entram nele) | Defina a área do leitor |
+| Muitas pessoas erradas no leitor | Leitor dessincronizado | **Limpar e sincronizar** no card do leitor (apaga os rostos e manda a lista certa) |
+
+### 6.3 PC do evento
+
+| Sintoma | O que fazer |
+|---|---|
+| Central não abre | Rode `ligar-ia-facial.bat` e depois `abrir-central.bat` |
+| "Motor de IA desligado" | Painel > IA: ligue o motor; ou rode `ligar-ia-facial.bat` |
+| Lento | Gerenciador de Tarefas: veja CPU de python, ffmpeg e go2rtc; reduza câmeras em "IA 24 h" e confira o sub-stream das câmeras |
+
+---
+
+## 7. Atualizar equipamentos e encerrar o evento
+
+### Atualizar firmware de leitor ou câmera
+- Só fora do horário de operação.
+- Depois: acerte o relógio, faça **Config Online** e **Sync** (leitor) ou **Testar conexão** (câmera).
+- Firmware novo pode apagar a configuração: refaça os testes da seção 4.5.
+
+### Fim do evento
+- **Esvaziar** os leitores alugados ou de terceiros: restaure o padrão de fábrica no próprio leitor (o botão "Limpar e sincronizar" apaga e **reenvia** as pessoas do evento, então não esvazia). Um botão "Esvaziar leitor" no painel está na lista da seção 8. Biometria é dado sensível (LGPD): não deixe rostos em equipamento que vai para outro lugar.
+- As gravações ficam no PC do evento (`NZT-Gravacoes`) e são apagadas pelo prazo configurado.
+
+---
+
+## 8. O que ainda não dá para fazer pela interface
+
+O objetivo é que tudo seja configurado pelo painel. Hoje, estes pontos ainda dependem de um desenvolvedor:
+
+| O quê | Hoje | Plano |
+|---|---|---|
+| Endereço padrão do servidor para os leitores | Digitado em cada "Config Online"; o padrão vem do arquivo `.env` da VPS | Padrão editável em Configurações |
+| Modelos de câmera (padrão de endereço RTSP) | Fixos no código (4 fabricantes) | Cadastro de modelos no painel, editável |
+| Leitores Hikvision | Não enviam a foto | Completar o adaptador e testar com um equipamento |
+| Outras marcas de leitor | Não suportadas | Cadastro de modelos + adaptador por marca |
+| Central pelo Tailscale / rede local | Arquivo `.env` do PC do evento | Opções na tela do agente |
+| Modo sem internet do leitor | A definir no teste com o equipamento | Opção por leitor no painel |
+| Empresa bloqueada | O servidor nega, mas os funcionários continuam no leitor | Suspender todos da empresa nos leitores |
+| Teste de rede (ping, porta, relógio do leitor) | Prompt de Comando | Botão "Diagnosticar" no painel, pelo agente |
+| Esvaziar um leitor no fim do evento | Restaurar padrão no próprio leitor | Botão "Esvaziar leitor" no painel |

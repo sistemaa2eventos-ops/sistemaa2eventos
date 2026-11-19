@@ -7,6 +7,30 @@ const { getNowLocal } = require('../../utils/dateUtils');
 
 const INSTANCIAS = new Map();
 
+// Validade de quem está suspenso (bloqueado/expulso): janela no passado, o leitor reconhece e nega
+const VALIDADE_SUSPENSO = { ValidFrom: '2000-01-01 00:00:00', ValidTo: '2000-01-01 00:00:01' };
+const VALIDADE_NORMAL = { ValidFrom: '2020-01-01 00:00:00', ValidTo: '2037-12-31 23:59:59' };
+
+/** Registro do usuário no terminal (mesmos campos no cadastro, na atualização e na suspensão) */
+function registroUsuario(hwUserId, nome, suspenso) {
+    return {
+        UserID: String(hwUserId),
+        UserName: nome,
+        UserType: 0,
+        Authority: 0, // 0 = Usuário comum (1 = Admin no firmware Intelbras)
+        Doors: [0, 1], // Porta 1 e Porta 2 liberadas
+        TimeSections: [255, 255], // 255 = Período 24h irrestrito (um por porta)
+        // Firmware novo (ex.: SS 5541 MF W 3.x) usa a permissão por porta abaixo;
+        // sem ela o terminal nega localmente (ErrorCode 18) mesmo com o servidor liberando.
+        // Firmware antigo ignora o campo.
+        MultiTimeSections: [
+            { Door: 0, TimeSections: [255] },
+            { Door: 1, TimeSections: [255] }
+        ],
+        ...(suspenso ? VALIDADE_SUSPENSO : VALIDADE_NORMAL)
+    };
+}
+
 class IntelbrasService extends AccessDevice {
     constructor(config) {
         super(config);
@@ -224,26 +248,8 @@ class IntelbrasService extends AccessDevice {
 
             logger.info('Registering person on Intelbras (V2)', { person_name: safeName, hw_user_id: hwUserId, device_ip: this.ip });
 
-            // 1. Usuário com permissão de portas e validade
-            const userData = {
-                UserList: [{
-                    UserID: String(hwUserId),
-                    UserName: safeName,
-                    UserType: 0,
-                    Authority: 0, // 0 = Usuário comum (1 = Admin no firmware Intelbras)
-                    Doors: [0, 1], // Porta 1 e Porta 2 liberadas
-                    TimeSections: [255, 255], // 255 = Período 24h irrestrito (um por porta)
-                    // Firmware novo (ex.: SS 5541 MF W 3.x) usa a permissão por porta abaixo;
-                    // sem ela o terminal nega localmente (ErrorCode 18) mesmo com o servidor liberando.
-                    // Firmware antigo ignora o campo.
-                    MultiTimeSections: [
-                        { Door: 0, TimeSections: [255] },
-                        { Door: 1, TimeSections: [255] }
-                    ],
-                    ValidFrom: '2020-01-01 00:00:00',
-                    ValidTo: '2037-12-31 23:59:59'
-                }]
-            };
+            // 1. Usuário com permissão de portas e validade (validade normal: desfaz uma suspensão)
+            const userData = { UserList: [registroUsuario(hwUserId, safeName, false)] };
 
             const userExists = await this._userExists(hwUserId);
             await this._postJson('/cgi-bin/AccessUser.cgi', { action: userExists ? 'updateMulti' : 'insertMulti' }, userData);
@@ -336,6 +342,22 @@ class IntelbrasService extends AccessDevice {
     /**
      * Remover Usuário do Terminal
      */
+    /**
+     * Suspende a pessoa: mantém usuário e rosto no terminal, com a validade vencida (o terminal nega).
+     * Quem ainda não está no terminal não é criado (não há o que negar). Desbloqueio: enrollUser
+     * grava a validade normal de novo.
+     * @returns {boolean} true se suspendeu, false se a pessoa não estava no terminal
+     */
+    async suspendUser(pessoa) {
+        const hwUserId = getHwUserId(pessoa);
+        if (!hwUserId) throw new Error('Dados inválidos para suspender no terminal: pessoa.id e pessoa.cpf ausentes.');
+        if (!(await this._userExists(hwUserId))) return false;
+        const nome = (pessoa?.nome_completo || pessoa?.nome || 'SEM NOME').trim().substring(0, 31);
+        await this._postJson('/cgi-bin/AccessUser.cgi', { action: 'updateMulti' }, { UserList: [registroUsuario(hwUserId, nome, true)] });
+        logger.info('User suspended on device (face kept, validity expired)', { device_ip: this.ip, hw_user_id: hwUserId });
+        return true;
+    }
+
     async deleteUser(userId) {
         try {
             // No V2, a remoção de usuários é via GET com UserIDList
@@ -623,3 +645,4 @@ class IntelbrasService extends AccessDevice {
 }
 
 module.exports = IntelbrasService;
+module.exports.registroUsuario = registroUsuario;

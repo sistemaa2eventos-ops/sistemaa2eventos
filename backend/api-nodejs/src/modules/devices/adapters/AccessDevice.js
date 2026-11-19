@@ -20,6 +20,13 @@ class AccessDevice {
     
     /** Remove pessoa do hardware */
     async deleteUser(userId) { throw new Error('Método deleteUser() precisa ser implementado.'); }
+
+    /**
+     * Suspende a pessoa no hardware: o rosto continua cadastrado, mas o leitor nega (validade vencida).
+     * Usado para bloqueado/expulso, que pode ser desbloqueado a qualquer momento com motivo.
+     * Equipamento sem suporte: o sistema remove a pessoa do leitor (mais seguro).
+     */
+    async suspendUser(pessoa) { throw new Error('Método suspendUser() não suportado por este equipamento.'); }
     
     /** Aciona o rele 1 para abrir a porta */
     async openDoor() { throw new Error('Método openDoor() precisa ser implementado.'); }

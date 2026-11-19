@@ -680,9 +680,12 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
 
             // O mesmo comando ainda pendente para a mesma pessoa/leitor é substituído pelo novo
             // (leitor offline por horas acumulava um cadastro repetido a cada alteração)
+            // Cadastrar e suspender são estados da mesma pessoa no leitor: vale só o último (bloqueia e
+            // desbloqueia com o leitor fora do ar → ao voltar, fica liberada, não suspensa)
             if (pessoaId) {
+                const substitui = ['enroll_face', 'suspend_user'].includes(tipo) ? ['enroll_face', 'suspend_user'] : [tipo];
                 await supabase.from('terminal_sync_queue').delete()
-                    .eq('dispositivo_id', dispositivoId).eq('tipo_comando', tipo)
+                    .eq('dispositivo_id', dispositivoId).in('tipo_comando', substitui)
                     .eq('pessoa_id', pessoaId).in('status', ['pendente', 'erro']);
             }
 
@@ -806,6 +809,8 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
                         await service.enrollUser(payload.pessoa, optimizedPhoto);
                     } else if (item.tipo_comando === 'delete_face') {
                         await service.deleteUser(payload.hwUserId);
+                    } else if (item.tipo_comando === 'suspend_user') {
+                        await this._suspenderNoTerminal(service, payload.pessoa);
                     }
 
                     // Sucesso
@@ -851,6 +856,36 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
         return !!pessoa?.bloqueado
             || pessoa?.ativo === false
             || ['bloqueado', 'recusado', 'expulso'].includes(pessoa?.status_acesso);
+    }
+
+    /**
+     * Bloqueado/expulso pode ser desbloqueado a qualquer momento (com motivo): fica no leitor com o rosto,
+     * SUSPENSO (validade vencida, o leitor nega até o sistema liberar de novo).
+     */
+    _statusSuspendeNosTerminais(pessoa) {
+        return !this._statusSoRemoveDosTerminais(pessoa)
+            && (!!pessoa?.bloqueado || ['bloqueado', 'expulso'].includes(pessoa?.status_acesso));
+    }
+
+    /** Inativo ou recusado: sai do leitor */
+    _statusSoRemoveDosTerminais(pessoa) {
+        return pessoa?.ativo === false || pessoa?.status_acesso === 'recusado';
+    }
+
+    /** Leitor configurado para remover (em vez de suspender) quem está bloqueado: config.bloqueado_no_leitor */
+    _terminalRemoveBloqueado(terminal) {
+        return terminal?.config?.bloqueado_no_leitor === 'remover';
+    }
+
+    /** Suspende no leitor; equipamento sem suporte à suspensão: remove (mais seguro). Devolve 'suspenso' | 'removido' */
+    async _suspenderNoTerminal(service, pessoa) {
+        const AccessDevice = require('./adapters/AccessDevice');
+        if (typeof service.suspendUser !== 'function' || service.suspendUser === AccessDevice.prototype.suspendUser) {
+            for (const id of getHwUserIdCandidates(pessoa)) await service.deleteUser(id);
+            return 'removido';
+        }
+        await service.suspendUser(pessoa);
+        return 'suspenso';
     }
 
     /**
@@ -915,10 +950,12 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
             }
 
             const nome = pessoa.nome_completo || pessoa.nome;
-            if (this._statusRemoveDosTerminais(pessoa)) {
-                logger.info(`🔄 [Sync] ${nome} está ${pessoa.status_acesso}/bloqueado — removendo dos terminais.`);
+            if (this._statusSoRemoveDosTerminais(pessoa)) {
+                logger.info(`🔄 [Sync] ${nome} está ${pessoa.ativo === false ? 'inativo' : pessoa.status_acesso} — removendo dos terminais.`);
                 return this.deleteUserFromAllDevices(pessoa, pessoa.evento_id, ctx);
             }
+            const suspenso = this._statusSuspendeNosTerminais(pessoa);
+            if (suspenso) logger.info(`🔄 [Sync] ${nome} está ${pessoa.status_acesso || 'bloqueado'} — suspenso nos terminais (rosto mantido, acesso negado).`);
 
             logger.debug(`🔄 Auto-Sync: Processando ${nome} para terminais...`);
 
@@ -934,15 +971,15 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
             const fotoInput = pessoa.foto_url || pessoa.foto_base64_cache || pessoa.foto_base64_internal;
             const areaIds = await this._getPessoaAreaIds(pessoa, ctx);
             const hwIds = getHwUserIdCandidates(pessoa);
-            const resultado = { cadastrados: [], removidos: [], enfileirados: [], ignorados: [] };
+            const resultado = { cadastrados: [], removidos: [], suspensos: [], enfileirados: [], ignorados: [] };
 
             let optimizedPhoto = null;
 
             for (const terminal of terminais) {
                 const online = terminal.status_online === 'online';
 
-                // Terminal de outra área: garantir que a pessoa NÃO está nele
-                if (!this._terminalAceitaPessoa(terminal, areaIds)) {
+                // Terminal de outra área (ou leitor que remove bloqueados): garantir que a pessoa NÃO está nele
+                if (!this._terminalAceitaPessoa(terminal, areaIds) || (suspenso && this._terminalRemoveBloqueado(terminal))) {
                     if (online) {
                         const service = DeviceFactory.getDevice(terminal);
                         for (const id of hwIds) await service.deleteUser(id);
@@ -950,6 +987,24 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
                         for (const id of hwIds) await this.addToTerminalQueue(terminal.id, 'delete_face', { hwUserId: id });
                     }
                     resultado.removidos.push(terminal.nome);
+                    continue;
+                }
+
+                // Bloqueado/expulso: rosto fica, acesso negado até o sistema liberar
+                if (suspenso) {
+                    if (!online) {
+                        await this.addToTerminalQueue(terminal.id, 'suspend_user', { pessoa });
+                        resultado.enfileirados.push(terminal.nome);
+                        continue;
+                    }
+                    try {
+                        const r = await this._suspenderNoTerminal(DeviceFactory.getDevice(terminal), pessoa);
+                        (r === 'suspenso' ? resultado.suspensos : resultado.removidos).push(terminal.nome);
+                    } catch (err) {
+                        logger.warn(`⚠️ Erro ao suspender ${nome} em ${terminal.nome}: ${err.message}. Enfileirando...`);
+                        await this.addToTerminalQueue(terminal.id, 'suspend_user', { pessoa });
+                        resultado.enfileirados.push(terminal.nome);
+                    }
                     continue;
                 }
 
@@ -1556,6 +1611,12 @@ class SyncService extends EventEmitter {  // ← EXTENDE EventEmitter
 
                 // 4. Analisar cada pessoa e verificar acessos
                 for (const pessoa of pessoas) {
+                    // Bloqueado/expulso fica suspenso no leitor (rosto mantido, acesso negado): não apagar
+                    if (this._statusSuspendeNosTerminais(pessoa)) {
+                        await this.syncUserToAllDevices(pessoa, ctx);
+                        await this.sleep(100);
+                        continue;
+                    }
                     let acessoPermitidoHoje = false;
                     const isAtivo = ['autorizado', 'checkin_feito', 'checkout_feito'].includes(pessoa.status_acesso);
                     
