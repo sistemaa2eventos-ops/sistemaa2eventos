@@ -218,6 +218,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/lgpd', lgpdRoutes);
 app.use('/api/watchlist', watchlistRoutes);
+app.use('/api/modelos-camera', require('./modules/system/modelosCamera.routes'));
 app.use('/api/cameras', cameraRoutes);
 app.use('/api/gravacoes', require('./modules/system/gravacao.routes'));
 app.use('/api/ia-servidores', require('./modules/system/iaServidores.routes'));

@@ -924,6 +924,52 @@ class DeviceController {
             res.status(500).json({ error: error.message });
         }
     }
+
+    /** Leitor do evento em foco (null se não for deste evento) */
+    async _leitorDoEvento(req) {
+        const { data } = await supabase.from('dispositivos_acesso').select('*')
+            .eq('id', req.params.id).eq('evento_id', req.event?.id).maybeSingle();
+        return data || null;
+    }
+
+    /**
+     * Botão "Diagnosticar": cadastro, agente, comunicação/senha, relógio, modo online, sinal, pessoas no
+     * leitor x esperadas e fila. Cada item diz como corrigir. Nada é alterado no leitor.
+     */
+    async diagnosticar(req, res) {
+        try {
+            const dispositivo = await this._leitorDoEvento(req);
+            if (!dispositivo) return res.status(404).json({ error: 'Leitor não encontrado neste evento' });
+            const { diagnosticarLeitor } = require('./diagnostico.service');
+            const resultado = await diagnosticarLeitor(dispositivo, {
+                service: DeviceFactory.getDevice(dispositivo),
+                agentService: require('../../services/agentService'),
+                syncService: require('./sync.service'),
+                naNuvem: !process.env.PYTHON_MICROSERVICE_URL
+            });
+            logger.info(`[Diagnóstico] ${dispositivo.nome}: ${resultado.resumo}`);
+            res.json({ success: true, data: { dispositivo: { id: dispositivo.id, nome: dispositivo.nome }, ...resultado } });
+        } catch (error) {
+            logger.error({ err: error, device_id: req.params.id }, 'Erro no diagnóstico do leitor');
+            res.status(500).json({ error: error.message });
+        }
+    }
+
+    /** Acerta o relógio do leitor (hora automática pelo NTP + hora de Brasília agora) */
+    async acertarRelogio(req, res) {
+        try {
+            const dispositivo = await this._leitorDoEvento(req);
+            if (!dispositivo) return res.status(404).json({ error: 'Leitor não encontrado neste evento' });
+            const service = DeviceFactory.getDevice(dispositivo);
+            if (typeof service.configureClock !== 'function') return res.status(400).json({ error: 'Este equipamento não permite acertar o relógio pelo sistema' });
+            const ok = await service.configureClock();
+            if (!ok) return res.status(502).json({ error: 'O leitor não aceitou o ajuste do relógio' });
+            res.json({ success: true, message: `Relógio de ${dispositivo.nome} acertado` });
+        } catch (error) {
+            logger.error({ err: error, device_id: req.params.id }, 'Erro ao acertar o relógio do leitor');
+            res.status(500).json({ error: error.message });
+        }
+    }
 }
 
 module.exports = new DeviceController();

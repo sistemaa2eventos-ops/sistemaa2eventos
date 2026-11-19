@@ -343,6 +343,7 @@ const Sidebar = ({ open, onClose }) => {
                 { grupo: t('sidebar.grupo_equipamentos', { defaultValue: 'Equipamentos' }) },
                 { text: t('sidebar.dispositivos', { defaultValue: 'Leitores e dispositivos' }), path: '/config/dispositivos', icon: <FaceIcon sx={{ fontSize: 16 }} /> },
                 { text: t('sidebar.cameras', { defaultValue: 'Câmeras e IA facial' }), path: '/config/cameras', icon: <CameraIcon sx={{ fontSize: 16 }} /> },
+                { text: t('sidebar.modelos_camera', { defaultValue: 'Modelos de câmera' }), path: '/config/modelos-camera', icon: <CameraIcon sx={{ fontSize: 16 }} /> },
                 { text: t('sidebar.veiculos_config', { defaultValue: 'Veículos' }), path: '/config/veiculos', icon: <CarIcon sx={{ fontSize: 16 }} /> },
                 { grupo: t('sidebar.grupo_comunicacao', { defaultValue: 'Comunicação' }) },
                 { text: t('sidebar.comunicacao', { defaultValue: 'Comunicação & Integrações' }), path: '/config/comunicacao', icon: <ExtensionIcon sx={{ fontSize: 16 }} /> },

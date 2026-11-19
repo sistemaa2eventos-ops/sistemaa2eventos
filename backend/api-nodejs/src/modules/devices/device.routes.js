@@ -57,6 +57,10 @@ router.post('/:id/force-queue', authorize('admin', 'supervisor'), deviceControll
 // Obter status de saúde do dispositivo
 router.get('/:id/health', deviceController.getHealth);
 
+// Diagnóstico completo (só lê) e acerto do relógio do leitor
+router.post('/:id/diagnosticar', authorize('admin', 'supervisor'), (req, res) => deviceController.diagnosticar(req, res));
+router.post('/:id/acertar-relogio', authorize('admin', 'supervisor'), (req, res) => deviceController.acertarRelogio(req, res));
+
 // Configurar Push de Eventos (Intelbras)
 router.post('/:id/configure-push', authorize('admin', 'supervisor'), deviceController.configurePush);
 

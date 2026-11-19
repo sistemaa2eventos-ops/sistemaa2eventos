@@ -1,3 +1,5 @@
+import { MODELOS_RESERVA, montarEnderecoRtsp } from '../../utils/modelosCamera';
+
 /**
  * Modos de cada câmera (gravados em cameras_ip: ia_ativa, vigilancia_ativa, gravacao_modo).
  */
@@ -41,7 +43,21 @@ export const NOVA_CAMERA = (areaId = '') => ({
 });
 
 /** Corpo para salvar a câmera (POST/PUT /cameras) */
-export const payloadCamera = (cam, eventoId) => {
+/**
+ * Endereços RTSP a partir do modelo escolhido (Configurações > Modelos de câmera). Só quando a câmera
+ * ainda não tem endereço (cadastro novo ou endereço apagado no "Avançado").
+ */
+export const enderecosDoModelo = (cam, modelos = MODELOS_RESERVA) => {
+    const porta = parseInt(cam.porta, 10) || 554;
+    const dados = { usuario: cam.usuario, senha: cam.senha, ip: cam.ip_address, porta, canal: cam.canal };
+    const modelo = modelos.find(m => m.nome === cam.fabricante);
+    const principal = montarEnderecoRtsp(modelo?.rtsp_principal, dados);
+    if (principal) return { stream_url: principal, url_substream: montarEnderecoRtsp(modelo.rtsp_sub, dados) };
+    // Webcam/OBS, Genérica ou modelo sem padrão: endereço genérico (troque no "Avançado")
+    return { stream_url: montarEnderecoRtsp('rtsp://{auth}{ip}:{porta}/live', dados), url_substream: null };
+};
+
+export const payloadCamera = (cam, eventoId, modelos = MODELOS_RESERVA) => {
     const porta = parseInt(cam.porta, 10) || (cam.protocolo === 'rtsp' ? 554 : 80);
     const payload = {
         ...cam,
@@ -52,20 +68,11 @@ export const payloadCamera = (cam, eventoId) => {
         porta
     };
     if (!payload.stream_url && payload.ip_address) {
-        const auth = payload.usuario && payload.senha ? `${encodeURIComponent(payload.usuario)}:${encodeURIComponent(payload.senha)}@` : '';
-        if (payload.fabricante === 'Mercusys / Tapo') {
-            payload.stream_url = `rtsp://${auth}${payload.ip_address}:${porta}/stream1`;
-            if (!payload.url_substream) payload.url_substream = `rtsp://${auth}${payload.ip_address}:${porta}/stream2`;
-        } else if (payload.fabricante === 'Intelbras') {
-            payload.stream_url = `rtsp://${auth}${payload.ip_address}:${porta}/cam/realmonitor?channel=1&subtype=0`;
-            if (!payload.url_substream) payload.url_substream = `rtsp://${auth}${payload.ip_address}:${porta}/cam/realmonitor?channel=1&subtype=1`;
-        } else if (payload.fabricante === 'Hikvision') {
-            payload.stream_url = `rtsp://${auth}${payload.ip_address}:${porta}/Streaming/Channels/101`;
-            if (!payload.url_substream) payload.url_substream = `rtsp://${auth}${payload.ip_address}:${porta}/Streaming/Channels/102`;
-        } else {
-            payload.stream_url = `rtsp://${auth}${payload.ip_address}:${porta}/live`;
-        }
+        const e = enderecosDoModelo({ ...payload, porta }, modelos);
+        payload.stream_url = e.stream_url;
+        if (!payload.url_substream && e.url_substream) payload.url_substream = e.url_substream;
     }
+    delete payload.canal;
     for (const campo of ['area', 'tem_senha', 'created_at', 'last_seen', 'id', 'evento']) delete payload[campo];
     return payload;
 };

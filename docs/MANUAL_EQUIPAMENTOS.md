@@ -105,7 +105,23 @@ Configurações > **Dispositivos** > novo dispositivo:
 Depois de salvar:
 1. **Config Online**: aponta o leitor para o servidor. A janela pede o endereço e a porta do servidor; deixe em branco para usar o padrão do sistema. Faça sempre depois de trocar IP, servidor ou firmware.
 2. **Sync**: envia as pessoas das áreas deste leitor.
-3. Confira o status **online** no card do leitor.
+3. **Diagnosticar** (botão no card do leitor): confere tudo de uma vez e mostra como corrigir.
+
+### 4.3.1 Diagnosticar
+O botão **Diagnosticar** só lê o leitor (não muda nada) e mostra cada item em verde (ok), amarelo (atenção) ou vermelho (corrigir). Onde houver, um botão ao lado corrige com um clique.
+
+| Item | O que confere | Correção pelo botão |
+|---|---|---|
+| Cadastro do leitor | IP, senha e área preenchidos | Editar leitor |
+| Agente do PC do evento | O PC do evento está conectado (a nuvem só alcança o leitor por ele) | — (rode `ligar-ia-facial.bat`) |
+| Comunicação e senha | O leitor responde e aceita usuário e senha | Editar leitor |
+| Relógio do leitor | Diferença para a hora de Brasília | Acertar relógio (liga também a hora automática) |
+| Modo online | O leitor está em modo online e sabe o endereço do servidor | Config Online |
+| Sinal do leitor para o servidor | Quando o leitor chamou o servidor pela última vez | Config Online |
+| Pessoas no leitor | Quantas há no leitor e quantas deveriam estar | Sync ou Limpar e sincronizar |
+| Comandos pendentes | Cadastros/remoções esperando o leitor | Reprocessar fila |
+
+Rode o diagnóstico na montagem, depois de qualquer troca (IP, firmware, roteador) e sempre que um leitor se comportar estranho.
 
 ### 4.4 Quem vai para cada leitor
 - Leitor de **credenciamento**: todos do evento.
@@ -150,17 +166,29 @@ O comportamento sem internet (o leitor decidir sozinho com a lista que já tem) 
 - Câmera apontada para onde os rostos passam de frente, na altura das pessoas, sem contraluz (porta com sol atrás é o pior caso).
 
 ### 5.2 Cadastrar no painel
-Monitor > Câmeras > **Gerenciar câmeras** > nova câmera. Escolha o fabricante e preencha IP, porta, usuário e senha: o sistema monta o endereço sozinho.
+Monitor > Câmeras > **Gerenciar câmeras** > nova câmera. Escolha o fabricante (modelo) e preencha IP, porta, usuário e senha: o sistema monta o endereço sozinho e mostra embaixo **"Endereço que será usado"** (com a senha escondida). Modelo com canal (gravadores com várias câmeras) mostra o campo **Canal**.
 
-| Fabricante no painel | Endereço principal | Sub-stream |
+Modelos que vêm com o sistema:
+
+| Modelo | Endereço principal | Sub-stream |
 |---|---|---|
 | Mercusys / Tapo | `rtsp://IP:554/stream1` | `stream2` |
-| Intelbras (e Dahua) | `rtsp://IP:554/cam/realmonitor?channel=1&subtype=0` | `subtype=1` |
+| Intelbras / Dahua | `rtsp://IP:554/cam/realmonitor?channel=1&subtype=0` | `subtype=1` |
 | Hikvision | `rtsp://IP:554/Streaming/Channels/101` | `102` |
-| Genérica | Informe o endereço RTSP completo do manual da câmera | Informe o do sub-stream |
-| RTSP / OBS / Webcam | Webcam do PC: escreva `webcam` (ou `webcam:1` para a segunda) | — |
+| Genérica | Informe o endereço RTSP completo no campo "Endereço RTSP" | Nas opções avançadas |
+| RTSP / OBS / Webcam | Webcam do PC: escreva `webcam` (ou `webcam:1` para a segunda) no endereço | — |
 
-Câmera de marca sem modelo pronto: use **Genérica** e descubra o endereço RTSP no manual do fabricante, ou com o programa gratuito *ONVIF Device Manager* (mostra os endereços de câmeras ONVIF da rede).
+### 5.2.1 Câmera de uma marca que não está na lista
+Cadastre o modelo **uma vez** em Configurações > Equipamentos > **Modelos de câmera** > Novo modelo. Ele passa a aparecer no cadastro de câmeras de todos os eventos.
+
+1. Descubra o endereço RTSP no manual do fabricante, no site do fabricante ou com o programa gratuito *ONVIF Device Manager* (mostra os endereços de câmeras ONVIF da rede).
+2. Troque as partes variáveis pelos marcadores: **`{auth}`** (usuário e senha, vêm de cada câmera), **`{ip}`**, **`{porta}`** e **`{canal}`**.
+   Ex.: o manual diz `rtsp://admin:12345@192.168.1.64:554/h264/ch1/sub` → modelo `rtsp://{auth}{ip}:{porta}/h264/ch{canal}/sub`.
+3. Preencha também o endereço do **sub-stream** (o vídeo leve). Sem ele, a IA analisa o vídeo principal, mais pesado.
+4. Em **Observações**, deixe a dica para a próxima equipe (onde fica a senha, configuração especial).
+5. Confira o **Exemplo** que aparece embaixo de cada campo antes de salvar.
+
+Nunca coloque usuário e senha no modelo: o sistema recusa. Modelos de fábrica podem ser editados e desativados, mas não apagados.
 
 Depois de salvar: **Testar conexão**. Escolha o modo:
 - **Só monitorar:** vídeo, sem IA.
@@ -229,11 +257,11 @@ O objetivo é que tudo seja configurado pelo painel. Hoje, estes pontos ainda de
 | O quê | Hoje | Plano |
 |---|---|---|
 | Endereço padrão do servidor para os leitores | Digitado em cada "Config Online"; o padrão vem do arquivo `.env` da VPS | Padrão editável em Configurações |
-| Modelos de câmera (padrão de endereço RTSP) | Fixos no código (4 fabricantes) | Cadastro de modelos no painel, editável |
 | Leitores Hikvision | Não enviam a foto | Completar o adaptador e testar com um equipamento |
 | Outras marcas de leitor | Não suportadas | Cadastro de modelos + adaptador por marca |
 | Central pelo Tailscale / rede local | Arquivo `.env` do PC do evento | Opções na tela do agente |
 | Modo sem internet do leitor | A definir no teste com o equipamento | Opção por leitor no painel |
 | Empresa bloqueada | O servidor nega, mas os funcionários continuam no leitor | Suspender todos da empresa nos leitores |
-| Teste de rede (ping, porta, relógio do leitor) | Prompt de Comando | Botão "Diagnosticar" no painel, pelo agente |
+| Diagnóstico de câmera | Botão "Testar conexão" (só diz se abre) | "Diagnosticar" da câmera, como o dos leitores |
+| Teste de rede genérico (qualquer IP/porta) | Prompt de Comando | Ferramenta de rede no painel, pelo agente |
 | Esvaziar um leitor no fim do evento | Restaurar padrão no próprio leitor | Botão "Esvaziar leitor" no painel |

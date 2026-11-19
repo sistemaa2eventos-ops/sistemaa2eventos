@@ -8,10 +8,10 @@ import { useSnackbar } from 'notistack';
 import api from '../../services/api';
 import NeonButton from '../common/NeonButton';
 import SeletorModo from './SeletorModo';
-import { MODOS_IA, MODOS_GRAVACAO, modoIaDe, camposDoModoIa, NOVA_CAMERA, payloadCamera, gbPorDia } from './opcoesCamera';
+import { MODOS_IA, MODOS_GRAVACAO, modoIaDe, camposDoModoIa, NOVA_CAMERA, payloadCamera, enderecosDoModelo, gbPorDia } from './opcoesCamera';
+import { useModelosCamera, WEBCAM_OBS, esconderSenha } from '../../utils/modelosCamera';
 import { botaoSecundario } from '../../styles/tokens';
 
-const FABRICANTES = ['RTSP / OBS / Webcam', 'Mercusys / Tapo', 'Intelbras', 'Hikvision', 'Genérica'];
 
 /**
  * Cadastro/edição de câmera — o MESMO formulário em Configurações › Câmeras e no Monitor
@@ -22,6 +22,8 @@ const CameraFormDialog = ({ open, camera, areas = [], eventoId, onClose, onSalvo
     const [cam, setCam] = useState(null);
     const [salvando, setSalvando] = useState(false);
     const [avancado, setAvancado] = useState(false);
+    // Fabricantes = modelos cadastrados em Configurações > Modelos de câmera (+ webcam/OBS do PC do evento)
+    const modelos = useModelosCamera(open);
 
     useEffect(() => {
         if (!open) return;
@@ -40,7 +42,7 @@ const CameraFormDialog = ({ open, camera, areas = [], eventoId, onClose, onSalvo
         }
         setSalvando(true);
         try {
-            const payload = payloadCamera(cam, eventoId);
+            const payload = payloadCamera(cam, eventoId, modelos);
             if (camera?.id) await api.put(`/cameras/${camera.id}`, payload);
             else await api.post('/cameras', payload);
             enqueueSnackbar(camera?.id ? 'Câmera salva.' : 'Câmera cadastrada.', { variant: 'success' });
@@ -69,15 +71,29 @@ const CameraFormDialog = ({ open, camera, areas = [], eventoId, onClose, onSalvo
                             <FormControl fullWidth>
                                 <InputLabel id="camera-fabricante-rotulo">Fabricante / tipo</InputLabel>
                                 <Select labelId="camera-fabricante-rotulo" id="camera-fabricante" label="Fabricante / tipo"
-                                    value={cam.fabricante || 'RTSP / OBS / Webcam'}
+                                    value={cam.fabricante || WEBCAM_OBS}
                                     onChange={(e) => {
                                         const fab = e.target.value;
-                                        const extra = fab === 'RTSP / OBS / Webcam'
+                                        const modelo = modelos.find(m => m.nome === fab);
+                                        const extra = fab === WEBCAM_OBS
                                             ? { porta: 8554, protocolo: 'rtsp' }
-                                            : (fab === 'Mercusys / Tapo' || fab === 'Intelbras' || fab === 'Hikvision') ? { porta: 554, protocolo: 'rtsp' } : {};
+                                            : modelo ? { porta: modelo.porta_padrao || 554, protocolo: 'rtsp' } : {};
+                                        // Câmera nova: o endereço segue o modelo escolhido (o padrão do formulário
+                                        // impedia o modelo de montar o endereço). Na edição fica como está: a senha
+                                        // salva não volta para a tela e o endereço seria remontado sem ela.
+                                        if (!camera?.id) {
+                                            Object.assign(extra, fab === WEBCAM_OBS
+                                                ? { stream_url: NOVA_CAMERA().stream_url, url_substream: '' }
+                                                : { stream_url: '', url_substream: '' });
+                                        }
                                         mudar({ fabricante: fab, ...extra });
                                     }}>
-                                    {FABRICANTES.map(f => <MenuItem key={f} value={f}>{f}</MenuItem>)}
+                                    <MenuItem value={WEBCAM_OBS}>{WEBCAM_OBS}</MenuItem>
+                                    {modelos.map(m => <MenuItem key={m.nome} value={m.nome}>{m.nome}</MenuItem>)}
+                                    {/* Câmera antiga com fabricante que saiu da lista: continua aparecendo */}
+                                    {cam.fabricante && cam.fabricante !== WEBCAM_OBS && !modelos.some(m => m.nome === cam.fabricante) && (
+                                        <MenuItem value={cam.fabricante}>{cam.fabricante}</MenuItem>
+                                    )}
                                 </Select>
                             </FormControl>
                         </Grid>
@@ -109,6 +125,29 @@ const CameraFormDialog = ({ open, camera, areas = [], eventoId, onClose, onSalvo
                                 value={cam.senha || ''} onChange={(e) => mudar({ senha: e.target.value })} />
                         </Grid>
                     </Grid>
+
+                    {(() => {
+                        const modelo = modelos.find(m => m.nome === cam.fabricante);
+                        const usaCanal = /\{canal\}/.test(modelo?.rtsp_principal || '');
+                        const previa = !cam.stream_url && cam.ip_address ? enderecosDoModelo(cam, modelos) : null;
+                        return (
+                            <>
+                                {modelo?.observacoes && <Alert severity="info" variant="outlined">{modelo.observacoes}</Alert>}
+                                {usaCanal && (
+                                    <TextField id="camera-canal" label="Canal (gravador com várias câmeras)" type="number" fullWidth
+                                        value={cam.canal || ''} placeholder="1" inputProps={{ min: 1, max: 256 }}
+                                        onChange={(e) => mudar({ canal: e.target.value })}
+                                        helperText="Câmera ligada direto na rede: deixe 1." />
+                                )}
+                                {previa?.stream_url && (
+                                    <Typography variant="caption" color="text.secondary" sx={{ wordBreak: 'break-all' }}>
+                                        Endereço que será usado: {esconderSenha(previa.stream_url)}
+                                        {previa.url_substream ? ` · sub-stream: ${esconderSenha(previa.url_substream)}` : ''}
+                                    </Typography>
+                                )}
+                            </>
+                        );
+                    })()}
 
                     <TextField id="camera-stream" label="Endereço RTSP (opcional)" fullWidth
                         placeholder="rtsp://usuario:senha@ip:554/cam/realmonitor?channel=1&subtype=0"

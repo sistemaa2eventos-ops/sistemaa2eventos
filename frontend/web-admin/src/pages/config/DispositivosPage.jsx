@@ -100,6 +100,8 @@ export default function DispositivosPage() {
 
   // Estados de ação por dispositivo
   const [actionLoading, setActionLoading] = useState({});
+  // Diagnóstico do leitor: { open, device, carregando, dados: { resumo, itens[] }, erro }
+  const [diag, setDiag] = useState({ open: false, device: null, carregando: false, dados: null, erro: null });
   const [expandedCards, setExpandedCards] = useState({});
 
   // Snapshot dialog
@@ -310,6 +312,34 @@ export default function DispositivosPage() {
     setPushDialog({ open: true, device, host: '', port: '' });
   };
 
+  const diagnosticar = async (device) => {
+    setDiag({ open: true, device, carregando: true, dados: null, erro: null });
+    try {
+      const { data } = await api.post(`/dispositivos/${device.id}/diagnosticar`, {}, { timeout: 60000 });
+      setDiag({ open: true, device, carregando: false, dados: data?.data || null, erro: null });
+    } catch (err) {
+      setDiag({ open: true, device, carregando: false, dados: null, erro: err.response?.data?.error || err.message });
+    }
+  };
+
+  // Correção de um clique a partir do diagnóstico
+  const corrigir = async (acao, device) => {
+    if (acao === 'editar') { setDiag(d => ({ ...d, open: false })); handleOpenDialog(device); return; }
+    if (acao === 'config_online') { setDiag(d => ({ ...d, open: false })); handleConfigurePush(device); return; }
+    if (acao === 'sync') { await handleSync(device.id); return diagnosticar(device); }
+    if (acao === 'limpar_sincronizar') { setDiag(d => ({ ...d, open: false })); handleReset(device); return; }
+    if (acao === 'fila') { await handleForceQueue(device.id); return diagnosticar(device); }
+    if (acao === 'acertar_relogio') {
+      try {
+        const { data } = await api.post(`/dispositivos/${device.id}/acertar-relogio`);
+        enqueueSnackbar(data?.message || 'Relógio acertado', { variant: 'success' });
+      } catch (err) {
+        enqueueSnackbar(`Não acertou o relógio: ${err.response?.data?.error || err.message}`, { variant: 'error' });
+      }
+      return diagnosticar(device);
+    }
+  };
+
   const confirmConfigurePush = async () => {
     const { device, host, port } = pushDialog;
     setPushDialog(p => ({ ...p, open: false }));
@@ -476,6 +506,15 @@ export default function DispositivosPage() {
                   Sync
                 </Button>
               </span>
+            </Tooltip>
+            <Tooltip title="Testa cadastro, conexão, senha, relógio, modo online e pessoas no leitor, e mostra como corrigir">
+              <Button size="small"
+                aria-label={`Diagnosticar ${device.nome}`}
+                startIcon={<PingIcon />}
+                onClick={() => diagnosticar(device)}
+                sx={{ color: '#00FF88', fontSize: '0.75rem', minWidth: 0 }}>
+                Diagnosticar
+              </Button>
             </Tooltip>
             <Tooltip title="Apagar todos os rostos do leitor e enviar de novo só quem tem acesso (leitor com pessoas erradas, fim de evento)">
               <span>
@@ -1106,6 +1145,52 @@ export default function DispositivosPage() {
       </Dialog>
 
       {/* ── Dialog: Configurar modo online */}
+      <Dialog open={diag.open} onClose={() => setDiag(d => ({ ...d, open: false }))} maxWidth="sm" fullWidth>
+        <DialogTitle>Diagnóstico: {diag.device?.nome}</DialogTitle>
+        <DialogContent dividers>
+          {diag.carregando && (
+            <Box sx={{ py: 3, textAlign: 'center' }}>
+              <CircularProgress size={28} />
+              <Typography variant="body2" sx={{ mt: 1, color: '#94A3B8' }}>Testando o leitor (até 30 s)...</Typography>
+            </Box>
+          )}
+          {diag.erro && <Alert severity="error">Não deu para diagnosticar: {diag.erro}</Alert>}
+          {diag.dados && (
+            <>
+              <Alert severity={diag.dados.itens.some(i => i.estado === 'erro') ? 'error' : diag.dados.itens.some(i => i.estado === 'alerta') ? 'warning' : 'success'} sx={{ mb: 1.5 }}>
+                {diag.dados.resumo}
+              </Alert>
+              {diag.dados.itens.map((i) => {
+                const cor = { ok: '#00FF88', alerta: '#FFB800', erro: RED, nao_testado: '#64748B' }[i.estado] || '#94A3B8';
+                const rotuloAcao = {
+                  editar: 'Editar leitor', config_online: 'Config Online', acertar_relogio: 'Acertar relógio',
+                  sync: 'Sync', limpar_sincronizar: 'Limpar e sincronizar', fila: 'Reprocessar fila'
+                }[i.acao];
+                return (
+                  <Box key={i.chave} sx={{ display: 'flex', gap: 1.5, py: 1, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: cor, mt: 0.75, flexShrink: 0 }} />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{i.titulo}</Typography>
+                      <Typography variant="body2" sx={{ color: '#CBD5E1' }}>{i.detalhe}</Typography>
+                      {i.como_corrigir && <Typography variant="caption" sx={{ color: cor, display: 'block', mt: 0.25 }}>{i.como_corrigir}</Typography>}
+                    </Box>
+                    {rotuloAcao && (
+                      <Button size="small" variant="outlined" onClick={() => corrigir(i.acao, diag.device)} sx={{ alignSelf: 'center', flexShrink: 0, fontSize: '0.72rem' }}>
+                        {rotuloAcao}
+                      </Button>
+                    )}
+                  </Box>
+                );
+              })}
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => diag.device && diagnosticar(diag.device)} disabled={diag.carregando}>Testar de novo</Button>
+          <Button onClick={() => setDiag(d => ({ ...d, open: false }))}>Fechar</Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog open={pushDialog.open} onClose={() => setPushDialog(p => ({ ...p, open: false }))} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ color: CYAN, fontWeight: 700 }}>Configurar Modo Online — {pushDialog.device?.nome}</DialogTitle>
         <DialogContent sx={{ pt: 2 }}>

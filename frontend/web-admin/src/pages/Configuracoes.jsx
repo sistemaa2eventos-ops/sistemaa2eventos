@@ -33,6 +33,7 @@ const GRUPOS = [
         titulo: 'Equipamentos', itens: [
             { nome: 'Leitores e dispositivos', texto: 'Leitores faciais, agente local e confiança do rosto', rota: '/config/dispositivos', icone: LeitorIcon },
             { nome: 'Câmeras e IA facial', texto: 'Câmeras IP e motor de reconhecimento', rota: '/config/cameras', icone: CameraIcon },
+            { nome: 'Modelos de câmera', texto: 'Endereço RTSP de cada fabricante (câmera nova sem código)', rota: '/config/modelos-camera', icone: CameraIcon },
             { nome: 'Veículos', texto: 'Leitura de placas', rota: '/config/veiculos', icone: CarIcon }
         ]
     },

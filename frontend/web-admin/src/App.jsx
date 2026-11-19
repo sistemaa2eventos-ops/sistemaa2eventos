@@ -53,6 +53,7 @@ const ConfigIntegracoes = lazy(() => import('./pages/config/ConfigIntegracoes'))
 const ConfigCredenciamento = lazy(() => import('./pages/config/ConfigCredenciamento'));
 const ConfigCheckin = lazy(() => import('./pages/config/ConfigCheckin'));
 const ConfigVeiculos = lazy(() => import('./pages/config/ConfigVeiculos'));
+const ConfigModelosCamera = lazy(() => import('./pages/config/ConfigModelosCamera'));
 const ConfigSeguranca = lazy(() => import('./pages/config/ConfigSeguranca'));
 const ConfigComunicacao = lazy(() => import('./pages/config/ConfigComunicacao'));
 const ConfigWebhooks = lazy(() => import('./pages/config/ConfigWebhooks'));
@@ -188,6 +189,7 @@ const AppContent = () => {
           <Route path="/config/terminais" element={<Navigate to="/config/dispositivos" replace />} />
           <Route path="/config/checkin" element={<ProtectedRoute role="admin_master"><ConfigCheckin /></ProtectedRoute>} />
           <Route path="/config/veiculos" element={<ProtectedRoute role="admin_master"><ConfigVeiculos /></ProtectedRoute>} />
+          <Route path="/config/modelos-camera" element={<ProtectedRoute role="admin_master"><ConfigModelosCamera /></ProtectedRoute>} />
           <Route path="/config/seguranca" element={<ProtectedRoute role="admin_master"><ConfigSeguranca /></ProtectedRoute>} />
           <Route path="/config/logs" element={<ProtectedRoute role="admin_master"><AuditoriaELogs aba="tecnicos" /></ProtectedRoute>} />
           <Route path="/config/comunicacao" element={<ProtectedRoute role="admin_master"><ConfigComunicacao /></ProtectedRoute>} />
