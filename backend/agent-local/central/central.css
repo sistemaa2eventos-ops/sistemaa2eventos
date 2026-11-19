@@ -175,3 +175,5 @@ body.entrada { align-items: center; justify-content: center; }
 .ptz-posicoes { max-width: 120px; padding: 4px; }
 .ptz-nome { width: 110px; padding: 4px 6px; }
 .ptz-aviso { color: #FFB800; font-size: 12px; width: 100%; min-height: 1em; }
+.controles-camera .botao-falar { padding: 4px 10px; cursor: pointer; }
+.controles-camera .botao-falar.ligado { background: #FF3366; color: #fff; border-color: #FF3366; }

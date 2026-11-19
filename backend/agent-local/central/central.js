@@ -128,6 +128,9 @@
             this.aviso = el('div', 'aviso', 'Conectando…');
             // Som e giro: só aparecem na câmera em tela grande (ver montarGrade)
             this.somLigado = false;     // o operador ligou o som desta câmera
+            this.falando = false;       // o operador está falando pelo microfone
+            this.micStream = null;
+            this.fluxo = new MediaStream();
             this.comAudio = false;      // a conexão atual pede a faixa de áudio
             this.comAudioConectado = false;
             this.posicoesCarregadas = false;
@@ -161,20 +164,36 @@
             this.comAudioConectado = this.comAudio;
             const g = ++this.geracao;
             this.aviso.textContent = 'Conectando…';
+            this.fluxo = new MediaStream();
             const pc = new RTCPeerConnection({ bundlePolicy: 'max-bundle' });
             this.pc = pc;
             try {
                 pc.addTransceiver('video', { direction: 'recvonly' });
-                // Áudio só quando o operador ouve esta câmera (não pesa na grade)
-                if (this.comAudio) pc.addTransceiver('audio', { direction: 'recvonly' });
+                // Áudio só quando o operador ouve ou fala com esta câmera (não pesa na grade)
+                if (this.comAudio) {
+                    let mic = null;
+                    if (this.falando) {
+                        // Microfone do computador: só funciona em localhost ou https, com permissão do navegador
+                        try { mic = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { mic = null; }
+                        if (g !== this.geracao) return;
+                        if (!mic) this.dizerFalar('Microfone não liberado. Clique em permitir no navegador (a Central precisa estar em localhost).');
+                    }
+                    this.micStream = mic || this.micStream;
+                    if (mic) pc.addTransceiver(mic.getAudioTracks()[0], { direction: 'sendrecv' });
+                    else pc.addTransceiver('audio', { direction: 'recvonly' });
+                }
                 pc.ontrack = (e) => {
                     // Vigilância: nada de colchão de reprodução, cada quadro vai para a tela assim que chega
                     try { e.receiver.jitterBufferTarget = 0; } catch { /* sem suporte */ }
                     try { e.receiver.playoutDelayHint = 0; } catch { /* sem suporte */ }
                     if (g !== this.geracao) return;
-                    this.video.srcObject = e.streams[0] || new MediaStream([e.track]);
+                    // Vídeo e áudio chegam em faixas separadas: juntam-se num único fluxo (uma faixa não pode
+                    // substituir a outra, senão o áudio tomava o lugar do vídeo)
+                    if (!this.fluxo.getTracks().includes(e.track)) this.fluxo.addTrack(e.track);
+                    this.video.srcObject = this.fluxo;
                     this.video.muted = !this.somLigado;
                     this.video.play().catch(() => {});
+                    if (e.track.kind === 'audio') this.dizerSom('Recebendo som da câmera.');
                 };
                 pc.addEventListener('connectionstatechange', () => {
                     if (g !== this.geracao) return;
@@ -199,6 +218,7 @@
                 if (g !== this.geracao) return;
                 await pc.setRemoteDescription({ type: 'answer', sdp: resposta });
                 this.conectadoEm = performance.now();
+                if (this.comAudio) this.conferirAudio(pc, g);
             } catch (err) {
                 if (g === this.geracao) this.reconectar(err.message);
             }
@@ -213,20 +233,64 @@
             this.botaoSom.type = 'button';
             this.botaoSom.title = 'Ouvir o som desta câmera';
             this.botaoSom.addEventListener('click', () => this.alterarSom(!this.somLigado));
-            caixa.append(this.botaoSom);
+            this.botaoFalar = el('button', 'botao-falar', 'Falar');
+            this.botaoFalar.type = 'button';
+            this.botaoFalar.title = 'Falar pelo microfone deste computador (sai pelo alto-falante da câmera, se ela tiver)';
+            this.botaoFalar.addEventListener('click', () => this.alterarFalar(!this.falando));
+            this.avisoSom = el('span', 'ptz-aviso', '');
+            this.avisoFalar = el('span', 'ptz-aviso', '');
+            caixa.append(this.botaoSom, this.botaoFalar, this.avisoSom, this.avisoFalar);
             if (cam.ptz) caixa.append(this.montarPtz(cam));
             return caixa;
         }
 
-        /** Liga ou desliga o som. Muda a conexão para pedir (ou não) a faixa de áudio. */
+        /** Liga ou desliga o som da câmera (Ouvir) */
         alterarSom(ligado) {
             this.somLigado = ligado;
-            this.comAudio = ligado;
-            this.botaoSom.textContent = ligado ? 'Silenciar' : 'Ouvir';
-            this.botaoSom.classList.toggle('ligado', ligado);
+            this.recarregarAudio();
+        }
+
+        /** Liga ou desliga o microfone para a câmera (Falar) */
+        alterarFalar(ligado) {
+            this.falando = ligado;
+            if (!ligado && this.micStream) { this.micStream.getTracks().forEach(t => t.stop()); this.micStream = null; }
+            this.recarregarAudio();
+        }
+
+        /** Áudio precisa de faixa própria na conexão: refaz a conexão com (ou sem) áudio */
+        recarregarAudio() {
+            this.comAudio = this.somLigado || this.falando;
+            this.botaoSom.textContent = this.somLigado ? 'Silenciar' : 'Ouvir';
+            this.botaoSom.classList.toggle('ligado', this.somLigado);
+            this.botaoFalar.textContent = this.falando ? 'Parar de falar' : 'Falar';
+            this.botaoFalar.classList.toggle('ligado', this.falando);
+            if (!this.comAudio) this.dizerSom('');
             const q = this.qualidade || 'foco';
             this.desconectar();
             this.conectar(q);
+        }
+
+        dizerSom(txt) { if (this.avisoSom) this.avisoSom.textContent = txt; }
+        dizerFalar(txt) { if (this.avisoFalar) this.avisoFalar.textContent = txt; }
+
+        /**
+         * Depois da resposta da câmera: o som chegou? A câmera aceitou o microfone (tem alto-falante)?
+         * Esta é a confirmação de que o áudio de volta funciona de verdade.
+         */
+        conferirAudio(pc, g) {
+            if (this.somLigado) {
+                setTimeout(() => {
+                    if (g !== this.geracao || this.fluxo.getAudioTracks().length) return;
+                    this.dizerSom('Sem som da câmera. Confira no aplicativo dela se o microfone está ativado.');
+                }, 5000);
+            }
+            if (this.falando) {
+                const envio = pc.getTransceivers().find(t => t.sender && t.sender.track && t.sender.track.kind === 'audio');
+                if (!envio) return;
+                const direcao = envio.currentDirection || '';
+                if (direcao.includes('send')) this.dizerFalar('Câmera aceitou sua voz: ela tem alto-falante.');
+                else this.dizerFalar('A câmera não aceitou o seu microfone: sem alto-falante, ou o retransmissor não suporta envio de áudio.');
+            }
         }
 
         montarPtz(cam) {
@@ -476,11 +540,16 @@
             const focoAqui = st.foco === cam.id;
             t.raiz.classList.toggle('principal', focoAqui);
             // Saiu da tela grande: o som desliga (não fica tocando na grade)
-            if (!focoAqui && (t.somLigado || t.comAudio)) {
+            if (!focoAqui && (t.somLigado || t.falando || t.comAudio)) {
                 t.somLigado = false;
                 t.comAudio = false;
+                if (t.falando) { t.falando = false; if (t.micStream) t.micStream.getTracks().forEach(tr => tr.stop()); t.micStream = null; }
                 t.botaoSom.textContent = 'Ouvir';
                 t.botaoSom.classList.remove('ligado');
+                t.botaoFalar.textContent = 'Falar';
+                t.botaoFalar.classList.remove('ligado');
+                t.dizerSom('');
+                t.dizerFalar('');
             }
             if (focoAqui && t.posicoes && !t.posicoesCarregadas) t.carregarPosicoes(cam);
             grade.append(t.raiz);
