@@ -200,8 +200,10 @@ if ($Acao -eq 'remover-autostart') {
 }
 
 # ---------------------------------------------------------------- tarefa agendada (recomendado)
-# No lugar do atalho de Inicialização: a tarefa sobe no login, sem janela, com privilégio de
-# administrador, e o Windows a reinicia sozinha se o vigia falhar. Precisa ser instalada como admin.
+# No lugar do atalho de Inicialização: a tarefa sobe no login, sem janela, e o Windows a reinicia sozinha se
+# o vigia falhar. Roda SEM privilégio de administrador: assim o painel consegue desligar o motor. (Tarefas
+# antigas, instaladas como administrador, deixavam o motor elevado: só o reinício do PC o encerrava.)
+# Trocar a tarefa existente pede administrador uma única vez; depois disso, não precisa mais.
 $NomeTarefa = 'NZT-IA-Facial'
 $AtalhoAntigo = Join-Path ([Environment]::GetFolderPath('Startup')) 'NZT-IA-Facial.lnk'
 
@@ -222,7 +224,7 @@ if ($Acao -eq 'instalar-tarefa') {
     $ajustes = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
         -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) `
         -StartWhenAvailable -MultipleInstances IgnoreNew
-    $principal = New-ScheduledTaskPrincipal -UserId $usuario -LogonType Interactive -RunLevel Highest
+    $principal = New-ScheduledTaskPrincipal -UserId $usuario -LogonType Interactive -RunLevel Limited
     
     try {
         $task = New-ScheduledTask -Action $acao -Trigger $gatilho -Settings $ajustes -Principal $principal -Description 'NZT: motor de IA facial e agente local do evento'
@@ -231,7 +233,7 @@ if ($Acao -eq 'instalar-tarefa') {
     catch {
         # Fallback nativo universal do Windows via schtasks.exe (evita inconsistências de tipos CIM no PowerShell)
         $cmdTr = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`""
-        & schtasks.exe /Create /TN $NomeTarefa /TR $cmdTr /SC ONLOGON /RL HIGHEST /F | Out-Null
+        & schtasks.exe /Create /TN $NomeTarefa /TR $cmdTr /SC ONLOGON /RL LIMITED /F | Out-Null
     }
     # Evita dois vigias: o atalho antigo sai quando a tarefa entra
     if (Test-Path $AtalhoAntigo) { Remove-Item $AtalhoAntigo -Force }
@@ -282,7 +284,16 @@ if ($Acao -eq 'parar') {
 # desliga só o motor; vídeo, gravação e leitores seguem pelo agente
 if ($Acao -eq 'parar-motor') {
     $p = Get-PidNaPorta $PortaMotor
-    if ($p) { Stop-Process -Id $p -Force -ErrorAction SilentlyContinue; Escrever "Motor de IA desligado pelo painel (PID $p)." 'Yellow' }
+    if ($p) {
+        Stop-Process -Id $p -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 2
+        # Ainda respondendo: o Windows não deixou encerrar (processo aberto como administrador)
+        if (Get-PidNaPorta $PortaMotor) {
+            Escrever "[ERRO] Motor de IA NÃO desligou (PID $p): o processo foi aberto como administrador. Reinicie o PC." 'Red'
+            exit 2
+        }
+        Escrever "Motor de IA desligado pelo painel (PID $p)." 'Yellow'
+    }
     exit 0
 }
 

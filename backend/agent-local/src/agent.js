@@ -613,11 +613,16 @@ async function definirMotor(ativo) {
     if (!ativo) {
         fs.writeFileSync(ARQ_MOTOR_DESLIGADO, new Date().toISOString());
         if (process.platform === 'win32' && fs.existsSync(scriptPs1)) {
-            const { spawn } = require('child_process');
-            spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPs1, 'parar-motor'],
-                { cwd: RAIZ_PROJETO, detached: true, stdio: 'ignore', windowsHide: true }).unref();
+            // Espera o script e lê o resultado: código 2 = o motor não encerrou (processo como administrador)
+            require('child_process').execFile('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPs1, 'parar-motor'],
+                { cwd: RAIZ_PROJETO, timeout: 30000, windowsHide: true }, (err) => {
+                    if (err && err.code === 2) log('error', 'Motor de IA NÃO desligou: o processo foi aberto como administrador. Reinicie o PC (ver ligar-ia-facial.bat).');
+                    else if (err) log('warn', `desligar o motor de IA: ${err.message}`);
+                    else log('info', 'Motor de IA desligado pelo painel (câmeras seguem com vídeo pelo retransmissor)');
+                });
+        } else {
+            log('info', 'Motor de IA desligado pelo painel (câmeras seguem com vídeo pelo retransmissor)');
         }
-        log('info', 'Motor de IA desligado pelo painel (câmeras seguem com vídeo pelo retransmissor)');
         return { ativo: false };
     }
     fs.rmSync(ARQ_MOTOR_DESLIGADO, { force: true });
