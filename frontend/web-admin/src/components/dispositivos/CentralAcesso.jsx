@@ -28,8 +28,11 @@ const CentralAcesso = ({ agente, onClose }) => {
     const [escolha, setEscolha] = useState('local');
     const [erro, setErro] = useState(null);
     const [salvando, setSalvando] = useState(false);
+    const [chave, setChave] = useState(null);
+    const [buscandoChave, setBuscandoChave] = useState(false);
 
     useEffect(() => {
+        setChave(null); // a chave não fica na tela de uma abertura para outra
         if (!agente) return;
         setStatus(null);
         setErro(null);
@@ -55,6 +58,24 @@ const CentralAcesso = ({ agente, onClose }) => {
             enqueueSnackbar(err.response?.data?.error || 'Falha ao atualizar a Central.', { variant: 'error' });
         } finally {
             setSalvando(false);
+        }
+    };
+
+    const pedirChave = async (nova) => {
+        if (nova && !(await confirmar({
+            titulo: 'Gerar nova chave',
+            mensagem: 'A chave atual deixa de funcionar e quem está com a Central aberta em outro computador sai na hora. Só entra quem receber a chave nova. Continuar?',
+            textoConfirmar: 'Gerar nova chave'
+        }))) return;
+        setBuscandoChave(true);
+        try {
+            const { data } = await api.post(`/agentes/${agente.id}/central/chave`, { nova }, { hideDefaultError: true });
+            setChave(data?.data?.chave || null);
+            if (nova) enqueueSnackbar('Chave nova gerada. Envie ao operador por um canal seguro.', { variant: 'success' });
+        } catch (err) {
+            enqueueSnackbar(err.response?.status === 403 ? 'Só o administrador vê e troca a chave.' : (err.response?.data?.error || 'Falha ao obter a chave.'), { variant: 'error' });
+        } finally {
+            setBuscandoChave(false);
         }
     };
 
@@ -93,9 +114,35 @@ const CentralAcesso = ({ agente, onClose }) => {
                                 <Tooltip title="Copiar"><IconButton size="small" onClick={() => copiar(e)}><CopyIcon sx={{ fontSize: 16 }} /></IconButton></Tooltip>
                             </Box>
                         ))}
-                        <Typography variant="caption" sx={{ color: '#94A3B8', display: 'block', mt: 1 }}>
-                            Fora do próprio PC, a Central pede a chave de acesso (no PC do evento, abra pelo abrir-central.bat).
-                        </Typography>
+                        <Box sx={{ mt: 2, pt: 1.5, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 700 }}>Chave de acesso</Typography>
+                            <Typography variant="caption" sx={{ color: '#94A3B8', display: 'block', mb: 1 }}>
+                                Fora do próprio PC, a Central pede esta chave (no PC do evento, o abrir-central.bat entra sozinho).
+                                Envie só por canal seguro; a entrada vale 12 horas em cada navegador.
+                            </Typography>
+                            {agente?.central_chave_pelo_painel ? (
+                                <>
+                                    {chave && (
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, p: 1, mb: 1, borderRadius: 1, bgcolor: 'rgba(0,0,0,0.35)' }}>
+                                            <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all', flex: 1 }}>{chave}</Typography>
+                                            <Tooltip title="Copiar chave"><IconButton size="small" onClick={() => copiar(chave)} aria-label="Copiar chave"><CopyIcon sx={{ fontSize: 16 }} /></IconButton></Tooltip>
+                                        </Box>
+                                    )}
+                                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                        <Button size="small" variant="outlined" disabled={buscandoChave} onClick={() => (chave ? setChave(null) : pedirChave(false))}>
+                                            {chave ? 'Esconder chave' : 'Mostrar chave'}
+                                        </Button>
+                                        <Button size="small" variant="outlined" color="warning" disabled={buscandoChave} onClick={() => pedirChave(true)}>
+                                            Gerar nova chave
+                                        </Button>
+                                    </Box>
+                                </>
+                            ) : (
+                                <Typography variant="caption" sx={{ color: '#FFB800' }}>
+                                    Agente antigo: no PC do evento, rode ligar-ia-facial.bat para ver e trocar a chave por aqui.
+                                </Typography>
+                            )}
+                        </Box>
                     </>
                 )}
             </DialogContent>

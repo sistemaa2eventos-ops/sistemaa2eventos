@@ -53,6 +53,18 @@ test('padrão só este PC; painel troca para rede local e a escolha fica gravada
     assert.strictEqual((await fetch(`http://127.0.0.1:${visor.PORTA}/health`)).status, 200);
 });
 
+test('gerar nova chave: grava no PC e derruba quem entrou com a antiga', () => {
+    const central = require('../src/central');
+    const antiga = central.chaveDeAcesso();
+    central._estado.sessoes.set('x'.repeat(48), Date.now() + 60000);
+    const nova = central.gerarNovaChave();
+    assert.notStrictEqual(nova, antiga);
+    assert.strictEqual(nova.length, 48);
+    assert.strictEqual(fs.readFileSync(process.env.CENTRAL_CHAVE_ARQ, 'utf8'), nova);
+    assert.strictEqual(central.chaveDeAcesso(), nova);
+    assert.strictEqual(central._estado.sessoes.size, 0);
+});
+
 test('modo inválido é recusado', async () => {
     await assert.rejects(() => visor.aplicarAcesso('internet'), /inválido/);
 });

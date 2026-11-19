@@ -53,6 +53,14 @@ function chaveDeAcesso() {
     return nova;
 }
 
+/** Troca a chave (painel: "Gerar nova chave"): quem entrou com a antiga sai na hora */
+function gerarNovaChave() {
+    const nova = crypto.randomBytes(24).toString('hex');
+    fs.writeFileSync(ARQ_CHAVE, nova, { mode: 0o600 });
+    estado.sessoes.clear();
+    return nova;
+}
+
 function iguais(a, b) {
     const x = Buffer.from(String(a));
     const y = Buffer.from(String(b));
@@ -388,4 +396,4 @@ function definirAcesso({ porta = estado.porta, soLocal, tailscale = null }) {
     estado.hostsExtras = new Set(tailscale ? [`${tailscale.ip}:${porta}`, `${tailscale.nome}:${porta}`] : []);
 }
 
-module.exports = { iniciar, definirAcesso, tratar, configurarCameras, definirAlvos, chaveDeAcesso, ARQ_CHAVE, _estado: estado, _caixaParaTela: caixaParaTela };
+module.exports = { iniciar, definirAcesso, gerarNovaChave, tratar, configurarCameras, definirAlvos, chaveDeAcesso, ARQ_CHAVE, _estado: estado, _caixaParaTela: caixaParaTela };

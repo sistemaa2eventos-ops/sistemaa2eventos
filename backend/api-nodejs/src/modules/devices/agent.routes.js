@@ -24,6 +24,7 @@ router.get('/', async (req, res) => {
             conectado: conectados.has(a.id),
             // O que o PC sabe fazer (agente antigo não troca o acesso da Central pelo painel)
             central_pelo_painel: !!agentService.recursos(a.id).central_acesso,
+            central_chave_pelo_painel: !!agentService.recursos(a.id).central_chave,
             dispositivos: (leitores || []).filter(l => l.agent_id === a.id).map(l => ({ id: l.id, nome: l.nome }))
         })));
     } catch (err) {
@@ -88,6 +89,23 @@ router.put('/:id/central', authorize('admin'), async (req, res) => {
         const r = await agentService.sendCommand(id, 'central_configurar', { acesso }, 15000);
         await auditService.logEntity(req, 'CENTRAL_ACCESS_CHANGE', 'AGENTES', id, { acesso }).catch(() => {});
         return ApiResponse.success(res, r);
+    } catch (err) {
+        return erroAgente(res, err);
+    }
+});
+
+// Chave de acesso da Central: mostrar (nova=false) ou gerar outra (nova=true, derruba quem entrou).
+// POST e sem cache: a chave não fica em log de acesso nem no histórico do navegador. Só admin, auditado.
+router.post('/:id/central/chave', authorize('admin'), async (req, res) => {
+    const id = agenteDoEvento(req);
+    if (!id) return ApiResponse.error(res, 'Agente desconectado ou de outro evento.', 404);
+    const nova = req.body?.nova === true;
+    try {
+        const r = await agentService.sendCommand(id, 'central_chave', { nova }, 8000);
+        if (!r?.chave) throw new Error('o PC não devolveu a chave');
+        await auditService.logEntity(req, nova ? 'CENTRAL_KEY_REGENERATE' : 'CENTRAL_KEY_VIEW', 'AGENTES', id, {}).catch(() => {});
+        res.set('Cache-Control', 'no-store');
+        return ApiResponse.success(res, { chave: r.chave, nova });
     } catch (err) {
         return erroAgente(res, err);
     }

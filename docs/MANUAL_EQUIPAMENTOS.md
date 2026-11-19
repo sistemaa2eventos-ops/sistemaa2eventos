@@ -66,6 +66,7 @@ Dê dois cliques em `C:\Projetos\Projeto_A2_Eventos\ligar-ia-facial.bat`. Ele:
 - Central (`http://localhost:8766/central/`): selo verde "Câmeras ao vivo", "Vídeo direto (WebRTC)" e "IA na GPU".
 - Para abrir a Central de novo: `abrir-central.bat`.
 - **Central em outro computador**: Leitores e dispositivos > Agentes locais > botão **Central** do agente. Escolha *Só este PC* (padrão), *Rede local do evento* (outro computador da sala, com a chave de acesso) ou *Tailscale* (operador remoto). Vale na hora, fica gravado no PC e a janela mostra os endereços para abrir. Precisa do agente 3.1 (`ligar-ia-facial.bat`).
+- **Chave de acesso** (na mesma janela, só administrador): **Mostrar chave** para copiar e enviar ao operador por canal seguro; **Gerar nova chave** quando alguém não deve mais entrar (a antiga para na hora e todos que estavam dentro saem). No outro computador, abra o endereço, cole a chave e clique em Entrar; vale 12 horas naquele navegador.
 
 ### 3.3 Energia e Windows
 - No Windows, configure para **nunca suspender nem desligar a tela** quando estiver na tomada.

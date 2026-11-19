@@ -262,6 +262,12 @@ const handlers = {
         return require('./visor-local').statusCentral();
     },
 
+    /** Chave de acesso da Central (painel, só admin): mostra a atual ou gera outra (derruba as entradas) */
+    async central_chave({ nova = false } = {}) {
+        const central = require('./central');
+        return { chave: nova === true ? central.gerarNovaChave() : central.chaveDeAcesso(), nova: nova === true };
+    },
+
     /** Troca quem pode abrir a Central ('local', 'rede' ou 'tailscale'); fica gravado neste PC */
     async central_configurar({ acesso }) {
         return require('./visor-local').aplicarAcesso(acesso, { salvar: true });
@@ -960,7 +966,7 @@ socket.on('connect', () => {
     socket.emit('agent:ready', {
         name: AGENT_NAME, version: VERSAO, ts: new Date().toISOString(),
         // O que este PC sabe fazer: o painel escolhe o caminho do vídeo e mostra o que falta instalar
-        recursos: { video_local: video.disponivel(), ffmpeg: video.temFfmpeg(), gravacao: video.temFfmpeg(), rostos_pelo_agente: true, rede_testar: true, central_acesso: true }
+        recursos: { video_local: video.disponivel(), ffmpeg: video.temFfmpeg(), gravacao: video.temFfmpeg(), rostos_pelo_agente: true, rede_testar: true, central_acesso: true, central_chave: true }
     });
     setTimeout(() => { sincronizarRostos(); }, 5000);
 });
