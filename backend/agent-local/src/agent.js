@@ -71,7 +71,9 @@ const motorDesligadoPeloPainel = () => fs.existsSync(ARQ_MOTOR_DESLIGADO);
 
 video.iniciar(log);
 // Visor local (central de operação na mesma rede): o vídeo não precisa passar pela VPS. Falha aqui não derruba o agente.
-try { require('./visor-local').iniciar(log, { fetchIa }); } catch (err) { log('warn', `visor local não iniciou: ${err.message}`); }
+try {
+    Promise.resolve(require('./visor-local').iniciar(log, { fetchIa })).catch(err => log('warn', `visor local não iniciou: ${err.message}`));
+} catch (err) { log('warn', `visor local não iniciou: ${err.message}`); }
 gravador.iniciar({
     logger: log,
     reportador: async (evento, dados) => {
@@ -253,6 +255,16 @@ const handlers = {
      */
     async rede_testar({ host, portas = [], timeoutMs = 2500 }) {
         return testarRede(host, portas, timeoutMs);
+    },
+
+    /** Central de Monitoramento: quem pode abrir e os endereços (tela Agentes locais do painel) */
+    async central_status() {
+        return require('./visor-local').statusCentral();
+    },
+
+    /** Troca quem pode abrir a Central ('local', 'rede' ou 'tailscale'); fica gravado neste PC */
+    async central_configurar({ acesso }) {
+        return require('./visor-local').aplicarAcesso(acesso, { salvar: true });
     },
 
     /** POST no motor de IA (biometria, verificação 1:1 dos leitores) */
@@ -948,7 +960,7 @@ socket.on('connect', () => {
     socket.emit('agent:ready', {
         name: AGENT_NAME, version: VERSAO, ts: new Date().toISOString(),
         // O que este PC sabe fazer: o painel escolhe o caminho do vídeo e mostra o que falta instalar
-        recursos: { video_local: video.disponivel(), ffmpeg: video.temFfmpeg(), gravacao: video.temFfmpeg(), rostos_pelo_agente: true, rede_testar: true }
+        recursos: { video_local: video.disponivel(), ffmpeg: video.temFfmpeg(), gravacao: video.temFfmpeg(), rostos_pelo_agente: true, rede_testar: true, central_acesso: true }
     });
     setTimeout(() => { sincronizarRostos(); }, 5000);
 });

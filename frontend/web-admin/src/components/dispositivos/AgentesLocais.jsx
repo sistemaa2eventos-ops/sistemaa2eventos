@@ -3,7 +3,8 @@ import {
     Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, IconButton,
     Stack, TextField, Tooltip, Typography
 } from '@mui/material';
-import { Add as AddIcon, ContentCopy as CopyIcon, Delete as DeleteIcon, Hub as AgentIcon } from '@mui/icons-material';
+import { Add as AddIcon, ContentCopy as CopyIcon, Delete as DeleteIcon, Hub as AgentIcon, Monitor as CentralIcon } from '@mui/icons-material';
+import CentralAcesso from './CentralAcesso';
 import { useSnackbar } from 'notistack';
 import api from '../../services/api';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
@@ -24,6 +25,7 @@ const AgentesLocais = ({ agentes = [], onChange }) => {
     const [nome, setNome] = useState('');
     const [criado, setCriado] = useState(null);
     const [salvando, setSalvando] = useState(false);
+    const [centralDe, setCentralDe] = useState(null);
 
     const criar = async () => {
         if (!nome.trim()) return;
@@ -82,12 +84,24 @@ const AgentesLocais = ({ agentes = [], onChange }) => {
                             {a.dispositivos?.length ? `Leitores: ${a.dispositivos.map(d => d.nome).join(', ')}` : 'Nenhum leitor vinculado'}
                             {a.last_connected_at && ` · última conexão ${new Date(a.last_connected_at).toLocaleString('pt-BR')}`}
                         </Typography>
+                        {a.conectado && (
+                            <Tooltip title={a.central_pelo_painel ? 'Quem pode abrir a Central de Monitoramento deste PC' : 'Agente antigo: no PC do evento, rode ligar-ia-facial.bat para escolher aqui'}>
+                                <span>
+                                    <Button size="small" startIcon={<CentralIcon />} disabled={!a.central_pelo_painel}
+                                        onClick={() => setCentralDe(a)} sx={{ color: CYAN, fontSize: '0.75rem', minWidth: 0 }}>
+                                        Central
+                                    </Button>
+                                </span>
+                            </Tooltip>
+                        )}
                         <Tooltip title="Desativar agente">
                             <IconButton size="small" onClick={() => desativar(a)} sx={{ color: '#FF3366' }}><DeleteIcon fontSize="small" /></IconButton>
                         </Tooltip>
                     </Stack>
                 ))}
             </Stack>
+
+            <CentralAcesso agente={centralDe} onClose={() => setCentralDe(null)} />
 
             <Dialog open={novoAberto} onClose={fechar} maxWidth="sm" fullWidth>
                 <DialogTitle sx={{ color: CYAN, fontWeight: 700 }}>Novo agente local</DialogTitle>

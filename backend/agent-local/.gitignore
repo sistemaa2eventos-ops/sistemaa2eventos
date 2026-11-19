@@ -10,3 +10,4 @@ bin/
 # Central de Monitoramento local: chave de acesso e alvos da watchlist (nunca no repositório)
 .central-chave
 .central-alvos.json
+.central-acesso.json

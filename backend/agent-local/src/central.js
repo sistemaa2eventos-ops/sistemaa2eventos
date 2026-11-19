@@ -375,11 +375,17 @@ function iniciar({ log, fetchIa, porta, soLocal, tailscale = null }) {
     if (log) estado.log = log;
     estado.fetchIa = fetchIa || null;
     estado.porta = porta;
-    estado.soLocal = soLocal !== false;
-    estado.tailscale = !!tailscale;
-    estado.hostsExtras = new Set(tailscale ? [`${tailscale.ip}:${porta}`, `${tailscale.nome}:${porta}`] : []);
+    definirAcesso({ porta, soLocal, tailscale });
     chaveDeAcesso();
     carregarAlvosSalvos();
 }
 
-module.exports = { iniciar, tratar, configurarCameras, definirAlvos, chaveDeAcesso, ARQ_CHAVE, _estado: estado, _caixaParaTela: caixaParaTela };
+/** Quem pode abrir a Central (trocado pelo painel sem reiniciar o agente) */
+function definirAcesso({ porta = estado.porta, soLocal, tailscale = null }) {
+    estado.porta = porta;
+    estado.soLocal = soLocal !== false;
+    estado.tailscale = !!tailscale;
+    estado.hostsExtras = new Set(tailscale ? [`${tailscale.ip}:${porta}`, `${tailscale.nome}:${porta}`] : []);
+}
+
+module.exports = { iniciar, definirAcesso, tratar, configurarCameras, definirAlvos, chaveDeAcesso, ARQ_CHAVE, _estado: estado, _caixaParaTela: caixaParaTela };

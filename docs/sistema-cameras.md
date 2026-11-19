@@ -406,7 +406,7 @@ Página servida pelo agente em `http://localhost:8766/central/`. Não depende da
 - `GET /central/entrar?chave=...` ou `POST` com formulário: se a chave bate (comparação em tempo constante), cria sessão e redireciona para `/central/` sem a chave na barra de endereço.
 - Cookie `nzt_central`: `HttpOnly`, `SameSite=Strict`, `Path=/central`, 12 horas.
 - Dez tentativas erradas em um minuto bloqueiam novas tentativas por um minuto (429).
-- Só aceita `Host: 127.0.0.1:8766` ou `localhost:8766` (protege contra DNS rebinding). Com `CENTRAL_REDE=1`, escuta em todas as interfaces e deixa de conferir o Host (use só com necessidade).
+- Só aceita `Host: 127.0.0.1:8766` ou `localhost:8766` (protege contra DNS rebinding). Com acesso "Rede local" (painel: Agentes locais > Central; ou `CENTRAL_REDE=1` sem escolha no painel), escuta em todas as interfaces e deixa de conferir o Host (use só com necessidade).
 - Cabeçalhos: `Content-Security-Policy` restrito, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`.
 
 ### 6.3 API da Central (todas exigem sessão)
@@ -610,7 +610,7 @@ Ainda não coberto: empresa bloqueada (o modo online nega, mas os funcionários 
 | Dois limites para alerta | motor `alerta_confiavel`; API `processarDeteccoesCamera`; Central | Falso alerta de watchlist/bloqueado com rosto pequeno ou semelhança baixa vira "possível", sem alarme. |
 | go2rtc sem reinício à toa | API `camerasDoEvento` (ordem fixa por id); agente `melhorModo` (modo da webcam salvo em `bin/webcam-modos.json`) | A assinatura da configuração só muda quando muda URL de câmera. |
 | Fora do evento sem vídeo pela VPS | painel `CameraVideo.jsx` | Sem visor local: 1 imagem/s na tela grande, 1 a cada 2 s nas miniaturas, com aviso. O vídeo via Socket.IO não é mais pedido. |
-| Central pelo Tailscale | agente `visor-local.js` + `central.js` (`CENTRAL_TAILSCALE=1`) | Segundo servidor só no IP 100.x, só com a Central (chave + sessão). Rotas do painel e IP da rede local continuam fechados. |
+| Central pelo Tailscale | agente `visor-local.js` + `central.js` (painel: Agentes locais > Central, gravado em `.central-acesso.json`; sem escolha, `CENTRAL_TAILSCALE=1`) | Segundo servidor só no IP 100.x, só com a Central (chave + sessão). Rotas do painel e IP da rede local continuam fechados. |
 | Tela honesta | `DispositivosPage.jsx`, `ConfigIAFacial.jsx` | "Modo offline" travado em negar (ver 9.9); escolha de stream da IA substituída pela orientação de configurar o sub-stream na câmera. |
 
 Testes: motor `tests/test_config_alerta.py` (11 verificações), agente `npm test` (13), API `npx jest` (5 novos em `alertaConfiavelCamera.test.js`).

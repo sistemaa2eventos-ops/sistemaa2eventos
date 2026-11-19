@@ -65,6 +65,7 @@ Dê dois cliques em `C:\Projetos\Projeto_A2_Eventos\ligar-ia-facial.bat`. Ele:
 - Painel > Monitor > aba **Saúde**: "Saúde do vídeo (PC do evento)" deve listar as câmeras com fps.
 - Central (`http://localhost:8766/central/`): selo verde "Câmeras ao vivo", "Vídeo direto (WebRTC)" e "IA na GPU".
 - Para abrir a Central de novo: `abrir-central.bat`.
+- **Central em outro computador**: Leitores e dispositivos > Agentes locais > botão **Central** do agente. Escolha *Só este PC* (padrão), *Rede local do evento* (outro computador da sala, com a chave de acesso) ou *Tailscale* (operador remoto). Vale na hora, fica gravado no PC e a janela mostra os endereços para abrir. Precisa do agente 3.1 (`ligar-ia-facial.bat`).
 
 ### 3.3 Energia e Windows
 - No Windows, configure para **nunca suspender nem desligar a tela** quando estiver na tomada.
@@ -277,5 +278,4 @@ O objetivo é que tudo seja configurado pelo painel. Hoje, estes pontos ainda de
 |---|---|---|
 | Leitores Hikvision | Não enviam a foto | Completar o adaptador e testar com um equipamento |
 | Outras marcas de leitor | Não suportadas | Cadastro de modelos + adaptador por marca |
-| Central pelo Tailscale / rede local | Arquivo `.env` do PC do evento | Opções na tela do agente |
 | Modo sem internet do leitor | A definir no teste com o equipamento | Opção por leitor no painel |

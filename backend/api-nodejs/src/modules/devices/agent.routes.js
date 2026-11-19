@@ -22,6 +22,8 @@ router.get('/', async (req, res) => {
         return ApiResponse.success(res, (agentes || []).map(a => ({
             ...a,
             conectado: conectados.has(a.id),
+            // O que o PC sabe fazer (agente antigo não troca o acesso da Central pelo painel)
+            central_pelo_painel: !!agentService.recursos(a.id).central_acesso,
             dispositivos: (leitores || []).filter(l => l.agent_id === a.id).map(l => ({ id: l.id, nome: l.nome }))
         })));
     } catch (err) {
@@ -56,6 +58,38 @@ router.post('/rede-testar', async (req, res) => {
         if (err.status) return ApiResponse.error(res, err.message, err.status);
         logger.error(`[Rede] Falha no teste: ${err.message}`);
         return ApiResponse.error(res, 'Erro ao testar a rede.');
+    }
+});
+
+// Central de Monitoramento do PC do evento: quem pode abrir (só o PC, rede local ou Tailscale)
+const ACESSOS_CENTRAL = ['local', 'rede', 'tailscale'];
+const agenteDoEvento = (req) => (agentService.agents.get(req.params.id)?.agentInfo?.evento_id === req.event.id ? req.params.id : null);
+const erroAgente = (res, err) => (/Comando desconhecido/i.test(err.message)
+    ? ApiResponse.error(res, 'O agente do PC do evento é de uma versão antiga. No PC do evento, rode ligar-ia-facial.bat para atualizar.', 409)
+    : ApiResponse.error(res, `O PC do evento não respondeu: ${err.message}`, 502));
+
+router.get('/:id/central', async (req, res) => {
+    const id = agenteDoEvento(req);
+    if (!id) return ApiResponse.error(res, 'Agente desconectado ou de outro evento.', 404);
+    try {
+        return ApiResponse.success(res, await agentService.sendCommand(id, 'central_status', {}, 8000));
+    } catch (err) {
+        return erroAgente(res, err);
+    }
+});
+
+// Abrir a Central para a rede: só admin (outros computadores passam a ver as câmeras, com a chave)
+router.put('/:id/central', authorize('admin'), async (req, res) => {
+    const acesso = req.body?.acesso;
+    if (!ACESSOS_CENTRAL.includes(acesso)) return ApiResponse.error(res, 'Escolha: só este PC, rede local ou Tailscale.', 400);
+    const id = agenteDoEvento(req);
+    if (!id) return ApiResponse.error(res, 'Agente desconectado ou de outro evento.', 404);
+    try {
+        const r = await agentService.sendCommand(id, 'central_configurar', { acesso }, 15000);
+        await auditService.logEntity(req, 'CENTRAL_ACCESS_CHANGE', 'AGENTES', id, { acesso }).catch(() => {});
+        return ApiResponse.success(res, r);
+    } catch (err) {
+        return erroAgente(res, err);
     }
 });
 

@@ -12,6 +12,8 @@
  * (caixas da IA lidas do motor deste PC).
  */
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
 const video = require('./video');
@@ -66,22 +68,123 @@ const caixaParaPainel = (f) => ({
     } : null
 });
 
+// ------------------------------------------------------------------------------------------------
+// Quem pode abrir a Central: 'local' (só este PC), 'rede' (outros computadores da rede do evento, com
+// a chave) ou 'tailscale' (este PC + operador remoto pela rede virtual do Tailscale). Escolhido no painel
+// (Agentes locais) e gravado neste PC, para valer também sem internet. Sem escolha no painel, vale o
+// .env antigo (CENTRAL_REDE=1 / CENTRAL_TAILSCALE=1).
+// ------------------------------------------------------------------------------------------------
+const ACESSOS = ['local', 'rede', 'tailscale'];
+const ARQ_ACESSO = process.env.CENTRAL_ACESSO_ARQ || path.join(__dirname, '..', '.central-acesso.json');
+const sim = (v) => /^(1|true|sim)$/i.test(String(v || ''));
+const vis = { log: () => {}, atender: null, servidor: null, servidorTs: null, acesso: 'local', origem: 'padrao', ts: null, vigiaTs: null };
+
+function acessoInicial() {
+    try {
+        const salvo = JSON.parse(fs.readFileSync(ARQ_ACESSO, 'utf8'));
+        if (ACESSOS.includes(salvo?.acesso)) return { acesso: salvo.acesso, origem: 'painel' };
+    } catch { /* sem escolha no painel */ }
+    if (sim(process.env.CENTRAL_REDE)) return { acesso: 'rede', origem: 'env' };
+    if (sim(process.env.CENTRAL_TAILSCALE)) return { acesso: 'tailscale', origem: 'env' };
+    return { acesso: 'local', origem: 'padrao' };
+}
+
+/** Fecha um servidor HTTP sem esperar conexões longas (vídeo) terminarem */
+function fechar(srv) {
+    if (!srv) return Promise.resolve();
+    return new Promise((ok) => {
+        srv.close(() => ok());
+        try { srv.closeAllConnections?.(); } catch { /* Node antigo */ }
+        setTimeout(ok, 1500);
+    });
+}
+
+function escutar(srv, host, aoOuvir) {
+    return new Promise((ok) => {
+        srv.once('listening', () => { aoOuvir(); ok(true); });
+        srv.once('error', (err) => { vis.log('warn', `visor local (${host}): ${err.message}`); ok(false); });
+        srv.listen(PORTA, host);
+    });
+}
+
+/** IPv4 da rede local deste PC (para mostrar no painel os endereços da Central) */
+function ipsDaRede() {
+    const ips = [];
+    for (const lista of Object.values(os.networkInterfaces())) {
+        for (const i of lista || []) {
+            if ((i.family !== 'IPv4' && i.family !== 4) || i.internal) continue;
+            const [a, b] = i.address.split('.').map(Number);
+            if (a === 169 && b === 254) continue;          // sem DHCP
+            if (a === 100 && b >= 64 && b <= 127) continue; // Tailscale (mostrado à parte)
+            ips.push(i.address);
+        }
+    }
+    return ips;
+}
+
+/** O que o painel mostra: modo atual, de onde veio e os endereços para abrir a Central */
+function statusCentral() {
+    const enderecos = [`http://localhost:${PORTA}/central/`];
+    if (vis.acesso === 'rede') for (const ip of ipsDaRede()) enderecos.push(`http://${ip}:${PORTA}/central/`);
+    if (vis.acesso === 'tailscale' && vis.ts) enderecos.push(`http://${vis.ts.ip}:${PORTA}/central/`, `http://${vis.ts.nome}:${PORTA}/central/`);
+    return {
+        acesso: vis.acesso,
+        origem: vis.origem,
+        tailscale_conectado: !!interfaceTailscale(),
+        enderecos
+    };
+}
+
+/**
+ * Aplica o modo de acesso: reabre o servidor no endereço certo (127.0.0.1 ou 0.0.0.0) e liga/desliga o
+ * servidor do Tailscale. @param salvar grava a escolha neste PC (vinda do painel)
+ */
+async function aplicarAcesso(acesso, { salvar = false } = {}) {
+    if (!ACESSOS.includes(acesso)) throw new Error('Modo de acesso inválido');
+    if (salvar) {
+        try { fs.writeFileSync(ARQ_ACESSO, JSON.stringify({ acesso, em: new Date().toISOString() })); } catch (err) { vis.log('warn', `central: não gravou o modo de acesso (${err.message})`); }
+        vis.origem = 'painel';
+    }
+    vis.acesso = acesso;
+    const naRede = acesso === 'rede';
+    vis.ts = acesso === 'tailscale' ? interfaceTailscale() : null;
+    if (acesso === 'tailscale' && !vis.ts) vis.log('warn', 'Central pelo Tailscale: o Tailscale não está conectado neste PC (sem endereço 100.64.0.0/10); tento de novo a cada minuto');
+    central.definirAcesso({ porta: PORTA, soLocal: !naRede, tailscale: vis.ts });
+
+    await Promise.all([fechar(vis.servidor), fechar(vis.servidorTs)]);
+    vis.servidor = null;
+    vis.servidorTs = null;
+    if (vis.atender) {
+        const host = naRede ? '0.0.0.0' : '127.0.0.1';
+        const srv = http.createServer(vis.atender);
+        srv.on('error', (err) => vis.log('warn', `visor local: ${err.message}`));
+        if (await escutar(srv, host, () => vis.log('info', `Central de Monitoramento: http://localhost:${PORTA}/central/ (vídeo direto, sem passar pela VPS${naRede ? '; aberta para a rede local' : ''})`))) vis.servidor = srv;
+    }
+    if (vis.ts) vis.servidorTs = await servidorTailscale(vis.ts, vis.log);
+
+    // Tailscale escolhido mas desconectado: assume sozinho quando ele conectar
+    clearInterval(vis.vigiaTs);
+    vis.vigiaTs = null;
+    if (acesso === 'tailscale' && !vis.ts) {
+        vis.vigiaTs = setInterval(() => {
+            if (vis.acesso === 'tailscale' && !vis.ts && interfaceTailscale()) aplicarAcesso('tailscale').catch(() => {});
+        }, 60000);
+        vis.vigiaTs.unref?.();
+    }
+    return statusCentral();
+}
+
 /**
  * @param {Function} log
  * @param {{ fetchIa?: Function }} opcoes  fetchIa: chamada ao motor de IA local (com a chave interna)
  */
 function iniciar(log, opcoes = {}) {
     const { fetchIa } = opcoes;
-    // CENTRAL_REDE=1: a Central também atende outros computadores da rede (com a chave de acesso)
-    const naRede = /^(1|true|sim)$/i.test(String(process.env.CENTRAL_REDE || ''));
-    // CENTRAL_TAILSCALE=1: a Central também atende pela interface do Tailscale (e só por ela, além do
-    // próprio PC). O operador remoto entra na rede virtual e vê ao vivo por WebRTC, sem vídeo pela VPS.
-    const comTailscale = !naRede && /^(1|true|sim)$/i.test(String(process.env.CENTRAL_TAILSCALE || ''));
-    const ts = comTailscale ? interfaceTailscale() : null;
-    if (comTailscale && !ts) log('warn', 'CENTRAL_TAILSCALE=1, mas o Tailscale não está conectado neste PC (sem endereço 100.64.0.0/10)');
-    central.iniciar({ log, fetchIa, porta: PORTA, soLocal: !naRede, tailscale: ts });
-    if (ts) servidorTailscale(ts, log);
-    const server = http.createServer(async (req, res) => {
+    vis.log = log;
+    const inicial = acessoInicial();
+    vis.origem = inicial.origem;
+    central.iniciar({ log, fetchIa, porta: PORTA, soLocal: inicial.acesso !== 'rede', tailscale: null });
+    vis.atender = async (req, res) => {
         const url = new URL(req.url, 'http://127.0.0.1');
         const origem = req.headers.origin;
         const origemOk = !!origem && ORIGENS.has(origem);
@@ -193,12 +296,9 @@ function iniciar(log, opcoes = {}) {
 
         res.statusCode = 404;
         res.end();
-    });
+    };
 
-    server.on('error', (err) => log('warn', `visor local: ${err.message}`));
-    const host = naRede ? '0.0.0.0' : '127.0.0.1';
-    server.listen(PORTA, host, () => log('info', `Central de Monitoramento: http://localhost:${PORTA}/central/ (vídeo direto, sem passar pela VPS${naRede ? '; aberta para a rede local' : ''})`));
-    return server;
+    return aplicarAcesso(inicial.acesso);
 }
 
 /** IPv4 do Tailscale neste PC (faixa CGNAT 100.64.0.0/10), ou null */
@@ -231,8 +331,17 @@ function servidorTailscale(ts, log) {
         res.end();
     });
     srv.on('error', (err) => log('warn', `central (tailscale): ${err.message}`));
-    srv.listen(PORTA, ts.ip, () => log('info', `Central também pelo Tailscale: http://${ts.ip}:${PORTA}/central/ (ou http://${ts.nome}:${PORTA}/central/)`));
-    return srv;
+    return escutar(srv, ts.ip, () => log('info', `Central também pelo Tailscale: http://${ts.ip}:${PORTA}/central/ (ou http://${ts.nome}:${PORTA}/central/)`))
+        .then(ok => (ok ? srv : null));
 }
 
-module.exports = { iniciar, PORTA, ORIGENS, caixaParaPainel, interfaceTailscale };
+/** Fecha os servidores da Central (encerramento e testes) */
+async function parar() {
+    clearInterval(vis.vigiaTs);
+    vis.vigiaTs = null;
+    await Promise.all([fechar(vis.servidor), fechar(vis.servidorTs)]);
+    vis.servidor = null;
+    vis.servidorTs = null;
+}
+
+module.exports = { iniciar, aplicarAcesso, parar, statusCentral, PORTA, ORIGENS, caixaParaPainel, interfaceTailscale, ACESSOS };
