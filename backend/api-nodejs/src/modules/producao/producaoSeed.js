@@ -272,9 +272,114 @@ function criarDadosDemonstracao(eventoId, usuario = {}) {
     const matPratId = uuidv4();
     const matGradeId = uuidv4();
     const materiais = [
-        { id: matTrussId, evento_id: eventoId, codigo_catalogo: 'TR-Q30-2M', nome: 'Treliça alumínio Q30 2m', categoria: 'box_truss', subtipo: 'Q30 2m', dimensoes: '2,00 x 0,30 x 0,30m', peso_kg: 12.5, fornecedor_nome: 'Estruturas Brasil Ltda', classe_deteccao_ia: 'truss_q30_2m', quantidade_planejada: 40, quantidade_recebida: 38, quantidade_avariada: 0, status_movimentacao: 'recebido' },
-        { id: matPratId, evento_id: eventoId, codigo_catalogo: 'PR-2X1', nome: 'Praticável pantográfico 2x1m', categoria: 'praticavel', subtipo: '2x1m alumínio', dimensoes: '2,00 x 1,00m', peso_kg: 32.0, fornecedor_nome: 'Estruturas Brasil Ltda', classe_deteccao_ia: 'praticavel_2x1', quantidade_planejada: 24, quantidade_recebida: 24, quantidade_avariada: 0, status_movimentacao: 'montado' },
-        { id: matGradeId, evento_id: eventoId, codigo_catalogo: 'GR-CONT', nome: 'Grade de contenção 2m galvanizada', categoria: 'grades', subtipo: '2,00 x 1,10m', dimensoes: '2,00 x 1,10m', peso_kg: 18.0, fornecedor_nome: 'Segurança e Gradis SA', classe_deteccao_ia: 'grade_contencao', quantidade_planejada: 80, quantidade_recebida: 0, quantidade_avariada: 0, status_movimentacao: 'previsto' }
+        {
+            id: matTrussId,
+            evento_id: eventoId,
+            codigo_catalogo: 'TR-Q30-2M',
+            nome: 'Treliça alumínio Q30 2m',
+            categoria: 'box_truss',
+            subtipo: 'Q30 2m',
+            dimensoes: '2,00 x 0,30 x 0,30m',
+            peso_kg: 12.5,
+            fornecedor_nome: 'Estruturas Brasil Ltda',
+            classe_deteccao_ia: 'truss_q30_2m',
+            foto_referencia_url: null,
+            fotos_referencia: [],
+            caracteristicas: {
+                cor_predominante: 'Alumínio / Prata',
+                cor_hex_referencia: '#CBD5E1',
+                formato_geometria: 'estrutura_vazada',
+                material_composicao: 'Alumínio 6061',
+                unidade_medida: 'un',
+                codigo_etiqueta: 'NZT-TRQ30',
+                marcas_distintivas: 'Treliça quadrada vazada em X prateada com flanges de 4 furos nas pontas',
+                palavras_chave_ia: ['trelica q30', 'box truss', 'aluminio', 'estrutura palco']
+            },
+            regra_monitoramento: {
+                acao_ao_detectar: 'contar_entrada',
+                modo_preferido: 'line_zone',
+                confianca_minima: 0.65,
+                area_alvo_id: areaPalcoId,
+                notificar_alerta: true,
+                instrucao_operacional: 'Contar cada módulo Q30 na descarga da doca e comparar com o romaneio de 40 unidades.'
+            },
+            quantidade_planejada: 40,
+            quantidade_recebida: 38,
+            quantidade_avariada: 0,
+            status_movimentacao: 'recebido'
+        },
+        {
+            id: matPratId,
+            evento_id: eventoId,
+            codigo_catalogo: 'PR-2X1',
+            nome: 'Praticável pantográfico 2x1m',
+            categoria: 'praticavel',
+            subtipo: '2x1m alumínio',
+            dimensoes: '2,00 x 1,00m',
+            peso_kg: 32.0,
+            fornecedor_nome: 'Estruturas Brasil Ltda',
+            classe_deteccao_ia: 'praticavel_2x1',
+            foto_referencia_url: null,
+            fotos_referencia: [],
+            caracteristicas: {
+                cor_predominante: 'Preto / Grafite',
+                cor_hex_referencia: '#1E293B',
+                formato_geometria: 'painel_plano',
+                material_composicao: 'Alumínio e compensado naval antiderrapante',
+                unidade_medida: 'un',
+                codigo_etiqueta: 'NZT-PR21',
+                marcas_distintivas: 'Tampo retangular preto com borda metálica prateada e sanfona pantográfica',
+                palavras_chave_ia: ['praticavel', 'tablado', 'stage deck', '2x1']
+            },
+            regra_monitoramento: {
+                acao_ao_detectar: 'alertar_divergencia',
+                modo_preferido: 'polygon_zone',
+                confianca_minima: 0.68,
+                area_alvo_id: areaPalcoId,
+                notificar_alerta: true,
+                instrucao_operacional: 'Monitorar empilhamento no setor norte e alertar imediatamente se houver divergência dos 24 módulos.'
+            },
+            quantidade_planejada: 24,
+            quantidade_recebida: 24,
+            quantidade_avariada: 0,
+            status_movimentacao: 'montado'
+        },
+        {
+            id: matGradeId,
+            evento_id: eventoId,
+            codigo_catalogo: 'GR-CONT',
+            nome: 'Grade de contenção 2m galvanizada',
+            categoria: 'grades',
+            subtipo: '2,00 x 1,10m',
+            dimensoes: '2,00 x 1,10m',
+            peso_kg: 18.0,
+            fornecedor_nome: 'Segurança e Gradis SA',
+            classe_deteccao_ia: 'grade_contencao',
+            foto_referencia_url: null,
+            fotos_referencia: [],
+            caracteristicas: {
+                cor_predominante: 'Cinza / Galvanizado',
+                cor_hex_referencia: '#94A3B8',
+                formato_geometria: 'estrutura_vazada',
+                material_composicao: 'Aço galvanizado',
+                unidade_medida: 'un',
+                codigo_etiqueta: 'NZT-GR2M',
+                marcas_distintivas: 'Gradil vertical de tubos verticais cinza com pés laterais em T',
+                palavras_chave_ia: ['grade contencao', 'gradil', 'barricada', 'cercamento']
+            },
+            regra_monitoramento: {
+                acao_ao_detectar: 'contar_entrada',
+                modo_preferido: 'line_zone',
+                confianca_minima: 0.65,
+                area_alvo_id: areaSegurancaId,
+                notificar_alerta: true,
+                instrucao_operacional: 'Contar grades descarregadas no perímetro antes da abertura de portões.'
+            },
+            quantidade_planejada: 80,
+            quantidade_recebida: 0,
+            quantidade_avariada: 0,
+            status_movimentacao: 'previsto'
+        }
     ];
 
     const recebimento1Id = uuidv4();

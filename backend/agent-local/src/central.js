@@ -346,6 +346,13 @@ async function tratar(req, res, url) {
         return true;
     }
 
+    // Diagnóstico do áudio: quais faixas o retransmissor tem para a câmera (entrada e envio de voz)
+    const mmd = p.match(/^\/central\/api\/camera\/([A-Za-z0-9-]{1,64})\/midias$/);
+    if (mmd && req.method === 'GET') {
+        json(res, 200, await video.midiasDaCamera(mmd[1]));
+        return true;
+    }
+
     if (p === '/central/api/estado' && req.method === 'GET') {
         json(res, 200, {
             cameras: estado.cameras.filter(c => video.conhece(c.id)).map(c => ({ ...c, ptz: camerasComGiro.has(c.id) })),

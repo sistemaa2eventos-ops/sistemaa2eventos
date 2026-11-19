@@ -1438,6 +1438,130 @@ async function gerarPlanoFasesElemento(eventoId, plantaId, dados, user, headers 
     };
 }
 
+const ACOES_MONITORAMENTO_MATERIAL_VALIDAS = [
+    'contar_entrada',
+    'contar_saida',
+    'monitorar_presenca',
+    'alertar_saida_indevida',
+    'alertar_divergencia'
+];
+const MODOS_CONTAGEM_MATERIAL_VALIDOS = ['line_zone', 'polygon_zone', 'sahi_estatico'];
+
+function normalizarFotosReferencia(fotos, fotoPrincipalInformada) {
+    const listaBruta = Array.isArray(fotos) ? fotos : [];
+    const agora = new Date().toISOString();
+    const validas = [];
+
+    for (const item of listaBruta) {
+        if (!item || typeof item !== 'object') continue;
+        const url = typeof item.url === 'string' ? item.url.trim() : '';
+        if (!url || url.length > 620000) continue;
+        validas.push({
+            id: String(item.id || uuidv4()),
+            url,
+            angulo: String(item.angulo || 'frontal').trim() || 'frontal',
+            legenda: String(item.legenda || '').trim().slice(0, 120),
+            principal: Boolean(item.principal),
+            assinatura_visual: (item.assinatura_visual && typeof item.assinatura_visual === 'object')
+                ? item.assinatura_visual
+                : null,
+            adicionada_em: item.adicionada_em || agora
+        });
+        if (validas.length >= 6) break;
+    }
+
+    const fotoFallback = typeof fotoPrincipalInformada === 'string' ? fotoPrincipalInformada.trim() : '';
+    if (validas.length === 0 && fotoFallback && fotoFallback.length <= 620000) {
+        validas.push({
+            id: uuidv4(),
+            url: fotoFallback,
+            angulo: 'frontal',
+            legenda: 'Referência principal',
+            principal: true,
+            assinatura_visual: null,
+            adicionada_em: agora
+        });
+    }
+
+    if (validas.length > 0) {
+        let idxPrincipal = -1;
+        if (fotoFallback) {
+            idxPrincipal = validas.findIndex((f) => f.url === fotoFallback);
+        }
+        if (idxPrincipal < 0) {
+            idxPrincipal = validas.findIndex((f) => f.principal);
+        }
+        if (idxPrincipal < 0) idxPrincipal = 0;
+
+        validas.forEach((f, idx) => {
+            f.principal = idx === idxPrincipal;
+        });
+    }
+
+    const principal = validas.find((f) => f.principal) || validas[0] || null;
+    return {
+        fotos_referencia: validas,
+        foto_referencia_url: principal ? principal.url : null
+    };
+}
+
+function normalizarCaracteristicasMaterial(dados = {}, atual = {}) {
+    const src = (dados?.caracteristicas && typeof dados.caracteristicas === 'object')
+        ? dados.caracteristicas
+        : (dados || {});
+    const base = (atual && typeof atual === 'object') ? atual : {};
+
+    const palavrasBrutas = src.palavras_chave_ia !== undefined
+        ? src.palavras_chave_ia
+        : (base.palavras_chave_ia ?? []);
+    const listaPalavras = Array.isArray(palavrasBrutas)
+        ? palavrasBrutas
+        : String(palavrasBrutas || '').split(/[,;\n]+/);
+    const palavras_chave_ia = Array.from(new Set(
+        listaPalavras.map((p) => String(p || '').trim()).filter(Boolean)
+    )).slice(0, 20);
+
+    return {
+        cor_predominante: String(src.cor_predominante ?? base.cor_predominante ?? '').trim(),
+        cor_hex_referencia: String(src.cor_hex_referencia ?? base.cor_hex_referencia ?? '').trim(),
+        formato_geometria: String(src.formato_geometria ?? base.formato_geometria ?? '').trim(),
+        material_composicao: String(src.material_composicao ?? base.material_composicao ?? '').trim(),
+        unidade_medida: String(src.unidade_medida ?? base.unidade_medida ?? 'un').trim() || 'un',
+        codigo_etiqueta: String(src.codigo_etiqueta ?? base.codigo_etiqueta ?? '').trim(),
+        marcas_distintivas: String(src.marcas_distintivas ?? base.marcas_distintivas ?? '').trim(),
+        palavras_chave_ia
+    };
+}
+
+function normalizarRegraMonitoramento(dados = {}, atual = {}) {
+    const src = (dados?.regra_monitoramento && typeof dados.regra_monitoramento === 'object')
+        ? dados.regra_monitoramento
+        : (dados || {});
+    const base = (atual && typeof atual === 'object') ? atual : {};
+
+    const acaoInformada = String(src.acao_ao_detectar ?? base.acao_ao_detectar ?? 'contar_entrada').trim();
+    const modoInformado = String(src.modo_preferido ?? base.modo_preferido ?? 'line_zone').trim();
+    const confBruta = Number(src.confianca_minima ?? base.confianca_minima ?? 0.65);
+    const confLimitada = Number.isFinite(confBruta)
+        ? Math.min(0.98, Math.max(0.4, confBruta))
+        : 0.65;
+
+    return {
+        acao_ao_detectar: ACOES_MONITORAMENTO_MATERIAL_VALIDAS.includes(acaoInformada)
+            ? acaoInformada
+            : 'contar_entrada',
+        modo_preferido: MODOS_CONTAGEM_MATERIAL_VALIDOS.includes(modoInformado)
+            ? modoInformado
+            : 'line_zone',
+        confianca_minima: Math.round(confLimitada * 100) / 100,
+        area_alvo_id: (src.area_alvo_id !== undefined ? src.area_alvo_id : base.area_alvo_id) || null,
+        notificar_alerta: src.notificar_alerta !== undefined
+            ? Boolean(src.notificar_alerta)
+            : (base.notificar_alerta !== undefined ? Boolean(base.notificar_alerta) : true),
+        instrucao_operacional: String(src.instrucao_operacional ?? base.instrucao_operacional ?? '').trim()
+    };
+}
+
 async function criarMaterial(eventoId, dados, user, headers = {}) {
     const { estado } = await carregarEstadoEvento(eventoId, { usuario: user });
     const ctx = calculos.resolverContextoUsuario(estado, user, headers);
@@ -1446,6 +1570,11 @@ async function criarMaterial(eventoId, dados, user, headers = {}) {
     }
     const nome = String(dados.nome || '').trim();
     if (!nome) throw erroHttp('Informe o nome do material.', 400);
+
+    const fotosNorm = normalizarFotosReferencia(dados.fotos_referencia, dados.foto_referencia_url);
+    const caracteristicas = normalizarCaracteristicasMaterial(dados);
+    const regra_monitoramento = normalizarRegraMonitoramento(dados);
+    const agora = new Date().toISOString();
 
     const novo = {
         id: uuidv4(),
@@ -1457,16 +1586,122 @@ async function criarMaterial(eventoId, dados, user, headers = {}) {
         dimensoes: dados.dimensoes || '',
         peso_kg: Number(dados.peso_kg || 0),
         fornecedor_nome: dados.fornecedor_nome || '',
-        classe_deteccao_ia: dados.classe_deteccao_ia || nome.toLowerCase().replace(/[^a-z0-9]+/g, '_'),
+        classe_deteccao_ia: String(dados.classe_deteccao_ia || '').trim() || nome.toLowerCase().replace(/[^a-z0-9]+/g, '_'),
+        foto_referencia_url: fotosNorm.foto_referencia_url,
+        fotos_referencia: fotosNorm.fotos_referencia,
+        caracteristicas,
+        regra_monitoramento,
         quantidade_planejada: Number(dados.quantidade_planejada || 0),
         quantidade_recebida: Number(dados.quantidade_recebida || 0),
         quantidade_avariada: Number(dados.quantidade_avariada || 0),
-        status_movimentacao: 'previsto'
+        status_movimentacao: 'previsto',
+        atualizado_em: agora
     };
     estado.materiais.push(novo);
-    registrarAuditoria(estado, ctx, 'CADASTRAR_MATERIAL', 'MATERIAL', novo.id, null, novo);
+    registrarAuditoria(estado, ctx, 'CADASTRAR_MATERIAL', 'MATERIAL', novo.id, null, {
+        nome: novo.nome,
+        codigo_catalogo: novo.codigo_catalogo,
+        fotos: novo.fotos_referencia.length,
+        acao_monitoramento: novo.regra_monitoramento.acao_ao_detectar
+    });
     await salvarEstadoEvento(eventoId, estado);
     return novo;
+}
+
+async function atualizarMaterial(eventoId, materialId, dados, user, headers = {}) {
+    const { estado } = await carregarEstadoEvento(eventoId, { usuario: user });
+    const ctx = calculos.resolverContextoUsuario(estado, user, headers);
+    if (!calculos.podeGerenciarCatalogo(ctx)) {
+        throw erroHttp('Apenas Auditoria, Produtor Geral ou Admin Master pode alterar o catálogo.', 403);
+    }
+    const material = (estado.materiais || []).find((m) => m.id === materialId);
+    if (!material) throw erroHttp('Material não encontrado.', 404);
+
+    const antes = {
+        nome: material.nome,
+        acao: material.regra_monitoramento?.acao_ao_detectar || 'contar_entrada',
+        fotos: (material.fotos_referencia || []).length
+    };
+
+    if (dados.nome !== undefined) {
+        const nomeLimpo = String(dados.nome || '').trim();
+        if (!nomeLimpo) throw erroHttp('O nome do material não pode ficar vazio.', 400);
+        material.nome = nomeLimpo;
+    }
+    if (dados.codigo_catalogo !== undefined) {
+        material.codigo_catalogo = String(dados.codigo_catalogo || '').trim() || material.codigo_catalogo;
+    }
+    if (dados.categoria !== undefined) material.categoria = dados.categoria || material.categoria;
+    if (dados.subtipo !== undefined) material.subtipo = String(dados.subtipo || '');
+    if (dados.dimensoes !== undefined) material.dimensoes = String(dados.dimensoes || '');
+    if (dados.peso_kg !== undefined) material.peso_kg = Number(dados.peso_kg || 0);
+    if (dados.fornecedor_nome !== undefined) material.fornecedor_nome = String(dados.fornecedor_nome || '');
+    if (dados.classe_deteccao_ia !== undefined) {
+        const cls = String(dados.classe_deteccao_ia || '').trim();
+        material.classe_deteccao_ia = cls || material.nome.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    }
+    if (dados.quantidade_planejada !== undefined) {
+        material.quantidade_planejada = Number(dados.quantidade_planejada || 0);
+    }
+
+    if (dados.fotos_referencia !== undefined || dados.foto_referencia_url !== undefined) {
+        const listaFotos = dados.fotos_referencia !== undefined
+            ? dados.fotos_referencia
+            : (material.fotos_referencia || []);
+        const fotosNorm = normalizarFotosReferencia(listaFotos, dados.foto_referencia_url);
+        material.fotos_referencia = fotosNorm.fotos_referencia;
+        material.foto_referencia_url = fotosNorm.foto_referencia_url;
+    }
+
+    if (dados.caracteristicas !== undefined || dados.cor_predominante !== undefined || dados.formato_geometria !== undefined || dados.palavras_chave_ia !== undefined) {
+        material.caracteristicas = normalizarCaracteristicasMaterial(dados, material.caracteristicas);
+    }
+
+    if (dados.regra_monitoramento !== undefined || dados.acao_ao_detectar !== undefined || dados.confianca_minima !== undefined) {
+        material.regra_monitoramento = normalizarRegraMonitoramento(dados, material.regra_monitoramento);
+    }
+
+    material.atualizado_em = new Date().toISOString();
+
+    registrarAuditoria(estado, ctx, 'ATUALIZAR_MATERIAL', 'MATERIAL', material.id, antes, {
+        nome: material.nome,
+        acao: material.regra_monitoramento?.acao_ao_detectar,
+        fotos: (material.fotos_referencia || []).length
+    });
+    await salvarEstadoEvento(eventoId, estado);
+    return material;
+}
+
+async function obterCatalogoVisaoMateriais(eventoId, user, headers = {}) {
+    const { estado } = await carregarEstadoEvento(eventoId, { usuario: user });
+    calculos.resolverContextoUsuario(estado, user, headers);
+
+    const materiaisAtivos = (estado.materiais || [])
+        .filter((m) => m.ativo !== false)
+        .map((m) => ({
+            id: m.id,
+            codigo_catalogo: m.codigo_catalogo,
+            nome: m.nome,
+            categoria: m.categoria,
+            subtipo: m.subtipo || '',
+            dimensoes: m.dimensoes || '',
+            peso_kg: Number(m.peso_kg || 0),
+            classe_deteccao_ia: m.classe_deteccao_ia || '',
+            foto_referencia_url: m.foto_referencia_url || null,
+            fotos_referencia: Array.isArray(m.fotos_referencia) ? m.fotos_referencia : [],
+            caracteristicas: normalizarCaracteristicasMaterial(m.caracteristicas || {}),
+            regra_monitoramento: normalizarRegraMonitoramento(m.regra_monitoramento || {}),
+            quantidade_planejada: Number(m.quantidade_planejada || 0),
+            quantidade_recebida: Number(m.quantidade_recebida || 0),
+            status_movimentacao: m.status_movimentacao || 'previsto'
+        }));
+
+    return {
+        evento_id: eventoId,
+        atualizado_em: new Date().toISOString(),
+        total_materiais: materiaisAtivos.length,
+        materiais: materiaisAtivos
+    };
 }
 
 /**
@@ -1502,9 +1737,22 @@ async function registrarConferenciaIa(eventoId, dados, user, headers = {}) {
             quantidade_corrigida_humano: null,
             confianca_media: Number(item.confianca_media || 0.91),
             quadro_chave_evidencia_url: item.quadro_chave_evidencia_url || null,
+            acao_aplicada: item.acao_aplicada || mat?.regra_monitoramento?.acao_ao_detectar || 'contar_entrada',
             justificativa_correcao: null
         };
     });
+
+    const acoesExecutadas = (Array.isArray(dados.acoes_executadas) ? dados.acoes_executadas : [])
+        .slice(0, 100)
+        .map((a) => ({
+            id: String(a.id || uuidv4()),
+            tipo: String(a.tipo || 'contar_entrada'),
+            material_id: a.material_id || null,
+            material_nome: String(a.material_nome || ''),
+            mensagem: String(a.mensagem || ''),
+            timestamp: a.timestamp || new Date().toISOString(),
+            evidencia_url: a.evidencia_url || null
+        }));
 
     const sessao = {
         id: uuidv4(),
@@ -1515,7 +1763,8 @@ async function registrarConferenciaIa(eventoId, dados, user, headers = {}) {
         status_processamento: 'concluido',
         iniciado_em: new Date().toISOString(),
         finalizado_em: new Date().toISOString(),
-        itens_contados: itens
+        itens_contados: itens,
+        acoes_executadas: acoesExecutadas
     };
 
     estado.recebimentos.unshift(recebimento);
@@ -1582,6 +1831,7 @@ async function cadastrarMaterialNaoReconhecido(eventoId, itemId, dados, user, he
         categoria: dados.categoria || 'geral',
         subtipo: dados.subtipo || '',
         classe_deteccao_ia: itemAlvo.classe_identificada,
+        foto_referencia_url: dados.foto_referencia_url || itemAlvo.quadro_chave_evidencia_url || null,
         quantidade_planejada: Number(dados.quantidade_planejada || itemAlvo.quantidade_ia || 0),
         quantidade_recebida: Number(itemAlvo.quantidade_ia || 0)
     }, user, headers);
@@ -2092,6 +2342,8 @@ module.exports = {
     publicarVersaoOficialPlanta,
     gerarPlanoFasesElemento,
     criarMaterial,
+    atualizarMaterial,
+    obterCatalogoVisaoMateriais,
     registrarConferenciaIa,
     confirmarItemContagem,
     cadastrarMaterialNaoReconhecido,

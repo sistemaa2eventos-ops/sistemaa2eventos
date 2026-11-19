@@ -44,6 +44,85 @@ export const ROTULO_MOVIMENTACAO = [
     { valor: 'devolvido', texto: 'Devolvido' }
 ];
 
+export const CATEGORIAS_MATERIAL = [
+    { valor: 'box_truss', rotulo: 'Box truss e treliças' },
+    { valor: 'praticavel', rotulo: 'Praticáveis' },
+    { valor: 'grades', rotulo: 'Grades e barricadas' },
+    { valor: 'som', rotulo: 'Áudio e sonorização' },
+    { valor: 'iluminacao', rotulo: 'Iluminação e LED' },
+    { valor: 'gerador', rotulo: 'Geradores e energia' },
+    { valor: 'tenda', rotulo: 'Tendas e coberturas' },
+    { valor: 'mobiliario', rotulo: 'Mobiliário e bares' },
+    { valor: 'sinalizacao', rotulo: 'Sinalização e comunicação' },
+    { valor: 'outros', rotulo: 'Outros materiais' }
+];
+
+export const CORES_MATERIAL = [
+    { rotulo: 'Alumínio / Prata', hex: '#CBD5E1' },
+    { rotulo: 'Preto / Grafite', hex: '#1E293B' },
+    { rotulo: 'Branco', hex: '#F8FAFC' },
+    { rotulo: 'Cinza / Galvanizado', hex: '#94A3B8' },
+    { rotulo: 'Amarelo', hex: '#FACC15' },
+    { rotulo: 'Laranja', hex: '#FB923C' },
+    { rotulo: 'Azul', hex: '#38BDF8' },
+    { rotulo: 'Vermelho', hex: '#F87171' },
+    { rotulo: 'Verde', hex: '#4ADE80' }
+];
+
+export const FORMATOS_MATERIAL = [
+    { valor: 'barra_retangular', rotulo: 'Barra / Perfil retangular longo' },
+    { valor: 'estrutura_vazada', rotulo: 'Estrutura metálica vazada (treliça/gradil)' },
+    { valor: 'painel_plano', rotulo: 'Painel / Tampo plano (praticável/LED)' },
+    { valor: 'caixa_cubica', rotulo: 'Caixa / Case / Módulo cúbico' },
+    { valor: 'cilindrico', rotulo: 'Cilíndrico / Tubo / Cabo em rolo' },
+    { valor: 'irregular', rotulo: 'Formato irregular / Peça especial' }
+];
+
+export const ANGULOS_FOTO_MATERIAL = [
+    { valor: 'frontal', rotulo: 'Vista frontal' },
+    { valor: 'lateral', rotulo: 'Vista lateral' },
+    { valor: 'superior', rotulo: 'Vista superior' },
+    { valor: 'empilhado', rotulo: 'Pilha / Agrupado' },
+    { valor: 'detalhe', rotulo: 'Detalhe (logo/conexão)' },
+    { valor: 'embalagem', rotulo: 'Case / Embalagem' }
+];
+
+export const ACOES_MONITORAMENTO_MATERIAL = [
+    {
+        valor: 'contar_entrada',
+        rotulo: 'Contar entrada / descarga',
+        descricao: 'Soma unidades que cruzam a linha de entrada ou entram na zona e atualiza o recebimento.',
+        cor: funcao.liberado
+    },
+    {
+        valor: 'contar_saida',
+        rotulo: 'Contar saída / carregamento',
+        descricao: 'Soma unidades que saem da área monitorada durante expedição ou desmontagem.',
+        cor: funcao.saida
+    },
+    {
+        valor: 'monitorar_presenca',
+        rotulo: 'Monitorar presença contínua',
+        descricao: 'Mantém a contagem em tempo real de quantos itens permanecem dentro da área demarcada.',
+        cor: funcao.acao
+    },
+    {
+        valor: 'alertar_divergencia',
+        rotulo: 'Contar e alertar divergência',
+        descricao: 'Conta as unidades e dispara alerta visual imediato se houver sobra ou falta frente ao previsto.',
+        cor: funcao.alerta
+    },
+    {
+        valor: 'alertar_saida_indevida',
+        rotulo: 'Alertar movimentação / saída indevida',
+        descricao: 'Captura evidência e gera alerta prioritário sempre que este objeto deixar a área ou cruzar o corte.',
+        cor: funcao.negado
+    }
+];
+
+export const obterInfoAcaoMaterial = (acao) =>
+    ACOES_MONITORAMENTO_MATERIAL.find((a) => a.valor === acao) || ACOES_MONITORAMENTO_MATERIAL[0];
+
 export const FASES_OPERACIONAIS = [
     { valor: 'montagem', rotulo: 'Montagem', cor: funcao.alerta },
     { valor: 'evento', rotulo: 'Evento', cor: funcao.acao },

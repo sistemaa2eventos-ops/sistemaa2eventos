@@ -480,7 +480,29 @@ function parar() {
     encerrarProcesso(p);
 }
 
+/**
+ * Faixas que o retransmissor tem para a câmera (diagnóstico do áudio). Para o som de volta (Falar)
+ * chegar à câmera, precisa existir uma faixa de áudio com "sendonly" (canal de envio da câmera).
+ */
+async function midiasDaCamera(cameraId) {
+    const nome = streamDa(cameraId, 'foco');
+    if (!nome) return { ok: false, motivo: 'Câmera não está no retransmissor local' };
+    if (!estado.proc) return { ok: false, motivo: 'Retransmissor parado' };
+    let r;
+    try { r = await chamarApi('/api/streams', { src: nome }, 3000); } catch { return { ok: false, motivo: 'Retransmissor não respondeu' }; }
+    if (!r.ok) return { ok: false, motivo: `Retransmissor respondeu HTTP ${r.status}` };
+    const j = await r.json().catch(() => null);
+    const medias = (j?.producers || []).flatMap(p => p.medias || []);
+    return {
+        ok: true,
+        medias,
+        audio_entrada: medias.some(m => /audio/i.test(m) && /recvonly/i.test(m)),
+        audio_envio: medias.some(m => /audio/i.test(m) && /sendonly/i.test(m))
+    };
+}
+
 module.exports = {
+    midiasDaCamera,
     iniciar, encerrarOrfaos, disponivel, temFfmpeg, caminhoFfmpeg, configurarCameras, conhece, streamDa, urlRtspLocal,
     abrirMp4, abrirWebrtc, abrirMjpeg, snapshot, status, parar, derivarSubstream,
     _estado: estado, MSG_PORTA_OCUPADA

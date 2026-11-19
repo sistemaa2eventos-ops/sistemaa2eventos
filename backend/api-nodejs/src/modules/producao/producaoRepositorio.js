@@ -230,6 +230,7 @@ async function sincronizarTabelasRelacionais(eventoId, estado) {
             dimensoes: m.dimensoes || null,
             peso_kg: m.peso_kg || null,
             fornecedor_nome: m.fornecedor_nome || null,
+            foto_referencia_url: m.foto_referencia_url || null,
             classe_deteccao_ia: m.classe_deteccao_ia || null,
             quantidade_planejada: Number(m.quantidade_planejada || 0),
             quantidade_recebida: Number(m.quantidade_recebida || 0),
@@ -275,6 +276,7 @@ async function sincronizarTabelasRelacionais(eventoId, estado) {
                     quantidade_ia: Number(i.quantidade_ia || 0),
                     quantidade_corrigida_humano: i.quantidade_corrigida_humano ?? null,
                     confianca_media: i.confianca_media ?? null,
+                    quadro_chave_evidencia_url: i.quadro_chave_evidencia_url || null,
                     justificativa_correcao: i.justificativa_correcao || null
                 });
             }

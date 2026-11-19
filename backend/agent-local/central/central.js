@@ -288,9 +288,28 @@
                 const envio = pc.getTransceivers().find(t => t.sender && t.sender.track && t.sender.track.kind === 'audio');
                 if (!envio) return;
                 const direcao = envio.currentDirection || '';
-                if (direcao.includes('send')) this.dizerFalar('Câmera aceitou sua voz: ela tem alto-falante.');
+                if (direcao.includes('send')) {
+                    this.dizerFalar('Câmera aceitou sua voz: ela tem alto-falante.');
+                    this.conferirEnvio(g);
+                }
                 else this.dizerFalar('A câmera não aceitou o seu microfone: sem alto-falante, ou o retransmissor não suporta envio de áudio.');
             }
+        }
+
+        /**
+         * A câmera "aceitar" na negociação não basta: o retransmissor precisa ter o canal de envio (sendonly)
+         * para levar a voz até ela. Esta checagem diz se esse canal existe.
+         */
+        async conferirEnvio(g) {
+            await new Promise(ok => setTimeout(ok, 1500));
+            if (g !== this.geracao) return;
+            try {
+                const r = await api(`/camera/${encodeURIComponent(this.cam.id)}/midias`, { signal: AbortSignal.timeout(5000) });
+                const j = await r.json();
+                if (g !== this.geracao || !j.ok || !(j.medias || []).length) return;
+                if (j.audio_envio) this.dizerFalar('Voz enviada à câmera: o canal de envio do retransmissor está ativo.');
+                else this.dizerFalar('A câmera aceitou o microfone, mas o retransmissor não tem canal para levar a sua voz até ela. A voz não sai da câmera.');
+            } catch { /* sem diagnóstico: a negociação já foi confirmada */ }
         }
 
         montarPtz(cam) {

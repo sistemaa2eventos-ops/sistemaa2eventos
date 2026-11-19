@@ -493,4 +493,100 @@ describe('Módulo de Produção — Regras de Negócio, Segurança e Cálculos',
         expect(resumoFinal.kpis.contagem_por_fase.desmontagem).toBeGreaterThanOrEqual(1);
         expect(typeof resumoFinal.kpis.progresso_por_fase.desmontagem).toBe('number');
     });
+
+    test('12. Cadastro visual de material (fotos, características, regra de ação), edição e catálogo para visão computacional', async () => {
+        const criado = await producaoService.criarMaterial(EVENTO_ID, {
+            nome: 'Caixa Line Array VTX A8',
+            codigo_catalogo: 'SOM-VTX-A8',
+            categoria: 'som',
+            dimensoes: '0,76 x 0,28 x 0,48m',
+            peso_kg: 29.5,
+            quantidade_planejada: 16,
+            fotos_referencia: [
+                {
+                    url: 'data:image/jpeg;base64,/9j/4AAQSkZJRg==',
+                    angulo: 'frontal',
+                    legenda: 'Frente com tela metálica',
+                    principal: false,
+                    assinatura_visual: { cor_media_rgb: [30, 32, 36], hist_hsv: [0, 0, 0], aspecto: 2.1, densidade_bordas: 0.42 }
+                },
+                {
+                    url: 'data:image/jpeg;base64,/9j/4AAQSkZJRg22==',
+                    angulo: 'lateral',
+                    legenda: 'Bumper lateral amarelo',
+                    principal: true
+                }
+            ],
+            caracteristicas: {
+                cor_predominante: 'Preto / Grafite',
+                cor_hex_referencia: '#1E293B',
+                formato_geometria: 'caixa_cubica',
+                material_composicao: 'Compensado naval com pintura poliureia',
+                unidade_medida: 'un',
+                codigo_etiqueta: 'NZT-VTX08',
+                marcas_distintivas: 'Logo lateral branco e alças pretas embutidas',
+                palavras_chave_ia: 'line array, caixa som, speaker, vtx'
+            },
+            regra_monitoramento: {
+                acao_ao_detectar: 'alertar_divergencia',
+                modo_preferido: 'line_zone',
+                confianca_minima: 0.75,
+                notificar_alerta: true,
+                instrucao_operacional: 'Contar cada caixa descendo da carreta e avisar se vier menos que 16.'
+            }
+        }, ADMIN_USER);
+
+        expect(criado.foto_referencia_url).toBe('data:image/jpeg;base64,/9j/4AAQSkZJRg22==');
+        expect(criado.fotos_referencia.length).toBe(2);
+        expect(criado.fotos_referencia.filter((f) => f.principal).length).toBe(1);
+        expect(criado.caracteristicas.palavras_chave_ia).toEqual(['line array', 'caixa som', 'speaker', 'vtx']);
+        expect(criado.regra_monitoramento.acao_ao_detectar).toBe('alertar_divergencia');
+        expect(criado.regra_monitoramento.confianca_minima).toBe(0.75);
+
+        const atualizado = await producaoService.atualizarMaterial(EVENTO_ID, criado.id, {
+            foto_referencia_url: 'data:image/jpeg;base64,/9j/4AAQSkZJRg==',
+            caracteristicas: { marcas_distintivas: 'Grade frontal hexagonal com selo azul' },
+            regra_monitoramento: { acao_ao_detectar: 'alertar_saida_indevida', confianca_minima: 0.82 }
+        }, ADMIN_USER);
+
+        expect(atualizado.foto_referencia_url).toBe('data:image/jpeg;base64,/9j/4AAQSkZJRg==');
+        expect(atualizado.caracteristicas.marcas_distintivas).toContain('selo azul');
+        expect(atualizado.regra_monitoramento.acao_ao_detectar).toBe('alertar_saida_indevida');
+        expect(atualizado.regra_monitoramento.confianca_minima).toBe(0.82);
+
+        const catalogo = await producaoService.obterCatalogoVisaoMateriais(EVENTO_ID, ADMIN_USER);
+        const itemCat = catalogo.materiais.find((m) => m.id === criado.id);
+        expect(itemCat).toBeDefined();
+        expect(itemCat.fotos_referencia.length).toBe(2);
+        expect(itemCat.regra_monitoramento.acao_ao_detectar).toBe('alertar_saida_indevida');
+
+        const conf = await producaoService.registrarConferenciaIa(EVENTO_ID, {
+            fornecedor_nome: 'ÁudioPro Eventos',
+            numero_nota_romaneio: 'NF-VTX-01',
+            origem_midia: 'video_gravado',
+            modo_contagem: 'line_zone',
+            itens: [
+                {
+                    material_id: criado.id,
+                    classe_identificada: criado.classe_deteccao_ia,
+                    quantidade_esperada: 16,
+                    quantidade_ia: 14,
+                    confianca_media: 0.86,
+                    quadro_chave_evidencia_url: 'data:image/jpeg;base64,/9j/evidencia=='
+                }
+            ],
+            acoes_executadas: [
+                {
+                    tipo: 'alertar_saida_indevida',
+                    material_id: criado.id,
+                    material_nome: criado.nome,
+                    mensagem: 'Caixa detectada saindo da doca fora da janela.'
+                }
+            ]
+        }, ADMIN_USER);
+
+        expect(conf.sessao.itens_contados[0].quadro_chave_evidencia_url).toBe('data:image/jpeg;base64,/9j/evidencia==');
+        expect(conf.sessao.itens_contados[0].acao_aplicada).toBe('alertar_saida_indevida');
+        expect(conf.sessao.acoes_executadas.length).toBe(1);
+    });
 });

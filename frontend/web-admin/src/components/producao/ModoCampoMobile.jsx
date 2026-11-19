@@ -55,6 +55,7 @@ import {
     formatarDataHoraCurta,
     formatarMoedaCentavos,
     obterCorArea,
+    obterInfoAcaoMaterial,
     obterInfoFase,
     obterNomeArea,
     obterRotuloPapel
@@ -1092,37 +1093,61 @@ const ModoCampoMobile = ({
                         </GlassCard>
                     ) : (
                         materiaisFiltrados.map((m) => {
-                            const rotuloAtual = ROTULO_MOVIMENTACAO.find((r) => r.valor === m.estagio_atual)?.texto || m.estagio_atual || 'Previsto';
-                            const proxEstagio = proximaEtapaMaterial(m.estagio_atual);
+                            const estagioAtual = m.status_movimentacao || m.estagio_atual || 'previsto';
+                            const rotuloAtual = ROTULO_MOVIMENTACAO.find((r) => r.valor === estagioAtual)?.texto || estagioAtual;
+                            const proxEstagio = proximaEtapaMaterial(estagioAtual);
                             const rotuloProx = ROTULO_MOVIMENTACAO.find((r) => r.valor === proxEstagio)?.texto;
                             const divergente = Number(m.quantidade_recebida || 0) > 0 && Number(m.quantidade_recebida || 0) !== Number(m.quantidade_planejada || 0);
+                            const infoAcao = obterInfoAcaoMaterial(m.regra_monitoramento?.acao_ao_detectar);
 
                             return (
                                 <GlassCard key={m.id} sx={{ p: 2 }}>
                                     <Stack spacing={1.25}>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
-                                            <Box>
-                                                <Typography sx={{ fontWeight: 700, fontSize: tamanhos.md, color: cores.textoForte }}>
-                                                    {m.nome}
-                                                </Typography>
-                                                <Typography sx={{ fontSize: tamanhos.xs, color: cores.textoSecundario }}>
-                                                    Planejado: {m.quantidade_planejada || 0} {m.unidade || 'un'} • Recebido: {m.quantidade_recebida || 0} {m.unidade || 'un'}
-                                                </Typography>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.25 }}>
+                                            <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'center', minWidth: 0, flex: 1 }}>
+                                                {m.foto_referencia_url && (
+                                                    <Box
+                                                        component="img"
+                                                        src={m.foto_referencia_url}
+                                                        alt={m.nome}
+                                                        sx={{ width: 52, height: 52, borderRadius: 1.5, objectFit: 'cover', flexShrink: 0, border: `1px solid ${cores.borda}` }}
+                                                    />
+                                                )}
+                                                <Box sx={{ minWidth: 0 }}>
+                                                    <Typography sx={{ fontWeight: 700, fontSize: tamanhos.md, color: cores.textoForte }}>
+                                                        {m.nome}
+                                                    </Typography>
+                                                    <Typography sx={{ fontSize: tamanhos.xs, color: cores.textoSecundario }}>
+                                                        Planejado: {m.quantidade_planejada || 0} {m.caracteristicas?.unidade_medida || m.unidade || 'un'} • Recebido: {m.quantidade_recebida || 0} {m.caracteristicas?.unidade_medida || m.unidade || 'un'}
+                                                    </Typography>
+                                                    {(m.caracteristicas?.cor_predominante || m.dimensoes) && (
+                                                        <Typography sx={{ fontSize: tamanhos.xs, color: cores.textoFraco }}>
+                                                            {[m.caracteristicas?.cor_predominante, m.dimensoes].filter(Boolean).join(' • ')}
+                                                        </Typography>
+                                                    )}
+                                                </Box>
                                             </Box>
                                             <Chip
                                                 size="small"
                                                 label={rotuloAtual}
-                                                sx={{ bgcolor: tom(cores.primaria, 0.14), color: cores.primaria, fontWeight: 600 }}
+                                                sx={{ bgcolor: tom(cores.primaria, 0.14), color: cores.primaria, fontWeight: 600, flexShrink: 0 }}
                                             />
                                         </Box>
 
-                                        {divergente && (
+                                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                                             <Chip
                                                 size="small"
-                                                label="Divergência entre planejado e recebido"
-                                                sx={{ bgcolor: tom(funcao.alerta, 0.16), color: funcao.alerta, alignSelf: 'flex-start' }}
+                                                label={infoAcao.rotulo}
+                                                sx={{ bgcolor: tom(infoAcao.cor, 0.14), color: infoAcao.cor, fontWeight: 600 }}
                                             />
-                                        )}
+                                            {divergente && (
+                                                <Chip
+                                                    size="small"
+                                                    label="Divergência entre planejado e recebido"
+                                                    sx={{ bgcolor: tom(funcao.alerta, 0.16), color: funcao.alerta }}
+                                                />
+                                            )}
+                                        </Stack>
 
                                         <Stack direction="row" spacing={1}>
                                             <Button

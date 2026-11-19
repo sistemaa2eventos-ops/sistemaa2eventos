@@ -250,9 +250,19 @@ router.post('/plantas/propostas/:propostaId/avaliar', permitirAcessoProducao('es
 }));
 
 // Materiais e Visão Computacional
+router.get('/materiais/catalogo-visao', permitirAcessoProducao('leitura'), tratar('obter catálogo visual para IA', async (req, res) => {
+    const data = await producaoService.obterCatalogoVisaoMateriais(req.event.id, req.user, req.headers);
+    return ApiResponse.success(res, data);
+}));
+
 router.post('/materiais', permitirAcessoProducao('escrita'), tratar('cadastrar material', async (req, res) => {
     const data = await producaoService.criarMaterial(req.event.id, req.body || {}, req.user, req.headers);
     return ApiResponse.success(res, data, 201);
+}));
+
+router.patch('/materiais/:id', permitirAcessoProducao('escrita'), tratar('atualizar material', async (req, res) => {
+    const data = await producaoService.atualizarMaterial(req.event.id, req.params.id, req.body || {}, req.user, req.headers);
+    return ApiResponse.success(res, data);
 }));
 
 router.post('/materiais/conferencia-ia', permitirAcessoProducao('escrita'), tratar('processar conferência IA', async (req, res) => {
