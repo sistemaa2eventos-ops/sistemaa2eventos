@@ -16,8 +16,10 @@ import {
   CheckCircle as OkIcon, Error as ErrIcon,
   Timeline as QueueIcon,
   RouterOutlined as RouterIcon,
-  ContentCopy as CopyIcon
+  ContentCopy as CopyIcon,
+  MenuBook as ManualIcon
 } from '@mui/icons-material';
+import { Link as RouterLink } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import PageHeader from '../../components/common/PageHeader';
 import GlassCard from '../../components/common/GlassCard';
@@ -705,6 +707,7 @@ export default function DispositivosPage() {
       <PageHeader
         title="Leitores e dispositivos"
         subtitle="Terminais faciais Intelbras/Hikvision, câmeras e catracas"
+        action={<Button variant="outlined" size="small" startIcon={<ManualIcon />} component={RouterLink} to="/manual-equipamentos#4-leitores-faciais-catracas-e-portarias">Manual</Button>}
       />
 
       <AgentesLocais agentes={agentes} onChange={() => carregarDados()} />

@@ -7,7 +7,7 @@ import {
     Videocam as CameraIcon, VideoLibrary as GravacoesIcon,
     Psychology as IaIcon, Add as AddIcon, Delete as DeleteIcon,
     Refresh as RefreshIcon, OpenInNew as OpenInNewIcon, Shield as ShieldIcon,
-    Tune as TuneIcon, PowerSettingsNew as PowerIcon
+    Tune as TuneIcon, PowerSettingsNew as PowerIcon, MenuBook as ManualIcon
 } from '@mui/icons-material';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
@@ -236,6 +236,7 @@ const ConfigCameras = ({ abaInicial = null }) => {
                 title="Câmeras e IA facial"
                 subtitle="As câmeras funcionam sem IA. Ligue o reconhecimento facial e a gravação só onde precisar."
                 breadcrumbs={[{ text: 'Configurações' }, { text: 'Equipamentos' }, { text: 'Câmeras e IA facial' }]}
+                action={<Button variant="outlined" size="small" startIcon={<ManualIcon />} onClick={() => navigate('/manual-equipamentos#5-cameras')}>Manual</Button>}
             />
 
             {/* BARRA SUPERIOR DE AÇÕES & ABAS */}

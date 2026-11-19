@@ -273,6 +273,11 @@ const AJUDAS = {
             'Lotes sobrepostos: crie dois lotes com a mesma faixa de números, um de "Montagem" e outro de "Evento (Showday)". No dia de cada fase, a leitura deve usar o lote certo.'
         ]
     },
+    '/manual-equipamentos': {
+        titulo: 'Manual de equipamentos',
+        objetivo: 'Passo a passo de rede, PC do evento, leitores faciais e câmeras: montagem, testes e correções.',
+        passos: ['Use a busca para achar um assunto (ex.: "relógio", "Config Online").', 'Clique numa seção no índice para ir até ela.', '"Imprimir" gera uma versão em papel ou PDF para levar ao evento.']
+    },
     '/config/dispositivos': {
         titulo: 'Leitores e dispositivos',
         objetivo: 'Cadastrar e operar os leitores faciais, câmeras, catracas e impressoras.',

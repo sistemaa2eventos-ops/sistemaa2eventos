@@ -59,6 +59,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '@mui/material/styles';
 import api from '../../services/api';
 import OperatorSection from './OperatorSection';
+import ManualIcon from '@mui/icons-material/MenuBook';
 import nztLogoClean from '../../assets/images/nzt-logo-clean.png';
 
 const StyledDrawer = styled(Drawer)(() => ({
@@ -345,6 +346,7 @@ const Sidebar = ({ open, onClose }) => {
                 { text: t('sidebar.cameras', { defaultValue: 'Câmeras e IA facial' }), path: '/config/cameras', icon: <CameraIcon sx={{ fontSize: 16 }} /> },
                 { text: t('sidebar.modelos_camera', { defaultValue: 'Modelos de câmera' }), path: '/config/modelos-camera', icon: <CameraIcon sx={{ fontSize: 16 }} /> },
                 { text: t('sidebar.veiculos_config', { defaultValue: 'Veículos' }), path: '/config/veiculos', icon: <CarIcon sx={{ fontSize: 16 }} /> },
+                { text: t('sidebar.manual_equipamentos', { defaultValue: 'Manual de equipamentos' }), path: '/manual-equipamentos', icon: <ManualIcon sx={{ fontSize: 16 }} /> },
                 { grupo: t('sidebar.grupo_comunicacao', { defaultValue: 'Comunicação' }) },
                 { text: t('sidebar.comunicacao', { defaultValue: 'Comunicação & Integrações' }), path: '/config/comunicacao', icon: <ExtensionIcon sx={{ fontSize: 16 }} /> },
                 { text: t('sidebar.webhooks', { defaultValue: 'Webhooks e chaves de API' }), path: '/config/webhooks', icon: <WebhookIcon sx={{ fontSize: 16 }} /> },
