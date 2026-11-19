@@ -831,16 +831,22 @@ class PublicController {
 
             const { data: empresa, error } = await supabase
                 .from('empresas')
+                // Só colunas que existem em eventos (cor_primaria, cor_secundaria e banner_url não existem no banco)
                 .select(`
                     id, nome, cnpj, servico, responsavel, registration_token_expires_at, evento_id,
                     eventos (
-                        nome, cor_primaria, cor_secundaria, logo_url, banner_url, politica_privacidade_url
+                        nome, logo_url, politica_privacidade_url
                     )
                 `)
                 .eq('registration_token', token)
                 .single();
 
-            if (error || !empresa) {
+            // PGRST116 = nenhuma linha (token inexistente). Qualquer outro erro é falha real e não deve parecer link inválido.
+            if (error && error.code !== 'PGRST116') {
+                logger.error('Erro de banco em getCompanyDocumentsByToken:', error);
+                return res.status(500).json({ error: 'Erro ao carregar documentos da empresa.' });
+            }
+            if (!empresa) {
                 return res.status(404).json({ error: 'Link da empresa inválido ou inexistente. Solicite um novo link ao administrador do evento.' });
             }
 
