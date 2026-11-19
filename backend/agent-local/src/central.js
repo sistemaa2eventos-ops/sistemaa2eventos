@@ -19,6 +19,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const video = require('./video');
+const onvif = require('./onvif');
+const ptz = require('./ptz');
 
 const DIR_ESTATICO = path.join(__dirname, '..', 'central');
 const ARQ_CHAVE = process.env.CENTRAL_CHAVE_ARQ || path.join(__dirname, '..', '.central-chave');
@@ -96,12 +98,63 @@ function bloqueadoPorTentativas() {
 
 // ------------------------------------------------------------------ dados vindos do agente
 /** Câmeras do evento (mesma lista que vai ao retransmissor) */
+// Câmeras com giro (ONVIF): IP e porta vêm do painel; usuário e senha, da própria URL da câmera
+const camerasComGiro = new Map();
+
+/** Usuário e senha que já estão na URL RTSP da câmera (a mesma conta serve ao giro) */
+function credenciaisDoStream(url) {
+    try {
+        const u = new URL(String(url));
+        return { usuario: decodeURIComponent(u.username || ''), senha: decodeURIComponent(u.password || '') };
+    } catch {
+        return { usuario: '', senha: '' };
+    }
+}
+
 function configurarCameras(cameras = []) {
     estado.cameras = cameras.filter(c => c && c.id).map(c => ({
         id: String(c.id),
         nome: String(c.nome || 'Câmera').slice(0, 80),
         ia: c.ia_ativa !== false
     }));
+    camerasComGiro.clear();
+    for (const c of cameras) {
+        if (!c || !c.id || !c.ptz || !c.ptz.ip) continue;
+        camerasComGiro.set(String(c.id), {
+            id: String(c.id),
+            ip_address: String(c.ptz.ip),
+            ptz_porta: Number(c.ptz.porta) || 2020,
+            ...credenciaisDoStream(c.stream_url)
+        });
+    }
+}
+
+/** Envio das mensagens ONVIF à câmera (a resposta de erro da câmera também vem como texto) */
+async function enviarOnvif(url, xml) {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': onvif.CONTENT_TYPE }, body: xml, signal: AbortSignal.timeout(6000) });
+    return r.text();
+}
+
+/** Giro da câmera pela Central: mover, parar, listar, ir e gravar posições */
+async function tratarPtz(req, res, camId, listar) {
+    const cam = camerasComGiro.get(camId);
+    if (!cam) { json(res, 409, { erro: 'Esta câmera não tem giro ligado no painel.' }); return; }
+    let pedido = { acao: 'listar' };
+    if (!listar) {
+        let corpo;
+        try { corpo = JSON.parse(await lerCorpo(req, 4096)) || {}; } catch { json(res, 400, { erro: 'pedido inválido' }); return; }
+        const num = (v) => { const n = Number(v); return Number.isFinite(n) ? Math.max(-1, Math.min(1, n)) : 0; };
+        pedido = corpo.acao === 'mover' ? { acao: 'mover', pan: num(corpo.pan), tilt: num(corpo.tilt), zoom: num(corpo.zoom) }
+            : corpo.acao === 'gravar' ? { acao: 'gravar', nome: String(corpo.nome || '').slice(0, 40) }
+            : corpo.acao === 'ir' ? { acao: 'ir', token: String(corpo.token || '').slice(0, 40) }
+            : { acao: corpo.acao };
+    }
+    try {
+        const r = await ptz.executar(cam, enviarOnvif, pedido);
+        json(res, 200, { ok: true, ...r });
+    } catch (err) {
+        json(res, err.status || 502, { erro: err.status ? err.message : `Sem resposta da câmera: ${err.message}` });
+    }
 }
 
 /** Alvos da watchlist entre as pessoas que este PC reconhece (vem da VPS; guardado para funcionar sem internet) */
@@ -287,9 +340,15 @@ async function tratar(req, res, url) {
     }
 
     // ---------------- API
+    const mpz = p.match(/^\/central\/api\/camera\/([A-Za-z0-9-]{1,64})\/ptz(\/posicoes)?$/);
+    if (mpz && (req.method === 'POST' || req.method === 'GET')) {
+        await tratarPtz(req, res, mpz[1], !!mpz[2]);
+        return true;
+    }
+
     if (p === '/central/api/estado' && req.method === 'GET') {
         json(res, 200, {
-            cameras: estado.cameras.filter(c => video.conhece(c.id)),
+            cameras: estado.cameras.filter(c => video.conhece(c.id)).map(c => ({ ...c, ptz: camerasComGiro.has(c.id) })),
             retransmissor: video.status(),
             watchlist: { alvos: estado.alvos.size, atualizada_em: estado.alvosEm || null }
         });
@@ -396,4 +455,4 @@ function definirAcesso({ porta = estado.porta, soLocal, tailscale = null }) {
     estado.hostsExtras = new Set(tailscale ? [`${tailscale.ip}:${porta}`, `${tailscale.nome}:${porta}`] : []);
 }
 
-module.exports = { iniciar, definirAcesso, gerarNovaChave, tratar, configurarCameras, definirAlvos, chaveDeAcesso, ARQ_CHAVE, _estado: estado, _caixaParaTela: caixaParaTela };
+module.exports = { iniciar, definirAcesso, _credenciaisDoStream: credenciaisDoStream, _camerasComGiro: camerasComGiro, gerarNovaChave, tratar, configurarCameras, definirAlvos, chaveDeAcesso, ARQ_CHAVE, _estado: estado, _caixaParaTela: caixaParaTela };

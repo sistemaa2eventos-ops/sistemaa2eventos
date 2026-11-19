@@ -126,7 +126,13 @@
             this.info = el('span', 'info', '');
             rotulo.append(nome, this.info);
             this.aviso = el('div', 'aviso', 'Conectando…');
-            this.raiz.append(this.video, this.canvas, rotulo, this.aviso);
+            // Som e giro: só aparecem na câmera em tela grande (ver montarGrade)
+            this.somLigado = false;     // o operador ligou o som desta câmera
+            this.comAudio = false;      // a conexão atual pede a faixa de áudio
+            this.comAudioConectado = false;
+            this.posicoesCarregadas = false;
+            this.controles = this.montarControles(cam);
+            this.raiz.append(this.video, this.canvas, rotulo, this.aviso, this.controles);
 
             this.raiz.addEventListener('click', () => alternarFoco(cam.id));
             this.raiz.addEventListener('keydown', (e) => { if (e.key === 'Enter') alternarFoco(cam.id); });
@@ -149,21 +155,25 @@
         }
 
         async conectar(qualidade) {
-            if (this.pc && this.qualidade === qualidade) return;
+            if (this.pc && this.qualidade === qualidade && this.comAudioConectado === this.comAudio) return;
             this.desconectar();
             this.qualidade = qualidade;
+            this.comAudioConectado = this.comAudio;
             const g = ++this.geracao;
             this.aviso.textContent = 'Conectando…';
             const pc = new RTCPeerConnection({ bundlePolicy: 'max-bundle' });
             this.pc = pc;
             try {
                 pc.addTransceiver('video', { direction: 'recvonly' });
+                // Áudio só quando o operador ouve esta câmera (não pesa na grade)
+                if (this.comAudio) pc.addTransceiver('audio', { direction: 'recvonly' });
                 pc.ontrack = (e) => {
                     // Vigilância: nada de colchão de reprodução, cada quadro vai para a tela assim que chega
                     try { e.receiver.jitterBufferTarget = 0; } catch { /* sem suporte */ }
                     try { e.receiver.playoutDelayHint = 0; } catch { /* sem suporte */ }
                     if (g !== this.geracao) return;
                     this.video.srcObject = e.streams[0] || new MediaStream([e.track]);
+                    this.video.muted = !this.somLigado;
                     this.video.play().catch(() => {});
                 };
                 pc.addEventListener('connectionstatechange', () => {
@@ -192,6 +202,132 @@
             } catch (err) {
                 if (g === this.geracao) this.reconectar(err.message);
             }
+        }
+
+        /** Barra da câmera em tela grande: som e, se a câmera gira, as setas e as posições */
+        montarControles(cam) {
+            const caixa = el('div', 'controles-camera');
+            // Clique e teclado aqui não podem trocar o foco nem mudar de página
+            for (const ev of ['click', 'pointerdown', 'keydown']) caixa.addEventListener(ev, (e) => e.stopPropagation());
+            this.botaoSom = el('button', 'botao-som', 'Ouvir');
+            this.botaoSom.type = 'button';
+            this.botaoSom.title = 'Ouvir o som desta câmera';
+            this.botaoSom.addEventListener('click', () => this.alterarSom(!this.somLigado));
+            caixa.append(this.botaoSom);
+            if (cam.ptz) caixa.append(this.montarPtz(cam));
+            return caixa;
+        }
+
+        /** Liga ou desliga o som. Muda a conexão para pedir (ou não) a faixa de áudio. */
+        alterarSom(ligado) {
+            this.somLigado = ligado;
+            this.comAudio = ligado;
+            this.botaoSom.textContent = ligado ? 'Silenciar' : 'Ouvir';
+            this.botaoSom.classList.toggle('ligado', ligado);
+            const q = this.qualidade || 'foco';
+            this.desconectar();
+            this.conectar(q);
+        }
+
+        montarPtz(cam) {
+            const caixa = el('div', 'ptz');
+            let velocidade = 0.5;
+            let timer = null;
+            let ocupado = false;
+            const aviso = el('span', 'ptz-aviso', '');
+            const dizer = (txt) => { aviso.textContent = txt; };
+            const enviar = async (corpo) => {
+                try {
+                    const r = await api(`/camera/${encodeURIComponent(cam.id)}/ptz`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo),
+                        signal: AbortSignal.timeout(9000)
+                    });
+                    const j = await r.json().catch(() => ({}));
+                    if (!r.ok) { dizer(j.erro || 'Não deu para mexer na câmera.'); return null; }
+                    dizer('');
+                    return j;
+                } catch (err) {
+                    dizer(err.name === 'TimeoutError' ? 'A câmera não respondeu.' : 'Sem conexão com a câmera.');
+                    return null;
+                }
+            };
+            const mover = (pan, tilt, zoom) => {
+                if (ocupado) return; // um comando por vez: sem fila de comandos atrasados
+                ocupado = true;
+                enviar({ acao: 'mover', pan: pan * velocidade, tilt: tilt * velocidade, zoom: zoom * velocidade }).finally(() => { ocupado = false; });
+            };
+            const parar = () => {
+                if (!timer) return;
+                clearInterval(timer);
+                timer = null;
+                enviar({ acao: 'parar' });
+            };
+            // Enquanto o botão está apertado, a câmera recebe o comando a cada 0,7 s; cada comando dura 1 s na câmera
+            const seta = (rotulo, titulo, pan, tilt, zoom = 0) => {
+                const b = el('button', 'ptz-botao', rotulo);
+                b.type = 'button';
+                b.title = titulo;
+                b.setAttribute('aria-label', titulo);
+                const apertar = (e) => {
+                    e.preventDefault();
+                    if (timer) return;
+                    mover(pan, tilt, zoom);
+                    timer = setInterval(() => mover(pan, tilt, zoom), 700);
+                };
+                b.addEventListener('pointerdown', apertar);
+                for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, parar);
+                return b;
+            };
+            const setas = el('div', 'ptz-setas');
+            setas.append(
+                el('span', 'vazio'),
+                seta('▲', 'Girar para cima', 0, 1),
+                seta('+', 'Zoom mais', 0, 0, 1),
+                seta('◀', 'Girar para a esquerda', -1, 0),
+                (() => { const b = el('button', 'ptz-botao parar', '■'); b.type = 'button'; b.title = 'Parar a câmera'; b.addEventListener('click', () => { parar(); enviar({ acao: 'parar' }); }); return b; })(),
+                seta('▶', 'Girar para a direita', 1, 0),
+                el('span', 'vazio'),
+                seta('▼', 'Girar para baixo', 0, -1),
+                seta('−', 'Zoom menos', 0, 0, -1)
+            );
+            const vel = el('input', 'ptz-velocidade');
+            vel.type = 'range'; vel.min = '0.2'; vel.max = '1'; vel.step = '0.1'; vel.value = String(velocidade);
+            vel.title = 'Velocidade do giro';
+            vel.setAttribute('aria-label', 'Velocidade do giro');
+            vel.addEventListener('input', () => { velocidade = Number(vel.value); });
+
+            this.posicoes = el('select', 'ptz-posicoes');
+            this.posicoes.setAttribute('aria-label', 'Posições salvas na câmera');
+            this.posicoes.append(el('option', '', 'Posições…'));
+            const ir = el('button', 'ptz-ir', 'Ir'); ir.type = 'button';
+            ir.addEventListener('click', () => { if (this.posicoes.value) enviar({ acao: 'ir', token: this.posicoes.value }); });
+            const nome = el('input', 'ptz-nome');
+            nome.placeholder = 'Nome da posição'; nome.maxLength = 40;
+            nome.setAttribute('aria-label', 'Nome da posição');
+            const gravar = el('button', 'ptz-gravar', 'Gravar aqui'); gravar.type = 'button';
+            gravar.addEventListener('click', async () => {
+                const r = await enviar({ acao: 'gravar', nome: nome.value.trim() || `Posição ${this.posicoes.options.length}` });
+                if (r) { nome.value = ''; dizer('Posição gravada.'); await this.carregarPosicoes(cam); }
+            });
+            caixa.append(setas, vel, this.posicoes, ir, nome, gravar, aviso);
+            this.enviarPtz = enviar;
+            return caixa;
+        }
+
+        /** Lista as posições salvas na câmera (ao abrir a câmera em tela grande) */
+        async carregarPosicoes(cam) {
+            try {
+                const r = await api(`/camera/${encodeURIComponent(cam.id)}/ptz/posicoes`, { signal: AbortSignal.timeout(9000) });
+                const j = await r.json().catch(() => ({}));
+                if (!r.ok) return;
+                this.posicoes.replaceChildren(el('option', '', 'Posições…'));
+                for (const p of j.presets || []) {
+                    const o = el('option', '', p.nome);
+                    o.value = p.token;
+                    this.posicoes.append(o);
+                }
+                this.posicoesCarregadas = true;
+            } catch { /* sem posições: o giro continua funcionando */ }
         }
 
         reconectar(motivo) {
@@ -337,9 +473,18 @@
         for (const cam of visiveis) {
             let t = st.tiles.get(cam.id);
             if (!t) { t = new Tile(cam); st.tiles.set(cam.id, t); }
-            t.raiz.classList.toggle('principal', st.foco === cam.id);
+            const focoAqui = st.foco === cam.id;
+            t.raiz.classList.toggle('principal', focoAqui);
+            // Saiu da tela grande: o som desliga (não fica tocando na grade)
+            if (!focoAqui && (t.somLigado || t.comAudio)) {
+                t.somLigado = false;
+                t.comAudio = false;
+                t.botaoSom.textContent = 'Ouvir';
+                t.botaoSom.classList.remove('ligado');
+            }
+            if (focoAqui && t.posicoes && !t.posicoesCarregadas) t.carregarPosicoes(cam);
             grade.append(t.raiz);
-            t.conectar(st.foco === cam.id ? 'foco' : 'mini');
+            t.conectar(focoAqui ? 'foco' : 'mini');
         }
         if (!visiveis.length) grade.append(el('p', 'vazio', 'Nenhuma câmera configurada neste evento.'));
         atualizarBotoesLayout();

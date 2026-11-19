@@ -573,6 +573,16 @@ function Confirm-Agente {
         Stop-Process -Id $a.ProcessId -Force -ErrorAction SilentlyContinue
     }
     if ($antigos) { Start-Sleep 2 }
+    # Processos node.exe sem permissão de leitura (ex.: agente aberto como administrador) não aparecem na
+    # checagem abaixo e continuam ocupando a porta do vídeo: avisa para reiniciar o PC
+    $ilegiveis = @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue | Where-Object { -not $_.CommandLine })
+    if ($ilegiveis.Count -gt 0) {
+        Escrever "[!] Há $($ilegiveis.Count) processo(s) node.exe sem permissão de leitura (possível agente antigo aberto como administrador). Se o vídeo não subir, reinicie o PC." 'Yellow'
+    }
+    $agentesLidos = @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -match 'agent\.js' })
+    if ($agentesLidos.Count -gt 1) {
+        Escrever "[!] Há $($agentesLidos.Count) agentes locais rodando ao mesmo tempo (PIDs: $(($agentesLidos | ForEach-Object { $_.ProcessId }) -join ', ')). Reinicie o PC para deixar só um." 'Yellow'
+    }
     if (Test-AgenteRodando) { Escrever '[3/3] Agente local: já estava ligado, mantendo.' 'Green'; return }
     Start-Agente
     Start-Sleep 3
@@ -625,6 +635,16 @@ function Install-VideoLocal {
 function Confirm-VideoLocal {
     $ErrorActionPreference = 'Continue'
     Install-VideoLocal
+    # Porta do retransmissor ocupada por outro processo (ex.: go2rtc de uma execução anterior, com outra senha)
+    $donoPorta = Get-PidNaPorta 1984
+    if ($donoPorta) {
+        $dono = Get-CimInstance Win32_Process -Filter "ProcessId=$donoPorta" -ErrorAction SilentlyContinue
+        $caminhoDono = if ($dono) { $dono.ExecutablePath } else { $null }
+        if (-not $caminhoDono -or ($caminhoDono -ne (Join-Path $DirAgente 'bin\go2rtc.exe'))) {
+            $nomeDono = if ($dono) { $dono.Name } else { 'sem permissão de leitura (provável execução como administrador)' }
+            Escrever "[!] Porta do vídeo (1984) em uso pelo processo $donoPorta ($nomeDono), que não é o retransmissor deste sistema. O vídeo das câmeras não vai funcionar. Feche esse processo ou reinicie o PC e rode este arquivo de novo, sem 'Executar como administrador'." 'Red'
+        }
+    }
     $ok = (Test-Path (Join-Path $DirAgente 'bin\go2rtc.exe'))
     if ($ok) { Escrever '[+] Vídeo das câmeras sem IA: retransmissor local pronto (o agente o liga).' 'Green' }
     else { Escrever '[+] Vídeo das câmeras sem IA: indisponível; o vídeo seguirá pelo motor de IA.' 'Yellow' }

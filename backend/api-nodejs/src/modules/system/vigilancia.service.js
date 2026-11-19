@@ -38,6 +38,11 @@ async function camerasDoEvento(eventoId) {
         if (error && (error.code === '42703' || /column/i.test(error.message))) ({ data, error } = await consultar('id, nome, status, stream_url'));
     }
     if (error) throw error;
+    // Giro (ONVIF): consulta à parte, para a falta da migração 20261119e não derrubar a lista acima
+    const giro = new Map();
+    const { data: dadosGiro, error: erroGiro } = await supabase.from('cameras_ip')
+        .select('id, ip_address, ptz_ativo, ptz_porta').eq('evento_id', eventoId).eq('ptz_ativo', true);
+    if (!erroGiro) for (const g of dadosGiro || []) giro.set(g.id, { ip: g.ip_address || null, porta: Number(g.ptz_porta) || 2020 });
     return (data || [])
         .filter(c => c.status !== 'desativada' && c.status !== 'inativa')
         .map(c => ({
@@ -50,7 +55,8 @@ async function camerasDoEvento(eventoId) {
             prioridade: c.prioridade ?? 1,
             url_substream: c.url_substream || null,
             gravacao_modo: c.gravacao_modo || 'desligada',
-            gravacao_stream: c.gravacao_stream || 'sub'
+            gravacao_stream: c.gravacao_stream || 'sub',
+            ptz: giro.get(c.id) || null // giro ligado: IP e porta ONVIF (o usuário e a senha vêm da URL)
         }));
 }
 

@@ -26,7 +26,7 @@ const VPS_URL = (process.env.VPS_URL || '').replace(/\/+$/, '');
 const AGENT_TOKEN = process.env.AGENT_TOKEN;
 const AGENT_NAME = process.env.AGENT_NAME || 'Agente Local';
 const IA_URL = (process.env.IA_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
-const VERSAO = '3.2.0';
+const VERSAO = '3.3.0';
 const RAIZ_PROJETO = path.resolve(__dirname, '..', '..', '..');
 // Motor de IA desligado pelo painel: o vigia (ligar-ia-facial.ps1) não o religa enquanto existir
 const ARQ_MOTOR_DESLIGADO = path.join(__dirname, '..', '.motor-desligado');

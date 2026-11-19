@@ -46,7 +46,7 @@ Pelo painel: **Leitores e dispositivos > Testar rede do evento**. Digite o IP, e
 - **Nada responde**: equipamento desligado, rede diferente ou IP errado.
 - Alguns equipamentos não respondem ao ping mesmo ligados: vale o resultado das portas.
 
-O agente do PC do evento precisa estar atualizado (versão 3.2, rode `ligar-ia-facial.bat`). Sem o painel, no Prompt de Comando: `ping 192.168.1.52`.
+O agente do PC do evento precisa estar atualizado (versão 3.3, rode `ligar-ia-facial.bat`). Sem o painel, no Prompt de Comando: `ping 192.168.1.52`.
 
 ### 2.4 Internet
 - Os leitores, hoje, **precisam do servidor para liberar** (modo online, seção 4.6). Sem internet, eles negam.
@@ -67,7 +67,7 @@ Dê dois cliques em `C:\Projetos\Projeto_A2_Eventos\ligar-ia-facial.bat`. Ele:
 - Painel > Monitor > aba **Saúde**: "Saúde do vídeo (PC do evento)" deve listar as câmeras com fps.
 - Central (`http://localhost:8766/central/`): selo verde "Câmeras ao vivo", "Vídeo direto (WebRTC)" e "IA na GPU".
 - Para abrir a Central de novo: `abrir-central.bat`.
-- **Central em outro computador**: Leitores e dispositivos > Agentes locais > botão **Central** do agente. Escolha *Só este PC* (padrão), *Rede local do evento* (outro computador da sala, com a chave de acesso) ou *Tailscale* (operador remoto). Vale na hora, fica gravado no PC e a janela mostra os endereços para abrir. Precisa do agente 3.1 ou mais novo (`ligar-ia-facial.bat`).
+- **Central em outro computador**: Leitores e dispositivos > Agentes locais > botão **Central** do agente. Escolha *Só este PC* (padrão), *Rede local do evento* (outro computador da sala, com a chave de acesso) ou *Tailscale* (operador remoto). Vale na hora, fica gravado no PC e a janela mostra os endereços para abrir. Precisa do agente 3.3 ou mais novo (`ligar-ia-facial.bat`).
 - **Chave de acesso** (na mesma janela, só administrador): **Mostrar chave** para copiar e enviar ao operador por canal seguro; **Gerar nova chave** quando alguém não deve mais entrar (a antiga para na hora e todos que estavam dentro saem). No outro computador, abra o endereço, cole a chave e clique em Entrar; vale 12 horas naquele navegador.
 
 ### 3.3 Energia e Windows
@@ -242,7 +242,11 @@ Câmeras que giram (Mercusys MC210, por exemplo) ganham controles na tela grande
 
 **Visão noturna:** quando a câmera troca para o infravermelho (imagem em preto e branco), aparece o aviso **Visão noturna** no topo da tela. A IA reconhece menos sem luz: deixe luz na portaria sempre que possível.
 
+**Na Central de Monitoramento** (`abrir-central.bat`, ou pelo endereço que aparece em Agentes locais > Central): ao abrir a câmera em tela grande, aparecem os mesmos controles de giro, e o botão **Ouvir** liga o som dessa câmera. O som fica só nessa câmera e desliga sozinho ao voltar para a grade. Se não sair som, confira no aplicativo da câmera se o **microfone está ativado**.
+
 **Atenção:** a câmera Wi-Fi tem cerca de 1 segundo de atraso entre a imagem e o giro. Movimento contínuo gasta o motor: use posições salvas para rondas.
+
+**Sem vídeo e "Diagnosticar" mostrando o retransmissor?** Se aparecer "A porta do vídeo (1984) está em uso por outro programa", há um retransmissor antigo aberto (geralmente de uma execução como administrador). Feche-o ou reinicie o PC, rode `ligar-ia-facial.bat` sem "Executar como administrador" e teste de novo.
 
 ---
 

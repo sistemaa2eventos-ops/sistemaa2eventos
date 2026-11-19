@@ -40,8 +40,11 @@ const estado = {
     assinatura: '',
     reiniciando: null,
     falhas: 0,
-    pronto: false
+    pronto: false,
+    // Outro go2rtc (de outra execução, com outra senha) responde na porta: nosso retransmissor não sobe
+    ocupada: false
 };
+const MSG_PORTA_OCUPADA = 'A porta do vídeo (1984) está em uso por outro programa (um retransmissor antigo). Feche-o ou reinicie o PC e rode ligar-ia-facial.bat.';
 
 function acharBinario(nome) {
     const exe = process.platform === 'win32' ? `${nome}.exe` : nome;
@@ -282,7 +285,9 @@ function iniciarProcesso() {
         if (estado.proc !== proc) return;
         try {
             const r = await chamarApi('/api', {}, 1500);
-            if (r.ok) { estado.pronto = true; estado.falhas = 0; return; }
+            if (r.ok) { estado.pronto = true; estado.ocupada = false; estado.falhas = 0; return; }
+            // 401: alguém responde na porta, mas não com a nossa senha (outro go2rtc antigo)
+            if (r.status === 401) estado.ocupada = true;
         } catch { /* ainda subindo */ }
         if (Date.now() - inicio < 15000) setTimeout(checar, 500);
     };
@@ -348,7 +353,9 @@ async function configurarCameras(cameras = []) {
         const url = await origemDaCamera(c.stream_url);
         if (!url) continue;
         const principal = nomeStream(c.id, false);
-        streams.set(principal, url);
+        // Áudio da câmera (escuta pelo botão "Ouvir" da Central): o navegador só toca Opus; o go2rtc converte
+        // só o áudio, o vídeo segue copiado. O áudio ligado não muda nada para quem só usa o vídeo.
+        streams.set(principal, typeof url === 'string' && /^rtsps?:\/\//i.test(url) ? `${url}#audio=opus` : url);
         const primeiroUrl = Array.isArray(url) ? url[0] : url;
         // Webcam não tem sub-stream: a miniatura usa o mesmo vídeo (já é leve)
         const subUrl = Array.isArray(url) || String(primeiroUrl).startsWith('ffmpeg:') ? null
@@ -400,7 +407,7 @@ function urlRtspLocal(cameraId, qualidade = 'foco') {
 async function esperarPronto(ms = 8000) {
     const fim = Date.now() + ms;
     while (!estado.pronto && Date.now() < fim) await new Promise(r => setTimeout(r, 200));
-    if (!estado.pronto) throw new Error('Retransmissor de vídeo local ainda não está pronto');
+    if (!estado.pronto) throw new Error(estado.ocupada ? MSG_PORTA_OCUPADA : 'Retransmissor de vídeo local ainda não está pronto');
 }
 
 /** Vídeo MP4 fragmentado (H.264 copiado) para o painel. Devolve o Response do fetch. */
@@ -461,6 +468,7 @@ function status() {
     return {
         disponivel: !!estado.bin,
         pronto: estado.pronto,
+        porta_ocupada: estado.ocupada,
         ffmpeg: !!estado.ffmpeg,
         cameras: estado.cameras.size
     };
@@ -474,5 +482,6 @@ function parar() {
 
 module.exports = {
     iniciar, encerrarOrfaos, disponivel, temFfmpeg, caminhoFfmpeg, configurarCameras, conhece, streamDa, urlRtspLocal,
-    abrirMp4, abrirWebrtc, abrirMjpeg, snapshot, status, parar, derivarSubstream
+    abrirMp4, abrirWebrtc, abrirMjpeg, snapshot, status, parar, derivarSubstream,
+    _estado: estado, MSG_PORTA_OCUPADA
 };
