@@ -194,7 +194,14 @@ describe('Módulo de Produção — Regras de Negócio, Segurança e Cálculos',
 
         // Detecção de dobra para produtor que já fez check-in e check-out hoje
         const prodPalco = resumoPos.produtores.find((p) => p.email === 'marcos.palco@nzt.com.br');
+        // O seed põe o check-in "11 h atrás": antes das 11h UTC ele cai no dia anterior. Cria o primeiro turno aqui.
         const hoje = new Date().toISOString().slice(0, 10);
+        await producaoService.registrarPresenca(EVENTO_ID, {
+            produtor_id: prodPalco.id,
+            tipo: 'checkin',
+            data_hora: `${hoje}T08:00:00.000Z`,
+            metodo: 'qrcode'
+        }, ADMIN_USER);
         await producaoService.registrarPresenca(EVENTO_ID, {
             produtor_id: prodPalco.id,
             tipo: 'checkout',
