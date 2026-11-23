@@ -75,12 +75,14 @@ class AuditController {
     async registrarLogoutSessao(req, res) {
         try {
             const user = req.user || {};
+            // Quem encerra a sessão é sempre o usuário autenticado: operador, papel e evento NÃO vêm do corpo
+            // (antes o corpo podia gravar o relatório em nome de outro operador, papel ou evento).
+            const operador_id = user.id;
+            const operador_nome = user.nome_completo || user.nome || 'Operador';
+            const operador_email = user.email;
+            const nivel_acesso = user.nivel_acesso || 'operador';
+            const evento_id = req.event?.id || user.evento_id || null;
             const {
-                operador_id = user.id,
-                operador_nome = user.nome_completo || user.nome || 'Operador',
-                operador_email = user.email,
-                nivel_acesso = user.nivel_acesso || 'operador',
-                evento_id = req.event?.id || user.evento_id || req.body.evento_id || null,
                 login_at,
                 logout_at = new Date().toISOString(),
                 tempo_online_segundos = 0,

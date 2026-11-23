@@ -317,14 +317,21 @@ class PublicController {
                 politica_url: evento.politica_privacidade_url || null
             } : null;
 
+            // Rota pública: quem tiver o link (encaminhado, vazado) não vê o CPF nem o e-mail inteiros (LGPD)
+            const digitosCpf = String(pessoa.cpf || '').replace(/\D/g, '');
+            const cpfMascarado = digitosCpf.length >= 2 ? `***.***.***-${digitosCpf.slice(-2)}` : null;
+            const emailMascarado = pessoa.email
+                ? String(pessoa.email).replace(/^(.{0,2})[^@]*(@.*)$/, '$1***$2')
+                : null;
+
             res.json({
                 success: true,
                 isPreRegistered: true,
                 pessoa: {
                     id: pessoa.id,
                     nome: pessoa.nome,
-                    cpf: pessoa.cpf,
-                    email: pessoa.email,
+                    cpf: cpfMascarado,
+                    email: emailMascarado,
                     funcao: pessoa.funcao,
                     empresa_nome: pessoa.empresas?.nome
                 },
