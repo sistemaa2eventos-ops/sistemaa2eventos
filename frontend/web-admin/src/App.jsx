@@ -243,7 +243,8 @@ function App() {
       <CssBaseline />
       <SnackbarProvider maxSnack={3}>
         <GlobalErrorBoundary>
-          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          {/* React Router 7: startTransition e relativeSplatPath (antes flags v7_*) já são o padrão */}
+          <BrowserRouter>
             <RootRouter />
           </BrowserRouter>
         </GlobalErrorBoundary>
