@@ -5,6 +5,7 @@ const accessController = require('../checkin/checkin.controller');
 const { authenticate, authorize, checkPermission } = require('../../middleware/auth');
 const { requireEvent } = require('../../middleware/eventMiddleware');
 const { validatePessoa } = require('../../middleware/validator');
+const { bloquearSeModuloDesligado } = require('../../middleware/moduloDesligado');
 
 // Aplicar middleware de autenticação e contexto de evento a todas as rotas
 router.use(authenticate, requireEvent);
@@ -12,7 +13,8 @@ router.use(authenticate, requireEvent);
 router.get('/', pessoaController.list.bind(pessoaController));
 router.get('/search', pessoaController.search.bind(pessoaController));
 router.post('/generate-upload-url', authorize('admin', 'supervisor', 'operador'), pessoaController.generateUploadUrl.bind(pessoaController));
-router.post('/', authorize('admin', 'supervisor', 'operador'), validatePessoa, pessoaController.create.bind(pessoaController));
+// Cadastro respeita o módulo "pessoas" desligado em Usuários → Permissões (a edição já confere a permissão)
+router.post('/', authorize('admin', 'supervisor', 'operador'), bloquearSeModuloDesligado('pessoas'), validatePessoa, pessoaController.create.bind(pessoaController));
 router.get('/:id', pessoaController.getById.bind(pessoaController));
 // Editar cadastro: operador com o módulo Pessoas liberado (campos de status/evento/empresa ficam fora, ver pessoa.service)
 router.put('/:id', authorize('admin', 'supervisor', 'operador'), checkPermission('pessoas', 'escrita'), pessoaController.update.bind(pessoaController));

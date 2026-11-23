@@ -20,6 +20,22 @@ function camposRemuneracao({ regra_remuneracao_id, regras_por_funcao } = {}) {
     return out;
 }
 
+/**
+ * Evento da requisição (requireEvent). Toda operação por id é limitada a ele: o cliente de serviço
+ * ignora RLS, então sem este filtro um usuário de um evento alcançaria empresas de outro.
+ */
+function eventoDaRequisicao(req, res) {
+    const eventoId = req.event?.id;
+    if (!eventoId) {
+        res.status(400).json({ error: 'Selecione um evento para continuar.' });
+        return null;
+    }
+    return eventoId;
+}
+
+// Termo de busca vai dentro de um filtro .or() do PostgREST: vírgula, parênteses e ponto mudariam o filtro
+const termoSeguro = (q) => String(q || '').replace(/[,()*%\\.:]/g, ' ').trim().slice(0, 100);
+
 class EmpresaController {
     async list(req, res) {
         try {
@@ -46,8 +62,9 @@ class EmpresaController {
 
             let query = supabase.from('empresas').select('*').eq('evento_id', evId);
 
-            if (q) {
-                query = query.or(`nome.ilike.%${q}%,cnpj.ilike.%${q}%`);
+            const termo = termoSeguro(q);
+            if (termo) {
+                query = query.or(`nome.ilike.%${termo}%,cnpj.ilike.%${termo}%`);
             }
 
             const { data, error } = await query.limit(50);
@@ -64,8 +81,8 @@ class EmpresaController {
         try {
             const { nome, cnpj, servico, email, email_convite, responsavel, telefone } = req.body;
             
-            // --- NEXUS CONTEXT FALLBACK (v24.0) ---
-            const evento_id = req.event?.id || req.body.evento_id || req.user?.evento_id || req.headers['x-evento-id'];
+            // Só o evento validado pelo requireEvent: corpo e cabeçalho não escolhem outro evento
+            const evento_id = req.event?.id;
 
             if (!evento_id) {
                 return res.status(400).json({ error: 'Falta vincular evento ativo para criar empresa.' });
@@ -124,12 +141,16 @@ class EmpresaController {
     async getById(req, res) {
         try {
             const { id } = req.params;
+            const eventoId = eventoDaRequisicao(req, res);
+            if (!eventoId) return;
             const { data, error } = await supabase
                 .from('empresas')
                 .select('*')
                 .eq('id', id)
-                .single();
+                .eq('evento_id', eventoId)
+                .maybeSingle();
             if (error) throw error;
+            if (!data) return res.status(404).json({ error: 'Empresa não encontrada neste evento.' });
             res.json({ success: true, data });
         } catch (error) {
             logger.error('Erro ao buscar empresa:', error);
@@ -154,12 +175,16 @@ class EmpresaController {
                 filtrados.email = req.body.email_convite;
             }
             const updates = { ...filtrados, ...camposRemuneracao(req.body) };
+            const eventoId = eventoDaRequisicao(req, res);
+            if (!eventoId) return;
             const { data, error } = await supabase
                 .from('empresas')
                 .update(updates)
                 .eq('id', id)
+                .eq('evento_id', eventoId)
                 .select();
             if (error) throw error;
+            if (!data?.length) return res.status(404).json({ error: 'Empresa não encontrada neste evento.' });
             res.json({ success: true, data: data[0] });
         } catch (error) {
             logger.error('Erro ao atualizar empresa:', error);
@@ -171,11 +196,16 @@ class EmpresaController {
     async delete(req, res) {
         try {
             const { id } = req.params;
-            const { error } = await supabase
+            const eventoId = eventoDaRequisicao(req, res);
+            if (!eventoId) return;
+            const { data, error } = await supabase
                 .from('empresas')
                 .delete()
-                .eq('id', id);
+                .eq('id', id)
+                .eq('evento_id', eventoId)
+                .select('id');
             if (error) throw error;
+            if (!data?.length) return res.status(404).json({ error: 'Empresa não encontrada neste evento.' });
             res.json({ success: true, message: 'Empresa deletada com sucesso' });
         } catch (error) {
             logger.error('Erro ao deletar empresa:', error);
@@ -189,16 +219,20 @@ class EmpresaController {
     async refreshToken(req, res) {
         try {
             const { id } = req.params;
+            const eventoId = eventoDaRequisicao(req, res);
+            if (!eventoId) return;
             const newToken = require('crypto').randomUUID();
 
             const { data, error } = await supabase
                 .from('empresas')
                 .update({ registration_token: newToken })
                 .eq('id', id)
+                .eq('evento_id', eventoId)
                 .select()
-                .single();
+                .maybeSingle();
 
             if (error) throw error;
+            if (!data) return res.status(404).json({ error: 'Empresa não encontrada neste evento.' });
             res.json({ success: true, token: newToken, data });
         } catch (error) {
             res.status(500).json({ error: 'Erro ao gerar token' });
@@ -211,11 +245,14 @@ class EmpresaController {
     async sendInviteEmail(req, res) {
         try {
             const { id } = req.params;
+            const eventoId = eventoDaRequisicao(req, res);
+            if (!eventoId) return;
             const { data: empresa, error } = await supabase
                 .from('empresas')
                 .select('*, eventos(nome)')
                 .eq('id', id)
-                .single();
+                .eq('evento_id', eventoId)
+                .maybeSingle();
 
             if (error || !empresa) {
                 return res.status(404).json({ error: 'Empresa não encontrada.' });
@@ -229,7 +266,7 @@ class EmpresaController {
             let token = empresa.registration_token;
             if (!token) {
                 token = require('crypto').randomUUID();
-                await supabase.from('empresas').update({ registration_token: token }).eq('id', id);
+                await supabase.from('empresas').update({ registration_token: token }).eq('id', id).eq('evento_id', eventoId);
             }
 
             const portalBase = (process.env.PUBLIC_PORTAL_URL || 'https://cadastro.nzt.app.br').replace(/\/+$/, '');
