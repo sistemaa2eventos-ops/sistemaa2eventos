@@ -424,9 +424,31 @@ const veiculoController = {
         try {
             const { placa } = req.params;
             const { evento_id, tipo = 'entrada' } = req.query;
+            const token = req.query.token || req.headers['x-push-token'];
 
             if (!placa || !evento_id) {
                 return res.status(400).json({ autorizado: false, motivo: 'DADOS_INCOMPLETOS' });
+            }
+
+            // Rota pública (câmera LPR não usa login): exige o token do dispositivo cadastrado NESTE evento.
+            // Antes bastava o evento_id, e qualquer pessoa consultava placas, via o nome do motorista e
+            // gravava passagens.
+            if (!token) {
+                return res.status(401).json({ autorizado: false, motivo: 'TOKEN_AUSENTE' });
+            }
+            const { data: dispositivo } = await supabase
+                .from('dispositivos_acesso')
+                .select('id')
+                .eq('control_token', String(token))
+                .eq('evento_id', evento_id)
+                .limit(1)
+                .maybeSingle();
+            if (!dispositivo) {
+                logger.warn(`🚨 [LPR] Token inválido para o evento ${evento_id} (IP ${req.ip})`);
+                return res.status(403).json({ autorizado: false, motivo: 'TOKEN_INVALIDO' });
+            }
+            if (!['entrada', 'saida'].includes(tipo)) {
+                return res.status(400).json({ autorizado: false, motivo: 'TIPO_INVALIDO' });
             }
 
             const { data: veiculo, error } = await supabase

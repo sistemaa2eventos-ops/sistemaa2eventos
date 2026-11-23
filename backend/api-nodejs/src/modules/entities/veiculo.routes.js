@@ -7,7 +7,8 @@ const { requireEvent } = require('../../middleware/eventMiddleware');
 /**
  * --- ROTA PÚBLICA LPR (Hardware Externo) ---
  * Sem authenticate pois hardware LPR externo (Câmeras IP) pode não ter suporte a tokens JWT dinâmicos.
- * A segurança é baseada na verificação do evento_id via query string no controller.
+ * Exige ?token= (ou cabeçalho X-Push-Token) igual ao control_token de um dispositivo do mesmo evento_id.
+ * URL na câmera: /api/veiculos/lpr/{placa}?evento_id={evento}&token={control_token}&tipo=entrada|saida
  */
 router.get('/lpr/:placa', veiculoController.consultarPlacaLPR);
 

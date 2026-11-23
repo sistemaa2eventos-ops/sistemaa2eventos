@@ -18,16 +18,25 @@ class HikvisionController {
             }
 
             const event = eventData.AccessControllerEvent;
-            const { employeeNoString, currentVerifyMode, similarity } = event;
+            const { currentVerifyMode, similarity } = event;
+            // O número vai dentro de um filtro .or() do PostgREST: só letras, dígitos e hífen (CPF ou id).
+            // Vírgula, ponto ou parênteses vindos do corpo mudariam o filtro.
+            const employeeNoString = String(event.employeeNoString || '').replace(/[^A-Za-z0-9-]/g, '').slice(0, 64);
+            if (!employeeNoString) return res.json({ success: true });
 
             logger.info(`🔔 [Hikvision] Identificação: UserID=${employeeNoString}, Method=${currentVerifyMode}, Confiança=${similarity}`);
 
-            // 1. Resolver Dispositivo via Token ou IP
-            const pushToken = req.query.token;
+            // 1. Resolver Dispositivo pelo token (?token= ou X-Push-Token = control_token do dispositivo).
+            // Sem token, só com HIKVISION_PERMITIR_IP=true (aparelho legado): o IP de origem pode ser forjado.
+            const pushToken = req.query.token || req.headers['x-push-token'];
             const devIp = req.ip.replace('::ffff:', '');
-            
+            if (!pushToken && process.env.HIKVISION_PERMITIR_IP !== 'true') {
+                logger.warn(`🚨 [Hikvision] Push sem token recusado (IP ${devIp}). Configure ?token=<control_token> no aparelho.`);
+                return res.status(401).json({ success: false, error: 'Token do dispositivo obrigatório' });
+            }
+
             let query = supabase.from('dispositivos_acesso').select('*');
-            if (pushToken) query = query.eq('control_token', pushToken);
+            if (pushToken) query = query.eq('control_token', String(pushToken));
             else query = query.eq('ip_address', devIp);
 
             const { data: dispositivo } = await query.limit(1).single();
