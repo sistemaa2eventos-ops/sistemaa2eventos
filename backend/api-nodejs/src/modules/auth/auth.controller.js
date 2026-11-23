@@ -908,6 +908,10 @@ class AuthController {
             if (!isAdminMaster && req.user?.evento_id) {
                 logger.info(`[listUsers] Filtrando por evento: ${req.user.evento_id}`);
                 query = query.eq('evento_id', req.user.evento_id);
+            } else if (!isAdminMaster && req.user?.nivel_acesso !== 'admin') {
+                // Sem evento vinculado e sem papel de administração: antes caía sem filtro e via os perfis
+                // (e-mail e telefone) de todos os eventos. Agora vê só o próprio perfil.
+                query = query.eq('id', req.user?.id);
             }
 
             logger.info('[listUsers] Executando query principal...');
@@ -1726,6 +1730,20 @@ class AuthController {
         try {
             const { userId } = req.params;
             const { nivel_acesso, evento_id } = req.body;
+
+            // Conta de Admin Master só é alterada por outro Admin Master: um admin não pode rebaixá-la
+            // nem mudar o evento dela (antes só o NOVO papel era conferido, não quem estava sendo alterado)
+            const quemAltera = req.user?.nivel_acesso;
+            if (quemAltera !== 'admin_master') {
+                const { data: alvo, error: alvoErr } = await supabase
+                    .from('perfis').select('nivel_acesso').eq('id', userId).maybeSingle();
+                if (alvoErr) throw alvoErr;
+                if (!alvo) return res.status(404).json({ error: 'Usuário não encontrado' });
+                if (alvo.nivel_acesso === 'admin_master') {
+                    logger.warn(`🚨 [updateUserRole] ${req.user?.id} (${quemAltera}) tentou alterar a conta Admin Master ${userId}`);
+                    return res.status(403).json({ error: 'Só um Admin Master pode alterar a conta de outro Admin Master.' });
+                }
+            }
 
             const updateData = { updated_at: new Date() };
 
