@@ -63,7 +63,7 @@ const veiculoController = require('../src/modules/entities/veiculo.controller');
 const hikvisionController = require('../src/modules/devices/hikvision.controller');
 const auditController = require('../src/modules/audit/audit.controller');
 const checkinService = require('../src/modules/checkin/checkin.service');
-const { bloquearSeModuloDesligado } = require('../src/middleware/moduloDesligado');
+const { bloquearSeModuloDesligado, exigirAlgumModulo } = require('../src/middleware/moduloDesligado');
 
 const resposta = () => {
     const res = { statusCode: 200, corpo: null };
@@ -272,5 +272,32 @@ describe('Módulo desligado em Usuários → Permissões', () => {
 
     it('admin não é afetado', () => {
         expect(rodar(usuario({ empresas: false }, 'admin')).next).toHaveBeenCalled();
+    });
+});
+
+describe('Estatísticas em tempo real: exige um dos módulos que usam a rota', () => {
+    const MODULOS = ['dashboard', 'monitoramento', 'checkin', 'checkout', 'fiscalizacao'];
+    const rodar = (perms, nivel = 'operador') => {
+        const res = resposta();
+        const next = jest.fn();
+        exigirAlgumModulo(MODULOS)({ user: { nivel_acesso: nivel, getEffectivePermissions: () => perms }, event: { id: 'ev-A' } }, res, next);
+        return { res, next };
+    };
+    const todosDesligados = Object.fromEntries(MODULOS.map(m => [m, false]));
+
+    it('bloqueia quem tem todos esses módulos desligados', () => {
+        const { res, next } = rodar(todosDesligados);
+        expect(res.statusCode).toBe(403);
+        expect(next).not.toHaveBeenCalled();
+    });
+
+    it('libera quem tem só o Dashboard ou só o Monitor', () => {
+        expect(rodar({ ...todosDesligados, dashboard: true }).next).toHaveBeenCalled();
+        expect(rodar({ ...todosDesligados, monitoramento: true }).next).toHaveBeenCalled();
+    });
+
+    it('módulo sem configuração não bloqueia; admin não é afetado', () => {
+        expect(rodar({ checkin: false }).next).toHaveBeenCalled();
+        expect(rodar(todosDesligados, 'admin').next).toHaveBeenCalled();
     });
 });

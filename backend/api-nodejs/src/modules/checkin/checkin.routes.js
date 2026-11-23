@@ -90,7 +90,11 @@ router.post('/fiscalizar', sessionMiddleware, rateLimiter.access, checkAnyPermis
 // CONSULTAS
 // ============================================
 router.get('/logs', sessionMiddleware, accessController.getLogs);
-router.get('/stats/realtime', sessionMiddleware, accessController.getRealtimeStats);
+// /stats/realtime devolve só contagens (sem nome ou CPF de pessoa). Exige ao menos um dos módulos das telas
+// que a usam: Dashboard, Monitor, Check-in, Check-out e Fiscalização.
+router.get('/stats/realtime', sessionMiddleware,
+    require('../../middleware/moduloDesligado').exigirAlgumModulo(['dashboard', 'monitoramento', 'checkin', 'checkout', 'fiscalizacao']),
+    accessController.getRealtimeStats);
 
 // ============================================
 // ADMINISTRATIVAS
