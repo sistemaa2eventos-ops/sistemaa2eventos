@@ -371,9 +371,19 @@ class CronController {
     /**
      * Endpoint para gatilho manual do Reset de Turnos
      */
+    // Fechamento manual de turno: SEMPRE de um evento só. Antes, sem evento na requisição (estas rotas não
+    // passam pelo requireEvent), resetTurnos(null) fechava os turnos de TODOS os eventos ativos.
     manualTrigger = async (req, res) => {
         try {
-            await this.resetTurnos(req.event?.id || null);
+            const eventoId = req.params?.id || req.event?.id || req.body?.evento_id || null;
+            if (!eventoId || !/^[0-9a-f-]{36}$/i.test(String(eventoId))) {
+                return res.status(400).json({ error: 'Informe o evento para fechar o turno.' });
+            }
+            const { data: evento, error: evErr } = await supabase.from('eventos').select('id').eq('id', eventoId).maybeSingle();
+            if (evErr) throw evErr;
+            if (!evento) return res.status(404).json({ error: 'Evento não encontrado.' });
+
+            await this.resetTurnos(evento.id);
             res.json({ success: true, message: 'Reset de turnos disparado com sucesso' });
         } catch (error) {
             res.status(500).json({ error: error.message });

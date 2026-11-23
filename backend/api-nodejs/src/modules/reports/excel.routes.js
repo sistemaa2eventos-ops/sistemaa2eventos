@@ -16,7 +16,8 @@ router.get('/template', excelController.downloadTemplate);
 router.get('/template/pessoas', excelController.downloadTemplate);
 
 // Importar Funcionários (Necessita Admin)
-router.post('/import', authenticate, authorize('admin', 'master'), upload.single('file'), excelController.importEmployees);
+// /import/pessoas é o caminho que o painel usa (Pessoas > Importar): antes não existia e a importação dava 404
+router.post(['/import', '/import/pessoas'], authenticate, authorize('admin', 'master'), upload.single('file'), excelController.importEmployees);
 
 // Exportar Funcionários (Necessita Admin)
 router.get('/export', authenticate, authorize('admin', 'master'), requireEvent, excelController.exportEmployees);

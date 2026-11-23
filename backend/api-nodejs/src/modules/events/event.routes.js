@@ -34,6 +34,8 @@ router.post('/:id/apply-preset', authorize('admin'), eventoController.applyPrese
 // Rotas de Áreas de Acesso (para biometria)
 router.get('/:id/areas', authorize('admin', 'supervisor'), eventoController.getAreas);
 
+// Fechar turno agora (Configurações > Evento). Sempre de um evento: o do :id, ou evento_id no corpo.
+router.post('/:id/reset-manual', authorize(['admin', 'master']), cronController.manualTrigger);
 router.post('/reset/manual', authorize(['admin', 'master']), cronController.manualTrigger);
 
 module.exports = router;

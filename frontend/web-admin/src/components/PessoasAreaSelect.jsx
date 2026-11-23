@@ -26,7 +26,8 @@ export default function PessoasAreaSelect({ eventoId, selectedAreas = [], onArea
         if (!eventoId) return;
         try {
             setLoading(true);
-            const { data } = await api.get(`/evento-areas?evento_id=${eventoId}`);
+            // Áreas do evento (a rota /evento-areas não existia no backend: 404)
+            const { data } = await api.get('/config/areas', { params: { evento_id: eventoId } });
             setAreas(data?.data || []);
         } catch (error) {
             enqueueSnackbar('Erro ao carregar áreas: ' + error.message, { variant: 'error' });

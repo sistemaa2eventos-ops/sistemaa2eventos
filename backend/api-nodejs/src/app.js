@@ -188,7 +188,6 @@ app.use('/api/empresas', empresaRoutes);
 app.use('/api/pessoas', pessoaRoutes);
 app.use('/api/eventos', eventoRoutes);
 app.use('/api/access', accessRoutes);
-app.use('/api/pulseira', accessRoutes); // Alias para compatibilidade com rotas de pulseira
 app.use('/api/checkin', accessRoutes); // Alias para compatibilidade com rotas de checkin/fiscalização
 app.use('/api/monitor', monitorRoutes);
 app.use('/api/reports', reportRoutes);

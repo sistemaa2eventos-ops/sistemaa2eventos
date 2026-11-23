@@ -191,7 +191,9 @@ export const useSystemSettings = () => {
 
     const downloadDailyReport = async (eventoId) => {
         try {
-            const response = await api.get(`/excel/relatorio-diario?evento_id=${eventoId}`, {
+            // Mesmo relatório diário consolidado da tela Relatórios (a rota /excel/relatorio-diario não existia: 404)
+            const response = await api.get('/reports/diario-consolidado/xlsx', {
+                params: { evento_id: eventoId },
                 responseType: 'blob'
             });
             const url = window.URL.createObjectURL(new Blob([response.data]));
