@@ -126,6 +126,13 @@ const Checkin = () => {
     localStorage.setItem('nzt_imprimir_checkin', checked ? 'true' : 'false');
   };
 
+  // Saída registrada na ficha: o último código lido sai do campo, para não aparecer no próximo check-in
+  const registrarSaidaLimpandoCodigo = async (pessoaId, numeroPulseira) => {
+    const r = await registrarSaidaFicha(pessoaId, numeroPulseira);
+    if (r?.success) setUltimoCodigoLido('');
+    return r;
+  };
+
   // Confirmação de credenciamento do modal (Fase 2)
   const handleConfirmarCredenciamento = async ({ pessoa_id, numero_pulseira, tipo_pulseira_id }) => {
     if (manualSaving || loading || !pessoa_id) return;
@@ -358,7 +365,7 @@ const Checkin = () => {
           onLiberarReentrada={liberarReentrada}
           liberandoReentrada={liberandoReentrada}
           podeLiberarReentrada={podeLiberarReentrada}
-          onRegistrarSaida={registrarSaidaFicha}
+          onRegistrarSaida={registrarSaidaLimpandoCodigo}
       />
 
       <LeitorQrCamera

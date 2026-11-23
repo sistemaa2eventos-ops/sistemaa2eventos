@@ -1,5 +1,6 @@
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
+const { TIPOS_AREA, CONTROLA_ENTRADA_POR_TIPO } = require('../checkin/services/tipoArea');
 
 class ConfigController {
     constructor() {
@@ -41,17 +42,25 @@ class ConfigController {
     async createArea(req, res) {
         try {
             const evento_id = req.event?.id || req.body.evento_id;
-            const { nome_area, controla_entrada } = req.body;
+            const { nome_area, controla_entrada, tipo_area } = req.body;
 
             if (!nome_area) return res.status(400).json({ error: 'Nome da área é obrigatório' });
             if (!evento_id) return res.status(400).json({ error: 'Contexto de evento não identificado' });
             if (controla_entrada !== undefined && controla_entrada !== null && typeof controla_entrada !== 'boolean') {
                 return res.status(400).json({ error: 'controla_entrada deve ser true ou false' });
             }
+            if (tipo_area !== undefined && tipo_area !== null && !TIPOS_AREA.includes(tipo_area)) {
+                return res.status(400).json({ error: `tipo_area deve ser um de: ${TIPOS_AREA.join(', ')}` });
+            }
 
-            // Área nova controla entrada (portão) por padrão; só grava o campo se foi informado
+            // Área nova controla entrada (portão) por padrão; só grava o campo se foi informado.
+            // Com tipo_area informado, o tipo manda em controla_entrada (uma só fonte de verdade).
             const linha = { evento_id, nome_area };
             if (typeof controla_entrada === 'boolean') linha.controla_entrada = controla_entrada;
+            if (tipo_area) {
+                linha.tipo_area = tipo_area;
+                linha.controla_entrada = CONTROLA_ENTRADA_POR_TIPO[tipo_area];
+            }
 
             const { data, error } = await supabase
                 .from('evento_areas')
@@ -84,17 +93,24 @@ class ConfigController {
     async updateArea(req, res) {
         try {
             const { id } = req.params;
-            const { nome_area, capacidade_maxima, controla_entrada } = req.body;
+            const { nome_area, capacidade_maxima, controla_entrada, tipo_area } = req.body;
             const eventoId = req.event?.id;
 
             if (controla_entrada !== undefined && controla_entrada !== null && typeof controla_entrada !== 'boolean') {
                 return res.status(400).json({ error: 'controla_entrada deve ser true ou false' });
+            }
+            if (tipo_area !== undefined && tipo_area !== null && !TIPOS_AREA.includes(tipo_area)) {
+                return res.status(400).json({ error: `tipo_area deve ser um de: ${TIPOS_AREA.join(', ')}` });
             }
 
             const updateData = { atualizado_em: new Date() };
             if (nome_area !== undefined && nome_area !== null) updateData.nome_area = nome_area;
             if (capacidade_maxima !== undefined && capacidade_maxima !== null) updateData.capacidade_maxima = capacidade_maxima;
             if (typeof controla_entrada === 'boolean') updateData.controla_entrada = controla_entrada;
+            if (tipo_area) {
+                updateData.tipo_area = tipo_area;
+                updateData.controla_entrada = CONTROLA_ENTRADA_POR_TIPO[tipo_area];
+            }
 
             const { data, error } = await supabase
                 .from('evento_areas')

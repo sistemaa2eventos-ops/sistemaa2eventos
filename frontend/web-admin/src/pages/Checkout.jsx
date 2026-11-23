@@ -144,7 +144,12 @@ const Checkout = () => {
   };
 
   // A saída é registrada pela janela, somente pela pulseira lida desta pessoa (o servidor usa esse número)
-  const registrarSaidaNaJanela = ({ pessoa, codigo }) => performCheckin('pulseira', codigo, pessoa.id);
+  // Saída registrada: o último código lido sai do campo, para não aparecer na próxima leitura
+  const registrarSaidaNaJanela = async ({ pessoa, codigo }) => {
+    const r = await performCheckin('pulseira', codigo, pessoa.id);
+    if (r?.success) setUltimoCodigoLido('');
+    return r;
+  };
 
   // Código (QR, barras, câmera, CPF ou nº da pulseira + Enter/OK) só localiza a pessoa e abre a janela de
   // conferência. A saída é registrada dentro da janela, pela leitura da pulseira. Igual ao Check-in.

@@ -114,7 +114,8 @@ export const UniversalPulseiraInput = ({
     onFilaChangeRef.current = onFilaChange;
     pulseiraTypesRef.current = pulseiraTypes;
 
-    // Quando o componente pai informa um código lido pela câmera/leitor, exibe o badge
+    // Quando o componente pai informa um código lido pela câmera/leitor, exibe o badge.
+    // Quando o pai zera o código (ex.: saída registrada), o badge some junto.
     useEffect(() => {
         if (ultimoCodigoLido) {
             setCodigoLidoBadge(String(ultimoCodigoLido).trim());
@@ -123,6 +124,8 @@ export const UniversalPulseiraInput = ({
             const t = setTimeout(() => setPulseAnimation(false), 600);
             return () => clearTimeout(t);
         }
+        setCodigoLidoBadge('');
+        setOrigemLeitura(null);
     }, [ultimoCodigoLido]);
 
     // Limpar timer ao desmontar

@@ -99,7 +99,10 @@ export const ModalCredenciamento = ({
         setErroSaida('');
         try {
             const r = await onRegistrarSaida(pessoa.id, pessoa.numero_pulseira);
-            if (r?.success) setSaidaRegistrada({ pessoaId: pessoa.id, offline: !!r.offline });
+            if (r?.success) {
+                setSaidaRegistrada({ pessoaId: pessoa.id, offline: !!r.offline });
+                setUltimoCodigoCamera(''); // a leitura da saída não pode aparecer na próxima ficha
+            }
             else if (!r?.turnoAnterior) setErroSaida(r?.error || 'Não foi possível registrar a saída.');
         } finally {
             setRegistrandoSaida(false);
@@ -126,6 +129,7 @@ export const ModalCredenciamento = ({
     useEffect(() => {
         if (open && pessoa) {
             setNumeroPulseira(pessoa.numero_pulseira || '');
+            setUltimoCodigoCamera(''); // cada pessoa começa sem o código lido da anterior
             setErroValidacao('');
             setSituacao(null);
             setSaidaRegistrada(null);
@@ -570,6 +574,7 @@ export const ModalCredenciamento = ({
                                     {/* Input Universal de Pulseira */}
                                     <Grid item xs={12} sm={5}>
                                         <UniversalPulseiraInput
+                                            key={pessoa.id}
                                             value={numeroPulseira}
                                             onChange={handleNumeroPulseiraChange}
                                             onConfirm={handleConfirmar}

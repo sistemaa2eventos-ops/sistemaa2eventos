@@ -12,6 +12,15 @@ const pulseiraService = require('../pulseiras/pulseira.service');
 const { buscarLotesDaFaixa, escolherLote } = require('../pulseiras/loteSelecao');
 const { buscarPessoaPorCodigo } = require('./codigoLeitor');
 const { etapaDoLote } = require('./services/entradaEtapa');
+const { bloqueioPorTipoArea } = require('./services/tipoArea');
+
+// Área só de monitoramento: nenhuma entrada/saída é registrada nela (409 AREA_SO_MONITORAMENTO)
+const recusarSeSoMonitoramento = async (res, areaId) => {
+    const msg = await bloqueioPorTipoArea(areaId);
+    if (!msg) return false;
+    res.status(409).json({ success: false, error: msg, codigo: 'AREA_SO_MONITORAMENTO' });
+    return true;
+};
 
 /**
  * Origem INFORMATIVA do credenciamento (campo observacao do registro). Nenhuma regra lê este texto:
@@ -306,6 +315,7 @@ class AccessController {
     async checkinManual(req, res) {
         try {
             const { busca: pessoa_id, dispositivoId, tipo, sync_id, offline_timestamp, area_id } = req.body;
+            if (await recusarSeSoMonitoramento(res, area_id)) return;
             const eventoId = req.event?.id;
             const supabaseClient = req.supabase || supabase;
 
@@ -340,6 +350,7 @@ class AccessController {
     async checkinQrcode(req, res) {
         try {
             const { qrCode, dispositivoId, tipo, sync_id, offline_timestamp, area_id } = req.body;
+            if (await recusarSeSoMonitoramento(res, area_id)) return;
             const eventoId = req.event?.id;
             const supabaseClient = req.supabase || supabase;
 
@@ -390,6 +401,7 @@ class AccessController {
             eventoId = req.event?.id;
             const area_id = req.body.area_id || null;
             const supabaseClient = req.supabase || supabase;
+            if (await recusarSeSoMonitoramento(res, area_id)) return;
 
             if (!pessoa_id || !numero_pulseira) {
                 return ApiResponse.error(res, 'pessoa_id e numero_pulseira são obrigatórios', 400);
@@ -501,6 +513,7 @@ class AccessController {
             eventoId = req.event?.id || req.headers['x-evento-id'] || req.query.evento_id;
             const area_id = req.body.area_id || null;
             const supabaseClient = req.supabase || supabase;
+            if (await recusarSeSoMonitoramento(res, area_id)) return;
             // Pessoa já localizada (credenciamento, ficha): a saída não depende de a pulseira estar correta
             const pessoaIdCorpo = req.body.pessoa_id ? String(req.body.pessoa_id).trim() : null;
 
@@ -596,6 +609,7 @@ class AccessController {
     async leitorRapido(req, res) {
         try {
             const { codigo, tipo = 'checkin', area_id, metodo = 'barcode', sync_id, offline_timestamp } = req.body;
+            if (await recusarSeSoMonitoramento(res, area_id)) return;
             const eventoId = req.event?.id || req.headers['x-evento-id'] || req.query.evento_id;
             const supabaseClient = req.supabase || supabase;
 
@@ -667,6 +681,7 @@ class AccessController {
     async credenciarPulseira(req, res) {
         try {
             const { pessoa_id, numero_pulseira, area_id, sync_id, offline_timestamp } = req.body;
+            if (await recusarSeSoMonitoramento(res, area_id)) return;
             const eventoId = req.event?.id;
             const supabaseClient = req.supabase || supabase;
 

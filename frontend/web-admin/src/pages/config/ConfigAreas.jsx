@@ -3,8 +3,16 @@ import {
     Box, Typography, Stack, IconButton, Dialog, 
     DialogTitle, DialogContent, DialogActions, 
     TextField, Button, CircularProgress, Grid,
-    Checkbox, FormControlLabel
+    MenuItem
 } from '@mui/material';
+
+// Tipo de operação da área (espelha TIPOS_AREA do backend, services/tipoArea.js)
+const TIPOS_AREA = [
+    { valor: 'checkin_checkout', rotulo: 'Check-in e check-out', descricao: 'Registra entrada e saída de pulseira. Circulação livre, sem limite de passagens.' },
+    { valor: 'liberacao_acesso', rotulo: 'Só liberação de acesso (portão)', descricao: 'Entrada única por etapa e dia. Reentrada só com liberação do controlador.' },
+    { valor: 'monitoramento', rotulo: 'Só monitoramento', descricao: 'Aparece no Monitor e nas câmeras. Não registra entrada nem saída.' }
+];
+const rotuloTipo = (valor) => TIPOS_AREA.find(t => t.valor === valor)?.rotulo || TIPOS_AREA[0].rotulo;
 import { useSnackbar } from 'notistack';
 import {
     Add as AddIcon,
@@ -27,7 +35,7 @@ const ConfigAreas = () => {
     const [saving, setSaving] = useState(false);
     const [openDialog, setOpenDialog] = useState(false);
     const [editingId, setEditingId] = useState(null);
-    const [formData, setFormData] = useState({ nome_area: '', capacidade_maxima: '', controla_entrada: true });
+    const [formData, setFormData] = useState({ nome_area: '', capacidade_maxima: '', tipo_area: 'checkin_checkout' });
     const { enqueueSnackbar } = useSnackbar();
 
     const columns = [
@@ -41,6 +49,12 @@ const ConfigAreas = () => {
                     <Typography variant="body2" sx={{ fontWeight: 700 }}>{val?.toUpperCase()}</Typography>
                 </Box>
             )
+        },
+        {
+            id: 'tipo_area',
+            label: 'Tipo',
+            minWidth: 180,
+            format: (val) => <Typography variant="body2">{rotuloTipo(val)}</Typography>
         },
         {
             id: 'capacidade_maxima',
@@ -107,11 +121,11 @@ const ConfigAreas = () => {
             setFormData({
                 nome_area: area.nome_area || '',
                 capacidade_maxima: area.capacidade_maxima || '',
-                controla_entrada: area.controla_entrada !== false
+                tipo_area: area.tipo_area || (area.controla_entrada !== false ? 'liberacao_acesso' : 'checkin_checkout')
             });
         } else {
             setEditingId(null);
-            setFormData({ nome_area: '', capacidade_maxima: '', controla_entrada: true });
+            setFormData({ nome_area: '', capacidade_maxima: '', tipo_area: 'checkin_checkout' });
         }
         setOpenDialog(true);
     };
@@ -124,14 +138,14 @@ const ConfigAreas = () => {
                 await api.put(`/config/areas/${editingId}`, {
                     nome_area: formData.nome_area,
                     capacidade_maxima: formData.capacidade_maxima ? parseInt(formData.capacidade_maxima) : null,
-                    controla_entrada: formData.controla_entrada
+                    tipo_area: formData.tipo_area
                 });
                 enqueueSnackbar('Área atualizada!', { variant: 'success' });
             } else {
                 await api.post('/config/areas', {
                     nome_area: formData.nome_area,
                     capacidade_maxima: formData.capacidade_maxima ? parseInt(formData.capacidade_maxima) : null,
-                    controla_entrada: formData.controla_entrada
+                    tipo_area: formData.tipo_area
                 });
                 enqueueSnackbar('Área criada com sucesso!', { variant: 'success' });
             }
@@ -200,20 +214,18 @@ const ConfigAreas = () => {
                             value={formData.capacidade_maxima}
                             onChange={(e) => setFormData({ ...formData, capacidade_maxima: e.target.value })}
                         />
-                        <Box>
-                            <FormControlLabel
-                                control={
-                                    <Checkbox
-                                        checked={formData.controla_entrada}
-                                        onChange={(e) => setFormData({ ...formData, controla_entrada: e.target.checked })}
-                                    />
-                                }
-                                label="Controla entrada (portão)"
-                            />
-                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ml: 4 }}>
-                                Quem entra por esta área faz check-in e, ao sair, check-out. Reentrada só com liberação do controlador. Desmarque para áreas de circulação livre.
-                            </Typography>
-                        </Box>
+                        <TextField
+                            select
+                            label="Tipo de operação"
+                            fullWidth
+                            value={formData.tipo_area}
+                            onChange={(e) => setFormData({ ...formData, tipo_area: e.target.value })}
+                            helperText={TIPOS_AREA.find(t => t.valor === formData.tipo_area)?.descricao}
+                        >
+                            {TIPOS_AREA.map(t => (
+                                <MenuItem key={t.valor} value={t.valor}>{t.rotulo}</MenuItem>
+                            ))}
+                        </TextField>
                     </Stack>
                 </DialogContent>
                 <DialogActions sx={{ p: 3 }}>

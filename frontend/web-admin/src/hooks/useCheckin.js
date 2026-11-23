@@ -358,7 +358,7 @@ export const useCheckin = (defaultMode, options = {}) => {
 
         // 🎯 ABERTURA / IDENTIFICAÇÃO AUTOMÁTICA VIA LEITOR FACIAL (Fase 1)
         socket.on('credenciamento_abrir', (data) => {
-            const { operationMode: modoAtual, sessaoAtiva: sessao, executarLeituraRapida: leituraRapida } = latestRef.current;
+            const { operationMode: modoAtual, sessaoAtiva: sessao, executarLeituraRapida: leituraRapida, handleSelectPessoa: abrirFicha } = latestRef.current;
             // Só a estação vinculada a este leitor reage
             if (sessao?.dispositivo_id && data?.dispositivo_id && sessao.dispositivo_id !== data.dispositivo_id) return;
             console.log('📡 [WS] Leitor facial reconheceu:', data);
@@ -368,15 +368,15 @@ export const useCheckin = (defaultMode, options = {}) => {
                     // Saída pelo rosto: registrada na hora, sem abrir a ficha (mesmo caminho da leitura rápida)
                     leituraRapida?.(data.pessoa.id, 'checkout', 'facial');
                 } else {
-                    // Entrada pelo rosto: registrada na hora, sem abrir a ficha. Em área que controla entrada,
-                    // o servidor decide (409 ENTRADA_BLOQUEADA) e o aviso aparece na tela.
+                    // Entrada pelo rosto (câmera ou leitor facial vinculado à estação): abre a ficha da pessoa
+                    // para o operador adicionar/conferir a pulseira e confirmar a entrada. Não registra sozinho.
                     const agora = Date.now();
                     const registros = rostoEntradaRef.current;
                     const ultimo = registros.get(data.pessoa.id);
                     if (ultimo && agora - ultimo < ROSTO_REPETIDO_MS) return;
                     if (registros.size > 200) registros.clear();
                     registros.set(data.pessoa.id, agora);
-                    leituraRapida?.(data.pessoa.id, 'checkin', 'facial', data.pessoa.nome_completo || data.pessoa.nome || null);
+                    abrirFicha?.(data.pessoa);
                 }
             }
         });
