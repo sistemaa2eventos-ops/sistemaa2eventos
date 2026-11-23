@@ -125,15 +125,31 @@ class PaymentService {
             .from('pessoas')
             .select('id, nome, evento_id, pagamento_validado');
 
-        if (external_id) {
-            findQuery = findQuery.or(`id.eq.${external_id},cpf.eq.${(cpf || '').replace(/[^\d]/g, '')}`);
-        } else if (cpf) {
-            findQuery = findQuery.eq('cpf', cpf.replace(/[^\d]/g, ''));
+        // external_id é o id do cadastro (um por evento). CPF/e-mail podem estar em vários eventos
+        // (a mesma pessoa em eventos diferentes): sem o id, vale o cadastro mais recente.
+        // Antes: .or(id, cpf) casava 2 linhas quando a pessoa estava em 2 eventos e o pagamento ficava órfão.
+        const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const cpfLimpo = (cpf || '').replace(/[^\d]/g, '');
+        if (external_id && UUID.test(String(external_id))) {
+            findQuery = findQuery.eq('id', String(external_id));
+        } else if (cpfLimpo) {
+            findQuery = findQuery.eq('cpf', cpfLimpo);
         } else if (email) {
             findQuery = findQuery.eq('email', email);
         }
 
-        const { data: pessoa, error: findError } = await findQuery.maybeSingle();
+        let { data: pessoa, error: findError } = await findQuery.order('created_at', { ascending: false }).limit(1).maybeSingle();
+
+        // external_id que não é um cadastro: tenta pelo CPF, como antes
+        if (!pessoa && !findError && external_id && cpfLimpo) {
+            ({ data: pessoa, error: findError } = await supabase
+                .from('pessoas')
+                .select('id, nome, evento_id, pagamento_validado')
+                .eq('cpf', cpfLimpo)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle());
+        }
 
         if (findError || !pessoa) {
             logger.error(`🚨 [Payment] Pessoa não encontrada para reconciliação: ${external_id || cpf || email}`);

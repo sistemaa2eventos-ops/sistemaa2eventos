@@ -205,7 +205,10 @@ async function processarDeteccoesCamera(cam, results, annotatedB64, { origem = '
         if (!mp) continue;
         if (!mp.foto_url && mp.cpf) {
             try {
-                const { data: pData } = await supabase.from('pessoas').select('foto_url').eq('cpf', mp.cpf).maybeSingle();
+                // A mesma pessoa pode estar em vários eventos (um cadastro por evento): busca no evento da câmera
+                let fotoQ = supabase.from('pessoas').select('foto_url').eq('cpf', mp.cpf);
+                if (eventoId) fotoQ = fotoQ.eq('evento_id', eventoId);
+                const { data: pData } = await fotoQ.order('created_at', { ascending: false }).limit(1).maybeSingle();
                 if (pData?.foto_url) mp.foto_url = pData.foto_url;
             } catch (fErr) {
                 logger.warn(`[Câmera] Falha ao recuperar foto de perfil: ${fErr.message}`);
