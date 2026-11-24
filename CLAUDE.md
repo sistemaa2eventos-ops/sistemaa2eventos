@@ -759,6 +759,15 @@ docker system prune -af
      avulsos de diagnóstico (backend/api-nodejs/check_*/test_*/query_*, *.py, *.jpg na raiz), todos de abr–out/2026.
 
 ```
+2026-11-24 - Deploy f2d012c (ficha do participante na fiscalização usa a situação de hoje)
+├─ Mudanças: FiscalizacaoPessoaModal sem busca no cadastro (não misturava pulseira/check-in de outro dia);
+│            mostra credencial, presença de hoje (com forma e operador), pulseira em uso, pulseira de outro dia
+│            não devolvida (manda ao credenciamento se ainda dentro), movimentos e áreas; telefone no payload
+├─ Status: ✅ OK (GitHub Actions run 45493050432); /fiscalizacao 200
+├─ Testes: backend 730 ✅; navegador com API simulada (pessoa ainda dentro com pulseira de outro dia; pendente)
+└─ Rollback: tag antes-deploy-20261124-ficha-fiscal (e53a8dc)
+
+
 2026-11-24 - Deploy a09e5de (fiscalização: credencial, presença de hoje, pulseira de outro dia)
 ├─ Mudanças: libera só credenciado, dentro do evento (último movimento de hoje é entrada, com ou sem pulseira)
 │            e pulseira em uso hoje; pulseira de outro dia não devolvida aparece com data e forma do check-in
