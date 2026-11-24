@@ -250,7 +250,10 @@ const Producao = () => {
                         size="small"
                         startIcon={<AbrirPortalIcon />}
                         onClick={() => {
-                            const url = `/portal-produtor${eventoId ? `?evento_id=${eventoId}` : ''}`;
+                            const basePortal = window.location.hostname.endsWith('nzt.app.br')
+                                ? 'https://produtor.nzt.app.br/'
+                                : '/portal-produtor';
+                            const url = `${basePortal}${eventoId ? `?evento_id=${eventoId}` : ''}`;
                             window.open(url, '_blank', 'noopener,noreferrer');
                         }}
                         sx={botaoSecundario}

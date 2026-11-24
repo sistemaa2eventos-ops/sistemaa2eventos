@@ -213,6 +213,7 @@ app.use('/api/agentes', require('./modules/devices/agent.routes'));
 app.use('/api/portal/empresa', portalEmpresaRoutes);
 app.use('/api/portal/cliente', portalClienteRoutes);
 app.use('/api/audit', auditRoutes);
+app.use('/api/audit', require('./modules/auditoria/auditoria.routes'));
 app.use('/api/payments', paymentRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/lgpd', lgpdRoutes);

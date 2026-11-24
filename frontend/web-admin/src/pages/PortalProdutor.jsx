@@ -5,26 +5,42 @@ import {
     Button,
     Chip,
     CircularProgress,
+    Divider,
+    Drawer,
     IconButton,
     InputAdornment,
+    List,
+    ListItemButton,
+    ListItemIcon,
+    ListItemText,
     Stack,
-    Tab,
-    Tabs,
     TextField,
+    Tooltip,
     Typography,
     useMediaQuery,
     useTheme
 } from '@mui/material';
 import {
+    AccountBalanceWallet as OrcamentosIcon,
+    CalendarMonth as CronogramaIcon,
+    Checklist as TarefasIcon,
+    Close as FecharIcon,
+    CloudDone as OnlineIcon,
     CloudOff as OfflineIcon,
-    Sync as SyncIcon,
-    Smartphone as CelularIcon,
+    Dashboard as VisaoGeralIcon,
     DesktopWindows as MonitorIcon,
-    Logout as SairIcon,
+    Engineering as ProducaoIcon,
+    Groups as EquipeIcon,
+    Inventory2 as MateriaisIcon,
     Login as EntrarIcon,
+    Logout as SairIcon,
+    Map as PlantasIcon,
+    Menu as MenuIcon,
+    Refresh as AtualizarIcon,
+    Smartphone as CelularIcon,
+    Sync as SyncIcon,
     Visibility as VisivelIcon,
-    VisibilityOff as OcultoIcon,
-    Engineering as ProducaoIcon
+    VisibilityOff as OcultoIcon
 } from '@mui/icons-material';
 import { useSearchParams } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
@@ -49,10 +65,12 @@ import { obterCorArea, obterNomeArea, obterRotuloPapel } from '../components/pro
 import { botaoSecundario, cores, funcao, tamanhos, tom } from '../styles/tokens';
 
 const HEADERS_VAZIO = {};
+const LARGURA_MENU_LATERAL = 264;
 
 const PortalProdutor = () => {
     const theme = useTheme();
     const isTelaMobile = useMediaQuery(theme.breakpoints.down('md'));
+    const isDesktop = useMediaQuery(theme.breakpoints.up('lg'));
     const { enqueueSnackbar } = useSnackbar();
     const [searchParams] = useSearchParams();
     const eventoParamUrl = searchParams.get('evento_id') || '';
@@ -66,10 +84,11 @@ const PortalProdutor = () => {
     const [mostrarSenha, setMostrarSenha] = useState(false);
     const [entrando, setEntrando] = useState(false);
 
-    // Dados do painel
+    // Dados e navegação do painel
     const [resumo, setResumo] = useState(null);
     const [carregando, setCarregando] = useState(false);
     const [abaAtiva, setAbaAtiva] = useState(0);
+    const [menuAberto, setMenuAberto] = useState(false);
     const [modoCampoForcado, setModoCampoForcado] = useState(null);
     const exibirModoCampo = modoCampoForcado !== null ? modoCampoForcado : isTelaMobile;
 
@@ -86,6 +105,7 @@ const PortalProdutor = () => {
         setSessao(null);
         setResumo(null);
         setAbaAtiva(0);
+        setMenuAberto(false);
     }, []);
 
     const atualizarContadorOffline = useCallback(async (eid) => {
@@ -212,16 +232,20 @@ const PortalProdutor = () => {
     const areas = resumo?.areas || [];
     const areaCor = obterCorArea(areas, ctx.area_id || sessao?.produtor?.area_id);
 
-    const abasVisiveis = useMemo(() => {
+    const secoesMenu = useMemo(() => {
         const lista = [
             {
                 id: 'geral',
                 rotulo: 'Visão geral',
+                subtitulo: 'Indicadores consolidados, andamento por frente e feed recente de campo.',
+                icone: <VisaoGeralIcon fontSize="small" />,
                 conteudo: <AbaVisaoGeralProducao resumo={resumo} aoTrocarAba={(idx) => setAbaAtiva(idx)} />
             },
             {
                 id: 'tarefas',
                 rotulo: 'Tarefas e checklist',
+                subtitulo: 'Execução por etapas (Montagem, Evento e Desmontagem) com evidências.',
+                icone: <TarefasIcon fontSize="small" />,
                 conteudo: (
                     <AbaTarefasChecklist
                         eventoId={eventoId}
@@ -235,6 +259,8 @@ const PortalProdutor = () => {
             {
                 id: 'plantas',
                 rotulo: 'Projetos e plantas',
+                subtitulo: 'Importação de plantas arquitetônicas, camadas, setores e intervenções.',
+                icone: <PlantasIcon fontSize="small" />,
                 conteudo: (
                     <AbaProjetosPlantas
                         resumo={resumo}
@@ -247,6 +273,8 @@ const PortalProdutor = () => {
             {
                 id: 'cronograma',
                 rotulo: 'Cronograma e prazos',
+                subtitulo: 'Linha do tempo por fase operacional, marcos e caminho crítico.',
+                icone: <CronogramaIcon fontSize="small" />,
                 conteudo: (
                     <AbaCronogramaPrazos
                         resumo={resumo}
@@ -259,6 +287,8 @@ const PortalProdutor = () => {
             {
                 id: 'materiais',
                 rotulo: 'Materiais e contagem IA',
+                subtitulo: 'Catálogo visual, rastreamento por vídeo e conferência de estoque.',
+                icone: <MateriaisIcon fontSize="small" />,
                 conteudo: (
                     <AbaMateriaisVisaoIa
                         resumo={resumo}
@@ -271,6 +301,8 @@ const PortalProdutor = () => {
             {
                 id: 'equipe',
                 rotulo: 'Equipe e presença',
+                subtitulo: 'Produtores, escalas, registro de ponto e acessos do portal.',
+                icone: <EquipeIcon fontSize="small" />,
                 conteudo: (
                     <AbaProdutoresPresenca
                         eventoId={eventoId}
@@ -287,6 +319,8 @@ const PortalProdutor = () => {
             lista.push({
                 id: 'orcamentos',
                 rotulo: 'Orçamentos e relatórios',
+                subtitulo: 'Controle financeiro da produção e emissão de relatórios executivos em PDF.',
+                icone: <OrcamentosIcon fontSize="small" />,
                 conteudo: (
                     <AbaOrcamentosRelatorios
                         resumo={resumo}
@@ -300,12 +334,20 @@ const PortalProdutor = () => {
         return lista;
     }, [resumo, eventoId, carregarResumo]);
 
+    const idxAtivo = Math.min(abaAtiva, Math.max(0, secoesMenu.length - 1));
+    const secaoAtual = secoesMenu[idxAtivo] || secoesMenu[0];
+
+    const selecionarSecao = (idx) => {
+        setAbaAtiva(idx);
+        setMenuAberto(false);
+    };
+
     // TELA 1: LOGIN EXCLUSIVO DOS PRODUTORES (SEPARADO DO PAINEL NZT)
     if (!token || !sessao?.evento?.id) {
         return (
             <Box
                 sx={{
-                    minHeight: '100vh',
+                    minHeight: '100dvh',
                     bgcolor: cores.fundo,
                     display: 'flex',
                     alignItems: 'center',
@@ -319,7 +361,7 @@ const PortalProdutor = () => {
                             <Chip
                                 size="small"
                                 icon={<ProducaoIcon sx={{ fontSize: 16 }} />}
-                                label="Portal exclusivo dos produtores"
+                                label="NZT Produção • Portal do Produtor"
                                 sx={{ bgcolor: tom(cores.primaria, 0.16), color: cores.primaria, fontWeight: 700 }}
                             />
                         </Box>
@@ -384,32 +426,63 @@ const PortalProdutor = () => {
         );
     }
 
-    // TELA 2: PAINEL SEPARADO DO PRODUTOR
-    return (
-        <Box sx={{ minHeight: '100vh', bgcolor: cores.fundo }}>
-            {/* Cabeçalho exclusivo do Portal do Produtor (sem barra lateral NZT) */}
-            <Box
-                sx={{
-                    px: { xs: 2, md: 3 },
-                    py: 1.5,
-                    bgcolor: cores.superficie,
-                    borderBottom: `1px solid ${cores.borda}`,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: 1.5
-                }}
-            >
-                <Box>
-                    <Typography sx={{ fontWeight: 700, fontSize: tamanhos.lg, color: cores.textoForte }}>
-                        {resumo?.evento?.nome || sessao?.evento?.nome || 'Portal de produção'}
+    const conteudoMenuLateral = (
+        <Box
+            sx={{
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                bgcolor: cores.fundo,
+                color: cores.texto
+            }}
+        >
+            {/* Identidade e Evento ativo */}
+            <Box sx={{ px: 2, py: 2, borderBottom: `1px solid ${cores.borda}` }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.25 }}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                        <Box
+                            sx={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: '8px',
+                                bgcolor: tom(cores.primaria, 0.16),
+                                color: cores.primaria,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0
+                            }}
+                        >
+                            <ProducaoIcon fontSize="small" />
+                        </Box>
+                        <Box>
+                            <Typography sx={{ fontWeight: 700, fontSize: tamanhos.md, color: cores.textoForte, lineHeight: 1.2 }}>
+                                NZT Produção
+                            </Typography>
+                            <Typography sx={{ fontSize: tamanhos.xs, color: cores.textoSecundario }}>
+                                Portal do Produtor
+                            </Typography>
+                        </Box>
+                    </Stack>
+                    {!isDesktop && (
+                        <IconButton size="small" onClick={() => setMenuAberto(false)} sx={{ color: cores.textoSecundario }} aria-label="Fechar menu">
+                            <FecharIcon fontSize="small" />
+                        </IconButton>
+                    )}
+                </Box>
+
+                <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: cores.superficie, border: `1px solid ${cores.borda}` }}>
+                    <Typography sx={{ fontSize: tamanhos.xs, color: cores.textoSecundario, fontWeight: 600 }}>
+                        Evento ativo
                     </Typography>
-                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: tamanhos.sm, color: cores.textoForte, mt: 0.25 }} noWrap>
+                        {resumo?.evento?.nome || sessao?.evento?.nome || 'Evento em produção'}
+                    </Typography>
+                    <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
                         <Chip
                             size="small"
                             label={ctx.nome || sessao?.produtor?.nome || 'Produtor'}
-                            sx={{ bgcolor: tom(funcao.acao, 0.14), color: funcao.acao, fontWeight: 700 }}
+                            sx={{ bgcolor: tom(funcao.acao, 0.14), color: funcao.acao, fontWeight: 700, maxWidth: '100%' }}
                         />
                         <Chip
                             size="small"
@@ -425,103 +498,327 @@ const PortalProdutor = () => {
                         )}
                     </Stack>
                 </Box>
+            </Box>
 
-                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-                    {!online && (
+            {/* Itens de navegação */}
+            <Box sx={{ flex: 1, overflowY: 'auto', px: 1.25, py: 1.5 }}>
+                <Typography sx={{ px: 1.25, mb: 0.75, fontSize: tamanhos.xs, fontWeight: 600, color: cores.textoFraco }}>
+                    Navegação
+                </Typography>
+                <List disablePadding>
+                    {secoesMenu.map((sec, idx) => {
+                        const selecionado = !exibirModoCampo && idx === idxAtivo;
+                        return (
+                            <ListItemButton
+                                key={sec.id}
+                                selected={selecionado}
+                                onClick={() => {
+                                    if (exibirModoCampo) setModoCampoForcado(false);
+                                    selecionarSecao(idx);
+                                }}
+                                sx={{
+                                    py: 1.1,
+                                    px: 1.5,
+                                    mb: 0.5,
+                                    color: selecionado ? cores.textoForte : cores.textoSecundario
+                                }}
+                            >
+                                <ListItemIcon sx={{ minWidth: 36, color: selecionado ? cores.primaria : cores.textoSecundario }}>
+                                    {sec.icone}
+                                </ListItemIcon>
+                                <ListItemText
+                                    primary={sec.rotulo}
+                                    primaryTypographyProps={{
+                                        fontSize: tamanhos.sm,
+                                        fontWeight: selecionado ? 700 : 500
+                                    }}
+                                />
+                            </ListItemButton>
+                        );
+                    })}
+                </List>
+            </Box>
+
+            {/* Rodapé operacional da sidebar */}
+            <Divider sx={{ borderColor: cores.borda }} />
+            <Box sx={{ p: 1.5 }}>
+                <Stack spacing={1}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 0.5 }}>
                         <Chip
                             size="small"
-                            icon={<OfflineIcon />}
-                            label="Offline"
-                            sx={{ bgcolor: tom(funcao.alerta, 0.16), color: funcao.alerta, fontWeight: 700 }}
+                            icon={online ? <OnlineIcon sx={{ fontSize: 15 }} /> : <OfflineIcon sx={{ fontSize: 15 }} />}
+                            label={online ? 'Online' : 'Offline'}
+                            sx={{
+                                bgcolor: tom(online ? funcao.liberado : funcao.alerta, 0.14),
+                                color: online ? funcao.liberado : funcao.alerta,
+                                fontWeight: 700
+                            }}
                         />
-                    )}
-                    {pendentesOffline > 0 && (
-                        <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<SyncIcon />}
-                            disabled={!online || sincronizando}
-                            onClick={handleSincronizarOffline}
-                            sx={botaoSecundario}
-                        >
-                            {sincronizando ? 'Sincronizando...' : `Sincronizar (${pendentesOffline})`}
-                        </Button>
-                    )}
+                        {pendentesOffline > 0 && (
+                            <Button
+                                size="small"
+                                variant="text"
+                                startIcon={<SyncIcon fontSize="small" />}
+                                disabled={!online || sincronizando}
+                                onClick={handleSincronizarOffline}
+                                sx={{ color: funcao.alerta, fontSize: tamanhos.xs, minWidth: 0, px: 1 }}
+                            >
+                                {sincronizando ? 'Sync...' : `Sync (${pendentesOffline})`}
+                            </Button>
+                        )}
+                    </Box>
+
                     <Button
+                        fullWidth
                         size="small"
                         variant="outlined"
                         startIcon={exibirModoCampo ? <MonitorIcon /> : <CelularIcon />}
-                        onClick={() => setModoCampoForcado(!exibirModoCampo)}
-                        sx={botaoSecundario}
+                        onClick={() => {
+                            setModoCampoForcado(!exibirModoCampo);
+                            setMenuAberto(false);
+                        }}
+                        sx={{ ...botaoSecundario, justifyContent: 'flex-start' }}
                     >
                         {exibirModoCampo ? 'Visão completa' : 'Modo celular (campo)'}
                     </Button>
+
                     <Button
+                        fullWidth
                         size="small"
                         variant="outlined"
                         startIcon={<SairIcon />}
                         onClick={handleSair}
-                        sx={botaoSecundario}
+                        sx={{
+                            ...botaoSecundario,
+                            justifyContent: 'flex-start',
+                            '&:hover': {
+                                borderColor: funcao.negado,
+                                color: funcao.negado,
+                                bgcolor: tom(funcao.negado, 0.08)
+                            }
+                        }}
                     >
-                        Sair
+                        Sair do portal
                     </Button>
                 </Stack>
             </Box>
+        </Box>
+    );
 
-            <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1440, mx: 'auto' }}>
-                {carregando && !resumo ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
-                        <CircularProgress />
-                    </Box>
-                ) : !resumo ? (
-                    <GlassCard sx={{ p: 3, textAlign: 'center' }}>
-                        <Typography sx={{ color: cores.textoSecundario, mb: 2 }}>
-                            Não foi possível carregar os dados do evento no momento.
-                        </Typography>
-                        <NeonButton onClick={carregarResumo}>Tentar novamente</NeonButton>
-                    </GlassCard>
-                ) : exibirModoCampo ? (
-                    <ModoCampoMobile
-                        eventoId={eventoId}
-                        resumo={resumo}
-                        headersExtra={HEADERS_VAZIO}
-                        apiClient={portalProdutorApi}
-                        online={online}
-                        pendentesOffline={pendentesOffline}
-                        sincronizando={sincronizando}
-                        aoSincronizar={handleSincronizarOffline}
-                        aoAtualizar={carregarResumo}
-                        aoSairModoCampo={() => setModoCampoForcado(false)}
-                    />
-                ) : (
-                    <>
-                        <Box sx={{ borderBottom: `1px solid ${cores.borda}`, mb: 3 }}>
-                            <Tabs
-                                value={Math.min(abaAtiva, abasVisiveis.length - 1)}
-                                onChange={(_, v) => setAbaAtiva(v)}
-                                variant="scrollable"
-                                scrollButtons="auto"
+    // TELA 2: LAYOUT COM MENU LATERAL RESPONSIVO + 100% DA LARGURA DA PÁGINA
+    return (
+        <Box sx={{ minHeight: '100dvh', width: '100%', bgcolor: cores.fundo, display: 'flex' }}>
+            {/* Menu lateral fixo no Desktop (>=1200px) quando não estiver no Modo Celular */}
+            {isDesktop && !exibirModoCampo && (
+                <Box
+                    component="aside"
+                    sx={{
+                        width: LARGURA_MENU_LATERAL,
+                        flexShrink: 0,
+                        borderRight: `1px solid ${cores.borda}`,
+                        position: 'sticky',
+                        top: 0,
+                        height: '100dvh'
+                    }}
+                >
+                    {conteudoMenuLateral}
+                </Box>
+            )}
+
+            {/* Drawer deslizante para Tablet / Mobile (ou quando usuário clicar no hambúrguer) */}
+            <Drawer
+                anchor="left"
+                open={menuAberto}
+                onClose={() => setMenuAberto(false)}
+                ModalProps={{ keepMounted: true }}
+                PaperProps={{
+                    sx: {
+                        width: LARGURA_MENU_LATERAL,
+                        maxWidth: '85vw',
+                        bgcolor: cores.fundo,
+                        borderRight: `1px solid ${cores.borda}`,
+                        borderRadius: 0
+                    }
+                }}
+            >
+                {conteudoMenuLateral}
+            </Drawer>
+
+            {/* Área principal preenchendo 100% do espaço disponível */}
+            <Box
+                component="main"
+                sx={{
+                    flex: 1,
+                    minWidth: 0,
+                    width: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    minHeight: '100dvh'
+                }}
+            >
+                {/* Barra superior limpa e coerente em todas as telas */}
+                <Box
+                    component="header"
+                    sx={{
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 20,
+                        px: { xs: 1.5, sm: 2.5, lg: 3 },
+                        py: 1.25,
+                        bgcolor: cores.superficie,
+                        borderBottom: `1px solid ${cores.borda}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 1.5,
+                        flexWrap: 'wrap'
+                    }}
+                >
+                    <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0, flex: 1 }}>
+                        {(!isDesktop || exibirModoCampo) && (
+                            <IconButton
+                                onClick={() => setMenuAberto(true)}
+                                aria-label="Abrir menu de navegação"
                                 sx={{
-                                    '& .MuiTab-root': {
-                                        textTransform: 'none',
-                                        fontWeight: 600,
-                                        fontSize: tamanhos.md,
-                                        color: cores.textoSecundario
-                                    },
-                                    '& .Mui-selected': {
-                                        color: `${cores.primaria} !important`
-                                    }
+                                    color: cores.textoForte,
+                                    bgcolor: cores.superficieElevada,
+                                    border: `1px solid ${cores.borda}`
                                 }}
                             >
-                                {abasVisiveis.map((aba) => (
-                                    <Tab key={aba.id} label={aba.rotulo} />
-                                ))}
-                            </Tabs>
+                                <MenuIcon />
+                            </IconButton>
+                        )}
+                        <Box sx={{ minWidth: 0 }}>
+                            <Typography
+                                sx={{
+                                    fontWeight: 700,
+                                    fontSize: { xs: tamanhos.md, sm: tamanhos.lg },
+                                    color: cores.textoForte,
+                                    lineHeight: 1.25
+                                }}
+                                noWrap
+                            >
+                                {exibirModoCampo
+                                    ? (resumo?.evento?.nome || sessao?.evento?.nome || 'Produção em campo')
+                                    : (secaoAtual?.rotulo || 'Produção')}
+                            </Typography>
+                            <Typography
+                                sx={{
+                                    fontSize: tamanhos.xs,
+                                    color: cores.textoSecundario,
+                                    display: { xs: 'none', sm: 'block' }
+                                }}
+                                noWrap
+                            >
+                                {exibirModoCampo
+                                    ? `${ctx.nome || sessao?.produtor?.nome || 'Produtor'} • ${obterRotuloPapel(ctx.papel_producao || sessao?.produtor?.papel_producao)}`
+                                    : (secaoAtual?.subtitulo || '')}
+                            </Typography>
                         </Box>
+                    </Stack>
 
-                        {abasVisiveis[Math.min(abaAtiva, abasVisiveis.length - 1)]?.conteudo}
-                    </>
-                )}
+                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                        {!online && (
+                            <Chip
+                                size="small"
+                                icon={<OfflineIcon />}
+                                label="Offline"
+                                sx={{ bgcolor: tom(funcao.alerta, 0.16), color: funcao.alerta, fontWeight: 700 }}
+                            />
+                        )}
+                        {pendentesOffline > 0 && (
+                            <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={<SyncIcon />}
+                                disabled={!online || sincronizando}
+                                onClick={handleSincronizarOffline}
+                                sx={botaoSecundario}
+                            >
+                                {sincronizando ? 'Sincronizando...' : `Sincronizar (${pendentesOffline})`}
+                            </Button>
+                        )}
+                        <Tooltip title="Atualizar dados">
+                            <span>
+                                <IconButton
+                                    size="small"
+                                    onClick={carregarResumo}
+                                    disabled={carregando}
+                                    sx={{
+                                        color: cores.textoSuave,
+                                        border: `1px solid ${cores.borda}`,
+                                        bgcolor: cores.superficieElevada
+                                    }}
+                                    aria-label="Atualizar dados"
+                                >
+                                    <AtualizarIcon fontSize="small" />
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={exibirModoCampo ? <MonitorIcon /> : <CelularIcon />}
+                            onClick={() => setModoCampoForcado(!exibirModoCampo)}
+                            sx={{ ...botaoSecundario, display: { xs: 'none', sm: 'inline-flex' } }}
+                        >
+                            {exibirModoCampo ? 'Visão completa' : 'Modo celular'}
+                        </Button>
+                        {(!isDesktop || exibirModoCampo) && (
+                            <Tooltip title="Sair do portal">
+                                <IconButton
+                                    size="small"
+                                    onClick={handleSair}
+                                    sx={{
+                                        color: cores.textoSecundario,
+                                        border: `1px solid ${cores.borda}`,
+                                        bgcolor: cores.superficieElevada
+                                    }}
+                                    aria-label="Sair do portal"
+                                >
+                                    <SairIcon fontSize="small" />
+                                </IconButton>
+                            </Tooltip>
+                        )}
+                    </Stack>
+                </Box>
+
+                {/* Conteúdo fluido ocupando 100% da largura da tela */}
+                <Box
+                    sx={{
+                        flex: 1,
+                        width: '100%',
+                        p: { xs: 1.5, sm: 2, md: 2.5, lg: 3 }
+                    }}
+                >
+                    {carregando && !resumo ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
+                            <CircularProgress />
+                        </Box>
+                    ) : !resumo ? (
+                        <GlassCard sx={{ p: 3, textAlign: 'center' }}>
+                            <Typography sx={{ color: cores.textoSecundario, mb: 2 }}>
+                                Não foi possível carregar os dados do evento no momento.
+                            </Typography>
+                            <NeonButton onClick={carregarResumo}>Tentar novamente</NeonButton>
+                        </GlassCard>
+                    ) : exibirModoCampo ? (
+                        <ModoCampoMobile
+                            eventoId={eventoId}
+                            resumo={resumo}
+                            headersExtra={HEADERS_VAZIO}
+                            apiClient={portalProdutorApi}
+                            online={online}
+                            pendentesOffline={pendentesOffline}
+                            sincronizando={sincronizando}
+                            aoSincronizar={handleSincronizarOffline}
+                            aoAtualizar={carregarResumo}
+                            aoSairModoCampo={() => setModoCampoForcado(false)}
+                        />
+                    ) : (
+                        secaoAtual?.conteudo
+                    )}
+                </Box>
             </Box>
         </Box>
     );

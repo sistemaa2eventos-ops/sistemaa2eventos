@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     Accordion, AccordionDetails, AccordionSummary, Box, Button, Chip, CircularProgress,
-    FormControlLabel, Stack, Switch, TextField, Typography
+    FormControlLabel, Stack, Switch, TextField, Typography, Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import { ExpandMore as ExpandMoreIcon, Search as SearchIcon, LockOpen as LiberadoIcon } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import api from '../../services/api';
 import ListaDocumentos from './ListaDocumentos';
 import { SITUACAO_DOCUMENTAL, MOTIVO_PENDENCIA, chipSx } from './documentosUtils';
+import NeonButton from '../common/NeonButton';
 
 const POR_PAGINA = 30;
 
@@ -25,6 +26,12 @@ const AbaColaboradores = ({ onAuditar, recarregarToken }) => {
     const [total, setTotal] = useState(0);
     const [pagina, setPagina] = useState(1);
     const [carregando, setCarregando] = useState(false);
+
+    // Modal de Liberar por um dia
+    const [openLiberarModal, setOpenLiberarModal] = useState(false);
+    const [pessoaLiberacao, setPessoaLiberacao] = useState(null);
+    const [motivoLiberacao, setMotivoLiberacao] = useState('');
+    const [liberandoHoje, setLiberandoHoje] = useState(false);
 
     useEffect(() => {
         const t = setTimeout(() => setBuscaAplicada(busca), 350);
@@ -49,6 +56,25 @@ const AbaColaboradores = ({ onAuditar, recarregarToken }) => {
     }, [buscaAplicada, somentePendentes, enqueueSnackbar]);
 
     useEffect(() => { carregar(1); }, [carregar, recarregarToken]);
+
+    const handleLiberarUmDia = async () => {
+        if (!pessoaLiberacao) return;
+        setLiberandoHoje(true);
+        try {
+            await api.post(`/audit/pessoas/${pessoaLiberacao.id}/liberar-um-dia`, {
+                motivo: motivoLiberacao.trim() || 'Sem motivo especificado'
+            });
+            enqueueSnackbar(`${pessoaLiberacao.nome_completo} liberado(a) por um dia com sucesso!`, { variant: 'success' });
+            setOpenLiberarModal(false);
+            setPessoaLiberacao(null);
+            setMotivoLiberacao('');
+            carregar(1); // Recarregar lista
+        } catch (err) {
+            enqueueSnackbar(`Erro ao liberar: ${err.response?.data?.detalhes?.detalhe || err.message}`, { variant: 'error' });
+        } finally {
+            setLiberandoHoje(false);
+        }
+    };
 
     return (
         <Box>
@@ -124,6 +150,27 @@ const AbaColaboradores = ({ onAuditar, recarregarToken }) => {
                                     Liberado manualmente até {new Date(p.liberacao_manual_ate).toLocaleString('pt-BR')} — {p.liberacao_manual_motivo || 'sem motivo'}
                                 </Typography>
                             )}
+                            {p.situacao_documental === 'pendente' && (
+                                <Box sx={{ mb: 2, p: 1.5, bgcolor: 'rgba(255, 184, 0, 0.1)', border: '1px solid #FFB800', borderRadius: 1 }}>
+                                    <Stack direction="row" spacing={1} alignItems="center">
+                                        <Box sx={{ flex: 1 }}>
+                                            <Typography variant="caption" sx={{ color: '#FFB800', fontWeight: 700 }}>
+                                                Documentação Pendente
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', display: 'block' }}>
+                                                Libere por um dia para permitir entrada em exceção hoje
+                                            </Typography>
+                                        </Box>
+                                        <Button
+                                            size="small"
+                                            onClick={() => { setPessoaLiberacao(p); setOpenLiberarModal(true); }}
+                                            sx={{ color: '#FFB800', '&:hover': { bgcolor: 'rgba(255, 184, 0, 0.1)' } }}
+                                        >
+                                            Liberar por um dia
+                                        </Button>
+                                    </Stack>
+                                </Box>
+                            )}
                             <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700 }}>Documentos entregues</Typography>
                             <ListaDocumentos documentos={docs} onAuditar={onAuditar} />
                         </AccordionDetails>
@@ -140,6 +187,40 @@ const AbaColaboradores = ({ onAuditar, recarregarToken }) => {
                     <Button onClick={() => carregar(pagina + 1)} sx={{ color: '#00D4FF' }}>Carregar mais</Button>
                 </Box>
             )}
+
+            {/* Modal: Liberar por um dia */}
+            <Dialog open={openLiberarModal} onClose={() => !liberandoHoje && setOpenLiberarModal(false)} maxWidth="sm" fullWidth>
+                <DialogTitle sx={{ bgcolor: 'rgba(255, 184, 0, 0.1)', borderBottom: '1px solid #FFB800', color: '#FFFFFF' }}>
+                    Liberar por um dia
+                </DialogTitle>
+                <DialogContent sx={{ bgcolor: 'rgba(0,0,0,0.3)', pt: 2 }}>
+                    {pessoaLiberacao && (
+                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', mb: 2 }}>
+                            Permitir entrada de <strong>{pessoaLiberacao.nome_completo}</strong> hoje, mesmo com documentação pendente.
+                            Amanhã volta a estar pendente automaticamente.
+                        </Typography>
+                    )}
+                    <TextField
+                        fullWidth
+                        multiline
+                        rows={3}
+                        label="Motivo da liberação (opcional)"
+                        value={motivoLiberacao}
+                        onChange={(e) => setMotivoLiberacao(e.target.value)}
+                        placeholder="Ex: Aguardando entrega do documento"
+                        disabled={liberandoHoje}
+                        sx={{ '& .MuiOutlinedInput-root': { color: '#FFFFFF', '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' } } }}
+                    />
+                </DialogContent>
+                <DialogActions sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.3)' }}>
+                    <Button onClick={() => setOpenLiberarModal(false)} disabled={liberandoHoje} sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                        Cancelar
+                    </Button>
+                    <NeonButton onClick={handleLiberarUmDia} loading={liberandoHoje}>
+                        Liberar por um dia
+                    </NeonButton>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

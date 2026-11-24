@@ -13,6 +13,7 @@ const { buscarLotesDaFaixa, escolherLote } = require('../pulseiras/loteSelecao')
 const { buscarPessoaPorCodigo } = require('./codigoLeitor');
 const { etapaDoLote } = require('./services/entradaEtapa');
 const { bloqueioPorTipoArea } = require('./services/tipoArea');
+const AuditoriaService = require('../auditoria/auditoria.service');
 
 // Área só de monitoramento: nenhuma entrada/saída é registrada nela (409 AREA_SO_MONITORAMENTO)
 const recusarSeSoMonitoramento = async (res, areaId) => {
@@ -21,6 +22,34 @@ const recusarSeSoMonitoramento = async (res, areaId) => {
     res.status(409).json({ success: false, error: msg, codigo: 'AREA_SO_MONITORAMENTO' });
     return true;
 };
+
+// Validação de Documentação Pendente
+const validarDocumentacao = async (res, eventoId, pessoaId) => {
+    try {
+        const status = await AuditoriaService.statusDocumentalComLiberacao(eventoId, pessoaId);
+
+        // Se documentação está pendente E não foi liberada hoje: bloquear
+        if (status.status === 'pendente' && !status.liberado_hoje) {
+            return {
+                bloqueado: true,
+                erro: {
+                    codigo: 'DOCUMENTACAO_PENDENTE',
+                    mensagem: '⚠️ DOCUMENTAÇÃO PENDENTE',
+                    detalhe: 'Esta pessoa não pode entrar. Sua documentação está pendente de aprovação.',
+                    status_documental: status.status,
+                    liberado_hoje: false,
+                }
+            };
+        }
+
+        return { bloqueado: false };
+    } catch (error) {
+        logger.error('Erro ao validar documentação:', error.message);
+        // Falha aberta: deixa entrar se houver erro
+        return { bloqueado: false };
+    }
+};
+
 const { outraPessoaNoLote } = require('./pulseiraLote');
 
 /**
@@ -322,6 +351,12 @@ class AccessController {
 
             if (!pessoa_id) return ApiResponse.error(res, 'ID do participante é obrigatório', 400);
 
+            // Validar documentação pendente
+            const docValidacao = await validarDocumentacao(res, eventoId, pessoa_id);
+            if (docValidacao.bloqueado) {
+                return ApiResponse.error(res, docValidacao.erro.detalhe, 403, docValidacao.erro);
+            }
+
             const result = await checkinService.registrarAcesso(supabaseClient, {
                 pessoa_id,
                 evento_id: eventoId,
@@ -365,6 +400,12 @@ class AccessController {
                 .single();
 
             if (pessoaErr || !pessoa) return ApiResponse.error(res, 'QR Code não encontrado', 404);
+
+            // Validar documentação pendente
+            const docValidacao = await validarDocumentacao(res, eventoId, pessoa.id);
+            if (docValidacao.bloqueado) {
+                return ApiResponse.error(res, docValidacao.erro.detalhe, 403, docValidacao.erro);
+            }
 
             const result = await checkinService.registrarAcesso(supabaseClient, {
                 pessoa_id: pessoa.id,

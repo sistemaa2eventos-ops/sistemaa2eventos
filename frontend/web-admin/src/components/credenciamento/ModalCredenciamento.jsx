@@ -74,6 +74,9 @@ export const ModalCredenciamento = ({
     const [motivoDevolucao, setMotivoDevolucao] = useState('');
     const [registrandoMotivo, setRegistrandoMotivo] = useState(false);
 
+    // Status de documentação com liberação diária
+    const [statusDocumentalComLiberacao, setStatusDocumentalComLiberacao] = useState(null);
+
     const carregarSituacao = async () => {
         if (!pessoa?.id) return;
         try {
@@ -93,6 +96,17 @@ export const ModalCredenciamento = ({
         } catch (err) {
             console.warn('Erro ao carregar status de pulseira:', err.message);
             setStatusPulseira(null);
+        }
+    };
+
+    const carregarStatusDocumentalComLiberacao = async () => {
+        if (!pessoa?.id) return;
+        try {
+            const resp = await api.get(`/audit/pessoas/${pessoa.id}/status-documental`);
+            setStatusDocumentalComLiberacao(resp.data?.data || null);
+        } catch (err) {
+            console.warn('Erro ao carregar status documental:', err.message);
+            setStatusDocumentalComLiberacao(null);
         }
     };
 
@@ -152,8 +166,10 @@ export const ModalCredenciamento = ({
             setErroSaida('');
             setMotivoDevolucao('');
             setStatusPulseira(null);
+            setStatusDocumentalComLiberacao(null);
             carregarSituacao();
             carregarStatusPulseira();
+            carregarStatusDocumentalComLiberacao();
 
             // Auto-selecionar o tipo de pulseira se a pessoa já tiver ou se houver padrão
             if (pessoa.tipo_pulseira_id) {
@@ -418,6 +434,41 @@ export const ModalCredenciamento = ({
                                     ? 'Saída guardada neste aparelho: será enviada quando a conexão voltar.'
                                     : 'Saída registrada.'}{' '}
                                 Pode confirmar a entrada de novo.
+                            </Typography>
+                        </Alert>
+                    )}
+
+                    {/* Documentação Pendente - BLOQUEIO DE CHECK-IN */}
+                    {statusDocumentalComLiberacao?.status === 'pendente' && !statusDocumentalComLiberacao?.liberado_hoje && (
+                        <Alert
+                            severity="error"
+                            variant="outlined"
+                            sx={{ mb: { xs: 2, sm: 3 }, color: '#FF3366', borderColor: 'rgba(255, 51, 102, 0.5)', bgcolor: 'rgba(255, 51, 102, 0.08)', '& .MuiAlert-icon': { color: '#FF3366' } }}
+                        >
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF', mb: 1 }}>
+                                ⚠️ DOCUMENTAÇÃO PENDENTE
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)' }}>
+                                Esta pessoa não pode fazer check-in. Sua documentação está pendente de aprovação.
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', display: 'block', mt: 0.5 }}>
+                                Acesse Auditoria Documental para liberar por um dia em exceção.
+                            </Typography>
+                        </Alert>
+                    )}
+
+                    {/* Documentação Liberada Hoje */}
+                    {statusDocumentalComLiberacao?.status === 'pendente' && statusDocumentalComLiberacao?.liberado_hoje && (
+                        <Alert
+                            severity="info"
+                            variant="outlined"
+                            sx={{ mb: { xs: 2, sm: 3 }, color: '#00D4FF', borderColor: 'rgba(0, 212, 255, 0.5)', bgcolor: 'rgba(0, 212, 255, 0.06)', '& .MuiAlert-icon': { color: '#00D4FF' } }}
+                        >
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                                ✓ Liberado por um dia
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.75)', display: 'block' }}>
+                                {statusDocumentalComLiberacao.motivo_liberacao ? `Motivo: ${statusDocumentalComLiberacao.motivo_liberacao}` : 'Entrada permitida apenas hoje.'}
                             </Typography>
                         </Alert>
                     )}
