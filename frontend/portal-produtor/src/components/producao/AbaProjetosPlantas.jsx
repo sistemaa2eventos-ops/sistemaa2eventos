@@ -29,6 +29,8 @@ import {
     Add as AddIcon,
     ZoomIn as ZoomInIcon,
     ZoomOut as ZoomOutIcon,
+    PanTool as MaoIcon,
+    CenterFocusStrong as AjustarTelaIcon,
     Straighten as ReguaIcon,
     Delete as ExcluirIcon,
     RotateRight as GirarIcon,
@@ -101,6 +103,10 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
     const httpClient = apiClient || api;
     const { enqueueSnackbar } = useSnackbar();
     const svgRef = useRef(null);
+    const viewportRef = useRef(null);
+    const panningRef = useRef(null);
+    const zoomRef = useRef(1);
+    const viewOffsetRef = useRef({ x: 0, y: 0 });
 
     const areas = useMemo(() => resumo?.areas || [], [resumo?.areas]);
     const projetos = useMemo(() => resumo?.projetos || [], [resumo?.projetos]);
@@ -142,6 +148,94 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
     const [arrastandoId, setArrastandoId] = useState(null);
     const [offsetArrasto, setOffsetArrasto] = useState({ dx: 0, dy: 0 });
     const [zoom, setZoom] = useState(1);
+    const [viewOffset, setViewOffset] = useState({ x: 0, y: 0 });
+    const [estaArrastandoMapa, setEstaArrastandoMapa] = useState(false);
+    const [espacoPressionado, setEspacoPressionado] = useState(false);
+
+    useEffect(() => {
+        zoomRef.current = zoom;
+    }, [zoom]);
+
+    useEffect(() => {
+        viewOffsetRef.current = viewOffset;
+    }, [viewOffset]);
+
+    useEffect(() => {
+        setZoom(1);
+        setViewOffset({ x: 0, y: 0 });
+    }, [planta?.id]);
+
+    // Atalho de teclado: segurar Espaço ativa a mãozinha temporariamente (padrão CAD/Figma)
+    useEffect(() => {
+        const onKeyDown = (e) => {
+            if (e.code === 'Space' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)) {
+                setEspacoPressionado(true);
+            }
+        };
+        const onKeyUp = (e) => {
+            if (e.code === 'Space') setEspacoPressionado(false);
+        };
+        window.addEventListener('keydown', onKeyDown);
+        window.addEventListener('keyup', onKeyUp);
+        return () => {
+            window.removeEventListener('keydown', onKeyDown);
+            window.removeEventListener('keyup', onKeyUp);
+        };
+    }, []);
+
+    // Zoom suave pela rodinha do mouse centrado exatamente sob o cursor (sem rolar a página)
+    useEffect(() => {
+        const el = viewportRef.current;
+        if (!el) return undefined;
+
+        const onWheel = (e) => {
+            e.preventDefault();
+            const svg = svgRef.current;
+            if (!svg) return;
+
+            const zoomAtual = zoomRef.current;
+            const fator = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+            const zoomNovo = Math.min(6, Math.max(0.35, Number((zoomAtual * fator).toFixed(3))));
+            if (zoomNovo === zoomAtual) return;
+
+            const ctm = svg.getScreenCTM();
+            const offsetAtual = viewOffsetRef.current;
+            if (ctm) {
+                const pt = svg.createSVGPoint();
+                pt.x = e.clientX;
+                pt.y = e.clientY;
+                const local = pt.matrixTransform(ctm.inverse());
+                const proporcao = zoomAtual / zoomNovo;
+                setViewOffset({
+                    x: local.x - (local.x - offsetAtual.x) * proporcao,
+                    y: local.y - (local.y - offsetAtual.y) * proporcao
+                });
+            }
+            setZoom(zoomNovo);
+        };
+
+        el.addEventListener('wheel', onWheel, { passive: false });
+        return () => el.removeEventListener('wheel', onWheel);
+    }, [planta?.id]);
+
+    const ajustarZoomNoCentro = (novoZoomBruto) => {
+        const zoomAtual = zoomRef.current;
+        const zoomNovo = Math.min(6, Math.max(0.35, Number(novoZoomBruto.toFixed(2))));
+        if (zoomNovo === zoomAtual) return;
+        const offsetAtual = viewOffsetRef.current;
+        const centroX = offsetAtual.x + (larguraCanvas / zoomAtual) / 2;
+        const centroY = offsetAtual.y + (alturaCanvas / zoomAtual) / 2;
+        setZoom(zoomNovo);
+        setViewOffset({
+            x: centroX - (larguraCanvas / zoomNovo) / 2,
+            y: centroY - (alturaCanvas / zoomNovo) / 2
+        });
+    };
+
+    const resetarZoomEPan = () => {
+        setZoom(1);
+        setViewOffset({ x: 0, y: 0 });
+    };
 
     // Desenho direto de setor (polígono / retângulo)
     const [pontosPoligono, setPontosPoligono] = useState([]);
@@ -304,12 +398,23 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
     const converterPontoSvg = (evt) => {
         const svg = svgRef.current;
         if (!svg) return { x: 0, y: 0 };
+        const ctm = svg.getScreenCTM();
+        if (ctm) {
+            const pt = svg.createSVGPoint();
+            pt.x = evt.clientX;
+            pt.y = evt.clientY;
+            const local = pt.matrixTransform(ctm.inverse());
+            return {
+                x: Math.max(0, Math.min(larguraCanvas, Math.round(local.x))),
+                y: Math.max(0, Math.min(alturaCanvas, Math.round(local.y)))
+            };
+        }
         const rect = svg.getBoundingClientRect();
         const vbW = larguraCanvas / zoom;
         const vbH = alturaCanvas / zoom;
         return {
-            x: Math.max(0, Math.min(larguraCanvas, Math.round(((evt.clientX - rect.left) / rect.width) * vbW))),
-            y: Math.max(0, Math.min(alturaCanvas, Math.round(((evt.clientY - rect.top) / rect.height) * vbH)))
+            x: Math.max(0, Math.min(larguraCanvas, Math.round(viewOffset.x + ((evt.clientX - rect.left) / rect.width) * vbW))),
+            y: Math.max(0, Math.min(alturaCanvas, Math.round(viewOffset.y + ((evt.clientY - rect.top) / rect.height) * vbH)))
         };
     };
 
@@ -359,6 +464,26 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
 
     // Eventos de mouse/ponteiro sobre o canvas do projeto
     const handlePointerDownCanvas = (evt) => {
+        // Botão do meio (scroll pressionado), ferramenta mãozinha ou Espaço + botão esquerdo: arrasta a planta
+        if (evt.button === 1 || ferramentaCanvas === 'pan' || (espacoPressionado && evt.button === 0)) {
+            evt.preventDefault();
+            panningRef.current = {
+                ativo: true,
+                pointerId: evt.pointerId,
+                startClientX: evt.clientX,
+                startClientY: evt.clientY,
+                startOffsetX: viewOffsetRef.current.x,
+                startOffsetY: viewOffsetRef.current.y
+            };
+            setEstaArrastandoMapa(true);
+            try {
+                evt.currentTarget.setPointerCapture(evt.pointerId);
+            } catch {
+                // Ignora se o navegador não suportar capture para este ponteiro
+            }
+            return;
+        }
+
         const pt = converterPontoSvg(evt);
 
         if (ferramentaCanvas === 'regua') {
@@ -385,6 +510,7 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
     };
 
     const handlePointerDownElemento = (evt, el) => {
+        if (evt.button === 1 || ferramentaCanvas === 'pan' || espacoPressionado) return;
         if (ferramentaCanvas !== 'selecionar') return;
         evt.stopPropagation();
         setElementoSelecionadoId(el.id);
@@ -396,6 +522,21 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
     };
 
     const handlePointerMoveCanvas = (evt) => {
+        if (panningRef.current?.ativo) {
+            const svg = svgRef.current;
+            if (!svg) return;
+            const ctm = svg.getScreenCTM();
+            const rect = svg.getBoundingClientRect();
+            const escalaX = ctm?.a || (rect.width / (larguraCanvas / zoomRef.current));
+            const escalaY = ctm?.d || (rect.height / (alturaCanvas / zoomRef.current));
+            const dxSvg = (evt.clientX - panningRef.current.startClientX) / (escalaX || 1);
+            const dySvg = (evt.clientY - panningRef.current.startClientY) / (escalaY || 1);
+            setViewOffset({
+                x: panningRef.current.startOffsetX - dxSvg,
+                y: panningRef.current.startOffsetY - dySvg
+            });
+            return;
+        }
         if (ferramentaCanvas === 'retangulo' && retanguloInicio) {
             setRetanguloAtual(converterPontoSvg(evt));
             return;
@@ -411,7 +552,19 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
         );
     };
 
-    const handlePointerUpCanvas = () => {
+    const handlePointerUpCanvas = (evt) => {
+        if (panningRef.current?.ativo) {
+            try {
+                if (evt?.currentTarget?.hasPointerCapture?.(panningRef.current.pointerId)) {
+                    evt.currentTarget.releasePointerCapture(panningRef.current.pointerId);
+                }
+            } catch {
+                // Ignora
+            }
+            panningRef.current = null;
+            setEstaArrastandoMapa(false);
+            return;
+        }
         if (ferramentaCanvas === 'retangulo' && retanguloInicio && retanguloAtual) {
             const x = Math.min(retanguloInicio.x, retanguloAtual.x);
             const y = Math.min(retanguloInicio.y, retanguloAtual.y);
@@ -1107,14 +1260,25 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
 
                         {planta && (
                             <>
-                                <Tooltip title="Diminuir zoom">
-                                    <IconButton size="small" onClick={() => setZoom((z) => Math.max(0.6, Number((z - 0.15).toFixed(2))))} sx={{ color: cores.texto }}>
+                                <Tooltip title="Diminuir zoom (ou use o scroll do mouse)">
+                                    <IconButton size="small" onClick={() => ajustarZoomNoCentro(zoom / 1.2)} sx={{ color: cores.texto }}>
                                         <ZoomOutIcon fontSize="small" />
                                     </IconButton>
                                 </Tooltip>
-                                <Tooltip title="Aumentar zoom">
-                                    <IconButton size="small" onClick={() => setZoom((z) => Math.min(2.5, Number((z + 0.15).toFixed(2))))} sx={{ color: cores.texto }}>
+                                <Chip
+                                    size="small"
+                                    label={`${Math.round(zoom * 100)}%`}
+                                    onClick={resetarZoomEPan}
+                                    sx={{ bgcolor: cores.superficieElevada, color: cores.textoForte, fontWeight: 700, cursor: 'pointer' }}
+                                />
+                                <Tooltip title="Aumentar zoom (ou use o scroll do mouse)">
+                                    <IconButton size="small" onClick={() => ajustarZoomNoCentro(zoom * 1.2)} sx={{ color: cores.texto }}>
                                         <ZoomInIcon fontSize="small" />
+                                    </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Ajustar planta à janela (100%)">
+                                    <IconButton size="small" onClick={resetarZoomEPan} sx={{ color: cores.textoSecundario }}>
+                                        <AjustarTelaIcon fontSize="small" />
                                     </IconButton>
                                 </Tooltip>
                                 <FormControl size="small" sx={{ minWidth: 135 }}>
@@ -1202,6 +1366,15 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
                                     sx={ferramentaCanvas === 'selecionar' ? undefined : botaoSecundario}
                                 >
                                     Selecionar e mover
+                                </Button>
+                                <Button
+                                    size="small"
+                                    variant={ferramentaCanvas === 'pan' ? 'contained' : 'outlined'}
+                                    startIcon={<MaoIcon />}
+                                    onClick={() => { setFerramentaCanvas('pan'); setPontosPoligono([]); }}
+                                    sx={ferramentaCanvas === 'pan' ? undefined : botaoSecundario}
+                                >
+                                    Mover planta (mãozinha)
                                 </Button>
                                 {podeAprovarPlanta && (
                                     <>
@@ -1559,27 +1732,38 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
                                 )}
 
                                 <Box
+                                    ref={viewportRef}
+                                    onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
+                                    onAuxClick={(e) => { if (e.button === 1) e.preventDefault(); }}
                                     sx={{
+                                        position: 'relative',
                                         border: `1px solid ${modoEdicao || ferramentaCanvas !== 'selecionar' ? cores.primaria : cores.borda}`,
                                         borderRadius: 2,
                                         bgcolor: cores.fundo,
-                                        overflow: 'auto',
-                                        touchAction: 'none'
+                                        overflow: 'hidden',
+                                        touchAction: 'none',
+                                        userSelect: 'none'
                                     }}
                                 >
                                     <svg
                                         ref={svgRef}
-                                        viewBox={`0 0 ${Math.round(larguraCanvas / zoom)} ${Math.round(alturaCanvas / zoom)}`}
+                                        viewBox={`${viewOffset.x} ${viewOffset.y} ${larguraCanvas / zoom} ${alturaCanvas / zoom}`}
                                         style={{
                                             width: '100%',
-                                            minHeight: 460,
-                                            maxHeight: 620,
+                                            minHeight: 520,
+                                            height: 'calc(100dvh - 300px)',
+                                            maxHeight: 820,
                                             display: 'block',
-                                            cursor: ferramentaCanvas === 'selecionar' ? (modoEdicao ? 'grab' : 'default') : 'crosshair'
+                                            cursor: estaArrastandoMapa
+                                                ? 'grabbing'
+                                                : ((ferramentaCanvas === 'pan' || espacoPressionado)
+                                                    ? 'grab'
+                                                    : (ferramentaCanvas === 'selecionar' ? (modoEdicao ? 'grab' : 'default') : 'crosshair'))
                                         }}
                                         onPointerDown={handlePointerDownCanvas}
                                         onPointerMove={handlePointerMoveCanvas}
                                         onPointerUp={handlePointerUpCanvas}
+                                        onPointerCancel={handlePointerUpCanvas}
                                     >
                                         <defs>
                                             <pattern id="grid-planta" width="30" height="30" patternUnits="userSpaceOnUse">
