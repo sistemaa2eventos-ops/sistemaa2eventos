@@ -5,6 +5,104 @@ const qrGenerator = require('../../utils/qrGenerator');
 const syncService = require('../devices/sync.service');
 const { v4: uuidv4 } = require('uuid');
 const emailService = require('../../services/emailService');
+const { buscarTodos, buscarPorIdsEmLotes } = require('../../utils/buscarTodos');
+
+// ---------------------------------------------------------------------------
+// Busca de pessoas por qualquer dado do cadastro (check-in, check-out, fiscalização, lista de pessoas)
+// ---------------------------------------------------------------------------
+const LIMITE_BUSCA = 200;
+const CAMPOS_PESSOA_BUSCA = 'id, nome_completo, nome_credencial, cpf, email, telefone, documento, passaporte, funcao, tipo_pessoa, status_acesso, foto_url, qr_code, ativo, created_at, numero_pulseira';
+// Banco sem alguma coluna opcional (passaporte etc.): a busca continua com o básico em vez de falhar
+const CAMPOS_PESSOA_BASICOS = 'id, nome_completo, nome_credencial, cpf, email, funcao, status_acesso, foto_url, qr_code, ativo, created_at, numero_pulseira';
+const CAMPOS_TEXTO = ['nome_completo', 'nome_credencial', 'email', 'funcao', 'tipo_pessoa', 'documento', 'passaporte', 'numero_pulseira'];
+const CAMPOS_TEXTO_BASICOS = ['nome_completo', 'nome_credencial', 'email', 'funcao', 'numero_pulseira'];
+const CAMPOS_NUMERO = ['cpf', 'telefone', 'documento', 'numero_pulseira'];
+const CAMPOS_NUMERO_BASICOS = ['cpf', 'numero_pulseira'];
+
+const normalizarTexto = (v) => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const soDigitos = (v) => String(v ?? '').replace(/\D/g, '');
+const textoDaEmpresa = (e) => (e ? normalizarTexto(`${e.nome || ''} ${e.cnpj || ''}`) : '');
+
+/** "  João  ELETRICISTA " → { tokens: ['joao', 'eletricista'], brutos: ['joão', 'eletricista'] }; menos de 2 letras = sem busca */
+function prepararBusca(queryText) {
+    const bruto = String(queryText ?? '').toLowerCase().trim();
+    if (normalizarTexto(bruto).length < 2) return null;
+    const brutos = bruto.split(/\s+/).filter(Boolean);
+    const tokens = brutos.map(normalizarTexto);
+    return tokens.length ? { tokens, brutos } : null;
+}
+
+// Tira o que quebra o filtro do PostgREST (vírgula, parênteses, aspas, curingas)
+const seguroParaFiltro = (token) => token.replace(/[,()"'\\*%:]/g, '_');
+/**
+ * Padrão largo: vogais e "c" viram "_" (qualquer letra), então "joao" acha "JOÃO" e "acougue" acha "AÇOUGUE".
+ * Traz candidatos a mais; a conferência exata (sem acento) é feita depois em pessoaAtendeBusca.
+ */
+const padraoLargo = (token) => token.replace(/[aeiouc]/g, '_').replace(/[^a-z0-9_@.-]/g, '_');
+const MAX_CANDIDATOS_SEM_ACENTO = 2000;
+
+function montarConsultaPessoas(client, campos, statusParam) {
+    let q = client.from('pessoas').select(campos);
+    if (statusParam) q = q.eq('status_acesso', String(statusParam).toLowerCase());
+    return q;
+}
+
+async function buscarPessoasPorTexto(client, eventoId, busca, statusParam) {
+    // O banco filtra pela palavra mais longa (a mais seletiva); as outras são conferidas em memória
+    const i = busca.tokens.reduce((melhor, t, idx) => (t.length > busca.tokens[melhor].length ? idx : melhor), 0);
+    const token = busca.tokens[i];
+    const bruto = busca.brutos[i];
+    const digitos = soDigitos(token);
+    const soNumero = /^[\d.\-/()]+$/.test(token);
+
+    const filtroExato = (camposTexto, camposNumero) => {
+        const textos = [...new Set([seguroParaFiltro(bruto), seguroParaFiltro(token)])];
+        const partes = camposTexto.flatMap(c => textos.map(t => `${c}.ilike.%${t}%`));
+        if (soNumero && digitos.length >= 2) {
+            // CPF gravado só com dígitos; telefone/documento podem ter pontuação: "%1%1%9%..." casa com "(11) 9..."
+            partes.push(...camposNumero.map(c => `${c}.ilike.%${c === 'cpf' || c === 'numero_pulseira' ? digitos : digitos.split('').join('%')}%`));
+        }
+        return partes.join(',');
+    };
+    const filtroSemAcento = (camposTexto) => camposTexto.map(c => `${c}.ilike.%${padraoLargo(token)}%`).join(',');
+    const base = (campos) => montarConsultaPessoas(client, campos, statusParam).eq('evento_id', eventoId);
+
+    const consultar = async (campos, camposTexto, camposNumero) => {
+        const tarefas = [buscarTodos(base(campos).or(filtroExato(camposTexto, camposNumero)), { paralelo: 2 })];
+        // Só vale a consulta sem acento quando a palavra tem letra que pode ter acento
+        if (!soNumero && /[aeiouc]/.test(token)) {
+            tarefas.push(base(campos).or(filtroSemAcento(camposTexto)).order('id').limit(MAX_CANDIDATOS_SEM_ACENTO));
+        }
+        const respostas = await Promise.all(tarefas);
+        const erro = respostas.find(r => r.error)?.error;
+        return erro ? { data: null, error: erro } : { data: respostas.flatMap(r => r.data || []), error: null };
+    };
+
+    let { data, error } = await consultar(CAMPOS_PESSOA_BUSCA, CAMPOS_TEXTO, CAMPOS_NUMERO);
+    if (error && (error.code === '42703' || /column|coluna/i.test(error.message || ''))) {
+        logger.warn('[PessoaService.searchPessoas] coluna opcional ausente, buscando com os campos básicos', { code: error.code });
+        ({ data, error } = await consultar(CAMPOS_PESSOA_BASICOS, CAMPOS_TEXTO_BASICOS, CAMPOS_NUMERO_BASICOS));
+    }
+    if (error) throw error;
+    return data || [];
+}
+
+/** Cada palavra da busca precisa aparecer em algum dado da pessoa ou da empresa dela */
+function pessoaAtendeBusca(pessoa, empresas, busca) {
+    const texto = normalizarTexto([
+        pessoa.nome_completo, pessoa.nome_credencial, pessoa.email, pessoa.funcao, pessoa.tipo_pessoa,
+        pessoa.documento, pessoa.passaporte, pessoa.numero_pulseira, pessoa.cpf, pessoa.telefone,
+        ...empresas.map(e => e && `${e.nome || ''} ${e.cnpj || ''}`)
+    ].filter(Boolean).join(' | '));
+    const numeros = [pessoa.cpf, pessoa.telefone, pessoa.documento, pessoa.numero_pulseira, ...empresas.map(e => e?.cnpj)]
+        .map(soDigitos).filter(Boolean);
+    return busca.tokens.every((t) => {
+        if (texto.includes(t)) return true;
+        const d = soDigitos(t);
+        // "123.456.789-00" acha o CPF gravado só com dígitos (o token precisa ser só número e pontuação)
+        return d.length >= 2 && /^[\d.\-/()]+$/.test(t) && numeros.some(n => n.includes(d));
+    });
+}
 
 
 class PessoaService {
@@ -147,63 +245,101 @@ class PessoaService {
      * Busca pessoas com filtros por nome, CPF ou empresa
      */
     async searchPessoas(supabaseClient, eventoId, queryText, empresaId, statusParam = null) {
-        // Passo 1: Buscar vínculos pivot aplicando filtro de empresa_id diretamente na pivot se houver
-        let pivotQuery = supabaseClient.from('pessoa_evento_empresa').select('*').eq('evento_id', eventoId);
-        if (empresaId) pivotQuery = pivotQuery.eq('empresa_id', empresaId);
+        const busca = prepararBusca(queryText);
 
-        const { data: pivots, error: pError } = await pivotQuery;
+        // Passo 1: vínculos do evento (todas as páginas: o Supabase corta em 1000 sem avisar)
+        let pivotQuery = supabaseClient.from('pessoa_evento_empresa')
+            .select('id, pessoa_id, empresa_id, status_aprovacao')
+            .eq('evento_id', eventoId);
+        if (empresaId) pivotQuery = pivotQuery.eq('empresa_id', empresaId);
+        const { data: pivots, error: pError } = await buscarTodos(pivotQuery);
         if (pError) throw pError;
         if (!pivots || pivots.length === 0) return [];
 
-        // Passo 2: Buscar pessoas com filtro de texto (ou todas do pivot se sem filtro)
-        const pIds = [...new Set(pivots.map(p => p.pessoa_id))];
-        let pesQuery = supabaseClient.from('pessoas')
-            .select('id, nome_completo, nome_credencial, cpf, funcao, status_acesso, foto_url, qr_code, ativo, created_at, numero_pulseira')
-            .in('id', pIds);
-
-        if (queryText) {
-            pesQuery = pesQuery.or(`nome_completo.ilike.%${queryText}%,cpf.ilike.%${queryText}%,numero_pulseira.ilike.%${queryText}%,funcao.ilike.%${queryText}%`);
+        const pivotsPorPessoa = new Map();
+        for (const p of pivots) {
+            if (!pivotsPorPessoa.has(p.pessoa_id)) pivotsPorPessoa.set(p.pessoa_id, []);
+            pivotsPorPessoa.get(p.pessoa_id).push(p);
         }
 
-        if (statusParam) {
-            pesQuery = pesQuery.eq('status_acesso', statusParam.toLowerCase());
+        // Passo 2: empresas do evento (nome/CNPJ também são buscáveis)
+        const eIds = [...new Set(pivots.map(p => p.empresa_id).filter(Boolean))];
+        const { data: empresas } = eIds.length
+            ? await buscarPorIdsEmLotes(eIds, (lote) => supabaseClient.from('empresas').select('id, nome, cnpj').in('id', lote))
+            : { data: [] };
+        const empMap = new Map((empresas || []).map(e => [e.id, e]));
+
+        // Passo 3: pessoas candidatas
+        let candidatas;
+        if (!busca) {
+            // Sem texto: as pessoas dos vínculos (ex.: filtro só por empresa)
+            const { data, error } = await buscarPorIdsEmLotes([...pivotsPorPessoa.keys()].slice(0, LIMITE_BUSCA),
+                (lote) => montarConsultaPessoas(supabaseClient, CAMPOS_PESSOA_BUSCA, statusParam).in('id', lote));
+            if (error) throw error;
+            candidatas = data || [];
+        } else {
+            // a) Pelo texto em qualquer campo do cadastro (filtro largo no banco, conferência exata abaixo)
+            const porTexto = await buscarPessoasPorTexto(supabaseClient, eventoId, busca, statusParam);
+
+            // b) Pela empresa: digitar o nome da empresa traz todos os funcionários dela
+            const empresasQueBatem = new Set((empresas || [])
+                .filter(e => busca.tokens.some(t => normalizarTexto(`${e.nome || ''} ${e.cnpj || ''}`).includes(t)
+                    || (soDigitos(t) && soDigitos(e.cnpj).includes(soDigitos(t)))))
+                .map(e => e.id));
+            const jaTemos = new Set(porTexto.map(p => p.id));
+            const idsDaEmpresa = empresasQueBatem.size
+                ? pivots.filter(p => empresasQueBatem.has(p.empresa_id) && !jaTemos.has(p.pessoa_id)).map(p => p.pessoa_id)
+                : [];
+            let porEmpresa = [];
+            if (idsDaEmpresa.length) {
+                const { data, error } = await buscarPorIdsEmLotes(idsDaEmpresa.slice(0, 1000),
+                    (lote) => montarConsultaPessoas(supabaseClient, CAMPOS_PESSOA_BUSCA, statusParam).in('id', lote));
+                if (error) throw error;
+                porEmpresa = data || [];
+            }
+            candidatas = [...porTexto, ...porEmpresa];
         }
 
-        const { data: pessoas, error: pesErr } = await pesQuery.limit(100);
-        if (pesErr) throw pesErr;
+        // Passo 4: só quem é do evento; com várias palavras, TODAS precisam aparecer (ex.: "eletricista dakota")
+        const vistos = new Set();
+        const resultado = [];
+        for (const pessoa of candidatas) {
+            if (vistos.has(pessoa.id) || !pivotsPorPessoa.has(pessoa.id)) continue;
+            const vinculos = pivotsPorPessoa.get(pessoa.id);
+            // Com mais de um vínculo, prefere a empresa que bate com a busca
+            const vinculo = (busca && vinculos.find(v => textoDaEmpresa(empMap.get(v.empresa_id)) &&
+                busca.tokens.some(t => textoDaEmpresa(empMap.get(v.empresa_id)).includes(t)))) || vinculos[0];
+            if (busca && !pessoaAtendeBusca(pessoa, vinculos.map(v => empMap.get(v.empresa_id)), busca)) continue;
+            vistos.add(pessoa.id);
+            resultado.push({ pessoa, vinculo });
+        }
 
-        // Passo 3: Unificar com empresas e buscar áreas autorizadas em batch
-        const eIds = [...new Set(pivots.map(p => p.empresa_id))];
-        const [empResult, areasResult] = await Promise.all([
-            supabaseClient.from('empresas').select('id, nome').in('id', eIds),
-            supabaseClient.from('pessoa_areas_acesso')
-                .select('pessoa_id, area_id')
-                .in('pessoa_id', pIds)
-                .eq('evento_id', eventoId)
-        ]);
+        // Ordem alfabética (ignora acentos e maiúsculas), depois limita
+        resultado.sort((a, b) => String(a.pessoa.nome_completo || '').localeCompare(String(b.pessoa.nome_completo || ''), 'pt-BR', { sensitivity: 'base' }));
+        const finais = resultado.slice(0, LIMITE_BUSCA);
+        if (!finais.length) return [];
 
-        const empMap = (empResult.data || []).reduce((acc, e) => { acc[e.id] = e; return acc; }, {});
-        const areasMap = (areasResult.data || []).reduce((acc, a) => {
-            if (!acc[a.pessoa_id]) acc[a.pessoa_id] = [];
-            acc[a.pessoa_id].push(a.area_id);
+        // Passo 5: áreas autorizadas só de quem vai na resposta
+        const { data: areas } = await buscarPorIdsEmLotes(finais.map(r => r.pessoa.id), (lote) =>
+            supabaseClient.from('pessoa_areas_acesso').select('pessoa_id, area_id').in('pessoa_id', lote).eq('evento_id', eventoId));
+        const areasMap = (areas || []).reduce((acc, a) => {
+            (acc[a.pessoa_id] = acc[a.pessoa_id] || []).push(a.area_id);
             return acc;
         }, {});
-        const pesMap = (pessoas || []).reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
 
-        return pivots.map(p => {
-            const pessoa = pesMap[p.pessoa_id];
-            if (!pessoa) return null;
+        return finais.map(({ pessoa, vinculo }) => {
+            const empresa = empMap.get(vinculo.empresa_id);
             return {
                 ...pessoa,
                 nome: pessoa.nome_completo,
                 status: pessoa.status_acesso,
-                empresa_nome: empMap[p.empresa_id]?.nome || null,
-                empresas: empMap[p.empresa_id] || { nome: 'Sem Empresa' },
-                vinculo_id: p.id,
-                status_pivot: p.status_aprovacao,
+                empresa_nome: empresa?.nome || null,
+                empresas: empresa ? { id: empresa.id, nome: empresa.nome } : { nome: 'Sem Empresa' },
+                vinculo_id: vinculo.id,
+                status_pivot: vinculo.status_aprovacao,
                 areas_autorizadas: areasMap[pessoa.id] || []
             };
-        }).filter(p => p !== null);
+        });
     }
 
     /**

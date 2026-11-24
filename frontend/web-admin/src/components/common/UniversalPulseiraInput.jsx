@@ -368,6 +368,34 @@ export const UniversalPulseiraInput = ({
                 </Typography>
 
                 <Stack direction="row" spacing={0.75} alignItems="center">
+                    {/* Lote da pulseira fica aqui em cima: dentro da caixa ele escondia parte do número */}
+                    {tipoPulseiraCorrespondente ? (
+                        <Fade in>
+                            <Chip
+                                label={tipoPulseiraCorrespondente.nome_tipo}
+                                size="small"
+                                sx={{
+                                    fontWeight: 700,
+                                    fontSize: '0.75rem',
+                                    height: 22,
+                                    bgcolor: tipoPulseiraCorrespondente.cor_hex
+                                        ? `${tipoPulseiraCorrespondente.cor_hex}33`
+                                        : `${accentColor}33`,
+                                    color: tipoPulseiraCorrespondente.cor_hex || accentColor,
+                                    border: `1px solid ${tipoPulseiraCorrespondente.cor_hex || accentColor}`
+                                }}
+                            />
+                        </Fade>
+                    ) : value && /^\d+$/.test(String(value).trim()) && pulseiraTypes.length > 0 ? (
+                        <Tooltip title="Número não coincide com nenhuma faixa de lote pré-cadastrada">
+                            <Chip
+                                icon={<WarningIcon sx={{ fontSize: '14px !important' }} />}
+                                label="Faixa avulsa"
+                                size="small"
+                                sx={{ fontSize: '0.75rem', height: 22, bgcolor: 'rgba(255, 170, 0, 0.15)', color: '#FFB800' }}
+                            />
+                        </Tooltip>
+                    ) : null}
                     {leiturasAguardando > 0 && (
                         <Chip
                             label={`Aguardando: ${leiturasAguardando}`}
@@ -422,20 +450,23 @@ export const UniversalPulseiraInput = ({
                                     color: origemLeitura === 'barcode' ? '#00FF88' : accentColor
                                 }}
                             >
-                                {onAbrirCamera && !mostrarBotaoCamera ? (
-                                    <Tooltip title="Ler QR Code ou Código de Barras pela câmera">
+                                {/* Câmera dentro da caixa (só o ícone): o espaço fica para o número aparecer inteiro */}
+                                {onAbrirCamera ? (
+                                    <Tooltip title="Ler pela câmera">
                                         <span>
                                             <IconButton
                                                 onClick={onAbrirCamera}
                                                 disabled={disabled || loading}
-                                                aria-label="Ler QR Code ou Código de Barras pela câmera"
+                                                aria-label="Ler pela câmera"
                                                 sx={{
-                                                    width: 44, height: 44, ml: -1.25,
+                                                    width: 40, height: 40, ml: -1.25,
                                                     color: 'inherit',
                                                     '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' }
                                                 }}
                                             >
-                                                <BarcodeIcon sx={{ fontSize: { xs: 22, sm: 26 } }} />
+                                                {mostrarBotaoCamera
+                                                    ? <CameraAltIcon sx={{ fontSize: { xs: 22, sm: 24 } }} />
+                                                    : <BarcodeIcon sx={{ fontSize: { xs: 22, sm: 26 } }} />}
                                             </IconButton>
                                         </span>
                                     </Tooltip>
@@ -455,35 +486,6 @@ export const UniversalPulseiraInput = ({
                             <Stack direction="row" spacing={0.75} alignItems="center">
                                 {loading ? (
                                     <CircularProgress size={22} sx={{ color: accentColor }} />
-                                ) : tipoPulseiraCorrespondente ? (
-                                    <Fade in>
-                                        <Chip
-                                            label={tipoPulseiraCorrespondente.nome_tipo}
-                                            size="small"
-                                            sx={{
-                                                fontWeight: 700,
-                                                fontSize: '0.75rem',
-                                                bgcolor: tipoPulseiraCorrespondente.cor_hex
-                                                    ? `${tipoPulseiraCorrespondente.cor_hex}33`
-                                                    : `${accentColor}33`,
-                                                color: tipoPulseiraCorrespondente.cor_hex || accentColor,
-                                                border: `1px solid ${tipoPulseiraCorrespondente.cor_hex || accentColor}`
-                                            }}
-                                        />
-                                    </Fade>
-                                ) : value && /^\d+$/.test(String(value).trim()) && pulseiraTypes.length > 0 ? (
-                                    <Tooltip title="Número não coincide com nenhuma faixa de lote pré-cadastrada">
-                                        <Chip
-                                            icon={<WarningIcon sx={{ fontSize: '14px !important' }} />}
-                                            label="Faixa avulsa"
-                                            size="small"
-                                            sx={{
-                                                fontSize: '0.75rem',
-                                                bgcolor: 'rgba(255, 170, 0, 0.15)',
-                                                color: '#FFB800'
-                                            }}
-                                        />
-                                    </Tooltip>
                                 ) : null}
 
                                 {Boolean(value) && !loading && (
@@ -530,9 +532,9 @@ export const UniversalPulseiraInput = ({
                     '& .MuiOutlinedInput-root': {
                         bgcolor: 'rgba(0, 0, 0, 0.35)',
                         color: '#FFFFFF',
-                        fontSize: { xs: '1rem', sm: '1.25rem' },
+                        fontSize: { xs: '1rem', sm: '1.15rem' },
                         fontWeight: 700,
-                        letterSpacing: { xs: '0.75px', sm: '1.5px' },
+                        letterSpacing: { xs: '0.5px', sm: '1px' },
                         fontFamily: '"Inter", sans-serif',
                         borderRadius: 1.5,
                         height: { xs: 48, sm: 58 },
@@ -559,34 +561,6 @@ export const UniversalPulseiraInput = ({
             />
                 </Box>
 
-                {onAbrirCamera && mostrarBotaoCamera && (
-                    <Button
-                        variant="contained"
-                        onClick={onAbrirCamera}
-                        disabled={disabled || loading}
-                        startIcon={<CameraAltIcon />}
-                        sx={{
-                            height: { xs: 48, sm: 58 },
-                            px: { xs: 1.75, sm: 2.75 },
-                            borderRadius: 1.5,
-                            bgcolor: accentColor,
-                            color: '#000000',
-                            fontWeight: 700,
-                            fontSize: { xs: '0.8125rem', sm: '0.9375rem' },
-                            fontFamily: '"Space Grotesk", sans-serif',
-                            whiteSpace: 'nowrap',
-                            flexShrink: 0,
-                            boxShadow: `0 0 14px ${accentColor}33`,
-                            '&:hover': {
-                                bgcolor: accentColor,
-                                filter: 'brightness(1.15)',
-                                boxShadow: `0 0 20px ${accentColor}66`
-                            }
-                        }}
-                    >
-                        Ler pela câmera
-                    </Button>
-                )}
             </Box>
 
             {pendentes > LIMITE_FILA_AVISO && (

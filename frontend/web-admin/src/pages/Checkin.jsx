@@ -238,9 +238,9 @@ const Checkin = () => {
                         handleSearch('');
                     }}
                     accentColor="#00FF88"
-                    label="Leitor, CPF ou nome"
-                    placeholder="Bipe QR/barras, digite o CPF ou o nome..."
-                    helperText="Bipe ou câmera: check-in automático • Digitação: Enter ou OK • Nome: escolha na lista"
+                    label="Buscar pessoa"
+                    placeholder="Nome, CPF, empresa, função, pulseira... ou bipe o QR"
+                    helperText="Busca por qualquer dado do cadastro, em ordem alfabética • Bipe ou câmera: check-in automático • Digitado: Enter ou OK"
                     pulseiraTypes={pulseiraTypes}
                     ultimoCodigoLido={ultimoCodigoLido}
                     onConfirm={confirmarCampo}
@@ -256,6 +256,10 @@ const Checkin = () => {
 
                 <Box sx={{ mt: 1.5, flex: 1, overflowY: 'auto', minHeight: { xs: searchResults.length > 0 ? 180 : 0, lg: 0 }, maxHeight: { xs: 280, lg: 'none' } }}>
                     {searchResults.length > 0 ? (
+                        <>
+                        <Typography variant="caption" sx={{ display: 'block', mb: 0.75, color: 'rgba(255,255,255,0.55)' }}>
+                            {searchResults.length === 1 ? '1 pessoa encontrada' : `${searchResults.length} pessoas encontradas`} • ordem alfabética
+                        </Typography>
                         <List disablePadding>
                             {searchResults.map(p => (
                                 <ListItem
@@ -294,14 +298,15 @@ const Checkin = () => {
                                     </Box>
                                     <ListItemText
                                         primary={p.nome}
-                                        secondary={[p.cpf || 'Sem CPF', p.numero_pulseira ? `Pulseira ${p.numero_pulseira}` : null, p.empresa_nome || p.empresas?.nome].filter(Boolean).join(' – ')}
+                                        secondary={[p.cpf || 'Sem CPF', p.funcao, p.numero_pulseira ? `Pulseira ${p.numero_pulseira}` : null, p.empresa_nome || p.empresas?.nome].filter(Boolean).join(' – ')}
                                         primaryTypographyProps={{ fontWeight: 700, fontSize: '0.9rem', noWrap: true }}
-                                        secondaryTypographyProps={{ fontSize: '0.78rem', noWrap: true }}
+                                        secondaryTypographyProps={{ fontSize: '0.78rem' }}
                                     />
                                 </ListItemButton>
                                 </ListItem>
                             ))}
                         </List>
+                        </>
                     ) : (
                         searchQuery.trim().length >= 2 && !searchLoading && (
                             <Typography variant="body2" sx={{ textAlign: 'center', opacity: 0.6, my: 2 }}>

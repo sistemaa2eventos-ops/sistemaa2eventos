@@ -91,7 +91,8 @@ const AJUDAS = {
         passos: [
             'Em "Conectar estação", escolha o leitor facial e/ou as câmeras da sua baia e dê o "Nome da estação".',
             'Escolha a área. "Todas as áreas (global)" é livre: a pessoa entra e sai quantas vezes quiser, sem liberação. Só área com portão ("Controla entrada") bloqueia a reentrada.',
-            'No campo "Leitor, CPF ou nome", bipe o QR/código de barras, use "Ler pela câmera" ou digite o CPF e aperte Enter: abre a ficha da pessoa. Digitando o nome, escolha a pessoa na lista.',
+            'No campo "Buscar pessoa", bipe o QR/código de barras, use o ícone da câmera ou digite o CPF e aperte Enter: abre a ficha da pessoa.',
+            'Para procurar, digite qualquer dado do cadastro: nome, CPF, empresa (traz todos da empresa), função (traz todos com a função), pulseira, e-mail ou telefone. Acentos não importam; várias palavras juntas filtram mais (ex.: "eletricista dakota"). A lista vem em ordem alfabética: clique na pessoa.',
             'Na ficha, bipe a pulseira em "Número da pulseira" (a entrada sai sozinha) ou digite o número e aperte Enter ou "Vincular pulseira & autorizar".'
         ],
         atencao: [
@@ -117,9 +118,10 @@ const AJUDAS = {
         objetivo: 'Registrar a saída pela pulseira: bipada ou lida pela câmera, a saída é registrada na hora; digitada, abre a ficha de conferência já preenchida e um Enter registra. Pelo leitor facial, o rosto registra a saída na hora.',
         passos: [
             'Vincule a estação e escolha a área, como no check-in.',
-            'No campo "Leitor, pulseira, CPF ou nome", bipe a pulseira ou use "Ler pela câmera": a saída é registrada na hora, sem abrir a ficha (tela verde "Saída liberada").',
+            'No campo "Buscar pessoa ou bipar a pulseira", bipe a pulseira ou use o ícone da câmera: a saída é registrada na hora, sem abrir a ficha (tela verde "Saída liberada").',
             'Digitando o número da pulseira e apertando Enter, abre a ficha da pessoa com o número já preenchido: confira e aperte Enter de novo para registrar a saída.',
             'CPF, QR do crachá ou nome (escolhido na lista) abrem a ficha vazia: bipe ou digite a pulseira desta pessoa para registrar a saída.',
+            'Para procurar, digite qualquer dado do cadastro (nome, CPF, empresa, função, e-mail, telefone): a lista vem em ordem alfabética.',
             'Na ficha, pulseira de outra pessoa não registra a saída: a tela avisa "Esta pulseira é de outra pessoa" e nada é registrado.'
         ],
         atencao: [
@@ -138,7 +140,7 @@ const AJUDAS = {
         objetivo: 'Conferir pulseiras e credenciais nos postos internos, sem registrar entrada nem saída.',
         passos: [
             'Escolha o "Posto de fiscalização" (a área onde você está).',
-            'No campo "Leitor, pulseira, CPF ou nome", bipe a pulseira ou o crachá, digite o número ou o CPF e aperte Enter, ou use "Ler pela câmera". Pelo nome, escolha a pessoa na lista (Enter com nome não fiscaliza).',
+            'No campo "Leitor, pulseira, CPF ou nome", bipe a pulseira ou o crachá, digite o número ou o CPF e aperte Enter, ou use o ícone da câmera. Pelo nome, escolha a pessoa na lista (Enter com nome não fiscaliza).',
             'Veja o resultado: LIBERADO, NÃO AUTORIZADO ou BLOQUEADO, com as áreas permitidas.'
         ],
         dicas: [
