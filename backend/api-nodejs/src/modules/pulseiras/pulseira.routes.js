@@ -65,4 +65,40 @@ router.post('/corrigir', checkPermission('checkin', 'escrita'), async (req, res)
     }
 });
 
+// Status de pulseira: em uso hoje ou pendência de dias anteriores
+router.get('/status/:pessoa_id', async (req, res) => {
+    try {
+        const { pessoa_id } = req.params;
+        if (!pessoa_id) return ApiResponse.error(res, 'pessoa_id é obrigatório.', 400);
+        const status = await pulseiraService.buscarStatusPulseira(req.event.id, pessoa_id);
+        return ApiResponse.success(res, status);
+    } catch (error) {
+        logger.error('Erro ao buscar status de pulseira:', error.message);
+        return ApiResponse.error(res, 'Erro ao buscar status da pulseira.', 500);
+    }
+});
+
+// Registrar motivo da não devolução (pendência de dia anterior)
+router.post('/pendencia/:pessoa_id', checkPermission('checkin', 'escrita'), async (req, res) => {
+    try {
+        const { pessoa_id } = req.params;
+        const { numero, dataCheckin, motivo } = req.body || {};
+        if (!pessoa_id || !numero || !dataCheckin) {
+            return ApiResponse.error(res, 'pessoa_id, numero e dataCheckin são obrigatórios.', 400);
+        }
+        const r = await pulseiraService.registrarMotivoPendencia(
+            req.event.id,
+            pessoa_id,
+            { numero, dataCheckin, motivo: motivo || null },
+            req.user?.id || null
+        );
+        await auditService.logEntity(req, 'BRACELET_PENDENCIA_MOTIVO', 'PESSOA', pessoa_id,
+            { numero_pulseira: numero, motivo: motivo || null });
+        return ApiResponse.success(res, r);
+    } catch (error) {
+        logger.error('Erro ao registrar motivo de pendência:', error.message);
+        return ApiResponse.error(res, 'Erro ao registrar o motivo.', 500);
+    }
+});
+
 module.exports = router;

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, Box, Typography, Grid, Stack,
     Chip, CircularProgress, IconButton, FormControl,
-    InputLabel, Select, MenuItem, Tooltip, Divider, Button, Alert
+    InputLabel, Select, MenuItem, Tooltip, Divider, Button, Alert, TextField
 } from '@mui/material';
 import {
     Badge as BadgeIcon,
@@ -69,6 +69,11 @@ export const ModalCredenciamento = ({
     const [registrandoSaida, setRegistrandoSaida] = useState(false);
     const [erroSaida, setErroSaida] = useState('');
 
+    // Status de pulseira: em uso hoje ou pendência anterior
+    const [statusPulseira, setStatusPulseira] = useState(null);
+    const [motivoDevolucao, setMotivoDevolucao] = useState('');
+    const [registrandoMotivo, setRegistrandoMotivo] = useState(false);
+
     const carregarSituacao = async () => {
         if (!pessoa?.id) return;
         try {
@@ -77,6 +82,17 @@ export const ModalCredenciamento = ({
             setSituacao((resp.data?.data || []).find(p => p.id === pessoa.id) || null);
         } catch {
             setSituacao(null);
+        }
+    };
+
+    const carregarStatusPulseira = async () => {
+        if (!pessoa?.id) return;
+        try {
+            const resp = await api.get(`/pulseiras/status/${pessoa.id}`);
+            setStatusPulseira(resp.data?.data || null);
+        } catch (err) {
+            console.warn('Erro ao carregar status de pulseira:', err.message);
+            setStatusPulseira(null);
         }
     };
 
@@ -134,8 +150,11 @@ export const ModalCredenciamento = ({
             setSituacao(null);
             setSaidaRegistrada(null);
             setErroSaida('');
+            setMotivoDevolucao('');
+            setStatusPulseira(null);
             carregarSituacao();
-            
+            carregarStatusPulseira();
+
             // Auto-selecionar o tipo de pulseira se a pessoa já tiver ou se houver padrão
             if (pessoa.tipo_pulseira_id) {
                 setSelectedTipoPulseira(pessoa.tipo_pulseira_id);
@@ -194,6 +213,26 @@ export const ModalCredenciamento = ({
             setErroValidacao(err.response?.data?.error || 'Não foi possível desfazer o lançamento da pulseira.');
         } finally {
             setDesfazendo(false);
+        }
+    };
+
+    const handleRegistrarMotivoPendencia = async () => {
+        if (!pessoa?.id || !statusPulseira?.pendencia || !motivoDevolucao.trim() || registrandoMotivo) return;
+        try {
+            setRegistrandoMotivo(true);
+            setErroValidacao('');
+            const eventoId = localStorage.getItem('active_evento_id');
+            await api.post(`/pulseiras/pendencia/${pessoa.id}`, {
+                numero: statusPulseira.pendencia.numero,
+                dataCheckin: statusPulseira.pendencia.dataCheckin,
+                motivo: motivoDevolucao.trim()
+            }, { params: { evento_id: eventoId } });
+            setMotivoDevolucao('');
+            await carregarStatusPulseira();
+        } catch (err) {
+            setErroValidacao(err.response?.data?.error || 'Não foi possível registrar o motivo.');
+        } finally {
+            setRegistrandoMotivo(false);
         }
     };
 
@@ -508,7 +547,7 @@ export const ModalCredenciamento = ({
                             <Box sx={{ mt: 1.5 }}>
                                 <Grid container spacing={1.5} alignItems="center">
                                     {/* Seletor Manual de Fase/Etapa (Montagem / Evento / Desmontagem) */}
-                                    <Grid item xs={12} sm={3}>
+                                    <Grid item xs={12} sm={2.5}>
                                         <FormControl fullWidth size="small">
                                             <InputLabel id="fase-pulseira-select" sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem' }}>
                                                 Etapa / Fase
@@ -519,7 +558,6 @@ export const ModalCredenciamento = ({
                                                 label="Etapa / Fase"
                                                 onChange={(e) => {
                                                     setFiltroFase(e.target.value);
-                                                    // Se o lote atual não faz parte da nova fase, limpa ou reseta
                                                     const novos = e.target.value === 'todas'
                                                         ? pulseiraTypes
                                                         : pulseiraTypes.filter(t => !t.fase || t.fase === 'todas' || t.fase === e.target.value);
@@ -544,7 +582,7 @@ export const ModalCredenciamento = ({
                                     </Grid>
 
                                     {/* Seletor do Lote de Pulseira */}
-                                    <Grid item xs={12} sm={4}>
+                                    <Grid item xs={12} sm={3.5}>
                                         <FormControl fullWidth size="small">
                                             <InputLabel id="tipo-pulseira-select" sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem' }}>
                                                 Lote / Tipo
@@ -572,7 +610,7 @@ export const ModalCredenciamento = ({
                                     </Grid>
 
                                     {/* Input Universal de Pulseira */}
-                                    <Grid item xs={12} sm={5}>
+                                    <Grid item xs={12} sm={4}>
                                         <UniversalPulseiraInput
                                             key={pessoa.id}
                                             value={numeroPulseira}
@@ -580,7 +618,7 @@ export const ModalCredenciamento = ({
                                             onConfirm={handleConfirmar}
                                             label="Número da pulseira"
                                             placeholder="Bipe ou digite o número da pulseira"
-                                            helperText="Leitor confirma sozinho • Digitado: Enter ↵ ou o botão abaixo"
+                                            helperText="Leitor confirma sozinho • Digitado: Enter ↵"
                                             pulseiraTypes={tiposPulseiraFiltrados.length > 0 ? tiposPulseiraFiltrados : pulseiraTypes}
                                             loading={loading}
                                             autoFocus={true}
@@ -588,12 +626,14 @@ export const ModalCredenciamento = ({
                                             onAbrirCamera={permitirCamera ? () => setLendoCamera(true) : undefined}
                                         />
                                     </Grid>
+
                                 </Grid>
 
-                                {pessoa.numero_pulseira && devolvidaId !== pessoa.id && desfeitaInfo?.id !== pessoa.id && (
+                                {/* Pulseira em uso (TODAY) */}
+                                {statusPulseira?.emUso && devolvidaId !== pessoa.id && desfeitaInfo?.id !== pessoa.id && (
                                     <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: 'rgba(0, 212, 255, 0.05)', p: 1, borderRadius: 1.5, border: '1px solid rgba(0, 212, 255, 0.15)' }}>
                                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>
-                                            Pulseira em uso: <strong>{pessoa.numero_pulseira}</strong>
+                                            Pulseira em uso: <strong>{statusPulseira.emUso}</strong>
                                         </Typography>
                                         <Button
                                             size="small"
@@ -626,6 +666,52 @@ export const ModalCredenciamento = ({
                                             </span>
                                         </Tooltip>
                                     </Box>
+                                )}
+
+                                {/* Pendência de pulseira anterior */}
+                                {statusPulseira?.pendencia && !statusPulseira?.emUso && (
+                                    <Alert
+                                        severity="warning"
+                                        variant="outlined"
+                                        sx={{ mt: 1, color: '#FFB800', borderColor: 'rgba(255, 184, 0, 0.5)', bgcolor: 'rgba(255, 184, 0, 0.06)', '& .MuiAlert-icon': { color: '#FFB800' } }}
+                                    >
+                                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF', mb: 1 }}>
+                                            ⚠️ PULSEIRA {statusPulseira.pendencia.numero} PENDENTE DESDE {new Date(statusPulseira.pendencia.dataCheckin).toLocaleDateString('pt-BR')}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.9)', mb: 1 }}>
+                                            Pessoa não descredenciou em {new Date(statusPulseira.pendencia.dataCheckin).toLocaleDateString('pt-BR')}.
+                                            {statusPulseira.pendencia.motivo && (
+                                                <>
+                                                    <br />
+                                                    <strong>Motivo registrado:</strong> {statusPulseira.pendencia.motivo}
+                                                </>
+                                            )}
+                                        </Typography>
+                                        {!statusPulseira.pendencia.motivo && (
+                                            <>
+                                                <TextField
+                                                    size="small"
+                                                    label="Motivo da não devolução"
+                                                    multiline
+                                                    rows={2}
+                                                    value={motivoDevolucao}
+                                                    onChange={(e) => setMotivoDevolucao(e.target.value)}
+                                                    placeholder="ex: Esqueceu de devolver, perdeu a pulseira, etc"
+                                                    fullWidth
+                                                    sx={{ mt: 1, mb: 1, '& .MuiOutlinedInput-root': { color: '#FFFFFF' }, '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' } }}
+                                                />
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    onClick={handleRegistrarMotivoPendencia}
+                                                    disabled={registrandoMotivo || !motivoDevolucao.trim()}
+                                                    sx={{ fontSize: '0.75rem', color: '#FFB800', borderColor: 'rgba(255, 184, 0, 0.6)', textTransform: 'none' }}
+                                                >
+                                                    {registrandoMotivo ? 'Registrando...' : 'Registrar Motivo'}
+                                                </Button>
+                                            </>
+                                        )}
+                                    </Alert>
                                 )}
 
                                 {desfeitaInfo?.id === pessoa.id && (

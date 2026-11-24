@@ -412,6 +412,110 @@ class PulseiraService {
                 if (error && !tabelaAusente(error)) logger.warn(`[Pulseiras] Operador da entrega não registrado: ${error.message}`);
             }, () => {});
     }
+
+    /**
+     * Status da pulseira: em uso hoje ou pendência de dias anteriores.
+     * @returns {{ emUso: number|null, pendencia: {numero, dataCheckin, motivo}|null }}
+     */
+    async buscarStatusPulseira(eventoId, pessoaId) {
+        const hoje = new Date().toISOString().split('T')[0];
+        const ontemT000 = new Date(Date.parse(hoje) - 86400000).toISOString();
+
+        // Pulseira em uso: check-in HOJE sem checkout HOJE
+        const { data: emUsoHoje } = await supabase.from('logs_acesso')
+            .select('numero_pulseira, created_at')
+            .eq('pessoa_id', pessoaId)
+            .eq('evento_id', eventoId)
+            .eq('tipo', 'checkin')
+            .gte('created_at', `${hoje}T00:00:00Z`)
+            .lt('created_at', `${hoje}T23:59:59Z`)
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+        const ultimoCheckinHoje = emUsoHoje?.[0];
+        let emUso = ultimoCheckinHoje?.numero_pulseira || null;
+
+        // Se houver check-in hoje, verificar se tem checkout HOJE também
+        if (emUso) {
+            const { data: checkoutHoje } = await supabase.from('logs_acesso')
+                .select('id')
+                .eq('pessoa_id', pessoaId)
+                .eq('evento_id', eventoId)
+                .eq('tipo', 'checkout')
+                .eq('numero_pulseira', emUso)
+                .gte('created_at', `${hoje}T00:00:00Z`)
+                .limit(1);
+
+            if (checkoutHoje?.length > 0) {
+                emUso = null; // teve checkout, não está em uso
+            }
+        }
+
+        // Pendência: check-in de dias anteriores sem checkout
+        let pendencia = null;
+        if (!emUso) {
+            const { data: checkinAnterior } = await supabase.from('logs_acesso')
+                .select('numero_pulseira, created_at')
+                .eq('pessoa_id', pessoaId)
+                .eq('evento_id', eventoId)
+                .eq('tipo', 'checkin')
+                .lt('created_at', `${hoje}T00:00:00Z`)
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            const ult = checkinAnterior?.[0];
+            if (ult) {
+                // Verificar se tem checkout desse check-in
+                const { data: checkoutAnterior } = await supabase.from('logs_acesso')
+                    .select('id')
+                    .eq('pessoa_id', pessoaId)
+                    .eq('evento_id', eventoId)
+                    .eq('tipo', 'checkout')
+                    .eq('numero_pulseira', ult.numero_pulseira)
+                    .gte('created_at', ult.created_at)
+                    .lt('created_at', `${hoje}T00:00:00Z`)
+                    .limit(1);
+
+                if (!checkoutAnterior?.length) {
+                    // Buscar motivo registrado
+                    const { data: motivos } = await supabase.from('pulseiras_pendencia')
+                        .select('motivo_nao_devolucao')
+                        .eq('pessoa_id', pessoaId)
+                        .eq('evento_id', eventoId)
+                        .eq('numero_pulseira', ult.numero_pulseira)
+                        .eq('data_checkin_anterior', ult.created_at)
+                        .limit(1);
+
+                    pendencia = {
+                        numero: ult.numero_pulseira,
+                        dataCheckin: ult.created_at,
+                        motivo: motivos?.[0]?.motivo_nao_devolucao || null
+                    };
+                }
+            }
+        }
+
+        return { emUso, pendencia };
+    }
+
+    /**
+     * Registrar motivo da não devolução de pulseira anterior.
+     */
+    async registrarMotivoPendencia(eventoId, pessoaId, { numero, dataCheckin, motivo }, usuarioId) {
+        const { error } = await supabase.from('pulseiras_pendencia')
+            .upsert({
+                pessoa_id: pessoaId,
+                evento_id: eventoId,
+                numero_pulseira: numero,
+                data_checkin_anterior: dataCheckin,
+                motivo_nao_devolucao: motivo,
+                registrado_por: usuarioId,
+                registrado_em: new Date().toISOString()
+            }, { onConflict: 'pessoa_id,evento_id,numero_pulseira,data_checkin_anterior' });
+
+        if (error) throw error;
+        return { success: true };
+    }
 }
 
 module.exports = new PulseiraService();
