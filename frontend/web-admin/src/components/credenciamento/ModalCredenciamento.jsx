@@ -596,9 +596,9 @@ export const ModalCredenciamento = ({
 
                             {/* Campo de Atribuição de Pulseira Universal com Seletor de Fase e Lote */}
                             <Box sx={{ mt: 1.5 }}>
-                                <Grid container spacing={1.5} alignItems="center">
+                                <Grid container spacing={1.5} alignItems="flex-start">
                                     {/* Seletor Manual de Fase/Etapa (Montagem / Evento / Desmontagem) */}
-                                    <Grid item xs={12} sm={2.5}>
+                                    <Grid item xs={6}>
                                         <FormControl fullWidth size="small">
                                             <InputLabel id="fase-pulseira-select" sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem' }}>
                                                 Etapa / Fase
@@ -633,7 +633,7 @@ export const ModalCredenciamento = ({
                                     </Grid>
 
                                     {/* Seletor do Lote de Pulseira */}
-                                    <Grid item xs={12} sm={3.5}>
+                                    <Grid item xs={6}>
                                         <FormControl fullWidth size="small">
                                             <InputLabel id="tipo-pulseira-select" sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem' }}>
                                                 Lote / Tipo
@@ -660,8 +660,8 @@ export const ModalCredenciamento = ({
                                         </FormControl>
                                     </Grid>
 
-                                    {/* Input Universal de Pulseira */}
-                                    <Grid item xs={12} sm={4}>
+                                    {/* Input Universal de Pulseira: linha inteira (rótulo, campo, câmera e OK não cabem ao lado dos seletores) */}
+                                    <Grid item xs={12}>
                                         <UniversalPulseiraInput
                                             key={pessoa.id}
                                             value={numeroPulseira}
