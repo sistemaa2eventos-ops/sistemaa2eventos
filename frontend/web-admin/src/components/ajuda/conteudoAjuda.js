@@ -114,16 +114,18 @@ const AJUDAS = {
     },
     '/checkout': {
         titulo: 'Check-out',
-        objetivo: 'Registrar a saída pela ficha de conferência: o campo só localiza a pessoa e abre a ficha; a saída é registrada pela pulseira dela dentro da ficha. Pelo leitor facial, o rosto registra a saída na hora, sem abrir a ficha.',
+        objetivo: 'Registrar a saída pela pulseira: bipada ou lida pela câmera, a saída é registrada na hora; digitada, abre a ficha de conferência já preenchida e um Enter registra. Pelo leitor facial, o rosto registra a saída na hora.',
         passos: [
             'Vincule a estação e escolha a área, como no check-in.',
-            'No campo "Leitor, pulseira, CPF ou nome", bipe o QR/código de barras, use "Ler pela câmera" ou digite o número da pulseira ou o CPF e aperte Enter: abre a ficha da pessoa. Digitando o nome, escolha a pessoa na lista.',
-            'Na ficha, bipe a pulseira desta pessoa (ou digite o número e aperte Enter ou OK): a saída é registrada ali. Pulseira de outra pessoa não registra a saída: a tela avisa "Esta pulseira é de outra pessoa" e nada é registrado.'
+            'No campo "Leitor, pulseira, CPF ou nome", bipe a pulseira ou use "Ler pela câmera": a saída é registrada na hora, sem abrir a ficha (tela verde "Saída liberada").',
+            'Digitando o número da pulseira e apertando Enter, abre a ficha da pessoa com o número já preenchido: confira e aperte Enter de novo para registrar a saída.',
+            'CPF, QR do crachá ou nome (escolhido na lista) abrem a ficha vazia: bipe ou digite a pulseira desta pessoa para registrar a saída.',
+            'Na ficha, pulseira de outra pessoa não registra a saída: a tela avisa "Esta pulseira é de outra pessoa" e nada é registrado.'
         ],
         atencao: [
-            'O campo nunca registra a saída sozinho, nem por código, CPF ou nome: a saída sai pela pulseira lida na ficha ou pelo rosto no leitor facial.',
+            'Só a pulseira da própria pessoa registra a saída direto. CPF, QR do crachá e nome nunca registram sozinhos: abrem a ficha.',
             'Pessoa sem pulseira cadastrada não tem saída pela ficha ("Sem pulseira cadastrada"). Pelo rosto, a saída não depende de pulseira.',
-            'Com leitor facial vinculado à estação, a saída pelo rosto é registrada na hora, sem abrir a ficha. Só a estação ligada àquele leitor reage. Texto digitado e bipe de pulseira continuam abrindo a ficha.',
+            'Com leitor facial vinculado à estação, a saída pelo rosto é registrada na hora, sem abrir a ficha. Só a estação ligada àquele leitor reage. Texto digitado continua abrindo a ficha.',
             'Os leitores físicos da portaria registram sozinhos, sem passar por esta tela.',
             'Sem internet, a ficha não abre: a pessoa precisa ser localizada pelo servidor. Uma saída lida na ficha fica guardada no aparelho e sobe sozinha depois. Se o servidor recusar ou não responder em 3 tentativas, ela aparece em "Recusados pelo servidor" até você dispensar; as leituras seguintes não esperam por ela.',
             'Se a pessoa entrou num dia anterior e não registrou a saída, abre a janela "Saída de um dia anterior": confira o horário sugerido (o da saída do dia anterior) e clique em "Corrigir saída". O turno antigo é corrigido e nada é lançado para hoje.',

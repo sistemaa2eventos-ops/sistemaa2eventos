@@ -18,7 +18,7 @@ import RecentAccessList from '../components/credenciamento/RecentAccessList';
 import CabecalhoOperacao, { BotaoJanelaRegistros } from '../components/credenciamento/CabecalhoOperacao';
 import { useCheckin } from '../hooks/useCheckin';
 import CorrigirTurnoDialog from '../components/checkin/CorrigirTurnoDialog';
-import ConferenciaSaidaDialog from '../components/checkin/ConferenciaSaidaDialog';
+import ConferenciaSaidaDialog, { identificarLeitura } from '../components/checkin/ConferenciaSaidaDialog';
 import PassagensRecusadas from '../components/checkin/PassagensRecusadas';
 import RecusadosSincronizacao from '../components/checkin/RecusadosSincronizacao';
 import { funcao, tom } from '../styles/tokens';
@@ -143,6 +143,7 @@ const Checkout = () => {
   const fecharJanela = () => {
     setPessoaJanela(null);
     setSelectedPessoa(null);
+    setCodigoInicialJanela('');
   };
 
   // A saída é registrada pela janela, somente pela pulseira lida desta pessoa (o servidor usa esse número)
@@ -153,15 +154,32 @@ const Checkout = () => {
     return r;
   };
 
-  // Código (QR, barras, câmera, CPF ou nº da pulseira + Enter/OK) só localiza a pessoa e abre a janela de
-  // conferência. A saída é registrada dentro da janela, pela leitura da pulseira. Igual ao Check-in.
-  const processarCodigo = (codigoBruto) => {
+  // Número digitado que é a pulseira da pessoa: a conferência abre com ele preenchido (Enter registra)
+  const [codigoInicialJanela, setCodigoInicialJanela] = useState('');
+
+  // Pulseira da pessoa lida pelo leitor ou pela câmera: saída registrada direto, sem abrir a conferência.
+  // Número digitado: abre a conferência já preenchida. CPF, QR do crachá ou pessoa sem pulseira: abre vazia.
+  const processarCodigo = async (codigoBruto, origem) => {
     const cod = String(codigoBruto || '').trim();
     if (!cod) return undefined;
     setPulseiraValue(''); // campo vazio: o próximo bipe não gruda no anterior
     setUltimoCodigoLido(cod); // o código aparece só no aviso "Código lido"
     handleSearch('');
-    return abrirConferenciaPorCodigo(cod);
+
+    const busca = await abrirConferenciaPorCodigo(cod, { abrir: false });
+    if (!busca?.success) return busca;
+    const pessoa = busca.data;
+    const ehPulseiraDela = identificarLeitura(pessoa, cod) === 'pulseira';
+
+    if (ehPulseiraDela && (origem === 'barcode' || origem === 'camera')) {
+      const r = await performCheckin('pulseira', cod, pessoa.id);
+      if (r?.success) setUltimoCodigoLido('');
+      return r;
+    }
+
+    setCodigoInicialJanela(ehPulseiraDela ? cod : '');
+    setSelectedPessoa(pessoa);
+    return { success: true, data: pessoa };
   };
 
   // Enter/OK: código abre a conferência. Texto com letras é nome: nunca abre sozinho; só mostra a lista.
@@ -173,7 +191,7 @@ const Checkout = () => {
       setPulseiraValue('');
       return undefined;
     }
-    return processarCodigo(texto);
+    return processarCodigo(texto, origem);
   };
 
   return (
@@ -226,7 +244,7 @@ const Checkout = () => {
                     accentColor={COR}
                     label="Leitor, pulseira, CPF ou nome"
                     placeholder="Bipe QR/barras, digite nº da pulseira, CPF ou nome..."
-                    helperText="Bipe ou câmera: abre a conferência • Digitação: Enter ou OK • Nome: escolha na lista"
+                    helperText="Pulseira bipada ou pela câmera: saída na hora • Digitada: Enter abre a conferência preenchida • Nome: escolha na lista"
                     pulseiraTypes={pulseiraTypes}
                     ultimoCodigoLido={ultimoCodigoLido}
                     onConfirm={confirmarCampo}
@@ -247,7 +265,7 @@ const Checkout = () => {
                             {searchResults.map(p => (
                                 <ListItem key={p.id} disablePadding sx={{ mb: 1 }}>
                                     <ListItemButton
-                                        onClick={() => setSelectedPessoa(p)} // abre a conferência, como no Check-in
+                                        onClick={() => { setCodigoInicialJanela(''); setSelectedPessoa(p); }} // abre a conferência, como no Check-in
                                         sx={{
                                             borderRadius: 1.5,
                                             p: 1.15,
@@ -344,7 +362,7 @@ const Checkout = () => {
           instrucao="Aponte a câmera para o QR Code ou código de barras da pulseira ou do crachá — a saída será registrada automaticamente."
           onLeitura={(cod) => {
               setLendoCamera(false);
-              processarCodigo(cod);
+              processarCodigo(cod, 'camera');
           }}
       />
 
@@ -354,6 +372,7 @@ const Checkout = () => {
           pessoa={pessoaJanela}
           onClose={fecharJanela}
           onRegistrar={registrarSaidaNaJanela}
+          codigoInicial={codigoInicialJanela}
           ocupado={manualSaving}
           accentColor={COR}
       />

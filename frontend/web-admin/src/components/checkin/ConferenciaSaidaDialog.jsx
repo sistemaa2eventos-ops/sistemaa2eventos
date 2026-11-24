@@ -28,6 +28,8 @@ export const ConferenciaSaidaDialog = ({
     pessoa,
     onClose,
     onRegistrar,
+    // Número já digitado na tela de check-out: a janela abre com ele e um Enter registra a saída
+    codigoInicial = '',
     ocupado = false,
     accentColor = '#FF3366'
 }) => {
@@ -40,10 +42,11 @@ export const ConferenciaSaidaDialog = ({
     // Só fecha com a fila vazia: uma leitura fechada no meio some junto com a janela
     const podeFechar = pendentes === 0 && !ocupado;
 
-    // Cada abertura (ou outra pessoa) começa limpa
+    // Cada abertura (ou outra pessoa) começa limpa, ou com o número já digitado
     useEffect(() => {
-        setValor('');
+        setValor(open ? String(codigoInicial || '') : '');
         setSucesso(false);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, pessoa?.id]);
 
     // Saída registrada: a janela fecha sozinha daqui a pouco, se não houver outra leitura na fila
@@ -132,7 +135,7 @@ export const ConferenciaSaidaDialog = ({
                         accentColor={accentColor}
                         label="Bipe a pulseira desta pessoa"
                         placeholder="Bipe a pulseira ou digite o número..."
-                        helperText="Bipe a pulseira: saída automática • Número digitado: Enter ou OK"
+                        helperText={valor ? 'Confira e aperte Enter para registrar a saída' : 'Bipe a pulseira: saída automática • Número digitado: Enter ou OK'}
                     />
 
                     {sucesso && (

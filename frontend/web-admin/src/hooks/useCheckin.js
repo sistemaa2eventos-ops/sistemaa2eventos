@@ -470,7 +470,8 @@ export const useCheckin = (defaultMode, options = {}) => {
      * Consulta participante por QR Code / CPF / Código e abre o modal de credenciamento
      * para conferência visual de dados e atribuição de pulseira antes de liberar o acesso.
      */
-    const abrirConferenciaPorCodigo = async (codigo) => {
+    // abrir=false só localiza a pessoa (a tela decide se abre a ficha ou registra direto)
+    const abrirConferenciaPorCodigo = async (codigo, { abrir = true } = {}) => {
         if (!codigo || !eventoId) return { success: false, error: 'Código ou evento ausente' };
         try {
             setLoading(true);
@@ -480,7 +481,7 @@ export const useCheckin = (defaultMode, options = {}) => {
             if (res.data?.success && res.data?.data) {
                 const pessoa = res.data.data;
                 tocarBipeNotificacao();
-                handleSelectPessoa(pessoa);
+                if (abrir) handleSelectPessoa(pessoa);
                 return { success: true, data: pessoa };
             }
             throw new Error(res.data?.error || 'Participante não localizado');
