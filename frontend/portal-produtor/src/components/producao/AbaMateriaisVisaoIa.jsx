@@ -68,6 +68,7 @@ import {
 } from './analisadorVideoMateriais';
 import ModalCameraCaptura from './ModalCameraCaptura';
 import PainelContagemFotoPilha from './PainelContagemFotoPilha';
+import PainelAnaliseVideoIa from './PainelAnaliseVideoIa';
 
 const ESTADO_INICIAL_MATERIAL = (areaPadrao = '') => ({
     nome: '',
@@ -847,6 +848,15 @@ const AbaMateriaisVisaoIa = ({ resumo, headersExtra, aoAtualizar, apiClient }) =
 
             {/* Contagem real por Foto da Pilha / Caminhão (Gemini Vision IA) */}
             <PainelContagemFotoPilha
+                materiais={materiais}
+                areas={areas}
+                httpClient={httpClient}
+                headersExtra={headersExtra}
+                aoAtualizar={aoAtualizar}
+            />
+
+            {/* Contagem real por Vídeo Gravado (Gemini Vision IA — sem duplicidade) */}
+            <PainelAnaliseVideoIa
                 materiais={materiais}
                 areas={areas}
                 httpClient={httpClient}

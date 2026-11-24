@@ -6,7 +6,7 @@ const logger = require('../../services/logger');
 const calculos = require('./producaoCalculos');
 const portalAuth = require('./producaoPortalAuth');
 const { gerarRelatorioPdfBuffer } = require('./producaoPdf.service');
-const { analisarFotoPilhaGemini } = require('./producaoVisaoIa.service');
+const { analisarFotoPilhaGemini, analisarVideoQuadrosGemini } = require('./producaoVisaoIa.service');
 const { criarDadosDemonstracao, TEMPLATES_TAREFAS } = require('./producaoSeed');
 const producaoRepositorio = require('./producaoRepositorio');
 
@@ -1733,6 +1733,35 @@ async function analisarFotoPilhaIa(eventoId, dados = {}, user, headers = {}) {
 }
 
 /**
+ * Analisa sequência cronológica de quadros-chave extraídos de um vídeo gravado
+ * via Gemini Vision, contabilizando itens únicos sem duplicidade.
+ */
+async function analisarVideoIa(eventoId, dados = {}, user, headers = {}) {
+    const { estado } = await carregarEstadoEvento(eventoId, { usuario: user });
+    calculos.resolverContextoUsuario(estado, user, headers);
+
+    const materiaisAtivos = (estado.materiais || []).filter((m) => m.ativo !== false);
+    const idsFiltro = Array.isArray(dados.material_ids) ? dados.material_ids.filter(Boolean) : [];
+    const materiaisSelecionados = idsFiltro.length > 0
+        ? materiaisAtivos.filter((m) => idsFiltro.includes(m.id))
+        : materiaisAtivos;
+
+    const resultado = await analisarVideoQuadrosGemini({
+        quadros: dados.quadros || [],
+        materiais: materiaisSelecionados,
+        contextoLocal: dados.contexto_local || 'Doca / Descarga',
+        tipoOperacao: dados.tipo_operacao || 'descarga_entrada',
+        duracaoSegundos: dados.duracao_segundos || 0,
+        observacaoOperador: dados.observacao_operador || ''
+    });
+
+    return {
+        evento_id: eventoId,
+        ...resultado
+    };
+}
+
+/**
  * Processa sessão de conferência assistida por IA (LineZone / PolygonZone / SAHI).
  */
 async function registrarConferenciaIa(eventoId, dados, user, headers = {}) {
@@ -2373,6 +2402,7 @@ module.exports = {
     atualizarMaterial,
     obterCatalogoVisaoMateriais,
     analisarFotoPilhaIa,
+    analisarVideoIa,
     registrarConferenciaIa,
     confirmarItemContagem,
     cadastrarMaterialNaoReconhecido,

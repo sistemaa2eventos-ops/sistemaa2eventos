@@ -343,8 +343,266 @@ async function analisarFotoPilhaGemini({
     };
 }
 
+/**
+ * Analisa uma sequência cronológica de quadros-chave extraídos de um vídeo gravado
+ * (descarga de caminhão, passagem em portão ou caminhada pelo galpão) via Gemini Vision,
+ * evitando contagem duplicada entre quadros consecutivos.
+ */
+async function analisarVideoQuadrosGemini({
+    quadros = [],
+    materiais = [],
+    contextoLocal = 'Doca / Descarga',
+    tipoOperacao = 'descarga_entrada',
+    duracaoSegundos = 0,
+    observacaoOperador = ''
+} = {}) {
+    const apiKey = (process.env.GEMINI_API_KEY_2 || process.env.GEMINI_API_KEY || '').trim();
+    if (!apiKey) {
+        throw erroHttp(
+            'Chave GEMINI_API_KEY_2 (ou GEMINI_API_KEY) não configurada no servidor. Crie uma chave gratuita em https://aistudio.google.com/apikey e adicione no arquivo .env do backend.',
+            503
+        );
+    }
+
+    const quadrosValidos = (Array.isArray(quadros) ? quadros : [])
+        .slice(0, 16)
+        .map((q, idx) => {
+            const parsed = extrairDataUrlImagem(q?.imagem_base64 || q?.url);
+            if (!parsed) return null;
+            return {
+                indice: idx + 1,
+                tempo_segundos: Math.max(0, Math.round(Number(q?.tempo_segundos || 0) * 10) / 10),
+                ...parsed
+            };
+        })
+        .filter(Boolean);
+
+    if (quadrosValidos.length === 0) {
+        throw erroHttp('Envie ao menos 1 quadro válido extraído do vídeo para análise.', 400);
+    }
+
+    const modeloPreferido = (process.env.GEMINI_VISION_MODEL || MODELO_PADRAO).trim();
+    const filaModelos = [modeloPreferido, ...MODELOS_FALLBACK.filter((m) => m !== modeloPreferido)];
+    const { selecionados, descricoes, imagensReferencia } = montarCatalogoPrompt(materiais);
+
+    const mapaOperacao = {
+        descarga_entrada: 'Descarga / entrada de materiais (itens passando do caminhão ou portão para o evento)',
+        carregamento_saida: 'Carregamento / saída de materiais (desmontagem ou devolução)',
+        inventario_caminhando: 'Caminhada de inventário (câmera percorrendo o galpão, caminhão ou setor)'
+    };
+
+    const textoCatalogo = descricoes.length > 0
+        ? descricoes.join('\n\n')
+        : 'Nenhum material pré-cadastrado selecionado. Identifique e conte os principais materiais/equipamentos de evento visíveis no vídeo como itens não catalogados.';
+
+    const promptInstrucao = [
+        'Você é um especialista em visão computacional e rastreamento temporal de materiais de eventos em vídeo (palco, box truss, grades, caixas, pallets, cadeiras, mesas, tendas, som, iluminação, geradores).',
+        '',
+        'TAREFA:',
+        `Você receberá ${quadrosValidos.length} QUADROS EM ORDEM CRONOLÓGICA de um vídeo gravado (duração aproximada: ${Math.round(Number(duracaoSegundos || 0))}s).`,
+        'Após os quadros do vídeo, podem existir FOTOS DE REFERÊNCIA dos materiais cadastrados no catálogo do evento.',
+        'Conte o TOTAL DE UNIDADES ÚNICAS de cada material que aparecem ao longo do vídeo SEM DUPLICAR itens que permanecem visíveis em quadros consecutivos.',
+        '',
+        `LOCAL / SETOR: ${contextoLocal}`,
+        `TIPO DE OPERAÇÃO: ${mapaOperacao[tipoOperacao] || mapaOperacao.descarga_entrada}`,
+        observacaoOperador ? `OBSERVAÇÃO DO OPERADOR: ${observacaoOperador}` : '',
+        '',
+        'CATÁLOGO DE MATERIAIS DO EVENTO:',
+        textoCatalogo,
+        '',
+        'REGRAS DE RASTREAMENTO TEMPORAL:',
+        '1. Compare quadros consecutivos para não contar duas vezes o mesmo item parado ou ainda em trânsito.',
+        '2. Ignore pessoas, empilhadeiras ou movimento de câmera — conte apenas os materiais/equipamentos.',
+        '3. Para cada material identificado, indique até 4 detecções representativas em "deteccoes_quadros" informando o "quadro_indice" (1 a N), "tempo_segundos", "rotulo" curto (ex.: "pç 01..06", "12 grades") e "box_2d" [ymin, xmin, ymax, xmax] na escala 0..1000.',
+        '4. Se um item corresponder ao catálogo, use EXATAMENTE o "material_id" listado no catálogo.',
+        '5. Se houver materiais relevantes não cadastrados, liste em "itens_nao_catalogados".',
+        '',
+        'RESPONDA APENAS EM JSON VÁLIDO seguindo exatamente este esquema:',
+        '{',
+        '  "local_identificado": "string curta",',
+        '  "observacao_geral": "resumo curto em português do fluxo observado no vídeo",',
+        '  "itens_identificados": [',
+        '    {',
+        '      "material_id": "id exato do catálogo",',
+        '      "nome_material": "nome do material",',
+        '      "unidade": "un | cx | m | kit",',
+        '      "quantidade": 24,',
+        '      "confianca": 0.90,',
+        '      "raciocinio_contagem": "ex.: 8 unidades nos quadros 1-3 + 16 novas unidades nos quadros 5-9 (sem duplicar)",',
+        '      "deteccoes_quadros": [',
+        '        {',
+        '          "quadro_indice": 2,',
+        '          "tempo_segundos": 4.5,',
+        '          "rotulo": "8 grades",',
+        '          "quantidade_no_quadro": 8,',
+        '          "box_2d": [200, 150, 800, 620]',
+        '        }',
+        '      ]',
+        '    }',
+        '  ],',
+        '  "itens_nao_catalogados": [',
+        '    {',
+        '      "descricao": "nome curto",',
+        '      "quantidade": 3,',
+        '      "confianca": 0.78,',
+        '      "quadro_indice": 4,',
+        '      "box_2d": [220, 400, 720, 780]',
+        '    }',
+        '  ]',
+        '}'
+    ].filter(Boolean).join('\n');
+
+    const parts = [{ text: promptInstrucao }];
+
+    quadrosValidos.forEach((q) => {
+        parts.push({
+            text: `QUADRO #${q.indice} DO VÍDEO (tempo ${q.tempo_segundos}s):`
+        });
+        parts.push({
+            inline_data: {
+                mime_type: q.mimeType,
+                data: q.data
+            }
+        });
+    });
+
+    // Limita fotos de referência para manter a requisição leve e rápida
+    imagensReferencia.slice(0, 6).forEach((ref, idx) => {
+        parts.push({
+            text: `REFERÊNCIA DO CATÁLOGO #${idx + 1}: "${ref.materialNome}" (ID: ${ref.materialId}, ângulo: ${ref.angulo})`
+        });
+        parts.push({
+            inline_data: {
+                mime_type: ref.mimeType,
+                data: ref.data
+            }
+        });
+    });
+
+    let respostaApi;
+    let modelo = filaModelos[0];
+    let ultimoErro = null;
+
+    for (const candidato of filaModelos) {
+        modelo = candidato;
+        try {
+            const url = `${GEMINI_ENDPOINT_BASE}/${encodeURIComponent(candidato)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+            respostaApi = await axios.post(
+                url,
+                {
+                    contents: [{ role: 'user', parts }],
+                    generationConfig: {
+                        temperature: 0.1,
+                        topP: 0.9,
+                        responseMimeType: 'application/json'
+                    }
+                },
+                {
+                    timeout: 60000,
+                    headers: { 'Content-Type': 'application/json' }
+                }
+            );
+            ultimoErro = null;
+            break;
+        } catch (err) {
+            ultimoErro = err;
+            const statusUpstream = err.response?.status;
+            const msgUpstream = err.response?.data?.error?.message || err.message || 'Erro desconhecido';
+            logger.warn(`[Produção/VisãoIA/Vídeo] Modelo ${candidato} falhou (${statusUpstream || 'net'}): ${msgUpstream}`);
+            if (statusUpstream === 400 || statusUpstream === 401 || statusUpstream === 403 || statusUpstream === 429) {
+                break;
+            }
+        }
+    }
+
+    if (ultimoErro || !respostaApi) {
+        const statusUpstream = ultimoErro?.response?.status;
+        const msgUpstream = ultimoErro?.response?.data?.error?.message || ultimoErro?.message || 'Erro desconhecido';
+        logger.error(`[Produção/VisãoIA/Vídeo] Falha Gemini (${statusUpstream || 'net'}): ${msgUpstream}`);
+        if (statusUpstream === 400 || statusUpstream === 401 || statusUpstream === 403) {
+            throw erroHttp(`Chave Gemini inválida ou sem permissão (${msgUpstream}).`, 502);
+        }
+        if (statusUpstream === 429) {
+            throw erroHttp('Limite gratuito da Gemini API atingido no momento. Aguarde alguns segundos e tente novamente.', 429);
+        }
+        throw erroHttp(`Falha ao analisar vídeo na Gemini API: ${msgUpstream}`, 502);
+    }
+
+    const textoResposta = respostaApi?.data?.candidates?.[0]?.content?.parts
+        ?.map((p) => p?.text || '')
+        .join('\n')
+        .trim();
+
+    const jsonBruto = extrairJsonRespostaGemini(textoResposta);
+    const mapaMateriais = new Map(selecionados.map((m) => [m.id, m]));
+
+    const itensIdentificados = (Array.isArray(jsonBruto.itens_identificados) ? jsonBruto.itens_identificados : [])
+        .map((item) => {
+            const mat = mapaMateriais.get(item.material_id) || null;
+            const deteccoes = (Array.isArray(item.deteccoes_quadros) ? item.deteccoes_quadros : [])
+                .map((d) => {
+                    const idxQuadro = Math.max(1, Math.min(quadrosValidos.length, Math.round(Number(d?.quadro_indice || 1))));
+                    const qRef = quadrosValidos[idxQuadro - 1];
+                    return {
+                        quadro_indice: idxQuadro,
+                        tempo_segundos: Number(d?.tempo_segundos ?? qRef?.tempo_segundos ?? 0),
+                        rotulo: String(d?.rotulo || `${d?.quantidade_no_quadro || 1} ${item.unidade || 'un'}`).slice(0, 60),
+                        quantidade_no_quadro: Math.max(1, Math.round(Number(d?.quantidade_no_quadro || 1))),
+                        box_2d: normalizarBox2d(d?.box_2d)
+                    };
+                })
+                .slice(0, 6);
+
+            const quantidadeFinal = Math.max(0, Math.round(Number(item.quantidade || 0)));
+
+            return {
+                material_id: mat ? mat.id : null,
+                codigo_catalogo: mat?.codigo_catalogo || '',
+                nome_material: mat?.nome || String(item.nome_material || 'Material identificado'),
+                unidade: item.unidade || mat?.caracteristicas?.unidade_medida || 'un',
+                quantidade_esperada: Number(mat?.quantidade_planejada || 0),
+                quantidade: quantidadeFinal,
+                confianca: Math.max(0.1, Math.min(0.99, Number(item.confianca ?? 0.86))),
+                raciocinio_contagem: String(item.raciocinio_contagem || '').slice(0, 260),
+                deteccoes_quadros: deteccoes
+            };
+        })
+        .filter((it) => it.quantidade > 0);
+
+    const itensNaoCatalogados = (Array.isArray(jsonBruto.itens_nao_catalogados) ? jsonBruto.itens_nao_catalogados : [])
+        .map((nr, idx) => ({
+            id: `nr-vid-${Date.now()}-${idx}`,
+            descricao: String(nr?.descricao || 'Objeto não catalogado').slice(0, 80),
+            quantidade: Math.max(1, Math.round(Number(nr?.quantidade || 1))),
+            confianca: Math.max(0.1, Math.min(0.99, Number(nr?.confianca ?? 0.72))),
+            quadro_indice: Math.max(1, Math.min(quadrosValidos.length, Math.round(Number(nr?.quadro_indice || 1)))),
+            box_2d: normalizarBox2d(nr?.box_2d)
+        }))
+        .filter((nr) => nr.quantidade > 0);
+
+    const totalCatalogo = itensIdentificados.reduce((acc, it) => acc + it.quantidade, 0);
+    const totalNaoCatalogado = itensNaoCatalogados.reduce((acc, it) => acc + it.quantidade, 0);
+
+    return {
+        modelo_ia_versao: modelo,
+        modo_contagem: 'video_quadros_ia',
+        tipo_operacao: tipoOperacao,
+        quadros_analisados: quadrosValidos.length,
+        duracao_segundos: Math.round(Number(duracaoSegundos || 0)),
+        local_identificado: String(jsonBruto.local_identificado || contextoLocal).slice(0, 60),
+        observacao_geral: String(jsonBruto.observacao_geral || '').slice(0, 400),
+        total_geral: totalCatalogo + totalNaoCatalogado,
+        total_catalogo: totalCatalogo,
+        total_nao_catalogado: totalNaoCatalogado,
+        itens_identificados: itensIdentificados,
+        itens_nao_catalogados: itensNaoCatalogados,
+        analisado_em: new Date().toISOString()
+    };
+}
+
 module.exports = {
     analisarFotoPilhaGemini,
+    analisarVideoQuadrosGemini,
     extrairDataUrlImagem,
     normalizarBox2d
 };

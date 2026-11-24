@@ -260,6 +260,11 @@ router.post('/materiais/analisar-foto-ia', permitirAcessoProducao('escrita'), tr
     return ApiResponse.success(res, data);
 }));
 
+router.post('/materiais/analisar-video-ia', permitirAcessoProducao('escrita'), tratar('analisar vídeo gravado com IA', async (req, res) => {
+    const data = await producaoService.analisarVideoIa(req.event.id, req.body || {}, req.user, req.headers);
+    return ApiResponse.success(res, data);
+}));
+
 router.post('/materiais', permitirAcessoProducao('escrita'), tratar('cadastrar material', async (req, res) => {
     const data = await producaoService.criarMaterial(req.event.id, req.body || {}, req.user, req.headers);
     return ApiResponse.success(res, data, 201);

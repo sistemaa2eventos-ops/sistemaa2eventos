@@ -4,6 +4,7 @@ jest.mock('axios');
 const axios = require('axios');
 const {
     analisarFotoPilhaGemini,
+    analisarVideoQuadrosGemini,
     extrairDataUrlImagem,
     normalizarBox2d
 } = require('../producaoVisaoIa.service');
@@ -105,5 +106,65 @@ describe('producaoVisaoIa.service (Gemini Vision)', () => {
         expect(res.itens_identificados[0].grupos).toHaveLength(3);
         expect(res.itens_identificados[0].quantidade_esperada).toBe(200);
         expect(res.itens_nao_catalogados).toHaveLength(1);
+    });
+
+    test('analisarVideoQuadrosGemini consolida contagem temporal sem duplicar itens entre quadros', async () => {
+        process.env.GEMINI_API_KEY_2 = 'chave-teste-gemini';
+        process.env.GEMINI_VISION_MODEL = 'gemini-3.1-flash-lite';
+
+        axios.post.mockResolvedValueOnce({
+            data: {
+                candidates: [{
+                    content: {
+                        parts: [{
+                            text: JSON.stringify({
+                                local_identificado: 'Doca Palco',
+                                observacao_geral: 'Descarga contínua de grades metálicas em 2 carrinhos.',
+                                itens_identificados: [
+                                    {
+                                        material_id: 'mat-grade-1',
+                                        nome_material: 'Grade de Isolamento',
+                                        unidade: 'un',
+                                        quantidade: 24,
+                                        confianca: 0.91,
+                                        raciocinio_contagem: '12 grades no primeiro carrinho (quadros 1-2) + 12 grades no segundo (quadros 3-4).',
+                                        deteccoes_quadros: [
+                                            { quadro_indice: 1, tempo_segundos: 2.0, rotulo: '12 grades', quantidade_no_quadro: 12, box_2d: [220, 140, 790, 560] },
+                                            { quadro_indice: 3, tempo_segundos: 8.5, rotulo: '12 grades', quantidade_no_quadro: 12, box_2d: [210, 320, 810, 740] }
+                                        ]
+                                    }
+                                ],
+                                itens_nao_catalogados: []
+                            })
+                        }]
+                    }
+                }]
+            }
+        });
+
+        const res = await analisarVideoQuadrosGemini({
+            quadros: [
+                { tempo_segundos: 2.0, imagem_base64: IMG_FAKE_DATA_URL },
+                { tempo_segundos: 5.0, imagem_base64: IMG_FAKE_DATA_URL },
+                { tempo_segundos: 8.5, imagem_base64: IMG_FAKE_DATA_URL },
+                { tempo_segundos: 11.0, imagem_base64: IMG_FAKE_DATA_URL }
+            ],
+            contextoLocal: 'Doca Palco',
+            tipoOperacao: 'descarga_entrada',
+            duracaoSegundos: 12,
+            materiais: [{
+                id: 'mat-grade-1',
+                codigo_catalogo: 'GR-01',
+                nome: 'Grade de Isolamento',
+                categoria: 'grades',
+                quantidade_planejada: 30,
+                caracteristicas: { unidade_medida: 'un', cor_predominante: 'Prata' }
+            }]
+        });
+
+        expect(res.modo_contagem).toBe('video_quadros_ia');
+        expect(res.quadros_analisados).toBe(4);
+        expect(res.total_catalogo).toBe(24);
+        expect(res.itens_identificados[0].deteccoes_quadros).toHaveLength(2);
     });
 });
