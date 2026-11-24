@@ -759,6 +759,14 @@ docker system prune -af
      avulsos de diagnóstico (backend/api-nodejs/check_*/test_*/query_*, *.py, *.jpg na raiz), todos de abr–out/2026.
 
 ```
+2026-11-24 - Deploy 702f7b9 (credenciamento: caixa da pulseira vazia; leitura automática para com a ficha aberta)
+├─ Mudanças: ModalCredenciamento começa com a caixa da pulseira vazia (não copia o número do cadastro);
+│            useCheckin ignora credenciamento_abrir enquanto a ficha está aberta (não reabre nem apaga a digitação)
+├─ Status: ✅ OK (GitHub Actions run 45496739042); /checkin 200
+├─ Testes: navegador com API simulada (caixa vazia); leitor real e evento do socket NÃO testados
+└─ Rollback: tag antes-deploy-20261124-credenciamento-pulseira (6291119)
+
+
 2026-11-24 - Deploy deb3bd8 (cartão do registro usa a situação de hoje)
 ├─ Mudanças: GET /checkin/situacao/:pessoa_id (mesma regra da fiscalização); PessoaCardDialog (Check-in, Check-out,
 │            janela de registros, dashboard) mostra credencial, presença, pulseira em uso hoje e pulseira de outro
