@@ -4,7 +4,8 @@ const axios = require('axios');
 const logger = require('../../services/logger');
 
 const GEMINI_ENDPOINT_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const MODELO_PADRAO = 'gemini-2.5-flash';
+const MODELO_PADRAO = 'gemini-3.1-flash-lite';
+const MODELOS_FALLBACK = ['gemini-3.1-flash-lite', 'gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
 const MAX_MATERIAIS_REFERENCIA = 10;
 const MAX_FOTOS_POR_MATERIAL = 2;
 const MAX_TOTAL_FOTOS_REF = 10;
@@ -135,7 +136,8 @@ async function analisarFotoPilhaGemini({
         throw erroHttp('Envie uma imagem válida em formato base64 (JPEG, PNG ou WebP).', 400);
     }
 
-    const modelo = (process.env.GEMINI_VISION_MODEL || MODELO_PADRAO).trim();
+    const modeloPreferido = (process.env.GEMINI_VISION_MODEL || MODELO_PADRAO).trim();
+    const filaModelos = [modeloPreferido, ...MODELOS_FALLBACK.filter((m) => m !== modeloPreferido)];
     const { selecionados, descricoes, imagensReferencia } = montarCatalogoPrompt(materiais);
 
     const textoCatalogo = descricoes.length > 0
@@ -220,26 +222,47 @@ async function analisarFotoPilhaGemini({
     });
 
     let respostaApi;
-    try {
-        const url = `${GEMINI_ENDPOINT_BASE}/${encodeURIComponent(modelo)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-        respostaApi = await axios.post(
-            url,
-            {
-                contents: [{ role: 'user', parts }],
-                generationConfig: {
-                    temperature: 0.1,
-                    topP: 0.9,
-                    responseMimeType: 'application/json'
+    let modelo = filaModelos[0];
+    let ultimoErro = null;
+
+    for (const candidato of filaModelos) {
+        modelo = candidato;
+        try {
+            const url = `${GEMINI_ENDPOINT_BASE}/${encodeURIComponent(candidato)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+            respostaApi = await axios.post(
+                url,
+                {
+                    contents: [{ role: 'user', parts }],
+                    generationConfig: {
+                        temperature: 0.1,
+                        topP: 0.9,
+                        responseMimeType: 'application/json'
+                    }
+                },
+                {
+                    timeout: 45000,
+                    headers: { 'Content-Type': 'application/json' }
                 }
-            },
-            {
-                timeout: 60000,
-                headers: { 'Content-Type': 'application/json' }
+            );
+            ultimoErro = null;
+            break;
+        } catch (err) {
+            ultimoErro = err;
+            const statusUpstream = err.response?.status;
+            const msgUpstream = err.response?.data?.error?.message || err.message || 'Erro desconhecido';
+            logger.warn(`[Produção/VisãoIA] Modelo ${candidato} falhou (${statusUpstream || 'net'}): ${msgUpstream}`);
+
+            // Se erro de chave inválida/permissão ou cota, não adianta tentar outro modelo
+            if (statusUpstream === 400 || statusUpstream === 401 || statusUpstream === 403 || statusUpstream === 429) {
+                break;
             }
-        );
-    } catch (err) {
-        const statusUpstream = err.response?.status;
-        const msgUpstream = err.response?.data?.error?.message || err.message || 'Erro desconhecido';
+            // Em caso de 404 (modelo descontinuado), 503 (alta demanda) ou timeout, tenta o próximo modelo da fila
+        }
+    }
+
+    if (ultimoErro || !respostaApi) {
+        const statusUpstream = ultimoErro?.response?.status;
+        const msgUpstream = ultimoErro?.response?.data?.error?.message || ultimoErro?.message || 'Erro desconhecido';
         logger.error(`[Produção/VisãoIA] Falha Gemini (${statusUpstream || 'net'}): ${msgUpstream}`);
 
         if (statusUpstream === 400 || statusUpstream === 401 || statusUpstream === 403) {

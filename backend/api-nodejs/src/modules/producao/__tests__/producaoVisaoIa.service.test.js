@@ -47,8 +47,8 @@ describe('producaoVisaoIa.service (Gemini Vision)', () => {
     });
 
     test('processa retorno estruturado do Gemini com caixas verdes e totais por material', async () => {
-        process.env.GEMINI_API_KEY = 'chave-teste-gemini';
-        process.env.GEMINI_VISION_MODEL = 'gemini-2.5-flash';
+        process.env.GEMINI_API_KEY_2 = 'chave-teste-gemini';
+        process.env.GEMINI_VISION_MODEL = 'gemini-3.1-flash-lite';
 
         axios.post.mockResolvedValueOnce({
             data: {
@@ -98,7 +98,7 @@ describe('producaoVisaoIa.service (Gemini Vision)', () => {
         });
 
         expect(axios.post).toHaveBeenCalledTimes(1);
-        expect(res.modelo_ia_versao).toBe('gemini-2.5-flash');
+        expect(res.modelo_ia_versao).toBe('gemini-3.1-flash-lite');
         expect(res.total_catalogo).toBe(196);
         expect(res.total_nao_catalogado).toBe(1);
         expect(res.total_geral).toBe(197);
