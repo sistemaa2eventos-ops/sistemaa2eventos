@@ -759,6 +759,16 @@ docker system prune -af
      avulsos de diagnóstico (backend/api-nodejs/check_*/test_*/query_*, *.py, *.jpg na raiz), todos de abr–out/2026.
 
 ```
+2026-11-24 - Deploy ab4fd8b (busca por qualquer dado; número inteiro no campo; câmera só ícone)
+├─ Mudanças: searchPessoas busca nome, nome do crachá, CPF (com ou sem pontuação), e-mail, telefone, documento,
+│            passaporte, função, tipo, pulseira e empresa (nome/CNPJ traz todos da empresa); sem acento;
+│            várias palavras = todas precisam bater; ordem alfabética (limite 200); vínculos com buscarTodos;
+│            UniversalPulseiraInput: câmera vira ícone dentro da caixa, chip do lote sobe para a linha do título;
+│            Check-in "Buscar pessoa", Check-out "Buscar pessoa ou bipar a pulseira"; lista com contagem e função
+├─ Status: ✅ OK (GitHub Actions run 45481702290); /checkin 200, /api/pessoas/search 401 sem login
+├─ Testes: backend 719 ✅ (7 novos); navegador com API simulada (CPF de 11 dígitos inteiro no campo)
+└─ Rollback: tag antes-deploy-20261124-busca-qualquer-dado (97eecdf)
+
 2026-11-24 - Deploy a8eaa40 (check-out direto pela pulseira)
 ├─ Mudanças: Checkout.jsx: pulseira da própria pessoa bipada ou lida pela câmera registra a saída na hora (sem
 │            ficha); número digitado abre ConferenciaSaidaDialog com codigoInicial e Enter registra; CPF, QR do
