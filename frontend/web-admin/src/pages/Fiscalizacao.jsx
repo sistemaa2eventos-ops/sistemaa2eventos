@@ -615,13 +615,27 @@ const Fiscalizacao = () => {
 
                                     {/* Presença de hoje */}
                                     <Grid item xs={12} sm={4}>
-                                        <Bloco titulo="Presença de hoje" cor={resultado.pessoa.dentro_do_evento ? '#00FF88' : '#FFB800'}>
-                                            <Typography sx={{ color: resultado.pessoa.dentro_do_evento ? '#00FF88' : '#FFB800', fontWeight: 800 }}>
-                                                {resultado.pessoa.dentro_do_evento
-                                                    ? 'DENTRO DO EVENTO'
-                                                    : (resultado.pessoa.ultimo_evento_hoje === 'checkout' ? 'FORA DO EVENTO' : 'SEM CHECK-IN HOJE')}
-                                            </Typography>
-                                        </Bloco>
+                                        {(() => {
+                                            const p = resultado.pessoa;
+                                            const ainda = Boolean(p.pulseira_anterior?.ainda_dentro);
+                                            const cor = p.dentro_do_evento ? '#00FF88' : (ainda ? '#FF3366' : '#FFB800');
+                                            const rotulo = p.dentro_do_evento
+                                                ? 'DENTRO DO EVENTO'
+                                                : ainda ? 'AINDA DENTRO (PULSEIRA DE OUTRO DIA)'
+                                                    : (p.ultimo_evento_hoje === 'checkout' ? 'FORA DO EVENTO' : 'SEM CHECK-IN HOJE');
+                                            const entrada = p.entrada_hoje;
+                                            return (
+                                                <Bloco titulo="Presença de hoje" cor={cor}>
+                                                    <Typography sx={{ color: cor, fontWeight: 800 }}>{rotulo}</Typography>
+                                                    {entrada && (
+                                                        <Typography variant="caption" sx={{ color: '#CBD5E1', display: 'block', mt: 0.5 }}>
+                                                            Entrou em {formatarDataHora(entrada.horario) || '—'} · {entrada.forma}
+                                                            {entrada.usuario_nome ? ` por ${entrada.usuario_nome}` : ''}
+                                                        </Typography>
+                                                    )}
+                                                </Bloco>
+                                            );
+                                        })()}
                                     </Grid>
 
                                     {/* Pulseira em uso hoje: só a de hoje; de outro dia nunca aparece */}
@@ -649,6 +663,8 @@ const Fiscalizacao = () => {
                                                     </Stack>
                                                     <Typography variant="caption" sx={{ color: '#CBD5E1', display: 'block', mt: 0.5 }}>
                                                         Colocada em {formatarDataHora(resultado.pessoa.pulseira.colocada_em) || '—'}
+                                                        {resultado.pessoa.pulseira.forma ? ` · ${resultado.pessoa.pulseira.forma}` : ''}
+                                                        {resultado.pessoa.pulseira.usuario_nome ? ` por ${resultado.pessoa.pulseira.usuario_nome}` : ''}
                                                     </Typography>
                                                 </>
                                             ) : (
@@ -659,6 +675,36 @@ const Fiscalizacao = () => {
                                         </Bloco>
                                     </Grid>
                                 </Grid>
+
+                                {/* Pulseira de outro dia que não foi devolvida: aparece com data e forma; ainda dentro = credenciamento */}
+                                {resultado.pessoa.pulseira_anterior && (() => {
+                                    const ant = resultado.pessoa.pulseira_anterior;
+                                    const cor = ant.ainda_dentro ? '#FF3366' : '#FFB800';
+                                    return (
+                                        <Box sx={{ mt: 1.25, p: 1.25, borderRadius: 1.25, bgcolor: `${cor}14`, border: `1px solid ${cor}88` }}>
+                                            <Typography variant="caption" sx={{ color: cor, fontWeight: 800, letterSpacing: 0.5, display: 'block', mb: 0.5 }}>
+                                                PULSEIRA DE OUTRO DIA — NÃO DEVOLVIDA
+                                            </Typography>
+                                            <Typography sx={{ color: '#FFFFFF', fontWeight: 800 }}>
+                                                Nº {ant.numero}{ant.tipo_nome ? ` · ${ant.tipo_nome}` : ''}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: '#CBD5E1' }}>
+                                                Check-in em {formatarDataHora(ant.colocada_em) || '—'}
+                                                {ant.forma ? ` · ${ant.forma}` : ''}
+                                                {ant.usuario_nome ? ` por ${ant.usuario_nome}` : ''}
+                                            </Typography>
+                                            {ant.ainda_dentro ? (
+                                                <Typography variant="body2" sx={{ color: '#FF3366', fontWeight: 700, mt: 0.5 }}>
+                                                    Ainda está no evento com esta pulseira. Dirija-se ao CREDENCIAMENTO para trocar a pulseira e fazer check-in novamente.
+                                                </Typography>
+                                            ) : (
+                                                <Typography variant="body2" sx={{ color: '#FFB800', mt: 0.5 }}>
+                                                    Saiu em {formatarDataHora(ant.saiu_em) || '—'} (fim de turno). Pulseira ainda não devolvida.
+                                                </Typography>
+                                            )}
+                                        </Box>
+                                    );
+                                })()}
 
                                 <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)', my: 1.5 }} />
 
@@ -677,7 +723,8 @@ const Fiscalizacao = () => {
                                                     </Box>
                                                     {' · '}{h.area_nome || 'Geral'}
                                                     {' · '}{h.numero_pulseira ? `pulseira ${h.numero_pulseira}` : 'sem pulseira'}
-                                                    {h.metodo ? ` · ${h.metodo}` : ''}
+                                                    {h.forma ? ` · ${h.forma}` : ''}
+                                                    {h.usuario_nome ? ` por ${h.usuario_nome}` : ''}
                                                 </Typography>
                                             );
                                         })}

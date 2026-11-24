@@ -1085,12 +1085,14 @@ class AccessController {
                 dentro_do_evento: situacao.dentro_do_evento,
                 ultimo_evento_hoje: situacao.ultimo_evento_hoje,
                 pulseira: situacao.pulseira,
+                pulseira_anterior: situacao.pulseira_anterior,
+                entrada_hoje: situacao.entrada_hoje,
                 numero_pulseira: situacao.pulseira?.numero || null,
                 historico_hoje: situacao.historico_hoje,
                 // Último check-in de hoje (a ficha completa usa estes nomes)
-                horario_checkin: [...situacao.historico_hoje].reverse().find(h => h.tipo === 'checkin')?.horario || null,
+                horario_checkin: situacao.entrada_hoje?.horario || null,
                 area_checkin: [...situacao.historico_hoje].reverse().find(h => h.tipo === 'checkin')?.area_nome || null,
-                metodo_checkin: [...situacao.historico_hoje].reverse().find(h => h.tipo === 'checkin')?.metodo || null,
+                metodo_checkin: situacao.entrada_hoje?.metodo || null,
                 areas_autorizadas: areasAutorizadas
             };
 
@@ -1221,17 +1223,25 @@ class AccessController {
                 });
             }
 
-            // 6c. Precisa estar dentro do evento: check-in de hoje com a pulseira em uso (sem saída depois)
+            // 6c. Precisa estar dentro do evento: o último movimento de hoje é entrada (com ou sem pulseira)
             if (!situacao.dentro_do_evento) {
+                // Ainda no evento com a pulseira de outro dia (sem entrada hoje): vai ao credenciamento
+                if (situacao.pulseira_anterior?.ainda_dentro && situacao.ultimo_evento_hoje === null) {
+                    return ApiResponse.success(res, {
+                        autorizado: false,
+                        status: 'pulseira_dia_anterior',
+                        mensagem: 'PULSEIRA DE OUTRO DIA: pessoa ainda no evento com a pulseira de um dia anterior. Dirija-se ao CREDENCIAMENTO para trocar a pulseira e fazer check-in novamente.',
+                        pessoa: pessoaPayload,
+                        area: areaFiscalizada
+                    });
+                }
                 const saiu = situacao.ultimo_evento_hoje === 'checkout';
                 return ApiResponse.success(res, {
                     autorizado: false,
                     status: saiu ? 'fora_do_evento' : 'sem_checkin',
                     mensagem: saiu
                         ? 'FORA DO EVENTO: a última movimentação de hoje foi saída'
-                        : (situacao.pulseira === null && situacao.ultimo_evento_hoje === 'checkin'
-                            ? 'SEM PULSEIRA EM USO: entrou hoje sem pulseira'
-                            : 'SEM CHECK-IN HOJE: não entrou no evento hoje'),
+                        : 'SEM CHECK-IN HOJE: não entrou no evento hoje',
                     pessoa: pessoaPayload,
                     area: areaFiscalizada
                 });
