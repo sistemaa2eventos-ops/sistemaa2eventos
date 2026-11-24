@@ -759,6 +759,12 @@ docker system prune -af
      avulsos de diagnóstico (backend/api-nodejs/check_*/test_*/query_*, *.py, *.jpg na raiz), todos de abr–out/2026.
 
 ```
+2026-11-24 - Deploy 0db0dec (tela verde/vermelha de resultado na frente da ficha)
+├─ Mudanças: FeedbackOverlay de Checkin.jsx e Checkout.jsx em tela inteira (position fixed, zIndex.modal + 2,
+│            pointerEvents none); antes ficava atrás do Dialog da ficha
+├─ Status: ✅ OK (GitHub Actions run 45452845978); painel 200
+└─ Rollback: tag antes-deploy-20261124-overlay-resultado (21ca1fe)
+
 2026-11-24 - Deploy 21ca1fe (pendência de pulseira: só entrada com pulseira; motivo grava)
 ├─ Mudanças: buscarStatusPulseira usa a última entrada COM pulseira; qualquer saída real resolve (a automática
 │            do fechamento de turno não), devolvida/perdida em pulseira_vinculos também; hoje em fuso local;
