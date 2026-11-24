@@ -195,7 +195,7 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
 
             const zoomAtual = zoomRef.current;
             const fator = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-            const zoomNovo = Math.min(6, Math.max(0.35, Number((zoomAtual * fator).toFixed(3))));
+            const zoomNovo = Math.min(10, Math.max(0.35, Number((zoomAtual * fator).toFixed(3))));
             if (zoomNovo === zoomAtual) return;
 
             const ctm = svg.getScreenCTM();
@@ -220,7 +220,7 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
 
     const ajustarZoomNoCentro = (novoZoomBruto) => {
         const zoomAtual = zoomRef.current;
-        const zoomNovo = Math.min(6, Math.max(0.35, Number(novoZoomBruto.toFixed(2))));
+        const zoomNovo = Math.min(10, Math.max(0.35, Number(novoZoomBruto.toFixed(2))));
         if (zoomNovo === zoomAtual) return;
         const offsetAtual = viewOffsetRef.current;
         const centroX = offsetAtual.x + (larguraCanvas / zoomAtual) / 2;
@@ -665,7 +665,7 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
         try {
             setProcessandoArquivo(true);
             const render = await renderizarPaginaPdfParaImagem(arquivoInspecionado.file, novaPag, {
-                maxLargura: 1600,
+                maxLargura: 4096,
                 transparente
             });
             setArquivoInspecionado((prev) => ({
@@ -696,7 +696,7 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
             if (arquivoInspecionado.tipo === 'pdf' && arquivoInspecionado.totalPaginas > 1 && formImportar.importarTodasPaginasPdf) {
                 for (let pag = 2; pag <= arquivoInspecionado.totalPaginas; pag++) {
                     const render = await renderizarPaginaPdfParaImagem(arquivoInspecionado.file, pag, {
-                        maxLargura: 1600,
+                        maxLargura: 3000,
                         transparente: true
                     });
                     camadasLote.push({

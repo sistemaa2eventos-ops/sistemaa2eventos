@@ -43,11 +43,45 @@ function carregarImagemElemento(src) {
     });
 }
 
+const MAX_PIXELS_CANVAS = 18000000; // ~4096x4390 (seguro para desktop e mobile)
+const MAX_DATAURL_BYTES = 7500000;  // cabe com folga no limite de 15 MB do Gateway/API
+
+function exportarCanvasAltaNitidez(canvas, transparente = false) {
+    // WebP preserva linhas finas e textos de AutoCAD muito melhor que JPEG e ocupa bem menos que PNG
+    const testarWebp = (q) => {
+        try {
+            const url = canvas.toDataURL('image/webp', q);
+            return url.startsWith('data:image/webp') ? url : null;
+        } catch {
+            return null;
+        }
+    };
+
+    if (transparente) {
+        const webpAlpha = testarWebp(0.94);
+        if (webpAlpha && webpAlpha.length <= MAX_DATAURL_BYTES) return webpAlpha;
+        const png = canvas.toDataURL('image/png');
+        if (png.length <= MAX_DATAURL_BYTES) return png;
+        return testarWebp(0.84) || png;
+    }
+
+    for (const q of [0.92, 0.85, 0.78]) {
+        const webp = testarWebp(q);
+        if (webp && webp.length <= MAX_DATAURL_BYTES) return webp;
+    }
+
+    let jpeg = canvas.toDataURL('image/jpeg', 0.92);
+    if (jpeg.length > MAX_DATAURL_BYTES) {
+        jpeg = canvas.toDataURL('image/jpeg', 0.82);
+    }
+    return jpeg;
+}
+
 /**
- * Renderiza uma página de um PDF arquitetônico para imagem pronta para o canvas da planta.
+ * Renderiza uma página de um PDF arquitetônico em alta definição (até 4K) para leitura de cotas e textos no zoom.
  */
 export async function renderizarPaginaPdfParaImagem(file, numeroPagina = 1, opcoes = {}) {
-    const { maxLargura = 1600, transparente = false } = opcoes;
+    const { maxLargura = 4096, transparente = false } = opcoes;
     const pdfjs = await obterPdfJs();
     const buffer = await file.arrayBuffer();
     const pdf = await pdfjs.getDocument({ data: buffer }).promise;
@@ -55,13 +89,22 @@ export async function renderizarPaginaPdfParaImagem(file, numeroPagina = 1, opco
     const page = await pdf.getPage(pagAlvo);
 
     const viewportBase = page.getViewport({ scale: 1 });
-    const escalaRender = Math.min(2.4, Math.max(1, maxLargura / Math.max(1, viewportBase.width)));
+    let escalaRender = Math.min(6, Math.max(1.5, maxLargura / Math.max(1, viewportBase.width)));
+
+    // Protege contra estouro de memória em pranchas A0 muito altas/largas
+    const pixelsProjetados = (viewportBase.width * escalaRender) * (viewportBase.height * escalaRender);
+    if (pixelsProjetados > MAX_PIXELS_CANVAS) {
+        escalaRender *= Math.sqrt(MAX_PIXELS_CANVAS / pixelsProjetados);
+    }
+
     const viewport = page.getViewport({ scale: escalaRender });
 
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(viewport.width);
     canvas.height = Math.round(viewport.height);
     const ctx2d = canvas.getContext('2d');
+    ctx2d.imageSmoothingEnabled = true;
+    ctx2d.imageSmoothingQuality = 'high';
 
     if (!transparente) {
         ctx2d.fillStyle = '#FFFFFF';
@@ -70,16 +113,15 @@ export async function renderizarPaginaPdfParaImagem(file, numeroPagina = 1, opco
 
     await page.render({ canvasContext: ctx2d, viewport }).promise;
 
-    let imagemUrl = canvas.toDataURL(transparente ? 'image/png' : 'image/jpeg', 0.88);
-    if (!transparente && imagemUrl.length > 2600000) {
-        imagemUrl = canvas.toDataURL('image/jpeg', 0.72);
-    }
+    const imagemUrl = exportarCanvasAltaNitidez(canvas, transparente);
 
     const { largura, altura } = normalizarDimensoes(viewportBase.width, viewportBase.height, 1280);
     return {
         imagemUrl,
         largura,
         altura,
+        larguraRenderPx: canvas.width,
+        alturaRenderPx: canvas.height,
         numeroPagina: pagAlvo,
         totalPaginas: pdf.numPages
     };
@@ -121,9 +163,9 @@ export async function inspecionarArquivoArquitetura(file) {
     const ext = (nome.split('.').pop() || '').toLowerCase();
     const mime = (file.type || '').toLowerCase();
 
-    // 1. PDF técnico (suporta múltiplas pranchas/páginas)
+    // 1. PDF técnico (suporta múltiplas pranchas/páginas em alta definição 4K)
     if (ext === 'pdf' || mime === 'application/pdf') {
-        const render = await renderizarPaginaPdfParaImagem(file, 1, { maxLargura: 1600, transparente: false });
+        const render = await renderizarPaginaPdfParaImagem(file, 1, { maxLargura: 4096, transparente: false });
         return {
             tipo: 'pdf',
             nomeArquivo: nome,
@@ -206,19 +248,24 @@ export async function inspecionarArquivoArquitetura(file) {
     const img = await carregarImagemElemento(rawUrl);
     const preservaAlpha = ext === 'png' || ext === 'webp' || mime === 'image/png' || mime === 'image/webp';
 
-    const maxRenderW = 1600;
-    const scale = img.width > maxRenderW ? (maxRenderW / img.width) : 1;
+    const maxRenderW = 4096;
+    let scale = img.width > maxRenderW ? (maxRenderW / img.width) : 1;
+    if ((img.width * scale) * (img.height * scale) > MAX_PIXELS_CANVAS) {
+        scale *= Math.sqrt(MAX_PIXELS_CANVAS / ((img.width * scale) * (img.height * scale)));
+    }
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(img.width * scale);
     canvas.height = Math.round(img.height * scale);
     const ctx2d = canvas.getContext('2d');
+    ctx2d.imageSmoothingEnabled = true;
+    ctx2d.imageSmoothingQuality = 'high';
     if (!preservaAlpha) {
         ctx2d.fillStyle = '#FFFFFF';
         ctx2d.fillRect(0, 0, canvas.width, canvas.height);
     }
     ctx2d.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-    const imagemUrl = canvas.toDataURL(preservaAlpha ? 'image/png' : 'image/jpeg', 0.88);
+    const imagemUrl = exportarCanvasAltaNitidez(canvas, preservaAlpha);
     const { largura, altura } = normalizarDimensoes(img.width, img.height, 1280);
 
     return {
