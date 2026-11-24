@@ -759,6 +759,14 @@ docker system prune -af
      avulsos de diagnóstico (backend/api-nodejs/check_*/test_*/query_*, *.py, *.jpg na raiz), todos de abr–out/2026.
 
 ```
+2026-11-24 - Deploy a8eaa40 (check-out direto pela pulseira)
+├─ Mudanças: Checkout.jsx: pulseira da própria pessoa bipada ou lida pela câmera registra a saída na hora (sem
+│            ficha); número digitado abre ConferenciaSaidaDialog com codigoInicial e Enter registra; CPF, QR do
+│            crachá e nome abrem a ficha vazia; abrirConferenciaPorCodigo(codigo, { abrir }); ajuda atualizada
+├─ Status: ✅ OK (GitHub Actions run 45455245873); /checkout 200
+├─ Testes: navegador com API simulada (bipe direto, digitado + Enter, CPF, código inexistente); sem leitor real
+└─ Rollback: tag antes-deploy-20261124-checkout-direto (fa52d27)
+
 2026-11-24 - Deploy 0db0dec (tela verde/vermelha de resultado na frente da ficha)
 ├─ Mudanças: FeedbackOverlay de Checkin.jsx e Checkout.jsx em tela inteira (position fixed, zIndex.modal + 2,
 │            pointerEvents none); antes ficava atrás do Dialog da ficha
