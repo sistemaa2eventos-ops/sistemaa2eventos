@@ -6,6 +6,7 @@ const logger = require('../../services/logger');
 const calculos = require('./producaoCalculos');
 const portalAuth = require('./producaoPortalAuth');
 const { gerarRelatorioPdfBuffer } = require('./producaoPdf.service');
+const { analisarFotoPilhaGemini } = require('./producaoVisaoIa.service');
 const { criarDadosDemonstracao, TEMPLATES_TAREFAS } = require('./producaoSeed');
 const producaoRepositorio = require('./producaoRepositorio');
 
@@ -1705,6 +1706,33 @@ async function obterCatalogoVisaoMateriais(eventoId, user, headers = {}) {
 }
 
 /**
+ * Analisa uma foto estática de pilha, caminhão ou estoque usando Gemini Vision,
+ * cruzando com as fotos de referência cadastradas no catálogo do evento.
+ */
+async function analisarFotoPilhaIa(eventoId, dados = {}, user, headers = {}) {
+    const { estado } = await carregarEstadoEvento(eventoId, { usuario: user });
+    calculos.resolverContextoUsuario(estado, user, headers);
+
+    const materiaisAtivos = (estado.materiais || []).filter((m) => m.ativo !== false);
+    const idsFiltro = Array.isArray(dados.material_ids) ? dados.material_ids.filter(Boolean) : [];
+    const materiaisSelecionados = idsFiltro.length > 0
+        ? materiaisAtivos.filter((m) => idsFiltro.includes(m.id))
+        : materiaisAtivos;
+
+    const resultado = await analisarFotoPilhaGemini({
+        imagemBase64: dados.imagem_base64,
+        materiais: materiaisSelecionados,
+        contextoLocal: dados.contexto_local || 'Estoque / Carga',
+        observacaoOperador: dados.observacao_operador || ''
+    });
+
+    return {
+        evento_id: eventoId,
+        ...resultado
+    };
+}
+
+/**
  * Processa sessão de conferência assistida por IA (LineZone / PolygonZone / SAHI).
  */
 async function registrarConferenciaIa(eventoId, dados, user, headers = {}) {
@@ -2344,6 +2372,7 @@ module.exports = {
     criarMaterial,
     atualizarMaterial,
     obterCatalogoVisaoMateriais,
+    analisarFotoPilhaIa,
     registrarConferenciaIa,
     confirmarItemContagem,
     cadastrarMaterialNaoReconhecido,

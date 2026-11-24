@@ -66,6 +66,8 @@ import {
     extrairAssinaturaVisualDeImagem,
     prepararAssinaturasMateriais
 } from './analisadorVideoMateriais';
+import ModalCameraCaptura from './ModalCameraCaptura';
+import PainelContagemFotoPilha from './PainelContagemFotoPilha';
 
 const ESTADO_INICIAL_MATERIAL = (areaPadrao = '') => ({
     nome: '',
@@ -114,6 +116,7 @@ const AbaMateriaisVisaoIa = ({ resumo, headersExtra, aoAtualizar, apiClient }) =
     const [modalMaterialAberto, setModalMaterialAberto] = useState(false);
     const [materialEditandoId, setMaterialEditandoId] = useState(null);
     const [processandoFoto, setProcessandoFoto] = useState(false);
+    const [cameraCadastroAberta, setCameraCadastroAberta] = useState(false);
     const [modalConferenciaAberto, setModalConferenciaAberto] = useState(false);
     const [evidenciaModalUrl, setEvidenciaModalUrl] = useState('');
     const [salvando, setSalvando] = useState(false);
@@ -645,6 +648,39 @@ const AbaMateriaisVisaoIa = ({ resumo, headersExtra, aoAtualizar, apiClient }) =
         }
     };
 
+    const handleCapturarFotoCadastro = async ({ file, dataUrl }) => {
+        const vagasRestantes = Math.max(0, 6 - formMaterial.fotos_referencia.length);
+        if (vagasRestantes === 0) {
+            enqueueSnackbar('Limite máximo de 6 fotos por material atingido.', { variant: 'warning' });
+            return;
+        }
+        try {
+            setProcessandoFoto(true);
+            const url = file ? await comprimirImagemCliente(file, 640, 0.78) : dataUrl;
+            const sig = await extrairAssinaturaVisualDeImagem(url);
+            const ordemAngulos = ['frontal', 'lateral', 'empilhado', 'detalhe', 'superior', 'geral'];
+            const proximoAngulo = ordemAngulos[formMaterial.fotos_referencia.length] || 'frontal';
+            const novaFoto = {
+                id: `foto-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                url,
+                angulo: proximoAngulo,
+                legenda: `Captura ${proximoAngulo}`,
+                principal: formMaterial.fotos_referencia.length === 0,
+                assinatura_visual: sig,
+                adicionada_em: new Date().toISOString()
+            };
+            setFormMaterial((prev) => ({
+                ...prev,
+                fotos_referencia: [...prev.fotos_referencia, novaFoto]
+            }));
+            enqueueSnackbar('Foto capturada e calibrada para reconhecimento IA.', { variant: 'success' });
+        } catch {
+            enqueueSnackbar('Não foi possível processar a foto capturada.', { variant: 'error' });
+        } finally {
+            setProcessandoFoto(false);
+        }
+    };
+
     const handleDefinirFotoPrincipal = (fotoId) => {
         setFormMaterial((prev) => ({
             ...prev,
@@ -808,6 +844,15 @@ const AbaMateriaisVisaoIa = ({ resumo, headersExtra, aoAtualizar, apiClient }) =
                     </Stack>
                 </Box>
             </GlassCard>
+
+            {/* Contagem real por Foto da Pilha / Caminhão (Gemini Vision IA) */}
+            <PainelContagemFotoPilha
+                materiais={materiais}
+                areas={areas}
+                httpClient={httpClient}
+                headersExtra={headersExtra}
+                aoAtualizar={aoAtualizar}
+            />
 
             {/* Analisador real de vídeo / câmera com assinatura visual e execução de regras */}
             <GlassCard sx={{ p: 2.5 }}>
@@ -1482,12 +1527,42 @@ const AbaMateriaisVisaoIa = ({ resumo, headersExtra, aoAtualizar, apiClient }) =
                                         Adicionar fotos
                                         <input type="file" accept="image/*" multiple hidden onChange={handleAdicionarFotosReferencia} />
                                     </Button>
-                                    <Button component="label" size="small" variant="outlined" disabled={processandoFoto} startIcon={<CameraFotoIcon />} sx={botaoSecundario}>
-                                        Tirar foto
-                                        <input type="file" accept="image/*" capture="environment" hidden onChange={handleAdicionarFotosReferencia} />
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        disabled={processandoFoto || formMaterial.fotos_referencia.length >= 6}
+                                        startIcon={<CameraFotoIcon />}
+                                        onClick={() => setCameraCadastroAberta(true)}
+                                        sx={botaoSecundario}
+                                    >
+                                        Tirar foto (Câmera)
                                     </Button>
                                 </Stack>
                             </Box>
+
+                            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 1.25 }}>
+                                {[
+                                    { valor: 'frontal', rotulo: '1. Frente' },
+                                    { valor: 'lateral', rotulo: '2. Lateral' },
+                                    { valor: 'empilhado', rotulo: '3. Empilhado' },
+                                    { valor: 'detalhe', rotulo: '4. Detalhe / Etiqueta' }
+                                ].map((guia) => {
+                                    const ok = formMaterial.fotos_referencia.some((f) => f.angulo === guia.valor);
+                                    return (
+                                        <Chip
+                                            key={guia.valor}
+                                            size="small"
+                                            label={ok ? `✓ ${guia.rotulo}` : guia.rotulo}
+                                            sx={{
+                                                bgcolor: ok ? tom(funcao.liberado, 0.16) : cores.superficieElevada,
+                                                color: ok ? funcao.liberado : cores.textoSecundario,
+                                                border: `1px solid ${ok ? funcao.liberado : cores.borda}`,
+                                                fontSize: tamanhos.xs
+                                            }}
+                                        />
+                                    );
+                                })}
+                            </Stack>
 
                             {formMaterial.fotos_referencia.length > 0 ? (
                                 <Grid container spacing={1.5} sx={{ mb: 1.5 }}>
@@ -1868,6 +1943,15 @@ const AbaMateriaisVisaoIa = ({ resumo, headersExtra, aoAtualizar, apiClient }) =
                     </Button>
                 </DialogActions>
             </Dialog>
+            <ModalCameraCaptura
+                aberto={cameraCadastroAberta}
+                titulo="Fotografar material para o catálogo IA"
+                subtitulo="Capture de 3 a 6 ângulos (frente, lateral, empilhado e detalhe) com boa iluminação."
+                maxLargura={800}
+                qualidade={0.82}
+                aoFechar={() => setCameraCadastroAberta(false)}
+                aoCapturar={handleCapturarFotoCadastro}
+            />
         </Stack>
     );
 };
