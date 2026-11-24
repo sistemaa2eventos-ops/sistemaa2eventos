@@ -759,6 +759,32 @@ docker system prune -af
      avulsos de diagnóstico (backend/api-nodejs/check_*/test_*/query_*, *.py, *.jpg na raiz), todos de abr–out/2026.
 
 ```
+2026-11-24 - Deploy 21ca1fe (pendência de pulseira: só entrada com pulseira; motivo grava)
+├─ Mudanças: buscarStatusPulseira usa a última entrada COM pulseira; qualquer saída real resolve (a automática
+│            do fechamento de turno não), devolvida/perdida em pulseira_vinculos também; hoje em fuso local;
+│            dataCheckin em ISO UTC; POST /pulseiras/pendencia com mensagens claras e motivo obrigatório
+├─ Status: ✅ OK (GitHub Actions run 45450994925); /api/ready ok, /api/pulseiras/status 401 sem login
+├─ Testes: backend 712 ✅ (6 novos)
+└─ Rollback: tag antes-deploy-20261124-pendencia-pulseira (3dcfe5c)
+
+2026-11-24 - Deploy 3dcfe5c (Pilar 3 corrigido: documentação pendente barra a entrada; liberar hoje na ficha)
+├─ Mudanças: checagem única (recusarSeDocumentacaoPendente) em credenciar-pulseira, pulseira/checkin,
+│            leitor-rapido, checkin/manual e checkin/qrcode; só barra com documentos exigidos para a função
+│            (regras_ativas) e sem liberação do dia (documento_liberacoes) nem do turno (liberacao_manual_ate);
+│            saída nunca barrada; operador de check-in libera hoje com motivo na ficha; data em fuso local
+│            (getHojeLocal); rotina noturna que apagava liberações removida (histórico mantido)
+├─ Migrations: 20261124_documento_liberacoes.sql e 20261124b_documento_liberacoes_data.sql aplicadas pela usuária
+├─ Status: ✅ OK (GitHub Actions run 45448109626); /api/ready ok, rotas /api/audit/pessoas/* 401 sem login
+├─ Testes: backend 706 ✅ (5 novos); lint e build do painel ✅; NÃO testado no navegador com pessoa real
+└─ Rollback: tag antes-deploy-20261124-pilar3-correcao (e43ebff)
+   Antes (mesmo dia): a36b03f Pilar 3 original (pendente entrava pelo credenciamento; data em UTC) e
+   e43ebff layout Etapa | Lote | pulseira em linha inteira (run 45442259862, rollback antes-deploy-20261124-layout-pulseira)
+
+2026-11-24 - Deploy e82cd60 (Pilar 1: QR do participante abre a ficha no check-in)
+├─ Mudanças: GET /checkin/qrcode/validar/:pessoa_id; Checkin.jsx reconhece "pessoa-{uuid}" e abre a ficha
+├─ Status: ✅ OK (GitHub Actions); /api/ready ok
+└─ Rollback: tag antes-deploy-20261124-pilar1-qrcode (b6d25f1)
+
 2026-11-24 - Deploy 3b7a0de (Pilar 2: pulseira com pendência de dias anteriores + motivo)
 ├─ Mudanças: tabela pulseiras_pendencia (pessoa_id, evento_id, numero, data_checkin, motivo);
 │            função buscarStatusPulseira {emUso, pendencia}; endpoints GET/POST pulseiras/status;
