@@ -88,12 +88,31 @@ const Checkin = () => {
 
   // Regra decidida: código (QR, código de barras, câmera, ou CPF/número digitado + Enter) neste campo só
   // LOCALIZA a pessoa e abre a janela de conferência. A entrada é registrada dentro da janela.
-  const processarCheckinCodigo = (codigoBruto) => {
+  const processarCheckinCodigo = async (codigoBruto) => {
     const cod = String(codigoBruto || '').trim();
     if (!cod) return;
     setBarcodeValue(''); // campo vazio: o próximo bipe não gruda no anterior
     setUltimoCodigoLido(cod); // o código lido aparece no badge "Código lido"
     handleSearch('');
+
+    // QR Code "pessoa-{uuid}": valida e abre modal com dados
+    if (cod.startsWith('pessoa-')) {
+      const pessoaId = cod.substring(7); // remove "pessoa-"
+      try {
+        const { data } = await import('../services/api').then(m => m.default.get(`/checkin/qrcode/validar/${pessoaId}`));
+        if (data?.data) {
+          // Dados da pessoa vêm do backend, abre modal diretamente
+          setSelectedPessoa(data.data);
+          return;
+        }
+      } catch (err) {
+        const msg = err.response?.data?.error || 'QR code inválido ou pessoa não encontrada.';
+        window.dispatchEvent(new CustomEvent('snackbar', { detail: { message: msg, severity: 'error' } }));
+        return;
+      }
+    }
+
+    // Código normal (pulseira, CPF, etc)
     abrirConferenciaPorCodigo(cod);
   };
 

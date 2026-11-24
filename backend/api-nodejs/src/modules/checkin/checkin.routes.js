@@ -133,6 +133,42 @@ router.get('/stats/realtime', sessionMiddleware,
 router.post('/expulsar/:pessoa_id', sessionMiddleware, authorize('admin_master'), accessController.expulsar);
 
 // ============================================
+// QR CODE: validação e abertura de ficha
+// ============================================
+router.get('/qrcode/validar/:pessoa_id', sessionMiddleware, async (req, res) => {
+    try {
+        const { pessoa_id } = req.params;
+        if (!pessoa_id) return res.status(400).json({ error: 'pessoa_id é obrigatório.' });
+
+        const { supabase } = require('../../config/supabase');
+        const { data: pessoa, error } = await supabase.from('pessoas')
+            .select('id, nome_completo, cpf, foto_url, funcao, numero_pulseira, status_acesso, empresas:empresa_id(nome)')
+            .eq('id', pessoa_id)
+            .eq('evento_id', req.event.id)
+            .single();
+
+        if (error || !pessoa) return res.status(404).json({ error: 'Pessoa não encontrada ou não autorizada neste evento.' });
+        if (pessoa.status_acesso === 'bloqueado') return res.status(403).json({ error: 'Pessoa bloqueada neste evento.' });
+
+        return res.json({
+            data: {
+                id: pessoa.id,
+                nome_completo: pessoa.nome_completo,
+                cpf: pessoa.cpf,
+                foto_url: pessoa.foto_url,
+                funcao: pessoa.funcao,
+                numero_pulseira: pessoa.numero_pulseira,
+                empresa_nome: pessoa.empresas?.nome || 'Avulso',
+                autorizado: true
+            }
+        });
+    } catch (error) {
+        require('../../services/logger').error('Erro ao validar QR code:', error.message);
+        return res.status(500).json({ error: 'Erro ao validar QR code.' });
+    }
+});
+
+// ============================================
 // DEPRECATED (ainda removidas):
 // - /validate/qrcode
 // - /checkin/barcode
