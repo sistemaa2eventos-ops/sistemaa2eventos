@@ -160,7 +160,8 @@ export const ModalCredenciamento = ({
     // Sincronizar quando abrir o modal ou mudar a pessoa
     useEffect(() => {
         if (open && pessoa) {
-            setNumeroPulseira(pessoa.numero_pulseira || '');
+            // Caixa da pulseira começa vazia: o número anterior não pode ser confirmado sem ser lido/digitado
+            setNumeroPulseira('');
             setUltimoCodigoCamera(''); // cada pessoa começa sem o código lido da anterior
             setErroValidacao('');
             setSituacao(null);

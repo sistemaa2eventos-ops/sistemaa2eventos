@@ -361,6 +361,9 @@ export const useCheckin = (defaultMode, options = {}) => {
             const { operationMode: modoAtual, sessaoAtiva: sessao, executarLeituraRapida: leituraRapida, handleSelectPessoa: abrirFicha } = latestRef.current;
             // Só a estação vinculada a este leitor reage
             if (sessao?.dispositivo_id && data?.dispositivo_id && sessao.dispositivo_id !== data.dispositivo_id) return;
+            // Ficha já aberta: a leitura automática para. Senão a janela reabre a cada leitura e apaga a pulseira
+            // que o operador estava digitando.
+            if (latestRef.current.fichaAberta) return;
             console.log('📡 [WS] Leitor facial reconheceu:', data);
             if (data?.pessoa) {
                 tocarBipeNotificacao();
@@ -826,7 +829,8 @@ export const useCheckin = (defaultMode, options = {}) => {
     };
 
     latestRef.current = {
-        operationMode, sessaoAtiva, handleSelectPessoa, executarLeituraRapida, eventAreas
+        operationMode, sessaoAtiva, handleSelectPessoa, executarLeituraRapida, eventAreas,
+        fichaAberta: Boolean(selectedPessoa)
     };
 
     return {
