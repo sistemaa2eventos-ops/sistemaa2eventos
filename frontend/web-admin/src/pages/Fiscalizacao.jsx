@@ -781,6 +781,7 @@ const Fiscalizacao = () => {
                     open={Boolean(cardPessoaModal)}
                     onClose={() => setCardPessoaModal(null)}
                     pessoa={cardPessoaModal}
+                    resultado={resultado}
                     areaFiscalizada={areaAtual}
                 />
             )}

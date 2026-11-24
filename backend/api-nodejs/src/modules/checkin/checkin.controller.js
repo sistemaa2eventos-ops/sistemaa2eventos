@@ -1012,7 +1012,7 @@ class AccessController {
             // na lista da busca por nome manda o id). Sem "nome contém": nome solto não fiscaliza ninguém.
             // Texto que não é código → 400; pulseira repetida ou código em duas pessoas → 409.
             const busca = await buscarPessoaPorCodigo(supabaseClient, eventoId, safeCodigo,
-                'id, nome_completo, cpf, funcao, status_acesso, status_documentos, numero_pulseira, foto_url, tipo_pulseira_id, bloqueado, motivo_bloqueio, ativo, empresas(id, nome, ativo)');
+                'id, nome_completo, cpf, funcao, status_acesso, status_documentos, numero_pulseira, foto_url, tipo_pulseira_id, bloqueado, motivo_bloqueio, ativo, telefone, empresas(id, nome, ativo)');
             if (!busca.pessoa && busca.status !== 404) {
                 return ApiResponse.error(res, busca.erro, busca.status);
             }
@@ -1071,6 +1071,7 @@ class AccessController {
                 id: pessoa.id,
                 nome_completo: pessoa.nome_completo,
                 cpf: pessoa.cpf,
+                telefone: pessoa.telefone || null,
                 funcao: pessoa.funcao,
                 empresa_nome: pessoa.empresas?.nome || 'Pessoa Física',
                 empresas: pessoa.empresas ? { id: pessoa.empresas.id, nome: pessoa.empresas.nome } : null,
