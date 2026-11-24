@@ -1,6 +1,6 @@
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
-const { limiteFiltro } = require('../../utils/dateUtils');
+const { limiteFiltro, getHojeLocal, getLimitesDiaLocalUTC } = require('../../utils/dateUtils');
 const { buscarTodos, buscarPorIdsEmLotes } = require('../../utils/buscarTodos');
 const { buscarLotesDaFaixa, escolherLote } = require('./loteSelecao');
 
@@ -16,6 +16,8 @@ const STATUS = {
     anulada: 'Anulada (lançamento errado)'
 };
 const MOTIVOS_MANUAIS = ['devolvida', 'perdida'];
+// Saídas gravadas pelo sistema (fechamento de turno, tempo limite): a pessoa não descredenciou
+const SAIDAS_AUTOMATICAS = ['CHECKOUT_FORCADO_CRON', 'AUTO_CHECKOUT_TIMEOUT'];
 // Trocada ou perdida: o número não volta a ser entregue no mesmo lote do evento.
 // Devolvida e desvinculada podem ser reentregues.
 const MOTIVOS_BLOQUEIO = ['substituida', 'perdida'];
@@ -414,88 +416,63 @@ class PulseiraService {
     }
 
     /**
-     * Status da pulseira: em uso hoje ou pendência de dias anteriores.
-     * @returns {{ emUso: number|null, pendencia: {numero, dataCheckin, motivo}|null }}
+     * Pulseira da última entrada COM pulseira que ainda não foi resolvida.
+     * Resolve: saída real depois dela (qualquer número; a saída automática do fechamento de turno não conta,
+     * porque a pessoa não descredenciou) ou a pulseira marcada como devolvida/perdida.
+     * Entrada de hoje não resolvida = em uso; de dia anterior = pendência. Entrada sem pulseira não gera nada.
+     * @returns {{ emUso: string|null, pendencia: {numero, dataCheckin, motivo}|null }}
      */
     async buscarStatusPulseira(eventoId, pessoaId) {
-        const hoje = new Date().toISOString().split('T')[0];
-        const ontemT000 = new Date(Date.parse(hoje) - 86400000).toISOString();
-
-        // Pulseira em uso: check-in HOJE sem checkout HOJE
-        const { data: emUsoHoje } = await supabase.from('logs_acesso')
+        const { data: entradas, error } = await supabase.from('logs_acesso')
             .select('numero_pulseira, created_at')
             .eq('pessoa_id', pessoaId)
             .eq('evento_id', eventoId)
             .eq('tipo', 'checkin')
-            .gte('created_at', `${hoje}T00:00:00Z`)
-            .lt('created_at', `${hoje}T23:59:59Z`)
+            .not('numero_pulseira', 'is', null)
             .order('created_at', { ascending: false })
-            .limit(1);
+            .limit(5);
+        if (error) throw error;
+        const ultima = (entradas || []).find(l => !['', '—'].includes(String(l.numero_pulseira).trim()));
+        if (!ultima) return { emUso: null, pendencia: null };
 
-        const ultimoCheckinHoje = emUsoHoje?.[0];
-        let emUso = ultimoCheckinHoje?.numero_pulseira || null;
+        const numero = String(ultima.numero_pulseira).trim();
+        const entradaIso = new Date(instante(ultima.created_at)).toISOString();
 
-        // Se houver check-in hoje, verificar se tem checkout HOJE também
-        if (emUso) {
-            const { data: checkoutHoje } = await supabase.from('logs_acesso')
-                .select('id')
+        const [saidas, marcadas] = await Promise.all([
+            supabase.from('logs_acesso')
+                .select('observacao')
                 .eq('pessoa_id', pessoaId)
                 .eq('evento_id', eventoId)
                 .eq('tipo', 'checkout')
-                .eq('numero_pulseira', emUso)
-                .gte('created_at', `${hoje}T00:00:00Z`)
-                .limit(1);
-
-            if (checkoutHoje?.length > 0) {
-                emUso = null; // teve checkout, não está em uso
-            }
-        }
-
-        // Pendência: check-in de dias anteriores sem checkout
-        let pendencia = null;
-        if (!emUso) {
-            const { data: checkinAnterior } = await supabase.from('logs_acesso')
-                .select('numero_pulseira, created_at')
+                .gt('created_at', ultima.created_at)
+                .limit(50),
+            supabase.from('pulseira_vinculos')
+                .select('id')
                 .eq('pessoa_id', pessoaId)
-                .eq('evento_id', eventoId)
-                .eq('tipo', 'checkin')
-                .lt('created_at', `${hoje}T00:00:00Z`)
-                .order('created_at', { ascending: false })
-                .limit(1);
+                .eq('numero_pulseira', numero)
+                .in('motivo_encerramento', ['devolvida', 'perdida'])
+                .gte('encerrado_em', entradaIso)
+                .limit(1)
+        ]);
+        if (saidas.error) throw saidas.error;
+        if (marcadas.error && !tabelaAusente(marcadas.error)) throw marcadas.error;
 
-            const ult = checkinAnterior?.[0];
-            if (ult) {
-                // Verificar se tem checkout desse check-in
-                const { data: checkoutAnterior } = await supabase.from('logs_acesso')
-                    .select('id')
-                    .eq('pessoa_id', pessoaId)
-                    .eq('evento_id', eventoId)
-                    .eq('tipo', 'checkout')
-                    .eq('numero_pulseira', ult.numero_pulseira)
-                    .gte('created_at', ult.created_at)
-                    .lt('created_at', `${hoje}T00:00:00Z`)
-                    .limit(1);
+        const saiuDeVerdade = (saidas.data || []).some(l => !SAIDAS_AUTOMATICAS.includes(l.observacao));
+        if (saiuDeVerdade || (marcadas.data || []).length > 0) return { emUso: null, pendencia: null };
 
-                if (!checkoutAnterior?.length) {
-                    // Buscar motivo registrado
-                    const { data: motivos } = await supabase.from('pulseiras_pendencia')
-                        .select('motivo_nao_devolucao')
-                        .eq('pessoa_id', pessoaId)
-                        .eq('evento_id', eventoId)
-                        .eq('numero_pulseira', ult.numero_pulseira)
-                        .eq('data_checkin_anterior', ult.created_at)
-                        .limit(1);
+        if (entradaIso >= getLimitesDiaLocalUTC(getHojeLocal()).start) return { emUso: numero, pendencia: null };
 
-                    pendencia = {
-                        numero: ult.numero_pulseira,
-                        dataCheckin: ult.created_at,
-                        motivo: motivos?.[0]?.motivo_nao_devolucao || null
-                    };
-                }
-            }
-        }
+        const { data: motivos } = await supabase.from('pulseiras_pendencia')
+            .select('motivo_nao_devolucao')
+            .eq('pessoa_id', pessoaId)
+            .eq('evento_id', eventoId)
+            .eq('data_checkin_anterior', entradaIso)
+            .limit(1);
 
-        return { emUso, pendencia };
+        return {
+            emUso: null,
+            pendencia: { numero, dataCheckin: entradaIso, motivo: motivos?.[0]?.motivo_nao_devolucao || null }
+        };
     }
 
     /**

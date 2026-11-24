@@ -82,14 +82,19 @@ router.get('/status/:pessoa_id', async (req, res) => {
 router.post('/pendencia/:pessoa_id', checkPermission('checkin', 'escrita'), async (req, res) => {
     try {
         const { pessoa_id } = req.params;
-        const { numero, dataCheckin, motivo } = req.body || {};
+        const { numero, dataCheckin } = req.body || {};
+        const motivo = String(req.body?.motivo || '').trim();
         if (!pessoa_id || !numero || !dataCheckin) {
-            return ApiResponse.error(res, 'pessoa_id, numero e dataCheckin são obrigatórios.', 400);
+            return ApiResponse.error(res, 'Pendência sem pulseira ou sem data: reabra a ficha e tente de novo.', 400);
         }
+        if (!/^\d+$/.test(String(numero).trim())) {
+            return ApiResponse.error(res, `Pulseira "${numero}" não é numérica: o motivo não pode ser registrado por aqui.`, 400);
+        }
+        if (motivo.length < 3) return ApiResponse.error(res, 'Escreva o motivo da não devolução.', 400);
         const r = await pulseiraService.registrarMotivoPendencia(
             req.event.id,
             pessoa_id,
-            { numero, dataCheckin, motivo: motivo || null },
+            { numero: parseInt(String(numero).trim(), 10), dataCheckin, motivo: motivo.slice(0, 500) },
             req.user?.id || null
         );
         await auditService.logEntity(req, 'BRACELET_PENDENCIA_MOTIVO', 'PESSOA', pessoa_id,
