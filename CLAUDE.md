@@ -759,6 +759,15 @@ docker system prune -af
      avulsos de diagnóstico (backend/api-nodejs/check_*/test_*/query_*, *.py, *.jpg na raiz), todos de abr–out/2026.
 
 ```
+2026-11-24 - Deploy deb3bd8 (cartão do registro usa a situação de hoje)
+├─ Mudanças: GET /checkin/situacao/:pessoa_id (mesma regra da fiscalização); PessoaCardDialog (Check-in, Check-out,
+│            janela de registros, dashboard) mostra credencial, presença, pulseira em uso hoje e pulseira de outro
+│            dia não devolvida; sem pulseira nem status do cadastro antigo
+├─ Status: ✅ OK (GitHub Actions run 45494417351); /checkin 200; /api/checkin/situacao sem login 401
+├─ Testes: backend 731 ✅; navegador com API simulada (cartão do registro)
+└─ Rollback: tag antes-deploy-20261124-cartao-registro (5a067a1)
+
+
 2026-11-24 - Deploy f2d012c (ficha do participante na fiscalização usa a situação de hoje)
 ├─ Mudanças: FiscalizacaoPessoaModal sem busca no cadastro (não misturava pulseira/check-in de outro dia);
 │            mostra credencial, presença de hoje (com forma e operador), pulseira em uso, pulseira de outro dia
