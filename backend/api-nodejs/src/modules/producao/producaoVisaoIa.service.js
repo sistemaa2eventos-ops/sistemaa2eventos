@@ -122,10 +122,10 @@ async function analisarFotoPilhaGemini({
     contextoLocal = 'Estoque / Carga',
     observacaoOperador = ''
 } = {}) {
-    const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+    const apiKey = (process.env.GEMINI_API_KEY_2 || process.env.GEMINI_API_KEY || '').trim();
     if (!apiKey) {
         throw erroHttp(
-            'Chave GEMINI_API_KEY não configurada no servidor. Crie uma chave gratuita em https://aistudio.google.com/apikey e adicione GEMINI_API_KEY no arquivo .env do backend.',
+            'Chave GEMINI_API_KEY_2 (ou GEMINI_API_KEY) não configurada no servidor. Crie uma chave gratuita em https://aistudio.google.com/apikey e adicione no arquivo .env do backend.',
             503
         );
     }

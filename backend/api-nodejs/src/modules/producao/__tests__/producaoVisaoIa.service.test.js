@@ -22,13 +22,14 @@ describe('producaoVisaoIa.service (Gemini Vision)', () => {
         process.env = envOriginal;
     });
 
-    test('retorna erro 503 amigável quando GEMINI_API_KEY não está configurada', async () => {
+    test('retorna erro 503 amigável quando GEMINI_API_KEY_2 e GEMINI_API_KEY não estão configuradas', async () => {
+        delete process.env.GEMINI_API_KEY_2;
         delete process.env.GEMINI_API_KEY;
         await expect(
             analisarFotoPilhaGemini({ imagemBase64: IMG_FAKE_DATA_URL, materiais: [] })
         ).rejects.toMatchObject({
             status: 503,
-            message: expect.stringContaining('GEMINI_API_KEY')
+            message: expect.stringContaining('GEMINI_API_KEY_2')
         });
     });
 
