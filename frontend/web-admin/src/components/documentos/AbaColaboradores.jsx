@@ -61,16 +61,14 @@ const AbaColaboradores = ({ onAuditar, recarregarToken }) => {
         if (!pessoaLiberacao) return;
         setLiberandoHoje(true);
         try {
-            await api.post(`/audit/pessoas/${pessoaLiberacao.id}/liberar-um-dia`, {
-                motivo: motivoLiberacao.trim() || 'Sem motivo especificado'
-            });
+            await api.post(`/audit/pessoas/${pessoaLiberacao.id}/liberar-um-dia`, { motivo: motivoLiberacao.trim() });
             enqueueSnackbar(`${pessoaLiberacao.nome_completo} liberado(a) por um dia com sucesso!`, { variant: 'success' });
             setOpenLiberarModal(false);
             setPessoaLiberacao(null);
             setMotivoLiberacao('');
             carregar(1); // Recarregar lista
         } catch (err) {
-            enqueueSnackbar(`Erro ao liberar: ${err.response?.data?.detalhes?.detalhe || err.message}`, { variant: 'error' });
+            enqueueSnackbar(err.response?.data?.error || 'Não foi possível liberar a entrada de hoje.', { variant: 'error' });
         } finally {
             setLiberandoHoje(false);
         }
@@ -126,6 +124,9 @@ const AbaColaboradores = ({ onAuditar, recarregarToken }) => {
                                     {p.liberacao_ativa && (
                                         <Chip size="small" icon={<LiberadoIcon sx={{ fontSize: 14 }} />} label="Liberado no turno" sx={chipSx('#A855F7')} />
                                     )}
+                                    {p.liberado_hoje && (
+                                        <Chip size="small" icon={<LiberadoIcon sx={{ fontSize: 14 }} />} label="Liberado hoje" sx={chipSx('#00D4FF')} />
+                                    )}
                                 </Stack>
                             </Stack>
                         </AccordionSummary>
@@ -150,24 +151,28 @@ const AbaColaboradores = ({ onAuditar, recarregarToken }) => {
                                     Liberado manualmente até {new Date(p.liberacao_manual_ate).toLocaleString('pt-BR')} — {p.liberacao_manual_motivo || 'sem motivo'}
                                 </Typography>
                             )}
-                            {p.situacao_documental === 'pendente' && (
+                            {p.regras_ativas && p.situacao_documental !== 'aprovado' && (
                                 <Box sx={{ mb: 2, p: 1.5, bgcolor: 'rgba(255, 184, 0, 0.1)', border: '1px solid #FFB800', borderRadius: 1 }}>
                                     <Stack direction="row" spacing={1} alignItems="center">
                                         <Box sx={{ flex: 1 }}>
                                             <Typography variant="caption" sx={{ color: '#FFB800', fontWeight: 700 }}>
-                                                Documentação Pendente
+                                                {p.liberado_hoje ? 'Entrada liberada hoje' : 'Documentação pendente: entrada barrada no check-in'}
                                             </Typography>
                                             <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', display: 'block' }}>
-                                                Libere por um dia para permitir entrada em exceção hoje
+                                                {p.liberado_hoje
+                                                    ? `Motivo: ${p.liberado_hoje_motivo || '—'}. Amanhã volta a ser barrada se a pendência continuar.`
+                                                    : 'Libere por um dia para permitir a entrada só hoje.'}
                                             </Typography>
                                         </Box>
-                                        <Button
-                                            size="small"
-                                            onClick={() => { setPessoaLiberacao(p); setOpenLiberarModal(true); }}
-                                            sx={{ color: '#FFB800', '&:hover': { bgcolor: 'rgba(255, 184, 0, 0.1)' } }}
-                                        >
-                                            Liberar por um dia
-                                        </Button>
+                                        {!p.liberado_hoje && (
+                                            <Button
+                                                size="small"
+                                                onClick={() => { setPessoaLiberacao(p); setMotivoLiberacao(''); setOpenLiberarModal(true); }}
+                                                sx={{ color: '#FFB800', '&:hover': { bgcolor: 'rgba(255, 184, 0, 0.1)' } }}
+                                            >
+                                                Liberar por um dia
+                                            </Button>
+                                        )}
                                     </Stack>
                                 </Box>
                             )}
@@ -204,7 +209,8 @@ const AbaColaboradores = ({ onAuditar, recarregarToken }) => {
                         fullWidth
                         multiline
                         rows={3}
-                        label="Motivo da liberação (opcional)"
+                        label="Motivo da liberação"
+                        required
                         value={motivoLiberacao}
                         onChange={(e) => setMotivoLiberacao(e.target.value)}
                         placeholder="Ex: Aguardando entrega do documento"
@@ -216,7 +222,7 @@ const AbaColaboradores = ({ onAuditar, recarregarToken }) => {
                     <Button onClick={() => setOpenLiberarModal(false)} disabled={liberandoHoje} sx={{ color: 'rgba(255,255,255,0.6)' }}>
                         Cancelar
                     </Button>
-                    <NeonButton onClick={handleLiberarUmDia} loading={liberandoHoje}>
+                    <NeonButton onClick={handleLiberarUmDia} loading={liberandoHoje} disabled={motivoLiberacao.trim().length < 3}>
                         Liberar por um dia
                     </NeonButton>
                 </DialogActions>

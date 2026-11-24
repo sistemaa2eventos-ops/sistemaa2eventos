@@ -1,166 +1,70 @@
 const { supabase } = require('../../config/supabase');
+const { getHojeLocal } = require('../../utils/dateUtils');
+const requisitos = require('../entities/documentoRequisitos.service');
+
+const COLUNAS_PESSOA = 'id, nome_completo, evento_id, funcao, origem_cadastro, status_acesso, liberacao_manual_ate, liberacao_manual_motivo';
 
 class AuditoriaService {
-  /**
-   * Verifica se pessoa está liberada HOJE para entrar
-   */
-  static async estaLiberadoHoje(eventoId, pessoaId) {
-    if (!eventoId || !pessoaId) return false;
-
-    try {
-      const hoje = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-
-      const { data, error } = await supabase
-        .from('documento_liberacoes')
-        .select('id')
-        .eq('pessoa_id', pessoaId)
-        .eq('evento_id', eventoId)
-        .eq('data_liberacao', hoje)
-        .single();
-
-      if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
-      return !!data;
-    } catch (error) {
-      console.error('Erro ao verificar liberação diária:', error.message);
-      return false;
-    }
-  }
-
-  /**
-   * Busca status documental com informação de liberação diária
-   * @returns { status, liberado_hoje, motivo_liberacao, pode_entrar }
-   */
-  static async statusDocumentalComLiberacao(eventoId, pessoaId) {
-    if (!eventoId || !pessoaId) {
-      return {
-        status: 'desconhecido',
-        liberado_hoje: false,
-        motivo_liberacao: null,
-        pode_entrar: false,
-      };
+    static async buscarPessoa(eventoId, pessoaId) {
+        const { data, error } = await supabase.from('pessoas').select(COLUNAS_PESSOA)
+            .eq('id', pessoaId).eq('evento_id', eventoId).maybeSingle();
+        if (error) throw error;
+        return data;
     }
 
-    try {
-      const { data: pessoa, error } = await supabase
-        .from('pessoas')
-        .select('status_documentos')
-        .eq('id', pessoaId)
-        .eq('evento_id', eventoId)
-        .single();
-
-      if (error && error.code !== 'PGRST116') throw error;
-
-      const status = pessoa?.status_documentos || 'desconhecido';
-      const liberado_hoje = await this.estaLiberadoHoje(eventoId, pessoaId);
-
-      // Buscar motivo da liberação de hoje
-      let motivo_liberacao = null;
-      if (liberado_hoje) {
-        const hoje = new Date().toISOString().split('T')[0];
-        const { data: lib } = await supabase
-          .from('documento_liberacoes')
-          .select('motivo')
-          .eq('pessoa_id', pessoaId)
-          .eq('evento_id', eventoId)
-          .eq('data_liberacao', hoje)
-          .single();
-
-        motivo_liberacao = lib?.motivo || null;
-      }
-
-      return {
-        status,
-        liberado_hoje,
-        motivo_liberacao,
-        pode_entrar: liberado_hoje || status === 'aprovado',
-      };
-    } catch (error) {
-      console.error('Erro ao buscar status documental:', error.message);
-      return {
-        status: 'erro',
-        liberado_hoje: false,
-        motivo_liberacao: null,
-        pode_entrar: false,
-      };
-    }
-  }
-
-  /**
-   * Libera pessoa APENAS para hoje
-   */
-  static async liberarPorUmDia(eventoId, pessoaId, motivo, usuarioId) {
-    if (!eventoId || !pessoaId) {
-      throw new Error('evento_id e pessoa_id são obrigatórios');
+    static async liberacaoDeHoje(eventoId, pessoaId) {
+        const { data, error } = await supabase.from('documento_liberacoes')
+            .select('motivo, liberado_em, liberado_por')
+            .eq('pessoa_id', pessoaId).eq('evento_id', eventoId).eq('data_liberacao', getHojeLocal())
+            .maybeSingle();
+        if (error) throw error;
+        return data;
     }
 
-    try {
-      const hoje = new Date().toISOString().split('T')[0];
+    /**
+     * Situação documental para uma ENTRADA. Só exige liberação quando o evento tem documentos exigidos
+     * para a função da pessoa (sem regras, quem não enviou nada também sai "pendente" e não pode travar o evento).
+     * Liberação vale se for do dia (documento_liberacoes) ou do turno (liberacao_manual_ate vigente).
+     */
+    static async situacaoParaEntrada(eventoId, pessoa) {
+        const avaliacao = await requisitos.avaliarPessoa({ ...pessoa, evento_id: eventoId });
+        const base = {
+            status: avaliacao.status_documentos,
+            pendencias: (avaliacao.pendencias || []).map(p => p.nome).filter(Boolean),
+        };
+        if (!avaliacao.regras_ativas || avaliacao.status_documentos === 'aprovado') {
+            return { ...base, exige_liberacao: false, liberado_hoje: false, motivo_liberacao: null, bloqueado: false };
+        }
 
-      const { data, error } = await supabase
-        .from('documento_liberacoes')
-        .upsert(
-          {
-            pessoa_id: pessoaId,
-            evento_id: eventoId,
-            data_liberacao: hoje,
-            motivo: motivo || null,
-            liberado_por: usuarioId || null,
-          },
-          { onConflict: 'pessoa_id,evento_id,data_liberacao' }
-        )
-        .select('data_liberacao, motivo')
-        .single();
-
-      if (error) throw error;
-
-      // Auditoria
-      await supabase
-        .from('logs_auditoria')
-        .insert({
-          evento_id: eventoId,
-          usuario_id: usuarioId,
-          acao: 'DOCUMENTO_LIBERAR_UM_DIA',
-          tabela: 'documento_liberacoes',
-          registro_id: pessoaId,
-          detalhes: { motivo, data_liberacao: hoje },
-        });
-
-      return {
-        success: true,
-        liberado_ate: data.data_liberacao,
-        motivo: data.motivo,
-      };
-    } catch (error) {
-      console.error('Erro ao liberar pessoa por um dia:', error.message);
-      throw error;
+        const doDia = await this.liberacaoDeHoje(eventoId, pessoa.id);
+        const noTurno = !!(pessoa.liberacao_manual_ate && new Date(pessoa.liberacao_manual_ate) > new Date());
+        const liberado = !!doDia || noTurno;
+        return {
+            ...base,
+            exige_liberacao: true,
+            liberado_hoje: liberado,
+            motivo_liberacao: doDia?.motivo || (noTurno ? pessoa.liberacao_manual_motivo : null) || null,
+            bloqueado: !liberado,
+        };
     }
-  }
 
-  /**
-   * Reverte liberações do dia anterior (cron job)
-   */
-  static async reverterLiberacoesDiaAnterior() {
-    try {
-      const hoje = new Date().toISOString().split('T')[0];
-
-      const { data: deletadas, error } = await supabase
-        .from('documento_liberacoes')
-        .delete()
-        .lt('data_liberacao', hoje)
-        .select('pessoa_id, evento_id, data_liberacao');
-
-      if (error) throw error;
-
-      if (deletadas && deletadas.length > 0) {
-        console.log(`[CRON] Revertidas ${deletadas.length} liberações do dia anterior`);
-      }
-
-      return deletadas || [];
-    } catch (error) {
-      console.error('[CRON] Erro ao reverter liberações:', error.message);
-      throw error;
+    /** Libera a entrada só no dia de hoje (fuso do evento); no dia seguinte a pessoa volta a ser barrada. */
+    static async liberarPorUmDia(eventoId, pessoaId, motivo, usuarioId) {
+        const hoje = getHojeLocal();
+        const { data, error } = await supabase.from('documento_liberacoes')
+            .upsert({
+                pessoa_id: pessoaId,
+                evento_id: eventoId,
+                data_liberacao: hoje,
+                motivo,
+                liberado_por: usuarioId || null,
+                liberado_em: new Date().toISOString(),
+            }, { onConflict: 'pessoa_id,evento_id,data_liberacao' })
+            .select('data_liberacao, motivo')
+            .single();
+        if (error) throw error;
+        return { liberado_ate: data.data_liberacao, motivo: data.motivo };
     }
-  }
 }
 
 module.exports = AuditoriaService;

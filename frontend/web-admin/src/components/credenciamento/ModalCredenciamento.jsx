@@ -76,6 +76,8 @@ export const ModalCredenciamento = ({
 
     // Status de documentação com liberação diária
     const [statusDocumentalComLiberacao, setStatusDocumentalComLiberacao] = useState(null);
+    const [motivoLiberarHoje, setMotivoLiberarHoje] = useState('');
+    const [liberandoHoje, setLiberandoHoje] = useState(false);
 
     const carregarSituacao = async () => {
         if (!pessoa?.id) return;
@@ -167,6 +169,7 @@ export const ModalCredenciamento = ({
             setMotivoDevolucao('');
             setStatusPulseira(null);
             setStatusDocumentalComLiberacao(null);
+            setMotivoLiberarHoje('');
             carregarSituacao();
             carregarStatusPulseira();
             carregarStatusDocumentalComLiberacao();
@@ -307,8 +310,31 @@ export const ModalCredenciamento = ({
 
     if (!pessoa) return null;
 
+    // Quem está dentro só sai: a pendência documental barra apenas a entrada
+    const docBloqueada = !!statusDocumentalComLiberacao?.bloqueado && pessoa.status_acesso !== 'checkin_feito';
+
+    const handleLiberarHoje = async () => {
+        if (!pessoa?.id || liberandoHoje) return;
+        setLiberandoHoje(true);
+        setErroValidacao('');
+        try {
+            await api.post(`/audit/pessoas/${pessoa.id}/liberar-um-dia`, { motivo: motivoLiberarHoje.trim() });
+            setMotivoLiberarHoje('');
+            await carregarStatusDocumentalComLiberacao();
+        } catch (err) {
+            setErroValidacao(err.response?.data?.error || 'Não foi possível liberar a entrada de hoje.');
+        } finally {
+            setLiberandoHoje(false);
+        }
+    };
+
     const handleConfirmar = (numInput, origem = 'manual', tipoAuto = null) => {
         if (loading) return;
+        if (docBloqueada) {
+            const erro = 'Documentação pendente: libere hoje (com o motivo) antes de confirmar a entrada.';
+            setErroValidacao(erro);
+            return { success: false, error: erro };
+        }
 
         const numFinal = (numInput || numeroPulseira || '').trim();
         // A escolha manual do operador no dropdown (selectedTipoPulseira) tem prioridade sobre o tipoAuto
@@ -438,34 +464,56 @@ export const ModalCredenciamento = ({
                         </Alert>
                     )}
 
-                    {/* Documentação Pendente - BLOQUEIO DE CHECK-IN */}
-                    {statusDocumentalComLiberacao?.status === 'pendente' && !statusDocumentalComLiberacao?.liberado_hoje && (
+                    {/* Documentação pendente: entrada barrada até liberar hoje */}
+                    {docBloqueada && (
                         <Alert
                             severity="error"
                             variant="outlined"
-                            sx={{ mb: { xs: 2, sm: 3 }, color: '#FF3366', borderColor: 'rgba(255, 51, 102, 0.5)', bgcolor: 'rgba(255, 51, 102, 0.08)', '& .MuiAlert-icon': { color: '#FF3366' } }}
+                            sx={{ mb: { xs: 2, sm: 3 }, color: '#FF3366', borderColor: 'rgba(255, 51, 102, 0.6)', bgcolor: 'rgba(255, 51, 102, 0.1)', '& .MuiAlert-icon': { color: '#FF3366' }, '& .MuiAlert-message': { width: '100%' } }}
                         >
-                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF', mb: 1 }}>
-                                ⚠️ DOCUMENTAÇÃO PENDENTE
+                            <Typography variant="body1" sx={{ fontWeight: 800, color: '#FFFFFF', mb: 0.5 }}>
+                                DOCUMENTAÇÃO PENDENTE: ENTRADA NÃO PERMITIDA
                             </Typography>
                             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)' }}>
-                                Esta pessoa não pode fazer check-in. Sua documentação está pendente de aprovação.
+                                {statusDocumentalComLiberacao.pendencias?.length
+                                    ? `Falta: ${statusDocumentalComLiberacao.pendencias.join(', ')}.`
+                                    : 'A documentação exigida para a função não está aprovada.'}
                             </Typography>
-                            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', display: 'block', mt: 0.5 }}>
-                                Acesse Auditoria Documental para liberar por um dia em exceção.
+                            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', display: 'block', mt: 0.5, mb: 1.25 }}>
+                                Para deixar entrar mesmo assim, libere só hoje informando o motivo. Amanhã a pessoa volta a ser barrada.
                             </Typography>
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}>
+                                <TextField
+                                    size="small"
+                                    fullWidth
+                                    placeholder="Motivo da liberação (ex.: ASO será entregue amanhã)"
+                                    value={motivoLiberarHoje}
+                                    onChange={(e) => setMotivoLiberarHoje(e.target.value)}
+                                    disabled={liberandoHoje}
+                                    sx={{ '& .MuiOutlinedInput-root': { color: '#FFFFFF', bgcolor: 'rgba(0,0,0,0.25)', '& fieldset': { borderColor: 'rgba(255,51,102,0.4)' } } }}
+                                />
+                                <Button
+                                    variant="outlined"
+                                    onClick={handleLiberarHoje}
+                                    disabled={liberandoHoje || motivoLiberarHoje.trim().length < 3}
+                                    startIcon={liberandoHoje ? <CircularProgress size={14} /> : <LiberarIcon sx={{ fontSize: 16 }} />}
+                                    sx={{ flexShrink: 0, minHeight: 40, color: '#FF3366', borderColor: 'rgba(255, 51, 102, 0.6)', textTransform: 'none', fontWeight: 700, borderRadius: 1.5 }}
+                                >
+                                    {liberandoHoje ? 'Liberando...' : 'Liberar hoje'}
+                                </Button>
+                            </Stack>
                         </Alert>
                     )}
 
-                    {/* Documentação Liberada Hoje */}
-                    {statusDocumentalComLiberacao?.status === 'pendente' && statusDocumentalComLiberacao?.liberado_hoje && (
+                    {/* Documentação pendente, mas liberada hoje (dia ou turno) */}
+                    {statusDocumentalComLiberacao?.exige_liberacao && statusDocumentalComLiberacao?.liberado_hoje && (
                         <Alert
                             severity="info"
                             variant="outlined"
                             sx={{ mb: { xs: 2, sm: 3 }, color: '#00D4FF', borderColor: 'rgba(0, 212, 255, 0.5)', bgcolor: 'rgba(0, 212, 255, 0.06)', '& .MuiAlert-icon': { color: '#00D4FF' } }}
                         >
                             <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
-                                ✓ Liberado por um dia
+                                Documentação pendente, entrada liberada hoje
                             </Typography>
                             <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.75)', display: 'block' }}>
                                 {statusDocumentalComLiberacao.motivo_liberacao ? `Motivo: ${statusDocumentalComLiberacao.motivo_liberacao}` : 'Entrada permitida apenas hoje.'}
@@ -519,7 +567,7 @@ export const ModalCredenciamento = ({
                                         size="small"
                                         sx={{ bgcolor: 'rgba(178,102,255,0.15)', color: '#A855F7', fontWeight: 700, fontSize: '0.75rem' }}
                                     />
-                                ) : situacao && statusDocs !== 'aprovado' && pessoa.status_acesso !== 'bloqueado' && (
+                                ) : situacao && statusDocs !== 'aprovado' && pessoa.status_acesso !== 'bloqueado' && !statusDocumentalComLiberacao?.exige_liberacao && (
                                     <Tooltip title="Permite entrada no leitor facial até o checkout ou o horário de reset do evento">
                                         <Button
                                             size="small"

@@ -102,12 +102,6 @@ class CronController {
         }, { timezone: 'America/Sao_Paulo' });
         setTimeout(() => this.verificarVencimentos().catch(e => logger.error('[CRON] verificarVencimentos (início) falhou:', e)), 60000);
 
-        // Reverter liberações de documentação do dia anterior (rodar diariamente à 00:05)
-        cron.schedule('5 0 * * *', () => {
-            logger.info('🔄 [CRON] Revertendo liberações de documentação do dia anterior...');
-            this.reverterLiberacoesDocumentacao().catch(e => logger.error('[CRON] reverterLiberacoesDocumentacao falhou:', e));
-        }, { timezone: 'America/Sao_Paulo' });
-
         // A cada minuto: expira liberações manuais e roda o fechamento de turno
         // de cada evento no seu horario_reset
         cron.schedule('* * * * *', () => {
@@ -371,19 +365,6 @@ class CronController {
             }
         } catch (error) {
             logger.error('❌ [CRON] Falha na execução da Revogação de Documentos:', error);
-        }
-    }
-
-    /**
-     * Reverte liberações de documentação diária do dia anterior
-     */
-    async reverterLiberacoesDocumentacao() {
-        try {
-            const AuditoriaService = require('../auditoria/auditoria.service');
-            const deletadas = await AuditoriaService.reverterLiberacoesDiaAnterior();
-            logger.info(`✅ [CRON] Revertidas ${deletadas.length} liberações de documentação do dia anterior.`);
-        } catch (error) {
-            logger.error('❌ [CRON] Falha ao reverter liberações de documentação:', error);
         }
     }
 

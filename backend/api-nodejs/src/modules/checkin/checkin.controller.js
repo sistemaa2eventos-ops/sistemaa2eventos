@@ -23,30 +23,23 @@ const recusarSeSoMonitoramento = async (res, areaId) => {
     return true;
 };
 
-// Validação de Documentação Pendente
-const validarDocumentacao = async (res, eventoId, pessoaId) => {
+// Documentação pendente (evento com documentos exigidos para a função) sem liberação do dia ou do turno:
+// a ENTRADA é recusada (403 DOCUMENTACAO_PENDENTE). Saída nunca é barrada. tipo ausente = entrada se a pessoa está fora.
+// Falha ao consultar não trava a portaria: a entrada segue e o erro fica no log.
+const recusarSeDocumentacaoPendente = async (res, eventoId, pessoa, tipo) => {
+    if (!pessoa?.id || tipo === 'checkout') return false;
+    if (!tipo && pessoa.status_acesso === 'checkin_feito') return false;
     try {
-        const status = await AuditoriaService.statusDocumentalComLiberacao(eventoId, pessoaId);
-
-        // Se documentação está pendente E não foi liberada hoje: bloquear
-        if (status.status === 'pendente' && !status.liberado_hoje) {
-            return {
-                bloqueado: true,
-                erro: {
-                    codigo: 'DOCUMENTACAO_PENDENTE',
-                    mensagem: '⚠️ DOCUMENTAÇÃO PENDENTE',
-                    detalhe: 'Esta pessoa não pode entrar. Sua documentação está pendente de aprovação.',
-                    status_documental: status.status,
-                    liberado_hoje: false,
-                }
-            };
-        }
-
-        return { bloqueado: false };
+        const situacao = await AuditoriaService.situacaoParaEntrada(eventoId, pessoa);
+        if (!situacao.bloqueado) return false;
+        const faltando = situacao.pendencias.length ? ` Pendente: ${situacao.pendencias.join(', ')}.` : '';
+        ApiResponse.error(res,
+            `DOCUMENTAÇÃO PENDENTE: ${pessoa.nome_completo || 'esta pessoa'} não pode entrar.${faltando} Libere hoje na ficha ou em Auditoria Documental.`,
+            403, { codigo: 'DOCUMENTACAO_PENDENTE', status_documental: situacao.status, pendencias: situacao.pendencias });
+        return true;
     } catch (error) {
-        logger.error('Erro ao validar documentação:', error.message);
-        // Falha aberta: deixa entrar se houver erro
-        return { bloqueado: false };
+        logger.warn({ err: error, pessoa_id: pessoa.id }, 'Situação documental indisponível; entrada não barrada');
+        return false;
     }
 };
 
@@ -351,10 +344,9 @@ class AccessController {
 
             if (!pessoa_id) return ApiResponse.error(res, 'ID do participante é obrigatório', 400);
 
-            // Validar documentação pendente
-            const docValidacao = await validarDocumentacao(res, eventoId, pessoa_id);
-            if (docValidacao.bloqueado) {
-                return ApiResponse.error(res, docValidacao.erro.detalhe, 403, docValidacao.erro);
+            if (tipo !== 'checkout' && UUID_RE.test(String(pessoa_id))) {
+                const pessoaDoc = await AuditoriaService.buscarPessoa(eventoId, pessoa_id).catch(() => null);
+                if (await recusarSeDocumentacaoPendente(res, eventoId, pessoaDoc, tipo)) return;
             }
 
             const result = await checkinService.registrarAcesso(supabaseClient, {
@@ -400,12 +392,7 @@ class AccessController {
                 .single();
 
             if (pessoaErr || !pessoa) return ApiResponse.error(res, 'QR Code não encontrado', 404);
-
-            // Validar documentação pendente
-            const docValidacao = await validarDocumentacao(res, eventoId, pessoa.id);
-            if (docValidacao.bloqueado) {
-                return ApiResponse.error(res, docValidacao.erro.detalhe, 403, docValidacao.erro);
-            }
+            if (await recusarSeDocumentacaoPendente(res, eventoId, pessoa, tipo)) return;
 
             const result = await checkinService.registrarAcesso(supabaseClient, {
                 pessoa_id: pessoa.id,
@@ -460,6 +447,7 @@ class AccessController {
             if (pessoaErr || !pessoa) {
                 return ApiResponse.error(res, 'Pessoa não encontrada', 404);
             }
+            if (await recusarSeDocumentacaoPendente(res, eventoId, pessoa, 'checkin')) return;
 
             // Lote da faixa que vale AGORA (fase, data e horário); a faixa pode repetir entre lotes
             const numeroPulseiraInt = parseInt(numero_pulseira, 10);
@@ -665,6 +653,7 @@ class AccessController {
 
             // 3. Registrar o acesso (checkin ou checkout) SEM exigir pulseira!
             const tipoPedido = (tipo === 'checkout' || tipo === 'checkin') ? tipo : null;
+            if (await recusarSeDocumentacaoPendente(res, eventoId, pessoa, tipoPedido)) return;
             const result = await checkinService.registrarAcesso(supabaseClient, {
                 pessoa_id: pessoa.id,
                 pessoa,
@@ -733,7 +722,10 @@ class AccessController {
                 return ApiResponse.error(res, 'Pessoa não encontrada', 404);
             }
 
-            // Documentação pendente: credenciar pelo operador vale como liberação do turno
+            // Documentação exigida e pendente sem liberação de hoje: recusa antes de qualquer gravação
+            if (await recusarSeDocumentacaoPendente(res, eventoId, pessoa, 'checkin')) return;
+
+            // Status de acesso pendente/recusado: credenciar pelo operador vale como liberação do turno
             // (registra quem liberou; expira no checkout ou no horário de reset do evento)
             if (['pendente', 'recusado'].includes(pessoa.status_acesso)) {
                 try {

@@ -355,14 +355,18 @@ class DocumentoService {
      * Busca por nome, CPF, e-mail, telefone, função, nome/CNPJ da empresa.
      */
     async listarColaboradores(eventoId, { search = '', page = 1, limit = 30, somentePendentes = false }) {
-        const [config, pessoasRes] = await Promise.all([
+        const [config, pessoasRes, liberacoesHoje] = await Promise.all([
             requisitos.getConfig(eventoId),
             supabase.from('pessoas')
                 .select('id, nome_completo, cpf, email, telefone, funcao, foto_url, evento_id, empresa_id, origem_cadastro, status_acesso, status_documentos, liberacao_manual_ate, liberacao_manual_por, liberacao_manual_motivo, empresas(nome, cnpj)')
                 .eq('evento_id', eventoId)
-                .order('nome_completo')
+                .order('nome_completo'),
+            supabase.from('documento_liberacoes').select('pessoa_id, motivo')
+                .eq('evento_id', eventoId).eq('data_liberacao', getHojeLocal())
         ]);
         if (pessoasRes.error) throw pessoasRes.error;
+        // Sem a tabela (migration não aplicada) a lista continua; só não mostra a liberação do dia
+        const liberadoHoje = new Map((liberacoesHoje.data || []).map(l => [l.pessoa_id, l.motivo]));
 
         const linhas = (pessoasRes.data || []).map(p => ({
             ...p,
@@ -389,6 +393,9 @@ class DocumentoService {
                 empresa_nome: p.empresas?.nome || null,
                 empresa_cnpj: p.empresas?.cnpj || null,
                 liberacao_ativa: !!(p.liberacao_manual_ate && new Date(p.liberacao_manual_ate).getTime() > agora),
+                regras_ativas: !!avaliacao.regras_ativas,
+                liberado_hoje: liberadoHoje.has(p.id),
+                liberado_hoje_motivo: liberadoHoje.get(p.id) || null,
                 documentos: docs.map(d => ({ ...d, tipo_nome: tiposPorId[d.tipo_documento_id]?.nome || null })),
                 exigidos: avaliacao.exigidos.map(t => ({ id: t.id, nome: t.nome, exige_validade: t.exige_validade })),
                 pendencias: avaliacao.pendencias,
