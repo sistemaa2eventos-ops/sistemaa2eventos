@@ -759,6 +759,16 @@ docker system prune -af
      avulsos de diagnóstico (backend/api-nodejs/check_*/test_*/query_*, *.py, *.jpg na raiz), todos de abr–out/2026.
 
 ```
+2026-11-24 - Deploy da4e092 (pulseira por lote, tipo de área, vigilância com CPF)
+├─ Mudanças: pulseiraLote.js (outraPessoaNoLote, loteAtivoDaPulseira); bloqueioPorTipoArea para checkin/checkout;
+│            type_pulseira_id como chave de lote; 8 testes novos (lote, áreas, watchlist, permissões);
+│            checkAnyPermission() para testes multi-sessão; monitor/watchlist seguros por evento;
+│            conteudoAjuda.js, useMonitor.js, Monitor.jsx atualizados; ia-servidor/package-lock.json
+├─ Migrations: 20261119f_area_geral_livre.sql aplicada (tabela areas_tipo, 3 tipos padrão)
+├─ Status: ✅ OK (GitHub Actions run 45425295015); painel 200, /api/ready 200, /api/checkin/stats/realtime 401 sem token
+├─ Testes: backend 701 ✅ ; frontend build ✅ (Vite)
+└─ Rollback: tag antes-deploy-20261124-pulseira-areas (da4e092)
+
 2026-11-23 - Deploy f957895 (revisão de segurança, empresa/pessoa em vários eventos, relatórios, dependências)
 ├─ Mudanças: empresas limitadas ao evento (getById/update/delete/convite); admin não altera Admin Master;
 │            /auth/users sem evento só vê o próprio perfil; LPR e Hikvision exigem token do dispositivo
