@@ -134,9 +134,17 @@ beforeEach(() => {
 });
 
 describe('controla_entrada da área (regra do portão)', () => {
-    it('área geral (sem área) controla; área sem linha também controla (comportamento antigo)', async () => {
-        expect(await entradaEtapa.areaControlaEntrada(supabase, null)).toBe(true);
+    it('área geral (sem área) é LIVRE (20261119f); área informada sem linha continua controlada (comportamento antigo)', async () => {
+        expect(await entradaEtapa.areaControlaEntrada(supabase, null)).toBe(false);
         expect(await entradaEtapa.areaControlaEntrada(supabase, UUID(99))).toBe(true);
+    });
+
+    it('área geral: dentro e saiu sem liberação não bloqueiam (entra e sai quantas vezes quiser)', async () => {
+        const dados = { evento_id: 'ev1', pessoa_id: PESSOA, etapa: 'montagem', dia: hoje(), area_id: null, logId: UUID(75) };
+        mockDb.logs_acesso.push({ id: UUID(76), evento_id: 'ev1', pessoa_id: PESSOA, tipo: 'checkin', etapa: 'montagem', dia_civil: hoje(), area_id: null, observacao: null, created_at: new Date(Date.now() - 60000).toISOString() });
+        expect(await entradaEtapa.bloqueioDeEntrada(supabase, dados)).toBeNull();
+        mockDb.logs_acesso.push({ id: UUID(77), evento_id: 'ev1', pessoa_id: PESSOA, tipo: 'checkout', etapa: 'montagem', dia_civil: hoje(), area_id: null, observacao: null, created_at: new Date().toISOString() });
+        expect(await entradaEtapa.bloqueioDeEntrada(supabase, dados)).toBeNull();
     });
 
     it('área com controla_entrada = false não controla; true controla; resultado fica em cache da requisição', async () => {

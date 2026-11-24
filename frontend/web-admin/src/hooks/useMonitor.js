@@ -38,6 +38,10 @@ export const useMonitor = ({ isAdminMaster = false } = {}) => {
 
     // States - Feed & Stats
     const [logs, setLogs] = useState([]);
+    // Sem o módulo de check-in, checkout ou fiscalização o servidor responde 403 em /access/logs:
+    // as estatísticas continuam carregando e a lista mostra um aviso
+    const [logsSemPermissao, setLogsSemPermissao] = useState(false);
+    const logsSemPermRef = useRef(false); // leitura estável dentro do socket
     const [stats, setStats] = useState({
         presentes: 0,
         capacidade: 0,
@@ -120,22 +124,34 @@ export const useMonitor = ({ isAdminMaster = false } = {}) => {
         statsTimerRef.current = setTimeout(fetchStats, 1200);
     }, [fetchStats]);
 
+    // Registros de acesso: catch próprio. 403 = operador sem módulo de check-in/checkout/fiscalização
+    const fetchLogs = useCallback(async () => {
+        if (!eventoId) return;
+        try {
+            const resp = await api.get('/access/logs', { params: { limit: 100, evento_id: eventoId }, timeout: 8000, hideDefaultError: true });
+            setLogs(resp.data.data || []);
+            logsSemPermRef.current = false;
+            setLogsSemPermissao(false);
+        } catch (error) {
+            if (error.response?.status === 403) {
+                logsSemPermRef.current = true;
+                setLogs([]);
+                setLogsSemPermissao(true);
+            } else {
+                log('Aviso: registros de acesso temporariamente indisponíveis');
+            }
+        }
+    }, [eventoId, log]);
+
+    // Estatísticas e registros em chamadas separadas: a falha de uma não derruba a outra
     const fetchData = useCallback(async () => {
         if (!eventoId) return;
         try {
-            const [logsResp, statsResp] = await Promise.all([
-                api.get('/access/logs', { params: { limit: 100, evento_id: eventoId }, timeout: 8000, hideDefaultError: true }),
-                api.get('/access/stats/realtime', { params: { evento_id: eventoId }, timeout: 8000, hideDefaultError: true })
-            ]);
-            setLogs(logsResp.data.data || []);
-            setStats(statsResp.data.data || STATS_VAZIAS);
-            setUltimaAtualizacao(new Date());
-        } catch (error) {
-            log('Aviso: polling do monitor temporariamente indisponível');
+            await Promise.all([fetchLogs(), fetchStats()]);
         } finally {
             setLoading(false);
         }
-    }, [eventoId, log]);
+    }, [eventoId, fetchLogs, fetchStats]);
 
     const fetchTerminais = useCallback(async () => {
         if (!eventoId) return;
@@ -391,6 +407,7 @@ export const useMonitor = ({ isAdminMaster = false } = {}) => {
             agendarStats();
         };
         socket.on('new_access', (newLog) => {
+            if (logsSemPermRef.current) return; // sem permissão para registros: a lista fica vazia com o aviso
             // Feed na hora; contadores (presentes, áreas, negados) recalculados no servidor —
             // a soma local errava com credenciamento, troca de área e passagens repetidas.
             pendentes = [...pendentes.filter(l => l.id !== newLog.id), newLog];
@@ -563,6 +580,7 @@ export const useMonitor = ({ isAdminMaster = false } = {}) => {
     return {
         logs: logsFiltrados,
         allLogs: logs,
+        logsSemPermissao,
         stats, loading,
         cameras, setCameras, fetchCameras, fetchWatchlist,
         historicoAlertas,

@@ -90,13 +90,13 @@ const AJUDAS = {
         objetivo: 'Registrar a entrada: pelo rosto, na hora (sem abrir a ficha), ou pela pulseira dentro da ficha de conferência. O campo de texto só localiza a pessoa e abre a ficha.',
         passos: [
             'Em "Conectar estação", escolha o leitor facial e/ou as câmeras da sua baia e dê o "Nome da estação".',
-            'Escolha a área (ou "Todas as áreas (global)").',
+            'Escolha a área. "Todas as áreas (global)" é livre: a pessoa entra e sai quantas vezes quiser, sem liberação. Só área com portão ("Controla entrada") bloqueia a reentrada.',
             'No campo "Leitor, CPF ou nome", bipe o QR/código de barras, use "Ler pela câmera" ou digite o CPF e aperte Enter: abre a ficha da pessoa. Digitando o nome, escolha a pessoa na lista.',
             'Na ficha, bipe a pulseira em "Número da pulseira" (a entrada sai sozinha) ou digite o número e aperte Enter ou "Vincular pulseira & autorizar".'
         ],
         atencao: [
             'O campo nunca registra a entrada sozinho, nem por código, CPF ou nome: a entrada só sai pela pulseira lida na ficha.',
-            'Uma pessoa não tem duas entradas na mesma etapa, dia e área enquanto estiver dentro: a segunda é recusada. Saída seguida de nova entrada é permitida (almoço, volta).',
+            'Em área com portão, entrada seguida de nova entrada, na mesma etapa, dia e área, é recusada enquanto a pessoa estiver dentro. Depois de uma saída, a nova entrada só passa na área geral ("Todas as áreas") ou, na área com portão, com "Liberar reentrada" feito por quem controla a entrada.',
             'Sem pulseira, a entrada só sai pelo botão "Confirmar entrada sem pulseira" na ficha.',
             'Os leitores físicos da portaria registram a entrada sozinhos, sem passar por esta tela.',
             'Com o leitor facial vinculado, o rosto registra a entrada na hora, sem abrir a ficha, só na estação ligada àquele leitor. Vale em todas as áreas. A entrada aparece na lista de registros.',
@@ -272,7 +272,7 @@ const AJUDAS = {
             'Cada leitor só recebe os rostos das pessoas autorizadas na área dele.',
             'Em área com portão, a reentrada depois de uma saída só acontece com "Liberar reentrada" no aviso ou na ficha do Check-in, feito por quem controla a entrada.',
             'Em área com portão, o rosto registra a entrada na hora; se a pessoa já está dentro ou saiu sem liberação, o Check-in mostra o aviso em vez de registrar. No Check-out, a saída pelo rosto é registrada na hora, com ou sem portão.',
-            'Desmarque "Controla entrada" em áreas de circulação livre: nelas a reentrada não depende de liberação do controlador.'
+            'Desmarque "Controla entrada" em áreas de circulação livre: nelas a pessoa entra e sai quantas vezes quiser, sem liberação. A opção "Todas as áreas (global)" do Check-in já funciona assim.'
         ]
     },
     '/config/pulseiras': {

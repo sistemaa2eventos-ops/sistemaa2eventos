@@ -192,18 +192,21 @@ describe('credenciamento de pessoa que está dentro', () => {
 
 describe('a observacao CREDENCIAMENTO não muda nenhuma decisão', () => {
     // Cliente simulado para a regra de entrada (bloqueioDeEntrada usa o cliente que recebe)
+    // Área de portão (controla entrada). Sem linha em evento_areas a área também controla (comportamento antigo);
+    // a área geral (nula) é livre desde a 20261119f
+    const AREA_PORTAO = 'a-portao';
     const bloqueio = (observacao, { saiu = false, liberadoDepois = false } = {}) => {
         const agora = Date.now();
         mockDb.logs_acesso = [{
             id: 'l1', evento_id: 'ev1', pessoa_id: PESSOA, tipo: saiu ? 'checkout' : 'checkin', metodo: 'pulseira',
-            etapa: 'evento', dia_civil: DIA, area_id: null, observacao,
+            etapa: 'evento', dia_civil: DIA, area_id: AREA_PORTAO, observacao,
             created_at: new Date(agora - 5 * 60000).toISOString()
         }];
         mockDb.liberacoes_reentrada = liberadoDepois
-            ? [{ id: 'lib1', evento_id: 'ev1', pessoa_id: PESSOA, etapa: 'evento', dia_civil: DIA, area_id: null, criado_em: new Date(agora - 60000).toISOString() }]
+            ? [{ id: 'lib1', evento_id: 'ev1', pessoa_id: PESSOA, etapa: 'evento', dia_civil: DIA, area_id: AREA_PORTAO, criado_em: new Date(agora - 60000).toISOString() }]
             : [];
         return entradaEtapa.bloqueioDeEntrada(supabase, {
-            evento_id: 'ev1', pessoa_id: PESSOA, etapa: 'evento', dia: DIA, area_id: null, logId: 'novo-log'
+            evento_id: 'ev1', pessoa_id: PESSOA, etapa: 'evento', dia: DIA, area_id: AREA_PORTAO, logId: 'novo-log'
         });
     };
     const resumo = (erro) => (erro ? { codigo: erro.codigo, liberavel: erro.liberavel, msg: erro.message } : null);

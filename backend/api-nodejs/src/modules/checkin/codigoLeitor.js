@@ -1,5 +1,10 @@
 'use strict';
 
+const { loteAtivoDaPulseira } = require('./pulseiraLote');
+
+// Todas as pessoas com o mesmo número (para desambiguar pelo lote); o limite só evita leitura sem fim
+const LIMITE_PULSEIRA = 50;
+
 /**
  * Leitor rápido (POST /access/leitor-rapido): o que foi lido é código, e de que tipo?
  * Só código faz check-in/check-out: pulseira, CPF (11 dígitos, com ou sem máscara), QR (JWT) ou id.
@@ -50,10 +55,12 @@ async function buscarPessoaPorCodigo(cliente, eventoId, codigo, colunas) {
     const tipo = classificarCodigoLeitor(texto);
     if (!tipo) return { status: 400, erro: MSG_NAO_E_CODIGO };
 
-    const base = () => cliente.from('pessoas').select(colunas).eq('evento_id', eventoId);
+    // tipo_pulseira_id vem junto para desambiguar o número repetido pelo lote
+    const colunasComLote = /tipo_pulseira_id/.test(colunas) ? colunas : `${colunas}, tipo_pulseira_id`;
+    const base = (cols = colunas) => cliente.from('pessoas').select(cols).eq('evento_id', eventoId);
     const vazio = Promise.resolve({ data: [], error: null });
     const [porPulseira, porQr, porCpf, porId] = await Promise.all([
-        tipo.pulseira ? base().eq('numero_pulseira', texto).limit(2) : vazio,
+        tipo.pulseira ? base(colunasComLote).eq('numero_pulseira', texto).limit(LIMITE_PULSEIRA) : vazio,
         tipo.qr ? base().eq('qr_code', texto).limit(2) : vazio,
         tipo.cpf ? base().in('cpf', tipo.cpf).limit(2) : vazio,
         tipo.id ? base().eq('id', texto).limit(1) : vazio
@@ -61,16 +68,29 @@ async function buscarPessoaPorCodigo(cliente, eventoId, codigo, colunas) {
     const erroBusca = [porPulseira, porQr, porCpf, porId].find(r => r.error)?.error;
     if (erroBusca) throw erroBusca;
 
-    // Pulseira com o mesmo número em duas pessoas: não escolhe uma delas
-    if ((porPulseira.data || []).length > 1) {
-        return { status: 409, erro: `A pulseira ${texto} está registrada para mais de uma pessoa neste evento. Corrija no credenciamento antes de liberar.` };
+    // Número repetido em mais de uma pessoa: só vale quem está no lote que vale AGORA.
+    // 409 só se o número estiver repetido DENTRO do lote ativo; repetido só em lotes fora do ativo → não casa.
+    let pulseiras = porPulseira.data || [];
+    let pulseiraEmOutroLote = false;
+    if (pulseiras.length > 1) {
+        const loteId = await loteAtivoDaPulseira(cliente, eventoId, texto);
+        const noLoteAtivo = pulseiras.filter(p => (p.tipo_pulseira_id ?? null) === loteId);
+        if (noLoteAtivo.length > 1) {
+            return { status: 409, erro: `A pulseira ${texto} está registrada para mais de uma pessoa neste lote. Corrija no credenciamento antes de liberar.` };
+        }
+        pulseiraEmOutroLote = noLoteAtivo.length === 0;
+        pulseiras = noLoteAtivo;
     }
 
     const encontradas = new Map();
-    for (const r of [porQr, porCpf, porId, porPulseira]) {
+    for (const r of [porQr, porCpf, porId]) {
         for (const p of r.data || []) if (!encontradas.has(p.id)) encontradas.set(p.id, p);
     }
-    if (encontradas.size === 0) return { status: 404, erro: `Participante não encontrado para o código "${texto}"` };
+    for (const p of pulseiras) if (!encontradas.has(p.id)) encontradas.set(p.id, p);
+    if (encontradas.size === 0) {
+        if (pulseiraEmOutroLote) return { status: 404, erro: `A pulseira ${texto} está registrada em outro lote, que não vale agora.` };
+        return { status: 404, erro: `Participante não encontrado para o código "${texto}"` };
+    }
     if (encontradas.size > 1) {
         return { status: 409, erro: 'Este código corresponde a mais de uma pessoa neste evento. Use a busca por nome.' };
     }

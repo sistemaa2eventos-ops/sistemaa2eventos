@@ -166,7 +166,8 @@ class DatabaseService {
             const { error: statusErr } = await supabase
                 .from('pessoas')
                 .update({ status_acesso: new_status, atualizado_em: new Date().toISOString() })
-                .eq('id', pessoa_id);
+                .eq('id', pessoa_id)
+                .eq('evento_id', evento_id); // nunca muda a pessoa de outro evento
             if (statusErr) logger.error(`Falha ao atualizar status da pessoa ${pessoa_id} para ${new_status}: ${statusErr.message}`);
         }
 

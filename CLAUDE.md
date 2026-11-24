@@ -759,11 +759,71 @@ docker system prune -af
      avulsos de diagnóstico (backend/api-nodejs/check_*/test_*/query_*, *.py, *.jpg na raiz), todos de abr–out/2026.
 
 ```
+2026-11-23 - Deploy f957895 (revisão de segurança, empresa/pessoa em vários eventos, relatórios, dependências)
+├─ Mudanças: empresas limitadas ao evento (getById/update/delete/convite); admin não altera Admin Master;
+│            /auth/users sem evento só vê o próprio perfil; LPR e Hikvision exigem token do dispositivo
+│            (HIKVISION_PERMITIR_IP=true reativa por IP); sessão do operador usa o usuário logado; link público
+│            mascara CPF/e-mail; fechar turno manual exige evento (antes fechava TODOS) + POST /eventos/:id/reset-manual;
+│            /excel/import/pessoas, relatório diário (Cron) e seletor de áreas corrigidos; alias /api/pulseira removido;
+│            /access/stats/realtime exige um módulo (dashboard/monitor/checkin/checkout/fiscalização);
+│            buscarTodos com páginas em paralelo (150 mil registros: ~16-20 s → ~4-5 s); pagamento por CPF com a
+│            pessoa em 2 eventos; express 4.22.3, uuid 11, mssql 12, react-router 7.18 (0 vulnerabilidades de produção)
+├─ Migrations: 20261119g_tipo_area.sql (aplicada); 20261123_empresa_pessoa_varios_eventos.sql PENDENTE (usuária aplica)
+├─ Status: ✅ OK (GitHub Actions run 45133849825); painel 200, /api/ready 200, rotas novas 401 sem login,
+│          LPR sem token 401, Hikvision sem token 401, /api/pulseira 404
+├─ Testes: backend 701 (estado do commit isolado: 566); navegador: login e redirecionamentos do React Router 7
+└─ Rollback: tag antes-deploy-20261123-seguranca (f2f2b5d)
+   Antes (mesmo dia): fd00f2c/f2f2b5d tipo de área + ficha no reconhecimento facial (rollback antes-deploy-20261123-tipo-area)
+
+2026-11-19 - Deploy 09a7565 (Módulo de Produção v1.1 — tag producao-v1.1.0 + diagnóstico de voz na Central)
+├─ Mudanças: ficha visual de materiais (até 6 fotos, assinatura visual HSV/bordas, cor, formato, composição e
+│            palavras-chave IA); regras automáticas de ação no vídeo (contar entrada/saída, monitorar presença,
+│            alertar divergência e saída indevida); rastreador real em vídeo gravado/câmera ao vivo com captura de
+│            quadro-chave; PATCH /api/producao/materiais/:id e GET /api/producao/materiais/catalogo-visao
+├─ Status: ✅ OK (GitHub Actions run 44635985641); /producao 200, /api/ready 200, /api/producao/materiais/catalogo-visao 401
+├─ Versão: tag producao-v1.1.0 (09a7565)
+└─ Rollback: tag antes-deploy-20261119-producao-v1.1 (181ce18)
+
+2026-11-19 - Deploy d2a14f8 (Módulo de Produção v1 — tag producao-v1.0.0)
+├─ Mudanças: módulo /producao (áreas, tarefas, plantas PDF/SVG/PNG com camadas e fases Montagem/Evento/Desmontagem,
+│            Gantt, materiais, presença e relatórios PDF); portal isolado /portal-produtor (scrypt/JWT, sem conta NZT)
+│            e modo celular PWA offline; + controle de reentrada por etapa e etiquetas no mesmo commit
+├─ Migrations: 20261119b_modulo_producao.sql (23 tabelas, aplicada no Supabase)
+├─ Status: ✅ OK (GitHub Actions run 44621979276); /producao e /portal-produtor 200, /api/ready 200, API /api/producao/* ativa
+├─ Versão: tag producao-v1.0.0 (d2a14f8)
+└─ Rollback: tag antes-deploy-20261119-producao-v1 (5a598dd)
+
+2026-11-19 - Deploy 181ce18 (áudio da câmera na Central: faixas juntas no mesmo fluxo; botão Falar)
+├─ Mudanças: central/central.js: vídeo e áudio num único MediaStream (antes uma faixa substituía a outra);
+│            aviso "Sem som da câmera"; botão Falar (microfone do PC, sendrecv) com confirmação de alto-falante
+├─ Agente: sem mudança de versão (a Central é lida do disco a cada pedido: basta recarregar a página)
+├─ Status: ✅ OK (GitHub Actions run 44633085595); painel 200, API 401
+├─ Testes: navegador com servidor simulado (botões e reconexão com áudio); som e alto-falante com câmera real NÃO testados
+└─ Rollback: tag antes-deploy-20261119-audio (ed09115)
+
+2026-11-19 - Deploy ed09115 (desligar o motor de IA pelo painel; tarefa NZT-IA-Facial sem administrador)
+├─ Mudanças: scripts/ligar-ia-facial.ps1: tarefa com RunLevel Limited (antes Highest: motor elevado não era encerrável);
+│            parar-motor confere e sai com código 2 se não encerrar; agent.js registra o erro
+├─ Ação do usuário: 1x, como administrador, `ligar-ia-facial.bat instalar-tarefa`; depois reiniciar o PC
+├─ Status: ✅ OK (GitHub Actions run 44630143285); painel 200
+└─ Rollback: tag antes-deploy-20261119-motor-desligar (4b35545)
+
+2026-11-19 - Deploy 4b35545 (giro e som na Central de Monitoramento; avisos do retransmissor)
+├─ Mudanças: Central (agent-local/central): tela grande com setas/zoom/posições (POST /central/api/camera/:id/ptz)
+│            e botão "Ouvir" (áudio via WebRTC; go2rtc converte o áudio do principal para Opus);
+│            vigilância envia ptz {ip, porta} por câmera; video.js avisa "porta 1984 em uso por outro programa";
+│            ligar-ia-facial.ps1 avisa go2rtc/agente estranho ou sem permissão de leitura
+├─ Agente: 3.3.0 — PC do evento roda ligar-ia-facial.bat (sem "como administrador")
+├─ Status: ✅ OK (GitHub Actions run 44628572846); painel 200, API 401
+├─ Testes: agente 19 (3 novos); backend 632 (suíte completa verde); Central testada no navegador com servidor simulado
+│          (setas, posições, áudio pede faixa de áudio). Som com câmera real NÃO testado.
+└─ Rollback: tag antes-deploy-20261119-central-ptz (5a598dd)
+
 2026-11-19 - Deploy 5a598dd (giro ONVIF, visão noturna)
 ├─ Mudanças: câmera com giro (cameras_ip.ptz_ativo/ptz_porta, porta ONVIF 2020); PainelGiro na tela grande do Monitor
 │            (setas que seguem enquanto apertadas, zoom, velocidade, posições salvas); POST /api/cameras/:id/ptz;
 │            GET /api/cameras/:id/ptz/presets; Diagnosticar confere o giro; selo "Visão noturna" (useVisaoNoturna.js)
-├─ Migrations: 20261119e_cameras_ptz.sql PENDENTE (usuária aplica; sem ela os controles de giro ficam ocultos)
+├─ Migrations: 20261119e_cameras_ptz.sql aplicada pela usuária em 19/11 (antes do teste com a MC210, firmware 1.4.5)
 ├─ Agente: 3.2.0 (comando http aceita POST) — PC do evento precisa de ligar-ia-facial.bat
 ├─ Status: ✅ OK (GitHub Actions run 44619992829); painel 200, rotas novas 401 sem login
 ├─ Testes: 11 novos (onvif/ptz, sem câmera real); lint e build ok; setas testadas no navegador com API simulada

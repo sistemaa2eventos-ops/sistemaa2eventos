@@ -38,7 +38,10 @@ jest.mock('../src/services/websocketService', () => ({ emit: jest.fn() }));
 jest.mock('../src/modules/checkin/services/database.service', () => ({}));
 jest.mock('../src/modules/system/watchlist.service', () => ({ verificarCPF: jest.fn(async () => null), registrarAlerta: jest.fn(async () => {}) }));
 jest.mock('../src/modules/pulseiras/pulseira.service', () => ({}));
-jest.mock('../src/modules/pulseiras/loteSelecao', () => ({ buscarLotesDaFaixa: jest.fn(), escolherLote: jest.fn() }));
+jest.mock('../src/modules/pulseiras/loteSelecao', () => ({
+    buscarLotesDaFaixa: jest.fn(async () => []),
+    escolherLote: jest.fn(async () => ({ lote: null, bloqueado: false, motivo: null }))
+}));
 
 const controller = require('../src/modules/checkin/checkin.controller');
 

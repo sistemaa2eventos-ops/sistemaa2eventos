@@ -23,14 +23,21 @@ class CheckinService {
             dispositivo_id, created_by, sync_id, offline_timestamp, area_id
         } = accessData;
 
-        // 1. Obter dados completos da pessoa
+        // 1. Obter dados completos da pessoa — SÓ deste evento. Pessoa de outro evento (pessoa_id de qualquer
+        //    evento chega pelo /checkin/manual) responde 404 aqui, antes de qualquer gravação.
+        const NAO_ACHADA = { error: 'Pessoa não encontrada neste evento', status: 404 };
         let pessoa = accessData.pessoa;
+        if (pessoa && pessoa.evento_id && pessoa.evento_id !== evento_id) return NAO_ACHADA;
         if (!pessoa) {
-            const { data: pData } = await supabase
+            const { data: pData, error: pErr } = await supabase
                 .from('pessoas')
                 .select(`${COLUNAS_PESSOA_ACESSO}, empresas(*)`)
                 .eq('id', pessoa_id)
+                .eq('evento_id', evento_id)
                 .single();
+            // PGRST116 = nenhuma linha (pessoa de outro evento ou inexistente): 404. Outro erro é falha de banco.
+            if (pErr && pErr.code !== 'PGRST116') throw pErr;
+            if (!pData) return NAO_ACHADA;
             pessoa = pData;
         }
 

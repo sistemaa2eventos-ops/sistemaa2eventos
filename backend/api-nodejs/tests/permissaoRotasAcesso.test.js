@@ -58,8 +58,9 @@ const passarPelaRota = async (caminho, usuario, body = {}) => {
     const permissao = permissaoDe(caminho);
     const next = jest.fn();
     const res = respostaFalsa();
-    await permissao({ user: usuario, headers: { 'x-evento-id': 'ev1' }, query: {}, body }, res, next);
-    return { next, res };
+    const req = { user: usuario, headers: { 'x-evento-id': 'ev1' }, query: {}, body };
+    await permissao(req, res, next);
+    return { next, res, req };
 };
 
 beforeEach(() => {
@@ -116,8 +117,8 @@ describe('operador só com o módulo fiscalização', () => {
 describe('B12: operador só com checkout', () => {
     const soCheckout = () => operador({ checkin: false, checkout: true, fiscalizacao: false });
 
-    it('a entrada (/pulseira/checkin) dá 403; a saída segue liberada', async () => {
-        const entrada = await passarPelaRota('/pulseira/checkin', soCheckout());
+    it('a entrada pedida (tipo checkin em /pulseira/checkin) dá 403; a saída segue liberada', async () => {
+        const entrada = await passarPelaRota('/pulseira/checkin', soCheckout(), { tipo: 'checkin' });
         expect(entrada.res.statusCode).toBe(403);
         expect(entrada.next).not.toHaveBeenCalled();
 
@@ -130,10 +131,11 @@ describe('B12: operador só com checkout', () => {
         expect(next).toHaveBeenCalled();
     });
 
-    it('o leitor rápido sem tipo é ENTRADA: quem só tem checkout recebe 403', async () => {
-        const { next, res } = await passarPelaRota('/leitor-rapido', soCheckout(), {});
-        expect(res.statusCode).toBe(403);
-        expect(next).not.toHaveBeenCalled();
+    it('o leitor rápido sem tipo passa: quem tem checkout entra na rota e o sistema decide entrada ou saída', async () => {
+        const { next, res, req } = await passarPelaRota('/leitor-rapido', soCheckout(), {});
+        expect(res.statusCode).toBe(200);
+        expect(next).toHaveBeenCalled();
+        expect(req.body.tipo).toBeUndefined();
     });
 });
 

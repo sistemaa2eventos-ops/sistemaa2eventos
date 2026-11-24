@@ -43,7 +43,10 @@ jest.mock('../src/services/websocketService', () => ({ emit: jest.fn() }));
 jest.mock('../src/modules/checkin/services/database.service', () => ({}));
 jest.mock('../src/modules/system/watchlist.service', () => ({ verificarCPF: jest.fn(async () => null), registrarAlerta: jest.fn(async () => {}) }));
 jest.mock('../src/modules/pulseiras/pulseira.service', () => ({}));
-jest.mock('../src/modules/pulseiras/loteSelecao', () => ({ buscarLotesDaFaixa: jest.fn(), escolherLote: jest.fn() }));
+jest.mock('../src/modules/pulseiras/loteSelecao', () => ({
+    buscarLotesDaFaixa: jest.fn(async () => []),
+    escolherLote: jest.fn(async () => ({ lote: null, bloqueado: false, motivo: null }))
+}));
 
 const controller = require('../src/modules/checkin/checkin.controller');
 const { classificarCodigoLeitor } = require('../src/modules/checkin/codigoLeitor');
@@ -134,5 +137,21 @@ describe('classificarCodigoLeitor', () => {
         expect(classificarCodigoLeitor('529.982.247-25')).toMatchObject({ pulseira: false, qr: false, cpf: ['52998224725', '529.982.247-25'] });
         expect(classificarCodigoLeitor(QR)).toMatchObject({ pulseira: false, qr: true });
         expect(classificarCodigoLeitor('11111111-2222-3333-4444-555555555555')).toMatchObject({ id: true });
+    });
+});
+
+describe('tipo ausente: o sistema decide (não força entrada)', () => {
+    it('leitura de pulseira sem tipo chega ao check-in com tipo null', async () => {
+        mockDb.registros.length = 0;
+        const r = await chamar({ codigo: '1001' });
+        expect(r.statusCode).toBe(200);
+        expect(mockDb.registros).toHaveLength(1);
+        expect(mockDb.registros[0].tipo).toBeNull();
+    });
+
+    it('tipo checkout explícito continua saída', async () => {
+        mockDb.registros.length = 0;
+        await chamar({ codigo: '1001', tipo: 'checkout' });
+        expect(mockDb.registros[0].tipo).toBe('checkout');
     });
 });

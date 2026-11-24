@@ -86,8 +86,9 @@ const resposta = () => {
     res.json = jest.fn(() => res);
     return res;
 };
+// area_id 'a1' = área de portão (sem linha em evento_areas, controla entrada). Sem área seria a área geral, que é livre (20261119f)
 const requisicao = () => ({
-    body: { pessoa_id: 'p1', numero_pulseira: '1234', tipo_pulseira_id: 'tp1' },
+    body: { pessoa_id: 'p1', numero_pulseira: '1234', tipo_pulseira_id: 'tp1', area_id: 'a1' },
     event: { id: 'e1' },
     user: { id: 'op1' },
     supabase: mockCriarCliente()

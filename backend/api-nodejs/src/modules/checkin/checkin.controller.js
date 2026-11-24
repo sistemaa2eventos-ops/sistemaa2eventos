@@ -21,6 +21,7 @@ const recusarSeSoMonitoramento = async (res, areaId) => {
     res.status(409).json({ success: false, error: msg, codigo: 'AREA_SO_MONITORAMENTO' });
     return true;
 };
+const { outraPessoaNoLote } = require('./pulseiraLote');
 
 /**
  * Origem INFORMATIVA do credenciamento (campo observacao do registro). Nenhuma regra lê este texto:
@@ -426,20 +427,9 @@ class AccessController {
             if (escolha.bloqueado) return ApiResponse.error(res, escolha.motivo, 403);
             const tipoPulseira = escolha.lote;
 
-            // Verificar duplicidade de pulseira (lista: maybeSingle falhava com 2+ donos e a checagem passava)
-            if (tipoPulseira?.alerta_duplicidade) {
-                const { data: existentes } = await supabaseClient
-                    .from('pessoas')
-                    .select('id, nome_completo')
-                    .eq('numero_pulseira', numero_pulseira)
-                    .eq('evento_id', eventoId)
-                    .neq('id', pessoa_id)
-                    .limit(1);
-
-                if (existentes && existentes.length > 0) {
-                    logger.warn(`⚠️ Pulseira ${numero_pulseira} já vinculada a ${existentes[0].nome_completo}`);
-                }
-            }
+            // Pulseira não pode estar em outra pessoa do evento DENTRO DO MESMO LOTE (sempre; nada é gravado se houver)
+            const outraNoLote = await outraPessoaNoLote(supabaseClient, eventoId, numero_pulseira, pessoa_id, tipoPulseira?.id ?? null);
+            if (outraNoLote) return ApiResponse.error(res, 'Pulseira já vinculada a outra pessoa neste lote', 409);
 
             // Salvar numero_pulseira e tipo_pulseira_id na pessoa
             const updateData = { numero_pulseira, updated_at: new Date() };
@@ -608,7 +598,8 @@ class AccessController {
      */
     async leitorRapido(req, res) {
         try {
-            const { codigo, tipo = 'checkin', area_id, metodo = 'barcode', sync_id, offline_timestamp } = req.body;
+            // tipo ausente: o sistema decide entrada ou saída (toggle); nunca vira 'checkin' por padrão
+            const { codigo, tipo, area_id, metodo = 'barcode', sync_id, offline_timestamp } = req.body;
             if (await recusarSeSoMonitoramento(res, area_id)) return;
             const eventoId = req.event?.id || req.headers['x-evento-id'] || req.query.evento_id;
             const supabaseClient = req.supabase || supabase;
@@ -632,12 +623,12 @@ class AccessController {
             }
 
             // 3. Registrar o acesso (checkin ou checkout) SEM exigir pulseira!
-            const tipoAcesso = tipo === 'checkout' ? 'checkout' : 'checkin';
+            const tipoPedido = (tipo === 'checkout' || tipo === 'checkin') ? tipo : null;
             const result = await checkinService.registrarAcesso(supabaseClient, {
                 pessoa_id: pessoa.id,
                 pessoa,
                 evento_id: eventoId,
-                tipo: tipoAcesso,
+                tipo: tipoPedido,
                 metodo: metodo || 'barcode',
                 dispositivo_id: 'web-dashboard',
                 created_by: req.user?.id,
@@ -647,8 +638,8 @@ class AccessController {
 
             if (result.error) return ApiResponse.error(res, result.error, result.status || 400, result.detalhes || null);
 
-            // Disparar Webhook
-            if (tipoAcesso === 'checkout') {
+            // Disparar Webhook (tipo efetivo: o que o sistema registrou)
+            if (result.tipo === 'checkout') {
                 webhookDispatcher.dispatchCheckout(eventoId, pessoa);
             } else {
                 webhookDispatcher.dispatchCheckin(eventoId, pessoa);
@@ -775,22 +766,9 @@ class AccessController {
                 }
             }
 
-            // 3. Verificar duplicidade
-            if (tipoPulseira?.alerta_duplicidade) {
-                const { data: existentes } = await supabaseClient
-                    .from('pessoas')
-                    .select('id, nome_completo')
-                    .eq('numero_pulseira', numero_pulseira)
-                    .eq('evento_id', eventoId)
-                    .neq('id', pessoa_id)
-                    .limit(1);
-                const existente = existentes?.[0];
-
-                if (existente) {
-                    return ApiResponse.error(res,
-                        `Pulseira ${numero_pulseira} já vinculada a ${existente.nome_completo}`, 409);
-                }
-            }
+            // 3. Pulseira não pode estar em outra pessoa do evento DENTRO DO MESMO LOTE (sempre, antes de gravar)
+            const outraNoLote = await outraPessoaNoLote(supabaseClient, eventoId, numero_pulseira, pessoa_id, tipoPulseira?.id ?? null);
+            if (outraNoLote) return ApiResponse.error(res, 'Pulseira já vinculada a outra pessoa neste lote', 409);
 
             // 3b. Pulseira trocada ou perdida neste lote não volta a ser entregue (antes de gravar qualquer coisa)
             const bloqueio = await pulseiraService.numeroBloqueado(eventoId, numero_pulseira, tipoPulseira?.id || null);

@@ -1,7 +1,7 @@
 /**
  * Permissão por tipo efetivo (req.body.tipo) nas rotas de entrada/saída e negação explícita de módulo.
  * - /leitor-rapido, /pulseira/checkin, /checkin/manual, /checkin/qrcode: tipo 'checkout' exige checkout;
- *   qualquer outro valor (inclusive ausente) exige checkin.
+ *   tipo 'checkin' exige checkin; tipo ausente exige checkin OU checkout (o sistema decide o tipo).
  * - checkAnyPermission: módulo desligado (=== false) → 403 sem consultar o PolicyEngine.
  * Supabase e políticas simulados; o middleware de permissão é o real.
  */
@@ -39,8 +39,9 @@ const operador = (permissoes, extra = {}) => ({
 const passar = async (middleware, usuario, body = {}) => {
     const next = jest.fn();
     const res = respostaFalsa();
-    await middleware({ user: usuario, headers: { 'x-evento-id': 'ev1' }, query: {}, body }, res, next);
-    return { next, res };
+    const req = { user: usuario, headers: { 'x-evento-id': 'ev1' }, query: {}, body };
+    await middleware(req, res, next);
+    return { next, res, req };
 };
 
 const soCheckin = () => operador({ checkin: true, checkout: false, fiscalizacao: false });
@@ -68,10 +69,10 @@ describe('rotas com tipo no corpo: a permissão segue o tipo efetivo', () => {
         expect(next).not.toHaveBeenCalled();
     });
 
-    it.each(rotas)('%s: operador só com checkout NÃO registra ENTRADA (sem tipo → 403)', async (caminho) => {
-        const { next, res } = await passar(permissaoDe(caminho), soCheckout(), {});
-        expect(res.statusCode).toBe(403);
-        expect(next).not.toHaveBeenCalled();
+    it.each(rotas)('%s: operador só com checkout, sem tipo → passa (o sistema decide; nenhum tipo é forçado)', async (caminho) => {
+        const { next, req } = await passar(permissaoDe(caminho), soCheckout(), {});
+        expect(next).toHaveBeenCalled();
+        expect(req.body.tipo).toBeUndefined();
     });
 
     it.each(rotas)('%s: operador só com checkout NÃO registra ENTRADA (tipo checkin → 403)', async (caminho) => {

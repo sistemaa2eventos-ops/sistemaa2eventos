@@ -123,7 +123,7 @@ const Monitor = () => {
   const [activeTab, setActiveTab] = useState('feed');
 
   const {
-    logs, stats, loading, areas, dispositivosLista, terminais,
+    logs, logsSemPermissao, stats, loading, areas, dispositivosLista, terminais,
     cameras, fetchCameras, fetchWatchlist, historicoAlertas,
     watchlist, contatos, addContato, removeContato,
     desbloquearAlvo, deixarDeMonitorar, exportarParticipantes, baixarModeloCSV,
@@ -1304,7 +1304,12 @@ const Monitor = () => {
                         '&::-webkit-scrollbar': { width: 6 },
                         '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0, 212, 255, 0.2)', borderRadius: 1.5 }
                     }}>
-                        {!loading && logs.length === 0 && (
+                        {logsSemPermissao && (
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', p: 2 }}>
+                                Sem permissão para ver os registros de acesso
+                            </Typography>
+                        )}
+                        {!loading && logs.length === 0 && !logsSemPermissao && (
                             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 2, opacity: 0.5 }}>
                                 <MonitorIcon sx={{ fontSize: 48, color: '#00D4FF' }} />
                                 <Typography variant="body2" color="text.secondary">Nenhum acesso registrado ainda.</Typography>

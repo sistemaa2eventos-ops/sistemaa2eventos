@@ -403,6 +403,34 @@ function checkAnyPermission(recursos, acao = 'escrita') {
 }
 
 /**
+ * Mesma regra do checkAnyPermission, sem resposta HTTP e sem log de bloqueio: true se o usuário tem pelo
+ * menos um dos recursos no evento (admin sempre; módulo ligado; módulo desligado = false; sem campo, a policy).
+ * Usa req.tenantId, que o checkAnyPermission de entrada já preenche: chamar depois dele.
+ */
+async function temAlgumRecurso(req, recursos, acao = 'escrita') {
+    if (!req.user) return false;
+    const userRole = extractRole(req.user);
+    if (userRole === 'admin_master' || userRole === 'admin') return true;
+
+    const tenantId = req.tenantId;
+    if (!tenantId) return false;
+    const lista = Array.isArray(recursos) ? recursos : [recursos];
+
+    const efetivas = typeof req.user.getEffectivePermissions === 'function'
+        ? req.user.getEffectivePermissions(tenantId)
+        : null;
+    if (efetivas) {
+        if (lista.some(r => efetivas[r] === true)) return true;
+        if (lista.every(r => efetivas[r] === false)) return false;
+    }
+
+    for (const recurso of lista) {
+        if (await policyEngine.hasPermission(userRole, recurso, acao, tenantId)) return true;
+    }
+    return false;
+}
+
+/**
  * Restringe a rota ao Admin Master (watchlist é sigilosa, inclusive para admin comum).
  */
 function requireAdminMaster(req, res, next) {
@@ -422,6 +450,7 @@ module.exports = {
     validateApiKey,
     checkPermission,
     checkAnyPermission,
+    temAlgumRecurso,
     normalize,
     extractRole
 };

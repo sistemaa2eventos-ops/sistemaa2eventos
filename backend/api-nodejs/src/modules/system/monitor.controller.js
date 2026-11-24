@@ -680,12 +680,17 @@ class MonitorController {
             if (!cpf) {
                 return res.status(400).json({ error: 'CPF é obrigatório' });
             }
+            // CPF parcial ou inválido nunca é gravado: a fiscalização só casa por CPF de 11 dígitos
+            const cpfLimpo = String(cpf).replace(/\D/g, '');
+            if (cpfLimpo.length !== 11) {
+                return res.status(400).json({ error: 'CPF inválido: informe 11 dígitos' });
+            }
 
             const { data, error } = await supabase
                 .from('watchlist')
                 .upsert([{
                     evento_id,
-                    cpf: String(cpf).replace(/\D/g, ''),
+                    cpf: cpfLimpo,
                     nome: nome || 'Alvo Monitorado',
                     motivo: motivo || 'Adicionado via monitor',
                     nivel_alerta: 'alto',

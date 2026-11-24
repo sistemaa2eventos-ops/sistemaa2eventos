@@ -3,14 +3,15 @@
 /**
  * Entrada única por etapa: não entrar de novo enquanto estiver DENTRO.
  *
- * Regra de portão (migration 20261119_controle_entrada_portao): só em área que CONTROLA entrada
- * (evento_areas.controla_entrada; área geral controla sempre), uma pessoa não entra de novo na mesma
+ * Regra de portão (migrations 20261119_controle_entrada_portao e 20261119f_area_geral_livre): só em área que
+ * CONTROLA entrada (evento_areas.controla_entrada = true). A área geral (area_id nulo) é LIVRE: não controla
+ * entrada, então a pessoa pode sair e voltar nela quantas vezes quiser. Em área que controla, uma pessoa não entra de novo na mesma
  * etapa (fase do lote), no mesmo dia civil (America/Sao_Paulo) e na mesma área:
  *   - se está DENTRO (último registro de passagem é entrada): 409, liberavel=false;
  *   - se SAIU (último é saída): 409, liberavel=true, até o controlador liberar (liberacoes_reentrada,
  *     com criado_em posterior à saída);
  *   - sem registro anterior na etapa/dia/área: entrada livre.
- * Área que não controla: nada é bloqueado. Vale para todos os caminhos (leitor rápido, pulseira,
+ * Área que não controla e área geral (sem área): nada é bloqueado. Vale para todos os caminhos (leitor rápido, pulseira,
  * facial, câmera, manual). Credenciamento NÃO tem regra própria: é entrada/saída comum (conta como
  * passagem, entra na regra de entrada única, na reentrada com liberação, nas contagens e no anti-passback).
  *
@@ -177,12 +178,13 @@ const ehTabelaAusente = (error) => !!error && (
 );
 
 /**
- * A área controla entrada (portão)? Área geral (sem área) sempre controla. Área que não se acha, ou coluna
- * ausente (migration não aplicada), controla: é o comportamento de antes. Só controla_entrada = false libera.
+ * A área controla entrada (portão)? Área geral (sem área, areaId nulo) é LIVRE: não controla (migration
+ * 20261119f). Área informada que não se acha, ou coluna ausente (migration não aplicada), controla: é o
+ * comportamento de antes. Só controla_entrada = false libera a área informada.
  * @param {Map} [cache] leitura por requisição: área → boolean
  */
 async function areaControlaEntrada(client, areaId, cache = null) {
-    if (!areaId) return true;
+    if (!areaId) return false;
     if (cache && cache.has(areaId)) return cache.get(areaId);
     const { data, error } = await (client || supabase).from('evento_areas')
         .select('controla_entrada').eq('id', areaId).maybeSingle();
@@ -226,11 +228,13 @@ async function idGravado(client, logId) {
  *     · dentro (último registro é entrada) → 409 liberavel=false;
  *     · saiu (último é saída) sem liberação posterior à saída → 409 liberavel=true;
  *     · sem registro anterior na etapa/dia/área → livre.
- * - Área que não controla: nada é bloqueado.
+ * - Área que não controla e área geral (sem área): nada é bloqueado.
  * - Reenvio do mesmo id (já gravado) nunca bloqueia.
  * @param {Object} p  { evento_id, pessoa_id, etapa, dia, area_id, logId, cache }
  */
 async function bloqueioDeEntrada(client, { evento_id, pessoa_id, etapa, dia, area_id, logId, cache = null }) {
+    // Área geral é livre (20261119f): nem consulta o último registro
+    if (!area_id) return null;
     const ultimo = await buscarUltimoRegistroNaEtapa(client, { evento_id, pessoa_id, etapa, dia, area_id });
     if (!ultimo || (logId && ultimo.id === logId)) return null;
 

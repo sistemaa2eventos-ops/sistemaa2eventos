@@ -6,6 +6,7 @@ const recusadosController = require('./recusados.controller');
 const { authenticate, authorize, checkAnyPermission } = require('../../middleware/auth');
 const { requireEvent } = require('../../middleware/eventMiddleware');
 const rateLimiter = require('../../middleware/rateLimiter');
+const ApiResponse = require('../../utils/apiResponse');
 
 // ============================================
 // ROTAS PÚBLICAS (sem autenticação - para terminais)
@@ -30,12 +31,41 @@ const PERM_LEITOR = ['checkin', 'checkout'];
 const PERM_CONSULTA = ['checkin', 'checkout', 'fiscalizacao'];
 
 // Rotas que recebem o tipo no corpo (leitor rápido, pulseira, manual, qrcode): a permissão segue o tipo EFETIVO.
-// tipo === 'checkout' exige o módulo checkout; qualquer outro valor (inclusive ausente) exige checkin.
+//   tipo 'checkout' → exige o módulo checkout;
+//   tipo 'checkin'  → exige o módulo checkin;
+//   tipo AUSENTE    → exige pelo menos checkin OU checkout (sem nenhum dos dois: 403).
+// Com o tipo ausente, NENHUM tipo é forçado aqui: o sistema (toggle, determineSmartAccessType) decide entrada ou saída.
 // `recursos` declara os módulos que a rota pode exigir (usado pelos testes de permissão).
+
+// Tipo do corpo normalizado (trim + minúsculas): 'CHECKOUT' e ' checkout ' são saída. Só 'checkin' e 'checkout'
+// (ou ausente: null, undefined, vazio) são aceitos; qualquer outro valor (ex.: 'fiscalizacao', 'negado',
+// 'expulsao', número, lista) é inválido → 400. Não é string → inválido.
+const lerTipoDoCorpo = (valor) => {
+    if (valor === undefined || valor === null) return { tipo: null };
+    if (typeof valor !== 'string') return { invalido: true };
+    const normalizado = valor.trim().toLowerCase();
+    if (normalizado === '') return { tipo: null };
+    return ['checkin', 'checkout'].includes(normalizado) ? { tipo: normalizado } : { invalido: true };
+};
+
 const exigePorTipo = (recursos) => {
     const entrada = checkAnyPermission(PERM_ENTRADA);
     const saida = checkAnyPermission(PERM_SAIDA);
-    const middleware = (req, res, next) => (req.body?.tipo === 'checkout' ? saida : entrada)(req, res, next);
+    const entradaOuSaida = checkAnyPermission(PERM_LEITOR);
+    const middleware = async (req, res, next) => {
+        const { tipo, invalido } = lerTipoDoCorpo(req.body?.tipo);
+        if (invalido) return ApiResponse.error(res, 'Tipo inválido: use checkin ou checkout', 400);
+        if (!req.body) req.body = {};
+        // O controller recebe o tipo já normalizado; ausente continua ausente (o sistema decide)
+        req.body.tipo = tipo || undefined;
+
+        const checagem = tipo === 'checkout' ? saida : (tipo === 'checkin' ? entrada : entradaOuSaida);
+        // checkAnyPermission: se responder 403/401/400, não chama o callback e a rota para aqui
+        let passou = false;
+        await checagem(req, res, () => { passou = true; });
+        if (!passou) return undefined;
+        return next();
+    };
     middleware.recursos = recursos;
     return middleware;
 };
@@ -82,16 +112,17 @@ router.post('/recusados/:id/resolver', sessionMiddleware, checkAnyPermission(['c
 // Consulta do crachá: quem faz check-in, checkout ou fiscalização (qualquer um dos três módulos no evento)
 router.get('/consultar-pulseira/:codigo', sessionMiddleware, rateLimiter.consulta,
     checkAnyPermission(['checkin', 'checkout', 'fiscalizacao']), accessController.consultarPulseira);
-router.get('/fiscalizacoes-recentes', sessionMiddleware, accessController.getFiscalizacoesRecentes);
+router.get('/fiscalizacoes-recentes', sessionMiddleware, checkAnyPermission(PERM_CONSULTA), accessController.getFiscalizacoesRecentes);
 // /checkin/fiscalizar removido: nenhum cliente do repositório o usa (o app fiscal chama /access/fiscalizar)
 router.post('/fiscalizar', sessionMiddleware, rateLimiter.access, checkAnyPermission(PERM_CONSULTA), accessController.fiscalizarAcesso);
 
 // ============================================
 // CONSULTAS
 // ============================================
-router.get('/logs', sessionMiddleware, accessController.getLogs);
-// /stats/realtime devolve só contagens (sem nome ou CPF de pessoa). Exige ao menos um dos módulos das telas
-// que a usam: Dashboard, Monitor, Check-in, Check-out e Fiscalização.
+// /logs devolve nome, CPF e foto das pessoas: só quem faz check-in, check-out ou fiscalização (ou admin).
+router.get('/logs', sessionMiddleware, checkAnyPermission(PERM_CONSULTA), accessController.getLogs);
+// /stats/realtime devolve só contagens, nomes de área e de empresa (sem nome ou CPF de pessoa). Exige ao
+// menos um dos módulos das telas que a usam: Dashboard, Monitor, Check-in, Check-out e Fiscalização.
 router.get('/stats/realtime', sessionMiddleware,
     require('../../middleware/moduloDesligado').exigirAlgumModulo(['dashboard', 'monitoramento', 'checkin', 'checkout', 'fiscalizacao']),
     accessController.getRealtimeStats);

@@ -75,6 +75,10 @@ class WatchlistController {
 
             if (!evento_id || !cpf) return res.status(400).json({ error: 'Campos obrigatórios ausentes' });
             const cpfLimpo = String(cpf).replace(/\D/g, '');
+            // CPF parcial ou inválido nunca é gravado: a fiscalização só casa por CPF de 11 dígitos
+            if (cpfLimpo.length !== 11) {
+                return res.status(400).json({ error: 'CPF inválido: informe 11 dígitos' });
+            }
 
             const { data, error } = await supabase
                 .from('watchlist')
@@ -520,13 +524,23 @@ class WatchlistController {
                     .eq('id', pessoa_id)
                     .single();
                 if (pessoa) {
+                    // Sem CPF de 11 dígitos não há como casar na fiscalização (que só casa por CPF): não grava
+                    // um CPF fictício ('ID-…') na watchlist
+                    const cpfPessoa = String(pessoa.cpf || '').replace(/\D/g, '');
+                    if (cpfPessoa.length !== 11) {
+                        return res.status(400).json({ error: 'Pessoa sem CPF cadastrado: não é possível procurar' });
+                    }
                     finalNome = pessoa.nome_completo;
-                    finalCpf = pessoa.cpf ? pessoa.cpf.replace(/\D/g, '') : `ID-${pessoa.id.slice(0, 8)}`;
+                    finalCpf = cpfPessoa;
                 }
             }
 
             if (!finalCpf) {
                 return res.status(400).json({ error: 'É necessário informar uma pessoa ou CPF válido.' });
+            }
+            // CPF direto no corpo parcial nunca é gravado: a fiscalização só casa por CPF de 11 dígitos
+            if (finalCpf.length !== 11) {
+                return res.status(400).json({ error: 'CPF inválido: informe 11 dígitos' });
             }
 
             const { data, error } = await supabase

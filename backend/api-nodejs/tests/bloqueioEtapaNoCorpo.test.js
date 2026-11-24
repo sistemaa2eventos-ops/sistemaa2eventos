@@ -68,13 +68,16 @@ const resposta = () => {
 // A validação lança o mesmo 409 que a regra de entrada real lançaria (banco simulado acima)
 const lancarBloqueio = () => {
     ValidationService.validateAccessRules.mockImplementation(async (eventoId, pessoa, tipo, metodo, timestamp, confianca, areaId, ctx) => {
-        throw await bloqueioDeEntrada(supabase, { evento_id: eventoId, pessoa_id: pessoa.id, ...ctx.entrada });
+        const erro = await bloqueioDeEntrada(supabase, { evento_id: eventoId, pessoa_id: pessoa.id, ...ctx.entrada });
+        if (erro) throw erro;
     });
 };
 
-const acesso = () => ({
+// Área de portão (controla entrada). A área geral (area_id nulo) é livre desde a 20261119f: ver o teste no fim
+const AREA_PORTAO = 'area-portao';
+const acesso = (area_id = AREA_PORTAO) => ({
     pessoa_id: 'p1', pessoa: { ...PESSOA }, evento_id: 'e1', metodo: 'pulseira', dispositivo_id: 'web-dashboard',
-    created_by: 'op1', area_id: null, etapa: 'montagem', tipo: 'checkin'
+    created_by: 'op1', area_id, etapa: 'montagem', tipo: 'checkin'
 });
 
 beforeEach(() => {
@@ -102,6 +105,18 @@ describe('checkin.service.registrarAcesso devolve a etapa no 409', () => {
 
         expect(r.status).toBe(409);
         expect(r.detalhes).toEqual({ codigo: 'ENTRADA_BLOQUEADA', liberavel: true, etapa: 'montagem' });
+    });
+});
+
+describe('área geral (sem área) é livre: pessoa dentro não recebe 409 (20261119f)', () => {
+    it('pessoa dentro na área geral: a entrada não é bloqueada', async () => {
+        mockEstado.ultimoLog = { id: 'log-antigo', tipo: 'checkin', created_at: '2026-11-19T12:00:00Z' };
+        lancarBloqueio();
+
+        const r = await checkinService.registrarAcesso(supabase, acesso(null));
+
+        expect(r.detalhes?.codigo).not.toBe('ENTRADA_BLOQUEADA');
+        expect(r.status).not.toBe(409);
     });
 });
 

@@ -12,12 +12,17 @@ let idsGravados = []; // ids já existentes em logs_acesso (consulta por id apó
 // Cliente Supabase simulado: registra cada operação e responde conforme o cenário
 const tabela = (nome) => {
     const op = { tabela: nome, filtros: {} };
+    const updateEncadeado = {
+        eq: (c, v) => { op.filtros[c] = v; return updateEncadeado; },
+        then: (ok, ko) => Promise.resolve({ error: null }).then(ok, ko)
+    };
     const builder = {
         insert: (linhas) => { op.acao = 'insert'; op.dados = linhas; chamadas.push(op); return Promise.resolve({ error: falharInsert }); },
         upsert: (linha) => { op.acao = 'upsert'; op.dados = linha; chamadas.push(op); return Promise.resolve({ error: null }); },
         update: (dados) => { op.acao = 'update'; op.dados = dados; chamadas.push(op); return builder; },
         select: () => { op.acao = 'select'; return builder; },
-        eq: (c, v) => { op.filtros[c] = v; return op.acao === 'update' ? Promise.resolve({ error: null }) : builder; },
+        // update aceita mais de um eq (id + evento_id) e só então resolve, como o PostgREST
+        eq: (c, v) => { op.filtros[c] = v; return op.acao === 'update' ? updateEncadeado : builder; },
         neq: () => builder,
         gt: () => builder,
         limit: () => Promise.resolve({ data: logMaisNovo, error: null }),
@@ -59,6 +64,12 @@ describe('registerAccessTransaction', () => {
         expect(r.na_fila).toBeUndefined();
         expect(chamadas.map(c => `${c.tabela}.${c.acao}`)).toEqual(['logs_acesso.insert', 'pessoas.update']);
         expect(publicados).toHaveLength(0);
+    });
+
+    it('o status da pessoa só muda dentro do evento do acesso (id + evento_id)', async () => {
+        await DatabaseService.registerAccessTransaction('log-2', new Date(), payload, pessoa, 'checkin_feito');
+        const update = chamadas.find(c => c.tabela === 'pessoas' && c.acao === 'update');
+        expect(update.filtros).toEqual({ id: 'p1', evento_id: 'e1' });
     });
 
     it('com o Supabase fora, manda o acesso liberado para a fila e não nega a pessoa', async () => {
