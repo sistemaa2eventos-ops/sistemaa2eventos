@@ -69,6 +69,7 @@ import {
 import ModalCameraCaptura from './ModalCameraCaptura';
 import PainelContagemFotoPilha from './PainelContagemFotoPilha';
 import PainelAnaliseVideoIa from './PainelAnaliseVideoIa';
+import DashboardContagemMateriais from './DashboardContagemMateriais';
 
 const ESTADO_INICIAL_MATERIAL = (areaPadrao = '') => ({
     nome: '',
@@ -119,6 +120,7 @@ const AbaMateriaisVisaoIa = ({ resumo, headersExtra, aoAtualizar, apiClient }) =
     const [processandoFoto, setProcessandoFoto] = useState(false);
     const [cameraCadastroAberta, setCameraCadastroAberta] = useState(false);
     const [modalConferenciaAberto, setModalConferenciaAberto] = useState(false);
+    const [submodoTela, setSubmodoTela] = useState('dashboard'); // dashboard | foto | video | live | catalogo
     const [evidenciaModalUrl, setEvidenciaModalUrl] = useState('');
     const [salvando, setSalvando] = useState(false);
 
@@ -844,27 +846,72 @@ const AbaMateriaisVisaoIa = ({ resumo, headersExtra, aoAtualizar, apiClient }) =
                         </NeonButton>
                     </Stack>
                 </Box>
+
+                {/* Navegação interna por modo operacional */}
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 2, pt: 1.75, borderTop: `1px solid ${cores.borda}` }}>
+                    {[
+                        { id: 'dashboard', rotulo: 'Dashboard e Auditoria' },
+                        { id: 'foto', rotulo: 'Foto da Pilha (IA)' },
+                        { id: 'video', rotulo: 'Vídeo Gravado (IA)' },
+                        { id: 'live', rotulo: 'Câmera / Rastreador ao Vivo' },
+                        { id: 'catalogo', rotulo: `Catálogo e Estoque (${materiais.length})` }
+                    ].map((modo) => {
+                        const ativo = submodoTela === modo.id;
+                        return (
+                            <Button
+                                key={modo.id}
+                                size="small"
+                                variant={ativo ? 'contained' : 'outlined'}
+                                onClick={() => setSubmodoTela(modo.id)}
+                                sx={ativo ? {
+                                    bgcolor: cores.primaria,
+                                    color: cores.fundo,
+                                    fontWeight: 700,
+                                    '&:hover': { bgcolor: cores.primaria }
+                                } : botaoSecundario}
+                            >
+                                {modo.rotulo}
+                            </Button>
+                        );
+                    })}
+                </Stack>
             </GlassCard>
 
+            {/* Dashboard de Contagem (estilo SensorTech) */}
+            {submodoTela === 'dashboard' && (
+                <DashboardContagemMateriais
+                    materiais={materiais}
+                    sessoes={sessoes}
+                    naoReconhecidos={naoReconhecidos}
+                    aoAbrirModo={(m) => setSubmodoTela(m)}
+                    aoAmpliarEvidencia={(url) => setEvidenciaModalUrl(url)}
+                />
+            )}
+
             {/* Contagem real por Foto da Pilha / Caminhão (Gemini Vision IA) */}
-            <PainelContagemFotoPilha
-                materiais={materiais}
-                areas={areas}
-                httpClient={httpClient}
-                headersExtra={headersExtra}
-                aoAtualizar={aoAtualizar}
-            />
+            {submodoTela === 'foto' && (
+                <PainelContagemFotoPilha
+                    materiais={materiais}
+                    areas={areas}
+                    httpClient={httpClient}
+                    headersExtra={headersExtra}
+                    aoAtualizar={aoAtualizar}
+                />
+            )}
 
             {/* Contagem real por Vídeo Gravado (Gemini Vision IA — sem duplicidade) */}
-            <PainelAnaliseVideoIa
-                materiais={materiais}
-                areas={areas}
-                httpClient={httpClient}
-                headersExtra={headersExtra}
-                aoAtualizar={aoAtualizar}
-            />
+            {submodoTela === 'video' && (
+                <PainelAnaliseVideoIa
+                    materiais={materiais}
+                    areas={areas}
+                    httpClient={httpClient}
+                    headersExtra={headersExtra}
+                    aoAtualizar={aoAtualizar}
+                />
+            )}
 
             {/* Analisador real de vídeo / câmera com assinatura visual e execução de regras */}
+            {submodoTela === 'live' && (
             <GlassCard sx={{ p: 2.5 }}>
                 <Grid container spacing={2.5} alignItems="flex-start">
                     <Grid item xs={12} lg={7}>
@@ -1064,9 +1111,10 @@ const AbaMateriaisVisaoIa = ({ resumo, headersExtra, aoAtualizar, apiClient }) =
                     </Grid>
                 </Grid>
             </GlassCard>
+            )}
 
             {/* Itens não reconhecidos para cadastro pela Auditoria */}
-            {naoReconhecidos.length > 0 && (
+            {(submodoTela === 'dashboard' || submodoTela === 'catalogo') && naoReconhecidos.length > 0 && (
                 <Alert severity="warning">
                     <Typography sx={{ fontWeight: 700, mb: 1 }}>
                         Novos materiais não reconhecidos aguardando cadastro pela Auditoria ({naoReconhecidos.length})
@@ -1109,6 +1157,7 @@ const AbaMateriaisVisaoIa = ({ resumo, headersExtra, aoAtualizar, apiClient }) =
             )}
 
             {/* Sessões de Conferência IA */}
+            {(submodoTela === 'dashboard' || submodoTela === 'foto' || submodoTela === 'video') && (
             <GlassCard sx={{ p: 2.5 }}>
                 <Typography variant="h6" sx={{ color: cores.textoForte, mb: 1.5 }}>
                     Conferências de recebimento (esperado × contado IA × revisão humana)
@@ -1235,8 +1284,10 @@ const AbaMateriaisVisaoIa = ({ resumo, headersExtra, aoAtualizar, apiClient }) =
                     })}
                 </Stack>
             </GlassCard>
+            )}
 
             {/* Catálogo visual completo e Rastreio de Movimentação */}
+            {submodoTela === 'catalogo' && (
             <GlassCard sx={{ p: 2.5 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                     <CatalogoIcon sx={{ color: funcao.acao }} />
@@ -1352,8 +1403,10 @@ const AbaMateriaisVisaoIa = ({ resumo, headersExtra, aoAtualizar, apiClient }) =
                     </Table>
                 </TableContainer>
             </GlassCard>
+            )}
 
             {/* Histórico de movimentações de estoque */}
+            {submodoTela === 'catalogo' && (
             <GlassCard sx={{ p: 2.5 }}>
                 <Typography variant="h6" sx={{ color: cores.textoForte, mb: 1.5 }}>
                     Histórico de movimentações de materiais ({movimentacoes.length})
@@ -1399,6 +1452,7 @@ const AbaMateriaisVisaoIa = ({ resumo, headersExtra, aoAtualizar, apiClient }) =
                     </Table>
                 </TableContainer>
             </GlassCard>
+            )}
 
             {/* Modal cadastrar / editar material completo */}
             <Dialog open={modalMaterialAberto} onClose={() => setModalMaterialAberto(false)} maxWidth="md" fullWidth>
