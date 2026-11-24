@@ -29,11 +29,14 @@ import RecusadosSincronizacao from '../components/checkin/RecusadosSincronizacao
 import PassagensRecusadas from '../components/checkin/PassagensRecusadas';
 import RelogioSincronizado from '../components/common/RelogioSincronizado';
 
-const FeedbackOverlay = styled(Box, { shouldForwardProp: (p) => p !== 'status' })(({ status }) => ({
-    position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-    background: status === 'sucesso' ? 'rgba(0,255,136,0.15)' : 'rgba(255,51,102,0.15)',
-    zIndex: 90, display: 'flex', flexDirection: 'column', alignItems: 'center', 
-    justifyContent: 'center', borderRadius: 12, border: status === 'sucesso' ? '4px solid #00FF88' : '4px solid #FF3366',
+// Tela inteira acima da ficha da pessoa (Dialog = zIndex.modal) e abaixo dos avisos (snackbar).
+// Não captura clique nem foco: o leitor continua digitando no campo da ficha enquanto ela aparece.
+const FeedbackOverlay = styled(Box, { shouldForwardProp: (p) => p !== 'status' })(({ status, theme }) => ({
+    position: 'fixed', inset: 0,
+    background: status === 'sucesso' ? 'rgba(0,255,136,0.15)' : 'rgba(255,51,102,0.18)',
+    zIndex: theme.zIndex.modal + 2, pointerEvents: 'none',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    border: status === 'sucesso' ? '6px solid #00FF88' : '6px solid #FF3366',
     backdropFilter: 'blur(8px)', animation: 'fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
 }));
 

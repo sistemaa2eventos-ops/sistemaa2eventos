@@ -84,11 +84,13 @@ const LinhaResumo = ({ rotulo, valor, cor = 'rgba(255,255,255,0.9)', dica }) => 
     return dica ? <Tooltip title={dica} placement="left">{linha}</Tooltip> : linha;
 };
 
-const FeedbackOverlay = styled(Box, { shouldForwardProp: (p) => p !== 'status' })(({ status }) => ({
-    position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-    background: status === 'sucesso' ? tom(COR, 0.15) : tom(funcao.negado, 0.15),
-    zIndex: 90, display: 'flex', flexDirection: 'column', alignItems: 'center', 
-    justifyContent: 'center', borderRadius: 12, border: `4px solid ${status === 'sucesso' ? COR : funcao.negado}`,
+// Tela inteira acima das janelas (Dialog) e abaixo dos avisos; não captura clique nem foco do leitor
+const FeedbackOverlay = styled(Box, { shouldForwardProp: (p) => p !== 'status' })(({ status, theme }) => ({
+    position: 'fixed', inset: 0,
+    background: status === 'sucesso' ? tom(COR, 0.15) : tom(funcao.negado, 0.18),
+    zIndex: theme.zIndex.modal + 2, pointerEvents: 'none',
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
+    justifyContent: 'center', border: `6px solid ${status === 'sucesso' ? COR : funcao.negado}`,
     backdropFilter: 'blur(8px)', animation: 'fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
 }));
 
