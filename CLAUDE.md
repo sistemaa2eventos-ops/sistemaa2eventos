@@ -759,6 +759,16 @@ docker system prune -af
      avulsos de diagnóstico (backend/api-nodejs/check_*/test_*/query_*, *.py, *.jpg na raiz), todos de abr–out/2026.
 
 ```
+2026-11-24 - Deploy 3b7a0de (Pilar 2: pulseira com pendência de dias anteriores + motivo)
+├─ Mudanças: tabela pulseiras_pendencia (pessoa_id, evento_id, numero, data_checkin, motivo);
+│            função buscarStatusPulseira {emUso, pendencia}; endpoints GET/POST pulseiras/status;
+│            layout ModalCredenciamento: Fase | Lote | Número (sem sobreposição);
+│            renderização condicional: pulseira TODAY vs pendência anterior + TextField motivo
+├─ Migrations: 20261124_pulseiras_pendencia.sql aplicada (com RLS por perfis)
+├─ Status: ✅ OK (GitHub Actions run 45432308823); painel 200, /api/ready 200 (database ok, redis ok)
+├─ Testes: backend 701 ✅
+└─ Rollback: tag antes-deploy-20261124-pulseira-pendencia (3b7a0de)
+
 2026-11-24 - Deploy da4e092 (pulseira por lote, tipo de área, vigilância com CPF)
 ├─ Mudanças: pulseiraLote.js (outraPessoaNoLote, loteAtivoDaPulseira); bloqueioPorTipoArea para checkin/checkout;
 │            type_pulseira_id como chave de lote; 8 testes novos (lote, áreas, watchlist, permissões);
