@@ -27,10 +27,10 @@ ALTER TABLE public.pulseiras_pendencia ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "admin_master_all" ON public.pulseiras_pendencia
   FOR ALL USING (auth.jwt() ->> 'role' = 'authenticated' AND EXISTS (
-    SELECT 1 FROM public.usuarios u WHERE u.id = auth.uid() AND u.nivel_acesso = 'admin_master'
+    SELECT 1 FROM public.perfis p WHERE p.id = auth.uid() AND p.nivel_acesso = 'admin_master'
   ));
 
 CREATE POLICY "operador_evento" ON public.pulseiras_pendencia
   FOR ALL USING (auth.jwt() ->> 'role' = 'authenticated' AND EXISTS (
-    SELECT 1 FROM public.usuarios u WHERE u.id = auth.uid() AND u.evento_id = evento_id
+    SELECT 1 FROM public.perfis p WHERE p.id = auth.uid() AND p.evento_id = evento_id
   ));
