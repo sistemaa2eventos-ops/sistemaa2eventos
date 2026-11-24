@@ -759,6 +759,18 @@ docker system prune -af
      avulsos de diagnóstico (backend/api-nodejs/check_*/test_*/query_*, *.py, *.jpg na raiz), todos de abr–out/2026.
 
 ```
+2026-11-24 - Deploy a09e5de (fiscalização: credencial, presença de hoje, pulseira de outro dia)
+├─ Mudanças: libera só credenciado, dentro do evento (último movimento de hoje é entrada, com ou sem pulseira)
+│            e pulseira em uso hoje; pulseira de outro dia não devolvida aparece com data e forma do check-in
+│            e, se ainda dentro, manda ao credenciamento (status pulseira_dia_anterior); pulseira devolvida,
+│            perdida ou com saída real fica oculta; forma do registro (facial, manual com operador, pulseira);
+│            movimentos de hoje; áreas; tela cheia funcional; fiscalizacaoSituacao.service.js
+├─ Commits: b64030f (primeira versão) e a09e5de; 473e30e (produção v1.3.0) foi junto no push
+├─ Status: ✅ OK (GitHub Actions run 45488044703); /checkin 200, /fiscalizacao 200
+├─ Testes: backend 730 ✅; navegador com API simulada (pulseira de outro dia ainda dentro; entrada manual sem pulseira)
+└─ Rollback: tag antes-deploy-20261124-fiscalizacao (89b09b3)
+
+
 2026-11-24 - Deploy ab4fd8b (busca por qualquer dado; número inteiro no campo; câmera só ícone)
 ├─ Mudanças: searchPessoas busca nome, nome do crachá, CPF (com ou sem pontuação), e-mail, telefone, documento,
 │            passaporte, função, tipo, pulseira e empresa (nome/CNPJ traz todos da empresa); sem acento;
