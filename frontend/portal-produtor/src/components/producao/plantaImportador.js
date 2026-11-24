@@ -5,7 +5,8 @@ let workerConfigurado = false;
 async function obterPdfJs() {
     const pdfjs = await import('pdfjs-dist');
     if (!workerConfigurado && pdfjs.GlobalWorkerOptions) {
-        pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+        const sep = pdfWorkerUrl.includes('?') ? '&' : '?';
+        pdfjs.GlobalWorkerOptions.workerSrc = `${pdfWorkerUrl}${sep}mime=js`;
         workerConfigurado = true;
     }
     return pdfjs;
