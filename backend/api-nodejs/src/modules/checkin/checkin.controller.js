@@ -14,7 +14,7 @@ const { buscarPessoaPorCodigo } = require('./codigoLeitor');
 const { etapaDoLote } = require('./services/entradaEtapa');
 const { bloqueioPorTipoArea } = require('./services/tipoArea');
 const AuditoriaService = require('../auditoria/auditoria.service');
-const { situacaoFiscal } = require('./fiscalizacaoSituacao.service');
+const { situacaoFiscal, areasDaPessoa } = require('./fiscalizacaoSituacao.service');
 
 // Área só de monitoramento: nenhuma entrada/saída é registrada nela (409 AREA_SO_MONITORAMENTO)
 const recusarSeSoMonitoramento = async (res, areaId) => {
@@ -997,6 +997,52 @@ class AccessController {
      * Valida permissão do colaborador para a área física específica
      * Dispara alerta multicanal imediato se o colaborador estiver na lista de procurados/watchlist
      */
+    /**
+     * Situação de hoje de uma pessoa do evento: credencial, presença, pulseira em uso, pulseira de outro dia,
+     * movimentos e áreas. Usada pela ficha do participante (mesma regra da fiscalização).
+     */
+    async situacaoPessoa(req, res) {
+        try {
+            const eventoId = req.event?.id;
+            const supabaseClient = req.supabase || supabase;
+            const { pessoa_id } = req.params;
+            const { data: pessoa, error } = await supabaseClient
+                .from('pessoas')
+                .select('id, nome_completo, cpf, funcao, status_acesso, foto_url, telefone, email, bloqueado, motivo_bloqueio, ativo, tipo_pulseira_id, empresas(id, nome, ativo)')
+                .eq('id', pessoa_id)
+                .eq('evento_id', eventoId)
+                .maybeSingle();
+            if (error) throw error;
+            if (!pessoa) return ApiResponse.error(res, 'Participante não encontrado neste evento.', 404);
+
+            const [situacao, areas] = await Promise.all([
+                situacaoFiscal(supabaseClient, eventoId, pessoa),
+                areasDaPessoa(supabaseClient, eventoId, pessoa),
+            ]);
+            return ApiResponse.success(res, {
+                pessoa: {
+                    id: pessoa.id,
+                    nome_completo: pessoa.nome_completo,
+                    cpf: pessoa.cpf,
+                    funcao: pessoa.funcao,
+                    empresa_nome: pessoa.empresas?.nome || null,
+                    empresas: pessoa.empresas ? { id: pessoa.empresas.id, nome: pessoa.empresas.nome } : null,
+                    foto_url: pessoa.foto_url,
+                    telefone: pessoa.telefone || null,
+                    email: pessoa.email || null,
+                    status_acesso: pessoa.status_acesso,
+                    bloqueado: pessoa.bloqueado,
+                    motivo_bloqueio: pessoa.motivo_bloqueio,
+                },
+                ...situacao,
+                areas_autorizadas: areas,
+            });
+        } catch (error) {
+            logger.error({ err: error, event_id: req.event?.id }, 'Erro ao buscar situação do participante');
+            return ApiResponse.error(res, 'Erro ao buscar a situação do participante.', 500);
+        }
+    }
+
     async fiscalizarAcesso(req, res) {
         try {
             const { codigo, area_id, metodo = 'scanner' } = req.body;

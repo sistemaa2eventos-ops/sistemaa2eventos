@@ -184,4 +184,19 @@ async function situacaoFiscal(client, eventoId, pessoa) {
     };
 }
 
-module.exports = { situacaoFiscal, SITUACOES_NAO_CREDENCIADAS, comoIsoUtc, FORMA_DO_METODO };
+// Áreas que a pessoa pode acessar: diretas e pelo lote da pulseira
+async function areasDaPessoa(client, eventoId, pessoa) {
+    const [diretas, porLote] = await Promise.all([
+        client.from('pessoa_areas_acesso').select('area_id, evento_areas(id, nome_area)').eq('pessoa_id', pessoa.id).eq('evento_id', eventoId),
+        pessoa.tipo_pulseira_id
+            ? client.from('pulseira_areas_permitidas').select('area_id, evento_areas(id, nome_area)').eq('tipo_pulseira_id', pessoa.tipo_pulseira_id)
+            : Promise.resolve({ data: [] }),
+    ]);
+    const mapa = new Map();
+    for (const item of [...(diretas.data || []), ...(porLote.data || [])]) {
+        if (item.area_id) mapa.set(item.area_id, item.evento_areas?.nome_area || 'Área');
+    }
+    return [...mapa.entries()].map(([id, nome_area]) => ({ id, nome_area }));
+}
+
+module.exports = { situacaoFiscal, areasDaPessoa, SITUACOES_NAO_CREDENCIADAS, comoIsoUtc, FORMA_DO_METODO };

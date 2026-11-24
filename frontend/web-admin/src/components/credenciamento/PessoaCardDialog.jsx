@@ -50,9 +50,16 @@ const PessoaCardDialog = ({
     const fetchDetalhes = async () => {
       try {
         setLoading(true);
-        const res = await api.get(`/pessoas/${pessoaId}`);
+        const res = await api.get(`/checkin/situacao/${pessoaId}`);
         if (!isCancelled && res.data?.success && res.data?.data) {
-          setDetalhesPessoa(res.data.data);
+          const d = res.data.data;
+          setDetalhesPessoa({
+            ...d.pessoa,
+            areas_autorizadas: d.areas_autorizadas,
+            horario_checkin: d.entrada_hoje?.horario || null,
+            metodo_checkin: d.entrada_hoje?.metodo || null,
+            situacao: d,
+          });
         }
       } catch (err) {
         // Fallback silencioso mantendo os dados que já vieram no log ou card
@@ -73,12 +80,14 @@ const PessoaCardDialog = ({
 
   // Unifica dados completos (API prioritária, fallback inteligente para dados imediatos da lista)
   const pessoaDados = { ...pessoaBase, ...(detalhesPessoa || {}) };
+  // Situação de hoje (credencial, presença, pulseira em uso, pulseira de outro dia): só existe quando carregou
+  const sit = detalhesPessoa?.situacao || null;
   const nome = pessoaDados.nome_completo || pessoaDados.nome || log?.pessoa_nome || 'Participante';
   const cpf = pessoaDados.cpf ? pessoaDados.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.***.***-$4') : (log?.cpf || 'Não informado');
   const empresa = pessoaDados.empresas?.nome || pessoaDados.empresa_nome || log?.empresa_nome || 'Geral / Não informada';
   const funcao = pessoaDados.funcao || log?.funcao || 'Operacional';
   const fotoUrl = pessoaDados.foto_url || log?.foto_capturada || log?.foto_url;
-  const pulseira = pessoaDados.numero_pulseira || log?.numero_pulseira || log?.extra?.numero_pulseira;
+  const pulseira = sit ? sit.pulseira?.numero : (log?.numero_pulseira || log?.extra?.numero_pulseira);
   const statusAcesso = pessoaDados.status_acesso || (log?.tipo === 'checkout' ? 'fora' : (log ? 'checkin_feito' : 'cadastrado'));
   const telefone = pessoaDados.telefone || pessoaDados.celular || null;
   const email = pessoaDados.email || null;
@@ -96,37 +105,29 @@ const PessoaCardDialog = ({
   const areaNome = log?.area_nome || log?.evento_areas?.nome_area || pessoaDados.area_checkin || 'Área Geral';
   const confianca = log?.confianca ? `${log.confianca}%` : null;
 
-  // Definição visual do status
+  // Definição visual do status: pela situação de hoje; sem ela, pelo registro
   const isBloqueado = Boolean(pessoaDados.bloqueado);
   const isSaida = isCheckout || statusAcesso === 'checkout_feito' || statusAcesso === 'fora';
-  const isPresente = statusAcesso === 'checkin_feito' || (!isCheckout && tipoAcesso === 'checkin');
+  const isPresente = sit ? Boolean(sit.dentro_do_evento) : (statusAcesso === 'checkin_feito' || (!isCheckout && tipoAcesso === 'checkin'));
   const isPendente = statusAcesso === 'pendente';
+  const ainda = Boolean(sit?.pulseira_anterior?.ainda_dentro);
 
   let statusLabel = 'Cadastrado';
   let statusColor = '#00D4FF';
-  let statusBg = 'rgba(0, 212, 255, 0.15)';
-
-  if (isBloqueado) {
-    statusLabel = 'Bloqueado';
-    statusColor = '#FF3366';
-    statusBg = 'rgba(255, 51, 102, 0.2)';
-  } else if (isSaida) {
-    statusLabel = 'Saída registrada';
-    statusColor = '#FF3366';
-    statusBg = 'rgba(255, 51, 102, 0.2)';
-  } else if (isPresente) {
-    statusLabel = 'Credenciado / No evento';
-    statusColor = '#00FF88';
-    statusBg = 'rgba(0, 255, 136, 0.15)';
-  } else if (isPendente) {
-    statusLabel = 'Aguardando Credenciamento';
-    statusColor = '#FFB800';
-    statusBg = 'rgba(255, 184, 0, 0.15)';
-  } else {
-    statusLabel = 'Autorizado';
-    statusColor = '#00FF88';
-    statusBg = 'rgba(0, 255, 136, 0.15)';
-  }
+  const definir = (rotulo, cor) => { statusLabel = rotulo; statusColor = cor; };
+  if (sit) {
+    if (isBloqueado) definir('Bloqueado', '#FF3366');
+    else if (!sit.credenciado) definir(`Não credenciado${sit.motivo_nao_credenciado ? ` · ${sit.motivo_nao_credenciado}` : ''}`, '#FF3366');
+    else if (ainda) definir('Ainda dentro com pulseira de outro dia', '#FF3366');
+    else if (sit.dentro_do_evento) definir('Dentro do evento', '#00FF88');
+    else if (sit.ultimo_evento_hoje === 'checkout') definir('Fora do evento (saiu hoje)', '#FFB800');
+    else definir('Sem check-in hoje', '#FFB800');
+  } else if (isBloqueado) definir('Bloqueado', '#FF3366');
+  else if (isSaida) definir('Saída registrada', '#FF3366');
+  else if (isPresente) definir('Credenciado / No evento', '#00FF88');
+  else if (isPendente) definir('Aguardando Credenciamento', '#FFB800');
+  else definir('Autorizado', '#00FF88');
+  const statusBg = `${statusColor}26`;
 
   const temRegistroAcesso = Boolean(log || pessoaDados.horario_checkin);
 
@@ -287,6 +288,29 @@ const PessoaCardDialog = ({
               </Stack>
 
               {/* CARD DETALHADO DO ÚLTIMO REGISTRO OU STATUS DE PRESENÇA */}
+              {sit && (
+                <Box sx={{ mb: 2, p: 1.5, borderRadius: 1.5, border: '1px solid rgba(255,255,255,0.1)', bgcolor: 'rgba(255,255,255,0.03)' }}>
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', letterSpacing: 1, display: 'block', mb: 1, fontWeight: 700 }}>
+                    SITUAÇÃO DE HOJE
+                  </Typography>
+                  <Stack spacing={0.6}>
+                    <Typography variant="body2"><b>Credencial:</b> {sit.credenciado ? 'Credenciado' : `Não credenciado${sit.motivo_nao_credenciado ? ` (${sit.motivo_nao_credenciado})` : ''}`}</Typography>
+                    <Typography variant="body2"><b>Presença:</b> {sit.dentro_do_evento ? 'Dentro do evento' : (sit.ultimo_evento_hoje === 'checkout' ? 'Saiu hoje' : 'Sem check-in hoje')}
+                      {sit.entrada_hoje ? ` · entrou em ${formatLocalDateTime(sit.entrada_hoje.horario)} · ${sit.entrada_hoje.forma}${sit.entrada_hoje.usuario_nome ? ` por ${sit.entrada_hoje.usuario_nome}` : ''}` : ''}
+                    </Typography>
+                    <Typography variant="body2"><b>Pulseira em uso hoje:</b> {sit.pulseira
+                      ? `nº ${sit.pulseira.numero}${sit.pulseira.tipo_nome ? ` (${sit.pulseira.tipo_nome})` : ''}, colocada em ${formatLocalDateTime(sit.pulseira.colocada_em)}${sit.pulseira.forma ? ` · ${sit.pulseira.forma}` : ''}`
+                      : 'nenhuma'}
+                    </Typography>
+                    {sit.pulseira_anterior && (
+                      <Typography variant="body2" sx={{ color: ainda ? '#FF3366' : '#FFB800', fontWeight: 700 }}>
+                        Pulseira de outro dia não devolvida: nº {sit.pulseira_anterior.numero}, check-in em {formatLocalDateTime(sit.pulseira_anterior.colocada_em)}
+                        {ainda ? ' — ainda no evento: credenciamento para trocar a pulseira e fazer check-in novamente.' : ` — saiu em ${formatLocalDateTime(sit.pulseira_anterior.saiu_em)} (fim de turno).`}
+                      </Typography>
+                    )}
+                  </Stack>
+                </Box>
+              )}
               {temRegistroAcesso ? (
                 <Box
                   sx={{

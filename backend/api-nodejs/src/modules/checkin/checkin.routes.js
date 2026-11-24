@@ -81,6 +81,8 @@ router.post('/link-checkin', sessionMiddleware, rateLimiter.access, checkAnyPerm
 router.get('/pulseira/buscar', sessionMiddleware, rateLimiter.consulta,
     checkAnyPermission(PERM_CONSULTA), accessController.buscarPessoaPulseira);
 router.get('/pulseira/ultimo/:pessoa_id', sessionMiddleware, checkAnyPermission(PERM_CONSULTA), accessController.ultimoCheckin);
+// Situação de hoje de uma pessoa (ficha do participante em Check-in, Check-out, janela e dashboard)
+router.get('/situacao/:pessoa_id', sessionMiddleware, checkAnyPermission(PERM_CONSULTA), accessController.situacaoPessoa);
 
 // ============================================
 // CHECK-IN GENÉRICO (manual e qrcode — painel web)
