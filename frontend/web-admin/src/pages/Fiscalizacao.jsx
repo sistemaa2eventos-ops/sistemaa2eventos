@@ -13,7 +13,6 @@ import {
     FullscreenExit as FullscreenExitIcon,
     VolumeUp as SoundOnIcon,
     VolumeOff as SoundOffIcon,
-    AccessTime as AccessTimeIcon,
     Badge as BadgeIcon,
     CorporateFare as CompanyIcon,
     Sensors as PulseiraIcon,
@@ -68,6 +67,16 @@ const playFeedbackSound = (type, soundEnabled = true) => {
 };
 
 
+// Caixinha de um dado da ficha (credencial, presença, pulseira)
+const Bloco = ({ titulo, cor, children }) => (
+    <Box sx={{ height: '100%', p: 1.25, borderRadius: 1.25, bgcolor: 'rgba(255,255,255,0.03)', border: `1px solid ${cor}55` }}>
+        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', display: 'block', fontWeight: 700, letterSpacing: 0.5, mb: 0.5 }}>
+            {titulo.toUpperCase()}
+        </Typography>
+        {children}
+    </Box>
+);
+
 const Fiscalizacao = () => {
     const { enqueueSnackbar } = useSnackbar();
     const theme = useTheme();
@@ -85,7 +94,7 @@ const Fiscalizacao = () => {
     const [loading, setLoading] = useState(false);
     const [resultado, setResultado] = useState(null);
     const [soundEnabled, setSoundEnabled] = useState(true);
-    const [isKiosk, setIsKiosk] = useState(false);
+    const [telaCheia, setTelaCheia] = useState(false);
 
     // Câmera Scanner QR / Barras
     const [cameraActive, setCameraActive] = useState(false);
@@ -229,6 +238,22 @@ const Fiscalizacao = () => {
 
     const areaAtual = areas.find(a => a.id === selectedAreaId);
 
+    // Tela cheia do navegador (o botão antes só trocava o ícone)
+    useEffect(() => {
+        const aoMudar = () => setTelaCheia(Boolean(document.fullscreenElement));
+        document.addEventListener('fullscreenchange', aoMudar);
+        return () => document.removeEventListener('fullscreenchange', aoMudar);
+    }, []);
+
+    const alternarTelaCheia = async () => {
+        try {
+            if (document.fullscreenElement) await document.exitFullscreen();
+            else await document.documentElement.requestFullscreen();
+        } catch {
+            enqueueSnackbar('O navegador não permitiu a tela cheia.', { variant: 'warning' });
+        }
+    };
+
     // Formatação de data/hora para visualização rápida no card
     const formatarHora = (isoStr) => {
         if (!isoStr) return null;
@@ -241,6 +266,18 @@ const Fiscalizacao = () => {
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit'
+            });
+        } catch {
+            return isoStr;
+        }
+    };
+
+    const formatarDataHora = (isoStr) => {
+        if (!isoStr) return null;
+        try {
+            return new Date(isoStr).toLocaleString('pt-BR', {
+                timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric',
+                hour: '2-digit', minute: '2-digit'
             });
         } catch {
             return isoStr;
@@ -292,9 +329,9 @@ const Fiscalizacao = () => {
                     </Tooltip>
 
                     {/* Tela Cheia */}
-                    <Tooltip title="Alternar modo tela cheia (kiosk)">
+                    <Tooltip title={telaCheia ? 'Sair da tela cheia' : 'Tela cheia'}>
                         <IconButton
-                            onClick={() => setIsKiosk(!isKiosk)}
+                            onClick={alternarTelaCheia}
                             sx={{
                                 color: '#00D4FF',
                                 bgcolor: 'rgba(0,212,255,0.08)',
@@ -304,7 +341,7 @@ const Fiscalizacao = () => {
                                 '&:hover': { bgcolor: 'rgba(0,212,255,0.18)' }
                             }}
                         >
-                            {isKiosk ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
+                            {telaCheia ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
                         </IconButton>
                     </Tooltip>
                 </Stack>
@@ -380,9 +417,9 @@ const Fiscalizacao = () => {
                     loading={loading}
                     autoFocus={true}
                     ultimoCodigoLido={ultimoCodigoLido}
-                    label="Leitor, pulseira, CPF ou nome"
-                    placeholder="Bipe QR/barras, digite nº da pulseira, CPF ou nome..."
-                    helperText="Bipe ou câmera: fiscalização automática • Digitação: Enter ou OK • Nome: escolha na lista"
+                    label="Buscar pessoa"
+                    placeholder="Nome, CPF, empresa, função, pulseira... ou bipe o QR"
+                    helperText="Busca por qualquer dado do cadastro, em ordem alfabética • Bipe ou câmera: fiscalização automática • Digitado: Enter ou OK"
                     accentColor="#00D4FF"
                     onAbrirCamera={() => setCameraActive(true)}
                 />
@@ -393,6 +430,9 @@ const Fiscalizacao = () => {
 
                 {buscaNomeOptions.length > 0 && (
                     <Box sx={{ mt: 1.5, maxHeight: 260, overflowY: 'auto' }}>
+                        <Typography variant="caption" sx={{ display: 'block', mb: 0.75, color: 'rgba(255,255,255,0.55)' }}>
+                            {buscaNomeOptions.length === 1 ? '1 pessoa encontrada' : `${buscaNomeOptions.length} pessoas encontradas`} • ordem alfabética
+                        </Typography>
                         <List disablePadding>
                             {buscaNomeOptions.map((option) => (
                                 <ListItem key={option.id} disablePadding sx={{ mb: 0.75 }}>
@@ -416,10 +456,10 @@ const Fiscalizacao = () => {
                                             primary={option.nome_completo || option.nome}
                                             secondary={[
                                                 option.cpf || 'Sem CPF',
+                                                option.funcao,
                                                 option.numero_pulseira ? `Pulseira ${option.numero_pulseira}` : null,
-                                                option.funcao || 'Participante',
                                                 option.empresa_nome || option.empresas?.nome
-                                            ].filter(Boolean).join(' • ')}
+                                            ].filter(Boolean).join(' – ')}
                                             primaryTypographyProps={{ fontWeight: 700, fontSize: '0.9rem', color: '#FFFFFF', noWrap: true }}
                                             secondaryTypographyProps={{ fontSize: '0.78rem', color: '#94A3B8', noWrap: true }}
                                         />
@@ -541,113 +581,137 @@ const Fiscalizacao = () => {
                                 </Box>
                             </Grid>
 
-                            {/* Ficha Rápida no Posto */}
+                            {/* Ficha de fiscalização: credencial, presença de hoje, pulseira em uso, movimentos e áreas */}
                             <Grid item xs={12} sm={8} md={8.5}>
                                 <Typography sx={{ color: '#FFFFFF', fontWeight: 700, fontFamily: '"Space Grotesk", sans-serif', fontSize: { xs: '1.2rem', sm: '1.5rem', md: '2rem' }, lineHeight: 1.2, mb: 0.8, textAlign: { xs: 'center', sm: 'left' } }}>
                                     {resultado.pessoa.nome_completo}
                                 </Typography>
 
-                                <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent={{ xs: 'center', sm: 'flex-start' }} sx={{ gap: 1, mb: 1.5 }}>
+                                <Stack direction="row" flexWrap="wrap" justifyContent={{ xs: 'center', sm: 'flex-start' }} sx={{ gap: 1, mb: 1.5 }}>
                                     <Chip
                                         icon={<BadgeIcon sx={{ fontSize: 16 }} />}
                                         label={resultado.pessoa.funcao || 'Participante'}
                                         sx={{ bgcolor: 'rgba(255,255,255,0.08)', color: '#FFFFFF', fontWeight: 700 }}
                                     />
-                                    {resultado.pessoa.empresas?.nome && (
-                                        <Chip
-                                            icon={<CompanyIcon sx={{ fontSize: 16 }} />}
-                                            label={resultado.pessoa.empresas.nome}
-                                            sx={{ bgcolor: 'rgba(255,255,255,0.08)', color: '#FFFFFF', fontWeight: 700 }}
-                                        />
-                                    )}
+                                    <Chip
+                                        icon={<CompanyIcon sx={{ fontSize: 16 }} />}
+                                        label={resultado.pessoa.empresas?.nome || resultado.pessoa.empresa_nome || 'Pessoa física'}
+                                        sx={{ bgcolor: 'rgba(255,255,255,0.08)', color: '#FFFFFF', fontWeight: 700 }}
+                                    />
                                 </Stack>
+
+                                <Grid container spacing={1.25}>
+                                    {/* Credencial */}
+                                    <Grid item xs={12} sm={4}>
+                                        <Bloco titulo="Credencial" cor={resultado.pessoa.credenciado ? '#00FF88' : '#FF3366'}>
+                                            <Typography sx={{ color: resultado.pessoa.credenciado ? '#00FF88' : '#FF3366', fontWeight: 800 }}>
+                                                {resultado.pessoa.credenciado ? 'CREDENCIADO' : 'NÃO CREDENCIADO'}
+                                            </Typography>
+                                            {!resultado.pessoa.credenciado && resultado.pessoa.motivo_nao_credenciado && (
+                                                <Typography variant="caption" sx={{ color: '#FFB3C6' }}>{resultado.pessoa.motivo_nao_credenciado}</Typography>
+                                            )}
+                                        </Bloco>
+                                    </Grid>
+
+                                    {/* Presença de hoje */}
+                                    <Grid item xs={12} sm={4}>
+                                        <Bloco titulo="Presença de hoje" cor={resultado.pessoa.dentro_do_evento ? '#00FF88' : '#FFB800'}>
+                                            <Typography sx={{ color: resultado.pessoa.dentro_do_evento ? '#00FF88' : '#FFB800', fontWeight: 800 }}>
+                                                {resultado.pessoa.dentro_do_evento
+                                                    ? 'DENTRO DO EVENTO'
+                                                    : (resultado.pessoa.ultimo_evento_hoje === 'checkout' ? 'FORA DO EVENTO' : 'SEM CHECK-IN HOJE')}
+                                            </Typography>
+                                        </Bloco>
+                                    </Grid>
+
+                                    {/* Pulseira em uso hoje: só a de hoje; de outro dia nunca aparece */}
+                                    <Grid item xs={12} sm={4}>
+                                        <Bloco titulo="Pulseira em uso hoje" cor={resultado.pessoa.pulseira ? '#00D4FF' : '#FFB800'}>
+                                            {resultado.pessoa.pulseira ? (
+                                                <>
+                                                    <Stack direction="row" alignItems="center" flexWrap="wrap" sx={{ gap: 0.75 }}>
+                                                        <PulseiraIcon sx={{ fontSize: 18, color: '#00D4FF' }} />
+                                                        <Typography sx={{ color: '#00D4FF', fontWeight: 800, fontSize: '1.15rem' }}>
+                                                            {resultado.pessoa.pulseira.numero}
+                                                        </Typography>
+                                                        {resultado.pessoa.pulseira.tipo_nome && (
+                                                            <Chip
+                                                                size="small"
+                                                                label={resultado.pessoa.pulseira.tipo_nome}
+                                                                sx={{
+                                                                    fontWeight: 700,
+                                                                    bgcolor: resultado.pessoa.pulseira.cor_hex ? `${resultado.pessoa.pulseira.cor_hex}33` : 'rgba(255,255,255,0.08)',
+                                                                    color: resultado.pessoa.pulseira.cor_hex || '#FFFFFF',
+                                                                    border: `1px solid ${resultado.pessoa.pulseira.cor_hex || 'rgba(255,255,255,0.2)'}`
+                                                                }}
+                                                            />
+                                                        )}
+                                                    </Stack>
+                                                    <Typography variant="caption" sx={{ color: '#CBD5E1', display: 'block', mt: 0.5 }}>
+                                                        Colocada em {formatarDataHora(resultado.pessoa.pulseira.colocada_em) || '—'}
+                                                    </Typography>
+                                                </>
+                                            ) : (
+                                                <Typography variant="body2" sx={{ color: '#FFB800', fontWeight: 700 }}>
+                                                    Nenhuma pulseira em uso hoje
+                                                </Typography>
+                                            )}
+                                        </Bloco>
+                                    </Grid>
+                                </Grid>
 
                                 <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)', my: 1.5 }} />
 
-                                {/* Detalhes: Pulseira, Check-in, Status de Acesso e Áreas */}
-                                <Grid container spacing={1.5}>
-                                    {/* Número da Pulseira */}
-                                    <Grid item xs={6}>
-                                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                            <PulseiraIcon sx={{ fontSize: 14, color: '#00D4FF' }} />
-                                            Pulseira / RFID
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ color: '#00D4FF', fontWeight: 700, fontFamily: '"Inter", sans-serif' }}>
-                                            {resultado.pessoa.numero_pulseira || 'Sem pulseira'}
-                                        </Typography>
-                                    </Grid>
-
-                                    {/* Horário de Check-in */}
-                                    <Grid item xs={6}>
-                                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                            <AccessTimeIcon sx={{ fontSize: 14, color: '#00FF88' }} />
-                                            Check-in no evento
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ color: resultado.pessoa.horario_checkin ? '#00FF88' : '#FFB800', fontWeight: 700, fontFamily: '"Inter", sans-serif' }}>
-                                            {resultado.pessoa.horario_checkin
-                                                ? `${formatarHora(resultado.pessoa.horario_checkin)}`
-                                                : 'Pendente'}
-                                        </Typography>
-                                    </Grid>
-
-                                    {/* Status do Acesso */}
-                                    <Grid item xs={6}>
-                                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>
-                                            Status de acesso
-                                        </Typography>
-                                        <Chip
-                                            label={resultado.pessoa.bloqueado ? 'BLOQUEADO' : (resultado.autorizado ? 'LIBERADO' : 'NÃO AUTORIZADO')}
-                                            size="small"
-                                            sx={{
-                                                bgcolor: resultado.pessoa.bloqueado ? 'rgba(255,51,102,0.2)' : (resultado.autorizado ? 'rgba(0,255,136,0.2)' : 'rgba(255,184,0,0.2)'),
-                                                color: resultado.pessoa.bloqueado ? '#FF3366' : (resultado.autorizado ? '#00FF88' : '#FFB800'),
-                                                fontWeight: 700,
-                                                mt: 0.5
-                                            }}
-                                        />
-                                    </Grid>
-
-                                    {/* Posto Atual */}
-                                    <Grid item xs={6}>
-                                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>
-                                            Posto fiscalizado
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 700, mt: 0.5 }}>
-                                            {areaAtual?.nome_area || 'Portaria Geral'}
-                                        </Typography>
-                                    </Grid>
-
-                                    {/* Áreas Autorizadas */}
-                                    <Grid item xs={12}>
-                                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block', mb: 0.8 }}>
-                                            Áreas autorizadas para esta credencial
-                                        </Typography>
-                                        <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 0.8 }}>
-                                            {resultado.areas_permitidas && resultado.areas_permitidas.length > 0 ? (
-                                                resultado.areas_permitidas.map((ar, idx) => {
-                                                    const isThisArea = ar.id === selectedAreaId;
-                                                    return (
-                                                        <Chip
-                                                            key={idx}
-                                                            label={isThisArea ? `★ ${ar.nome_area || ar} (POSTO ATUAL)` : (ar.nome_area || ar)}
-                                                            size="small"
-                                                            sx={{
-                                                                bgcolor: isThisArea ? '#00FF88' : 'rgba(255,255,255,0.06)',
-                                                                color: isThisArea ? '#000000' : '#CBD5E1',
-                                                                fontWeight: isThisArea ? 900 : 600,
-                                                                border: isThisArea ? 'none' : '1px solid rgba(255,255,255,0.12)'
-                                                            }}
-                                                        />
-                                                    );
-                                                })
-                                            ) : (
-                                                <Typography variant="caption" sx={{ color: '#94A3B8' }}>
-                                                    {resultado.pessoa.tipo_pulseira?.nome_tipo ? `Tipo: ${resultado.pessoa.tipo_pulseira.nome_tipo}` : 'Acesso geral padrão'}
+                                {/* Movimentos de hoje: entradas e saídas, com horário, área e pulseira */}
+                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', display: 'block', mb: 0.75, fontWeight: 700, letterSpacing: 0.5 }}>
+                                    MOVIMENTOS DE HOJE
+                                </Typography>
+                                {(resultado.pessoa.historico_hoje || []).length > 0 ? (
+                                    <Stack spacing={0.6} sx={{ mb: 1.5 }}>
+                                        {resultado.pessoa.historico_hoje.map((h, idx) => {
+                                            const entrada = h.tipo === 'checkin';
+                                            return (
+                                                <Typography key={idx} variant="body2" sx={{ color: '#E2E8F0' }}>
+                                                    <Box component="span" sx={{ color: entrada ? '#00FF88' : '#FFB800', fontWeight: 800 }}>
+                                                        {formatarHora(h.horario)} {entrada ? 'ENTRADA' : 'SAÍDA'}
+                                                    </Box>
+                                                    {' · '}{h.area_nome || 'Geral'}
+                                                    {' · '}{h.numero_pulseira ? `pulseira ${h.numero_pulseira}` : 'sem pulseira'}
+                                                    {h.metodo ? ` · ${h.metodo}` : ''}
                                                 </Typography>
-                                            )}
-                                        </Stack>
-                                    </Grid>
-                                </Grid>
+                                            );
+                                        })}
+                                    </Stack>
+                                ) : (
+                                    <Typography variant="body2" sx={{ color: '#94A3B8', mb: 1.5 }}>Nenhuma entrada ou saída hoje.</Typography>
+                                )}
+
+                                {/* Áreas que a pessoa pode acessar */}
+                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', display: 'block', mb: 0.75, fontWeight: 700, letterSpacing: 0.5 }}>
+                                    ÁREAS QUE PODE ACESSAR
+                                </Typography>
+                                <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 0.8 }}>
+                                    {(resultado.pessoa.areas_autorizadas || []).length > 0 ? (
+                                        resultado.pessoa.areas_autorizadas.map((ar) => {
+                                            const isThisArea = ar.id === selectedAreaId;
+                                            return (
+                                                <Chip
+                                                    key={ar.id}
+                                                    label={isThisArea ? `★ ${ar.nome_area} (POSTO ATUAL)` : ar.nome_area}
+                                                    size="small"
+                                                    sx={{
+                                                        bgcolor: isThisArea ? '#00FF88' : 'rgba(255,255,255,0.06)',
+                                                        color: isThisArea ? '#000000' : '#CBD5E1',
+                                                        fontWeight: isThisArea ? 900 : 600,
+                                                        border: isThisArea ? 'none' : '1px solid rgba(255,255,255,0.12)'
+                                                    }}
+                                                />
+                                            );
+                                        })
+                                    ) : (
+                                        <Typography variant="caption" sx={{ color: '#94A3B8' }}>Nenhuma área cadastrada para esta pessoa.</Typography>
+                                    )}
+                                </Stack>
                             </Grid>
                         </Grid>
                     )}

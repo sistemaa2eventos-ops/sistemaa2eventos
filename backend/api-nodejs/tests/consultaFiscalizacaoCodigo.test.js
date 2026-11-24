@@ -37,7 +37,9 @@ jest.mock('../src/services/webhookDispatcher', () => ({ dispatchCheckin: jest.fn
 jest.mock('../src/services/websocketService', () => ({ emit: jest.fn() }));
 jest.mock('../src/modules/checkin/services/database.service', () => ({}));
 jest.mock('../src/modules/system/watchlist.service', () => ({ verificarCPF: jest.fn(async () => null), registrarAlerta: jest.fn(async () => {}) }));
-jest.mock('../src/modules/pulseiras/pulseira.service', () => ({}));
+jest.mock('../src/modules/pulseiras/pulseira.service', () => ({
+    buscarStatusPulseira: jest.fn(async () => ({ emUso: null, pendencia: null }))
+}));
 jest.mock('../src/modules/pulseiras/loteSelecao', () => ({
     buscarLotesDaFaixa: jest.fn(async () => []),
     escolherLote: jest.fn(async () => ({ lote: null, bloqueado: false, motivo: null }))

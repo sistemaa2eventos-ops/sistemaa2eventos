@@ -4,7 +4,9 @@
  */
 const mockWatchIlike = jest.fn();
 
-const mockDb = { pessoas: [], watchlist: [] };
+const mockDb = { pessoas: [], watchlist: [], logs: [] };
+// Pulseira em uso hoje por pessoa (a fiscalização só libera quem está dentro do evento)
+const mockPulseiraHoje = {};
 
 function mockConstruir(tabela) {
     const filtros = [];
@@ -15,7 +17,7 @@ function mockConstruir(tabela) {
     q.ilike = (c, v) => { if (tabela === 'watchlist') mockWatchIlike(c, v); return q; };
     q.insert = () => Promise.resolve({ data: null, error: null });
     let limite = Infinity;
-    const base = () => (tabela === 'pessoas' ? mockDb.pessoas : tabela === 'watchlist' ? mockDb.watchlist : []);
+    const base = () => (tabela === 'pessoas' ? mockDb.pessoas : tabela === 'watchlist' ? mockDb.watchlist : tabela === 'logs_acesso' ? mockDb.logs : []);
     const linhas = () => base().filter(r => filtros.every(([op, c, v]) => (op === 'eq' ? r[c] === v : v.includes(r[c]))));
     q.limit = (n) => { limite = n; return q; };
     q.single = async () => ({ data: linhas()[0] || null, error: null });
@@ -32,7 +34,9 @@ jest.mock('../src/services/webhookDispatcher', () => ({ dispatchCheckin: jest.fn
 jest.mock('../src/services/websocketService', () => ({ emit: jest.fn() }));
 jest.mock('../src/modules/checkin/services/database.service', () => ({ logDeniedAccess: jest.fn(async () => {}) }));
 jest.mock('../src/modules/system/watchlist.service', () => ({ verificarCPF: jest.fn(async () => null), registrarAlerta: jest.fn(async () => {}) }));
-jest.mock('../src/modules/pulseiras/pulseira.service', () => ({}));
+jest.mock('../src/modules/pulseiras/pulseira.service', () => ({
+    buscarStatusPulseira: jest.fn(async (_ev, pid) => ({ emUso: mockPulseiraHoje[pid] || null, pendencia: null }))
+}));
 jest.mock('../src/modules/pulseiras/loteSelecao', () => ({ buscarLotesDaFaixa: jest.fn(), escolherLote: jest.fn() }));
 
 const websocketService = require('../src/services/websocketService');
@@ -65,6 +69,12 @@ beforeEach(() => {
         { id: 'p2', evento_id: 'ev1', nome_completo: 'Sem Cpf', cpf: null, numero_pulseira: '3003', status_acesso: 'checkin_feito' }
     ];
     mockDb.watchlist = [];
+    mockDb.logs = [
+        { tipo: 'checkin', evento_id: 'ev1', pessoa_id: 'p1', numero_pulseira: '1001', created_at: new Date().toISOString(), metodo: 'pulseira' },
+        { tipo: 'checkin', evento_id: 'ev1', pessoa_id: 'p2', numero_pulseira: '3003', created_at: new Date().toISOString(), metodo: 'pulseira' }
+    ];
+    for (const k of Object.keys(mockPulseiraHoje)) delete mockPulseiraHoje[k];
+    Object.assign(mockPulseiraHoje, { p1: '1001', p2: '3003' });
 });
 
 describe('fiscalização: watchlist só por CPF', () => {

@@ -14,6 +14,7 @@ const { buscarPessoaPorCodigo } = require('./codigoLeitor');
 const { etapaDoLote } = require('./services/entradaEtapa');
 const { bloqueioPorTipoArea } = require('./services/tipoArea');
 const AuditoriaService = require('../auditoria/auditoria.service');
+const { situacaoFiscal } = require('./fiscalizacaoSituacao.service');
 
 // Área só de monitoramento: nenhuma entrada/saída é registrada nela (409 AREA_SO_MONITORAMENTO)
 const recusarSeSoMonitoramento = async (res, areaId) => {
@@ -1011,7 +1012,7 @@ class AccessController {
             // na lista da busca por nome manda o id). Sem "nome contém": nome solto não fiscaliza ninguém.
             // Texto que não é código → 400; pulseira repetida ou código em duas pessoas → 409.
             const busca = await buscarPessoaPorCodigo(supabaseClient, eventoId, safeCodigo,
-                'id, nome_completo, cpf, funcao, status_acesso, status_documentos, numero_pulseira, foto_url, tipo_pulseira_id, bloqueado, motivo_bloqueio, empresas(id, nome, ativo)');
+                'id, nome_completo, cpf, funcao, status_acesso, status_documentos, numero_pulseira, foto_url, tipo_pulseira_id, bloqueado, motivo_bloqueio, ativo, empresas(id, nome, ativo)');
             if (!busca.pessoa && busca.status !== 404) {
                 return ApiResponse.error(res, busca.erro, busca.status);
             }
@@ -1037,8 +1038,10 @@ class AccessController {
                 areaFiscalizada = areaData;
             }
 
-            // 3. Buscar todas as áreas autorizadas da pessoa (diretas + por tipo de pulseira) e histórico do último check-in
-            const [paaRes, papRes, checkinLogRes] = await Promise.all([
+            // 3. Situação de hoje (credencial, dentro do evento, pulseira em uso com tipo e horário, movimentos)
+            // e todas as áreas autorizadas da pessoa (diretas + por tipo de pulseira)
+            const [situacao, paaRes, papRes] = await Promise.all([
+                situacaoFiscal(supabaseClient, eventoId, pessoa),
                 supabaseClient
                     .from('pessoa_areas_acesso')
                     .select('area_id, evento_areas(id, nome_area)')
@@ -1048,16 +1051,7 @@ class AccessController {
                         .from('pulseira_areas_permitidas')
                         .select('area_id, evento_areas(id, nome_area)')
                         .eq('tipo_pulseira_id', pessoa.tipo_pulseira_id)
-                    : Promise.resolve({ data: [] }),
-                supabaseClient
-                    .from('logs_acesso')
-                    .select('created_at, area_id, metodo, evento_areas(nome_area)')
-                    .eq('evento_id', eventoId)
-                    .eq('pessoa_id', pessoa.id)
-                    .in('tipo', ['checkin', 'entrada'])
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .maybeSingle()
+                    : Promise.resolve({ data: [] })
             ]);
 
             const areasMap = new Map();
@@ -1072,19 +1066,6 @@ class AccessController {
                 }
             });
 
-            let ultimoCheckin = checkinLogRes?.data;
-            if (!ultimoCheckin) {
-                const { data: anyLog } = await supabaseClient
-                    .from('logs_acesso')
-                    .select('created_at, area_id, metodo, evento_areas(nome_area)')
-                    .eq('evento_id', eventoId)
-                    .eq('pessoa_id', pessoa.id)
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
-                ultimoCheckin = anyLog;
-            }
-
             const areasAutorizadas = Array.from(areasMap.entries()).map(([id, nome]) => ({ id, nome_area: nome }));
             const pessoaPayload = {
                 id: pessoa.id,
@@ -1092,15 +1073,24 @@ class AccessController {
                 cpf: pessoa.cpf,
                 funcao: pessoa.funcao,
                 empresa_nome: pessoa.empresas?.nome || 'Pessoa Física',
+                empresas: pessoa.empresas ? { id: pessoa.empresas.id, nome: pessoa.empresas.nome } : null,
                 foto_url: pessoa.foto_url,
-                numero_pulseira: pessoa.numero_pulseira,
                 status_acesso: pessoa.status_acesso,
                 status_documentos: pessoa.status_documentos,
                 bloqueado: pessoa.bloqueado,
                 motivo_bloqueio: pessoa.motivo_bloqueio,
-                horario_checkin: ultimoCheckin?.created_at || null,
-                area_checkin: ultimoCheckin?.evento_areas?.nome_area || null,
-                metodo_checkin: ultimoCheckin?.metodo || null,
+                // Credencial e presença de hoje (só pulseira em uso hoje; de outro dia não aparece)
+                credenciado: situacao.credenciado,
+                motivo_nao_credenciado: situacao.motivo_nao_credenciado,
+                dentro_do_evento: situacao.dentro_do_evento,
+                ultimo_evento_hoje: situacao.ultimo_evento_hoje,
+                pulseira: situacao.pulseira,
+                numero_pulseira: situacao.pulseira?.numero || null,
+                historico_hoje: situacao.historico_hoje,
+                // Último check-in de hoje (a ficha completa usa estes nomes)
+                horario_checkin: [...situacao.historico_hoje].reverse().find(h => h.tipo === 'checkin')?.horario || null,
+                area_checkin: [...situacao.historico_hoje].reverse().find(h => h.tipo === 'checkin')?.area_nome || null,
+                metodo_checkin: [...situacao.historico_hoje].reverse().find(h => h.tipo === 'checkin')?.metodo || null,
                 areas_autorizadas: areasAutorizadas
             };
 
@@ -1215,6 +1205,33 @@ class AccessController {
                     autorizado: false,
                     status: 'pendente',
                     mensagem: 'CREDENCIAMENTO PENDENTE (Dirija-se à Portaria)',
+                    pessoa: pessoaPayload,
+                    area: areaFiscalizada
+                });
+            }
+
+            // 6b. Credencial recusada/em verificação/cadastro desativado: não passa
+            if (!situacao.credenciado) {
+                return ApiResponse.success(res, {
+                    autorizado: false,
+                    status: 'nao_credenciado',
+                    mensagem: `NÃO CREDENCIADO: ${situacao.motivo_nao_credenciado}`,
+                    pessoa: pessoaPayload,
+                    area: areaFiscalizada
+                });
+            }
+
+            // 6c. Precisa estar dentro do evento: check-in de hoje com a pulseira em uso (sem saída depois)
+            if (!situacao.dentro_do_evento) {
+                const saiu = situacao.ultimo_evento_hoje === 'checkout';
+                return ApiResponse.success(res, {
+                    autorizado: false,
+                    status: saiu ? 'fora_do_evento' : 'sem_checkin',
+                    mensagem: saiu
+                        ? 'FORA DO EVENTO: a última movimentação de hoje foi saída'
+                        : (situacao.pulseira === null && situacao.ultimo_evento_hoje === 'checkin'
+                            ? 'SEM PULSEIRA EM USO: entrou hoje sem pulseira'
+                            : 'SEM CHECK-IN HOJE: não entrou no evento hoje'),
                     pessoa: pessoaPayload,
                     area: areaFiscalizada
                 });
