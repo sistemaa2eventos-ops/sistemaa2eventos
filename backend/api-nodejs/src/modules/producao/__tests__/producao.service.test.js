@@ -233,7 +233,7 @@ describe('Módulo de Produção — Regras de Negócio, Segurança e Cálculos',
         expect(atualizado.historico_cache[0].valor_anterior_centavos).toBe(120000);
 
         const convite = await producaoService.gerarConviteProdutor(EVENTO_ID, prodSom.id, ADMIN_USER);
-        expect(convite.link).toContain('/portal-produtor');
+        expect(convite.link).toContain(`evento_id=${EVENTO_ID}`);
         expect(convite.link).toContain('convite_producao=');
         expect(convite.mensagem_whatsapp).toContain('Rafael Costa');
 
@@ -358,7 +358,7 @@ describe('Módulo de Produção — Regras de Negócio, Segurança e Cálculos',
 
         expect(acessoDefinido.acesso_provisionado).toBe(true);
         expect(acessoDefinido.login_acesso).toBe('juliana.cam');
-        expect(acessoDefinido.link_portal).toContain('/portal-produtor');
+        expect(acessoDefinido.link_portal).toContain(`evento_id=${EVENTO_ID}`);
         expect(acessoDefinido.produtor.possui_login).toBe(true);
         expect(acessoDefinido.produtor.senha_hash).toBeUndefined();
         expect(acessoDefinido.mensagem_whatsapp).toContain('juliana.cam');

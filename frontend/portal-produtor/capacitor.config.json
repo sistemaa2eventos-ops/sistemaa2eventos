@@ -1,0 +1,15 @@
+{
+  "appId": "br.app.nzt.producao",
+  "appName": "NZT Produção",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "iosScheme": "https",
+    "hostname": "produtor.nzt.app.br"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "backgroundColor": "#050B18"
+    }
+  }
+}

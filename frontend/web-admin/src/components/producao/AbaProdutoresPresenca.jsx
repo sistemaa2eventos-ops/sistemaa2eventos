@@ -232,7 +232,9 @@ const AbaProdutoresPresenca = ({ eventoId, resumo, headersExtra, aoAtualizar, ap
                 headersExtra,
                 httpClient
             );
-            const linkPortal = `${window.location.origin}/portal-produtor?evento_id=${eventoId}`;
+            const linkPortal = resp?.link_portal || (window.location.hostname.endsWith('nzt.app.br')
+                ? `https://produtor.nzt.app.br/?evento_id=${eventoId}`
+                : `${window.location.origin}/portal-produtor?evento_id=${eventoId}`);
             const textoCredenciais = `Olá ${modalAcessoProdutor.nome}! Seu acesso ao Portal Exclusivo de Produção está ativo.\nLink do portal: ${linkPortal}\nLogin: ${loginLimpo}\nSenha: ${senhaLimpa}`;
             setFormAcesso((prev) => ({
                 ...prev,

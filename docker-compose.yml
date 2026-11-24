@@ -129,6 +129,8 @@ services:
         condition: service_started
       cadastro:
         condition: service_started
+      produtor:
+        condition: service_started
     networks:
       - a2_net
     healthcheck:
@@ -191,6 +193,27 @@ services:
       resources:
         limits:
           memory: 512M
+
+  # Portal isolado da equipe de produção (produtor.nzt.app.br — PWA standalone / base para app iOS e Android)
+  produtor:
+    logging: *logging
+    build:
+      context: ./frontend/portal-produtor
+    container_name: a2_eventos_portal_produtor
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      - TZ=America/Sao_Paulo
+    networks:
+      - a2_net
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
 
 # Câmeras com IA rodam no PC local do evento, não na VPS (as câmeras ficam na rede local do evento):
 # motor backend/microservice-face-python + agente backend/agent-local, ligados por scripts/ligar-ia-facial.bat.

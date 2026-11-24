@@ -518,8 +518,8 @@ async function definirAcessoProdutor(eventoId, produtorId, dados, user, headers 
     });
     await salvarEstadoEvento(eventoId, estado);
 
-    const baseUrl = (process.env.FRONTEND_URL || (process.env.NODE_ENV === 'production' ? 'https://painel.nzt.app.br' : 'http://localhost:5173')).replace(/\/+$/, '');
-    const linkPortal = `${baseUrl}/portal-produtor?evento_id=${eventoId}`;
+    const baseUrl = (process.env.PORTAL_PRODUTOR_URL || (process.env.NODE_ENV === 'production' ? 'https://produtor.nzt.app.br' : 'http://localhost:5174')).replace(/\/+$/, '');
+    const linkPortal = `${baseUrl}/?evento_id=${eventoId}`;
 
     return {
         produtor: calculos.sanitizarProdutorParaUsuario(produtor, ctx),
@@ -544,8 +544,8 @@ async function gerarConviteProdutor(eventoId, produtorId, user, headers = {}) {
     produtor.convite_token = tokenConvite;
     produtor.convite_gerado_em = new Date().toISOString();
 
-    const baseUrl = (process.env.FRONTEND_URL || (process.env.NODE_ENV === 'production' ? 'https://painel.nzt.app.br' : 'http://localhost:5173')).replace(/\/+$/, '');
-    const link = `${baseUrl}/portal-produtor?evento_id=${eventoId}&convite_producao=${tokenConvite}`;
+    const baseUrl = (process.env.PORTAL_PRODUTOR_URL || (process.env.NODE_ENV === 'production' ? 'https://produtor.nzt.app.br' : 'http://localhost:5174')).replace(/\/+$/, '');
+    const link = `${baseUrl}/?evento_id=${eventoId}&convite_producao=${tokenConvite}`;
     const mensagemWhatsapp = `Olá ${produtor.nome}! Você foi convidado(a) para atuar na produção do evento "${evento?.nome || 'NZT Eventos'}". Acesse o Portal Exclusivo de Produtores pelo link: ${link}`;
 
     registrarAuditoria(estado, ctx, 'GERAR_CONVITE_PRODUTOR', 'PRODUTOR', produtor.id, null, { login_acesso: produtor.login_acesso || produtor.email });

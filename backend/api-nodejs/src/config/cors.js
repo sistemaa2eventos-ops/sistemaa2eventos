@@ -7,13 +7,19 @@
 const allowedOrigins = [
     // Production URLs (via environment variables)
     process.env.FRONTEND_URL,
+    process.env.PORTAL_PRODUTOR_URL,
     process.env.PUBLIC_PORTAL_URL,
     process.env.API_URL,
 
     // Production URLs (hardcoded fallback — garante acesso mesmo se env estiver incompleto)
     'https://painel.nzt.app.br',
+    'https://produtor.nzt.app.br',
     'https://cadastro.nzt.app.br',
     'https://api.nzt.app.br',
+
+    // Mobile app (Capacitor iOS / Android)
+    'capacitor://localhost',
+    'https://localhost',
 
     // Development URLs (fallback)
     'http://localhost',
@@ -21,8 +27,10 @@ const allowedOrigins = [
     'http://localhost:3000',
     'http://localhost:3002',
     'http://localhost:5173',
+    'http://localhost:5174',
     'http://127.0.0.1:3000',
-    'http://127.0.0.1:5173'
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:5174'
 ].filter(Boolean); // Remove nulos caso o env não esteja definido
 
 // Deduplica (caso env vars repitam os hardcoded)
