@@ -759,6 +759,13 @@ docker system prune -af
      avulsos de diagnóstico (backend/api-nodejs/check_*/test_*/query_*, *.py, *.jpg na raiz), todos de abr–out/2026.
 
 ```
+2026-11-25 - Deploy b921f8b (criar operador da Central: campo errado em vermelho em vez de botão apagado)
+├─ Mudanças: AbaOperadoresCentral: botão sempre clicável, motivo no campo (login com @/acento/espaço, senha < 8);
+│            login tira acento e troca espaço por ponto; sem preenchimento automático do navegador
+├─ Status: ✅ OK (GitHub Actions run 45715842615); /monitor 200, /api/ready ok
+└─ Rollback: tag antes-deploy-20261125-operador-form (caa23bb)
+
+
 2026-11-25 - Deploy 0ebf90b (Central: login por operador e registro de atividades; controle assumir/liberar; som)
 ├─ Mudanças: Central local (localhost:8766/central) troca a chave por login/senha de operador (chave só vale com
 │            o evento sem operadores); controle assumir/liberar (giro e fala só com o controle, solta após 10 min);
