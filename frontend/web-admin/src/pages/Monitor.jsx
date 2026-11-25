@@ -285,6 +285,19 @@ const Monitor = () => {
     });
   }, [resetPlayerControlsTimer]);
 
+  // Enquanto o painel de giro está sendo usado, renova o timer (sem isso os controles somem no meio do movimento)
+  const manterControlesRef = React.useRef(null);
+  const iniciarManterControles = React.useCallback(() => {
+    resetPlayerControlsTimer();
+    clearInterval(manterControlesRef.current);
+    manterControlesRef.current = setInterval(resetPlayerControlsTimer, 1500);
+  }, [resetPlayerControlsTimer]);
+  const pararManterControles = React.useCallback(() => {
+    clearInterval(manterControlesRef.current);
+    manterControlesRef.current = null;
+    resetPlayerControlsTimer();
+  }, [resetPlayerControlsTimer]);
+
   useEffect(() => {
     if (activeStreamCam) {
       setShowPlayerControls(true);
@@ -294,6 +307,7 @@ const Monitor = () => {
     }
     return () => {
       if (playerControlsTimerRef.current) clearTimeout(playerControlsTimerRef.current);
+      clearInterval(manterControlesRef.current);
     };
   }, [activeStreamCam, resetPlayerControlsTimer]);
 
@@ -2343,8 +2357,17 @@ const Monitor = () => {
         )}
 
         {/* Giro da câmera (setas, velocidade, posições): só com giro ligado e os controles visíveis */}
+        {/* Acima do overlay (zIndex 20): o clique nos botões não chega ao overlay, que esconderia os controles.
+            Enquanto o dedo/mouse está no painel, os controles ficam abertos (senão somem no meio do movimento). */}
         {activeStreamCam?.ptz_ativo && showPlayerControls && (
-            <Box sx={{ position: 'absolute', left: '50%', bottom: { xs: 12, sm: 16 }, transform: 'translateX(-50%)', zIndex: 5, maxWidth: 'calc(100% - 24px)' }}>
+            <Box
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => { e.stopPropagation(); iniciarManterControles(); }}
+                onPointerUp={pararManterControles}
+                onPointerCancel={pararManterControles}
+                onPointerLeave={pararManterControles}
+                sx={{ position: 'absolute', left: '50%', bottom: { xs: 12, sm: 16 }, transform: 'translateX(-50%)', zIndex: 25, maxWidth: 'calc(100% - 24px)' }}
+            >
                 <PainelGiro cameraId={activeStreamCam.id} />
             </Box>
         )}
