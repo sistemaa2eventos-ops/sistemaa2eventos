@@ -759,6 +759,16 @@ docker system prune -af
      avulsos de diagnóstico (backend/api-nodejs/check_*/test_*/query_*, *.py, *.jpg na raiz), todos de abr–out/2026.
 
 ```
+2026-11-25 - Deploy 81fdceb (baixar registro do evento antes de excluir)
+├─ Mudanças: GET /api/eventos/:id/registro-encerramento (só admin, leitura); diálogo ExcluirEventoDialog: baixa
+│            JSON (evento, empresas, pessoas, vínculos, acessos, pulseiras, pendências, auditoria da Central);
+│            "Excluir definitivamente" só libera após o download; sem segredos (face, foto, QR, tokens)
+├─ Status: ✅ OK (GitHub Actions run 45718131121); /eventos 200, /api/ready ok, rota nova 401 sem login
+├─ Testes: backend 744 ✅ (7 novos); lint e build do painel ✅; download real no navegador NÃO testado
+├─ Limite: a trava é só no painel; DELETE /api/eventos/:id segue aceito direto pela API
+└─ Rollback: tag antes-deploy-20261125-registro-encerramento (8f92376)
+
+
 2026-11-25 - Deploy b921f8b (criar operador da Central: campo errado em vermelho em vez de botão apagado)
 ├─ Mudanças: AbaOperadoresCentral: botão sempre clicável, motivo no campo (login com @/acento/espaço, senha < 8);
 │            login tira acento e troca espaço por ponto; sem preenchimento automático do navegador
