@@ -36,6 +36,7 @@
     // ------------------------------------------------------------------ estado
     const st = {
         cameras: [],
+        controle: { meu: false, ocupado: false },   // quem mexe nas câmeras (giro e fala): uma tela por vez
         tiles: new Map(),     // id → Tile
         layout: ler('central_layout') || 'auto',
         pagina: 0,
@@ -190,10 +191,19 @@
                     // Vídeo e áudio chegam em faixas separadas: juntam-se num único fluxo (uma faixa não pode
                     // substituir a outra, senão o áudio tomava o lugar do vídeo)
                     if (!this.fluxo.getTracks().includes(e.track)) this.fluxo.addTrack(e.track);
-                    this.video.srcObject = this.fluxo;
+                    // Reatribuir srcObject reinicia o elemento e cancela o play() anterior (AbortError):
+                    // o áudio, que chega depois do vídeo, perdia a reprodução. Atribui uma vez só.
+                    if (this.video.srcObject !== this.fluxo) this.video.srcObject = this.fluxo;
                     this.video.muted = !this.somLigado;
-                    this.video.play().catch(() => {});
-                    if (e.track.kind === 'audio') this.dizerSom('Recebendo som da câmera.');
+                    // Sem catch silencioso: se o navegador bloquear a reprodução, o operador precisa saber
+                    if (this.video.paused) this.video.play().catch((err) => {
+                        if (g !== this.geracao) return;
+                        this.dizerSom(`O navegador não tocou o som (${err.name}). Clique em Ouvir de novo; se continuar, confira o volume do Windows e do navegador.`);
+                    });
+                    if (e.track.kind === 'audio') {
+                        this.medirSom(e.track, g);
+                        this.dizerSom('Recebendo som da câmera.');
+                    }
                 };
                 pc.addEventListener('connectionstatechange', () => {
                     if (g !== this.geracao) return;
@@ -213,7 +223,16 @@
                     method: 'POST', headers: { 'Content-Type': 'application/sdp' }, body: pc.localDescription.sdp,
                     signal: AbortSignal.timeout(10000)
                 });
-                if (!r.ok && this.falando) this.desistirDeFalar('A voz não abriu: a câmera recusou o acesso do protocolo Tapo (conta na nuvem). Ouvir continua funcionando.');
+                if (!r.ok && this.falando) {
+                    if (r.status === 403) this.desistirDeFalar('Assuma o controle para falar com a câmera.');
+                    else {
+                        const j = await r.clone().json().catch(() => ({}));
+                        this.desistirDeFalar(j.motivo === 'login_recusado'
+                            ? 'A câmera recusou a senha da conta do app (401). Confira a senha e, no app da Mercusys, se existe uma opção de compatibilidade com outros aplicativos.'
+                            : 'A voz não abriu: a câmera pede a senha da conta do app (Mercusys/Tapo). Digite-a abaixo; ela fica só neste PC.');
+                        if (this.formTapo) this.formTapo.hidden = false;
+                    }
+                }
                 if (!r.ok) throw new Error(r.status === 404 ? 'câmera fora do retransmissor' : `retransmissor ${r.status}`);
                 const resposta = await r.text();
                 if (g !== this.geracao) return;
@@ -240,7 +259,54 @@
             this.botaoFalar.addEventListener('click', () => this.alterarFalar(!this.falando));
             this.avisoSom = el('span', 'ptz-aviso', '');
             this.avisoFalar = el('span', 'ptz-aviso', '');
-            caixa.append(this.botaoSom, this.botaoFalar, this.avisoSom, this.avisoFalar);
+            // Volume desta câmera (só o áudio dela, não o volume do Windows) e o medidor do som que chega
+            this.volume = el('input');
+            this.volume.type = 'range';
+            this.volume.min = '0';
+            this.volume.max = '1';
+            this.volume.step = '0.05';
+            this.volume.value = '1';
+            this.volume.title = 'Volume desta câmera';
+            this.volume.setAttribute('aria-label', 'Volume desta câmera');
+            this.volume.style.cssText = 'width:80px;accent-color:#22D3EE';
+            this.volume.addEventListener('input', () => { this.video.volume = Number(this.volume.value); });
+            this.medidor = el('span');
+            this.medidor.title = 'Mostra se o som da câmera chega ao navegador';
+            this.medidor.style.cssText = 'display:inline-block;width:70px;height:8px;background:#1B2C47;border-radius:4px;overflow:hidden;vertical-align:middle';
+            this.medidor.append(el('i'));
+            this.medidor.firstChild.style.cssText = 'display:block;height:100%;width:0%;background:#22D3EE';
+            // Senha da conta do app: só aparece quando a câmera recusa a voz
+            this.formTapo = el('span');
+            this.formTapo.hidden = true;
+            const senhaTapo = el('input');
+            senhaTapo.type = 'password';
+            senhaTapo.autocomplete = 'off';
+            senhaTapo.maxLength = 128;
+            senhaTapo.placeholder = 'Senha da conta do app';
+            senhaTapo.setAttribute('aria-label', 'Senha da conta do app Mercusys/Tapo');
+            const salvarTapo = el('button', 'botao-falar', 'Salvar senha');
+            salvarTapo.type = 'button';
+            salvarTapo.addEventListener('click', async () => {
+                if (!senhaTapo.value) { senhaTapo.focus(); return; }
+                salvarTapo.disabled = true;
+                try {
+                    const r = await api(`/camera/${encodeURIComponent(cam.id)}/conta-tapo`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ senha: senhaTapo.value }), signal: AbortSignal.timeout(15000)
+                    });
+                    const j = await r.json().catch(() => ({}));
+                    if (!r.ok) { this.dizerFalar(j.erro || 'Não deu para salvar a senha.'); return; }
+                    senhaTapo.value = '';
+                    this.formTapo.hidden = true;
+                    this.dizerFalar('Senha salva neste PC. O vídeo volta em alguns segundos; depois clique em Falar de novo.');
+                } catch {
+                    this.dizerFalar('O agente não respondeu. Tente de novo.');
+                } finally {
+                    salvarTapo.disabled = false;
+                }
+            });
+            this.formTapo.append(senhaTapo, salvarTapo);
+            caixa.append(this.botaoSom, this.botaoFalar, this.volume, this.medidor, this.avisoSom, this.avisoFalar, this.formTapo);
             if (cam.ptz) caixa.append(this.montarPtz(cam));
             return caixa;
         }
@@ -279,6 +345,53 @@
             this.botaoFalar.textContent = 'Falar';
             this.botaoFalar.classList.remove('ligado');
             this.dizerFalar(msg);
+        }
+
+        /**
+         * Medidor do áudio que CHEGA ao navegador (antes da saída do PC). Se a barra se mexe, o som está
+         * no navegador e o problema é o volume/saída. Se fica parada, a câmera ou o retransmissor não manda som.
+         */
+        medirSom(track, g) {
+            this.pararMedidor();
+            try {
+                const AC = window.AudioContext || window.webkitAudioContext;
+                if (!AC) return;
+                const ctx = new AC();
+                ctx.resume?.().catch(() => {});
+                const an = ctx.createAnalyser();
+                an.fftSize = 1024;
+                ctx.createMediaStreamSource(new MediaStream([track])).connect(an); // só analisa; não vai para a saída
+                const buf = new Float32Array(an.fftSize);
+                const inicio = performance.now();
+                let pico = 0;
+                this.audioCtx = ctx;
+                this.medidorTimer = setInterval(() => {
+                    if (g !== this.geracao) { this.pararMedidor(); return; }
+                    an.getFloatTimeDomainData(buf);
+                    let soma = 0;
+                    for (const v of buf) soma += v * v;
+                    const nivel = Math.sqrt(soma / buf.length);
+                    pico = Math.max(pico, nivel);
+                    this.medidor.firstChild.style.width = `${Math.min(100, Math.round(nivel * 400))}%`;
+                    if (!this.somDetectado && nivel > 0.002) {
+                        this.somDetectado = true;
+                        this.dizerSom('O som chega ao navegador. Se não ouvir, suba o volume desta câmera e confira o volume do Windows.');
+                    }
+                    if (!this.semSomDiagnostico && performance.now() - inicio > 6000 && pico < 0.001) {
+                        this.semSomDiagnostico = true;
+                        this.dizerSom('Nenhum som chega ao navegador: a câmera ou o retransmissor não está mandando áudio.');
+                    }
+                }, 200);
+            } catch { /* sem análise de áudio neste navegador: o som continua funcionando, sem medidor */ }
+        }
+
+        pararMedidor() {
+            clearInterval(this.medidorTimer);
+            this.medidorTimer = null;
+            if (this.audioCtx) { this.audioCtx.close().catch(() => {}); this.audioCtx = null; }
+            if (this.medidor) this.medidor.firstChild.style.width = '0%';
+            this.somDetectado = false;
+            this.semSomDiagnostico = false;
         }
 
         dizerSom(txt) { if (this.avisoSom) this.avisoSom.textContent = txt; }
@@ -442,6 +555,7 @@
             this.pc = null;
             this.qualidade = null;
             this.video.srcObject = null;
+            this.pararMedidor();
             this.totalAnterior = 0;
             this.ultimoQuadro = 0;
             this.raiz.classList.remove('ao-vivo');
@@ -811,6 +925,41 @@
         if (id && st.cameras.some(c => c.id === id)) { st.foco = id; montarGrade(); }
     });
 
+    // ------------------------------------------------------------------ controle (giro e fala)
+    // Uma tela por vez. Quem não tem o controle vê as câmeras, ouve e acompanha os alertas.
+    function aplicarControle() {
+        const c = st.controle;
+        const botao = $('controle');
+        botao.textContent = c.meu ? 'Liberar controle' : c.ocupado ? 'Controle com outra tela' : 'Assumir controle';
+        botao.disabled = c.ocupado && !c.meu;
+        botao.classList.toggle('ligado', c.meu);
+        botao.title = c.meu ? 'Você está com o controle. Libere quando terminar.'
+            : c.ocupado ? 'Outra tela está com o controle. Ela precisa liberar.'
+                : 'Assuma para girar a câmera e falar com ela.';
+        for (const t of st.tiles.values()) {
+            const bloqueado = !c.meu;
+            t.raiz.querySelectorAll('.botao-falar, .ptz button, .ptz select, .ptz input, .ptz-ir, .ptz-gravar').forEach((x) => {
+                x.disabled = bloqueado;
+            });
+            if (bloqueado && t.falando) t.alterarFalar(false); // perdeu o controle: para de falar
+        }
+    }
+
+    $('controle').addEventListener('click', async () => {
+        const acao = st.controle.meu ? 'liberar' : 'assumir';
+        try {
+            const r = await api('/controle', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ acao }), signal: AbortSignal.timeout(4000)
+            });
+            const j = await r.json().catch(() => ({}));
+            if (r.ok) st.controle = { meu: !!j.meu, ocupado: !!j.ocupado };
+            else if (j.ocupado !== undefined) st.controle = { meu: !!j.meu, ocupado: !!j.ocupado };
+            if (!r.ok && j.erro) $('controle').title = j.erro;
+        } catch { /* agente ocupado: tenta de novo no próximo ciclo */ }
+        aplicarControle();
+    });
+
     // ------------------------------------------------------------------ barra de estados
     function chip(txt, tipo, titulo) {
         const c = el('span', `chip ${tipo || ''}`, txt);
@@ -819,6 +968,7 @@
     }
 
     function atualizarEstados() {
+        aplicarControle();
         const tiles = [...st.tiles.values()].filter(t => t.pc);
         const vivas = tiles.filter(t => t.raiz.classList.contains('ao-vivo')).length;
         const chips = [
@@ -844,6 +994,7 @@
             st.saude = s.motor ? s : null;
             if (!s.motor) st.motor = false;
             st.watchlist = e.watchlist;
+            if (e.controle) st.controle = e.controle;
             // Câmera nova ou removida no painel: refaz a grade
             const ids = (e.cameras || []).map(c => c.id).join(',');
             if (ids !== st.cameras.map(c => c.id).join(',')) {
@@ -871,6 +1022,7 @@
             const e = await (await api('/estado')).json();
             st.cameras = e.cameras || [];
             st.watchlist = e.watchlist;
+            if (e.controle) st.controle = e.controle;
         } catch { st.cameras = []; }
         montarGrade();
         atualizarEstados();

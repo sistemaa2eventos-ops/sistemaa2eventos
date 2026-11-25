@@ -17,12 +17,14 @@ process.env.CENTRAL_CHAVE_ARQ = path.join(pasta, 'chave');
 process.env.CENTRAL_ALVOS_ARQ = path.join(pasta, 'alvos.json');
 
 // Vídeo simulado: só a câmera "cam1" existe
+const senhasTapo = [];
 const videoPath = require.resolve('../src/video');
 require.cache[videoPath] = {
     id: videoPath, filename: videoPath, loaded: true, exports: {
         conhece: (id) => id === 'cam1',
         status: () => ({ disponivel: true, pronto: true }),
-        abrirWebrtc: async (id, q, sdp) => `v=0\r\nresposta-${q}-${sdp.length}`
+        abrirWebrtc: async (id, q, sdp) => `v=0\r\nresposta-${q}-${sdp.length}`,
+        definirSenhaTapo: async (id, senha) => { senhasTapo.push([id, senha]); }
     }
 };
 const central = require('../src/central');
@@ -171,6 +173,79 @@ test('Tailscale: aceita o IP 100.x, o nome do PC e *.ts.net; continua recusando 
     // Sem Tailscale, só localhost
     central.iniciar({ log: () => {}, fetchIa, porta, soLocal: true });
     assert.strictEqual((await pedir('/central/api/estado', { host: `100.70.1.2:${porta}`, cookie })).status, 421);
+});
+
+const pedirControle = (cookie, acao) => pedir('/central/api/controle', { metodo: 'POST', cookie, corpo: JSON.stringify({ acao }), tipo: 'application/json' });
+
+test('controle: uma tela por vez; só quem tem o controle fala com a câmera', async () => {
+    const a = await entrar();
+    const b = await entrar();
+    assert.deepStrictEqual(JSON.parse((await pedir('/central/api/estado', { cookie: a })).corpo).controle, { meu: false, ocupado: false });
+
+    const assumiu = await pedirControle(a, 'assumir');
+    assert.strictEqual(assumiu.status, 200);
+    assert.deepStrictEqual(JSON.parse(assumiu.corpo), { meu: true, ocupado: true });
+
+    // Outra tela não assume enquanto a primeira tem o controle
+    const negado = await pedirControle(b, 'assumir');
+    assert.strictEqual(negado.status, 409);
+    assert.deepStrictEqual(JSON.parse(negado.corpo).meu, false);
+    assert.deepStrictEqual(JSON.parse((await pedir('/central/api/estado', { cookie: b })).corpo).controle, { meu: false, ocupado: true });
+
+    // Falar: sem controle é recusado; com controle chega ao retransmissor
+    const falaNegada = await pedir('/central/api/camera/cam1/webrtc?qualidade=foco&fala=1', { metodo: 'POST', cookie: b, corpo: 'v=0 oferta', tipo: 'application/sdp' });
+    assert.strictEqual(falaNegada.status, 403);
+    const falaOk = await pedir('/central/api/camera/cam1/webrtc?qualidade=foco&fala=1', { metodo: 'POST', cookie: a, corpo: 'v=0 oferta', tipo: 'application/sdp' });
+    assert.strictEqual(falaOk.status, 201);
+    // Ouvir (sem fala) continua livre para as duas telas
+    const ouvirOutra = await pedir('/central/api/camera/cam1/webrtc?qualidade=foco', { metodo: 'POST', cookie: b, corpo: 'v=0 oferta', tipo: 'application/sdp' });
+    assert.strictEqual(ouvirOutra.status, 201);
+
+    // Quem não tem o controle não consegue liberá-lo
+    assert.strictEqual((await pedirControle(b, 'liberar')).status, 403);
+    // Quem tem o controle libera; a outra tela assume
+    const liberou = await pedirControle(a, 'liberar');
+    assert.deepStrictEqual(JSON.parse(liberou.corpo), { meu: false, ocupado: false });
+    assert.strictEqual((await pedirControle(b, 'assumir')).status, 200);
+    assert.strictEqual((await pedirControle(b, 'liberar')).status, 200);
+    assert.strictEqual((await pedirControle(a, 'nada')).status, 400);
+});
+
+test('giro: sem controle o comando nem chega à câmera (403)', async () => {
+    const original = [{ id: 'cam1', nome: 'Portaria', ia_ativa: true }, { id: 'fora', nome: 'Fora do retransmissor' }];
+    central.configurarCameras([{ id: 'cam1', nome: 'Portaria', ia_ativa: true, ptz: { ip: '10.0.0.9', porta: 2020 } }]);
+    try {
+        const sem = await pedir('/central/api/camera/cam1/ptz', { metodo: 'POST', cookie: await entrar(), corpo: JSON.stringify({ acao: 'mover', pan: 0.1 }), tipo: 'application/json' });
+        assert.strictEqual(sem.status, 403);
+        assert.strictEqual(JSON.parse(sem.corpo).sem_controle, true);
+    } finally {
+        central.configurarCameras(original);
+    }
+});
+
+test('controle: sair da sessão libera o controle de quem saiu', async () => {
+    const a = await entrar();
+    const b = await entrar();
+    assert.strictEqual((await pedirControle(a, 'assumir')).status, 200);
+    assert.strictEqual((await pedirControle(b, 'assumir')).status, 409);
+    await pedir('/central/sair', { metodo: 'POST', cookie: a });
+    assert.strictEqual((await pedirControle(b, 'assumir')).status, 200);
+    await pedirControle(b, 'liberar');
+});
+
+test('senha da conta do app: só quem tem o controle grava; nunca volta na resposta', async () => {
+    const a = await entrar();
+    const b = await entrar();
+    const corpo = JSON.stringify({ senha: 'Nuvem@1' });
+    const tipo = 'application/json';
+    assert.strictEqual((await pedir('/central/api/camera/cam1/conta-tapo', { metodo: 'POST', cookie: b, corpo, tipo })).status, 403);
+    assert.strictEqual(senhasTapo.length, 0);
+    assert.strictEqual((await pedirControle(a, 'assumir')).status, 200);
+    const ok = await pedir('/central/api/camera/cam1/conta-tapo', { metodo: 'POST', cookie: a, corpo, tipo });
+    assert.strictEqual(ok.status, 200);
+    assert.ok(!ok.corpo.includes('Nuvem@1'));
+    assert.deepStrictEqual(senhasTapo, [['cam1', 'Nuvem@1']]);
+    await pedirControle(a, 'liberar');
 });
 
 test('muitas chaves erradas seguidas bloqueiam por 1 minuto', async () => {

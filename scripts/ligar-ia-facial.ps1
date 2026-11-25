@@ -512,10 +512,16 @@ function Show-Motor {
 }
 
 # Processo iniciado antes da última atualização do arquivo? (código novo no disco, versão antiga rodando)
-function Test-ProcessoDesatualizado([int]$processId, [string]$arquivo) {
+function Test-ProcessoDesatualizado([int]$processId, [string]$caminho) {
     try {
         $p = Get-CimInstance Win32_Process -Filter "ProcessId=$processId" -ErrorAction Stop
-        return ((Get-Item $arquivo).LastWriteTime -gt $p.CreationDate)
+        $item = Get-Item $caminho -ErrorAction Stop
+        # Pasta: vale o arquivo mais novo dela. Antes só o arquivo principal contava, e uma mudança em outro
+        # módulo (ex.: central.js) deixava o processo antigo rodando com código velho.
+        $ultima = if ($item.PSIsContainer) {
+            (Get-ChildItem $caminho -File -Recurse -ErrorAction Stop | Sort-Object LastWriteTime -Descending | Select-Object -First 1).LastWriteTime
+        } else { $item.LastWriteTime }
+        return ($ultima -gt $p.CreationDate)
     }
     catch { return $false }
 }
@@ -578,7 +584,7 @@ function Confirm-Agente {
     $script:AgenteAtivo = $true
     # Agente antigo rodando com código novo no disco (ex.: motor novo exige a chave interna): reinicia
     $antigos = Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
-    Where-Object { $_.CommandLine -match 'agent\.js' -and (Test-ProcessoDesatualizado $_.ProcessId (Join-Path $DirAgente 'src\agent.js')) }
+    Where-Object { $_.CommandLine -match 'agent\.js' -and (Test-ProcessoDesatualizado $_.ProcessId (Join-Path $DirAgente 'src')) }
     foreach ($a in $antigos) {
         Escrever '[3/3] Agente local: código atualizado no disco, reiniciando o agente para a versão nova...' 'Yellow'
         Stop-Process -Id $a.ProcessId -Force -ErrorAction SilentlyContinue

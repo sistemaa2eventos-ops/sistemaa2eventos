@@ -27,6 +27,9 @@ const ARQ_CHAVE = process.env.CENTRAL_CHAVE_ARQ || path.join(__dirname, '..', '.
 const ARQ_ALVOS = process.env.CENTRAL_ALVOS_ARQ || path.join(__dirname, '..', '.central-alvos.json');
 const SESSAO_MS = 12 * 60 * 60 * 1000;
 const COOKIE = 'nzt_central';
+// Controle das câmeras (giro e fala): uma tela por vez. Quem assume é o único que mexe; libera sozinho
+// depois deste tempo sem atividade, para o controle não ficar preso se a tela fechar sem liberar.
+const CONTROLE_OCIOSO_MS = 10 * 60 * 1000;
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml' };
 
 const estado = {
@@ -60,6 +63,7 @@ function gerarNovaChave() {
     const nova = crypto.randomBytes(24).toString('hex');
     fs.writeFileSync(ARQ_CHAVE, nova, { mode: 0o600 });
     estado.sessoes.clear();
+    controle.token = null;
     return nova;
 }
 
@@ -136,10 +140,39 @@ async function enviarOnvif(url, xml) {
 }
 
 /** Giro da câmera pela Central: mover, parar, listar, ir e gravar posições */
+/** Controle das câmeras: guarda o token da sessão que tem o controle (nunca sai deste processo) */
+const controle = { token: null, visto: 0 };
+
+/** Token de quem tem o controle agora, ou null (libera sozinho se ficou ocioso) */
+function controleAtivo() {
+    if (controle.token && Date.now() - controle.visto > CONTROLE_OCIOSO_MS) controle.token = null;
+    return controle.token;
+}
+
+function temControle(req) {
+    const t = lerCookie(req);
+    return !!t && controleAtivo() === t;
+}
+
+/** O que a tela precisa saber: se é ela quem tem o controle, e se há alguém com ele */
+function estadoDoControle(req) {
+    const ativo = controleAtivo();
+    return { meu: !!ativo && ativo === lerCookie(req), ocupado: !!ativo };
+}
+
+/** Fecha a sessão de quem tinha o controle: o controle volta a ficar livre */
+function liberarDaSessao(token) {
+    if (token && controle.token === token) controle.token = null;
+}
+
 async function tratarPtz(req, res, camId, listar) {
     const cam = camerasComGiro.get(camId);
     if (!cam) { json(res, 409, { erro: 'Esta câmera não tem giro ligado no painel.' }); return; }
     let pedido = { acao: 'listar' };
+    if (!listar && !temControle(req)) {
+        json(res, 403, { erro: 'Só quem tem o controle mexe na câmera. Assuma o controle primeiro.', sem_controle: true });
+        return;
+    }
     if (!listar) {
         let corpo;
         try { corpo = JSON.parse(await lerCorpo(req, 4096)) || {}; } catch { json(res, 400, { erro: 'pedido inválido' }); return; }
@@ -328,12 +361,17 @@ async function tratar(req, res, url) {
         return true;
     }
 
+    // Qualquer pedido de quem tem o controle conta como atividade (o controle não cai enquanto ela usa a tela)
+    const tokenDaSessao = lerCookie(req);
+    if (controle.token && controle.token === tokenDaSessao) controle.visto = Date.now();
+
     // ---------------- página
     if (p === '/central' || p === '/central/') { servirArquivo(res, 'index.html'); return true; }
     if (p === '/central/central.js') { servirArquivo(res, 'central.js'); return true; }
     if (p === '/central/sair' && req.method === 'POST') {
         const t = lerCookie(req);
         if (t) estado.sessoes.delete(t);
+        liberarDaSessao(t);
         res.setHeader('Set-Cookie', `${COOKIE}=; HttpOnly; SameSite=Strict; Path=/central; Max-Age=0`);
         json(res, 200, { ok: true });
         return true;
@@ -353,11 +391,51 @@ async function tratar(req, res, url) {
         return true;
     }
 
+    // Senha da conta do app (Mercusys/Tapo) para falar com a câmera. Só quem tem o controle grava.
+    // A senha fica só neste PC (video.definirSenhaTapo) e nunca volta para a tela.
+    const mct = p.match(/^\/central\/api\/camera\/([A-Za-z0-9-]{1,64})\/conta-tapo$/);
+    if (mct && req.method === 'POST') {
+        if (!temControle(req)) { json(res, 403, { erro: 'Assuma o controle para configurar a fala.', sem_controle: true }); return true; }
+        let corpo;
+        try { corpo = JSON.parse(await lerCorpo(req, 1024)) || {}; } catch { json(res, 400, { erro: 'pedido inválido' }); return true; }
+        const senha = typeof corpo.senha === 'string' ? corpo.senha : '';
+        if (senha.length > 128) { json(res, 400, { erro: 'Senha longa demais.' }); return true; }
+        try {
+            await video.definirSenhaTapo(mct[1], senha);
+            json(res, 200, { ok: true });
+        } catch (err) {
+            json(res, err.status || 500, { erro: err.message });
+        }
+        return true;
+    }
+
+    // Assumir ou liberar o controle das câmeras (giro e fala). Uma tela por vez.
+    if (p === '/central/api/controle' && req.method === 'POST') {
+        let corpo;
+        try { corpo = JSON.parse(await lerCorpo(req, 256)) || {}; } catch { json(res, 400, { erro: 'pedido inválido' }); return true; }
+        const meu = tokenDaSessao;
+        if (corpo.acao === 'assumir') {
+            const ativo = controleAtivo();
+            if (ativo && ativo !== meu) { json(res, 409, { erro: 'Outra tela já está com o controle. Ela precisa liberar primeiro.', ...estadoDoControle(req) }); return true; }
+            controle.token = meu;
+            controle.visto = Date.now();
+        } else if (corpo.acao === 'liberar') {
+            if (controleAtivo() !== meu) { json(res, 403, { erro: 'Só quem tem o controle pode liberá-lo.', ...estadoDoControle(req) }); return true; }
+            controle.token = null;
+        } else {
+            json(res, 400, { erro: 'ação inválida' });
+            return true;
+        }
+        json(res, 200, estadoDoControle(req));
+        return true;
+    }
+
     if (p === '/central/api/estado' && req.method === 'GET') {
         json(res, 200, {
             cameras: estado.cameras.filter(c => video.conhece(c.id)).map(c => ({ ...c, ptz: camerasComGiro.has(c.id) })),
             retransmissor: video.status(),
-            watchlist: { alvos: estado.alvos.size, atualizada_em: estado.alvosEm || null }
+            watchlist: { alvos: estado.alvos.size, atualizada_em: estado.alvosEm || null },
+            controle: estadoDoControle(req)
         });
         return true;
     }
@@ -366,6 +444,11 @@ async function tratar(req, res, url) {
     if (mw && req.method === 'POST') {
         if (!video.conhece(mw[1])) { json(res, 404, { erro: 'câmera desconhecida' }); return true; }
         const qualidade = url.searchParams.get('qualidade') === 'foco' ? 'foco' : 'mini';
+        // Falar (voz de volta) só com o controle
+        if (url.searchParams.get('fala') === '1' && !temControle(req)) {
+            json(res, 403, { erro: 'Só quem tem o controle pode falar com a câmera.', sem_controle: true });
+            return true;
+        }
         try {
             const oferta = await lerCorpo(req, 64 * 1024);
             if (!oferta.startsWith('v=0')) { res.statusCode = 400; res.end(); return true; }
@@ -376,6 +459,11 @@ async function tratar(req, res, url) {
             res.end(resposta);
         } catch (err) {
             estado.log('warn', `central (webrtc): ${err.message}`);
+            // Câmera recusou o login (caso da fala pelo protocolo Tapo): a tela precisa saber que foi isso
+            if (/\b401\b|Unauthorized/i.test(err.message)) {
+                json(res, 502, { erro: 'A câmera recusou o login (401).', motivo: 'login_recusado' });
+                return true;
+            }
             res.statusCode = 503;
             res.end();
         }

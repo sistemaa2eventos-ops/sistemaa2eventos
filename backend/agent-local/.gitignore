@@ -11,3 +11,5 @@ bin/
 .central-chave
 .central-alvos.json
 .central-acesso.json
+# Senha da conta do app Mercusys/Tapo por câmera (fala pela Central): só neste PC
+.tapo-contas.json

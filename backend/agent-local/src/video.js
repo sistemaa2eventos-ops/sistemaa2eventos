@@ -26,6 +26,9 @@ const PORTA_API = Number(process.env.GO2RTC_PORTA_API || 1984);
 const PORTA_RTSP = Number(process.env.GO2RTC_PORTA_RTSP || 8555);
 const PORTA_WEBRTC = Number(process.env.GO2RTC_PORTA_WEBRTC || 8557);
 const ARQ_CONFIG = path.join(DIR_BIN, 'go2rtc.yaml');
+// Senha da conta da nuvem (a do app Mercusys/Tapo) por IP da câmera: o canal de voz (protocolo Tapo) só
+// aceita essa senha, e não a da conta RTSP. Fica só neste PC, fora do Git, com permissão restrita.
+const ARQ_CONTAS_TAPO = process.env.TAPO_CONTAS_ARQ || path.join(__dirname, '..', '.tapo-contas.json');
 
 let log = (nivel, msg) => console.log(`[${new Date().toISOString()}] ${nivel.toUpperCase()} ${msg}`);
 
@@ -37,6 +40,7 @@ const estado = {
     senha: crypto.randomBytes(18).toString('base64url'),
     streams: new Map(),      // nome → url de origem (com credencial da câmera)
     cameras: new Map(),      // camera_id → { principal, sub }
+    ultimaLista: [],         // última lista de câmeras recebida (para reaplicar quando a senha Tapo muda)
     assinatura: '',
     reiniciando: null,
     falhas: 0,
@@ -345,9 +349,11 @@ async function chamarApi(caminho, params = {}, timeoutMs = 8000, extras = {}) {
  * (cadastro ou edição): quem estava assistindo reconecta sozinho em segundos.
  */
 async function configurarCameras(cameras = []) {
+    estado.ultimaLista = cameras;
     if (!estado.bin) return;
     const streams = new Map();
     const camMap = new Map();
+    const contasTapo = lerContasTapo();
     for (const c of cameras) {
         if (!c.id) continue;
         const url = await origemDaCamera(c.stream_url);
@@ -358,7 +364,7 @@ async function configurarCameras(cameras = []) {
         streams.set(principal, typeof url === 'string' && /^rtsps?:\/\//i.test(url) ? `${url}#audio=opus` : url);
         // Falar (voz de volta): em câmeras Mercusys/Tapo o canal fica no protocolo Tapo, não no RTSP. Fonte
         // separada, só para quem fala (a conexão de vídeo e de ouvir não muda). Não consome nada sem uso.
-        const falaUrl = urlFalaTapo(c.stream_url, c.fabricante);
+        const falaUrl = urlFalaTapo(c.stream_url, c.fabricante, contasTapo[hostDaUrl(c.stream_url)]);
         if (falaUrl) streams.set(`${principal}_fala`, falaUrl);
         const primeiroUrl = Array.isArray(url) ? url[0] : url;
         // Webcam não tem sub-stream: a miniatura usa o mesmo vídeo (já é leve)
@@ -443,7 +449,12 @@ async function abrirWebrtc(cameraId, qualidade, ofertaSdp, opcoes = {}) {
         body: ofertaSdp,
         headers: { 'Content-Type': 'application/sdp' }
     });
-    if (!res.ok) throw new Error(`Retransmissor respondeu HTTP ${res.status}`);
+    if (!res.ok) {
+        // O motivo do go2rtc (ex.: "streams: 401 Unauthorized" quando a câmera recusa o login) vai junto,
+        // para a tela dizer o que houve em vez de repetir a mesma mensagem
+        const motivo = (await res.text().catch(() => '')).slice(0, 200).replace(/\w+:\/\/[^@\s]*@/g, '***@');
+        throw new Error(`Retransmissor respondeu HTTP ${res.status}${motivo ? `: ${motivo}` : ''}`);
+    }
     return res.text();
 }
 
@@ -486,15 +497,48 @@ function parar() {
     encerrarProcesso(p);
 }
 
+/** IP (ou nome) da câmera a partir da URL RTSP; null se a URL não for válida */
+function hostDaUrl(streamUrl) {
+    try { return new URL(String(streamUrl)).hostname || null; } catch { return null; }
+}
+
+/** Senhas da conta da nuvem por IP da câmera ({ "192.168.1.88": "senha" }); vazio se não houver arquivo */
+function lerContasTapo() {
+    try {
+        const j = JSON.parse(fs.readFileSync(ARQ_CONTAS_TAPO, 'utf8'));
+        return j && typeof j === 'object' && !Array.isArray(j) ? j : {};
+    } catch { return {}; }
+}
+
+/**
+ * Grava a senha da conta da nuvem (a do app) para a câmera e reaplica a configuração: a fonte de voz passa
+ * a usá-la. O go2rtc reinicia (alguns segundos sem vídeo). Senha vazia apaga a gravada.
+ */
+async function definirSenhaTapo(cameraId, senha) {
+    const cam = (estado.ultimaLista || []).find(c => String(c.id) === String(cameraId));
+    if (!cam) { const e = new Error('Câmera não está no retransmissor local'); e.status = 404; throw e; }
+    if (!/mercusys|tapo/i.test(String(cam.fabricante || ''))) { const e = new Error('Só câmeras Mercusys/Tapo usam a conta do app para falar'); e.status = 409; throw e; }
+    const host = hostDaUrl(cam.stream_url);
+    if (!host) { const e = new Error('Endereço da câmera inválido'); e.status = 409; throw e; }
+    const contas = lerContasTapo();
+    if (senha) contas[host] = String(senha); else delete contas[host];
+    fs.writeFileSync(ARQ_CONTAS_TAPO, JSON.stringify(contas), { mode: 0o600 });
+    await configurarCameras(estado.ultimaLista);
+    return { ok: true };
+}
+
 /**
  * Endereço da fonte Tapo do go2rtc (canal de voz de volta) a partir da URL RTSP da câmera. Só para
- * Mercusys/Tapo. Usuário e senha vêm da própria URL da câmera.
+ * Mercusys/Tapo. O protocolo Tapo só aceita a senha da conta da nuvem (a do app): com ela, vai no formato
+ * tapo://senha@ip. Sem ela, tenta usuário e senha da URL RTSP (a câmera costuma recusar).
  */
-function urlFalaTapo(streamUrl, fabricante = '') {
+function urlFalaTapo(streamUrl, fabricante = '', senhaNuvem = null) {
     if (!/mercusys|tapo/i.test(String(fabricante || ''))) return null;
     let u;
     try { u = new URL(String(streamUrl)); } catch { return null; }
-    if (!/^rtsps?:$/i.test(u.protocol) || !u.hostname || !u.password) return null;
+    if (!/^rtsps?:$/i.test(u.protocol) || !u.hostname) return null;
+    if (senhaNuvem) return `tapo://${encodeURIComponent(String(senhaNuvem))}@${u.hostname}?backchannel=1&audio=pcma`;
+    if (!u.password) return null;
     const user = encodeURIComponent(decodeURIComponent(u.username || 'admin'));
     const senha = encodeURIComponent(decodeURIComponent(u.password));
     return `tapo://${user}:${senha}@${u.hostname}?backchannel=1&audio=pcma`;
@@ -525,5 +569,5 @@ module.exports = {
     midiasDaCamera,
     iniciar, encerrarOrfaos, disponivel, temFfmpeg, caminhoFfmpeg, configurarCameras, conhece, streamDa, urlRtspLocal,
     abrirMp4, abrirWebrtc, abrirMjpeg, snapshot, status, parar, derivarSubstream,
-    _estado: estado, MSG_PORTA_OCUPADA, urlFalaTapo
+    _estado: estado, MSG_PORTA_OCUPADA, urlFalaTapo, definirSenhaTapo, lerContasTapo
 };
