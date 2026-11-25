@@ -53,6 +53,7 @@ const AbaOperadoresCentral = ({ cameras = [] }) => {
     const [dialogo, setDialogo] = useState(null);          // { modo: 'novo'|'editar'|'senha', op }
     const [form, setForm] = useState(FORM_VAZIO);
     const [salvando, setSalvando] = useState(false);
+    const [tentou, setTentou] = useState(false);            // clicou em salvar com campo errado
     const [excluindo, setExcluindo] = useState(null);      // operador a confirmar
     const [registros, setRegistros] = useState([]);
     const [carregandoRegistros, setCarregandoRegistros] = useState(false);
@@ -98,6 +99,7 @@ const AbaOperadoresCentral = ({ cameras = [] }) => {
 
     const abrir = (modo, op = null) => {
         setForm(op ? { nome: op.nome, login: op.login, senha: '' } : FORM_VAZIO);
+        setTentou(false);
         setDialogo({ modo, op });
     };
 
@@ -161,11 +163,19 @@ const AbaOperadoresCentral = ({ cameras = [] }) => {
         URL.revokeObjectURL(url);
     };
 
-    const formValido = dialogo?.modo === 'editar'
-        ? form.nome.trim().length >= 2
-        : dialogo?.modo === 'senha'
-            ? form.senha.trim().length >= 8
-            : form.nome.trim().length >= 2 && /^[a-z0-9._-]{3,40}$/.test(form.login) && form.senha.trim().length >= 8;
+    // O que falta em cada campo (o botão não fica apagado sem explicação: ao clicar, o campo errado fica vermelho)
+    const errosForm = {
+        nome: dialogo?.modo !== 'senha' && form.nome.trim().length < 2 ? 'Informe o nome (pelo menos 2 letras).' : '',
+        login: dialogo?.modo === 'novo' && !/^[a-z0-9._-]{3,40}$/.test(form.login)
+            ? (form.login.length < 3 ? 'O login precisa de pelo menos 3 caracteres.' : 'Use só letras sem acento, números, ponto, hífen ou sublinhado (sem @ e sem espaço).')
+            : '',
+        senha: dialogo?.modo !== 'editar' && form.senha.trim().length < 8 ? `A senha precisa de pelo menos 8 caracteres (tem ${form.senha.trim().length}).` : ''
+    };
+    const formValido = !errosForm.nome && !errosForm.login && !errosForm.senha;
+    const tentarSalvar = () => {
+        if (!formValido) { setTentou(true); return; }
+        salvar();
+    };
 
     return (
         <Box sx={{ display: 'grid', gap: 3 }}>
@@ -305,27 +315,30 @@ const AbaOperadoresCentral = ({ cameras = [] }) => {
                         <DialogContent sx={{ display: 'grid', gap: 2, pt: '8px !important' }}>
                             {dialogo.modo !== 'senha' && (
                                 <TextField id="central-op-nome" label="Nome completo" value={form.nome} autoFocus
-                                    inputProps={{ maxLength: 80 }}
-                                    helperText="Aparece no registro de atividades e na Central."
+                                    inputProps={{ maxLength: 80 }} autoComplete="off"
+                                    error={tentou && !!errosForm.nome}
+                                    helperText={(tentou && errosForm.nome) || 'Aparece no registro de atividades e na Central.'}
                                     onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} />
                             )}
                             {dialogo.modo === 'novo' && (
                                 <TextField id="central-op-login" label="Login" value={form.login}
-                                    inputProps={{ maxLength: 40, autoCapitalize: 'none', spellCheck: false }}
-                                    helperText="De 3 a 40 caracteres: letras minúsculas, números, ponto, hífen ou sublinhado."
-                                    onChange={e => setForm(f => ({ ...f, login: e.target.value.toLowerCase().replace(/\s/g, '') }))} />
+                                    inputProps={{ maxLength: 40, autoCapitalize: 'none', spellCheck: false }} autoComplete="off"
+                                    error={tentou && !!errosForm.login}
+                                    helperText={(tentou && errosForm.login) || 'De 3 a 40 caracteres: letras sem acento, números, ponto, hífen ou sublinhado. Ex.: maria.silva'}
+                                    onChange={e => setForm(f => ({ ...f, login: e.target.value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, '.') }))} />
                             )}
                             {dialogo.modo !== 'editar' && (
                                 <TextField id="central-op-senha" label={dialogo.modo === 'senha' ? 'Nova senha' : 'Senha'} type="password" value={form.senha}
                                     autoFocus={dialogo.modo === 'senha'} autoComplete="new-password"
                                     inputProps={{ maxLength: 128 }}
-                                    helperText="Pelo menos 8 caracteres. Entregue a senha ao operador por um canal seguro."
+                                    error={tentou && !!errosForm.senha}
+                                    helperText={(tentou && errosForm.senha) || 'Pelo menos 8 caracteres. Entregue a senha ao operador por um canal seguro.'}
                                     onChange={e => setForm(f => ({ ...f, senha: e.target.value }))} />
                             )}
                         </DialogContent>
                         <DialogActions sx={{ px: 3, pb: 2.5 }}>
                             <Button variant="outlined" sx={botaoSecundario} onClick={() => setDialogo(null)} disabled={salvando}>Cancelar</Button>
-                            <NeonButton onClick={salvar} disabled={!formValido || salvando}>
+                            <NeonButton onClick={tentarSalvar} disabled={salvando}>
                                 {salvando ? 'Salvando…' : dialogo.modo === 'novo' ? 'Criar operador' : 'Salvar'}
                             </NeonButton>
                         </DialogActions>
