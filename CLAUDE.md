@@ -759,6 +759,19 @@ docker system prune -af
      avulsos de diagnóstico (backend/api-nodejs/check_*/test_*/query_*, *.py, *.jpg na raiz), todos de abr–out/2026.
 
 ```
+2026-11-25 - Deploy 0ebf90b (Central: login por operador e registro de atividades; controle assumir/liberar; som)
+├─ Mudanças: Central local (localhost:8766/central) troca a chave por login/senha de operador (chave só vale com
+│            o evento sem operadores); controle assumir/liberar (giro e fala só com o controle, solta após 10 min);
+│            ouvir com volume e medidor; Monitor > "Operadores da Central" (só admin): cadastro e registro com CSV;
+│            /api/central-operadores; agente guarda hashes (login sem internet) e fila de registros no disco;
+│            painel só visualiza (giro saiu do Monitor); f958b3b ([skip ci]) foi junto
+├─ Migrations: 20261125_central_operadores.sql aplicada pela usuária antes do push
+├─ Status: ✅ OK (GitHub Actions run 45713760321); /monitor 200, /api/ready ok, /api/central-operadores 401 sem login
+├─ Testes: backend 737 ✅ (6 novos); agente 30 ✅; lint e build do painel ✅; NÃO testado com a API real no navegador
+├─ Agente: PC do evento precisa rodar ligar-ia-facial.bat; fala na Mercusys (Tapo) ainda recusada (401)
+└─ Rollback: tag antes-deploy-20261125-central-operadores (3e71fec)
+
+
 2026-11-24 - Deploy 702f7b9 (credenciamento: caixa da pulseira vazia; leitura automática para com a ficha aberta)
 ├─ Mudanças: ModalCredenciamento começa com a caixa da pulseira vazia (não copia o número do cadastro);
 │            useCheckin ignora credenciamento_abrir enquanto a ficha está aberta (não reabre nem apaga a digitação)
