@@ -14,6 +14,9 @@ export const useEventos = () => {
     const [openDialog, setOpenDialog] = useState(false);
     const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
     const [eventoToDelete, setEventoToDelete] = useState(null);
+    // Registro do evento antes da exclusão: 'pendente' | 'gerando' | 'baixado' | 'erro'
+    const [registroEstado, setRegistroEstado] = useState('pendente');
+    const [registroErro, setRegistroErro] = useState('');
     const [selectedEvento, setSelectedEvento] = useState(null);
     const [tabValue, setTabValue] = useState(0);
 
@@ -146,10 +149,43 @@ export const useEventos = () => {
 
     const handleDelete = (id) => {
         setEventoToDelete(id);
+        setRegistroEstado('pendente');
+        setRegistroErro('');
         setOpenDeleteConfirm(true);
     };
 
+    // Gera o registro do evento e baixa no PC do admin. A exclusão só é liberada depois disto.
+    const baixarRegistroEvento = async () => {
+        if (!eventoToDelete) return false;
+        setRegistroEstado('gerando');
+        setRegistroErro('');
+        try {
+            const { data } = await api.get(`/eventos/${eventoToDelete}/registro-encerramento`, { timeout: 180000 });
+            const nomeBase = String(data?.evento?.nome || 'evento').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'evento';
+            const stamp = format(new Date(), 'yyyy-MM-dd_HH-mm');
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `registro-encerramento_${nomeBase}_${stamp}.json`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 15000);
+            setRegistroEstado('baixado');
+            return true;
+        } catch (error) {
+            const motivo = error.response?.data?.error || error.message || 'erro desconhecido';
+            setRegistroErro(`Não foi possível gerar o registro do evento: ${motivo}. O evento não foi excluído.`);
+            setRegistroEstado('erro');
+            return false;
+        }
+    };
+
     const confirmDelete = async () => {
+        // Trava: sem o registro baixado nesta tela, a exclusão não acontece
+        if (registroEstado !== 'baixado') return;
         try {
             setDeleteLoading(true);
             await api.delete(`/eventos/${eventoToDelete}`);
@@ -215,6 +251,10 @@ export const useEventos = () => {
         loading,
         saving,
         deleteLoading,
+        registroEstado,
+        registroErro,
+        baixarRegistroEvento,
+        eventoToDelete,
         openDialog,
         setOpenDialog,
         openDeleteConfirm,

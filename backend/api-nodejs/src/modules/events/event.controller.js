@@ -1,6 +1,7 @@
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const eventService = require('./event.service');
+const registroEncerramentoService = require('./registroEncerramento.service');
 const websocketService = require('../../services/websocketService');
 const ApiResponse = require('../../utils/apiResponse');
 
@@ -128,6 +129,22 @@ class EventoController {
         } catch (error) {
             logger.error('Erro ao desativar evento:', error.message);
             return ApiResponse.error(res, error.message);
+        }
+    }
+
+    // Registro do evento para baixar antes de excluir (só leitura; a exclusão em si não muda)
+    async registroEncerramento(req, res) {
+        try {
+            const { id } = req.params;
+            const supabaseClient = req.supabase || supabase;
+            const registro = await registroEncerramentoService.montarRegistroEncerramento(supabaseClient, id, {
+                geradoPor: req.user?.nome || null
+            });
+            res.setHeader('Cache-Control', 'no-store');
+            return res.json(registro);
+        } catch (error) {
+            logger.error('Erro ao gerar registro de encerramento do evento:', error.message);
+            return ApiResponse.error(res, error.message, error.status || 500);
         }
     }
 

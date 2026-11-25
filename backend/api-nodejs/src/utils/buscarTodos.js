@@ -84,4 +84,5 @@ async function buscarPorIdsEmLotes(ids, montar, tamanhoLote = 200) {
     return { data: linhas, error: null };
 }
 
-module.exports = { buscarTodos, buscarPorIdsEmLotes };
+// LIMITE_SEGURANCA exportado: quem precisa de TODAS as linhas (ex.: registro de encerramento) confere se bateu o teto
+module.exports = { buscarTodos, buscarPorIdsEmLotes, LIMITE_SEGURANCA };

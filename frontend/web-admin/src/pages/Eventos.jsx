@@ -10,10 +10,10 @@ import {
 } from '@mui/icons-material';
 import PageHeader from '../components/common/PageHeader';
 import NeonButton from '../components/common/NeonButton';
-import ConfirmDialog from '../components/common/ConfirmDialog';
 import { useEventos } from '../hooks/useEventos';
 import EventCard from '../components/evento/EventCard';
 import EventFormDialog from '../components/evento/EventFormDialog';
+import ExcluirEventoDialog from '../components/evento/ExcluirEventoDialog';
 
 const Eventos = ({ isEmbedded = false }) => {
     const {
@@ -21,6 +21,10 @@ const Eventos = ({ isEmbedded = false }) => {
         loading,
         saving,
         deleteLoading,
+        registroEstado,
+        registroErro,
+        baixarRegistroEvento,
+        eventoToDelete,
         openDialog,
         openDeleteConfirm,
         setOpenDeleteConfirm,
@@ -102,13 +106,15 @@ const Eventos = ({ isEmbedded = false }) => {
                 handleDateToggle={handleDateToggle}
             />
 
-            <ConfirmDialog
+            <ExcluirEventoDialog
                 open={openDeleteConfirm}
-                onConfirm={confirmDelete}
+                nomeEvento={eventos.find(e => e.id === eventoToDelete)?.nome}
+                estado={registroEstado}
+                erro={registroErro}
+                onBaixar={baixarRegistroEvento}
+                onExcluir={confirmDelete}
                 onCancel={() => setOpenDeleteConfirm(false)}
                 loading={deleteLoading}
-                title="Excluir evento definitivamente"
-                message="O evento e as configurações dele serão apagados de vez, sem como desfazer. Para só pausar o evento, use o botão Ativo/Inativo no card. Deseja excluir?"
             />
         </Box>
     );

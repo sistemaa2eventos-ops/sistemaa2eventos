@@ -21,6 +21,8 @@ router.put('/:id', authorize('admin'), eventoController.update);
 router.patch('/:id/activate', authorize('admin'), eventoController.activate);
 router.patch('/:id/deactivate', authorize('admin'), eventoController.deactivate);
 router.patch('/:id/toggle-module', authorize('admin'), eventoController.toggleModule);
+// Registro para baixar antes da exclusão (o painel só libera excluir depois do download)
+router.get('/:id/registro-encerramento', authorize('admin'), eventoController.registroEncerramento);
 router.delete('/:id', authorize('admin'), eventoController.delete);
 
 // Rotas de Quotas Diárias
