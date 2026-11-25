@@ -11,9 +11,14 @@
  *  - caixas da IA de todas as câmeras numa consulta só ao motor deste PC;
  *  - alertas da watchlist marcados aqui mesmo (lista de alvos vem da VPS a cada minuto e fica em disco).
  *
- * Acesso: chave em backend/agent-local/.central-chave (criada no 1º uso; o atalho abrir-central.bat a
- * usa). A chave vira um cookie de sessão HttpOnly/SameSite=Strict de 12 h. Escutando só em 127.0.0.1,
+ * Acesso: login e senha do operador (cadastrado no painel, Monitor > Operadores da Central). A lista de
+ * operadores vem da VPS com o hash da senha e fica em disco: o login funciona sem internet. Enquanto o
+ * evento não tem nenhum operador, vale a chave de backend/agent-local/.central-chave (instalação).
+ * A entrada vira um cookie de sessão HttpOnly/SameSite=Strict de 12 h. Escutando só em 127.0.0.1,
  * o cabeçalho Host também é conferido (protege contra "DNS rebinding").
+ *
+ * Registro (LGPD/LAI): entrar, sair, assistir, ouvir, falar, girar e o controle ficam numa fila em disco
+ * com o nome do operador e o horário; o agente envia à VPS e apaga só o que ela confirmou.
  */
 const fs = require('fs');
 const path = require('path');
@@ -25,6 +30,11 @@ const ptz = require('./ptz');
 const DIR_ESTATICO = path.join(__dirname, '..', 'central');
 const ARQ_CHAVE = process.env.CENTRAL_CHAVE_ARQ || path.join(__dirname, '..', '.central-chave');
 const ARQ_ALVOS = process.env.CENTRAL_ALVOS_ARQ || path.join(__dirname, '..', '.central-alvos.json');
+const ARQ_OPERADORES = process.env.CENTRAL_OPERADORES_ARQ || path.join(__dirname, '..', '.central-operadores.json');
+const ARQ_AUDITORIA = process.env.CENTRAL_AUDITORIA_ARQ || path.join(__dirname, '..', '.central-auditoria.json');
+const AUDITORIA_MAX = 5000;   // fila no PC sem internet; passando disso, os mais antigos saem
+// Ações que se repetem muito viram um registro só por janela (girar segurando a seta, reconexão do vídeo)
+const AGRUPAR_MS = { girar: 5000, assistir: 10 * 60 * 1000, ouvir: 10 * 60 * 1000 };
 const SESSAO_MS = 12 * 60 * 60 * 1000;
 const COOKIE = 'nzt_central';
 // Controle das câmeras (giro e fala): uma tela por vez. Quem assume é o único que mexe; libera sozinho
@@ -42,8 +52,11 @@ const estado = {
     cameras: [],              // [{ id, nome, ia }]
     alvos: new Map(),         // pessoa_id → { motivo, nivel }
     alvosEm: 0,
-    sessoes: new Map(),       // token → expira
+    sessoes: new Map(),       // token → { ate, operador: { id, nome, login } | null (entrou pela chave) }
     tentativas: [],           // instantes de logins errados (limite por minuto)
+    operadores: new Map(),    // login → { id, nome, login, senha_hash } (só ativos, vindos da VPS)
+    auditoria: [],            // registros ainda não confirmados pela VPS
+    agrupados: new Map(),     // `${token}:${acao}:${camera}` → último registro (ver AGRUPAR_MS)
     lote: null                // motor sem /api/track/lote: false (usa 1 consulta por câmera)
 };
 
@@ -64,6 +77,7 @@ function gerarNovaChave() {
     fs.writeFileSync(ARQ_CHAVE, nova, { mode: 0o600 });
     estado.sessoes.clear();
     controle.token = null;
+    controle.nome = null;
     return nova;
 }
 
@@ -80,18 +94,115 @@ function lerCookie(req) {
 
 function sessaoOk(req) {
     const t = lerCookie(req);
-    const ate = t && estado.sessoes.get(t);
-    if (!ate) return false;
-    if (Date.now() > ate) { estado.sessoes.delete(t); return false; }
+    const s = t && estado.sessoes.get(t);
+    if (!s) return false;
+    if (Date.now() > s.ate) { estado.sessoes.delete(t); return false; }
     return true;
 }
 
-function novaSessao(res) {
+/** Operador da sessão do pedido ({ id, nome, login }), ou null se entrou pela chave */
+function operadorDe(req) {
+    const t = lerCookie(req);
+    return (t && estado.sessoes.get(t)?.operador) || null;
+}
+
+function novaSessao(res, operador = null) {
     const agora = Date.now();
-    for (const [t, ate] of estado.sessoes) if (ate < agora) estado.sessoes.delete(t);
+    for (const [t, s] of estado.sessoes) if (s.ate < agora) estado.sessoes.delete(t);
     const token = crypto.randomBytes(24).toString('hex');
-    estado.sessoes.set(token, agora + SESSAO_MS);
+    estado.sessoes.set(token, { ate: agora + SESSAO_MS, operador });
     res.setHeader('Set-Cookie', `${COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/central; Max-Age=${SESSAO_MS / 1000}`);
+    return token;
+}
+
+// ------------------------------------------------------------------ operadores (login e senha)
+/** Mesmo formato do painel (scrypt$salt$hash); a senha é aparada antes, como no cadastro */
+function verificarSenha(senha, hash) {
+    const partes = String(hash || '').split('$');
+    if (partes.length !== 3 || partes[0] !== 'scrypt' || !partes[1] || !partes[2]) return false;
+    try {
+        const calculado = crypto.scryptSync(String(senha || '').trim(), partes[1], 64);
+        const esperado = Buffer.from(partes[2], 'hex');
+        return calculado.length === esperado.length && crypto.timingSafeEqual(calculado, esperado);
+    } catch { return false; }
+}
+
+/** Operadores ativos do evento (vêm da VPS). A lista fica em disco: o login funciona sem internet. */
+function definirOperadores(lista = [], { salvar = true } = {}) {
+    const validos = (Array.isArray(lista) ? lista : []).filter(o => o && o.id && o.login && o.nome && String(o.senha_hash || '').startsWith('scrypt$'));
+    estado.operadores = new Map(validos.map(o => [String(o.login).toLowerCase(), {
+        id: String(o.id), nome: String(o.nome).slice(0, 80), login: String(o.login).toLowerCase(), senha_hash: String(o.senha_hash)
+    }]));
+    // Operador desativado ou excluído no painel sai na hora
+    for (const [t, s] of estado.sessoes) {
+        if (s.operador && !estado.operadores.has(s.operador.login)) { estado.sessoes.delete(t); liberarDaSessao(t); }
+    }
+    if (salvar) {
+        try { fs.writeFileSync(ARQ_OPERADORES, JSON.stringify([...estado.operadores.values()]), { mode: 0o600 }); } catch { /* segue em memória */ }
+    }
+}
+
+function carregarOperadoresSalvos() {
+    try { definirOperadores(JSON.parse(fs.readFileSync(ARQ_OPERADORES, 'utf8')), { salvar: false }); } catch { /* sem lista ainda */ }
+}
+
+/** Login e senha do operador; null se não confere. Tempo parecido com ou sem login (não revela quem existe). */
+function autenticar(login, senha) {
+    const op = estado.operadores.get(String(login || '').trim().toLowerCase());
+    const ok = verificarSenha(senha, op ? op.senha_hash : 'scrypt$00$00');
+    return ok && op ? { id: op.id, nome: op.nome, login: op.login } : null;
+}
+
+// ------------------------------------------------------------------ registro de atividades
+function salvarAuditoria() {
+    try { fs.writeFileSync(ARQ_AUDITORIA, JSON.stringify(estado.auditoria), { mode: 0o600 }); } catch { /* segue em memória */ }
+}
+
+function carregarAuditoriaSalva() {
+    try {
+        const j = JSON.parse(fs.readFileSync(ARQ_AUDITORIA, 'utf8'));
+        if (Array.isArray(j)) estado.auditoria = j.slice(-AUDITORIA_MAX);
+    } catch { /* fila vazia */ }
+}
+
+/**
+ * Registra quem fez o quê. `operador` null = entrou pela chave de instalação. Ações repetidas (girar,
+ * assistir, ouvir) viram um registro só por janela, para a lista mostrar o que aconteceu e não ruído.
+ */
+function auditar({ operador, token = '', acao, cameraId = null, detalhe = {}, nomeTentado = null }) {
+    const agora = Date.now();
+    const janela = AGRUPAR_MS[acao];
+    if (janela) {
+        const chave = `${token}:${acao}:${cameraId || ''}`;
+        if (agora - (estado.agrupados.get(chave) || 0) < janela) return;
+        estado.agrupados.set(chave, agora);
+        if (estado.agrupados.size > 2000) estado.agrupados.clear();
+    }
+    estado.auditoria.push({
+        uid: crypto.randomBytes(12).toString('hex'),
+        operador_id: operador ? operador.id : null,
+        operador_nome: operador ? operador.nome : (nomeTentado ? `login tentado: ${String(nomeTentado).slice(0, 40)}` : 'chave de acesso (instalação)'),
+        operador_login: operador ? operador.login : null,
+        acao,
+        camera_id: cameraId,
+        detalhe,
+        ocorrido_em: new Date(agora).toISOString()
+    });
+    if (estado.auditoria.length > AUDITORIA_MAX) estado.auditoria.splice(0, estado.auditoria.length - AUDITORIA_MAX);
+    salvarAuditoria();
+}
+
+/** Registros para enviar à VPS (os mais antigos primeiro) */
+function auditoriaPendente(max = 200) {
+    return estado.auditoria.slice(0, max);
+}
+
+/** A VPS confirmou: estes saem da fila */
+function confirmarAuditoria(uids = []) {
+    const feitos = new Set(uids);
+    const antes = estado.auditoria.length;
+    estado.auditoria = estado.auditoria.filter(r => !feitos.has(r.uid));
+    if (estado.auditoria.length !== antes) salvarAuditoria();
 }
 
 function bloqueadoPorTentativas() {
@@ -141,11 +252,11 @@ async function enviarOnvif(url, xml) {
 
 /** Giro da câmera pela Central: mover, parar, listar, ir e gravar posições */
 /** Controle das câmeras: guarda o token da sessão que tem o controle (nunca sai deste processo) */
-const controle = { token: null, visto: 0 };
+const controle = { token: null, visto: 0, nome: null };
 
 /** Token de quem tem o controle agora, ou null (libera sozinho se ficou ocioso) */
 function controleAtivo() {
-    if (controle.token && Date.now() - controle.visto > CONTROLE_OCIOSO_MS) controle.token = null;
+    if (controle.token && Date.now() - controle.visto > CONTROLE_OCIOSO_MS) { controle.token = null; controle.nome = null; }
     return controle.token;
 }
 
@@ -154,15 +265,15 @@ function temControle(req) {
     return !!t && controleAtivo() === t;
 }
 
-/** O que a tela precisa saber: se é ela quem tem o controle, e se há alguém com ele */
+/** O que a tela precisa saber: se é ela quem tem o controle, se há alguém com ele e quem é */
 function estadoDoControle(req) {
     const ativo = controleAtivo();
-    return { meu: !!ativo && ativo === lerCookie(req), ocupado: !!ativo };
+    return { meu: !!ativo && ativo === lerCookie(req), ocupado: !!ativo, quem: ativo ? controle.nome : null };
 }
 
 /** Fecha a sessão de quem tinha o controle: o controle volta a ficar livre */
 function liberarDaSessao(token) {
-    if (token && controle.token === token) controle.token = null;
+    if (token && controle.token === token) { controle.token = null; controle.nome = null; }
 }
 
 async function tratarPtz(req, res, camId, listar) {
@@ -184,6 +295,11 @@ async function tratarPtz(req, res, camId, listar) {
     }
     try {
         const r = await ptz.executar(cam, enviarOnvif, pedido);
+        const acaoRegistro = { mover: 'girar', ir: 'ir_posicao', gravar: 'gravar_posicao' }[pedido.acao];
+        if (acaoRegistro) {
+            const detalhe = pedido.acao === 'gravar' ? { posicao: pedido.nome } : pedido.acao === 'ir' ? { posicao: pedido.token } : {};
+            auditar({ operador: operadorDe(req), token: lerCookie(req), acao: acaoRegistro, cameraId: camId, detalhe });
+        }
         json(res, 200, { ok: true, ...r });
     } catch (err) {
         json(res, err.status || 502, { erro: err.status ? err.message : `Sem resposta da câmera: ${err.message}` });
@@ -277,13 +393,27 @@ function servirArquivo(res, nome) {
     });
 }
 
-const PAGINA_ENTRADA = (erro) => `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+/**
+ * Página de entrada. Com operadores cadastrados: login e senha (cada acesso tem nome). Sem nenhum ainda
+ * (instalação do evento): a chave de acesso deste PC, com o aviso de como cadastrar os operadores.
+ * Os textos de erro são só os deste arquivo (nada que o usuário digitou volta para a página).
+ */
+const PAGINA_ENTRADA = (erro, { comChave = false } = {}) => `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Central de Monitoramento</title>
 <link rel="stylesheet" href="/central/central.css"></head><body class="entrada">
 <form method="post" action="/central/entrar" class="cartao-entrada">
-<h1>Central de Monitoramento</h1><p>Use o atalho <b>abrir-central.bat</b> deste PC ou cole a chave de acesso.</p>
+<h1>Central de Monitoramento</h1>
+${comChave
+        ? `<p>Nenhum operador cadastrado neste evento ainda. Entre com a chave de acesso deste PC e cadastre os operadores no painel, em <b>Monitor &gt; Operadores da Central</b>.</p>
 ${erro ? `<p class="erro">${erro}</p>` : ''}
-<input name="chave" type="password" autocomplete="off" placeholder="Chave de acesso" autofocus>
+<label for="chave">Chave de acesso</label>
+<input id="chave" name="chave" type="password" autocomplete="off" autofocus>`
+        : `<p>Entre com o seu login de operador. Cada acesso e cada ação nas câmeras ficam registrados com o seu nome.</p>
+${erro ? `<p class="erro">${erro}</p>` : ''}
+<label for="usuario">Login</label>
+<input id="usuario" name="usuario" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="40" autofocus required>
+<label for="senha">Senha</label>
+<input id="senha" name="senha" type="password" autocomplete="current-password" maxlength="128" required>`}
 <button type="submit">Entrar</button></form></body></html>`;
 
 async function consultarMotor(caminho, opcoes = {}) {
@@ -327,29 +457,48 @@ async function tratar(req, res, url) {
 
     // ---------------- entrada
     if (p === '/central/entrar') {
+        const semOperadores = estado.operadores.size === 0;
         let chave = url.searchParams.get('chave');
+        let usuario = null;
+        let senha = null;
         if (req.method === 'POST') {
-            const corpo = await lerCorpo(req, 2048).catch(() => '');
-            chave = new URLSearchParams(corpo).get('chave');
+            const corpo = new URLSearchParams(await lerCorpo(req, 2048).catch(() => ''));
+            chave = corpo.get('chave');
+            usuario = corpo.get('usuario');
+            senha = corpo.get('senha');
         }
-        if (bloqueadoPorTentativas()) {
-            res.statusCode = 429;
+        const pagina = (status, erro) => {
+            res.statusCode = status;
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
-            res.end(PAGINA_ENTRADA('Muitas tentativas. Aguarde 1 minuto.'));
+            res.end(PAGINA_ENTRADA(erro, { comChave: semOperadores }));
             return true;
-        }
-        if (chave && iguais(chave.trim(), chaveDeAcesso())) {
-            novaSessao(res);
+        };
+        const entrar = (operador) => {
+            const token = novaSessao(res, operador);
+            auditar({ operador, token, acao: 'entrar' });
             res.statusCode = 303;
             res.setHeader('Location', '/central/'); // tira a chave da barra de endereço
             res.end();
             return true;
+        };
+        if (bloqueadoPorTentativas()) return pagina(429, 'Muitas tentativas. Aguarde 1 minuto.');
+
+        if (usuario || senha) {
+            const operador = autenticar(usuario, senha);
+            if (operador) return entrar(operador);
+            estado.tentativas.push(Date.now());
+            auditar({ operador: null, acao: 'entrar_falhou', nomeTentado: usuario || '(vazio)' });
+            return pagina(401, 'Login ou senha incorretos.');
         }
-        if (chave) estado.tentativas.push(Date.now());
-        res.statusCode = chave ? 401 : 200;
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.end(PAGINA_ENTRADA(chave ? 'Chave incorreta.' : ''));
-        return true;
+        if (chave) {
+            // A chave só vale na instalação (nenhum operador ainda): depois, todo acesso tem nome.
+            // O atalho que abre a Central com a chave na URL só mostra a tela de login (não é tentativa).
+            if (!semOperadores) return pagina(req.method === 'POST' ? 401 : 200, req.method === 'POST' ? 'Entre com o seu login e senha de operador.' : '');
+            if (iguais(chave.trim(), chaveDeAcesso())) return entrar(null);
+            estado.tentativas.push(Date.now());
+            return pagina(401, 'Chave incorreta.');
+        }
+        return pagina(200, '');
     }
     if (p === '/central/central.css') { servirArquivo(res, 'central.css'); return true; }
 
@@ -370,6 +519,7 @@ async function tratar(req, res, url) {
     if (p === '/central/central.js') { servirArquivo(res, 'central.js'); return true; }
     if (p === '/central/sair' && req.method === 'POST') {
         const t = lerCookie(req);
+        auditar({ operador: operadorDe(req), token: t, acao: 'sair' });
         if (t) estado.sessoes.delete(t);
         liberarDaSessao(t);
         res.setHeader('Set-Cookie', `${COOKIE}=; HttpOnly; SameSite=Strict; Path=/central; Max-Age=0`);
@@ -402,6 +552,8 @@ async function tratar(req, res, url) {
         if (senha.length > 128) { json(res, 400, { erro: 'Senha longa demais.' }); return true; }
         try {
             await video.definirSenhaTapo(mct[1], senha);
+            // Só o fato fica no registro; a senha nunca
+            auditar({ operador: operadorDe(req), token: tokenDaSessao, acao: 'senha_app_camera', cameraId: mct[1], detalhe: { senha: senha ? 'definida' : 'apagada' } });
             json(res, 200, { ok: true });
         } catch (err) {
             json(res, err.status || 500, { erro: err.message });
@@ -417,11 +569,17 @@ async function tratar(req, res, url) {
         if (corpo.acao === 'assumir') {
             const ativo = controleAtivo();
             if (ativo && ativo !== meu) { json(res, 409, { erro: 'Outra tela já está com o controle. Ela precisa liberar primeiro.', ...estadoDoControle(req) }); return true; }
+            const jaEra = ativo === meu;
+            const operador = operadorDe(req);
             controle.token = meu;
             controle.visto = Date.now();
+            controle.nome = operador ? operador.nome : 'Acesso pela chave';
+            if (!jaEra) auditar({ operador, token: meu, acao: 'assumir_controle' });
         } else if (corpo.acao === 'liberar') {
             if (controleAtivo() !== meu) { json(res, 403, { erro: 'Só quem tem o controle pode liberá-lo.', ...estadoDoControle(req) }); return true; }
             controle.token = null;
+            controle.nome = null;
+            auditar({ operador: operadorDe(req), token: meu, acao: 'liberar_controle' });
         } else {
             json(res, 400, { erro: 'ação inválida' });
             return true;
@@ -435,7 +593,8 @@ async function tratar(req, res, url) {
             cameras: estado.cameras.filter(c => video.conhece(c.id)).map(c => ({ ...c, ptz: camerasComGiro.has(c.id) })),
             retransmissor: video.status(),
             watchlist: { alvos: estado.alvos.size, atualizada_em: estado.alvosEm || null },
-            controle: estadoDoControle(req)
+            controle: estadoDoControle(req),
+            operador: (() => { const o = operadorDe(req); return o ? { nome: o.nome, login: o.login } : null; })()
         });
         return true;
     }
@@ -452,7 +611,11 @@ async function tratar(req, res, url) {
         try {
             const oferta = await lerCorpo(req, 64 * 1024);
             if (!oferta.startsWith('v=0')) { res.statusCode = 400; res.end(); return true; }
-            const resposta = await video.abrirWebrtc(mw[1], qualidade, oferta, { fala: url.searchParams.get('fala') === '1' });
+            const fala = url.searchParams.get('fala') === '1';
+            const resposta = await video.abrirWebrtc(mw[1], qualidade, oferta, { fala });
+            // Quem viu, ouviu ou falou com a câmera (assistir e ouvir agrupados: reconexões não viram ruído)
+            const acao = fala ? 'falar' : /\bm=audio\b/.test(oferta) ? 'ouvir' : 'assistir';
+            auditar({ operador: operadorDe(req), token: tokenDaSessao, acao, cameraId: mw[1], detalhe: acao === 'assistir' ? { qualidade } : {} });
             res.statusCode = 201;
             res.setHeader('Content-Type', 'application/sdp');
             res.setHeader('Cache-Control', 'no-store');
@@ -540,6 +703,8 @@ function iniciar({ log, fetchIa, porta, soLocal, tailscale = null }) {
     definirAcesso({ porta, soLocal, tailscale });
     chaveDeAcesso();
     carregarAlvosSalvos();
+    carregarOperadoresSalvos();
+    carregarAuditoriaSalva();
 }
 
 /** Quem pode abrir a Central (trocado pelo painel sem reiniciar o agente) */
@@ -550,4 +715,8 @@ function definirAcesso({ porta = estado.porta, soLocal, tailscale = null }) {
     estado.hostsExtras = new Set(tailscale ? [`${tailscale.ip}:${porta}`, `${tailscale.nome}:${porta}`] : []);
 }
 
-module.exports = { iniciar, definirAcesso, _credenciaisDoStream: credenciaisDoStream, _camerasComGiro: camerasComGiro, gerarNovaChave, tratar, configurarCameras, definirAlvos, chaveDeAcesso, ARQ_CHAVE, _estado: estado, _caixaParaTela: caixaParaTela };
+module.exports = {
+    iniciar, definirAcesso, _credenciaisDoStream: credenciaisDoStream, _camerasComGiro: camerasComGiro, gerarNovaChave, tratar,
+    configurarCameras, definirAlvos, chaveDeAcesso, ARQ_CHAVE, _estado: estado, _caixaParaTela: caixaParaTela,
+    definirOperadores, auditoriaPendente, confirmarAuditoria, _verificarSenha: verificarSenha
+};

@@ -60,7 +60,7 @@ import KpiCards from '../components/monitor/KpiCards';
 import AbaSaude from '../components/monitor/AbaSaude';
 
 import { botaoSecundario } from '../styles/tokens';
-import PainelGiro from '../components/cameras/PainelGiro';
+import AbaOperadoresCentral from '../components/monitor/AbaOperadoresCentral';
 import useVisaoNoturna from '../hooks/useVisaoNoturna';
 import { comoRotulo } from '../utils/formatadores';
 
@@ -100,6 +100,8 @@ const Monitor = () => {
   const { enqueueSnackbar } = useSnackbar();
   const { user } = useAuth();
   const isAdminMaster = user?.nivel_acesso === 'admin_master';
+  // Operadores da Central: a API só aceita admin (cadastro de acesso e registro de atividades)
+  const isAdmin = ['admin', 'admin_master', 'master'].includes(user?.nivel_acesso);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   // Detecção estável de mobile/tablet em qualquer orientação (largura <= 1024px OU altura de celular deitado <= 540px)
@@ -116,9 +118,10 @@ const Monitor = () => {
       list.push({ id: 'watchlist', label: 'Watchlist' });
     }
     list.push({ id: 'cameras', label: 'Câmeras' });
+    if (isAdmin) list.push({ id: 'operadores', label: 'Operadores da Central' });
     list.push({ id: 'saude', label: 'Saúde do sistema' });
     return list;
-  }, [isAdminMaster]);
+  }, [isAdminMaster, isAdmin]);
 
   const [activeTab, setActiveTab] = useState('feed');
 
@@ -285,19 +288,6 @@ const Monitor = () => {
     });
   }, [resetPlayerControlsTimer]);
 
-  // Enquanto o painel de giro está sendo usado, renova o timer (sem isso os controles somem no meio do movimento)
-  const manterControlesRef = React.useRef(null);
-  const iniciarManterControles = React.useCallback(() => {
-    resetPlayerControlsTimer();
-    clearInterval(manterControlesRef.current);
-    manterControlesRef.current = setInterval(resetPlayerControlsTimer, 1500);
-  }, [resetPlayerControlsTimer]);
-  const pararManterControles = React.useCallback(() => {
-    clearInterval(manterControlesRef.current);
-    manterControlesRef.current = null;
-    resetPlayerControlsTimer();
-  }, [resetPlayerControlsTimer]);
-
   useEffect(() => {
     if (activeStreamCam) {
       setShowPlayerControls(true);
@@ -307,7 +297,6 @@ const Monitor = () => {
     }
     return () => {
       if (playerControlsTimerRef.current) clearTimeout(playerControlsTimerRef.current);
-      clearInterval(manterControlesRef.current);
     };
   }, [activeStreamCam, resetPlayerControlsTimer]);
 
@@ -2261,6 +2250,11 @@ const Monitor = () => {
           </Box>
       )}
 
+      {/* OPERADORES DA CENTRAL (só admin): login de quem opera a Central e o registro do que fez */}
+      {activeTab === 'operadores' && isAdmin && (
+          <AbaOperadoresCentral cameras={cameras} />
+      )}
+
       {/* ABA 4: SAÚDE DO SISTEMA */}
       {activeTab === 'saude' && (
           <AbaSaude
@@ -2356,21 +2350,8 @@ const Monitor = () => {
             </Box>
         )}
 
-        {/* Giro da câmera (setas, velocidade, posições): só com giro ligado e os controles visíveis */}
-        {/* Acima do overlay (zIndex 20): o clique nos botões não chega ao overlay, que esconderia os controles.
-            Enquanto o dedo/mouse está no painel, os controles ficam abertos (senão somem no meio do movimento). */}
-        {activeStreamCam?.ptz_ativo && showPlayerControls && (
-            <Box
-                onClick={(e) => e.stopPropagation()}
-                onPointerDown={(e) => { e.stopPropagation(); iniciarManterControles(); }}
-                onPointerUp={pararManterControles}
-                onPointerCancel={pararManterControles}
-                onPointerLeave={pararManterControles}
-                sx={{ position: 'absolute', left: '50%', bottom: { xs: 12, sm: 16 }, transform: 'translateX(-50%)', zIndex: 25, maxWidth: 'calc(100% - 24px)' }}
-            >
-                <PainelGiro cameraId={activeStreamCam.id} />
-            </Box>
-        )}
+        {/* Giro da câmera: só na Central em tempo real (com login, controle por operador e registro).
+            O painel apenas mostra o vídeo; assim duas pessoas não mexem na mesma câmera ao mesmo tempo. */}
 
         {/* Com os controles escondidos, o fechar continua no mesmo lugar: o player nunca fica sem saída */}
         {!showPlayerControls && (

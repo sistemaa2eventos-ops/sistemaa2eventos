@@ -15,6 +15,8 @@ fs.writeFileSync(path.join(pasta, 'chave'), 'k'.repeat(48));
 process.env.CENTRAL_CHAVE_ARQ = path.join(pasta, 'chave');
 process.env.CENTRAL_ALVOS_ARQ = path.join(pasta, 'alvos.json');
 process.env.CENTRAL_ACESSO_ARQ = path.join(pasta, 'acesso.json');
+process.env.CENTRAL_OPERADORES_ARQ = path.join(pasta, 'operadores.json');
+process.env.CENTRAL_AUDITORIA_ARQ = path.join(pasta, 'auditoria.json');
 delete process.env.CENTRAL_REDE;
 delete process.env.CENTRAL_TAILSCALE;
 
@@ -56,7 +58,7 @@ test('padrão só este PC; painel troca para rede local e a escolha fica gravada
 test('gerar nova chave: grava no PC e derruba quem entrou com a antiga', () => {
     const central = require('../src/central');
     const antiga = central.chaveDeAcesso();
-    central._estado.sessoes.set('x'.repeat(48), Date.now() + 60000);
+    central._estado.sessoes.set('x'.repeat(48), { ate: Date.now() + 60000, operador: null });
     const nova = central.gerarNovaChave();
     assert.notStrictEqual(nova, antiga);
     assert.strictEqual(nova.length, 48);

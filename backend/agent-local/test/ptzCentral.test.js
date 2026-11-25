@@ -13,6 +13,8 @@ const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'ptz-central-'));
 fs.writeFileSync(path.join(pasta, 'chave'), 'k'.repeat(48));
 process.env.CENTRAL_CHAVE_ARQ = path.join(pasta, 'chave');
 process.env.CENTRAL_ALVOS_ARQ = path.join(pasta, 'alvos.json');
+process.env.CENTRAL_OPERADORES_ARQ = path.join(pasta, 'operadores.json');
+process.env.CENTRAL_AUDITORIA_ARQ = path.join(pasta, 'auditoria.json');
 
 const central = require('../src/central');
 

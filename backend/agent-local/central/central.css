@@ -142,6 +142,8 @@ body.entrada { align-items: center; justify-content: center; }
 .cartao-entrada h1 { margin: 0; font-size: 20px; }
 .cartao-entrada p { margin: 0; color: var(--apagado); }
 .cartao-entrada .erro { color: var(--vermelho); }
+.cartao-entrada label { font-size: 13px; color: var(--texto); margin-bottom: -6px; }
+.cartao-entrada input:focus-visible, .cartao-entrada button:focus-visible { outline: 2px solid var(--ciano); outline-offset: 2px; }
 .cartao-entrada input {
     background: var(--fundo); border: 1px solid var(--borda); border-radius: var(--raio); color: var(--texto);
     padding: 10px; font: inherit;

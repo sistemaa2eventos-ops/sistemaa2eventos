@@ -210,6 +210,7 @@ app.use('/api/remuneracao', require('./modules/remuneracao/remuneracao.routes'))
 app.use('/api/pulseiras', require('./modules/pulseiras/pulseira.routes'));
 app.use('/api/drive', require('./modules/integracoes/drive.routes'));
 app.use('/api/agentes', require('./modules/devices/agent.routes'));
+app.use('/api/central-operadores', require('./modules/system/centralOperadores.routes'));
 app.use('/api/portal/empresa', portalEmpresaRoutes);
 app.use('/api/portal/cliente', portalClienteRoutes);
 app.use('/api/audit', auditRoutes);

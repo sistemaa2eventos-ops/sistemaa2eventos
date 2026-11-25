@@ -5,6 +5,7 @@
  */
 const { test, before, after } = require('node:test');
 const assert = require('node:assert');
+const crypto = require('node:crypto');
 const http = require('node:http');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -15,6 +16,8 @@ const CHAVE = 'k'.repeat(48);
 fs.writeFileSync(path.join(pasta, 'chave'), CHAVE);
 process.env.CENTRAL_CHAVE_ARQ = path.join(pasta, 'chave');
 process.env.CENTRAL_ALVOS_ARQ = path.join(pasta, 'alvos.json');
+process.env.CENTRAL_OPERADORES_ARQ = path.join(pasta, 'operadores.json');
+process.env.CENTRAL_AUDITORIA_ARQ = path.join(pasta, 'auditoria.json');
 
 // Vídeo simulado: só a câmera "cam1" existe
 const senhasTapo = [];
@@ -180,17 +183,17 @@ const pedirControle = (cookie, acao) => pedir('/central/api/controle', { metodo:
 test('controle: uma tela por vez; só quem tem o controle fala com a câmera', async () => {
     const a = await entrar();
     const b = await entrar();
-    assert.deepStrictEqual(JSON.parse((await pedir('/central/api/estado', { cookie: a })).corpo).controle, { meu: false, ocupado: false });
+    assert.deepStrictEqual(JSON.parse((await pedir('/central/api/estado', { cookie: a })).corpo).controle, { meu: false, ocupado: false, quem: null });
 
     const assumiu = await pedirControle(a, 'assumir');
     assert.strictEqual(assumiu.status, 200);
-    assert.deepStrictEqual(JSON.parse(assumiu.corpo), { meu: true, ocupado: true });
+    assert.deepStrictEqual(JSON.parse(assumiu.corpo), { meu: true, ocupado: true, quem: 'Acesso pela chave' });
 
     // Outra tela não assume enquanto a primeira tem o controle
     const negado = await pedirControle(b, 'assumir');
     assert.strictEqual(negado.status, 409);
     assert.deepStrictEqual(JSON.parse(negado.corpo).meu, false);
-    assert.deepStrictEqual(JSON.parse((await pedir('/central/api/estado', { cookie: b })).corpo).controle, { meu: false, ocupado: true });
+    assert.deepStrictEqual(JSON.parse((await pedir('/central/api/estado', { cookie: b })).corpo).controle, { meu: false, ocupado: true, quem: 'Acesso pela chave' });
 
     // Falar: sem controle é recusado; com controle chega ao retransmissor
     const falaNegada = await pedir('/central/api/camera/cam1/webrtc?qualidade=foco&fala=1', { metodo: 'POST', cookie: b, corpo: 'v=0 oferta', tipo: 'application/sdp' });
@@ -205,7 +208,7 @@ test('controle: uma tela por vez; só quem tem o controle fala com a câmera', a
     assert.strictEqual((await pedirControle(b, 'liberar')).status, 403);
     // Quem tem o controle libera; a outra tela assume
     const liberou = await pedirControle(a, 'liberar');
-    assert.deepStrictEqual(JSON.parse(liberou.corpo), { meu: false, ocupado: false });
+    assert.deepStrictEqual(JSON.parse(liberou.corpo), { meu: false, ocupado: false, quem: null });
     assert.strictEqual((await pedirControle(b, 'assumir')).status, 200);
     assert.strictEqual((await pedirControle(b, 'liberar')).status, 200);
     assert.strictEqual((await pedirControle(a, 'nada')).status, 400);
@@ -246,6 +249,54 @@ test('senha da conta do app: só quem tem o controle grava; nunca volta na respo
     assert.ok(!ok.corpo.includes('Nuvem@1'));
     assert.deepStrictEqual(senhasTapo, [['cam1', 'Nuvem@1']]);
     await pedirControle(a, 'liberar');
+});
+
+test('operadores: login e senha substituem a chave; cada ação fica registrada com o nome', async () => {
+    const salt = 'ab'.repeat(16);
+    const hash = `scrypt$${salt}$${crypto.scryptSync('Senha@123', salt, 64).toString('hex')}`;
+    const form = 'application/x-www-form-urlencoded';
+    central.definirOperadores([{ id: 'op-1', nome: 'Maria Operadora', login: 'maria', senha_hash: hash }]);
+    try {
+        const antes = central.auditoriaPendente(100000).length;
+        // A chave deixa de valer: o atalho com a chave só mostra a tela de login (sem contar tentativa)
+        const pelaChave = await pedir(`/central/entrar?chave=${CHAVE}`);
+        assert.strictEqual(pelaChave.status, 200);
+        assert.match(pelaChave.corpo, /name="usuario"/);
+        assert.ok(!pelaChave.headers['set-cookie']);
+        assert.strictEqual((await pedir('/central/entrar', { metodo: 'POST', corpo: `chave=${CHAVE}`, tipo: form })).status, 401);
+
+        const errada = await pedir('/central/entrar', { metodo: 'POST', corpo: 'usuario=maria&senha=errada', tipo: form });
+        assert.strictEqual(errada.status, 401);
+        assert.ok(!errada.headers['set-cookie']);
+
+        // Login sem diferenciar maiúsculas
+        const certa = await pedir('/central/entrar', { metodo: 'POST', corpo: 'usuario=Maria&senha=Senha%40123', tipo: form });
+        assert.strictEqual(certa.status, 303);
+        const cookie = String(certa.headers['set-cookie'][0]).split(';')[0];
+        assert.deepStrictEqual(JSON.parse((await pedir('/central/api/estado', { cookie })).corpo).operador, { nome: 'Maria Operadora', login: 'maria' });
+        assert.strictEqual(JSON.parse((await pedirControle(cookie, 'assumir')).corpo).quem, 'Maria Operadora');
+        await pedir('/central/api/camera/cam1/webrtc?qualidade=foco', { metodo: 'POST', cookie, corpo: 'v=0 oferta', tipo: 'application/sdp' });
+        // Reconexão do mesmo vídeo não vira outro registro
+        await pedir('/central/api/camera/cam1/webrtc?qualidade=foco', { metodo: 'POST', cookie, corpo: 'v=0 oferta', tipo: 'application/sdp' });
+        await pedirControle(cookie, 'liberar');
+
+        const novos = central.auditoriaPendente(100000).slice(antes);
+        assert.deepStrictEqual(novos.map(r => r.acao), ['entrar_falhou', 'entrar', 'assumir_controle', 'assistir', 'liberar_controle']);
+        assert.strictEqual(novos[0].operador_nome, 'login tentado: maria');
+        assert.ok(novos.slice(1).every(r => r.operador_id === 'op-1' && r.operador_nome === 'Maria Operadora'));
+        assert.strictEqual(novos[3].camera_id, 'cam1');
+        assert.ok(!JSON.stringify(novos).includes('Senha@123') && !JSON.stringify(novos).includes('errada'), 'senha nunca vai para o registro');
+
+        // VPS confirmou: sai da fila
+        central.confirmarAuditoria(novos.map(r => r.uid));
+        assert.strictEqual(central.auditoriaPendente(100000).length, antes);
+
+        // Operador desativado no painel: a sessão dele cai na hora
+        central.definirOperadores([]);
+        assert.strictEqual((await pedir('/central/api/estado', { cookie })).status, 401);
+    } finally {
+        central.definirOperadores([]);
+    }
 });
 
 test('muitas chaves erradas seguidas bloqueiam por 1 minuto', async () => {

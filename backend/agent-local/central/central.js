@@ -930,12 +930,14 @@
     function aplicarControle() {
         const c = st.controle;
         const botao = $('controle');
-        botao.textContent = c.meu ? 'Liberar controle' : c.ocupado ? 'Controle com outra tela' : 'Assumir controle';
+        const quem = c.quem || 'outra tela';
+        botao.textContent = c.meu ? 'Liberar controle' : c.ocupado ? `Controle com ${quem}` : 'Assumir controle';
         botao.disabled = c.ocupado && !c.meu;
         botao.classList.toggle('ligado', c.meu);
         botao.title = c.meu ? 'Você está com o controle. Libere quando terminar.'
-            : c.ocupado ? 'Outra tela está com o controle. Ela precisa liberar.'
+            : c.ocupado ? `${quem} está com o controle e precisa liberar.`
                 : 'Assuma para girar a câmera e falar com ela.';
+        $('operador').textContent = st.operador ? st.operador.nome : 'Acesso pela chave';
         for (const t of st.tiles.values()) {
             const bloqueado = !c.meu;
             t.raiz.querySelectorAll('.botao-falar, .ptz button, .ptz select, .ptz input, .ptz-ir, .ptz-gravar').forEach((x) => {
@@ -945,6 +947,12 @@
         }
     }
 
+    // Sair: encerra a sessão no agente (o controle, se era desta tela, fica livre) e volta ao login
+    $('sair').addEventListener('click', async () => {
+        try { await fetch(`${API.replace(/\/api$/, '')}/sair`, { method: 'POST', cache: 'no-store' }); } catch { /* sai mesmo assim */ }
+        location.href = '/central/entrar';
+    });
+
     $('controle').addEventListener('click', async () => {
         const acao = st.controle.meu ? 'liberar' : 'assumir';
         try {
@@ -953,8 +961,7 @@
                 body: JSON.stringify({ acao }), signal: AbortSignal.timeout(4000)
             });
             const j = await r.json().catch(() => ({}));
-            if (r.ok) st.controle = { meu: !!j.meu, ocupado: !!j.ocupado };
-            else if (j.ocupado !== undefined) st.controle = { meu: !!j.meu, ocupado: !!j.ocupado };
+            if (r.ok || j.ocupado !== undefined) st.controle = { meu: !!j.meu, ocupado: !!j.ocupado, quem: j.quem || null };
             if (!r.ok && j.erro) $('controle').title = j.erro;
         } catch { /* agente ocupado: tenta de novo no próximo ciclo */ }
         aplicarControle();
@@ -995,6 +1002,7 @@
             if (!s.motor) st.motor = false;
             st.watchlist = e.watchlist;
             if (e.controle) st.controle = e.controle;
+            st.operador = e.operador || null;
             // Câmera nova ou removida no painel: refaz a grade
             const ids = (e.cameras || []).map(c => c.id).join(',');
             if (ids !== st.cameras.map(c => c.id).join(',')) {
@@ -1023,6 +1031,7 @@
             st.cameras = e.cameras || [];
             st.watchlist = e.watchlist;
             if (e.controle) st.controle = e.controle;
+            st.operador = e.operador || null;
         } catch { st.cameras = []; }
         montarGrade();
         atualizarEstados();

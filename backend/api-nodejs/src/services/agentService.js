@@ -128,6 +128,23 @@ class AgentService {
                     .catch(err => { logger.warn(`[Biometria] pedido do agente ${nome}: ${err.message}`); ack({ ok: false, erro: err.message }); });
             });
 
+            // Central de Monitoramento local: operadores do evento (com hash da senha, para o login no PC
+            // funcionar sem internet) e o registro de quem operou as câmeras
+            socket.on('agent:central_operadores', (_pedido, ack) => {
+                if (typeof ack !== 'function') return;
+                require('../modules/system/centralOperadores.service').paraAgente(socket.agentInfo.evento_id)
+                    .then(operadores => ack({ ok: true, operadores }))
+                    .catch(err => { logger.warn(`[Central] operadores para o agente ${nome}: ${err.message}`); ack({ ok: false, erro: err.message }); });
+            });
+            socket.on('agent:central_auditoria', (itens, ack) => {
+                require('../modules/system/centralOperadores.service').registrarAuditoria(socket.agentInfo, itens)
+                    .then(r => typeof ack === 'function' && ack(r))
+                    .catch(err => {
+                        logger.warn(`[Central] registro de atividades do agente ${nome}: ${err.message}`);
+                        if (typeof ack === 'function') ack({ ok: false, erro: err.message });
+                    });
+            });
+
             // Gravação concluída no PC do evento / gravações apagadas pelo prazo ou limite de espaço
             socket.on('agent:gravacao', (dados, ack) => {
                 require('../modules/system/gravacao.service').registrar(socket.agentInfo, dados)

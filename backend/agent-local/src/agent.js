@@ -268,6 +268,12 @@ const handlers = {
         return { chave: nova === true ? central.gerarNovaChave() : central.chaveDeAcesso(), nova: nova === true };
     },
 
+    /** Operadores da Central mudaram no painel: busca a lista agora (sem esperar o ciclo de 1 min) */
+    async central_operadores() {
+        await sincronizarOperadoresCentral();
+        return { ok: true };
+    },
+
     /** Troca quem pode abrir a Central ('local', 'rede' ou 'tailscale'); fica gravado neste PC */
     async central_configurar({ acesso }) {
         return require('./visor-local').aplicarAcesso(acesso, { salvar: true });
@@ -774,6 +780,44 @@ setInterval(() => { sincronizarWatchlist(); }, 60000);
 setTimeout(() => { sincronizarWatchlist(); }, 10000);
 
 /**
+ * Operadores da Central (login e senha, cadastrados no painel em Monitor > Operadores da Central).
+ * Vêm com o hash da senha e ficam em disco: o login no PC funciona sem internet. Lista vazia vinda da
+ * VPS também vale (todos desativados = volta a valer só a chave de instalação).
+ */
+let avisouOperadores = false;
+async function sincronizarOperadoresCentral() {
+    if (!socket.connected) return;
+    try {
+        const r = await socket.timeout(15000).emitWithAck('agent:central_operadores', {});
+        if (!r?.ok) throw new Error(r?.erro || 'servidor sem suporte (atualize a API)');
+        require('./central').definirOperadores(r.operadores || []);
+        avisouOperadores = false;
+    } catch (err) {
+        if (!avisouOperadores) log('warn', `operadores da Central: ${err.message}`);
+        avisouOperadores = true;
+    }
+}
+setInterval(() => { sincronizarOperadoresCentral(); }, 60000);
+setTimeout(() => { sincronizarOperadoresCentral(); }, 5000);
+
+/** Registro de atividades da Central → VPS. Só sai da fila do PC o que a VPS confirmou. */
+let enviandoAuditoria = false;
+async function enviarAuditoriaCentral() {
+    if (!socket.connected || enviandoAuditoria) return;
+    const central = require('./central');
+    const lote = central.auditoriaPendente(200);
+    if (!lote.length) return;
+    enviandoAuditoria = true;
+    try {
+        const r = await socket.timeout(15000).emitWithAck('agent:central_auditoria', lote);
+        if (r?.ok) central.confirmarAuditoria(lote.map(x => x.uid));
+    } catch { /* sem resposta: tenta no próximo ciclo; a fila fica em disco */ } finally {
+        enviandoAuditoria = false;
+    }
+}
+setInterval(() => { enviarAuditoriaCentral(); }, 10000);
+
+/**
  * Saúde do vídeo para o painel (aba Saúde do sistema): a cada 10 s o motor informa fps, reconexões,
  * resolução e análise de cada câmera. A VPS guarda só o último envio; sem envio há 30 s, o painel avisa.
  */
@@ -980,6 +1024,8 @@ socket.on('connect', () => {
         recursos: { video_local: video.disponivel(), ffmpeg: video.temFfmpeg(), gravacao: video.temFfmpeg(), rostos_pelo_agente: true, rede_testar: true, central_acesso: true, central_chave: true, http_post: true }
     });
     setTimeout(() => { sincronizarRostos(); }, 5000);
+    // Voltou a internet: operadores atualizados e o registro que ficou no PC segue para a VPS
+    setTimeout(() => { sincronizarOperadoresCentral(); enviarAuditoriaCentral(); }, 3000);
 });
 socket.on('disconnect', (motivo) => log('warn', `Desconectado (${motivo}). Tentando reconectar...`));
 socket.on('connect_error', (err) => log('error', `Falha ao conectar: ${err.message}`));

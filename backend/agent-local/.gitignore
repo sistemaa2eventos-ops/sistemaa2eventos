@@ -11,5 +11,8 @@ bin/
 .central-chave
 .central-alvos.json
 .central-acesso.json
+# Operadores da Central (hash das senhas) e fila do registro de atividades ainda não enviada à VPS
+.central-operadores.json
+.central-auditoria.json
 # Senha da conta do app Mercusys/Tapo por câmera (fala pela Central): só neste PC
 .tapo-contas.json
