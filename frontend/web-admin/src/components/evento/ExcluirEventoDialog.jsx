@@ -27,8 +27,9 @@ const ExcluirEventoDialog = ({ open, nomeEvento, estado, erro, onBaixar, onExclu
                 </Typography>
 
                 <Typography variant="body2" sx={{ color: cores.textoSuave, mb: 2 }}>
-                    <strong>Passo 1.</strong> Baixe o registro do evento no seu computador: dados do evento, pessoas, empresas,
-                    acessos (entradas e saídas), pulseiras e o registro de atividades da Central. A exclusão só é liberada depois do download.
+                    <strong>Passo 1.</strong> Baixe a pasta com os dados do evento no seu computador: empresas, pessoas,
+                    veículos, documentos e relatórios. Guarde esse arquivo para conferências futuras (por exemplo, pagamentos).
+                    A exclusão só é liberada depois do download.
                 </Typography>
 
                 {erro && (
@@ -37,7 +38,7 @@ const ExcluirEventoDialog = ({ open, nomeEvento, estado, erro, onBaixar, onExclu
 
                 {baixado && (
                     <Alert severity="success" icon={<OkIcon fontSize="inherit" />} sx={{ mb: 2 }}>
-                        Registro baixado. Confira o arquivo JSON na pasta de downloads do navegador antes de continuar.
+                        Pasta baixada (arquivo .zip). Confira na pasta de downloads do navegador antes de continuar.
                     </Alert>
                 )}
 
@@ -48,7 +49,7 @@ const ExcluirEventoDialog = ({ open, nomeEvento, estado, erro, onBaixar, onExclu
                     disabled={travado}
                     sx={{ mb: 2 }}
                 >
-                    {baixando ? 'Gerando registro...' : baixado ? 'Baixar de novo' : 'Baixar registro do evento (JSON)'}
+                    {baixando ? 'Gerando pasta...' : baixado ? 'Baixar de novo' : 'Baixar pasta do evento (.zip)'}
                 </Button>
 
                 <Typography variant="body2" sx={{ color: cores.textoSuave }}>

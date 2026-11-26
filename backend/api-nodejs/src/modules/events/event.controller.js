@@ -132,7 +132,8 @@ class EventoController {
         }
     }
 
-    // Registro do evento para baixar antes de excluir (só leitura; a exclusão em si não muda)
+    // Pasta (.zip) com empresas, pessoas, veículos, documentos e relatórios, para baixar antes de excluir.
+    // Só leitura: a exclusão em si não muda.
     async registroEncerramento(req, res) {
         try {
             const { id } = req.params;
@@ -140,8 +141,12 @@ class EventoController {
             const registro = await registroEncerramentoService.montarRegistroEncerramento(supabaseClient, id, {
                 geradoPor: req.user?.nome || null
             });
+            const pacote = registroEncerramentoService.gerarPacoteZip(registro);
             res.setHeader('Cache-Control', 'no-store');
-            return res.json(registro);
+            res.setHeader('Content-Type', 'application/zip');
+            res.setHeader('Content-Disposition', `attachment; filename="${registroEncerramentoService.nomeDoArquivo(registro.evento?.nome)}"`);
+            res.setHeader('Content-Length', pacote.length);
+            return res.end(pacote);
         } catch (error) {
             logger.error('Erro ao gerar registro de encerramento do evento:', error.message);
             return ApiResponse.error(res, error.message, error.status || 500);

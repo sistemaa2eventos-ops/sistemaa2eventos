@@ -160,15 +160,17 @@ export const useEventos = () => {
         setRegistroEstado('gerando');
         setRegistroErro('');
         try {
-            const { data } = await api.get(`/eventos/${eventoToDelete}/registro-encerramento`, { timeout: 180000 });
-            const nomeBase = String(data?.evento?.nome || 'evento').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            // Resposta \u00e9 o .zip (blob); erro volta como JSON, ent\u00e3o \u00e9 lido como texto
+            const { data: zip } = await api.get(`/eventos/${eventoToDelete}/registro-encerramento`, { timeout: 180000, responseType: 'blob' });
+            const nomeEvento = eventos.find(e => e.id === eventoToDelete)?.nome || 'evento';
+            const nomeBase = String(nomeEvento).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
                 .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'evento';
             const stamp = format(new Date(), 'yyyy-MM-dd_HH-mm');
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
+            const blob = new Blob([zip], { type: 'application/zip' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `registro-encerramento_${nomeBase}_${stamp}.json`;
+            link.download = `registro-encerramento_${nomeBase}_${stamp}.zip`;
             document.body.appendChild(link);
             link.click();
             link.remove();
@@ -176,7 +178,13 @@ export const useEventos = () => {
             setRegistroEstado('baixado');
             return true;
         } catch (error) {
-            const motivo = error.response?.data?.error || error.message || 'erro desconhecido';
+            let motivo = error.message || 'erro desconhecido';
+            const corpo = error.response?.data;
+            if (corpo instanceof Blob) {
+                try { motivo = JSON.parse(await corpo.text())?.error || motivo; } catch { /* mantém a mensagem padrão */ }
+            } else if (corpo?.error) {
+                motivo = corpo.error;
+            }
             setRegistroErro(`Não foi possível gerar o registro do evento: ${motivo}. O evento não foi excluído.`);
             setRegistroEstado('erro');
             return false;
