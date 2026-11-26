@@ -6,7 +6,7 @@ async function testListUsers() {
         ip_address: '192.168.1.17',
         porta: 80,
         user_device: 'admin',
-        password_device: 'admin123'
+        password_device: process.env.INTELBRAS_DEFAULT_PASS
     };
 
     const service = new IntelbrasService(config);

@@ -7,7 +7,7 @@ async function testSync() {
     console.log('1. Login...');
     const loginRes = await axios.post(`${BASE}/api/auth/login`, {
         email: 'admin@a2eventos.com.br',
-        password: 'admin123'
+        password: process.env.INTELBRAS_DEFAULT_PASS
     }).catch(err => ({ data: err.response?.data, status: err.response?.status }));
 
     if (!loginRes.data?.token) {

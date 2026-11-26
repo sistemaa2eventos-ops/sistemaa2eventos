@@ -375,7 +375,7 @@ curl -X POST https://painel.nzt.app.br/api/intelbras/webhook \
 ```bash
 # Intelbras padrão (se não fornecer credenciais)
 INTELBRAS_DEFAULT_USER=admin
-INTELBRAS_DEFAULT_PASS=admin123
+INTELBRAS_DEFAULT_PASS=<SENHA_DO_EQUIPAMENTO>
 
 # Timeout para conexão com dispositivo
 DEVICE_CONNECTION_TIMEOUT=15000  # 15 segundos

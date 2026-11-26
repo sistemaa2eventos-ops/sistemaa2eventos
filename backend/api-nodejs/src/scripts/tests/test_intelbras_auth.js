@@ -4,7 +4,7 @@ const DigestFetch = DigestFetchLib.default || DigestFetchLib;
 async function testAuth() {
     const ip = '192.168.1.17';
     const user = 'admin';
-    const pass = 'admin123';
+    const pass = process.env.INTELBRAS_DEFAULT_PASS;
     const client = new DigestFetch(user, pass);
 
     const url = `http://${ip}/cgi-bin/accessControl.cgi?action=addUser&UserID=999&UserName=Test&Authority=2&UserType=0`;

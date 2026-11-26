@@ -275,7 +275,7 @@ curl -v http://192.168.1.17
 ```bash
 # Acessar diretamente a URL do snapshot
 curl http://192.168.1.17/cgi-bin/snapshot.cgi \
-  --digest -u admin:admin123 \
+  --digest -u admin:<SENHA_DO_EQUIPAMENTO> \
   -o snapshot.jpg
 
 # Se funcionar: arquivo screenshot.jpg é criado

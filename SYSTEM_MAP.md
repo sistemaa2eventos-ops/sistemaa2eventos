@@ -133,7 +133,7 @@ Roteamento:
 Intelbras Terminal:
   URL: http://192.168.1.17
   Usuário: admin
-  Senha: admin123
+  Senha: <SENHA_DO_EQUIPAMENTO>
 
 Gmail SMTP:
   Email: sistemaa2eventos@gmail.com
@@ -226,7 +226,7 @@ SMTP_EMAIL=sistemaa2eventos@gmail.com
 
 # Hardware
 INTELBRAS_DEFAULT_USER=admin
-INTELBRAS_DEFAULT_PASS=admin123
+INTELBRAS_DEFAULT_PASS=<SENHA_DO_EQUIPAMENTO>
 HARDWARE_CALLBACK_PORT=443
 ```
 

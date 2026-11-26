@@ -7,7 +7,7 @@ async function updateCredentials() {
         .from('dispositivos_acesso')
         .update({
             user_device: 'admin',
-            password_device: 'admin123'
+            password_device: process.env.INTELBRAS_DEFAULT_PASS
         })
         .eq('marca', 'intelbras');
 

@@ -5,7 +5,7 @@ const fs = require('fs');
 async function testAddFace() {
     const ip = '192.168.1.17';
     const user = 'admin';
-    const pass = 'admin123';
+    const pass = process.env.INTELBRAS_DEFAULT_PASS;
     const client = new DigestFetch(user, pass);
 
     // Creating a dummy valid-ish binary if possible, or just some bytes

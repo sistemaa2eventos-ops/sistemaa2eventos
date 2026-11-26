@@ -4,7 +4,7 @@ const DigestFetch = DigestFetchLib.default || DigestFetchLib;
 async function testRPC() {
     const ip = '192.168.1.17';
     const user = 'admin';
-    const pass = 'admin123';
+    const pass = process.env.INTELBRAS_DEFAULT_PASS;
     const client = new DigestFetch(user, pass);
 
     const url = `http://${ip}/cgi-bin/RPC2`;

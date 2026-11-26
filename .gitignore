@@ -88,6 +88,7 @@ codigo_*.txt
 # Playwright (gerados pelos testes do a2-eventos)
 playwright-report/
 test-results/
+.playwright-mcp/
 
 # ===== CLEANUP RULES (Phase 1 Audit 2026-04-23) =====
 

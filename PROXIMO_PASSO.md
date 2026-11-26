@@ -54,7 +54,7 @@ Descomente e configure seus IPs de câmeras:
 
 ```bash
 CAMERA_1_NAME=Portaria Principal
-CAMERA_1_RTSP=rtsp://admin:admin123@192.168.1.100:554/stream
+CAMERA_1_RTSP=rtsp://admin:<SENHA_DO_EQUIPAMENTO>@192.168.1.100:554/stream
 CAMERA_1_LOCATION=Entrada
 CAMERA_1_TYPE=face
 ```
