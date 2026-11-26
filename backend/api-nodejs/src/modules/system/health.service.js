@@ -35,18 +35,29 @@ class HealthService {
 
     async runDiagnostics() {
         try {
-            // 0. Carregar configurações do evento ativo para obter thresholds dinâmicos
-            const { data: activeEvent } = await supabase
-                .from('eventos')
-                .select('config')
-                .eq('status', 'ativo')
-                .order('updated_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
+            // 0. Carregar apenas o campo leve sync_delay_threshold_min (sem puxar eventos.config inteiro,
+            //    que chegava a 504 KB por minuto e gerava ~26 GB/mês de Database Egress!) e somente se o Edge local estiver ativo.
+            let syncDelayThreshold = this.thresholds.maxSyncDelayMinutes;
+            if (edgeAtivo()) {
+                if (!this._thresholdCache || Date.now() > this._thresholdCache.expiresAt) {
+                    const { data: activeEvent } = await supabase
+                        .from('eventos')
+                        .select('sync_delay_threshold_min:config->sync_delay_threshold_min')
+                        .eq('status', 'ativo')
+                        .order('updated_at', { ascending: false })
+                        .limit(1)
+                        .maybeSingle();
+                    const val = Number(activeEvent?.sync_delay_threshold_min);
+                    this._thresholdCache = {
+                        val: Number.isFinite(val) && val > 0 ? val : this.thresholds.maxSyncDelayMinutes,
+                        expiresAt: Date.now() + 10 * 60 * 1000
+                    };
+                }
+                syncDelayThreshold = this._thresholdCache.val;
+            }
 
-            const customThresholds = activeEvent?.config || {};
             const thresholds = {
-                maxSyncDelayMinutes: customThresholds.sync_delay_threshold_min || this.thresholds.maxSyncDelayMinutes,
+                maxSyncDelayMinutes: syncDelayThreshold,
                 maxPendingItems: this.thresholds.maxPendingItems,
                 maxLatencyMs: this.thresholds.maxLatencyMs
             };
@@ -76,10 +87,10 @@ class HealthService {
                 });
             }
 
-            // 2. Verificar Conectividade Cloud
+            // 2. Verificar Conectividade Cloud (HEAD leve sem agregação count(*))
             try {
                 const start = Date.now();
-                const { error } = await supabase.from('eventos').select('count', { count: 'exact', head: true }).limit(1);
+                const { error } = await supabase.from('eventos').select('id', { head: true }).limit(1);
                 const latency = Date.now() - start;
 
                 if (error) throw error;

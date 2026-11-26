@@ -19,11 +19,12 @@ const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 
 const CICLO_MS = Number(process.env.FILA_LEITORES_CICLO_MS || 3000);
+const CICLO_MAX_MS = Number(process.env.FILA_LEITORES_CICLO_MAX_MS || 20000);
 const LOTE = 200;
 const GUARDAR_PROCESSADOS_DIAS = 7;
 const LOTE_GRANDE = 20; // a partir daqui carrega leitores e áreas do evento uma vez só
 
-const estado = { timer: null, rodando: false, semTabela: false, ultimaLimpeza: 0, processados: 0, ultimoCiclo: null };
+const estado = { timer: null, rodando: false, semTabela: false, ultimaLimpeza: 0, processados: 0, ultimoCiclo: null, atrasoMs: CICLO_MS };
 
 const tabelaInexistente = (err) => !!err && (err.code === '42P01' || err.code === 'PGRST205' || /does not exist|Could not find the table/i.test(err.message || ''));
 
@@ -102,15 +103,40 @@ async function limparAntigos() {
     await supabase.from('fila_sync_leitores').delete().lt('processado_em', limite);
 }
 
+function agendarProximo(ms) {
+    clearTimeout(estado.timer);
+    estado.atrasoMs = ms;
+    estado.timer = setTimeout(rodarCiclo, ms);
+    if (typeof estado.timer?.unref === 'function') estado.timer.unref();
+}
+
+async function rodarCiclo() {
+    const feitos = await ciclo();
+    if (!estado.timer) return; // parar() foi chamado durante o ciclo
+    if (estado.semTabela) {
+        // Sem a tabela, tenta de novo só a cada minuto (a migration pode ser aplicada com a API no ar)
+        agendarProximo(60000);
+    } else if (feitos > 0) {
+        agendarProximo(CICLO_MS);
+    } else {
+        // Backoff adaptativo quando a fila está vazia (ex.: 3s -> 6s -> 12s -> 20s), reduzindo ~85% das leituras ociosas
+        const proximo = Math.min(CICLO_MAX_MS, Math.max(CICLO_MS, Math.round(estado.atrasoMs * 2)));
+        agendarProximo(proximo);
+    }
+}
+
 function iniciar() {
     if (estado.timer) return;
-    const rodar = async () => {
-        await ciclo();
-        // Sem a tabela, tenta de novo só a cada minuto (a migration pode ser aplicada com a API no ar)
-        estado.timer = setTimeout(rodar, estado.semTabela ? 60000 : CICLO_MS);
-    };
-    estado.timer = setTimeout(rodar, 5000);
-    logger.info(`[Leitores] fila de sincronização ativa (a cada ${CICLO_MS / 1000} s)`);
+    estado.atrasoMs = CICLO_MS;
+    estado.timer = setTimeout(rodarCiclo, 5000);
+    if (typeof estado.timer?.unref === 'function') estado.timer.unref();
+    logger.info(`[Leitores] fila de sincronização ativa (backoff ${CICLO_MS / 1000}s–${CICLO_MAX_MS / 1000}s)`);
+}
+
+/** Acorda o worker imediatamente quando a própria API sabe que gerou pendência */
+function acordar() {
+    if (!estado.timer || estado.rodando || estado.semTabela) return;
+    agendarProximo(500);
 }
 
 function parar() {
@@ -120,4 +146,4 @@ function parar() {
 
 const status = () => ({ ...estado, timer: undefined });
 
-module.exports = { iniciar, parar, ciclo, status };
+module.exports = { iniciar, parar, acordar, ciclo, status };

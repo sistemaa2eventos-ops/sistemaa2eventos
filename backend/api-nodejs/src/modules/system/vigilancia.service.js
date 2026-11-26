@@ -17,6 +17,8 @@ const logger = require('../../services/logger');
  */
 const IA_URL_DIRETA = process.env.PYTHON_MICROSERVICE_URL || null;
 const RECONFIGURAR_MS = 5 * 60 * 1000;
+const CACHE_CAMERAS_MS = 60 * 1000;
+const cacheCameras = new Map(); // eventoId → { lista, expiraEm }
 const iaHeaders = () => (process.env.IA_CHAVE_INTERNA ? { 'X-IA-Chave': process.env.IA_CHAVE_INTERNA } : {});
 
 /**
@@ -25,25 +27,35 @@ const iaHeaders = () => (process.env.IA_CHAVE_INTERNA ? { 'X-IA-Chave': process.
  * motor e só as marcadas no gravador.
  */
 async function camerasDoEvento(eventoId) {
+    const emCache = cacheCameras.get(eventoId);
+    if (emCache && emCache.expiraEm > Date.now()) return emCache.lista;
+
     // RTSP e webcam USB do PC do evento ("webcam", "webcam:1", "usb:0")
     // Ordem fixa: a lista vira a configuração do retransmissor no PC do evento, e uma ordem diferente a
     // cada envio mudava a assinatura e reiniciava o go2rtc (todas as câmeras caíam por alguns segundos)
     const consultar = (campos) => supabase.from('cameras_ip').select(campos).eq('evento_id', eventoId)
         .or('stream_url.like.rtsp%,stream_url.like.webcam%,stream_url.like.usb%')
         .order('id', { ascending: true });
-    let { data, error } = await consultar('id, nome, status, stream_url, ia_ativa, vigilancia_ativa, prioridade, url_substream, gravacao_modo, gravacao_stream, fabricante');
+    let incluiuPtz = true;
+    let { data, error } = await consultar('id, nome, status, stream_url, ia_ativa, vigilancia_ativa, prioridade, url_substream, gravacao_modo, gravacao_stream, fabricante, ip_address, ptz_ativo, ptz_porta');
     if (error && (error.code === '42703' || /column/i.test(error.message))) {
-        // banco sem a migration 20261111 (gravação) ou 20261028 (IA por câmera)
-        ({ data, error } = await consultar('id, nome, status, stream_url, ia_ativa, vigilancia_ativa, prioridade, url_substream'));
-        if (error && (error.code === '42703' || /column/i.test(error.message))) ({ data, error } = await consultar('id, nome, status, stream_url'));
+        incluiuPtz = false;
+        // banco sem a migration 20261119e (PTZ), 20261111 (gravação) ou 20261028 (IA por câmera)
+        ({ data, error } = await consultar('id, nome, status, stream_url, ia_ativa, vigilancia_ativa, prioridade, url_substream, gravacao_modo, gravacao_stream, fabricante'));
+        if (error && (error.code === '42703' || /column/i.test(error.message))) {
+            ({ data, error } = await consultar('id, nome, status, stream_url, ia_ativa, vigilancia_ativa, prioridade, url_substream'));
+            if (error && (error.code === '42703' || /column/i.test(error.message))) ({ data, error } = await consultar('id, nome, status, stream_url'));
+        }
     }
     if (error) throw error;
-    // Giro (ONVIF): consulta à parte, para a falta da migração 20261119e não derrubar a lista acima
+    // Giro (ONVIF): fallback em consulta separada só se o banco ainda não tiver as colunas PTZ
     const giro = new Map();
-    const { data: dadosGiro, error: erroGiro } = await supabase.from('cameras_ip')
-        .select('id, ip_address, ptz_ativo, ptz_porta').eq('evento_id', eventoId).eq('ptz_ativo', true);
-    if (!erroGiro) for (const g of dadosGiro || []) giro.set(g.id, { ip: g.ip_address || null, porta: Number(g.ptz_porta) || 2020 });
-    return (data || [])
+    if (!incluiuPtz) {
+        const { data: dadosGiro, error: erroGiro } = await supabase.from('cameras_ip')
+            .select('id, ip_address, ptz_ativo, ptz_porta').eq('evento_id', eventoId).eq('ptz_ativo', true);
+        if (!erroGiro) for (const g of dadosGiro || []) giro.set(g.id, { ip: g.ip_address || null, porta: Number(g.ptz_porta) || 2020 });
+    }
+    const lista = (data || [])
         .filter(c => c.status !== 'desativada' && c.status !== 'inativa')
         .map(c => ({
             id: c.id,
@@ -56,9 +68,13 @@ async function camerasDoEvento(eventoId) {
             url_substream: c.url_substream || null,
             gravacao_modo: c.gravacao_modo || 'desligada',
             gravacao_stream: c.gravacao_stream || 'sub',
-            fabricante: c.fabricante || null, // Mercusys/Tapo: o retransmissor monta o canal de voz de volta
-            ptz: giro.get(c.id) || null // giro ligado: IP e porta ONVIF (o usuário e a senha vêm da URL)
+            fabricante: c.fabricante || null,
+            ptz: incluiuPtz
+                ? (c.ptz_ativo ? { ip: c.ip_address || null, porta: Number(c.ptz_porta) || 2020 } : null)
+                : (giro.get(c.id) || null)
         }));
+    cacheCameras.set(eventoId, { lista, expiraEm: Date.now() + CACHE_CAMERAS_MS });
+    return lista;
 }
 
 /** Envia ao agente a lista de câmeras do evento dele e as chaves gerais (motor de IA, gravação) */
@@ -91,10 +107,16 @@ async function configurarAgente(agentId, eventoId) {
 
 /** Câmeras do evento mudaram (cadastro/edição/exclusão): reconfigura quem vigia */
 async function eventoAlterado(eventoId) {
+    if (eventoId) cacheCameras.delete(eventoId);
+    else cacheCameras.clear();
     const agentService = require('../../services/agentService');
     const agentId = agentService.findAgentForEvent(eventoId);
     if (agentId) await configurarAgente(agentId, eventoId);
-    if (IA_URL_DIRETA) local.proximaConfiguracao = 0;
+    if (IA_URL_DIRETA) {
+        local.proximaConfiguracao = 0;
+        local.proximaTentativaEm = 0;
+    }
+    sincronizarDireto().catch(() => {});
 }
 
 /** Detecção enviada por um agente: só vale para câmera do evento do próprio agente (local: esta API buscou no motor) */
@@ -115,35 +137,47 @@ async function receberDeteccao(eventoIdDoAgente, deteccao, { local = false } = {
 }
 
 // ---- Modo servidor local: esta API fala direto com o motor ----
-const local = { desde: 0, inicio: null, proximaConfiguracao: 0, rodando: false };
+const local = { desde: 0, inicio: null, proximaConfiguracao: 0, proximaTentativaEm: 0, rodando: false };
 
 async function cicloLocal() {
-    if (local.rodando) return;
+    if (local.rodando || Date.now() < local.proximaTentativaEm) return;
     local.rodando = true;
     try {
+        // Consulta primeiro o motor Python local: se estiver desligado/inacessível, falha em memória
+        // sem disparar nenhuma query no Supabase e aguarda 15 s antes de tentar de novo.
+        const { data } = await axios.get(`${IA_URL_DIRETA}/api/vigilancia/deteccoes`, {
+            params: { desde: local.desde, max_idade_s: 60 },
+            timeout: 5000,
+            headers: iaHeaders()
+        });
+        local.proximaTentativaEm = 0;
+
+        if (data.inicio !== undefined && data.inicio !== local.inicio) {
+            // Motor reiniciou, ou esta API acabou de subir: força reenvio das câmeras
+            local.inicio = data.inicio;
+            local.desde = 0;
+            local.proximaConfiguracao = 0;
+        } else if (data.seq < local.desde) {
+            local.desde = 0;
+        }
+
         if (Date.now() >= local.proximaConfiguracao) {
+            // Agenda antes do POST para evitar loop de queries no Supabase se /api/vigilancia falhar
+            local.proximaConfiguracao = Date.now() + 30000;
             const { data: eventos } = await supabase.from('eventos').select('id').eq('status', 'ativo');
             const cameras = (await Promise.all((eventos || []).map(e => camerasDoEvento(e.id)))).flat();
             await axios.post(`${IA_URL_DIRETA}/api/vigilancia`, { cameras }, { timeout: 10000, headers: iaHeaders() });
             const { perfil, ajustes } = await require('./iaConfig.service').obter();
             await axios.post(`${IA_URL_DIRETA}/api/config`, { perfil, ajustes }, { timeout: 10000, headers: iaHeaders() }).catch(() => {});
-            local.proximaConfiguracao = Date.now() + 30000;
         }
-        const { data } = await axios.get(`${IA_URL_DIRETA}/api/vigilancia/deteccoes`, { params: { desde: local.desde, max_idade_s: 60 }, timeout: 5000, headers: iaHeaders() });
-        if (data.inicio !== undefined && data.inicio !== local.inicio) {
-            // Motor reiniciou, ou esta API acabou de subir: só detecções recentes (max_idade_s) viram alerta
-            local.inicio = data.inicio;
-            local.desde = 0;
-            local.proximaConfiguracao = 0;
-            return;
-        }
-        if (data.seq < local.desde) { local.desde = 0; return; } // motor reiniciou
+
         for (const d of data.deteccoes || []) {
             await receberDeteccao(null, d, { local: true }).catch(err => logger.error(`[Vigilância] ${err.message}`));
             local.desde = d.seq;
         }
     } catch {
-        // motor desligado: tenta no próximo ciclo
+        // motor desligado/inacessível: backoff de 15 s sem consultar o Supabase
+        local.proximaTentativaEm = Date.now() + 15000;
     } finally {
         local.rodando = false;
     }
@@ -159,18 +193,21 @@ async function sincronizarDireto() {
     sincronizandoDireto = true;
     try {
         const iaCentral = require('../../services/iaCentral');
-        const [{ data: ativos }, { data: configs }] = await Promise.all([
-            supabase.from('eventos').select('id').eq('status', 'ativo'),
-            supabase.from('cameras_evento_config').select('evento_id').eq('ia_onde', 'direto_servidor')
-        ]);
+        const { data: configs } = await supabase.from('cameras_evento_config').select('evento_id').eq('ia_onde', 'direto_servidor');
         const diretos = new Set((configs || []).map(c => c.evento_id));
+        const jaVigiados = iaCentral.eventosVigiados();
+
+        // Atalho: nenhum evento configurado como direto_servidor e nenhum sendo vigiado → evita consultar eventos e cameras_ip
+        if (diretos.size === 0 && jaVigiados.length === 0) return;
+
+        const { data: ativos } = await supabase.from('eventos').select('id').eq('status', 'ativo');
         for (const e of ativos || []) {
             if (!diretos.has(e.id)) continue;
             const cameras = (await camerasDoEvento(e.id)).filter(c => c.ia_ativa);
             const r = await iaCentral.vigiar(e.id, cameras);
             if (r.indisponivel) logger.warn(`[Vigilância] evento ${e.id.slice(0, 8)}: nenhum servidor central disponível`);
         }
-        for (const eventoId of iaCentral.eventosVigiados()) {
+        for (const eventoId of jaVigiados) {
             const ativo = (ativos || []).some(e => e.id === eventoId);
             if (!ativo || !diretos.has(eventoId)) iaCentral.pararVigilancia(eventoId);
         }
@@ -184,7 +221,7 @@ async function sincronizarDireto() {
 function iniciar() {
     // Biometrias pendentes (foto sem vetor) geradas pelo motor do evento, via agente
     require('./biometriaAgente.service').iniciar();
-    setInterval(sincronizarDireto, 20000).unref();
+    setInterval(sincronizarDireto, 60000).unref();
     if (IA_URL_DIRETA) {
         setInterval(cicloLocal, 1500).unref();
         logger.info(`👁️ [Vigilância] modo servidor local: motor em ${IA_URL_DIRETA}`);

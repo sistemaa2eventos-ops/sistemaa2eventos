@@ -161,12 +161,23 @@ class DeviceHealthCheckService {
                         }
                     }
 
-                    // Preparar update para Supabase (último contato só muda quando houve contato)
-                    updates.push({
-                        id: dispositivo.id,
-                        status_online: nowOnline ? 'online' : 'offline',
-                        ultimo_ping: nowOnline ? status.timestamp.toISOString() : dispositivo.ultimo_ping
-                    });
+                    // Persistir no Supabase apenas quando:
+                    //  1. status_online mudou (online <-> offline), ou
+                    //  2. está online e o ultimo_ping salvo no banco tem mais de 10 min.
+                    // Evita gravar UPDATEs redundantes a cada 2 min que geravam >86% de dead tuples.
+                    const PERSISTIR_PING_MS = 10 * 60 * 1000;
+                    const statusNovo = nowOnline ? 'online' : 'offline';
+                    const mudouStatus = dispositivo.status_online !== statusNovo;
+                    const pingSalvoMs = dispositivo.ultimo_ping ? new Date(dispositivo.ultimo_ping).getTime() : 0;
+                    const precisaPersistirPing = nowOnline && (!pingSalvoMs || (Date.now() - pingSalvoMs) >= PERSISTIR_PING_MS);
+
+                    if (mudouStatus || precisaPersistirPing) {
+                        updates.push({
+                            id: dispositivo.id,
+                            status_online: statusNovo,
+                            ultimo_ping: nowOnline ? status.timestamp.toISOString() : dispositivo.ultimo_ping
+                        });
+                    }
 
                     // Manter registro em memória
                     this.deviceStatuses.set(dispositivo.id, {

@@ -57,7 +57,9 @@ async function verificarLeitores(eventos, avisar) {
 async function verificarLotacao(eventos, avisar) {
     const operacao = require('../modules/system/operacao.service');
     for (const ev of eventos) {
-        const r = await operacao.resumo(ev.id);
+        const r = typeof operacao.resumoLotacao === 'function'
+            ? await operacao.resumoLotacao(ev.id)
+            : await operacao.resumo(ev.id);
         for (const id of ['capacidade', 'areas_cheias']) {
             const chave = `${ev.id}:${id}`;
             const alerta = (r.alertas || []).find(a => a.id === id);

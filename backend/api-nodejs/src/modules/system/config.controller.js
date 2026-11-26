@@ -259,7 +259,7 @@ class ConfigController {
             const evento_id = req.event.id;
             const { data: evento, error } = await supabase
                 .from('eventos')
-                .select('config')
+                .select('registration:config->registration')
                 .eq('id', evento_id)
                 .single();
 
@@ -277,7 +277,7 @@ class ConfigController {
                 { id: 'foto_url', label: 'Foto Biométrica', active: true, required: true }
             ];
 
-            const registration = evento.config?.registration || {
+            const registration = evento?.registration || {
                 fields: {
                     Participante: [...defaultFields],
                     Expositor: [...defaultFields],

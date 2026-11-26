@@ -251,6 +251,92 @@ class OperacaoService {
         cacheService.set(chave, resultado, TTL_MS);
         return resultado;
     }
+
+    /**
+     * Versão enxuta usada pelo vigiaEvento a cada 2 min: evita baixar todas as tabelas
+     * (documentos, empresas, pulseiras, logs de 48h) quando não há ninguém perto de 90% da lotação,
+     * economizando centenas de MB/mês de Database Egress no Supabase.
+     */
+    async resumoLotacao(eventoId) {
+        const emCache = cacheService.get(`operacao_${eventoId}`);
+        if (emCache) return { alertas: emCache.alertas || [] };
+
+        const chaveCfg = `operacao_cap_cfg_${eventoId}`;
+        let cfg = cacheService.get(chaveCfg);
+        if (!cfg) {
+            const [eventoRes, areasRes] = await Promise.all([
+                seguro(supabase.from('eventos').select('capacidade_total').eq('id', eventoId).single(), 'evento_cap'),
+                seguro(supabase.from('evento_areas').select('id, nome_area, capacidade_maxima').eq('evento_id', eventoId), 'areas_cap')
+            ]);
+            cfg = {
+                capacidade: Number(eventoRes.data?.capacidade_total) || 0,
+                areas: (areasRes.data || []).map(a => ({
+                    id: a.id,
+                    nome: a.nome_area,
+                    capacidade: Number(a.capacidade_maxima) || 0
+                }))
+            };
+            cacheService.set(chaveCfg, cfg, 5 * 60 * 1000);
+        }
+
+        const limitesAtivos = [
+            ...(cfg.capacidade > 0 ? [cfg.capacidade] : []),
+            ...cfg.areas.filter(a => a.capacidade > 0).map(a => a.capacidade)
+        ];
+        if (limitesAtivos.length === 0) return { alertas: [] };
+
+        const menorGatilho = Math.ceil(Math.min(...limitesAtivos) * PCT_ATENCAO);
+        const { count, error } = await supabase
+            .from('pessoas')
+            .select('id', { count: 'exact', head: true })
+            .eq('evento_id', eventoId)
+            .eq('status_acesso', 'checkin_feito');
+        if (error || !count || count < menorGatilho) {
+            return { alertas: [] };
+        }
+
+        const alertas = [];
+        if (cfg.capacidade > 0 && count >= cfg.capacidade * PCT_ATENCAO) {
+            alertas.push({
+                id: 'capacidade',
+                nivel: count >= cfg.capacidade ? 'error' : 'warning',
+                titulo: `Evento com ${Math.round((count / cfg.capacidade) * 100)}% da capacidade`,
+                texto: `${count} pessoas dentro para ${cfg.capacidade} vagas.`
+            });
+        }
+
+        const areasComCap = cfg.areas.filter(a => a.capacidade > 0);
+        if (areasComCap.length > 0 && count >= Math.ceil(Math.min(...areasComCap.map(a => a.capacidade)) * PCT_ATENCAO)) {
+            const hoje = getHojeLocal();
+            const ontem = new Date(`${hoje}T12:00:00Z`); ontem.setUTCDate(ontem.getUTCDate() - 1);
+            const { start: inicioOntem } = getLimitesDiaLocalUTC(ontem.toISOString().slice(0, 10));
+            const [presRes, logsRes] = await Promise.all([
+                seguro(buscarTodos(supabase.from('pessoas').select('id').eq('evento_id', eventoId).eq('status_acesso', 'checkin_feito')), 'presentes_lot'),
+                seguro(buscarTodos(supabase.from('logs_acesso').select('pessoa_id, area_id, tipo, created_at').eq('evento_id', eventoId).in('tipo', ['checkin', 'entrada']).gte('created_at', inicioOntem)), 'logs_lot')
+            ]);
+            const logsOrd = (logsRes.data || []).sort((a, b) => instante(a.created_at) - instante(b.created_at));
+            const ultimaArea = {};
+            logsOrd.forEach(l => { ultimaArea[l.pessoa_id] = l.area_id; });
+            const porArea = {};
+            (presRes.data || []).forEach(p => {
+                const aid = ultimaArea[p.id];
+                if (aid) porArea[aid] = (porArea[aid] || 0) + 1;
+            });
+            const areasCheias = areasComCap
+                .map(a => ({ ...a, presentes: porArea[a.id] || 0 }))
+                .filter(a => a.presentes >= a.capacidade * PCT_ATENCAO);
+            if (areasCheias.length) {
+                alertas.push({
+                    id: 'areas_cheias',
+                    nivel: areasCheias.some(a => a.presentes >= a.capacidade) ? 'error' : 'warning',
+                    titulo: `${areasCheias.length} área(s) perto ou acima da lotação`,
+                    itens: areasCheias.map(a => `${a.nome}: ${a.presentes}/${a.capacidade}`)
+                });
+            }
+        }
+
+        return { alertas };
+    }
 }
 
 module.exports = new OperacaoService();

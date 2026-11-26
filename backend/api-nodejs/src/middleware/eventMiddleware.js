@@ -2,19 +2,30 @@ const { supabase } = require('../config/supabase');
 const logger = require('../services/logger');
 const { normalize } = require('./auth');
 
-// Cache curto do evento: toda requisição com contexto de evento buscava a linha inteira no banco.
-const CACHE_EVENTO_MS = 15 * 1000;
+// Cache do contexto de evento: evita consultar o banco a cada requisição e exclui a coluna `config`
+// (que armazena o JSONB pesado de `modulo_producao` / plantas em TOAST).
+const CACHE_EVENTO_MS = 60 * 1000;
+const COLUNAS_EVENTO_CONTEXTO = [
+    'id', 'nome', 'slug', 'descricao', 'local', 'data_inicio', 'data_fim', 'logo_url',
+    'status', 'capacidade_total', 'datas_montagem', 'datas_evento', 'datas_desmontagem',
+    'horario_reset', 'tipos_checkin', 'tipos_checkout', 'impressao_etiquetas',
+    'created_by', 'created_at', 'updated_at', 'campos_obrigatorios',
+    'inscritos_count', 'politica_privacidade_url', 'min_face_score'
+].join(', ');
 const cacheEvento = new Map(); // id → { evento, expiraEm }
 
 async function buscarEvento(eventoId) {
     const item = cacheEvento.get(eventoId);
     if (item && item.expiraEm > Date.now()) return { evento: { ...item.evento }, error: null };
 
-    const { data: evento, error } = await supabase
+    let { data: evento, error } = await supabase
         .from('eventos')
-        .select('*')
+        .select(COLUNAS_EVENTO_CONTEXTO)
         .eq('id', eventoId)
         .single();
+    if (error && (error.code === '42703' || error.code === 'PGRST204' || /column/i.test(error.message || ''))) {
+        ({ data: evento, error } = await supabase.from('eventos').select('*').eq('id', eventoId).single());
+    }
     if (evento) {
         if (cacheEvento.size > 500) cacheEvento.clear();
         cacheEvento.set(eventoId, { evento, expiraEm: Date.now() + CACHE_EVENTO_MS });

@@ -319,7 +319,7 @@ class MonitorController {
         try {
             const { error: supabaseError } = await supabase
                 .from('eventos')
-                .select('count')
+                .select('id', { head: true })
                 .limit(1);
 
             // Sincronização

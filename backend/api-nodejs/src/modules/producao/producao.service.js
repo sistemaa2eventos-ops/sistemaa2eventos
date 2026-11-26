@@ -67,8 +67,65 @@ function registrarAuditoria(estado, ctx, acao, entidade, entidadeId, antes = nul
     }
 }
 
+const CACHE_PRODUCAO_MS = 60 * 1000;
+
+async function externalizarDataUriPlanta(eventoId, dataUri, prefixo = 'planta') {
+    if (typeof dataUri !== 'string' || !dataUri.startsWith('data:image/') || dataUri.length < 8192) return dataUri;
+    if (!supabase?.storage || typeof supabase.storage.from !== 'function') return dataUri;
+    try {
+        const match = dataUri.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+        if (!match) return dataUri;
+        const mime = match[1];
+        const ext = (mime.split('/')[1] || 'jpg').replace('jpeg', 'jpg').replace(/[^a-z0-9]/gi, '');
+        const buffer = Buffer.from(match[2], 'base64');
+        const caminho = `producao/${eventoId}/${prefixo}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        const bucket = supabase.storage.from('documentos_operacionais');
+        const { error } = await bucket.upload(caminho, buffer, {
+            contentType: mime,
+            cacheControl: '31536000',
+            upsert: true
+        });
+        if (error) return dataUri;
+        const pub = bucket.getPublicUrl(caminho);
+        return pub?.data?.publicUrl || dataUri;
+    } catch {
+        return dataUri;
+    }
+}
+
+async function externalizarImagensEstado(eventoId, estado) {
+    if (!estado || !Array.isArray(estado.plantas)) return false;
+    let alterou = false;
+    for (const planta of estado.plantas) {
+        for (const versao of planta?.versoes || []) {
+            if (typeof versao.imagem_fundo_url === 'string' && versao.imagem_fundo_url.startsWith('data:image/')) {
+                const novaUrl = await externalizarDataUriPlanta(eventoId, versao.imagem_fundo_url, `base_${versao.id || 'v'}`);
+                if (novaUrl !== versao.imagem_fundo_url) {
+                    versao.imagem_fundo_url = novaUrl;
+                    alterou = true;
+                }
+            }
+            for (const camada of versao?.camadas_arquitetura || []) {
+                if (typeof camada.imagem_url === 'string' && camada.imagem_url.startsWith('data:image/')) {
+                    const novaUrl = await externalizarDataUriPlanta(eventoId, camada.imagem_url, `camada_${camada.id || 'c'}`);
+                    if (novaUrl !== camada.imagem_url) {
+                        camada.imagem_url = novaUrl;
+                        alterou = true;
+                    }
+                }
+            }
+        }
+    }
+    return alterou;
+}
+
 async function carregarEstadoEvento(eventoId, { criarSeVazio = false, usuario = {} } = {}) {
     if (!eventoId) throw erroHttp('Selecione um evento ativo para acessar a Produção.', 400);
+
+    const emMem = memoriaEventos.get(eventoId);
+    if (emMem && emMem.expiraEm && emMem.expiraEm > Date.now()) {
+        return emMem;
+    }
 
     try {
         const { data, error } = await supabase
@@ -80,17 +137,25 @@ async function carregarEstadoEvento(eventoId, { criarSeVazio = false, usuario = 
         if (!error && data) {
             const mod = data.config?.modulo_producao;
             if (mod && typeof mod === 'object') {
-                memoriaEventos.set(eventoId, { evento: data, estado: mod });
-                return { evento: data, estado: mod };
+                // Migra automaticamente imagens Base64 legadas (500 KB+) para o CDN do Supabase Storage na primeira leitura
+                const migrouBase64 = await externalizarImagensEstado(eventoId, mod);
+                if (migrouBase64) {
+                    await salvarEstadoEvento(eventoId, mod, data.config || {});
+                    return memoriaEventos.get(eventoId);
+                }
+                const reg = { evento: data, estado: mod, expiraEm: Date.now() + CACHE_PRODUCAO_MS };
+                memoriaEventos.set(eventoId, reg);
+                return reg;
             }
             if (criarSeVazio) {
                 const novoEstado = criarDadosDemonstracao(eventoId, usuario);
                 await salvarEstadoEvento(eventoId, novoEstado, data.config || {});
-                return { evento: data, estado: novoEstado };
+                return { evento: data, estado: novoEstado, expiraEm: Date.now() + CACHE_PRODUCAO_MS };
             }
             const vazio = ESTADO_VAZIO();
-            memoriaEventos.set(eventoId, { evento: data, estado: vazio });
-            return { evento: data, estado: vazio };
+            const regVazio = { evento: data, estado: vazio, expiraEm: Date.now() + CACHE_PRODUCAO_MS };
+            memoriaEventos.set(eventoId, regVazio);
+            return regVazio;
         }
     } catch (err) {
         logger.debug(`[Produção] Fallback memória para evento ${eventoId}: ${err.message}`);
@@ -101,12 +166,13 @@ async function carregarEstadoEvento(eventoId, { criarSeVazio = false, usuario = 
     }
 
     const estadoInicial = criarSeVazio ? criarDadosDemonstracao(eventoId, usuario) : ESTADO_VAZIO();
-    const registro = { evento: { id: eventoId, nome: 'Evento em produção', config: {} }, estado: estadoInicial };
+    const registro = { evento: { id: eventoId, nome: 'Evento em produção', config: {} }, estado: estadoInicial, expiraEm: Date.now() + CACHE_PRODUCAO_MS };
     memoriaEventos.set(eventoId, registro);
     return registro;
 }
 
 async function salvarEstadoEvento(eventoId, estado, configAtual = null) {
+    await externalizarImagensEstado(eventoId, estado);
     const atualMem = memoriaEventos.get(eventoId);
     const eventoBase = atualMem?.evento || { id: eventoId, nome: 'Evento em produção', config: {} };
     let baseConfig = configAtual || eventoBase.config || {};
@@ -129,7 +195,7 @@ async function salvarEstadoEvento(eventoId, estado, configAtual = null) {
         logger.debug(`[Produção] Persistência em memória mantida (${err.message})`);
     }
 
-    memoriaEventos.set(eventoId, { evento: eventoBase, estado });
+    memoriaEventos.set(eventoId, { evento: eventoBase, estado, expiraEm: Date.now() + CACHE_PRODUCAO_MS });
 }
 
 function verificarAcessoTarefa(tarefa, ctx) {

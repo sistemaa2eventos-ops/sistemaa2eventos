@@ -68,10 +68,10 @@ const supabasePublic = createClient(
     try {
         console.log('🔄 Testando conexão com Supabase...');
 
-        // Tenta uma consulta simples
-        const { data, error } = await supabase
+        // Tenta uma consulta leve (HEAD sem agregação na tabela inteira)
+        const { error } = await supabase
             .from('eventos')
-            .select('count')
+            .select('id', { head: true })
             .limit(1);
 
         if (error) {
