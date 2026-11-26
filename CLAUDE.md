@@ -745,6 +745,17 @@ docker system prune -af
 **Registre cada deploy aqui:**
 
 ```
+2026-11-26 - Deploy f0d4364 (senha padrão de equipamento fora dos scripts e docs; guardião de integridade)
+├─ Mudanças: scripts de teste e arquivos de diagnóstico leem INTELBRAS_DEFAULT_PASS do ambiente (sem senha literal);
+│            documentação usa <SENHA_DO_EQUIPAMENTO>; .playwright-mcp/ no .gitignore; GUARDIAN_SKILL.md e
+│            DESIGN_SKILL.md versionados; CLAUDE.md aponta para o guardião. Sem mudança de código de produção
+│            (commits 8f1b2f8 e f0d4364)
+├─ Status: ✅ OK (GitHub Actions run 45910156901: testes e deploy na VPS); /api/ready 200, /eventos 200, empresa.nzt.app.br 200
+├─ Testes: backend 793 ✅ (local, antes do push)
+├─ Pendência: trocar a senha dos equipamentos que ainda usam o padrão de fábrica (ação da usuária); a senha antiga
+│            continua no histórico do git
+└─ Rollback: tag antes-deploy-20261126-seguranca (c04f4bd)
+
 2026-11-26 - Deploy 1efebf6 (portal da empresa, planilha de participantes, pendências de documentos)
 ├─ Mudanças: portal da empresa (empresa.nzt.app.br: login e-mail + chave, participantes, documentos, solicitações
 │            aprovadas no painel); planilha por evento (modelo, importar/exportar por empresa); documentos
