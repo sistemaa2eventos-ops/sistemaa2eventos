@@ -759,6 +759,15 @@ docker system prune -af
      avulsos de diagnóstico (backend/api-nodejs/check_*/test_*/query_*, *.py, *.jpg na raiz), todos de abr–out/2026.
 
 ```
+2026-11-25 - Deploy 098cae8 (registro de encerramento vira pasta .zip: empresas, pessoas, veículos, documentos, relatórios)
+├─ Mudanças: GET /api/eventos/:id/registro-encerramento devolve .zip (CSV por assunto + evento.json + LEIA-ME.txt);
+│            acessos, pulseiras e Central saíram do registro; utils/zipSimples.js (zip sem dependência)
+├─ Status: ✅ OK (GitHub Actions run 45744119288); /eventos 200, /api/ready ok, rota nova 401 sem login
+├─ Testes: backend 750 ✅ (13 do registro); zip validado com Python zipfile; lint e build do painel ✅;
+│          download no navegador e evento real NÃO testados
+└─ Rollback: tag antes-deploy-20261125-registro-zip (6d9caa0)
+
+
 2026-11-25 - Deploy 81fdceb (baixar registro do evento antes de excluir)
 ├─ Mudanças: GET /api/eventos/:id/registro-encerramento (só admin, leitura); diálogo ExcluirEventoDialog: baixa
 │            JSON (evento, empresas, pessoas, vínculos, acessos, pulseiras, pendências, auditoria da Central);
