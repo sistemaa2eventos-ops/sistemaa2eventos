@@ -6,6 +6,12 @@
 
 ---
 
+## 🛡️ GUARDIÃO DE INTEGRIDADE (OBRIGATÓRIO)
+
+Antes de qualquer alteração, refatoração ou nova feature em código existente, siga o protocolo de **[GUARDIAN_SKILL.md](GUARDIAN_SKILL.md)** (raiz do projeto): primeiro o diagnóstico de fluxo e dependências, os alertas de risco e as opções A/B/C, e só depois de a usuária aprovar a abordagem escreva o código. Perguntas e leituras de código seguem normalmente.
+
+---
+
 ## 🎯 SKILLS DISPONÍVEIS
 
 Este projeto possui **skills customizadas** no Claude que podem ser invocadas via slash commands. Use quando precisar:
@@ -507,7 +513,7 @@ LOG_LEVEL=info
 
 ```bash
 INTELBRAS_DEFAULT_USER=admin
-INTELBRAS_DEFAULT_PASS=admin123
+INTELBRAS_DEFAULT_PASS=<SENHA_DO_EQUIPAMENTO>
 HARDWARE_CALLBACK_PORT=443
 ```
 
@@ -745,30 +751,34 @@ docker system prune -af
 │            obrigatórios por função e para empresas; autorizado só com documentação validada; reset expira liberações
 ├─ Migrations: 20261126_portal_empresa.sql (aplicada pela usuária antes do push)
 ├─ Status: ✅ OK (GitHub Actions run 45907799278); painel.nzt.app.br/api/ready 200; rotas novas 401 sem login
-├─ Pendência: DNS empresa.nzt.app.br não existe (NXDOMAIN): criar na Cloudflare igual produtor.nzt.app.br
+├─ DNS: empresa.nzt.app.br criado na Cloudflare (26/11) e resolvendo; https://empresa.nzt.app.br responde 200
 ├─ Testes: backend 793 ✅; build do painel, portal da empresa e site público ✅; navegador testado só em localhost
 └─ Rollback: tag antes-deploy-20261126-portal-empresa (977a22b)
+
+
+2026-11-25 - Deploy 977a22b (perf Supabase: menos egress e polling ocioso)
+├─ Mudanças: health/eventMiddleware deixam de ler eventos.config (504 KB) a cada minuto; plantas baixas em base64
+│            saem para bucket público de CDN; backoff adaptativo na fila de sync dos leitores e no loop de câmera IA;
+│            pula atualização redundante de ping e checagem leve de capacidade; índices de FK, RLS (initplan e
+│            isolamento por tenant), revoga RPC pública nas funções de trigger
+├─ Migrations: 20261125b_otimizacao_supabase_leve.sql (aplicada pela usuária)
+├─ Status: ✅ OK (GitHub Actions run 45744765290); /api/ready 200
+├─ Testes: não registrados no commit
+└─ Rollback: commit f68e636 (sem tag)
 ```
 
-### Situação em 2026-11-17 (revisão de VPS, GitHub e Supabase dos últimos 10 dias)
+### Situação em 2026-11-26 (revisão do guardião: repositório, GitHub, DNS e migrations)
 
-- **Código:** 46 commits entre 10/11 e 12/11; nenhum commit depois de 5e6b336 (12/11 00:16). Local, origin e VPS no mesmo commit.
-- **VPS:** /root/Projeto_A2_Eventos em 5e6b336; 6 containers healthy (gateway, admin_web, portal, api,
-  api_intelbras há 5 dias; redis há 2 semanas); /health ok, banco conectado; disco 11% de 96 GB, RAM 1,3/7,8 GB.
-  Nos logs dos últimos 5 dias não há erros, só avisos: agente "PC IA Facial do Evento" e "SERVIDOR A2" (IA central)
-  caindo e voltando várias vezes por dia, e timeout em vigilancia_configurar (agente desligado).
-- **Supabase:** as 7 migrations do período estão aplicadas (20261111_cameras_modos_gravacao, 20261111_pulseiras_fase_data,
-  20261111c_sessao_cameras, 20261112_servidores_ia, 20261112b_operadores_eventos_permitidos,
-  20261112c_pulseira_correcao_empresa, 20261112_arquitetura_ia_tres_modos). Eventos ativos: HISTÓRIAS CURITIBA (09/11),
-  Evento de Teste (robôs), EVENTO GENÉRICO. Desde 07/11: 3 pessoas, 7 acessos, 1 evento e 1 empresa novos.
-- **GitHub Actions:** o run 43096686493 (push de 053315f) está "queued" desde 11/11 e nunca rodou; o deploy foi feito
-  pelo run manual 43098168407. Pode ser cancelado.
-- **Pendências encontradas:**
-  1. ~~O modo de IA "Central Remota / Fibra" (`direto_servidor`) só existe na tela~~ — RESOLVIDO no mesmo dia em
-     f25ee11 (17/11 16:54): a nuvem envia as câmeras ao servidor central e o PC do evento não analisa nesse modo.
-  2. Não verificados com pessoa real: quiosque bloqueado, câmera com IA vinculada à estação, 3 testes de pulseira.
-  3. Local sem commit: scripts/ligar-ia-facial.ps1 apenas reformatado pelo editor (sem mudança de lógica) e scripts
-     avulsos de diagnóstico (backend/api-nodejs/check_*/test_*/query_*, *.py, *.jpg na raiz), todos de abr–out/2026.
+- **Código:** produção em 1efebf6 (run 45907799278 ✅). Local e origin em `master`, sem diferença. Árvore limpa após os commits deste dia.
+- **Migrations:** 20261123_empresa_pessoa_varios_eventos, 20261125b_otimizacao_supabase_leve e 20261126_portal_empresa
+  confirmadas como aplicadas pela usuária (26/11). Não há mais migration pendente registrada.
+- **DNS:** empresa.nzt.app.br resolve (Cloudflare) e responde 200. painel.nzt.app.br/api/ready 200.
+- **Segurança:** a senha padrão de equipamento saiu de todos os arquivos versionados (scripts e documentação passam a
+  ler `INTELBRAS_DEFAULT_PASS` do ambiente). Ainda faltam: trocar a senha nos equipamentos que usam o padrão de fábrica,
+  e a senha permanece no histórico antigo do git.
+- **Pendências de teste com pessoa real (herdadas de 17/11):** quiosque bloqueado, câmera com IA vinculada à estação,
+  3 testes de pulseira.
+- **Telas grandes (1efebf6):** PermissoesAcesso.jsx, ConfigGeral.jsx, Empresas.jsx foram testadas pela usuária antes do deploy desta data.
 
 ```
 2026-11-25 - Deploy 098cae8 (registro de encerramento vira pasta .zip: empresas, pessoas, veículos, documentos, relatórios)
@@ -1213,5 +1223,5 @@ docker system prune -af
 
 ---
 
-**Última verificação:** 2026-11-17  
+**Última verificação:** 2026-11-26  
 **Próxima revisão:** Quando adicionar novos serviços externos
