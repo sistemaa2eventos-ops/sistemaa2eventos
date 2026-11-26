@@ -334,7 +334,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
     };
 
     return (
-        <Box sx={{ p: embedded ? 0 : { xs: 1.5, sm: 2.5, md: 4 } }}>
+        <Box sx={{ p: embedded ? 0 : { xs: 2, sm: 3, md: 4 }, maxWidth: embedded ? 'none' : 1600, mx: 'auto', width: '100%' }}>
             {!embedded && (
                 <PageHeader
                     title="Pulseiras"

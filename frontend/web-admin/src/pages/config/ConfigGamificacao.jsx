@@ -83,7 +83,7 @@ const ConfigGamificacao = () => {
     }
 
     return (
-        <Box sx={{ p: { xs: 2, md: 4 } }}>
+        <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, maxWidth: 1600, mx: 'auto', width: '100%' }}>
             <PageHeader
                 title="Gamificação"
                 subtitle="Pontos por ação do participante para medir engajamento."

@@ -149,6 +149,7 @@ class AuthController {
                         checkout: true,
                         fiscalizacao: true,
                         monitoramento: true,
+                        producao: true,
                         usuarios: true
                     } : effectivePermissions
                 }
@@ -321,8 +322,11 @@ class AuthController {
                 : [];
 
             // Ponto de partida: o modelo do perfil "operador" (Configurações → Perfis de Acesso)
+            const modeloPerfil = await perfilAcesso.padraoDoPerfil('operador');
             let basePermissions = {
-                ...(await perfilAcesso.modulosDoPerfil('operador')),
+                ...modeloPerfil.modulos,
+                pagina_inicial: modeloPerfil.pagina_inicial || null,
+                modo_tela: modeloPerfil.modo_tela || 'normal',
                 usuarios: false
             };
 
@@ -1814,7 +1818,12 @@ class AuthController {
 
     async savePermissions(req, res) {
         try {
-            const data = await perfilAcesso.salvar(req.params.role, req.body?.modulos || {}, req.user);
+            const payload = {
+                modulos: req.body?.modulos || {},
+                ...(req.body?.pagina_inicial !== undefined ? { pagina_inicial: req.body.pagina_inicial } : {}),
+                ...(req.body?.modo_tela !== undefined ? { modo_tela: req.body.modo_tela } : {})
+            };
+            const data = await perfilAcesso.salvar(req.params.role, payload, req.user);
             logger.info(`✅ Perfil de acesso '${req.params.role}' atualizado por ${req.user?.email}`);
             res.json({ success: true, data });
         } catch (error) {
@@ -1824,16 +1833,99 @@ class AuthController {
         }
     }
 
-    /** Aplica o modelo do perfil a todos os usuários desse papel (só os módulos) */
+    /** Aplica o modelo do perfil a todos os usuários desse papel */
     async applyPermissions(req, res) {
         try {
-            const result = await perfilAcesso.aplicarATodos(req.params.role);
+            const result = await perfilAcesso.aplicarATodos(req.params.role, req.body || {});
             logger.info(`✅ Perfil de acesso '${req.params.role}' aplicado a ${result.atualizados}/${result.total} usuários por ${req.user?.email}`);
             res.json({ success: true, data: result });
         } catch (error) {
             if (error.status === 400) return res.status(400).json({ error: error.message });
             logger.error('Erro ao aplicar perfil de acesso:', error);
             res.status(500).json({ error: 'Erro ao aplicar perfil de acesso' });
+        }
+    }
+
+    // =========================================================================
+    // MODELOS NOMEADOS DE PERFIS DE ACESSO (CRUD & APLICAÇÃO)
+    // =========================================================================
+
+    async listModelos(req, res) {
+        try {
+            const data = await perfilAcesso.listarModelos();
+            res.json({ success: true, data: data.modelos, modulos: data.modulos, resumo_usuarios: data.resumo_usuarios });
+        } catch (error) {
+            logger.error('Erro ao listar modelos de perfis:', error);
+            res.status(500).json({ error: 'Erro ao listar modelos de perfis de acesso.' });
+        }
+    }
+
+    async createModelo(req, res) {
+        try {
+            const data = await perfilAcesso.criarModelo(req.body, req.user);
+            logger.info(`✅ Modelo de perfil '${data.nome}' criado por ${req.user?.email}`);
+            res.status(201).json({ success: true, data });
+        } catch (error) {
+            logger.error('Erro ao criar modelo de perfil:', error);
+            res.status(error.status || 500).json({ error: error.message || 'Erro ao criar modelo de perfil.' });
+        }
+    }
+
+    async updateModelo(req, res) {
+        try {
+            const data = await perfilAcesso.atualizarModelo(req.params.id, req.body, req.user);
+            logger.info(`✅ Modelo de perfil '${req.params.id}' atualizado por ${req.user?.email}`);
+            res.json({ success: true, data });
+        } catch (error) {
+            logger.error('Erro ao atualizar modelo de perfil:', error);
+            res.status(error.status || 500).json({ error: error.message || 'Erro ao atualizar modelo de perfil.' });
+        }
+    }
+
+    async deleteModelo(req, res) {
+        try {
+            const result = await perfilAcesso.excluirModelo(req.params.id);
+            logger.info(`✅ Modelo de perfil '${req.params.id}' excluído por ${req.user?.email}`);
+            res.json({ success: true, data: result });
+        } catch (error) {
+            logger.error('Erro ao excluir modelo de perfil:', error);
+            res.status(error.status || 500).json({ error: error.message || 'Erro ao excluir modelo de perfil.' });
+        }
+    }
+
+    async applyModelo(req, res) {
+        try {
+            const result = await perfilAcesso.aplicarModeloATodos(req.params.id, req.body || {});
+            logger.info(`✅ Modelo '${req.params.id}' aplicado a ${result.atualizados}/${result.total} operadores`);
+            res.json({ success: true, data: result });
+        } catch (error) {
+            logger.error('Erro ao aplicar modelo aos operadores:', error);
+            res.status(error.status || 500).json({ error: error.message || 'Erro ao aplicar modelo.' });
+        }
+    }
+
+    // =========================================================================
+    // POLÍTICAS ESPECIAIS (PRODUÇÃO, CENTRAL CFTV, EMPRESAS)
+    // =========================================================================
+
+    async getPoliticas(req, res) {
+        try {
+            const data = await perfilAcesso.obterPoliticasEspeciais();
+            res.json({ success: true, data });
+        } catch (error) {
+            logger.error('Erro ao obter políticas especiais:', error);
+            res.status(500).json({ error: 'Erro ao obter políticas especiais.' });
+        }
+    }
+
+    async savePoliticas(req, res) {
+        try {
+            const data = await perfilAcesso.salvarPoliticasEspeciais(req.params.tipo, req.body, req.user);
+            logger.info(`✅ Políticas de '${req.params.tipo}' atualizadas por ${req.user?.email}`);
+            res.json({ success: true, data });
+        } catch (error) {
+            logger.error('Erro ao salvar políticas especiais:', error);
+            res.status(error.status || 500).json({ error: error.message || 'Erro ao salvar políticas especiais.' });
         }
     }
 

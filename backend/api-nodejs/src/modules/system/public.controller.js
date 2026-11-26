@@ -1,6 +1,7 @@
 const { supabase, uploadImage } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const { fotoUrlAceitavel, documentoFotoAceitavel, formaCanonica } = require('../../services/storageSeguro');
+const { ehPreCadastroPendente } = require('../planilha/planilha.service');
 
 /** Valor aceito pela regra (novo e do nosso storage) vai na forma canônica; o resto (já gravado) fica igual. */
 const canonicoSeNovo = (valor, aceitavel) => (valor && aceitavel(valor) ? formaCanonica(valor) : valor);
@@ -146,6 +147,109 @@ const respostaDocumentosFalharam = (res, falharam) => res.status(502).json({
 });
 
 class PublicController {
+    /**
+     * Identidade pública do sistema (nome, logo, emblema e ícones PWA definidos em Configurações → Geral).
+     * Cache curto em memória (60 s), invalidado ao salvar configurações.
+     */
+    async getSystemBranding(req, res) {
+        try {
+            const emCache = cacheService.get('system_branding_public');
+            if (emCache) return res.json({ success: true, data: emCache });
+
+            const { data } = await supabase
+                .from('system_settings')
+                .select('*')
+                .eq('id', 1)
+                .maybeSingle();
+
+            const cfg = data?.config || {};
+            const branding = {
+                system_name: String(data?.system_name || cfg.system_name || 'NZT Eventos').trim() || 'NZT Eventos',
+                logo_url: String(data?.logo_url ?? cfg.logo_url ?? '').trim(),
+                emblem_url: String(data?.emblem_url ?? cfg.emblem_url ?? '').trim(),
+                pwa_icon_general_url: String(data?.pwa_icon_general_url ?? cfg.pwa_icon_general_url ?? '').trim(),
+                pwa_icon_producao_url: String(data?.pwa_icon_producao_url ?? cfg.pwa_icon_producao_url ?? '').trim(),
+                pwa_icon_monitoramento_url: String(data?.pwa_icon_monitoramento_url ?? cfg.pwa_icon_monitoramento_url ?? '').trim(),
+                audio_feedback_enabled: data?.audio_feedback_enabled !== false && cfg.audio_feedback_enabled !== false,
+                performance_mode_enabled: Boolean(data?.performance_mode_enabled || cfg.performance_mode_enabled),
+                offline_cache_enabled: data?.offline_cache_enabled !== false && cfg.offline_cache_enabled !== false
+            };
+            cacheService.set('system_branding_public', branding, 60000);
+            return res.json({ success: true, data: branding });
+        } catch (error) {
+            logger.warn(`[Branding] Falha ao ler identidade do sistema: ${error.message}`);
+            return res.json({
+                success: true,
+                data: {
+                    system_name: 'NZT Eventos',
+                    logo_url: '',
+                    emblem_url: '',
+                    pwa_icon_general_url: '',
+                    pwa_icon_producao_url: '',
+                    pwa_icon_monitoramento_url: '',
+                    audio_feedback_enabled: true,
+                    performance_mode_enabled: false,
+                    offline_cache_enabled: true
+                }
+            });
+        }
+    }
+
+    /**
+     * Web App Manifest dinâmico gerado com base na identidade e ícones configurados
+     */
+    async getPwaManifest(req, res) {
+        try {
+            const { data } = await supabase.from('system_settings').select('*').eq('id', 1).maybeSingle();
+            const cfg = data?.config || {};
+            const sysName = String(data?.system_name || cfg.system_name || 'NZT Eventos').trim() || 'NZT Eventos';
+            const iconGeral = String(data?.pwa_icon_general_url ?? cfg.pwa_icon_general_url ?? '').trim();
+            const iconProducao = String(data?.pwa_icon_producao_url ?? cfg.pwa_icon_producao_url ?? '').trim();
+            const iconMonitor = String(data?.pwa_icon_monitoramento_url ?? cfg.pwa_icon_monitoramento_url ?? '').trim();
+
+            const icons = [
+                { src: iconGeral || '/pwa-192x192-v2.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+                { src: iconGeral || '/pwa-512x512-v2.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+                { src: iconGeral || '/pwa-maskable-512x512-v2.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+            ];
+
+            const shortcuts = [
+                {
+                    name: `Produção - ${sysName}`,
+                    short_name: 'Produção',
+                    description: 'Acesso rápido ao módulo operacional de produção',
+                    url: '/producao',
+                    icons: [{ src: iconProducao || iconGeral || '/pwa-192x192-v2.png', sizes: '192x192' }]
+                },
+                {
+                    name: `Monitoramento - ${sysName}`,
+                    short_name: 'Monitoramento',
+                    description: 'Monitoramento de capacidade e portaria',
+                    url: '/monitor',
+                    icons: [{ src: iconMonitor || iconGeral || '/pwa-192x192-v2.png', sizes: '192x192' }]
+                }
+            ];
+
+            const manifest = {
+                name: `${sysName} Intelligent Control`,
+                short_name: sysName,
+                description: `Controle de acesso e credenciamento — ${sysName}`,
+                theme_color: '#050B18',
+                background_color: '#050B18',
+                display: 'standalone',
+                start_url: '/',
+                scope: '/',
+                icons,
+                shortcuts
+            };
+
+            res.setHeader('Content-Type', 'application/manifest+json');
+            return res.json(manifest);
+        } catch (error) {
+            logger.warn(`[PWA] Falha ao gerar manifest dinâmico: ${error.message}`);
+            return res.json({ name: 'NZT Eventos', short_name: 'NZT', start_url: '/' });
+        }
+    }
     /**
      * Obter dados da empresa pelo token (Publico)
      */
@@ -484,18 +588,21 @@ class PublicController {
 
             // 2. Validar CPF e Duplicidade (Apenas se for novo registro)
             const cpfLimpo = cpf.replace(/[^\d]/g, '');
+            // Pré-cadastro da planilha desta empresa ainda não concluído: o envio completa esse registro
+            let preCadastroId = null;
             if (context === 'EMPRESA') {
                 const { data: existe } = await supabase
                     .from('pessoas')
-                    .select('id')
+                    .select('id, empresa_id, origem_cadastro, aceite_lgpd, created_by')
                     .eq('cpf', cpfLimpo)
                     .eq('evento_id', eventoId)
-                    .single();
+                    .maybeSingle();
 
-                if (existe) return res.status(400).json({ error: 'Este CPF já está cadastrado.' });
+                if (existe && ehPreCadastroPendente(existe, empresaId)) preCadastroId = existe.id;
+                else if (existe) return res.status(400).json({ error: 'Este CPF já está cadastrado.' });
 
-                // Verificar Limite
-                if (activeContext.max_colaboradores > 0) {
+                // Verificar Limite (o pré-cadastro já ocupa a vaga dele)
+                if (!preCadastroId && activeContext.max_colaboradores > 0) {
                     const { count } = await supabase
                         .from('pessoas')
                         .select('id', { count: 'exact', head: true })
@@ -543,7 +650,7 @@ class PublicController {
                 .eq('cpf', cpfLimpo)
                 .maybeSingle();
 
-            if (cpfExistente && context === 'EMPRESA') {
+            if (cpfExistente && context === 'EMPRESA' && cpfExistente.id !== preCadastroId) {
                 return res.status(409).json({ error: 'Este CPF já está cadastrado para este evento.' });
             }
 
@@ -600,13 +707,15 @@ class PublicController {
 
             let finalPessoaId = null;
 
-            if (context === 'PESSOA') {
+            if (context === 'PESSOA' || preCadastroId) {
+                // Convite individual ou pré-cadastro da planilha: completa o registro que já existe
+                const idAlvo = preCadastroId || targetId;
                 const { error: updErr } = await supabase
                     .from('pessoas')
                     .update(personaData)
-                    .eq('id', targetId);
+                    .eq('id', idAlvo);
                 if (updErr) throw updErr;
-                finalPessoaId = targetId;
+                finalPessoaId = idAlvo;
             } else {
                 logger.info(`[INSERT] Tentando inserir: ${JSON.stringify(personaData).substring(0, 200)}...`);
                 const { data: newPessoa, error: insErr } = await supabase

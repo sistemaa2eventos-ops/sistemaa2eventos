@@ -1,39 +1,27 @@
 import React from 'react';
 import {
-  Box, Typography, Stack, IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
-  Chip, Button, useTheme, useMediaQuery, CircularProgress, Tabs, Tab, TextField
+  Box, Typography, Dialog, DialogTitle, DialogContent, DialogActions,
+  Button, useTheme, useMediaQuery, CircularProgress, Tabs, Tab, TextField
 } from '@mui/material';
 import {
-  Add as AddIcon, Search as SearchIcon, FileUpload as UploadIcon, FileDownload as DownloadIcon,
-  InsertDriveFile as FileIcon, Cancel as CancelIcon, CameraAlt as CameraIcon
+  Add as AddIcon, Search as SearchIcon,
 } from '@mui/icons-material';
 import PhotoCapture from '../components/common/PhotoCapture';
 import GlassCard from '../components/common/GlassCard';
 import PageHeader from '../components/common/PageHeader';
 import NeonButton from '../components/common/NeonButton';
-import { styled } from '@mui/material/styles';
 import { usePessoas } from '../hooks/usePessoas';
+import { useSearchParams } from 'react-router-dom';
 
 // MICRO-COMPONENTS
 import PessoasTable from '../components/pessoa/PessoasTable';
 import PessoaFormDialog from '../components/pessoa/PessoaFormDialog';
 import ConfirmDialog from '../components/common/ConfirmDialog';
+import AnexarDocumentoDialog from '../components/documentos/AnexarDocumentoDialog';
 import api from '../services/api';
-import { obterUrlDocumentoAssinada } from '../components/documentos/documentosUtils';
 import { useSnackbar } from 'notistack';
 import { botaoSecundario } from '../styles/tokens';
 
-const StatusChip = styled(Chip)(({ theme: _theme, status }) => {
-  const colors = {
-    'ativo': { bg: 'rgba(0, 255, 136, 0.1)', text: '#00FF88', border: 'rgba(0, 255, 136, 0.2)' },
-    'autorizado': { bg: 'rgba(0, 255, 136, 0.1)', text: '#00FF88', border: 'rgba(0, 255, 136, 0.2)' },
-    'pendente': { bg: 'rgba(255, 170, 0, 0.1)', text: '#FFB800', border: 'rgba(255, 170, 0, 0.2)' },
-    'verificacao': { bg: 'rgba(0, 212, 255, 0.1)', text: '#00D4FF', border: 'rgba(0, 212, 255, 0.2)' },
-    'bloqueado': { bg: 'rgba(255, 51, 102, 0.1)', text: '#FF3366', border: 'rgba(255, 51, 102, 0.2)' }
-  };
-  const current = colors[status] || colors['ativo'];
-  return { fontWeight: 700, fontSize: '0.75rem', height: 24, background: current.bg, color: current.text, border: `1px solid ${current.border}`, letterSpacing: '1px' }
-});
 
 const Pessoas = () => {
   const theme = useTheme();
@@ -61,12 +49,11 @@ const Pessoas = () => {
     empresas,
     activeEvent,
     documentos,
+    loadDocumentos,
     saving,
     openDocsDialog, setOpenDocsDialog,
     selectedPessoaDocs,
     openWebcamECM, setOpenWebcamECM,
-    openImport, setOpenImport,
-    importLoading,
     openBlockDialog, setOpenBlockDialog,
     isBlocking,
     pessoaToBlock,
@@ -98,10 +85,7 @@ const Pessoas = () => {
     handleNextStep,
     handleOpenWebcamECM,
     handleUploadWebcamECM,
-    handleUploadECM,
-    handleImport,
-    handleExport,
-    handleDownloadTemplate
+    handleUploadECM
   } = usePessoas();
 
   const handleViewQR = async (pessoa) => {
@@ -134,19 +118,16 @@ const Pessoas = () => {
     }
   };
 
-  // Documento em bucket privado: pede a URL assinada e só então abre. A aba é aberta já no clique
-  // para o navegador não bloquear o pop-up depois da espera.
-  const abrirDocumentoPessoa = async (doc) => {
-    const aba = window.open('', '_blank');
-    try {
-      const url = await obterUrlDocumentoAssinada('pessoa', doc.id);
-      if (aba) aba.location.href = url;
-      else window.open(url, '_blank');
-    } catch {
-      aba?.close();
-      enqueueSnackbar('Não foi possível abrir o documento. Tente novamente.', { variant: 'error' });
-    }
-  };
+
+  // Atalho vindo de outras telas (ex.: Empresas › Participantes): ?editar=ID abre a edição do participante
+  const [searchParams, setSearchParams] = useSearchParams();
+  React.useEffect(() => {
+    const idEditar = searchParams.get('editar');
+    if (!idEditar) return;
+    setSearchParams({}, { replace: true });
+    handleOpenDialog({ id: idEditar });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 }, maxWidth: '100%', overflowX: 'hidden' }}>
@@ -159,38 +140,10 @@ const Pessoas = () => {
         />
         <Box sx={{ 
           display: 'grid', 
-          gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, auto)' }, 
+          gridTemplateColumns: { xs: '1fr', sm: 'auto' }, 
           gap: 1.5, 
           width: { xs: '100%', md: 'auto' } 
         }}>
-          <Button 
-            variant="outlined" 
-            size="small"
-            startIcon={<DownloadIcon sx={{ fontSize: 18 }} />} 
-            onClick={handleDownloadTemplate} 
-            sx={botaoSecundario}
-          >
-            Baixar modelo
-          </Button>
-          <Button 
-            variant="outlined" 
-            size="small"
-            startIcon={<UploadIcon sx={{ fontSize: 18 }} />} 
-            onClick={() => setOpenImport(true)} 
-            sx={botaoSecundario}
-          >
-            Importar planilha
-          </Button>
-          <Button 
-            variant="outlined" 
-            size="small"
-            startIcon={<DownloadIcon sx={{ fontSize: 18 }} />} 
-            onClick={handleExport} 
-            disabled={saving} 
-            sx={botaoSecundario}
-          >
-            {saving ? 'Exportando...' : 'Exportar planilha'}
-          </Button>
           <NeonButton 
             startIcon={<AddIcon sx={{ fontSize: 18 }} />} 
             loading={saving} 
@@ -289,53 +242,14 @@ const Pessoas = () => {
         isEmpresa={isEmpresa}
       />
 
-      <Dialog 
-        open={openDocsDialog} 
-        onClose={() => setOpenDocsDialog(false)} 
-        maxWidth="md" 
-        fullWidth
-        PaperProps={{
-          sx: { maxHeight: { sm: '90dvh' } }
-        }}
-      >
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>DOCUMENTOS ECM: {selectedPessoaDocs?.nome}</Typography>
-          <IconButton onClick={() => setOpenDocsDialog(false)}><CancelIcon /></IconButton>
-        </DialogTitle>
-        <DialogContent dividers sx={{ overflowY: 'auto' }}>
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="subtitle2" sx={{ color: '#00D4FF', mb: 2 }}>Documentos anexados</Typography>
-            <Stack spacing={1}>
-              {(!Array.isArray(documentos) || documentos.length === 0) ? (
-                <Typography variant="body2" color="text.secondary">Nenhum documento encontrado.</Typography>
-              ) : (
-                documentos.map(doc => (
-                  <Box key={doc.id} sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
-                      <FileIcon color="primary" />
-                      <Box>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{doc.titulo}</Typography>
-                        <Typography variant="caption" color="text.secondary">{doc.tipo_doc} • Enviado em {new Date(doc.data_inclusao).toLocaleDateString()}</Typography>
-                      </Box>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <StatusChip status={doc.status} label={doc.status} />
-                      <IconButton size="small" onClick={() => abrirDocumentoPessoa(doc)} aria-label="Baixar documento"><DownloadIcon fontSize="small" /></IconButton>
-                    </Box>
-                  </Box>
-                ))
-              )}
-            </Stack>
-          </Box>
-          <Box sx={{ p: { xs: 2, sm: 3 }, border: '2px dashed rgba(0,212,255,0.2)', borderRadius: 1.5, textAlign: 'center' }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>Enviar novo documento</Typography>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1.5, sm: 2 }} justifyContent="center">
-              <Button variant="contained" startIcon={<UploadIcon />} onClick={() => { const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*,application/pdf'; input.onchange = (e) => handleUploadECM(selectedPessoaDocs.id, e.target.files[0]); input.click(); }} sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700, height: 38 }}>Arquivo / scanner</Button>
-              <Button variant="contained" startIcon={<CameraIcon />} onClick={() => handleOpenWebcamECM(selectedPessoaDocs.id)} sx={{ bgcolor: '#7B2FBE', color: '#FFFFFF', fontWeight: 700, height: 38 }}>Foto webcam</Button>
-            </Stack>
-          </Box>
-        </DialogContent>
-      </Dialog>
+      <AnexarDocumentoDialog
+        open={openDocsDialog}
+        onClose={() => setOpenDocsDialog(false)}
+        entityType="pessoa"
+        entityId={selectedPessoaDocs?.id}
+        nomeEntidade={selectedPessoaDocs?.nome_completo || selectedPessoaDocs?.nome || ''}
+        onEnviado={() => loadDocumentos(selectedPessoaDocs?.id)}
+      />
 
       <Dialog 
         open={openWebcamECM} 
@@ -355,28 +269,6 @@ const Pessoas = () => {
         <DialogActions><Button variant="outlined" onClick={() => setOpenWebcamECM(false)} sx={botaoSecundario}>Fechar</Button></DialogActions>
       </Dialog>
 
-      <Dialog 
-        open={openImport} 
-        onClose={() => !importLoading && setOpenImport(false)} 
-        maxWidth="xs" 
-        fullWidth 
-        fullScreen={isMobile}
-        PaperProps={{
-          sx: { maxHeight: { sm: '90dvh' } }
-        }}
-      >
-        <DialogTitle sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 }}>Importação em lote</DialogTitle>
-        <DialogContent sx={{ overflowY: 'auto' }}>
-          <Box sx={{ py: 2, textAlign: 'center' }}>
-            <Typography variant="body2" sx={{ mb: 3, color: 'text.secondary' }}>Selecione o arquivo Excel preenchido com os dados das empresas e colaboradores.</Typography>
-            <input type="file" accept=".xlsx, .xls" id="excel-upload" style={{ display: 'none' }} onChange={handleImport} disabled={importLoading} />
-            <label htmlFor="excel-upload">
-              <Button component="span" variant="contained" disabled={importLoading} startIcon={importLoading ? null : <UploadIcon />} sx={{ background: 'linear-gradient(45deg, #00FF88 30%, #00D4FF 90%)', color: '#000000', fontWeight: 700, px: 4, height: 38 }}>{importLoading ? 'Processando...' : 'Selecionar arquivo'}</Button>
-            </label>
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}><Button variant="outlined" onClick={() => setOpenImport(false)} disabled={importLoading} sx={botaoSecundario}>Fechar</Button></DialogActions>
-      </Dialog>
 
       {/* FIX ERR-PF05: Dialog de Bloqueio/Desbloqueio que faltava */}
       <Dialog 

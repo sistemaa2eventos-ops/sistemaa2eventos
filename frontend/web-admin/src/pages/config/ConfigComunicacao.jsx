@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
     Box, Typography, Grid, TextField, Switch, FormControlLabel,
     Button, CircularProgress, Tabs, Tab, Stack, Divider, Chip,
@@ -35,6 +35,7 @@ import { botaoSecundario } from '../../styles/tokens';
 
 const ConfigComunicacao = ({ defaultTab = null }) => {
     const location = useLocation();
+    const navigate = useNavigate();
     const { enqueueSnackbar } = useSnackbar();
     const { settings, setSettings, loading, saving, handleSave, testEmail, testTelegram } = useSystemSettings();
 
@@ -247,7 +248,7 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
     }
 
     return (
-        <Box sx={{ p: { xs: 2, md: 4 } }}>
+        <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, maxWidth: 1600, mx: 'auto', width: '100%' }}>
             <PageHeader
                 title="Comunicação & Integrações"
                 subtitle="Servidores de envio, gateways externos, alertas em tempo real e modelos de mensagens."
@@ -740,23 +741,41 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                                 </ListItem>
                                 <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)' }} />
 
-                                {/* PICO DE OCUPAÇÃO */}
-                                <ListItem sx={{ py: 2 }}>
+                                {/* PICO DE OCUPAÇÃO — fonte única em Configurações → Geral */}
+                                <ListItem sx={{ py: 2, pr: { xs: 2, sm: 24 } }}>
                                     <ListItemIcon sx={{ color: 'warning.main', minWidth: 48 }}>
                                         <WarningIcon />
                                     </ListItemIcon>
                                     <ListItemText
-                                        primary="Alerta: Pico de Evento (Lotação Crítica)"
-                                        secondary="Dispara alerta quando a ocupação do evento ou setor atingir a porcentagem limite estipulada."
+                                        primary="Alerta preventivo de lotação"
+                                        secondary={
+                                            settings.alert_event_peak !== false
+                                                ? `Ativo no limiar de ${settings.alert_peak_threshold || 90}% da capacidade (configurado em Geral).`
+                                                : 'Desativado em Configurações → Geral.'
+                                        }
                                         primaryTypographyProps={{ fontWeight: 600, color: '#FFFFFF' }}
                                         secondaryTypographyProps={{ fontSize: '0.75rem', color: 'text.secondary' }}
                                     />
                                     <ListItemSecondaryAction>
-                                        <Switch
-                                            checked={!!settings.alert_event_peak}
-                                            onChange={(e) => setSettings(prev => ({ ...prev, alert_event_peak: e.target.checked }))}
-                                            color="warning"
-                                        />
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                            <Chip
+                                                size="small"
+                                                label={settings.alert_event_peak !== false ? `${settings.alert_peak_threshold || 90}%` : 'OFF'}
+                                                sx={{
+                                                    fontWeight: 700,
+                                                    bgcolor: settings.alert_event_peak !== false ? 'rgba(255, 184, 0, 0.14)' : 'rgba(148, 163, 184, 0.14)',
+                                                    color: settings.alert_event_peak !== false ? '#FFB800' : '#94A3B8'
+                                                }}
+                                            />
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                onClick={() => navigate('/config/geral')}
+                                                sx={{ ...botaoSecundario, minHeight: 32, fontSize: '0.75rem' }}
+                                            >
+                                                Ajustar em Geral
+                                            </Button>
+                                        </Stack>
                                     </ListItemSecondaryAction>
                                 </ListItem>
                                 <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)' }} />

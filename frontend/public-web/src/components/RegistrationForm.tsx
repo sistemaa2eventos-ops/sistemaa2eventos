@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
-import { Upload, CheckCircle, AlertCircle, Calendar, ShieldCheck, ChevronRight, User, Briefcase, Users, Clock } from 'lucide-react';
+import { Upload, CheckCircle, AlertCircle, Calendar, ShieldCheck, ChevronRight, User, Briefcase } from 'lucide-react';
 import api from '@/lib/api';
 import PhotoCapture from './PhotoCapture';
 import PhotoEditor from './PhotoEditor';
@@ -62,12 +62,6 @@ interface RegistrationFormProps {
     } | null;
 }
 
-interface EmployeeSummary {
-    id: string;
-    nome: string;
-    funcao?: string;
-    status_acesso?: string;
-}
 
 interface UploadedDocument {
     name: string;
@@ -79,6 +73,8 @@ interface UploadedDocument {
 }
 
 const LIMITE_ARQUIVO = 3 * 1024 * 1024;
+// Portal da empresa (login do responsável): documentos da empresa e acompanhamento da equipe
+const PORTAL_EMPRESA_URL = process.env.NEXT_PUBLIC_PORTAL_EMPRESA_URL || 'https://empresa.nzt.app.br';
 // Mesma normalização do servidor ("  limpeza " → "LIMPEZA")
 const normalizarFuncao = (f: string) => f.trim().replace(/\s+/g, ' ').toUpperCase();
 
@@ -118,32 +114,10 @@ export default function RegistrationForm({ token, company, branding, requiredFie
         if (error) erroRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, [error]);
     const [rawPhoto, setRawPhoto] = useState<string | null>(null);
-    const [employees, setEmployees] = useState<EmployeeSummary[]>([]);
-    const [loadingEmployees, setLoadingEmployees] = useState(!preFilledData);
     const [showLGPDModal, setShowLGPDModal] = useState(false);
     const { t } = useTranslation('common');
 
     const LGPD_TEXT = `O Tratamento de Dados Pessoais Sensíveis (Biometria Facial) é realizado com a finalidade exclusiva de segurança, prevenção à fraude e controle de acesso em tempo real. Os dados são armazenados em ambiente criptografado e não são compartilhados com terceiros para fins comerciais. Ao prosseguir, você autoriza o processamento desses dados conforme a Lei 13.709/2018.`;
-
-    // Fetch existing employees
-    useEffect(() => {
-        if (!preFilledData && token) { // Apenas se for link de empresa (link global), ignora se for link nominal de pessoa
-            const fetchEmployees = async () => {
-                try {
-                    const cleanToken = token.trim();
-                    const res = await api.get(`/public/company/${cleanToken}/employees`);
-                    setEmployees(res.data.employees || []);
-                } catch (err: unknown) {
-                    if (asApiError(err).response?.status !== 404) {
-                        console.error('Failed to load employees', err);
-                    }
-                } finally {
-                    setLoadingEmployees(false);
-                }
-            };
-            fetchEmployees();
-        }
-    }, [token, preFilledData]);
 
     // Helper: campo é obrigatório? nome e cpf = SEMPRE obrigatórios
     const isRequired = (field: keyof RequiredFieldsConfig): boolean => {
@@ -174,6 +148,11 @@ export default function RegistrationForm({ token, company, branding, requiredFie
     // Um anexo por tipo de documento pedido (id do tipo → arquivo)
     const [docsPorTipo, setDocsPorTipo] = useState<Record<string, UploadedDocument>>({});
     const [funcaoOutra, setFuncaoOutra] = useState(false);
+
+    // Pré-cadastro da planilha da empresa: com o CPF, os dados enviados pela empresa aparecem para conferir.
+    // Achado o pré-cadastro, o CPF fica travado; o resto pode ser corrigido antes de enviar.
+    const [preCadastro, setPreCadastro] = useState<'nenhum' | 'buscando' | 'encontrado'>('nenhum');
+    const cpfConsultadoRef = useRef('');
     const regrasDocs = company.documentos;
     const funcoesDoEvento = regrasDocs?.funcoes || [];
     const docsMinimos = regrasDocs?.minimo || [];
@@ -193,11 +172,50 @@ export default function RegistrationForm({ token, company, branding, requiredFie
     };
 
 
+    const consultarPreCadastro = async (cpfDigitos: string) => {
+        if (preFilledData || cpfConsultadoRef.current === cpfDigitos) return;
+        cpfConsultadoRef.current = cpfDigitos;
+        setPreCadastro('buscando');
+        try {
+            const { data } = await api.post(`/public/company/${token.trim()}/pre-cadastro`, { cpf: cpfDigitos });
+            const dados = data?.encontrado ? data.dados || {} : null;
+            if (!dados) { setPreCadastro('nenhum'); return; }
+            // Só o que a empresa preencheu na planilha; o que veio vazio fica como está
+            setFormData(prev => ({
+                ...prev,
+                nome: dados.nome_completo || prev.nome,
+                email: dados.email || prev.email,
+                nome_mae: dados.nome_mae || prev.nome_mae,
+                data_nascimento: dados.data_nascimento || prev.data_nascimento,
+                funcao: dados.funcao || prev.funcao
+            }));
+            if (dados.funcao && funcoesDoEvento.length > 0 && !funcoesDoEvento.includes(dados.funcao)) setFuncaoOutra(true);
+            setPreCadastro('encontrado');
+        } catch {
+            // Sem resposta: o cadastro segue normal, digitado
+            setPreCadastro('nenhum');
+        }
+    };
+
+    // "Não é o meu CPF": destrava e limpa o que veio da planilha
+    const descartarPreCadastro = () => {
+        cpfConsultadoRef.current = '';
+        setPreCadastro('nenhum');
+        setFuncaoOutra(false);
+        setFormData(prev => ({ ...prev, cpf: '', nome: '', email: '', nome_mae: '', data_nascimento: '', funcao: '' }));
+    };
+
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value: rawValue } = e.target;
+        if (name === 'cpf' && preCadastro === 'encontrado') return; // CPF do pré-cadastro não muda
         const value = name === 'cpf' ? maskCPF(rawValue) : rawValue;
 
         setFormData(prev => ({ ...prev, [name]: value }));
+
+        if (name === 'cpf') {
+            const digitos = value.replace(/\D/g, '');
+            if (digitos.length === 11 && isValidCPF(digitos)) consultarPreCadastro(digitos);
+        }
     };
 
     const toggleDate = (date: string) => {
@@ -387,11 +405,11 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                     <p className="text-slate-500 text-sm">Cadastro institucional — <span className="text-slate-300 font-medium">{company.nome}</span></p>
                     {!preFilledData && (
                         <a
-                            href={`/empresa/${token}`}
+                            href={PORTAL_EMPRESA_URL}
                             className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/30 hover:bg-purple-500/20 transition-all"
                         >
                             <Briefcase className="w-3.5 h-3.5" />
-                            Responsável: enviar documentos da empresa
+                            Responsável: portal da empresa
                         </a>
                     )}
                 </div>
@@ -485,7 +503,38 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                         )}
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-1.5">
+                            <div className="md:col-span-2 space-y-1.5">
+                                <label className="block text-sm font-medium text-slate-300">{t('registration.document', { defaultValue: 'CPF' })}</label>
+                                <input
+                                    required
+                                    name="cpf"
+                                    inputMode="numeric"
+                                    value={formData.cpf}
+                                    onChange={handleInputChange}
+                                    readOnly={!!preFilledData?.cpf || preCadastro === 'encontrado'}
+                                    aria-describedby="cpf-ajuda"
+                                    className={`w-full p-3.5 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-inner ${(preFilledData?.cpf || preCadastro === 'encontrado') ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                    placeholder="000.000.000-00"
+                                />
+                                <p id="cpf-ajuda" className="text-xs text-slate-500">
+                                    {preCadastro === 'buscando'
+                                        ? 'Procurando o seu pré-cadastro...'
+                                        : 'Comece pelo CPF: se a sua empresa já enviou os seus dados, eles aparecem preenchidos.'}
+                                </p>
+                                {preCadastro === 'encontrado' && (
+                                    <div role="status" className="mt-2 p-3 rounded-xl border border-green-500/40 bg-green-500/10 text-sm text-green-300 flex flex-wrap items-center justify-between gap-2">
+                                        <span className="flex items-center gap-2">
+                                            <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                                            Encontramos os dados enviados pela {company.nome}. Confira e corrija o que estiver errado.
+                                        </span>
+                                        <button type="button" onClick={descartarPreCadastro} className="text-xs font-semibold underline underline-offset-4 text-green-200 hover:text-white">
+                                            Não é o meu CPF
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="md:col-span-2 space-y-1.5">
                                 <label className="block text-sm font-medium text-slate-300">{t('registration.full_name', { defaultValue: 'Nome Completo' })}</label>
                                 <input
                                     required
@@ -495,19 +544,6 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                                     readOnly={!!preFilledData?.nome}
                                     className={`w-full p-3.5 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-inner ${preFilledData?.nome ? 'opacity-70 cursor-not-allowed grayscale' : ''}`}
                                     placeholder="Digite seu nome legal"
-                                />
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <label className="block text-sm font-medium text-slate-300">{t('registration.document', { defaultValue: 'CPF' })}</label>
-                                <input
-                                    required
-                                    name="cpf"
-                                    value={formData.cpf}
-                                    onChange={handleInputChange}
-                                    readOnly={!!preFilledData?.cpf}
-                                    className={`w-full p-3.5 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-inner ${preFilledData?.cpf ? 'opacity-70 cursor-not-allowed grayscale' : ''}`}
-                                    placeholder="000.000.000-00"
                                 />
                             </div>
 
@@ -896,49 +932,6 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                 </div>
             )}
 
-            {/* Listagem de Colaboradores Existentes (Aprovados/Pendentes) */}
-            {!preFilledData && (
-                <div className="border-t border-slate-800 bg-slate-900/40 p-8 rounded-b-3xl">
-                    <div className="flex items-center gap-3 mb-6">
-                        <Users className="w-5 h-5 text-slate-400" />
-                        <h3 className="text-lg font-semibold text-slate-300">Equipe Pré-Cadastrada</h3>
-                    </div>
-
-                    {loadingEmployees ? (
-                        <div className="flex justify-center p-4">
-                            <div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
-                        </div>
-                    ) : employees.length === 0 ? (
-                        <div className="text-center p-6 bg-slate-800/20 rounded-2xl border border-slate-800">
-                            <p className="text-slate-500 text-sm">Nenhum funcionário cadastrado ainda.</p>
-                        </div>
-                    ) : (
-                        <div className="grid gap-3">
-                            {employees.map(emp => (
-                                <div key={emp.id} className="flex items-center justify-between p-4 bg-slate-800/40 border border-slate-700/50 rounded-xl hover:bg-slate-800/60 transition-colors">
-                                    <div>
-                                        <p className="font-medium text-white">{emp.nome}</p>
-                                        <p className="text-xs text-slate-400 mt-0.5">{emp.funcao || 'N/D'}</p>
-                                    </div>
-                                    <div className={`px-3 py-1 rounded-full text-xs font-semibold border flex items-center gap-1.5
-                                        ${emp.status_acesso === 'aprovado' || emp.status_acesso === 'liberado'
-                                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                            : emp.status_acesso === 'bloqueado' || emp.status_acesso === 'rejeitado'
-                                            ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                                            : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}
-                                    >
-                                        {(emp.status_acesso === 'aprovado' || emp.status_acesso === 'liberado') && <CheckCircle className="w-3 h-3" />}
-                                        {(emp.status_acesso === 'bloqueado' || emp.status_acesso === 'rejeitado') && <AlertCircle className="w-3 h-3" />}
-                                        {(emp.status_acesso === 'pendente') && <Clock className="w-3 h-3" />}
-                                        
-                                        {(emp.status_acesso || 'pendente').toUpperCase()}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
         </div>
     );
 }

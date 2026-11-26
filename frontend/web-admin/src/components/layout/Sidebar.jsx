@@ -46,6 +46,7 @@ import {
     ViewModule as CredIcon,
     FactCheck as CheckConfigIcon,
     Article as DocsIcon,
+    TableChart as PlanilhaIcon,
     Place as AreaIcon,
     QrCode2 as PulseiraIcon,
     Face as FaceIcon,
@@ -62,6 +63,7 @@ import api from '../../services/api';
 import OperatorSection from './OperatorSection';
 import ManualIcon from '@mui/icons-material/MenuBook';
 import nztLogoClean from '../../assets/images/nzt-logo-clean.png';
+import { useSystemBranding } from '../../hooks/useSystemBranding';
 
 const StyledDrawer = styled(Drawer)(() => ({
     width: 280,
@@ -141,6 +143,7 @@ const NavItem = styled(ListItemButton, {
 
 const Sidebar = ({ open, onClose }) => {
     const { user, hasMenuAccess, changeActiveEvento } = useAuth();
+    const { system_name: systemName, logo_url: customLogoUrl } = useSystemBranding();
     const navigate = useNavigate();
     const location = useLocation();
     const { t, i18n } = useTranslation();
@@ -349,6 +352,7 @@ const Sidebar = ({ open, onClose }) => {
                 { text: t('sidebar.regras_acesso', { defaultValue: 'Regras de acesso' }), path: '/config/checkin', icon: <CheckConfigIcon sx={{ fontSize: 16 }} /> },
                 { text: t('sidebar.credenciamento', { defaultValue: 'Credenciamento' }), path: '/config/credenciamento', icon: <CredIcon sx={{ fontSize: 16 }} /> },
                 { text: t('sidebar.documentos', { defaultValue: 'Documentos' }), path: '/config/documentos', icon: <DocsIcon sx={{ fontSize: 16 }} /> },
+                { text: t('sidebar.planilha', { defaultValue: 'Planilha de participantes' }), path: '/config/planilha', icon: <PlanilhaIcon sx={{ fontSize: 16 }} /> },
                 { grupo: t('sidebar.grupo_credenciais', { defaultValue: 'Credenciais físicas' }) },
                 { text: t('sidebar.pulseiras', { defaultValue: 'Pulseiras' }), path: '/config/pulseiras', icon: <PulseiraIcon sx={{ fontSize: 16 }} /> },
                 { text: t('sidebar.etiquetas', { defaultValue: 'Etiquetas e crachás' }), path: '/config/etiquetas', icon: <LabelIcon sx={{ fontSize: 16 }} /> },
@@ -510,12 +514,12 @@ const Sidebar = ({ open, onClose }) => {
                     const eid = localStorage.getItem('active_evento_id');
                     navigate(eid ? `/?evento_id=${eid}` : '/');
                 }} 
-                title="NZT Intelligent Control Systems - Início"
+                title={`${systemName || 'NZT Intelligent Control Systems'} - Início`}
             >
                 <Box
                     component="img"
-                    src={nztLogoClean}
-                    alt="NZT Intelligent Control Systems"
+                    src={customLogoUrl || nztLogoClean}
+                    alt={systemName || 'NZT Intelligent Control Systems'}
                     sx={{
                         width: '100%',
                         maxWidth: 145,

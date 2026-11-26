@@ -109,7 +109,7 @@ const PessoasTable = ({
       id: 'status_acesso',
       label: 'Estado',
       minWidth: 150,
-      format: (val) => {
+      format: (val, row) => {
         const STATUS_LABELS = {
           checkin_feito:   'Check-in Realizado',
           checkout_feito:  'Check-out Realizado',
@@ -121,7 +121,11 @@ const PessoasTable = ({
           ausente:         'Ausente'
         };
         const statusVal = val || 'autorizado';
-        const labelText = STATUS_LABELS[statusVal.toLowerCase()] || statusVal;
+        // Pendente com liberação do operador no turno: mostra que está liberado, sem parecer autorizado
+        const liberadoNoTurno = statusVal === 'pendente' && row?.liberacao_manual_ate && new Date(row.liberacao_manual_ate) > new Date();
+        const labelText = liberadoNoTurno
+          ? 'Pendente · liberado no turno'
+          : (STATUS_LABELS[statusVal.toLowerCase()] || statusVal);
         return <StatusChip status={statusVal} label={labelText} />;
       }
     },

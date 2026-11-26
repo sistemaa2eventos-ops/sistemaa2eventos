@@ -16,7 +16,18 @@ const moduloEmpresas = bloquearSeModuloDesligado('empresas');
 // Leitura sem o bloqueio de módulo: a lista de empresas alimenta o cadastro de pessoas e outras telas.
 router.get('/', empresaController.list);
 router.get('/search', empresaController.search);
+// Portal da empresa: solicitações do responsável (antes de /:id) e chave de acesso
+const portalAdmin = require('../portalEmpresa/portalEmpresaAdmin.controller');
+const decideSolicitacao = authorize('master', 'admin', 'supervisor');
+router.get('/solicitacoes', decideSolicitacao, portalAdmin.listarSolicitacoes);
+router.get('/solicitacoes/contagem', decideSolicitacao, portalAdmin.contarSolicitacoes);
+router.post('/solicitacoes/:solicitacaoId/aprovar', decideSolicitacao, moduloEmpresas, portalAdmin.aprovar);
+router.post('/solicitacoes/:solicitacaoId/recusar', decideSolicitacao, moduloEmpresas, portalAdmin.recusar);
+router.get('/:id/portal-acesso', authorize('master', 'admin', 'supervisor'), moduloEmpresas, portalAdmin.obterAcesso);
+router.post('/:id/portal-acesso/chave', authorize('master', 'admin', 'supervisor'), moduloEmpresas, portalAdmin.gerarChave);
+
 router.get('/:id', empresaController.getById);
+router.get('/:id/participantes-resumo', empresaController.participantesResumo);
 router.post('/', authorize('master', 'admin', 'supervisor', 'operador'), moduloEmpresas, empresaController.create);
 router.put('/:id', authorize('master', 'admin', 'supervisor', 'operador'), moduloEmpresas, empresaController.update);
 router.delete('/:id', authorize('master', 'admin'), empresaController.delete);

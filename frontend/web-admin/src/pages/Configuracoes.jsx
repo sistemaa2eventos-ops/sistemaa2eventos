@@ -5,7 +5,7 @@ import {
     Watch as PulseiraIcon, Label as EtiquetaIcon, Face as LeitorIcon, Videocam as CameraIcon, DirectionsCar as CarIcon,
     Extension as ComunicacaoIcon, Webhook as WebhookIcon, Tune as GeralIcon, VerifiedUser as PerfisIcon,
     Security as SegurancaIcon, Schedule as CronIcon, Translate as IdiomaIcon, Storage as BancoIcon,
-    Description as LogsIcon
+    Description as LogsIcon, TableChart as PlanilhaIcon
 } from '@mui/icons-material';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/common/PageHeader';
@@ -20,7 +20,8 @@ const GRUPOS = [
             { nome: 'Áreas', texto: 'Áreas de acesso e capacidade', rota: '/config/areas', icone: AreaIcon },
             { nome: 'Regras de acesso', texto: 'Anti-passback, saída automática e lotação', rota: '/config/checkin', icone: RegrasIcon },
             { nome: 'Credenciamento', texto: 'Campos do formulário de pré-cadastro', rota: '/config/credenciamento', icone: CredIcon },
-            { nome: 'Documentos', texto: 'Documentos obrigatórios por função', rota: '/config/documentos', icone: DocsIcon }
+            { nome: 'Documentos', texto: 'Documentos obrigatórios por função', rota: '/config/documentos', icone: DocsIcon },
+            { nome: 'Planilha de participantes', texto: 'Modelo de importação e exportação das empresas', rota: '/config/planilha', icone: PlanilhaIcon }
         ]
     },
     {
@@ -34,6 +35,7 @@ const GRUPOS = [
             { nome: 'Leitores e dispositivos', texto: 'Leitores faciais, agente local e confiança do rosto', rota: '/config/dispositivos', icone: LeitorIcon },
             { nome: 'Câmeras e IA facial', texto: 'Câmeras IP e motor de reconhecimento', rota: '/config/cameras', icone: CameraIcon },
             { nome: 'Modelos de câmera', texto: 'Endereço RTSP de cada fabricante (câmera nova sem código)', rota: '/config/modelos-camera', icone: CameraIcon },
+            { nome: 'Manual de equipamentos', texto: 'Guia de bancada, montagem e correção de rede e CFTV', rota: '/manual-equipamentos', icone: DocsIcon },
             { nome: 'Veículos', texto: 'Leitura de placas', rota: '/config/veiculos', icone: CarIcon }
         ]
     },
@@ -45,9 +47,9 @@ const GRUPOS = [
     },
     {
         titulo: 'Sistema', itens: [
-            { nome: 'Geral', texto: 'Nome, logo e alerta de lotação', rota: '/config/geral', icone: GeralIcon },
-            { nome: 'Perfis de acesso', texto: 'Módulos padrão dos operadores', rota: '/config/permissoes', icone: PerfisIcon },
-            { nome: 'Segurança', texto: 'Duração do login e proteções', rota: '/config/seguranca', icone: SegurancaIcon },
+            { nome: 'Geral', texto: 'Identidade institucional e limiar de alerta de lotação', rota: '/config/geral', icone: GeralIcon },
+            { nome: 'Perfis de acesso', texto: 'Módulos e tela inicial padrão dos operadores', rota: '/config/permissoes', icone: PerfisIcon },
+            { nome: 'Segurança', texto: 'Duração do login, proteções e revogação de sessões', rota: '/config/seguranca', icone: SegurancaIcon },
             { nome: 'Rotinas automáticas', texto: 'Fechamento do dia e relatório diário', rota: '/config/cron', icone: CronIcon },
             { nome: 'Idiomas', texto: 'Idioma padrão', rota: '/config/idiomas', icone: IdiomaIcon },
             { nome: 'Banco de dados', texto: 'Conexão e sincronização', rota: '/config/banco-dados', icone: BancoIcon },
@@ -74,7 +76,7 @@ const Configuracoes = () => {
     }, [params, navigate]);
 
     return (
-        <Box sx={{ p: { xs: 2, md: 4 } }}>
+        <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, maxWidth: 1600, mx: 'auto', width: '100%' }}>
             <PageHeader title="Configurações" subtitle="Tudo o que se configura no sistema, nos mesmos grupos do menu lateral." />
             {GRUPOS.map(g => (
                 <Box key={g.titulo} component="section" aria-labelledby={`grupo-${g.titulo}`} sx={{ mt: 3 }}>

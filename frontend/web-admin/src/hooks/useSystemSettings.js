@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSnackbar } from 'notistack';
 import api from '../services/api';
 import i18n from '../config/i18n';
+import { notificarBrandingAtualizado } from './useSystemBranding';
 
 const CONFIG_INICIAL = {
         system_name: 'NZT Eventos',
@@ -71,6 +72,8 @@ export const useSystemSettings = () => {
     const ultimoSalvo = useRef(CONFIG_INICIAL);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [uploadingLogo, setUploadingLogo] = useState(false);
+    const [versaoSalva, setVersaoSalva] = useState(0);
 
     const fetchSettings = useCallback(async () => {
         try {
@@ -78,11 +81,14 @@ export const useSystemSettings = () => {
             const response = await api.get('/settings');
             if (response.data.success) {
                 const data = response.data.data || {};
-                ultimoSalvo.current = { ...CONFIG_INICIAL, ...data };
-                setSettings(prev => ({
-                    ...prev,
-                    ...data
-                }));
+                const mesclado = { ...CONFIG_INICIAL, ...data };
+                ultimoSalvo.current = mesclado;
+                setSettings(mesclado);
+                setVersaoSalva(v => v + 1);
+                notificarBrandingAtualizado({
+                    system_name: mesclado.system_name,
+                    logo_url: mesclado.logo_url
+                });
 
                 // Se o navegador ainda não tem preferência local salva, adota o idioma do servidor
                 const serverLang = data.language;
@@ -104,6 +110,20 @@ export const useSystemSettings = () => {
         fetchSettings();
     }, [fetchSettings]);
 
+    const hasChanges = useMemo(() => {
+        void versaoSalva;
+        for (const chave of Object.keys(settings)) {
+            if (JSON.stringify(settings[chave]) !== JSON.stringify(ultimoSalvo.current[chave])) {
+                return true;
+            }
+        }
+        return false;
+    }, [settings, versaoSalva]);
+
+    const discardChanges = useCallback(() => {
+        setSettings({ ...ultimoSalvo.current });
+    }, []);
+
     const handleSave = async (newSettings = null) => {
         try {
             setSaving(true);
@@ -117,24 +137,85 @@ export const useSystemSettings = () => {
                     }
                 }
                 if (Object.keys(payload).length === 0) {
-                    enqueueSnackbar('Nada foi alterado.', { variant: 'info' });
+                    enqueueSnackbar('Nenhuma alteração pendente para salvar.', { variant: 'info' });
                     return true;
                 }
             }
             const response = await api.put('/settings', payload);
             if (response.data.success) {
                 enqueueSnackbar('Configurações atualizadas com sucesso!', { variant: 'success' });
-                ultimoSalvo.current = { ...CONFIG_INICIAL, ...response.data.data };
-                setSettings(prev => ({ ...prev, ...response.data.data }));
+                const atualizado = { ...CONFIG_INICIAL, ...ultimoSalvo.current, ...(response.data.data || {}) };
+                ultimoSalvo.current = atualizado;
+                setSettings(atualizado);
+                setVersaoSalva(v => v + 1);
+                notificarBrandingAtualizado({
+                    system_name: atualizado.system_name,
+                    logo_url: atualizado.logo_url,
+                    emblem_url: atualizado.emblem_url,
+                    pwa_icon_general_url: atualizado.pwa_icon_general_url,
+                    pwa_icon_producao_url: atualizado.pwa_icon_producao_url,
+                    pwa_icon_monitoramento_url: atualizado.pwa_icon_monitoramento_url,
+                    audio_feedback_enabled: atualizado.audio_feedback_enabled,
+                    performance_mode_enabled: atualizado.performance_mode_enabled,
+                    offline_cache_enabled: atualizado.offline_cache_enabled
+                });
                 return true;
             }
         } catch (error) {
-            enqueueSnackbar('Erro ao salvar configurações.', { variant: 'error' });
+            enqueueSnackbar(error.response?.data?.error || 'Erro ao salvar configurações.', { variant: 'error' });
             return false;
         } finally {
             setSaving(false);
         }
     };
+
+    const uploadSystemAsset = async (imagemBase64, tipo = 'logo') => {
+        try {
+            setUploadingLogo(true);
+            const { data } = await api.post('/settings/logo', { imagem_base64: imagemBase64, tipo });
+            if (data?.success) {
+                const campo = data.campo || (tipo === 'logo' ? 'logo_url' : `${tipo}_url`);
+                const novaUrl = data.url || data.logo_url || '';
+                ultimoSalvo.current = { ...ultimoSalvo.current, [campo]: novaUrl };
+                setSettings(prev => ({ ...prev, [campo]: novaUrl }));
+                setVersaoSalva(v => v + 1);
+                notificarBrandingAtualizado({ [campo]: novaUrl });
+                enqueueSnackbar(data.message || 'Ativo visual atualizado com sucesso!', { variant: 'success' });
+                return true;
+            }
+            return false;
+        } catch (error) {
+            enqueueSnackbar(error.response?.data?.error || 'Erro ao enviar imagem.', { variant: 'error' });
+            return false;
+        } finally {
+            setUploadingLogo(false);
+        }
+    };
+
+    const removeSystemAsset = async (tipo = 'logo') => {
+        try {
+            setUploadingLogo(true);
+            const { data } = await api.post('/settings/logo', { remover: true, tipo });
+            if (data?.success) {
+                const campo = data.campo || (tipo === 'logo' ? 'logo_url' : `${tipo}_url`);
+                ultimoSalvo.current = { ...ultimoSalvo.current, [campo]: '' };
+                setSettings(prev => ({ ...prev, [campo]: '' }));
+                setVersaoSalva(v => v + 1);
+                notificarBrandingAtualizado({ [campo]: '' });
+                enqueueSnackbar(data.message || 'Padrão restaurado com sucesso.', { variant: 'info' });
+                return true;
+            }
+            return false;
+        } catch (error) {
+            enqueueSnackbar(error.response?.data?.error || 'Erro ao restaurar padrão.', { variant: 'error' });
+            return false;
+        } finally {
+            setUploadingLogo(false);
+        }
+    };
+
+    const uploadSystemLogo = (imagemBase64) => uploadSystemAsset(imagemBase64, 'logo');
+    const removeSystemLogo = () => removeSystemAsset('logo');
 
     const generateApiKey = async () => {
         try {
@@ -213,7 +294,14 @@ export const useSystemSettings = () => {
         setSettings,
         loading,
         saving,
+        uploadingLogo,
+        hasChanges,
+        discardChanges,
         handleSave,
+        uploadSystemLogo,
+        removeSystemLogo,
+        uploadSystemAsset,
+        removeSystemAsset,
         generateApiKey,
         testEmail,
         testTelegram,

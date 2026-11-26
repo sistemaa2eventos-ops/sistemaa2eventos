@@ -56,7 +56,8 @@ const Usuarios = () => {
         inviteLinkInfo, setInviteLinkInfo,
         handleResetPassword, handleResendInvite,
         updateEventPermission, copyPermissionsToAllEvents,
-        handleOpenDialog, handleSave, handleApprove, handleToggleStatus, handleDeleteUser
+        handleOpenDialog, handleSave, handleApprove, handleToggleStatus, handleDeleteUser,
+        modelosPerfis, aplicarModeloAoFormulario
     } = useUsuarios();
     const { user: currentUser } = useAuth();
     const { enqueueSnackbar } = useSnackbar();
@@ -275,7 +276,7 @@ const Usuarios = () => {
     ];
 
     return (
-        <Box sx={{ p: { xs: 2, md: 3 } }}>
+        <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, maxWidth: 1600, mx: 'auto', width: '100%' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, mb: 3, flexWrap: 'wrap', gap: 2 }}>
                 <PageHeader 
                     title="Operadores" 
@@ -509,6 +510,35 @@ const Usuarios = () => {
                                 />
                             </RadioGroup>
                         </Box>
+
+                        {/* MODELO DE PERFIL PREDEFINIDO: Preenchimento rápido */}
+                        {modelosPerfis && modelosPerfis.length > 0 && (
+                            <FormControl fullWidth size="small">
+                                <InputLabel id="modelo-perfil-label">Modelo de Perfil (Preenchimento Rápido)</InputLabel>
+                                <Select
+                                    labelId="modelo-perfil-label"
+                                    label="Modelo de Perfil (Preenchimento Rápido)"
+                                    value={formData.permissions?.modelo_perfil_id || ''}
+                                    onChange={(e) => {
+                                        if (e.target.value) {
+                                            aplicarModeloAoFormulario(e.target.value);
+                                        } else {
+                                            setFormData({
+                                                ...formData,
+                                                permissions: { ...formData.permissions, modelo_perfil_id: null, modelo_perfil_nome: null }
+                                            });
+                                        }
+                                    }}
+                                >
+                                    <MenuItem value=""><em>Personalizado (ajuste manual dos módulos)</em></MenuItem>
+                                    {modelosPerfis.map(m => (
+                                        <MenuItem key={m.id} value={m.id}>
+                                            {m.nome} {m.padrao ? '★ (Padrão do Sistema)' : ''}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        )}
 
                         {/* PÁGINA INICIAL: escolhida por quem administra. Vazio = a primeira página permitida. */}
                         <FormControl fullWidth size="small">

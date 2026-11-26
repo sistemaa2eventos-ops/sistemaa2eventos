@@ -161,7 +161,7 @@ build_docker() {
     log_info "Building Docker images (sem cache)..."
     log_warn "Isso pode levar 10-15 minutos..."
 
-    docker-compose build frontend cadastro produtor api gateway api_intelbras
+    docker-compose build frontend cadastro produtor empresa api gateway api_intelbras
 
     log_success "Build concluído"
 }
@@ -173,7 +173,7 @@ start_services() {
     log_info "Iniciando containers..."
 
     log_info "Limpando containers antigos conflitantes..."
-    docker rm -f a2_eventos_pg_edge a2_eventos_redis a2_eventos_api a2_eventos_api_intelbras a2_eventos_gateway a2_eventos_admin_web a2_eventos_portal a2_eventos_portal_produtor a2_eventos_ai_worker 2>/dev/null || true
+    docker rm -f a2_eventos_pg_edge a2_eventos_redis a2_eventos_api a2_eventos_api_intelbras a2_eventos_gateway a2_eventos_admin_web a2_eventos_portal a2_eventos_portal_produtor a2_eventos_portal_empresa a2_eventos_ai_worker 2>/dev/null || true
 
     docker-compose up -d
 
@@ -187,8 +187,8 @@ start_services() {
 # DEPLOY SEM DERRUBAR TUDO + VOLTA AUTOMÁTICA
 # ============================================================================
 # Serviços do sistema (o Redis fica de fora: guarda a fila de acessos e as conexões)
-SERVICOS_APP="api api_intelbras frontend cadastro produtor gateway"
-CONTAINERS_SAUDE="a2_eventos_api a2_eventos_api_intelbras a2_eventos_admin_web a2_eventos_portal a2_eventos_portal_produtor"
+SERVICOS_APP="api api_intelbras frontend cadastro produtor empresa gateway"
+CONTAINERS_SAUDE="a2_eventos_api a2_eventos_api_intelbras a2_eventos_admin_web a2_eventos_portal a2_eventos_portal_produtor a2_eventos_portal_empresa"
 # Nome das imagens = nome do projeto do compose (pasta em minúsculas, como o compose gera)
 PROJETO_IMG="${COMPOSE_PROJECT_NAME:-$(basename "$PWD" | tr '[:upper:]' '[:lower:]')}"
 PRAZO_SAUDE=180

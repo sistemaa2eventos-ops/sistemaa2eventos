@@ -10,28 +10,58 @@ const AuthContext = createContext({});
 
 export const useAuth = () => useContext(AuthContext);
 
-export const getDefaultRoute = (nivel_acesso) => {
-  const routes = {
-    admin_master: '/',
-    operador: '/checkin',
-    op_atendimento: '/checkin',
-    op_monitoramento: '/monitor',
-    op_analista: '/'
+export const getDefaultRoute = (userOrRole) => {
+  const user = typeof userOrRole === 'object' && userOrRole ? userOrRole : null;
+  const role = user ? user.nivel_acesso : userOrRole;
+
+  if (role === 'admin_master' || role === 'master' || role === 'admin') {
+    return '/';
+  }
+
+  const perms = user?.permissions || {};
+  const paginaInicial = perms.pagina_inicial;
+
+  const MAPA_ROTAS = {
+    dashboard: '/',
+    checkin: '/checkin',
+    checkout: '/checkout',
+    fiscalizacao: '/fiscalizacao',
+    monitoramento: '/monitor',
+    pessoas: '/pessoas',
+    empresas: '/empresas',
+    relatorios: '/reports',
+    veiculos: '/veiculos',
+    auditoria_documentos: '/auditoria',
+    producao: '/producao'
   };
-  return routes[nivel_acesso] || '/login';
+
+  // 1. Se tem página inicial explicitamente definida e o módulo está permitido, vai direto nela
+  if (paginaInicial && MAPA_ROTAS[paginaInicial] && perms[paginaInicial] !== false) {
+    return MAPA_ROTAS[paginaInicial];
+  }
+
+  // 2. Se a página inicial é automática ou nula, vai para o primeiro módulo que estiver liberado
+  for (const [mod, rota] of Object.entries(MAPA_ROTAS)) {
+    if (perms[mod] === true) {
+      return rota;
+    }
+  }
+
+  return '/checkin';
 };
 
-// Módulos disponíveis
+// Módulos disponíveis (mantido sincronizado com useUsuarios.js)
 export const MODULOS = [
   { key: 'dashboard', label: 'Dashboard', icon: 'Home' },
   { key: 'empresas', label: 'Empresas', icon: 'Building' },
-  { key: 'pessoas', label: 'Pessoas', icon: 'Users' },
-  { key: 'auditoria_documentos', label: 'Auditoria', icon: 'FileText' },
-  { key: 'monitoramento', label: 'Monitoramento', icon: 'Monitor' },
+  { key: 'pessoas', label: 'Participantes', icon: 'Users' },
+  { key: 'auditoria_documentos', label: 'Auditoria documental', icon: 'FileText' },
+  { key: 'monitoramento', label: 'Monitor em tempo real', icon: 'Monitor' },
   { key: 'relatorios', label: 'Relatórios', icon: 'BarChart' },
   { key: 'veiculos', label: 'Veículos', icon: 'Truck' },
   { key: 'checkin', label: 'Check-in', icon: 'LogIn' },
   { key: 'checkout', label: 'Check-out', icon: 'LogOut' },
+  { key: 'fiscalizacao', label: 'Fiscalização de áreas', icon: 'Shield' },
   { key: 'producao', label: 'Produção', icon: 'Engineering' }
 ];
 
@@ -370,7 +400,7 @@ export const AuthProvider = ({ children }) => {
         checkin: true,
         checkout: true,
         fiscalizacao: true,
-        dispositivos: true,
+        producao: true,
         usuarios: true,
         configuracoes: true
       };

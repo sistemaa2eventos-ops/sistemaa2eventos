@@ -15,7 +15,10 @@ const SETTINGS_ALLOWED_FIELDS = [
     'anti_passback_enabled', 'checkin_cooldown_min',
     'biometric_confidence', 'biometric_confianca_baixa',
     'jwt_expiry', 'cron_reset_hora', 'cron_relatorio_hora',
-    'log_retention_days', 'logo_url', 'config',
+    'log_retention_days', 'logo_url', 'emblem_url',
+    'pwa_icon_general_url', 'pwa_icon_producao_url', 'pwa_icon_monitoramento_url',
+    'audio_feedback_enabled', 'performance_mode_enabled', 'offline_cache_enabled',
+    'config',
     // SMTP
     'smtp_enabled', 'smtp_host', 'smtp_port', 'smtp_email', 'smtp_user', 'smtp_pass',
     // WhatsApp
@@ -55,12 +58,62 @@ const SETTINGS_ALLOWED_FIELDS = [
 // Campos enviados pelo frontend que ainda não possuem coluna própria em system_settings.
 // São persistidos em system_settings.config (JSONB) para o upsert não falhar com 42703.
 const SETTINGS_LEGACY_CONFIG_FIELDS = [
-    'biometric_login_enabled', 'alert_operator_login', 'alert_event_peak',
+    'biometric_login_enabled', 'alert_operator_login', 'alert_event_peak', 'alert_peak_threshold',
+    'emblem_url', 'pwa_icon_general_url', 'pwa_icon_producao_url', 'pwa_icon_monitoramento_url',
+    'audio_feedback_enabled', 'performance_mode_enabled', 'offline_cache_enabled',
     'anpr_enabled', 'anpr_endpoint', 'anpr_confidence_min', 'anpr_log_retention_days',
     'telegram_chat_id', 'telegram_alerts_enabled', 'email_relatorio_ativo', 'relatorio_telegram_ativo',
     'telegram_chat_id_sistema', 'telegram_alertas_sistema',
     'email_from', 'email_from_name', 'whatsapp_api_url', 'whatsapp_api_key'
 ];
+
+/**
+ * Promove chaves salvas em config (JSONB) para o primeiro nível da resposta sem cobrir colunas preenchidas.
+ * Usado tanto na leitura (GET) quanto no retorno do salvamento (PUT) para a tela não perder valores legados.
+ */
+function mesclarConfigLegado(registro) {
+    if (!registro || typeof registro !== 'object') return registro;
+    const config = registro.config && typeof registro.config === 'object' ? registro.config : {};
+    const saida = { ...registro };
+    for (const [campo, valor] of Object.entries(config)) {
+        if (saida[campo] === null || saida[campo] === undefined || saida[campo] === '') {
+            saida[campo] = valor;
+        }
+    }
+    if (saida.alert_peak_threshold === null || saida.alert_peak_threshold === undefined || saida.alert_peak_threshold === '') {
+        saida.alert_peak_threshold = 90;
+    }
+    if (!saida.system_name) {
+        saida.system_name = 'NZT Eventos';
+    }
+    if (saida.logo_url === null || saida.logo_url === undefined) {
+        saida.logo_url = '';
+    }
+    if (saida.emblem_url === null || saida.emblem_url === undefined) {
+        saida.emblem_url = '';
+    }
+    if (saida.pwa_icon_general_url === null || saida.pwa_icon_general_url === undefined) {
+        saida.pwa_icon_general_url = '';
+    }
+    if (saida.pwa_icon_producao_url === null || saida.pwa_icon_producao_url === undefined) {
+        saida.pwa_icon_producao_url = '';
+    }
+    if (saida.pwa_icon_monitoramento_url === null || saida.pwa_icon_monitoramento_url === undefined) {
+        saida.pwa_icon_monitoramento_url = '';
+    }
+    saida.audio_feedback_enabled = saida.audio_feedback_enabled !== false;
+    saida.performance_mode_enabled = Boolean(saida.performance_mode_enabled);
+    saida.offline_cache_enabled = saida.offline_cache_enabled !== false;
+    return saida;
+}
+
+function invalidarCachesSistema() {
+    try { require('../../services/cacheService').del('system_branding_public'); } catch (_) { /* opcional */ }
+    try {
+        const op = require('./operacao.service');
+        if (typeof op.limparCacheConfig === 'function') op.limparCacheConfig();
+    } catch (_) { /* opcional */ }
+}
 
 // Segredos: só o admin_master recebe os valores. Os demais recebem só se estão configurados.
 // Campo vazio no PUT significa "manter o que já está gravado".
@@ -113,6 +166,7 @@ class SettingsController {
                 settings = {
                     id: 1,
                     system_name: 'NZT Eventos',
+                    logo_url: '',
                     theme_neon_enabled: true,
                     language: 'pt-BR',
                     biometric_login_enabled: true,
@@ -120,6 +174,7 @@ class SettingsController {
                     api_url: process.env.API_URL ? `${process.env.API_URL}/api` : 'https://api.nzt.app.br/api',
                     alert_operator_login: false,
                     alert_event_peak: true,
+                    alert_peak_threshold: 90,
                     biometric_sensitivity: 85,
                     liveness_check_enabled: true,
                     anti_passback_enabled: true,
@@ -136,15 +191,7 @@ class SettingsController {
                     config: {}
                 };
             } else {
-                // Campos legados persistidos em config (JSONB) voltam no mesmo nível da resposta.
-                // Alguns (telegram_chat_id, email_from, whatsapp_*) também têm coluna, sempre vazia:
-                // a coluna nula cobria o valor salvo, a tela mostrava em branco e o próximo
-                // "Salvar" apagava o Chat ID. Coluna só prevalece quando tem valor.
-                const config = settings.config || {};
-                settings = { ...settings };
-                for (const [campo, valor] of Object.entries(config)) {
-                    if (settings[campo] === null || settings[campo] === undefined || settings[campo] === '') settings[campo] = valor;
-                }
+                settings = mesclarConfigLegado(settings);
             }
 
             res.json({ success: true, data: ocultarSegredos(settings, souAdminMaster(req)) });
@@ -168,6 +215,18 @@ class SettingsController {
                 for (const campo of CAMPOS_SECRETOS) {
                     if (!podeGravarSegredos || payload.config[campo] === '' || payload.config[campo] === null) delete payload.config[campo];
                 }
+            }
+
+            if (payload.system_name !== undefined) {
+                const nomeLimpo = String(payload.system_name || '').trim().slice(0, 80);
+                if (!nomeLimpo) {
+                    return res.status(400).json({ error: 'Informe um nome válido para o sistema.' });
+                }
+                payload.system_name = nomeLimpo;
+            }
+            if (payload.alert_peak_threshold !== undefined) {
+                const lim = parseInt(payload.alert_peak_threshold, 10);
+                payload.alert_peak_threshold = Number.isFinite(lim) ? Math.max(50, Math.min(100, lim)) : 90;
             }
 
             // Sincronizar email_from e smtp_email para manter consistência
@@ -202,14 +261,34 @@ class SettingsController {
                 else delete payload.config.perfis_acesso;
             }
 
-            const { data, error } = await supabase
+            let { data, error } = await supabase
                 .from('system_settings')
                 .upsert({ id: 1, ...payload, updated_at: new Date() })
                 .select()
                 .single();
 
+            // Ambiente sem alguma coluna opcional (ex.: system_name / logo_url): migra para config JSONB automaticamente
+            if (error && (error.code === '42703' || error.code === 'PGRST204')) {
+                const matchCol = String(error.message || '').match(/['"]([a-z0-9_]+)['"]/i);
+                const colAusente = matchCol?.[1];
+                if (colAusente && payload[colAusente] !== undefined && colAusente !== 'id' && colAusente !== 'config') {
+                    const { data: rowCfg } = await supabase.from('system_settings').select('config').eq('id', 1).maybeSingle();
+                    const baseCfg = (payload.config && typeof payload.config === 'object') ? payload.config : (rowCfg?.config || {});
+                    payload.config = { ...baseCfg, [colAusente]: payload[colAusente] };
+                    delete payload[colAusente];
+                    const retry = await supabase
+                        .from('system_settings')
+                        .upsert({ id: 1, ...payload, updated_at: new Date() })
+                        .select()
+                        .single();
+                    data = retry.data;
+                    error = retry.error;
+                }
+            }
+
             if (error) throw error;
             require('../../services/telegramSistema').limparCache(); // Chat ID/token novos valem na hora
+            invalidarCachesSistema();
 
             // Reagendar cron jobs configuráveis se os horários mudaram (sem precisar reiniciar o servidor)
             if (payload.cron_reset_hora || payload.cron_relatorio_hora) {
@@ -226,10 +305,87 @@ class SettingsController {
                 }
             }
 
-            res.json({ success: true, message: 'Configurações atualizadas com sucesso', data: ocultarSegredos(data, souAdminMaster(req)) });
+            res.json({ success: true, message: 'Configurações atualizadas com sucesso', data: ocultarSegredos(mesclarConfigLegado(data), souAdminMaster(req)) });
         } catch (error) {
             logger.error('Erro ao atualizar system_settings no Supabase:', error);
             res.status(500).json({ error: 'Erro ao atualizar configurações' });
+        }
+    }
+
+    // Upload ou remoção de ativos visuais (logo, favicon e ícones de PWA específicos) via backend
+    async uploadLogo(req, res) {
+        try {
+            const { tipo = 'logo', imagem_base64, remover } = req.body || {};
+
+            const MAPA_TIPOS = {
+                logo: { campo: 'logo_url', nome: 'Logo do painel', prefixo: 'system-logo' },
+                emblem: { campo: 'emblem_url', nome: 'Emblema / Favicon', prefixo: 'system-emblem' },
+                pwa_general: { campo: 'pwa_icon_general_url', nome: 'Ícone PWA Geral', prefixo: 'pwa-general' },
+                pwa_producao: { campo: 'pwa_icon_producao_url', nome: 'Ícone PWA Produção', prefixo: 'pwa-producao' },
+                pwa_monitoramento: { campo: 'pwa_icon_monitoramento_url', nome: 'Ícone PWA Monitoramento', prefixo: 'pwa-monitoramento' }
+            };
+
+            const configTipo = MAPA_TIPOS[tipo] || MAPA_TIPOS.logo;
+            const campoAlvo = configTipo.campo;
+
+            if (remover) {
+                const { data: rowCfg } = await supabase.from('system_settings').select('config').eq('id', 1).maybeSingle();
+                const cfgAtual = { ...(rowCfg?.config || {}) };
+                delete cfgAtual[campoAlvo];
+
+                const payloadUpsert = { id: 1, [campoAlvo]: '', config: cfgAtual, updated_at: new Date() };
+                let { error } = await supabase.from('system_settings').upsert(payloadUpsert);
+                if (error && (error.code === '42703' || error.code === 'PGRST204')) {
+                    const fallbackPayload = { id: 1, config: { ...cfgAtual, [campoAlvo]: '' }, updated_at: new Date() };
+                    ({ error } = await supabase.from('system_settings').upsert(fallbackPayload));
+                }
+                if (error) throw error;
+                invalidarCachesSistema();
+                return res.json({ success: true, tipo, campo: campoAlvo, url: '', message: `${configTipo.nome} padrão restaurado com sucesso.` });
+            }
+
+            const str = String(imagem_base64 || '').trim();
+            const m = str.match(/^data:(image\/(?:png|jpeg|jpg|webp));base64,([A-Za-z0-9+/=\s]+)$/i);
+            if (!m) {
+                return res.status(400).json({ error: 'Formato inválido. Envie uma imagem PNG, JPG ou WEBP.' });
+            }
+
+            const mime = m[1].toLowerCase() === 'image/jpg' ? 'image/jpeg' : m[1].toLowerCase();
+            const ext = mime === 'image/png' ? 'png' : (mime === 'image/webp' ? 'webp' : 'jpg');
+            const buffer = Buffer.from(m[2].replace(/\s+/g, ''), 'base64');
+
+            if (!buffer.length || buffer.length > 2 * 1024 * 1024) {
+                return res.status(400).json({ error: 'A imagem deve ter no máximo 2 MB.' });
+            }
+
+            const filePath = `branding/${configTipo.prefixo}-${Date.now()}.${ext}`;
+            const { error: uploadError } = await supabase.storage
+                .from('avatars')
+                .upload(filePath, buffer, { contentType: mime, upsert: true });
+
+            if (uploadError) {
+                logger.error(`Erro ao enviar ${configTipo.nome} para o bucket avatars:`, uploadError);
+                return res.status(500).json({ error: 'Não foi possível salvar o arquivo no armazenamento.' });
+            }
+
+            const { data: pubData } = supabase.storage.from('avatars').getPublicUrl(filePath);
+            const publicUrl = pubData?.publicUrl || '';
+
+            const { data: rowCfg } = await supabase.from('system_settings').select('config').eq('id', 1).maybeSingle();
+            const cfgAtual = { ...(rowCfg?.config || {}), [campoAlvo]: publicUrl };
+
+            const payloadUpsert = { id: 1, [campoAlvo]: publicUrl, config: cfgAtual, updated_at: new Date() };
+            let { error: dbErr } = await supabase.from('system_settings').upsert(payloadUpsert);
+            if (dbErr && (dbErr.code === '42703' || dbErr.code === 'PGRST204')) {
+                ({ error: dbErr } = await supabase.from('system_settings').upsert({ id: 1, config: cfgAtual, updated_at: new Date() }));
+            }
+            if (dbErr) throw dbErr;
+
+            invalidarCachesSistema();
+            return res.json({ success: true, tipo, campo: campoAlvo, url: publicUrl, logo_url: publicUrl, message: `${configTipo.nome} atualizado com sucesso!` });
+        } catch (error) {
+            logger.error('Erro em uploadLogo/uploadAsset:', error);
+            return res.status(500).json({ error: 'Erro ao atualizar o ativo do sistema.' });
         }
     }
 

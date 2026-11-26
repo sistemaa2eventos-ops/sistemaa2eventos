@@ -63,7 +63,7 @@ const ConfigVeiculos = () => {
         );
     }
     return (
-        <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 }, maxWidth: '100%', overflowX: 'hidden' }}>
+        <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, maxWidth: 1600, mx: 'auto', width: '100%' }}>
             <PageHeader
                 title="Veículos e estacionamento"
                 subtitle="Leitura de placas (LPR) e cancelas."
@@ -72,7 +72,7 @@ const ConfigVeiculos = () => {
 
             <Grid container spacing={3} sx={{ mt: 1 }}>
                 <Grid item xs={12} md={6}>
-                    <GlassCard sx={{ p: { xs: 2, sm: 3 }, mb: 4 }}>
+                    <GlassCard sx={{ p: { xs: 2.5, md: 3 }, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                             <CarIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
                             <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
@@ -127,7 +127,7 @@ const ConfigVeiculos = () => {
                 </Grid>
 
                 <Grid item xs={12} md={6}>
-                    <GlassCard sx={{ p: 3, mb: 4, opacity: 0.6 }}>
+                    <GlassCard sx={{ p: { xs: 2.5, md: 3 }, height: '100%', opacity: 0.8 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                             <ParkingIcon sx={{ color: 'text.secondary', fontSize: 28 }} />
                             <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.secondary' }}>

@@ -172,7 +172,7 @@ const ConfigAreas = () => {
     if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>;
 
     return (
-        <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 4 } }}>
+        <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, maxWidth: 1600, mx: 'auto', width: '100%' }}>
             <PageHeader
                 title="Áreas"
                 subtitle="Crie e gerencie as áreas de acesso do evento. Cada área pode ser associada a um ou mais leitores."

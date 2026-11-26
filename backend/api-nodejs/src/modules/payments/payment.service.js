@@ -1,6 +1,7 @@
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const crypto = require('crypto');
+const documentoService = require('../entities/documento.service');
 
 class PaymentService {
     /**
@@ -174,11 +175,13 @@ class PaymentService {
 
         // 3. Validar Pagamento na Pessoa (se ainda não estava validado)
         if (!pessoa.pagamento_validado) {
+            // Pagamento não dispensa documentação: sem documentos validados a pessoa fica pendente
+            const motivo = await documentoService.motivoSemAutorizacao(pessoa.id);
             const { error: updateError } = await supabase
                 .from('pessoas')
-                .update({ 
+                .update({
                     pagamento_validado: true,
-                    status_acesso: 'autorizado',
+                    status_acesso: motivo ? 'pendente' : 'autorizado',
                     updated_at: new Date()
                 })
                 .eq('id', pessoa.id);

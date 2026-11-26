@@ -2,24 +2,25 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSnackbar } from 'notistack';
 import api from '../services/api';
 
-// Módulos disponíveis no sistema
+// Módulos operacionais disponíveis para operadores (espelha Sidebar, ProtectedRoute e perfilAcesso.service.js)
 export const MODULOS = [
-  { key: 'dashboard', label: 'Dashboard' },
-  { key: 'checkin', label: 'Check-in' },
-  { key: 'checkout', label: 'Check-out' },
-  { key: 'fiscalizacao', label: 'Fiscalização de Áreas' },
-  { key: 'monitoramento', label: 'Monitoramento' },
-  { key: 'pessoas', label: 'Participantes / Pessoas' },
-  { key: 'empresas', label: 'Empresas' },
-  { key: 'relatorios', label: 'Relatórios' },
-  { key: 'veiculos', label: 'Veículos LPR' },
-  { key: 'auditoria_documentos', label: 'Auditoria Documental' },
-  { key: 'dispositivos', label: 'Terminais / Dispositivos' },
-  { key: 'producao', label: 'Produção' }
+  // Operação de campo
+  { key: 'checkin', label: 'Check-in', grupo: 'operacao', descricao: 'Credenciamento, pulseiras e entrada por leitor ou busca' },
+  { key: 'checkout', label: 'Check-out', grupo: 'operacao', descricao: 'Registro de saída por pulseira ou leitor facial' },
+  { key: 'fiscalizacao', label: 'Fiscalização de áreas', grupo: 'operacao', descricao: 'Conferência de acesso nos postos internos sem registrar passagem' },
+  { key: 'monitoramento', label: 'Monitor em tempo real', grupo: 'operacao', descricao: 'Passagens ao vivo, status dos leitores e mural CFTV' },
+  { key: 'producao', label: 'Produção', grupo: 'operacao', descricao: 'Cronograma, checklists, plantas e controle operacional de montagem' },
+  // Gestão e consulta
+  { key: 'dashboard', label: 'Dashboard', grupo: 'gestao', descricao: 'Visão executiva de ocupação, alertas e fluxo por hora do evento' },
+  { key: 'pessoas', label: 'Participantes', grupo: 'gestao', descricao: 'Cadastro, consulta, QR Code, bloqueio e planilha de participantes' },
+  { key: 'empresas', label: 'Empresas', grupo: 'gestao', descricao: 'Empresas contratadas, cotas diárias e links de pré-cadastro' },
+  { key: 'auditoria_documentos', label: 'Auditoria documental', grupo: 'gestao', descricao: 'Análise, aprovação e controle de validade de documentos' },
+  { key: 'relatorios', label: 'Relatórios', grupo: 'gestao', descricao: 'Presença, ponto, diárias, pulseiras e exportação em Excel/PDF' },
+  { key: 'veiculos', label: 'Veículos', grupo: 'gestao', descricao: 'Cadastro de veículos autorizados e passagens de portaria' }
 ];
 
 export const DEFAULT_PERMISSIONS = {
-  dashboard: false, // opcional para todos (padrão desligado)
+  dashboard: false,
   checkin: false,
   checkout: false,
   fiscalizacao: false,
@@ -29,9 +30,10 @@ export const DEFAULT_PERMISSIONS = {
   relatorios: false,
   veiculos: false,
   auditoria_documentos: false,
-  dispositivos: false,
   producao: false,
-  usuarios: false
+  usuarios: false,
+  pagina_inicial: null,
+  modo_tela: 'normal'
 };
 
 /**
@@ -55,6 +57,16 @@ export const useUsuarios = () => {
     const [inviteLinkInfo, setInviteLinkInfo] = useState(null); // { email, nome, link, emailEnviado }
     const [selectedUser, setSelectedUser] = useState(null);
     const [_userToDelete, setUserToDelete] = useState(null);
+    const [modelosPerfis, setModelosPerfis] = useState([]);
+
+    const loadModelos = useCallback(async () => {
+        try {
+            const { data } = await api.get('/auth/permissions/modelos', { hideDefaultError: true });
+            setModelosPerfis(data?.data || []);
+        } catch {
+            // Silencioso se der erro
+        }
+    }, []);
     
     // Formulário do Operador
     const [formData, setFormData] = useState({
@@ -112,7 +124,34 @@ export const useUsuarios = () => {
     useEffect(() => {
         loadUsuarios();
         loadEventos();
-    }, [loadUsuarios, loadEventos]);
+        loadModelos();
+    }, [loadUsuarios, loadEventos, loadModelos]);
+
+    const aplicarModeloAoFormulario = (modeloId) => {
+        const modelo = modelosPerfis.find(m => m.id === modeloId);
+        if (!modelo) return;
+        setFormData(prev => {
+            const novasPerms = {
+                ...DEFAULT_PERMISSIONS,
+                ...(modelo.modulos || {}),
+                pagina_inicial: modelo.pagina_inicial || null,
+                modo_tela: modelo.modo_tela || 'normal',
+                modelo_perfil_id: modelo.id,
+                modelo_perfil_nome: modelo.nome,
+                regras: { ...(modelo.regras || {}) },
+                restricoes_horario: { ...(modelo.restricoes_horario || {}) }
+            };
+            const novasPorEvento = {};
+            (prev.eventos_permitidos || []).forEach(eid => {
+                novasPorEvento[eid] = { ...novasPerms };
+            });
+            return {
+                ...prev,
+                permissions: novasPerms,
+                eventos_permissoes: novasPorEvento
+            };
+        });
+    };
 
     const handleOpenDialog = (user = null, prefillOrfao = null) => {
         if (user) {
@@ -144,6 +183,10 @@ export const useUsuarios = () => {
             });
         } else {
             setSelectedUser(null);
+            const activeEventoId = localStorage.getItem('active_evento_id') || '';
+            const eventosIniciais = activeEventoId && eventos.some(e => e.id === activeEventoId) ? [activeEventoId] : [];
+            const permsIniciais = { ...DEFAULT_PERMISSIONS };
+
             setFormData({
                 email: prefillOrfao?.email || '',
                 nome_completo: prefillOrfao?.nome_completo || '',
@@ -151,21 +194,36 @@ export const useUsuarios = () => {
                 modo_ativacao: 'convite',
                 senha_inicial: '',
                 nivel_acesso: 'operador',
-                vinculo_tipo: 'global',
-                eventos_permitidos: [],
-                eventos_permissoes: {},
-                evento_id: '',
-                permissions: { ...DEFAULT_PERMISSIONS }
+                vinculo_tipo: eventosIniciais.length > 0 ? 'especifico' : 'global',
+                eventos_permitidos: eventosIniciais,
+                eventos_permissoes: eventosIniciais.length > 0 ? { [eventosIniciais[0]]: { ...permsIniciais } } : {},
+                evento_id: eventosIniciais[0] || '',
+                permissions: permsIniciais
             });
-            // Operador novo parte do modelo do perfil (Configurações → Perfis de Acesso)
+            // Operador novo parte do modelo do perfil (Configurações → Perfis de acesso)
             api.get('/auth/permissions/operador', { hideDefaultError: true })
                 .then(({ data }) => {
-                    const modelo = data?.data?.modulos;
+                    const perfilDados = data?.data;
+                    const modelo = perfilDados?.modulos;
                     if (!modelo) return;
-                    // Só se as permissões ainda forem as padrão (o admin não começou a ajustar)
-                    setFormData(prev => JSON.stringify(prev.permissions) === JSON.stringify(DEFAULT_PERMISSIONS)
-                        ? { ...prev, permissions: { ...DEFAULT_PERMISSIONS, ...modelo } }
-                        : prev);
+                    setFormData(prev => {
+                        if (JSON.stringify(prev.permissions) !== JSON.stringify(DEFAULT_PERMISSIONS)) return prev;
+                        const novasPerms = {
+                            ...DEFAULT_PERMISSIONS,
+                            ...modelo,
+                            pagina_inicial: perfilDados.pagina_inicial || null,
+                            modo_tela: perfilDados.modo_tela || 'normal'
+                        };
+                        const novasPorEvento = {};
+                        (prev.eventos_permitidos || []).forEach(eid => {
+                            novasPorEvento[eid] = { ...novasPerms };
+                        });
+                        return {
+                            ...prev,
+                            permissions: novasPerms,
+                            eventos_permissoes: novasPorEvento
+                        };
+                    });
                 })
                 .catch(() => { /* sem modelo: fica o padrão */ });
         }
@@ -386,6 +444,7 @@ export const useUsuarios = () => {
         updateEventPermission,
         copyPermissionsToAllEvents,
         handleOpenDialog, handleSave, handleResendInvite, handleApprove, handleToggleStatus, handleResetPassword, handleDeleteUser,
+        modelosPerfis, loadModelos, aplicarModeloAoFormulario,
         MODULOS, DEFAULT_PERMISSIONS
     };
 };

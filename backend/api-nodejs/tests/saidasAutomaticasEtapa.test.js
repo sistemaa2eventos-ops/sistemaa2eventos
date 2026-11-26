@@ -39,6 +39,7 @@ jest.mock('../src/config/supabase', () => {
         const b = {
             select: (s) => { q.select = s; return b; },
             eq: () => b, gte: () => b, order: () => b, limit: () => b,
+            not: () => b, // liberações expiram no reset: sem liberação no mock
             in: (c, v) => { q.filtro = { c, v }; return b; },
             range: async () => resultado(),
             maybeSingle: async () => ({

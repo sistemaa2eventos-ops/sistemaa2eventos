@@ -47,7 +47,7 @@ const Eventos = ({ isEmbedded = false }) => {
     } = useEventos();
 
     return (
-        <Box sx={{ p: isEmbedded ? 2 : { xs: 2, md: 3 } }}>
+        <Box sx={{ p: isEmbedded ? 2 : { xs: 2, sm: 3, md: 4 }, maxWidth: isEmbedded ? 'none' : 1600, mx: 'auto', width: '100%' }}>
             <Box sx={{ display: 'flex', justifyContent: isEmbedded ? 'flex-end' : 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, mb: 3, flexWrap: 'wrap', gap: 2 }}>
                 {!isEmbedded && (
                     <PageHeader

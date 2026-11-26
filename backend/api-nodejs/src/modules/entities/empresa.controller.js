@@ -1,6 +1,7 @@
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const { normalizarFuncao } = require('./documentoRequisitos.service');
+const empresaResumo = require('./empresaResumo.service');
 
 /**
  * Regra de remuneração padrão e regras por função ({ "FUNÇÃO": regra_id }), normalizadas.
@@ -118,16 +119,23 @@ class EmpresaController {
             if (emailDestino && novaEmpresa?.registration_token) {
                 const portalBase = (process.env.PUBLIC_PORTAL_URL || 'https://cadastro.nzt.app.br').replace(/\/+$/, '');
                 const linkEquipe = `${portalBase}/register/${novaEmpresa.registration_token}`;
-                const linkDocsEmpresa = `${portalBase}/empresa/${novaEmpresa.registration_token}`;
                 const emailService = require('../../services/emailService');
-                emailService.sendCompanyInvite(
-                    emailDestino,
-                    novaEmpresa.nome,
-                    linkEquipe,
-                    linkDocsEmpresa,
-                    novaEmpresa.responsavel,
-                    req.event?.nome || null
-                ).catch(err => logger.warn(`⚠️ [EmpresaCreate] Falha ao enviar e-mail de convite automático: ${err.message}`));
+                // Empresa nova com e-mail do responsável: a chave do portal nasce agora e vai no convite
+                (async () => {
+                    let acesso = null;
+                    if (novaEmpresa.email) {
+                        acesso = await require('../portalEmpresa/portalEmpresaAdmin.service')
+                            .gerarChave(evento_id, novaEmpresa.id).catch(() => null);
+                    }
+                    await emailService.sendCompanyInvite(
+                        emailDestino,
+                        novaEmpresa.nome,
+                        linkEquipe,
+                        acesso,
+                        novaEmpresa.responsavel,
+                        req.event?.nome || null
+                    );
+                })().catch(err => logger.warn(`⚠️ [EmpresaCreate] Falha ao enviar e-mail de convite automático: ${err.message}`));
             }
 
             res.status(201).json({ success: true, data: novaEmpresa });
@@ -155,6 +163,24 @@ class EmpresaController {
         } catch (error) {
             logger.error('Erro ao buscar empresa:', error);
             res.status(500).json({ error: error.message });
+        }
+    }
+
+    // Participantes da empresa no evento, com o movimento de hoje e a situação documental de cada um
+    async participantesResumo(req, res) {
+        try {
+            const { id } = req.params;
+            const eventoId = eventoDaRequisicao(req, res);
+            if (!eventoId) return;
+            const { data: empresa, error } = await supabase
+                .from('empresas').select('id, nome').eq('id', id).eq('evento_id', eventoId).maybeSingle();
+            if (error) throw error;
+            if (!empresa) return res.status(404).json({ error: 'Empresa não encontrada neste evento.' });
+            const resultado = await empresaResumo.resumoParticipantes(eventoId, id);
+            res.json({ success: true, data: { empresa, ...resultado } });
+        } catch (error) {
+            logger.error('Erro ao montar resumo de participantes da empresa:', error);
+            res.status(500).json({ error: 'Erro ao carregar os participantes da empresa.' });
         }
     }
 
@@ -271,14 +297,18 @@ class EmpresaController {
 
             const portalBase = (process.env.PUBLIC_PORTAL_URL || 'https://cadastro.nzt.app.br').replace(/\/+$/, '');
             const linkEquipe = `${portalBase}/register/${token}`;
-            const linkDocsEmpresa = `${portalBase}/empresa/${token}`;
+
+            // Portal da empresa: login (e-mail do responsável) + chave; sem chave ainda, gera agora
+            const portalAdmin = require('../portalEmpresa/portalEmpresaAdmin.service');
+            let acesso = await portalAdmin.obterAcesso(eventoId, id);
+            if (!acesso.chave && acesso.login) acesso = await portalAdmin.gerarChave(eventoId, id);
 
             const emailService = require('../../services/emailService');
             const enviado = await emailService.sendCompanyInvite(
                 emailDestino,
                 empresa.nome,
                 linkEquipe,
-                linkDocsEmpresa,
+                acesso.chave ? acesso : null,
                 empresa.responsavel,
                 empresa.eventos?.nome || req.event?.nome || null
             );
@@ -291,7 +321,7 @@ class EmpresaController {
                 success: true,
                 message: `Convite enviado com sucesso para ${emailDestino}!`,
                 link: linkEquipe,
-                link_documentos: linkDocsEmpresa
+                portal_url: acesso.url
             });
         } catch (error) {
             logger.error('Erro ao enviar convite por e-mail:', error);

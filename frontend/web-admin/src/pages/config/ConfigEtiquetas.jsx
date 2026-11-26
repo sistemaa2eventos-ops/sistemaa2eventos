@@ -1331,7 +1331,7 @@ const ConfigEtiquetas = () => {
     const dadosVisualizacao = useMemo(() => enriquecerDados(DADOS_EXEMPLO), []);
 
     return (
-        <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 4 } }}>
+        <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, maxWidth: 1600, mx: 'auto', width: '100%' }}>
             <PageHeader
                 title="Etiquetas e crachás"
                 subtitle="Editor profissional estilo gráfica: movimentação suave e imediata, réguas, guias e biblioteca de modelos."

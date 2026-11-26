@@ -215,6 +215,28 @@ services:
         reservations:
           memory: 64M
 
+  # Portal da empresa (empresa.nzt.app.br): o responsável acompanha a equipe, envia documentos e faz pedidos.
+  # Fora do depends_on do gateway de propósito: falha no portal não impede o painel de subir.
+  empresa:
+    logging: *logging
+    build:
+      context: ./frontend/portal-empresa
+    container_name: a2_eventos_portal_empresa
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      - TZ=America/Sao_Paulo
+    networks:
+      - a2_net
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 32M
+
 # Câmeras com IA rodam no PC local do evento, não na VPS (as câmeras ficam na rede local do evento):
 # motor backend/microservice-face-python + agente backend/agent-local, ligados por scripts/ligar-ia-facial.bat.
 

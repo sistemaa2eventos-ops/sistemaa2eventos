@@ -122,16 +122,16 @@ const ConfigWebhooks = () => {
     }
 
     return (
-        <Box sx={{ p: { xs: 2, md: 4 } }}>
+        <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, maxWidth: 1600, mx: 'auto', width: '100%' }}>
             <PageHeader
                 title="Webhooks e chaves de API"
                 subtitle="Conecte o NZT a outros sistemas, como ERP, PowerBI ou Zapier."
                 breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Integrações externas' }]}
             />
 
-            <Grid container spacing={4} sx={{ mt: 1 }}>
+            <Grid container spacing={3} sx={{ mt: 1 }}>
                 <Grid item xs={12} lg={6}>
-                    <GlassCard sx={{ p: 3, mb: 4, height: '100%' }}>
+                    <GlassCard sx={{ p: { xs: 2.5, md: 3 }, height: '100%' }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                 <CodeIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
@@ -172,7 +172,7 @@ const ConfigWebhooks = () => {
                 </Grid>
 
                 <Grid item xs={12} lg={6}>
-                    <GlassCard sx={{ p: 3, mb: 4, height: '100%' }}>
+                    <GlassCard sx={{ p: { xs: 2.5, md: 3 }, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                             <WebhookIcon sx={{ color: '#7B2FBE', fontSize: 28 }} />
                             <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>

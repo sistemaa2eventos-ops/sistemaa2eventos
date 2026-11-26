@@ -177,10 +177,14 @@ class EmailService {
      * Envia convite corporativo unificado para Empresa (B2B)
      * Inclui o link de cadastro de colaboradores e o link para envio da documentação da empresa.
      */
-    async sendCompanyInvite(email, nomeEmpresa, link, linkDocumentos = null, responsavel = null, eventoNome = null) {
+    /**
+     * Convite da empresa: acesso ao portal da empresa (login + chave) e link de cadastro da equipe.
+     * @param {{ url: string, login: string, chave: string }|null} acessoPortal
+     */
+    async sendCompanyInvite(email, nomeEmpresa, link, acessoPortal = null, responsavel = null, eventoNome = null) {
         if (!email) return false;
         try {
-            const docLink = linkDocumentos || String(link || '').replace('/register/', '/empresa/');
+            const portalUrl = acessoPortal?.url || process.env.PORTAL_EMPRESA_URL || 'https://empresa.nzt.app.br';
             const saudacao = responsavel ? `Olá, ${responsavel} (${nomeEmpresa})!` : `Olá, ${nomeEmpresa}!`;
             const textoEvento = eventoNome ? ` para atuar no evento <strong>${eventoNome}</strong>` : ' para atuar no evento';
             const mailOptions = {
@@ -197,14 +201,20 @@ class EmailService {
                             <p>Sua empresa foi cadastrada com sucesso${textoEvento}.</p>
 
                             <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; margin: 25px 0;">
-                                <h3 style="margin: 0 0 10px 0; color: #050B18; font-size: 16px;">1. Documentação da Empresa (Responsável)</h3>
+                                <h3 style="margin: 0 0 10px 0; color: #050B18; font-size: 16px;">1. Portal da empresa (responsável)</h3>
                                 <p style="margin: 0 0 18px 0; font-size: 14px; color: #475569;">
-                                    Utilize o link abaixo para anexar os documentos da empresa (Cartão CNPJ, Contrato Social, PGR, PCMSO, Alvará ou outros exigidos pela organização) para análise da auditoria documental:
+                                    No portal você envia os documentos da empresa e da equipe, acompanha quem já fez o cadastro, check-in e check-out, e pede alterações ou exclusões à organização.
                                 </p>
                                 <div style="text-align: center;">
-                                    <a href="${docLink}" style="background: linear-gradient(135deg, #7B2FBE 0%, #4C1D95 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 15px; display: inline-block;">ANEXAR DOCUMENTOS DA EMPRESA</a>
+                                    <a href="${portalUrl}" style="background: linear-gradient(135deg, #7B2FBE 0%, #4C1D95 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 15px; display: inline-block;">ACESSAR O PORTAL DA EMPRESA</a>
                                 </div>
-                                <p style="margin: 12px 0 0 0; font-size: 12px; color: #64748b; word-break: break-all; text-align: center;">${docLink}</p>
+                                <p style="margin: 12px 0 0 0; font-size: 12px; color: #64748b; word-break: break-all; text-align: center;">${portalUrl}</p>
+                                ${acessoPortal?.chave ? `
+                                <table style="margin: 16px auto 0; font-size: 14px; color: #050B18;">
+                                    <tr><td style="padding: 4px 10px; color: #64748b;">Login</td><td style="padding: 4px 10px;"><strong>${acessoPortal.login}</strong></td></tr>
+                                    <tr><td style="padding: 4px 10px; color: #64748b;">Chave de acesso</td><td style="padding: 4px 10px; font-family: monospace; font-size: 16px; letter-spacing: 1px;"><strong>${acessoPortal.chave}</strong></td></tr>
+                                </table>
+                                <p style="margin: 10px 0 0 0; font-size: 12px; color: #b45309; text-align: center;">Não compartilhe a chave: ela dá acesso aos dados da sua empresa e da sua equipe.</p>` : ''}
                             </div>
 
                             <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 10px; padding: 20px; margin: 25px 0;">
@@ -218,7 +228,7 @@ class EmailService {
                                 <p style="margin: 12px 0 0 0; font-size: 12px; color: #64748b; word-break: break-all; text-align: center;">${link}</p>
                             </div>
 
-                            <p style="font-size: 14px; color: #666;"><strong>Dica:</strong> Através dos links acima, você poderá acompanhar em tempo real o status de aprovação dos documentos da empresa e dos colaboradores cadastrados.</p>
+                            <p style="font-size: 14px; color: #666;"><strong>Dica:</strong> o link de cadastro da equipe é para os colaboradores. O acompanhamento da equipe e dos documentos fica no portal da empresa, com o seu login.</p>
                             <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;" />
                             <p style="font-size: 12px; color: #999; text-align: center;">Suporte Técnico: suporte@nzt.app.br<br>© 2026 A2 Eventos - Sistema Soberano de Acesso</p>
                         </div>

@@ -67,16 +67,16 @@ const ConfigCheckin = () => {
         );
     }
     return (
-        <Box sx={{ p: { xs: 2, md: 4 } }}>
+        <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, maxWidth: 1600, mx: 'auto', width: '100%' }}>
             <PageHeader
                 title="Regras de acesso"
                 subtitle="Tempo mínimo entre passagens e limites de lotação."
                 breadcrumbs={[{ text: 'Sistema' }, { text: 'Configurações' }, { text: 'Check-in / check-out' }]}
             />
 
-            <Grid container spacing={4} sx={{ mt: 1 }}>
+            <Grid container spacing={3} sx={{ mt: 1 }}>
                 <Grid item xs={12} md={6}>
-                    <GlassCard sx={{ p: 3, mb: 4, height: '100%' }}>
+                    <GlassCard sx={{ p: { xs: 2.5, md: 3 }, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                             <TimerIcon sx={{ color: funcao.acao, fontSize: 28 }} />
                             <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
@@ -137,7 +137,7 @@ const ConfigCheckin = () => {
                 </Grid>
 
                 <Grid item xs={12} md={6}>
-                    <GlassCard sx={{ p: 3, mb: 4, height: '100%' }}>
+                    <GlassCard sx={{ p: { xs: 2.5, md: 3 }, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                             <GroupIcon sx={{ color: funcao.acao, fontSize: 28 }} />
                             <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>

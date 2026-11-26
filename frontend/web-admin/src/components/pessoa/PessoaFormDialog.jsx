@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Dialog, DialogContent, DialogActions, Grid, Box, Typography, Step,
   Button, TextField, FormControl, InputLabel, Select, MenuItem, Stepper, StepLabel,
-  Divider, Stack, FormGroup, FormControlLabel, Checkbox, CircularProgress
+  Divider, Stack, FormGroup, FormControlLabel, Checkbox, CircularProgress, Autocomplete
 } from '@mui/material';
 import {
   InsertDriveFile as FileIcon,
@@ -18,8 +18,12 @@ import NeonButton from '../common/NeonButton';
 import TituloModal from '../common/TituloModal';
 import useFecharComVoltar from '../../hooks/useFecharComVoltar';
 import useFotoPessoa from '../../hooks/useFotoPessoa';
+import api from '../../services/api';
+import ChecklistObrigatorios from '../documentos/ChecklistObrigatorios';
 
 import { botaoSecundario } from '../../styles/tokens';
+
+const normalizarFuncao = (f) => String(f || '').trim().replace(/\s+/g, ' ').toUpperCase();
 const PessoaFormDialog = ({
   open,
   onClose,
@@ -47,7 +51,42 @@ const PessoaFormDialog = ({
   isEmpresa = false
 }) => {
   const [activePhaseTab, setActivePhaseTab] = React.useState('todas');
+  // Configuração documental do evento: funções cadastradas e obrigatórios por função
+  const [configDocs, setConfigDocs] = React.useState(null);
   useFecharComVoltar(open, onClose);
+
+  React.useEffect(() => {
+    if (!open) return;
+    // Sem permissão de documentos a lista some e a função continua livre (digitada)
+    api.get('/documentos/config')
+      .then(resp => setConfigDocs(resp.data?.data || null))
+      .catch(() => setConfigDocs(null));
+  }, [open]);
+
+  const funcoesEvento = React.useMemo(
+    () => (configDocs?.funcoes || []).filter(f => f && f !== '*'),
+    [configDocs]
+  );
+
+  // Mesma regra do backend: obrigatórios de todos + os da função; situação pelo documento enviado
+  const obrigatoriosDaPessoa = React.useMemo(() => {
+    if (!configDocs) return [];
+    const f = normalizarFuncao(formData?.funcao);
+    const ids = new Set([...(configDocs.regras?.['*'] || []), ...(configDocs.regras?.[f] || [])]);
+    const hoje = format(new Date(), 'yyyy-MM-dd');
+    return (configDocs.tipos || [])
+      .filter(t => t.ativo !== false && ids.has(t.id))
+      .map(t => {
+        const doTipo = (documentos || []).filter(d => d.tipo_documento_id === t.id);
+        let situacao = 'falta_anexar';
+        if (doTipo.some(d => d.status === 'aprovado' && (!d.data_validade || d.data_validade >= hoje))) situacao = 'ok';
+        else if (doTipo.some(d => d.status === 'pendente' || d.status === 'em_analise')) situacao = 'em_analise';
+        else if (doTipo.some(d => d.status === 'reenvio_solicitado')) situacao = 'reenvio_solicitado';
+        else if (doTipo.some(d => d.status === 'reprovado' || d.status === 'rejeitado')) situacao = 'reprovado';
+        else if (doTipo.some(d => d.status === 'aprovado')) situacao = 'vencido';
+        return { id: t.id, nome: t.nome, situacao };
+      });
+  }, [configDocs, formData?.funcao, documentos]);
   // Foto guardada da pessoa vem por URL assinada; captura ainda não salva (data:) segue direto
   const { url: fotoFormUrl } = useFotoPessoa(formData?.id, formData?.foto_url, { preguicoso: false });
   return (
@@ -306,7 +345,16 @@ const PessoaFormDialog = ({
                     <TextField label="E-mail" fullWidth required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
                   </Grid>
                   <Grid item xs={12} sm={6} md={isEmpresa ? 12 : 6}>
-                    <TextField label="Função" fullWidth required value={formData.funcao} onChange={(e) => setFormData({ ...formData, funcao: e.target.value })} />
+                    <Autocomplete
+                      freeSolo
+                      options={funcoesEvento}
+                      value={formData.funcao || ''}
+                      onInputChange={(e, v) => setFormData({ ...formData, funcao: v })}
+                      onChange={(e, v) => setFormData({ ...formData, funcao: v || '' })}
+                      renderInput={(params) => (
+                        <TextField {...params} label="Função" required helperText={funcoesEvento.length ? 'Escolha da lista ou digite uma nova função' : undefined} />
+                      )}
+                    />
                   </Grid>
 
                   {!isEmpresa && (
@@ -536,6 +584,14 @@ const PessoaFormDialog = ({
                   <Box sx={{ mt: 1 }}>
                     <Typography variant="subtitle2" sx={{ color: '#00D4FF', mb: 1, fontWeight: 700 }}>DOCUMENTAÇÃO PESSOAL ECM (NRs, ASO, seguros)</Typography>
                     <Divider sx={{ mb: 1.5, borderColor: 'rgba(0,212,255,0.2)' }} />
+                    {obrigatoriosDaPessoa.length > 0 && (
+                      <Box sx={{ mb: 2, p: 1.5, borderRadius: 1.5, border: '1px solid rgba(0,212,255,0.2)', bgcolor: 'rgba(0,212,255,0.04)' }}>
+                        <ChecklistObrigatorios obrigatorios={obrigatoriosDaPessoa} titulo={`Documentos obrigatórios para ${formData.funcao || 'a função'}`} />
+                        <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.6)', mt: 1 }}>
+                          Anexe todos. Enquanto faltar algum, o participante fica pendente; a auditoria aprova cada documento.
+                        </Typography>
+                      </Box>
+                    )}
                     {!selectedPessoa ? (
                       <Box sx={{ textAlign: 'center', py: 4 }}>
                         <CircularProgress size={24} sx={{ color: '#00D4FF', mb: 2 }} />

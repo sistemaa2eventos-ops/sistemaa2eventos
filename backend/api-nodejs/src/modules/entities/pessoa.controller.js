@@ -5,6 +5,7 @@ const ApiResponse = require('../../utils/apiResponse');
 const emailService = require('../../services/emailService');
 const auditService = require('../../services/audit.service');
 const syncService = require('../devices/sync.service');
+const documentoService = require('./documento.service');
 
 
 class PessoaController {
@@ -273,8 +274,14 @@ class PessoaController {
                 return ApiResponse.error(res, 'Pessoa não encontrada.', 404);
             }
 
+            // 1.1 Autorizado só com documentação validada (pendente não vira autorizado por botão)
+            if (status === 'autorizado') {
+                const motivo = await documentoService.motivoSemAutorizacao(id);
+                if (motivo) return ApiResponse.error(res, motivo, 409);
+            }
+
             // 2. Preparar dados de atualização
-            const updateData = { 
+            const updateData = {
                 status_acesso: status, 
                 updated_at: new Date() 
             };

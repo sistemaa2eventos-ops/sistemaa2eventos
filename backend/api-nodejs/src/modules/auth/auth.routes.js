@@ -78,11 +78,21 @@ router.get('/me', authenticate, authController.getProfile);
 router.post('/profile/change-password', authenticate, authController.changeOwnPassword);
 router.post('/active-event', authenticate, authController.setActiveEvent);
 
-// Permissões de menu granulares
-router.get('/permissions', authenticate, authorize('admin'), authController.listPermissions);
-router.get('/permissions/:role', authenticate, authorize('admin'), authController.getPermissions);
-router.put('/permissions/:role', authenticate, authorize('admin'), authController.savePermissions);
-router.post('/permissions/:role/aplicar', authenticate, authorize('admin'), authController.applyPermissions);
+// Permissões de menu granulares e Modelos Nomeados de Perfis de Acesso
+router.get('/permissions/modelos', authenticate, authorize('admin_master'), authController.listModelos);
+router.post('/permissions/modelos', authenticate, authorize('admin_master'), authController.createModelo);
+router.put('/permissions/modelos/:id', authenticate, authorize('admin_master'), authController.updateModelo);
+router.delete('/permissions/modelos/:id', authenticate, authorize('admin_master'), authController.deleteModelo);
+router.post('/permissions/modelos/:id/aplicar', authenticate, authorize('admin_master'), authController.applyModelo);
+
+// Políticas Especiais (Produção, Central CFTV, Empresas)
+router.get('/permissions/politicas', authenticate, authorize('admin_master'), authController.getPoliticas);
+router.put('/permissions/politicas/:tipo', authenticate, authorize('admin_master'), authController.savePoliticas);
+
+router.get('/permissions', authenticate, authorize('admin_master'), authController.listPermissions);
+router.get('/permissions/:role', authenticate, authorize('admin_master'), authController.getPermissions);
+router.put('/permissions/:role', authenticate, authorize('admin_master'), authController.savePermissions);
+router.post('/permissions/:role/aplicar', authenticate, authorize('admin_master'), authController.applyPermissions);
 
 // ============================================
 // GESTÃO DE USUÁRIOS

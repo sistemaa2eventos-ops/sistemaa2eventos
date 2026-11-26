@@ -144,7 +144,7 @@ const ConfigIdiomas = () => {
     );
 
     return (
-        <Box sx={{ p: { xs: 2, md: 4 } }}>
+        <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, maxWidth: 1600, mx: 'auto', width: '100%' }}>
             <PageHeader
                 title={t('idiomas.title', { defaultValue: 'Idiomas' })}
                 subtitle={t('idiomas.subtitle', { defaultValue: 'Idioma das telas do painel e do portal de cadastro.' })}

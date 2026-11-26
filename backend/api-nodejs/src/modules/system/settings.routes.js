@@ -10,6 +10,7 @@ router.use(authenticate);
 // Rotas exclusivas para admin e master
 router.get('/', authorize(['admin', 'master', 'supervisor']), settingsController.getSettings);
 router.put('/', authorize(['admin', 'master']), settingsController.updateSettings);
+router.post('/logo', authorize(['admin', 'master']), settingsController.uploadLogo);
 
 // Rota publica para admin web
 router.get('/metrics', authorize(['admin', 'master', 'supervisor']), getDbMetrics);

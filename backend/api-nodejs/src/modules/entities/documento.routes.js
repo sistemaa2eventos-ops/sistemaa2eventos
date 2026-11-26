@@ -82,6 +82,27 @@ router.put(
     checkPermission('documentos', 'aprovar'),
     documentoController.salvarConfiguracao
 );
+// Obrigatórios, anexados e situação de um participante/empresa (diálogo de anexar documento)
+router.get(
+    '/:entityType/:entityId/situacao',
+    checkPermission('documentos', 'ler'),
+    documentoController.situacaoEntidade
+);
+router.post(
+    '/config/copiar',
+    checkPermission('documentos', 'aprovar'),
+    documentoController.copiarConfiguracao
+);
+router.delete(
+    '/config/tipos/:tipoId',
+    checkPermission('documentos', 'aprovar'),
+    documentoController.excluirTipoConfiguracao
+);
+router.delete(
+    '/config/funcoes/:funcao',
+    checkPermission('documentos', 'aprovar'),
+    documentoController.excluirFuncaoConfiguracao
+);
 
 // URL assinada temporária para visualizar o arquivo
 router.get(

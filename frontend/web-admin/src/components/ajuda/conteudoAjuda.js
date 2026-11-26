@@ -237,9 +237,18 @@ const AJUDAS = {
     },
     '/config/geral': {
         titulo: 'Configurações gerais',
-        objetivo: 'Nome e logo do sistema, comportamento da interface e alerta de lotação.',
-        passos: ['Ajuste e clique em "Salvar Alterações".'],
-        atencao: ['A logo enviada só fica gravada depois de "Salvar Alterações".']
+        objetivo: 'Gerenciar a identidade visual do painel, ícones de instalação PWA por módulo, parâmetros de operação de campo e alertas informativos de lotação.',
+        passos: [
+            'Em "Identidade Visual do Painel", ajuste o "Nome do sistema", envie a "Logo Principal (Horizontal)" e o "Emblema / Favicon (Quadrado)".',
+            'Em "Aplicativos PWA e Ícones de Instalação Móvel", personalize os ícones da tela inicial de celulares/tablets para a visão Geral, Produção (/producao) e Monitoramento (/monitor).',
+            'Em "Comportamento & Operação de Campo", ative ou desative o feedback sonoro (bip de validação), o modo econômico de alto desempenho e a sincronização prévia offline.',
+            'Em "Alerta Preventivo de Lotação", ajuste o percentual informativo para aviso visual no painel e canais de comunicação.',
+            'Clique em "Salvar alterações" no cabeçalho para aplicar as configurações.'
+        ],
+        atencao: [
+            'O upload ou restauração dos ativos visuais entra em vigor imediatamente nos menus, login e telas iniciais.',
+            'O gatilho de lotação nesta tela é estritamente informativo: as catracas continuam funcionando normalmente. Para regras de bloqueio físico por área, utilize a tela "Regras de acesso".'
+        ]
     },
     '/config/credenciamento': {
         titulo: 'Credenciamento',
@@ -400,14 +409,25 @@ const AJUDAS = {
     },
     '/config/permissoes': {
         titulo: 'Perfis de acesso',
-        objetivo: 'Os módulos que todo operador novo recebe.',
-        passos: ['Marque os módulos e clique "Salvar perfil".', 'Se quiser aplicar aos operadores que já existem, use "Aplicar a todos".'],
-        atencao: ['"Aplicar a todos" substitui os ajustes individuais feitos em Operadores.']
+        objetivo: 'Definir os módulos padrão e o comportamento inicial de tela que todo novo operador recebe ao ser cadastrado.',
+        passos: [
+            'Escolha os módulos de "Operação de campo" e "Gestão, cadastros e consulta" (ou use um modelo rápido).',
+            'Defina a "Página inicial padrão ao entrar" e o "Modo de tela padrão" (Normal, Tela cheia ou Quiosque travado).',
+            'Clique em "Salvar perfil".',
+            'Se quiser atualizar os operadores já cadastrados, clique em "Aplicar aos existentes" e escolha o escopo de atualização.'
+        ],
+        atencao: [
+            'O Dashboard é opcional: para operadores exclusivos de portaria, você pode liberar apenas Check-in / Check-out.',
+            '"Aplicar aos existentes" preserva os eventos vinculados de cada operador, atualizando os módulos conforme marcado na confirmação.'
+        ]
     },
     '/config/seguranca': {
         titulo: 'Segurança',
-        objetivo: 'Duração do login e proteções de acesso.',
-        passos: ['Ajuste e clique "Salvar regras".']
+        objetivo: 'Controlar a duração das sessões de login, proteções de autenticação e desconexão global de emergência.',
+        passos: [
+            'Ajuste a "Duração do login (horas)" e as proteções e clique em "Salvar regras".',
+            'Em caso de emergência, use "Desconectar todos os operadores agora" para invalidar as sessões abertas.'
+        ]
     },
     '/config/webhooks': {
         titulo: 'Webhooks e chaves de API',

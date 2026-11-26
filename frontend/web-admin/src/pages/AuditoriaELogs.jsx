@@ -13,7 +13,7 @@ import ConfigLogs from './config/ConfigLogs';
 const AuditoriaELogs = ({ aba = 'acoes' }) => {
     const navigate = useNavigate();
     return (
-        <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 } }}>
+        <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, maxWidth: 1600, mx: 'auto', width: '100%' }}>
             <PageHeader title="Auditoria e logs" subtitle="Quem fez o quê no painel e os registros técnicos do servidor." />
             <Tabs
                 value={aba}

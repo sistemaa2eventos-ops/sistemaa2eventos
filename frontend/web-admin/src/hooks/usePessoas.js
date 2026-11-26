@@ -578,6 +578,7 @@ export const usePessoas = () => {
         empresas,
         activeEvent,
         documentos,
+        loadDocumentos,
         saving,
         openDocsDialog, setOpenDocsDialog,
         selectedPessoaDocs,

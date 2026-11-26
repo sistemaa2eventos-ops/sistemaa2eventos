@@ -259,6 +259,65 @@ class DocumentoController {
         }
     }
 
+    /** Obrigatórios, documentos anexados e situação de um participante ou empresa (diálogo de anexar). */
+    async situacaoEntidade(req, res) {
+        try {
+            const eventoId = eventoDaRequisicao(req);
+            if (!eventoId) return ApiResponse.error(res, 'Evento não identificado', 400);
+            const { entityType, entityId } = req.params;
+            if (!['pessoa', 'empresa'].includes(entityType)) return ApiResponse.error(res, 'Tipo inválido.', 400);
+            const data = await documentoService.situacaoEntidade(eventoId, entityType, entityId);
+            return ApiResponse.success(res, data);
+        } catch (error) {
+            logger.error('Erro ao obter situação documental:', error.message);
+            return ApiResponse.error(res, error.message, error.status || 500);
+        }
+    }
+
+    /** Copia a configuração de documentos de outro evento para o evento em foco. */
+    async copiarConfiguracao(req, res) {
+        try {
+            const eventoId = eventoDaRequisicao(req);
+            if (!eventoId) return ApiResponse.error(res, 'Evento não identificado', 400);
+            const data = await documentoService.copiarConfiguracao(eventoId, req.body?.origem_evento_id);
+            await auditService.logEntity(req, 'COPY_DOC_REQUIREMENTS', 'EVENTO', eventoId, { origem_evento_id: req.body?.origem_evento_id });
+            return ApiResponse.success(res, data);
+        } catch (error) {
+            logger.error('Erro ao copiar configuração documental:', error.message);
+            return ApiResponse.error(res, error.message, error.status || 500);
+        }
+    }
+
+    /** Exclui um tipo de documento do catálogo (recusa se já houver documento enviado com ele). */
+    async excluirTipoConfiguracao(req, res) {
+        try {
+            const eventoId = eventoDaRequisicao(req);
+            if (!eventoId) return ApiResponse.error(res, 'Evento não identificado', 400);
+            const tipoId = req.params.tipoId;
+            const data = await documentoService.excluirTipo(eventoId, tipoId);
+            await auditService.logEntity(req, 'DELETE_DOC_TYPE', 'EVENTO', eventoId, { tipo_documento_id: tipoId });
+            return ApiResponse.success(res, data);
+        } catch (error) {
+            logger.error('Erro ao excluir tipo de documento:', error.message);
+            return ApiResponse.error(res, error.message, error.status || 500);
+        }
+    }
+
+    /** Exclui uma função da lista do evento (recusa se houver participante com ela). */
+    async excluirFuncaoConfiguracao(req, res) {
+        try {
+            const eventoId = eventoDaRequisicao(req);
+            if (!eventoId) return ApiResponse.error(res, 'Evento não identificado', 400);
+            const funcao = req.params.funcao || ''; // o Express já decodifica o parâmetro
+            const data = await documentoService.excluirFuncao(eventoId, funcao);
+            await auditService.logEntity(req, 'DELETE_DOC_FUNCTION', 'EVENTO', eventoId, { funcao });
+            return ApiResponse.success(res, data);
+        } catch (error) {
+            logger.error('Erro ao excluir função:', error.message);
+            return ApiResponse.error(res, error.message, error.status || 500);
+        }
+    }
+
     async salvarConfiguracao(req, res) {
         try {
             const eventoId = eventoDaRequisicao(req);

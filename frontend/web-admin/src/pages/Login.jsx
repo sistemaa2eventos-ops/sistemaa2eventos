@@ -25,6 +25,7 @@ import { useTranslation } from 'react-i18next';
 import { styled } from '@mui/material/styles';
 import NeonButton from '../components/common/NeonButton';
 import nztEmblem from '../assets/images/nzt-emblem.png';
+import { useSystemBranding } from '../hooks/useSystemBranding';
 
 const LoginContainer = styled(Box)(() => ({
     minHeight: '100dvh',
@@ -123,6 +124,7 @@ const inputSx = {
 
 const Login = () => {
     const { t } = useTranslation();
+    const { system_name: systemName, logo_url: customLogoUrl } = useSystemBranding();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -159,7 +161,7 @@ const Login = () => {
             const result = await login(email, password, rememberMe);
             if (result.success) {
                 const user = result.user;
-                const route = getDefaultRoute(user.nivel_acesso);
+                const route = getDefaultRoute(user);
 
                 if (user.nivel_acesso !== 'master' && user.nivel_acesso !== 'admin' && user.evento_id) {
                     navigate(`${route}?evento_id=${user.evento_id}`);
@@ -206,8 +208,8 @@ const Login = () => {
                     <Box sx={{ mb: 2.5, display: 'flex', justifyContent: 'center' }}>
                         <Box
                             component="img"
-                            src={nztEmblem}
-                            alt="NZT Intelligent Control Systems"
+                            src={customLogoUrl || nztEmblem}
+                            alt={systemName || 'NZT Intelligent Control Systems'}
                             sx={{
                                 width: 110,
                                 height: 110,

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
+  Badge,
   Box,
   Typography,
   Stack,
@@ -32,9 +33,16 @@ import {
   WhatsApp as WhatsAppIcon,
   Email as EmailIcon,
   Check as CheckIcon,
-  Tune as RegrasIcon
+  Tune as RegrasIcon,
+  Group as GroupIcon,
+  FileDownload as DownloadIcon,
+  Inbox as SolicitacoesIcon
 } from '@mui/icons-material';
 import GlassCard from '../components/common/GlassCard';
+import EmpresaParticipantesDialog from '../components/empresas/EmpresaParticipantesDialog';
+import ImportarPlanilhaDialog from '../components/empresas/ImportarPlanilhaDialog';
+import SolicitacoesEmpresasDialog from '../components/empresas/SolicitacoesEmpresasDialog';
+import { baixarModeloPlanilha, exportarPlanilhaEmpresa } from '../components/empresas/planilhaEmpresa';
 import PageHeader from '../components/common/PageHeader';
 import NeonButton from '../components/common/NeonButton';
 import DataTable from '../components/common/DataTable';
@@ -80,6 +88,76 @@ const Empresas = () => {
   const [activePhaseTabEmpresa, setActivePhaseTabEmpresa] = useState('todas');
   const [openRegras, setOpenRegras] = useState(false);
   const [openDocsEmpresaDialog, setOpenDocsEmpresaDialog] = useState(false);
+  const [openParticipantes, setOpenParticipantes] = useState(false);
+  const [openImportarPlanilha, setOpenImportarPlanilha] = useState(false);
+  // Solicitações do portal da empresa: só aparece para quem pode decidir (a API responde 403 aos demais)
+  const [openSolicitacoes, setOpenSolicitacoes] = useState(false);
+  const [solicitacoesPendentes, setSolicitacoesPendentes] = useState(null);
+  const contarSolicitacoes = React.useCallback(async () => {
+    try {
+      const { data } = await api.get('/empresas/solicitacoes/contagem');
+      setSolicitacoesPendentes(data?.data?.pendentes ?? 0);
+    } catch {
+      setSolicitacoesPendentes(null);
+    }
+  }, []);
+  useEffect(() => { contarSolicitacoes(); }, [contarSolicitacoes]);
+  // Portal da empresa (empresa.nzt.app.br): login = e-mail do responsável, senha = chave de acesso
+  const [acessoPortal, setAcessoPortal] = useState(null);
+  const [carregandoAcesso, setCarregandoAcesso] = useState(false);
+  const [mostrarChave, setMostrarChave] = useState(false);
+
+  // Na primeira vez que a janela abre a chave é gerada sozinha (precisa do e-mail do responsável)
+  const carregarAcessoPortal = async (empresa) => {
+    setAcessoPortal(null);
+    setMostrarChave(false);
+    setCarregandoAcesso(true);
+    try {
+      let { data } = await api.get(`/empresas/${empresa.id}/portal-acesso`);
+      let acesso = data?.data;
+      if (acesso && !acesso.chave && acesso.login) {
+        ({ data } = await api.post(`/empresas/${empresa.id}/portal-acesso/chave`));
+        acesso = data?.data;
+      }
+      setAcessoPortal(acesso || null);
+    } catch (err) {
+      setAcessoPortal({ erro: err.response?.data?.error || 'Não foi possível carregar o acesso ao portal.' });
+    } finally {
+      setCarregandoAcesso(false);
+    }
+  };
+
+  const trocarChavePortal = async () => {
+    const empresa = inviteResult.empresa;
+    if (!empresa) return;
+    if (!window.confirm('Gerar uma nova chave? A chave atual deixa de funcionar e quem estiver no portal precisa entrar de novo.')) return;
+    try {
+      const { data } = await api.post(`/empresas/${empresa.id}/portal-acesso/chave`);
+      setAcessoPortal(data?.data || null);
+      setMostrarChave(true);
+      enqueueSnackbar('Nova chave gerada. Envie para o responsável.', { variant: 'success' });
+    } catch (err) {
+      enqueueSnackbar(err.response?.data?.error || 'Erro ao gerar a chave.', { variant: 'error' });
+    }
+  };
+
+  const copiar = async (texto, mensagem) => {
+    try { await navigator.clipboard.writeText(texto); enqueueSnackbar(mensagem, { variant: 'success' }); }
+    catch { enqueueSnackbar('Não foi possível copiar.', { variant: 'error' }); }
+  };
+
+  // Texto do acesso ao portal para WhatsApp e e-mail
+  const textoAcessoPortal = (negrito = '') => (acessoPortal?.chave
+    ? `${acessoPortal.url}\nLogin: ${negrito}${acessoPortal.login}${negrito}\nChave de acesso: ${negrito}${acessoPortal.chave}${negrito}`
+    : `${acessoPortal?.url || 'https://empresa.nzt.app.br'}`);
+
+  // Planilha de participantes (modelo do evento em Configurações › Planilha de participantes)
+  const baixarModeloEvento = async () => {
+    try { await baixarModeloPlanilha(); } catch (err) { enqueueSnackbar(err.message, { variant: 'error' }); }
+  };
+  const exportarEmpresa = async (empresa) => {
+    try { await exportarPlanilhaEmpresa(empresa); } catch (err) { enqueueSnackbar(err.message, { variant: 'error' }); }
+  };
   const [empresaDocsAlvo, setEmpresaDocsAlvo] = useState(null);
   const [openCameraDocEmpresa, setOpenCameraDocEmpresa] = useState(false);
   const [docTipoSelecionado, setDocTipoSelecionado] = useState('Cartão CNPJ');
@@ -294,6 +372,33 @@ const Empresas = () => {
           </IconButton>
           <IconButton
             size="small"
+            onClick={() => { setSelectedEmpresa(row); setOpenParticipantes(true); }}
+            sx={acaoTabela}
+            title="Participantes da empresa (cadastro, pulseira, movimento de hoje e pendências)"
+            aria-label={`Participantes de ${row.nome}`}
+          >
+            <GroupIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            onClick={() => { setSelectedEmpresa(row); setOpenImportarPlanilha(true); }}
+            sx={acaoTabela}
+            title="Importar planilha de participantes desta empresa"
+            aria-label={`Importar planilha de ${row.nome}`}
+          >
+            <UploadIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            onClick={() => exportarEmpresa(row)}
+            sx={acaoTabela}
+            title="Exportar planilha de participantes desta empresa (colunas do modelo)"
+            aria-label={`Exportar planilha de ${row.nome}`}
+          >
+            <DownloadIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
             onClick={() => {
                 setSelectedEmpresa(row);
                 setOpenQuotaDialog(true);
@@ -336,6 +441,7 @@ const Empresas = () => {
         const linkDocumentos = `${publicUrl}/empresa/${row.registration_token}`;
         setInviteResult({ link, linkDocumentos, empresa: row });
         setOpenInviteDialog(true);
+        carregarAcessoPortal(row);
         return;
       }
 
@@ -345,6 +451,7 @@ const Empresas = () => {
       const linkDocumentos = `${publicUrl}/empresa/${data.token}`;
       setInviteResult({ link, linkDocumentos, empresa: { ...row, registration_token: data.token } });
       setOpenInviteDialog(true);
+      carregarAcessoPortal(row);
       loadEmpresas();
 
       try {
@@ -363,15 +470,14 @@ const Empresas = () => {
     const eventoNome = localStorage.getItem('active_evento_nome') || 'Evento';
     const empresaNome = inviteResult.empresa.nome;
     const responsavel = inviteResult.empresa.responsavel || 'Responsável';
-    const linkDocs = inviteResult.linkDocumentos || inviteResult.link.replace('/register/', '/empresa/');
     
     const subject = encodeURIComponent(`Portal de Credenciamento e Documentação - ${empresaNome} (${eventoNome})`);
     const body = encodeURIComponent(
       `Olá, ${responsavel}!\n\n` +
       `Confirmamos que a empresa ${empresaNome} foi cadastrada no evento ${eventoNome}.\n\n` +
-      `1) DOCUMENTAÇÃO DA EMPRESA (Responsável):\n` +
-      `Acesse o link abaixo para anexar os documentos da empresa (Cartão CNPJ, Contrato Social, PGR, PCMSO, Alvará, etc.) para auditoria:\n` +
-      `${linkDocs}\n\n` +
+      `1) PORTAL DA EMPRESA (Responsável):\n` +
+      `Documentos da empresa e da equipe, acompanhamento de check-in e check-out e solicitações à organização:\n` +
+      `${textoAcessoPortal()}\n\n` +
       `2) CADASTRO DA EQUIPE / COLABORADORES:\n` +
       `Utilize ou compartilhe o link abaixo com seus colaboradores para o credenciamento facial da equipe:\n` +
       `${inviteResult.link}\n\n` +
@@ -393,13 +499,12 @@ const Empresas = () => {
     if (waPhone && waPhone.length <= 11 && !waPhone.startsWith('55')) {
       waPhone = `55${waPhone}`;
     }
-    const linkDocs = inviteResult.linkDocumentos || inviteResult.link.replace('/register/', '/empresa/');
     
     const body = encodeURIComponent(
       `Olá, *${responsavel}*!\n\n` +
       `Sua empresa *${empresaNome}* foi cadastrada para o evento *${eventoNome}*.\n\n` +
-      `📄 *1. Enviar documentos da empresa (Responsável):*\n` +
-      `${linkDocs}\n\n` +
+      `🏢 *1. Portal da empresa (responsável):* documentos, equipe, check-in e solicitações\n` +
+      `${textoAcessoPortal('*')}\n\n` +
       `👥 *2. Cadastrar colaboradores da equipe:*\n` +
       `${inviteResult.link}`
     );
@@ -489,6 +594,16 @@ const Empresas = () => {
           breadcrumbs={[{ text: 'Dashboard' }, { text: 'Empresas' }]}
         />
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: { xs: 0, md: 2 }, width: { xs: '100%', md: 'auto' } }}>
+          {solicitacoesPendentes !== null && (
+            <Badge badgeContent={solicitacoesPendentes} color="warning" overlap="rectangular">
+              <Button variant="outlined" startIcon={<SolicitacoesIcon />} onClick={() => setOpenSolicitacoes(true)} sx={botaoSecundario}>
+                Solicitações
+              </Button>
+            </Badge>
+          )}
+          <Button variant="outlined" startIcon={<DownloadIcon />} onClick={baixarModeloEvento} sx={botaoSecundario}>
+            Baixar modelo
+          </Button>
           <Button variant="outlined" startIcon={<RegrasIcon />} onClick={() => setOpenRegras(true)} sx={botaoSecundario}>
             Regras de remuneração
           </Button>
@@ -819,6 +934,25 @@ const Empresas = () => {
         </DialogActions>
       </Dialog>
 
+      <SolicitacoesEmpresasDialog
+        open={openSolicitacoes}
+        onClose={() => { setOpenSolicitacoes(false); contarSolicitacoes(); }}
+        onAlterado={() => { contarSolicitacoes(); loadEmpresas(); }}
+      />
+
+      <ImportarPlanilhaDialog
+        open={openImportarPlanilha}
+        onClose={() => setOpenImportarPlanilha(false)}
+        empresa={selectedEmpresa}
+        onImportado={() => loadEmpresas()}
+      />
+
+      <EmpresaParticipantesDialog
+        open={openParticipantes}
+        onClose={() => setOpenParticipantes(false)}
+        empresa={selectedEmpresa}
+      />
+
       <ConfirmDialog
         open={openDeleteConfirm}
         title="Remover empresa?"
@@ -875,27 +1009,59 @@ const Empresas = () => {
           </Typography>
 
           <Box sx={{ p: 2, bgcolor: 'rgba(123, 47, 190, 0.08)', border: '1px solid rgba(123, 47, 190, 0.3)', borderRadius: 1.5, mb: 2 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5, gap: 1 }}>
-              <Typography variant="caption" sx={{ color: '#C084FC', fontWeight: 700 }}>
-                1. Link para anexar documentos da empresa (Responsável)
-              </Typography>
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<CopyIcon fontSize="small" />}
-                onClick={() => {
-                  const docLink = inviteResult.linkDocumentos || inviteResult.link.replace('/register/', '/empresa/');
-                  navigator.clipboard.writeText(docLink);
-                  enqueueSnackbar('Link de documentos da empresa copiado!', { variant: 'success' });
-                }}
-                sx={{ borderColor: 'rgba(192,132,252,0.4)', color: '#C084FC', fontSize: '0.72rem', py: 0.2 }}
-              >
-                Copiar
-              </Button>
-            </Box>
-            <Typography variant="caption" sx={{ color: '#FFFFFF', wordBreak: 'break-all', display: 'block' }}>
-              {inviteResult.linkDocumentos || inviteResult.link.replace('/register/', '/empresa/')}
+            <Typography variant="caption" sx={{ color: '#C084FC', fontWeight: 700, display: 'block', mb: 1 }}>
+              1. Portal da empresa (responsável): documentos, equipe, check-in e solicitações
             </Typography>
+            {carregandoAcesso && <Typography variant="caption" sx={{ color: 'text.secondary' }}>Carregando o acesso...</Typography>}
+            {!carregandoAcesso && acessoPortal?.erro && (
+              <Typography variant="caption" sx={{ color: '#FFB800' }}>{acessoPortal.erro}</Typography>
+            )}
+            {!carregandoAcesso && acessoPortal && !acessoPortal.erro && (
+              <Stack spacing={1}>
+                {[
+                  { rotulo: 'Endereço', valor: acessoPortal.url, copiar: 'Endereço do portal copiado!' },
+                  { rotulo: 'Login', valor: acessoPortal.login || 'Cadastre o e-mail do responsável na empresa', copiar: acessoPortal.login ? 'Login copiado!' : null },
+                ].map(item => (
+                  <Stack key={item.rotulo} direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>{item.rotulo}</Typography>
+                      <Typography variant="body2" sx={{ color: '#FFFFFF', wordBreak: 'break-all' }}>{item.valor}</Typography>
+                    </Box>
+                    {item.copiar && (
+                      <IconButton size="small" onClick={() => copiar(item.valor, item.copiar)} sx={acaoTabela} title={`Copiar ${item.rotulo.toLowerCase()}`}>
+                        <CopyIcon fontSize="small" />
+                      </IconButton>
+                    )}
+                  </Stack>
+                ))}
+                <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Chave de acesso (senha)</Typography>
+                    <Typography variant="body2" sx={{ color: '#FFFFFF', fontFamily: 'monospace', letterSpacing: 1 }}>
+                      {acessoPortal.chave ? (mostrarChave ? acessoPortal.chave : '••••-••••-••••') : 'Ainda não gerada'}
+                    </Typography>
+                  </Box>
+                  <Stack direction="row" spacing={0.5}>
+                    {acessoPortal.chave && (
+                      <>
+                        <Button size="small" onClick={() => setMostrarChave(v => !v)} sx={{ textTransform: 'none' }}>
+                          {mostrarChave ? 'Ocultar' : 'Mostrar'}
+                        </Button>
+                        <IconButton size="small" onClick={() => copiar(acessoPortal.chave, 'Chave de acesso copiada!')} sx={acaoTabela} title="Copiar chave">
+                          <CopyIcon fontSize="small" />
+                        </IconButton>
+                      </>
+                    )}
+                    <Button size="small" onClick={trocarChavePortal} disabled={!acessoPortal.login} sx={{ textTransform: 'none', color: '#FFB800' }}>
+                      {acessoPortal.chave ? 'Trocar chave' : 'Gerar chave'}
+                    </Button>
+                  </Stack>
+                </Stack>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  A chave vai junto no WhatsApp e no e-mail abaixo. Trocar a chave encerra os acessos abertos.
+                </Typography>
+              </Stack>
+            )}
           </Box>
 
           <Box sx={{ p: 2, bgcolor: 'rgba(0, 212, 255, 0.06)', border: '1px solid rgba(0, 212, 255, 0.25)', borderRadius: 1.5, mb: 3 }}>

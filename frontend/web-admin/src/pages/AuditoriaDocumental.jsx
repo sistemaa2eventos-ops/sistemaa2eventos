@@ -29,6 +29,10 @@ import DataTable from '../components/common/DataTable';
 import api from '../services/api';
 import VisualizadorDocumento from '../components/documentos/VisualizadorDocumento';
 import { obterUrlDocumentoAssinada, origemDocumento } from '../components/documentos/documentosUtils';
+import ChecklistObrigatorios from '../components/documentos/ChecklistObrigatorios';
+import FilaPessoasPendentes from '../components/documentos/FilaPessoasPendentes';
+import FilaEmpresasPendentes from '../components/documentos/FilaEmpresasPendentes';
+import AnexarDocumentoDialog from '../components/documentos/AnexarDocumentoDialog';
 import AbaColaboradores from '../components/documentos/AbaColaboradores';
 import AbaEmpresas from '../components/documentos/AbaEmpresas';
 import AbaVencimentos from '../components/documentos/AbaVencimentos';
@@ -88,7 +92,9 @@ const AuditoriaDocumental = () => {
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalCount, setTotalCount] = useState(0);
-    const [search, setSearch] = useState('');
+    // ?busca=... vem do atalho "ver pendentes" da função na configuração de documentos
+    const [search, setSearch] = useState(() => searchParams.get('busca') || '');
+    const [anexarAlvo, setAnexarAlvo] = useState(null); // { entityType, entityId, nome }
     const [debouncedSearch, setDebouncedSearch] = useState('');
 
     useEffect(() => {
@@ -258,6 +264,18 @@ const AuditoriaDocumental = () => {
                     <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
                         Doc: {String(row.entidade_doc || '—')}
                     </Typography>
+                    {row.tipo_entidade === 'pessoa' && (
+                        <>
+                            <Typography variant="caption" display="block" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                                {row.cadastrado_em
+                                    ? `Cadastro ${new Date(row.cadastrado_em).toLocaleDateString('pt-BR')} · há ${row.dias_pendente} dia(s)`
+                                    : 'Cadastro sem data'}
+                            </Typography>
+                            <Box sx={{ mt: 0.75 }}>
+                                <ChecklistObrigatorios obrigatorios={row.obrigatorios} compacto />
+                            </Box>
+                        </>
+                    )}
                 </Box>
             )
         },
@@ -511,6 +529,33 @@ const AuditoriaDocumental = () => {
                     />
                 )}
             </GlassCard>
+
+            {/* Quem ainda está pendente de documentação (permanece aqui até regularizar) */}
+            <GlassCard sx={{ p: 3, mt: 3 }}>
+                <FilaPessoasPendentes
+                    search={debouncedSearch}
+                    recarregarToken={recarregarToken}
+                    onAnexar={(row) => setAnexarAlvo({ entityType: 'pessoa', entityId: row.id, nome: row.nome_completo })}
+                />
+            </GlassCard>
+
+            <GlassCard sx={{ p: 3, mt: 3 }}>
+                <FilaEmpresasPendentes
+                    search={debouncedSearch}
+                    recarregarToken={recarregarToken}
+                    onAnexar={(row) => setAnexarAlvo({ entityType: 'empresa', entityId: row.id, nome: row.nome })}
+                />
+            </GlassCard>
+
+            <AnexarDocumentoDialog
+                open={!!anexarAlvo}
+                onClose={() => setAnexarAlvo(null)}
+                entityType={anexarAlvo?.entityType}
+                entityId={anexarAlvo?.entityId}
+                nomeEntidade={anexarAlvo?.nome}
+                tipos={tiposDocumento}
+                onEnviado={() => { setRecarregarToken(t => t + 1); loadDocumentos(); loadStats(); }}
+            />
             </>)}
 
             {/* MODAL 1: PREVIEW RÁPIDO COM VISUALIZADOR EMBUTIDO */}

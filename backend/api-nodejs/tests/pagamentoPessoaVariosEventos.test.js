@@ -37,6 +37,11 @@ function mockFrom(tabela) {
 
 jest.mock('../src/services/logger', () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }));
 jest.mock('../src/config/supabase', () => ({ supabase: { from: (t) => mockFrom(t) } }));
+// Este teste cuida de quem paga; a regra de documentação tem teste próprio (autorizacaoExigeDocumentacao)
+jest.mock('../src/modules/entities/documento.service', () => ({
+    motivoSemAutorizacao: jest.fn().mockResolvedValue(null),
+    sincronizarStatusPessoa: jest.fn().mockResolvedValue(null),
+}));
 
 const pagamentos = require('../src/modules/payments/payment.service');
 

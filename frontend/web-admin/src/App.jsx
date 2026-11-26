@@ -3,7 +3,6 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import Box from '@mui/material/Box';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import theme from './styles/theme';
 import GlobalErrorBoundary from './components/common/GlobalErrorBoundary';
@@ -45,6 +44,7 @@ const AuditoriaELogs = lazy(() => import('./pages/AuditoriaELogs'));
 const Configuracoes = lazy(() => import('./pages/Configuracoes'));
 const ConfigEtiquetas = lazy(() => import('./pages/config/ConfigEtiquetas'));
 const ConfigDocumentos = lazy(() => import('./pages/config/ConfigDocumentos'));
+const ConfigPlanilha = lazy(() => import('./pages/config/ConfigPlanilha'));
 
 const ConfigCameras = lazy(() => import('./pages/config/ConfigCameras'));
 const ConfigBancoDados = lazy(() => import('./pages/config/ConfigBancoDados'));
@@ -178,7 +178,8 @@ const AppContent = () => {
           <Route path="/config/geral" element={<ProtectedRoute role="admin_master"><ConfigGeral /></ProtectedRoute>} />
           {/* Tela antiga do leitor facial: os mesmos leitores ficam em Leitores e dispositivos */}
           <Route path="/config/leitor-facial" element={<Navigate to="/config/dispositivos" replace />} />
-          <Route path="/config/documentos" element={<ProtectedRoute role="admin_master"><Box sx={{ p: { xs: 2, md: 4 } }}><ConfigDocumentos /></Box></ProtectedRoute>} />
+          <Route path="/config/documentos" element={<ProtectedRoute role="admin_master"><ConfigDocumentos /></ProtectedRoute>} />
+          <Route path="/config/planilha" element={<ProtectedRoute role="admin_master"><ConfigPlanilha /></ProtectedRoute>} />
           <Route path="/config/idiomas" element={<ProtectedRoute role="admin_master"><ConfigIdiomas /></ProtectedRoute>} />
           <Route path="/config/notificacoes" element={<ProtectedRoute role="admin_master"><ConfigNotificacoes /></ProtectedRoute>} />
           <Route path="/config/integracoes" element={<ProtectedRoute role="admin_master"><ConfigIntegracoes /></ProtectedRoute>} />

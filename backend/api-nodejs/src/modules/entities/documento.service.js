@@ -10,6 +10,15 @@ const { caminhoDeStorage, urlAssinada, assinarLinhas, SEGUNDOS_PADRAO, BUCKETS_D
 const STATUS_AUDITORIA = ['aprovado', 'reprovado', 'reenvio_solicitado'];
 const STATUS_EM_FILA = ['pendente', 'em_analise'];
 
+/** Dias corridos desde uma data ISO (cadastro); null se não houver data. */
+const diasDesde = (iso) => (iso ? Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)) : null);
+
+/** Motivo de cada obrigatório faltante → situação exibida ao auditor. */
+const SITUACAO_OBRIGATORIO = {
+    nao_enviado: 'falta_anexar', em_analise: 'em_analise', reenvio_solicitado: 'reenvio_solicitado',
+    vencido: 'vencido', reprovado: 'reprovado'
+};
+
 class DocumentoService {
     /**
      * Valida assinatura de arquivo (Magic Numbers)
@@ -198,9 +207,10 @@ class DocumentoService {
             let novoStatusAcesso = pessoa.status_acesso || 'pendente';
             const intocavel = ['checkin_feito', 'bloqueado'].includes(pessoa.status_acesso);
             if (!intocavel) {
+                // Autorizado só com documentação aprovada; qualquer outra situação é pendente
                 if (novoStatusDocs === 'aprovado') novoStatusAcesso = 'autorizado';
                 else if (novoStatusDocs === 'reprovado') novoStatusAcesso = 'recusado';
-                else if (avaliacao.regras_ativas || novoStatusDocs !== 'pendente') novoStatusAcesso = 'pendente';
+                else novoStatusAcesso = 'pendente';
             }
 
             const { error: updateErr } = await supabase.from('pessoas')
@@ -219,12 +229,34 @@ class DocumentoService {
     }
 
     /**
+     * Regra: "autorizado" só com documentação validada pela auditoria. Pendente é pendente.
+     * Devolve o motivo que impede autorizar agora, ou null se a pessoa pode ficar autorizada.
+     * Cadastro interno/importado é isento (o operador confere no atendimento): avaliar() já devolve aprovado.
+     */
+    async motivoSemAutorizacao(pessoaId) {
+        if (!pessoaId) return null;
+        const { data: pessoa } = await supabase
+            .from('pessoas')
+            .select('id, evento_id, funcao, origem_cadastro')
+            .eq('id', pessoaId)
+            .single();
+        if (!pessoa) return null;
+
+        const avaliacao = await requisitos.avaliarPessoa(pessoa);
+        if (avaliacao.status_documentos === 'aprovado') return null;
+
+        const nomes = (avaliacao.pendencias || []).map(p => p.nome).join(', ');
+        const detalhe = nomes ? `: ${nomes}` : ` (situação: ${avaliacao.status_documentos})`;
+        return `Documentação não validada${detalhe}. A pessoa fica pendente até a auditoria aprovar, ou use "Liberar no turno".`;
+    }
+
+    /**
      * Pessoas/empresas do evento e seus documentos (sem FK no banco, então sem join embutido).
      * @returns {{ pessoasPorId: Object, empresasPorId: Object, pesDocs: Array, empDocs: Array }}
      */
     async _documentosDoEvento(eventoId, filtrarDocs = (q) => q) {
         const [pesRes, empRes] = await Promise.all([
-            supabase.from('pessoas').select('id, nome_completo, cpf, email, telefone, funcao, empresas(nome, cnpj)').eq('evento_id', eventoId),
+            supabase.from('pessoas').select('id, nome_completo, cpf, email, telefone, funcao, created_at, origem_cadastro, empresas(nome, cnpj)').eq('evento_id', eventoId),
             supabase.from('empresas').select('id, nome, cnpj').eq('evento_id', eventoId)
         ]);
         if (pesRes.error) throw pesRes.error;
@@ -329,6 +361,26 @@ class DocumentoService {
 
         const from = (page - 1) * limit;
         const pagina = filtradas.slice(from, from + limit);
+
+        // Obrigatórios da função de cada pessoa da página, com a situação de cada um (o auditor confere a lista)
+        const pessoasNaPagina = pagina.filter(l => l.tipo_entidade === 'pessoa');
+        if (pessoasNaPagina.length > 0) {
+            const config = await requisitos.getConfig(evento_id);
+            const idsPessoas = [...new Set(pessoasNaPagina.map(l => l.entity_id))];
+            const docsPorPessoa = {};
+            for (let i = 0; i < idsPessoas.length; i += 200) {
+                const { data } = await supabase.from('pessoa_documentos').select('*').in('pessoa_id', idsPessoas.slice(i, i + 200));
+                for (const d of data || []) (docsPorPessoa[d.pessoa_id] = docsPorPessoa[d.pessoa_id] || []).push(d);
+            }
+            for (const l of pessoasNaPagina) {
+                const pessoa = pessoasPorId[l.entity_id];
+                const avaliacao = requisitos.avaliar(config, pessoa || {}, docsPorPessoa[l.entity_id] || []);
+                l.obrigatorios = this._obrigatoriosComSituacao(avaliacao);
+                l.cadastrado_em = pessoa?.created_at || null;
+                l.dias_pendente = diasDesde(pessoa?.created_at);
+            }
+        }
+
         await assinarLinhas(pagina);
         return {
             data: pagina.map(({ _busca, pessoas, empresas, ...resto }) => resto),
@@ -336,6 +388,69 @@ class DocumentoService {
             page: parseInt(page),
             limit: parseInt(limit)
         };
+    }
+
+    /** Obrigatórios de uma empresa (tipos de empresa do evento) com a situação de cada um. */
+    _obrigatoriosEmpresa(tiposEmpresa, tiposPorId, docs, hoje = getHojeLocal()) {
+        return tiposEmpresa.map(id => {
+            const doTipo = docs.filter(d => d.tipo_documento_id === id);
+            let situacao = 'falta_anexar';
+            if (doTipo.some(d => requisitos.documentoValido(d, hoje))) situacao = 'ok';
+            else if (doTipo.some(d => d.status === 'pendente' || d.status === 'em_analise')) situacao = 'em_analise';
+            else if (doTipo.some(d => d.status === 'reenvio_solicitado')) situacao = 'reenvio_solicitado';
+            else if (doTipo.some(d => d.status === 'reprovado' || d.status === 'rejeitado')) situacao = 'reprovado';
+            else if (doTipo.some(d => d.status === 'aprovado')) situacao = 'vencido';
+            return { id, nome: tiposPorId[id]?.nome, situacao };
+        });
+    }
+
+    /**
+     * Situação documental de um participante ou empresa: obrigatórios (com situação), documentos já
+     * anexados e a situação geral. Alimenta o diálogo de anexar documento.
+     */
+    async situacaoEntidade(eventoId, entityType, entityId) {
+        const config = await requisitos.getConfig(eventoId);
+        const tiposPorId = Object.fromEntries(config.tipos.map(t => [t.id, t]));
+        const { data: docs, error: docsErr } = await supabase
+            .from(entityType === 'empresa' ? 'empresa_documentos' : 'pessoa_documentos')
+            .select('*')
+            .eq(entityType === 'empresa' ? 'empresa_id' : 'pessoa_id', entityId)
+            .order('data_inclusao', { ascending: false });
+        if (docsErr) throw docsErr;
+        const documentos = (docs || []).map(d => ({ ...d, tipo_nome: tiposPorId[d.tipo_documento_id]?.nome || d.tipo_doc || null }));
+
+        if (entityType === 'empresa') {
+            const { data: empresa } = await supabase.from('empresas').select('id').eq('id', entityId).eq('evento_id', eventoId).maybeSingle();
+            if (!empresa) { const err = new Error('Empresa não encontrada neste evento.'); err.status = 404; throw err; }
+            const { data: ev } = await supabase.from('eventos').select('config').eq('id', eventoId).maybeSingle();
+            const idsTipos = new Set(config.tipos.map(t => t.id));
+            const tiposEmpresa = (ev?.config?.tipos_empresa || []).filter(id => idsTipos.has(id));
+            const obrigatorios = this._obrigatoriosEmpresa(tiposEmpresa, tiposPorId, documentos);
+            const situacao = obrigatorios.length === 0 ? (documentos.length ? 'aprovado' : 'pendente')
+                : obrigatorios.every(o => o.situacao === 'ok') ? 'aprovado' : 'pendente';
+            return { obrigatorios, documentos, situacao };
+        }
+
+        const { data: pessoa, error: pesErr } = await supabase
+            .from('pessoas').select('id, evento_id, funcao, origem_cadastro').eq('id', entityId).eq('evento_id', eventoId).maybeSingle();
+        if (pesErr) throw pesErr;
+        if (!pessoa) { const err = new Error('Participante não encontrado neste evento.'); err.status = 404; throw err; }
+        const avaliacao = requisitos.avaliar(config, pessoa, documentos);
+        return {
+            obrigatorios: this._obrigatoriosComSituacao(avaliacao),
+            documentos,
+            situacao: avaliacao.status_documentos
+        };
+    }
+
+    /** Lista de obrigatórios da pessoa com a situação de cada um ('ok' quando já validado). */
+    _obrigatoriosComSituacao(avaliacao) {
+        const pendencia = new Map((avaliacao.pendencias || []).map(p => [p.tipo_documento_id, p.motivo]));
+        return (avaliacao.exigidos || []).map(t => ({
+            id: t.id,
+            nome: t.nome,
+            situacao: pendencia.has(t.id) ? (SITUACAO_OBRIGATORIO[pendencia.get(t.id)] || pendencia.get(t.id)) : 'ok'
+        }));
     }
 
     /** Filtro de texto que também compara só os dígitos (CPF/CNPJ/telefone formatados). */
@@ -358,7 +473,7 @@ class DocumentoService {
         const [config, pessoasRes, liberacoesHoje] = await Promise.all([
             requisitos.getConfig(eventoId),
             supabase.from('pessoas')
-                .select('id, nome_completo, cpf, email, telefone, funcao, foto_url, evento_id, empresa_id, origem_cadastro, status_acesso, status_documentos, liberacao_manual_ate, liberacao_manual_por, liberacao_manual_motivo, empresas(nome, cnpj)')
+                .select('id, nome_completo, cpf, email, telefone, funcao, foto_url, evento_id, empresa_id, origem_cadastro, status_acesso, status_documentos, created_at, liberacao_manual_ate, liberacao_manual_por, liberacao_manual_motivo, empresas(nome, cnpj)')
                 .eq('evento_id', eventoId)
                 .order('nome_completo'),
             supabase.from('documento_liberacoes').select('pessoa_id, motivo')
@@ -400,11 +515,18 @@ class DocumentoService {
                 exigidos: avaliacao.exigidos.map(t => ({ id: t.id, nome: t.nome, exige_validade: t.exige_validade })),
                 pendencias: avaliacao.pendencias,
                 vencendo: avaliacao.vencendo.map(d => d.id),
-                situacao_documental: avaliacao.status_documentos
+                situacao_documental: avaliacao.status_documentos,
+                obrigatorios: this._obrigatoriosComSituacao(avaliacao),
+                cadastrado_em: p.created_at || null,
+                dias_pendente: diasDesde(p.created_at)
             };
         });
 
-        if (somentePendentes) resultado = resultado.filter(p => p.situacao_documental !== 'aprovado');
+        if (somentePendentes) {
+            // Fila de análise: quem está pendente, o mais antigo primeiro (quanto tempo sem enviar)
+            resultado = resultado.filter(p => p.situacao_documental !== 'aprovado')
+                .sort((a, b) => new Date(a.cadastrado_em || 0) - new Date(b.cadastrado_em || 0));
+        }
 
         const from = (page - 1) * limit;
         const pagina = resultado.slice(from, from + limit);
@@ -419,7 +541,7 @@ class DocumentoService {
     async listarEmpresas(eventoId, { search = '', page = 1, limit = 30, somentePendentes = false }) {
         const { data: empresas, error } = await supabase
             .from('empresas')
-            .select('id, nome, cnpj, servico, responsavel, email, telefone, evento_id')
+            .select('id, nome, cnpj, servico, responsavel, email, telefone, evento_id, created_at')
             .eq('evento_id', eventoId)
             .order('nome');
         if (error) throw error;
@@ -441,8 +563,29 @@ class DocumentoService {
             for (const d of data || []) (docsPorEmpresa[d.empresa_id] = docsPorEmpresa[d.empresa_id] || []).push(d);
         }
 
+        // Obrigatórios para empresas (eventos.config.tipos_empresa). Sem lista, vale a regra antiga (abaixo).
+        const { data: evRow } = await supabase.from('eventos').select('config').eq('id', eventoId).maybeSingle();
+        const config = await requisitos.getConfig(eventoId);
+        const idsTipos = new Set(config.tipos.map(t => t.id));
+        const tiposEmpresa = (evRow?.config?.tipos_empresa || []).filter(id => idsTipos.has(id));
+        const tiposPorId = Object.fromEntries(config.tipos.map(t => [t.id, t]));
+        const hoje = getHojeLocal();
+
         let resultado = filtradas.map(({ _busca, ...e }) => {
             const docs = docsPorEmpresa[e.id] || [];
+            if (tiposEmpresa.length > 0) {
+                const exigidos = this._obrigatoriosEmpresa(tiposEmpresa, tiposPorId, docs, hoje);
+                const situacao_documental = exigidos.every(x => x.situacao === 'ok') ? 'aprovado'
+                    : exigidos.some(x => x.situacao === 'reprovado') ? 'reprovado'
+                    : exigidos.some(x => x.situacao === 'reenvio_solicitado') ? 'reenvio_solicitado'
+                    : exigidos.some(x => x.situacao === 'em_analise') ? 'em_analise' : 'pendente';
+                return {
+                    ...e,
+                    documentos: docs.map(d => ({ ...d, tipo_entidade: 'empresa', entidade_nome: e.nome, entidade_doc: e.cnpj, tipo_nome: tiposPorId[d.tipo_documento_id]?.nome || null })),
+                    situacao_documental,
+                    obrigatorios: exigidos
+                };
+            }
             let situacao_documental = 'pendente';
             if (docs.length > 0) {
                 if (docs.some(d => d.status === 'reprovado' || d.status === 'rejeitado')) {
@@ -462,7 +605,12 @@ class DocumentoService {
             };
         });
 
-        if (somentePendentes) resultado = resultado.filter(e => e.situacao_documental !== 'aprovado');
+        // Fila: empresas pendentes, a mais antiga primeiro (quanto tempo sem enviar)
+        resultado = resultado.map(e => ({ ...e, cadastrado_em: e.created_at || null, dias_pendente: diasDesde(e.created_at) }));
+        if (somentePendentes) {
+            resultado = resultado.filter(e => e.situacao_documental !== 'aprovado')
+                .sort((a, b) => new Date(a.cadastrado_em || 0) - new Date(b.cadastrado_em || 0));
+        }
 
         const from = (page - 1) * limit;
         const pagina = resultado.slice(from, from + limit);
@@ -538,20 +686,142 @@ class DocumentoService {
 
     /** Configuração documental do evento + funções em uso. */
     async obterConfiguracao(eventoId) {
-        const [config, funcoesRes] = await Promise.all([
+        const [config, pessoas, eventoRes] = await Promise.all([
             requisitos.getConfig(eventoId),
-            supabase.from('pessoas').select('funcao').eq('evento_id', eventoId)
+            buscarTodos(supabase.from('pessoas').select('funcao').eq('evento_id', eventoId)).then(r => r.data || []),
+            supabase.from('eventos').select('config').eq('id', eventoId).maybeSingle()
         ]);
-        const funcoes = [...new Set((funcoesRes.data || []).map(p => normalizarFuncao(p.funcao)).filter(Boolean))].sort();
-        for (const f of Object.keys(config.regras)) if (f !== FUNCAO_PADRAO && !funcoes.includes(f)) funcoes.push(f);
-        return { ...config, funcoes, funcao_padrao: FUNCAO_PADRAO };
+        // Funções cadastradas à mão (sem documento marcado ainda) ficam em eventos.config.funcoes_extra
+        const extras = (eventoRes.data?.config?.funcoes_extra || []).map(normalizarFuncao).filter(f => f && f !== FUNCAO_PADRAO);
+        const emUso = {};
+        for (const p of pessoas) {
+            const f = normalizarFuncao(p.funcao);
+            if (f) emUso[f] = (emUso[f] || 0) + 1;
+        }
+        const funcoes = [...new Set([
+            ...Object.keys(emUso),
+            ...extras,
+            ...Object.keys(config.regras).filter(f => f !== FUNCAO_PADRAO)
+        ])].sort();
+        // Documentos obrigatórios para empresas (ids de tipos do evento)
+        const idsTipos = new Set((config.tipos || []).map(t => t.id));
+        const tiposEmpresa = (eventoRes.data?.config?.tipos_empresa || []).filter(id => idsTipos.has(id));
+
+        return { ...config, funcoes, funcoes_em_uso: emUso, tipos_empresa: tiposEmpresa, funcao_padrao: FUNCAO_PADRAO };
+    }
+
+    /**
+     * Copia a configuração de documentos de outro evento para este: tipos (mesmo nome = mesmo tipo),
+     * obrigatórios por função, obrigatórios para empresas, funções e aviso.
+     * Tipos que só existem neste evento continuam; as marcações deste evento são substituídas pelas da origem.
+     */
+    async copiarConfiguracao(eventoId, origemId) {
+        if (!origemId || origemId === eventoId) {
+            const err = new Error('Escolha outro evento de origem.');
+            err.status = 400;
+            throw err;
+        }
+        const { data: origem, error } = await supabase.from('eventos').select('id').eq('id', origemId).maybeSingle();
+        if (error) throw error;
+        if (!origem) {
+            const err = new Error('Evento de origem não encontrado.');
+            err.status = 404;
+            throw err;
+        }
+
+        const cfg = await this.obterConfiguracao(origemId);
+        const nomePorId = Object.fromEntries((cfg.tipos || []).map(t => [t.id, t.nome]));
+        const nomesDe = (ids) => (ids || []).map(id => nomePorId[id]).filter(Boolean);
+
+        const tipos = (cfg.tipos || []).map((t, i) => ({
+            nome: t.nome, exige_validade: !!t.exige_validade, ativo: t.ativo !== false, ordem: i
+        }));
+        const regras = {};
+        for (const [funcao, ids] of Object.entries(cfg.regras || {})) regras[funcao] = nomesDe(ids);
+
+        await this.salvarConfiguracao(eventoId, {
+            tipos,
+            regras,
+            tipos_empresa: nomesDe(cfg.tipos_empresa),
+            funcoes: (cfg.funcoes || []).filter(f => f !== FUNCAO_PADRAO),
+            aviso_vencimento_dias: cfg.aviso_vencimento_dias
+        });
+        return this.obterConfiguracao(eventoId);
+    }
+
+    /**
+     * Exclui uma função da lista do evento e as regras de documento dela.
+     * Com participantes cadastrados nessa função, não exclui (eles ficariam sem função válida).
+     */
+    async excluirFuncao(eventoId, funcaoRaw) {
+        const funcao = normalizarFuncao(funcaoRaw);
+        if (!funcao || funcao === FUNCAO_PADRAO) {
+            const err = new Error('Função inválida.');
+            err.status = 400;
+            throw err;
+        }
+
+        const pessoas = await buscarTodos(supabase.from('pessoas').select('funcao').eq('evento_id', eventoId));
+        const usados = (pessoas.data || []).filter(p => normalizarFuncao(p.funcao) === funcao).length;
+        if (usados > 0) {
+            const err = new Error(`Esta função é usada por ${usados} participante(s). Troque a função deles antes de excluir.`);
+            err.status = 409;
+            throw err;
+        }
+
+        const { data: ev, error: evErr } = await supabase.from('eventos').select('config').eq('id', eventoId).single();
+        if (evErr) throw evErr;
+        const extrasAtuais = (ev?.config?.funcoes_extra || []).map(normalizarFuncao);
+        const novoConfig = { ...(ev?.config || {}), funcoes_extra: extrasAtuais.filter(f => f !== funcao) };
+        const up = await supabase.from('eventos').update({ config: novoConfig }).eq('id', eventoId);
+        if (up.error) throw up.error;
+        require('../../middleware/eventMiddleware').invalidarEvento(eventoId);
+
+        const del = await supabase.from('evento_documentos_funcao').delete().eq('evento_id', eventoId).eq('funcao', funcao);
+        if (del.error) throw del.error;
+
+        requisitos.invalidarConfig(eventoId);
+        this.recalcularEvento(eventoId).catch(e => logger.error(`[Documentos] Falha ao recalcular evento: ${e.message}`));
+        return this.obterConfiguracao(eventoId);
+    }
+
+    /**
+     * Exclui um tipo de documento do catálogo. Com documentos já enviados usando o tipo,
+     * não exclui (perderia o vínculo): o operador deve desativar.
+     */
+    async excluirTipo(eventoId, tipoId) {
+        const [pes, emp] = await Promise.all([
+            supabase.from('pessoa_documentos').select('id', { count: 'exact', head: true }).eq('tipo_documento_id', tipoId),
+            supabase.from('empresa_documentos').select('id', { count: 'exact', head: true }).eq('tipo_documento_id', tipoId)
+        ]);
+        if (pes.error) throw pes.error;
+        if (emp.error) throw emp.error;
+        const usados = (pes.count || 0) + (emp.count || 0);
+        if (usados > 0) {
+            const err = new Error(`Este tipo tem ${usados} documento(s) enviado(s). Desative-o em vez de excluir.`);
+            err.status = 409;
+            throw err;
+        }
+
+        const { data, error } = await supabase.from('evento_tipos_documento')
+            .delete().eq('id', tipoId).eq('evento_id', eventoId).select('id');
+        if (error) throw error;
+        if (!data?.length) {
+            const err = new Error('Tipo de documento não encontrado neste evento.');
+            err.status = 404;
+            throw err;
+        }
+
+        requisitos.invalidarConfig(eventoId);
+        this.recalcularEvento(eventoId).catch(e => logger.error(`[Documentos] Falha ao recalcular evento: ${e.message}`));
+        return this.obterConfiguracao(eventoId);
     }
 
     /**
      * Salva catálogo de tipos, regras por função e antecedência do aviso.
      * @param {{ tipos: Array, regras: Object<string, string[]>, aviso_vencimento_dias: number }} body
      */
-    async salvarConfiguracao(eventoId, { tipos = [], regras = {}, aviso_vencimento_dias }) {
+    async salvarConfiguracao(eventoId, { tipos = [], regras = {}, aviso_vencimento_dias, funcoes, tipos_empresa }) {
         // 1. Tipos: atualiza os existentes e cria os novos
         const idsPorNome = {};
         for (const [i, t] of tipos.entries()) {
@@ -584,10 +854,19 @@ class DocumentoService {
             if (ins.error) throw ins.error;
         }
 
-        // 3. Antecedência do aviso (eventos.config JSONB)
-        if (aviso_vencimento_dias !== undefined) {
+        // 3. Antecedência do aviso e funções cadastradas à mão (eventos.config JSONB)
+        if (aviso_vencimento_dias !== undefined || Array.isArray(funcoes) || Array.isArray(tipos_empresa)) {
             const { data: ev } = await supabase.from('eventos').select('config').eq('id', eventoId).single();
-            const novoConfig = { ...(ev?.config || {}), aviso_vencimento_dias: Math.max(1, parseInt(aviso_vencimento_dias, 10) || 15) };
+            const novoConfig = { ...(ev?.config || {}) };
+            if (Array.isArray(tipos_empresa)) {
+                novoConfig.tipos_empresa = [...new Set(tipos_empresa.map(ref => idsPorNome[ref] || ref).filter(Boolean))];
+            }
+            if (aviso_vencimento_dias !== undefined) {
+                novoConfig.aviso_vencimento_dias = Math.max(1, parseInt(aviso_vencimento_dias, 10) || 15);
+            }
+            if (Array.isArray(funcoes)) {
+                novoConfig.funcoes_extra = [...new Set(funcoes.map(normalizarFuncao).filter(f => f && f !== FUNCAO_PADRAO))].sort();
+            }
             const up = await supabase.from('eventos').update({ config: novoConfig }).eq('id', eventoId);
             if (up.error) throw up.error;
             require('../../middleware/eventMiddleware').invalidarEvento(eventoId);

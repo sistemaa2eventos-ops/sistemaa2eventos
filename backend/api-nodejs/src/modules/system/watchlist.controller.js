@@ -3,6 +3,7 @@ const watchlistService = require('./watchlist.service');
 const logger = require('../../services/logger');
 const emailService = require('../../services/emailService');
 const websocketService = require('../../services/websocketService');
+const documentoService = require('../entities/documento.service');
 
 class WatchlistController {
     /**
@@ -177,7 +178,7 @@ class WatchlistController {
 
             // 3. LIBERAÇÃO IMEDIATA: Atualizar todas as ocorrências deste CPF na tabela pessoas em todos os eventos
             if (cpfLimpo) {
-                await supabase
+                const { data: ocorrencias } = await supabase
                     .from('pessoas')
                     .update({
                         bloqueado: false,
@@ -185,7 +186,10 @@ class WatchlistController {
                         motivo_bloqueio: null,
                         updated_at: new Date()
                     })
-                    .eq('cpf', cpfLimpo);
+                    .eq('cpf', cpfLimpo)
+                    .select('id');
+                // Desbloquear não dispensa documentação: reavalia cada ocorrência (pendente se faltar documento)
+                for (const p of ocorrencias || []) await documentoService.sincronizarStatusPessoa(null, p.id);
             }
 
             // 4. Limpar trava de rastreamento em memória se houver

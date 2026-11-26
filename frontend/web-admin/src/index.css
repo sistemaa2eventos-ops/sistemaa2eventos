@@ -168,3 +168,13 @@ body.modo-quiosque .app-conteudo {
     font-size: max(16px, 1em) !important;
   }
 }
+
+/* Modo de Alto Desempenho (Tablets de portaria, celulares antigos e economia de bateria) */
+html[data-performance-mode="true"] .status-dot,
+html[data-performance-mode="true"] .neon-glow,
+html[data-performance-mode="true"] .neon-card {
+  animation: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+

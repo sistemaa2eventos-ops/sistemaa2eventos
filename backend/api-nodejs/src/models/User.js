@@ -108,6 +108,7 @@ class User {
                 checkout: true,
                 fiscalizacao: true,
                 monitoramento: true,
+                producao: true,
                 usuarios: true
             };
         }

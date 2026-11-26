@@ -238,6 +238,10 @@ class CronController {
 
             if (updateErr) throw updateErr;
 
+            // Autorizado só com documentação validada: reavalia (pendente se faltar documento)
+            const documentoService = require('../entities/documento.service');
+            await emParalelo(pessoasIds, 5, (id) => documentoService.sincronizarStatusPessoa(null, id));
+
         } catch (error) {
             logger.error('❌ [CRON] Falha na execução do Auto-Checkout:', error);
         }
@@ -327,6 +331,15 @@ class CronController {
                     .in('id', lote);
                 if (updateErr) throw updateErr;
             }
+
+            // 2.0 Reset diário: toda liberação manual do evento expira (quem estava liberado volta a pendente),
+            //     inclusive quem não entrou nem saiu neste turno
+            const liberacaoManualExpira = require('../entities/liberacaoManual.service');
+            const { data: liberados, error: liberadosErr } = await buscarTodos(
+                supabase.from('pessoas').select('id').eq('evento_id', eventoId).not('liberacao_manual_ate', 'is', null)
+            );
+            if (liberadosErr) throw liberadosErr;
+            await emParalelo((liberados || []).map(p => p.id), 5, (id) => liberacaoManualExpira.encerrar(id, 'reset diário'));
 
             // 2.1 Fim do turno: encerra liberações manuais e reavalia a documentação
             //     (quem tem pendência volta a "pendente" para o próximo turno)

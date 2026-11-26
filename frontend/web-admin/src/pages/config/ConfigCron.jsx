@@ -114,7 +114,7 @@ const ConfigCron = () => {
     }
 
     return (
-        <Box sx={{ p: { xs: 2, md: 4 } }}>
+        <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, maxWidth: 1600, mx: 'auto', width: '100%' }}>
             <PageHeader
                 title="Rotinas automáticas"
                 subtitle="Horários das rotinas automáticas e ações manuais de manutenção."

@@ -703,7 +703,7 @@ export default function DispositivosPage() {
 
   // ── Render principal
   return (
-    <Box sx={{ p: { xs: 2, md: 4 } }}>
+    <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, maxWidth: 1600, mx: 'auto', width: '100%' }}>
       <PageHeader
         title="Leitores e dispositivos"
         subtitle="Terminais faciais Intelbras/Hikvision, câmeras e catracas"
