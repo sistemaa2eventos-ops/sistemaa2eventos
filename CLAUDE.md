@@ -738,6 +738,18 @@ docker system prune -af
 
 **Registre cada deploy aqui:**
 
+```
+2026-11-26 - Deploy 1efebf6 (portal da empresa, planilha de participantes, pendências de documentos)
+├─ Mudanças: portal da empresa (empresa.nzt.app.br: login e-mail + chave, participantes, documentos, solicitações
+│            aprovadas no painel); planilha por evento (modelo, importar/exportar por empresa); documentos
+│            obrigatórios por função e para empresas; autorizado só com documentação validada; reset expira liberações
+├─ Migrations: 20261126_portal_empresa.sql (aplicada pela usuária antes do push)
+├─ Status: ✅ OK (GitHub Actions run 45907799278); painel.nzt.app.br/api/ready 200; rotas novas 401 sem login
+├─ Pendência: DNS empresa.nzt.app.br não existe (NXDOMAIN): criar na Cloudflare igual produtor.nzt.app.br
+├─ Testes: backend 793 ✅; build do painel, portal da empresa e site público ✅; navegador testado só em localhost
+└─ Rollback: tag antes-deploy-20261126-portal-empresa (977a22b)
+```
+
 ### Situação em 2026-11-17 (revisão de VPS, GitHub e Supabase dos últimos 10 dias)
 
 - **Código:** 46 commits entre 10/11 e 12/11; nenhum commit depois de 5e6b336 (12/11 00:16). Local, origin e VPS no mesmo commit.
