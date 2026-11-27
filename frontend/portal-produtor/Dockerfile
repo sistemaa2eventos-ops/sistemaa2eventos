@@ -1,5 +1,5 @@
 # Fase 1: Build standalone do Portal do Produtor
-FROM node:20-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci

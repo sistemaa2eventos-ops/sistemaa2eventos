@@ -1,5 +1,5 @@
 # Fase 1: build do portal da empresa
-FROM node:20-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci

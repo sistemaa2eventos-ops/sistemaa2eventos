@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:24-alpine
 
 # Instalar timezone data — Alpine não inclui por padrão
 # Sem isso, TZ=America/Sao_Paulo não funciona corretamente
