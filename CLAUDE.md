@@ -745,6 +745,21 @@ docker system prune -af
 **Registre cada deploy aqui:**
 
 ```
+2026-11-26 - Deploy 8fd2d6a (imagens em Node 24)
+├─ Mudanças: API, site público (Next.js 16) e build do painel e dos portais em node:24-alpine (Node 20 sem suporte
+│            desde 30/04/2026); produção passa a usar a mesma versão dos testes do CI
+├─ Status: ✅ OK (GitHub Actions run 45917421314); imagens reconstruídas sobre node:24-alpine; containers healthy;
+│          painel, produtor, empresa e cadastro 200; /api/ready ok (database ok, redis ok)
+└─ Rollback: tag antes-deploy-20261127-node24 (9ecb721)
+
+2026-11-26 - Deploy 9ecb721 (CI valida o nginx antes do deploy; cabeçalhos HSTS e X-XSS-Protection)
+├─ Mudanças: job "Validar configurações do nginx" (nginx -t no gateway com a imagem real e nos 3 front-ends);
+│            o deploy só roda se testes E validação passarem; actions/checkout e setup-node v5; npm ci com cache;
+│            HSTS sem "preload"; X-XSS-Protection "0" (OWASP)
+├─ Status: ✅ OK (GitHub Actions run 45917279680); 4 configurações validadas no log; painel, produtor, empresa 200
+├─ Observação: o HSTS que chega ao navegador é o da Cloudflare (max-age=31536000), não o do gateway
+└─ Rollback: tag antes-deploy-20261127-ci-nginx (6ae93aa)
+
 2026-11-26 - Deploy 81e44ef (segredo próprio do portal da empresa; cabeçalhos do domínio empresa no gateway)
 ├─ Mudanças: PORTAL_EMPRESA_SEGREDO (GitHub Secret, gravado no .env da VPS pelo deploy se ainda não existir);
 │            portal não usa mais JWT_SECRET nem SUPABASE_JWT_SECRET; segredo ausente ou curto (<32) derruba só o portal;
