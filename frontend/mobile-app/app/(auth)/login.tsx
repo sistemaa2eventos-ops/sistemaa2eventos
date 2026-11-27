@@ -9,6 +9,7 @@ import { supabase } from '@/services/supabase';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 
+import { cores, fonte } from '@/constants/theme';
 export default function LoginScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -45,7 +46,7 @@ export default function LoginScreen() {
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <LinearGradient
-                colors={['#050B18', '#0A1628', '#050B18']}
+                colors={[cores.fundo, cores.superficie, cores.fundo]}
                 style={styles.background}
             />
 
@@ -125,24 +126,24 @@ const styles = StyleSheet.create({
         marginBottom: 50,
     },
     logoText: {
-        fontFamily: 'Orbitron-Black',
+        fontFamily: fonte.titulo,
         fontSize: 48,
-        color: '#00D4FF',
+        color: cores.primaria,
         textShadowColor: 'rgba(0, 212, 255, 0.5)',
         textShadowOffset: { width: 0, height: 0 },
         textShadowRadius: 15,
         marginBottom: 8,
     },
     title: {
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         fontSize: 22,
-        color: '#FFFFFF',
+        color: cores.textoForte,
         letterSpacing: 4,
         marginBottom: 8,
     },
     subtitle: {
         fontSize: 10,
-        color: '#90A4AE',
+        color: cores.textoSecundario,
         letterSpacing: 1.5,
         textAlign: 'center',
         fontWeight: '700',
@@ -161,11 +162,11 @@ const styles = StyleSheet.create({
     },
     footerText: {
         fontSize: 10,
-        color: '#90A4AE',
+        color: cores.textoSecundario,
         letterSpacing: 1,
     },
     link: {
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         fontSize: 12,
         letterSpacing: 1,
     },

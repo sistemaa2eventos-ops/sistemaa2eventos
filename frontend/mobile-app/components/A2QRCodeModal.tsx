@@ -7,6 +7,7 @@ import { A2Button } from '@/components/A2Button';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
+import { cores } from '@/constants/theme';
 interface A2QRCodeModalProps {
     visible: boolean;
     onClose: () => void;
@@ -54,7 +55,7 @@ export function A2QRCodeModal({ visible, onClose, value, title = 'Meu Acesso' }:
     );
 }
 
-const white = '#FFFFFF';
+const white = cores.textoForte;
 
 const styles = StyleSheet.create({
     centeredView: {

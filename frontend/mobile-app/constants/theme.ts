@@ -1,53 +1,64 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Tokens do NZT Mobile. Fonte única de cor, raio, espaço, fonte e toque.
+ * Componentes importam daqui; nunca escrever hex, raio ou espaçamento solto.
+ * Tema escuro apenas (ver skill nzt-design-mobile-app).
  */
 
-import { Platform } from 'react-native';
+export const cores = {
+  fundo: '#050B18',
+  superficie: '#0A1628',
+  superficieElevada: '#0F1E37',
+  borda: 'rgba(148,163,184,0.16)',
+  bordaDestaque: 'rgba(0,212,255,0.35)',
+  primaria: '#00D4FF',
+  primariaHover: '#33DDFF',
+  sucesso: '#00FF88',
+  alerta: '#FFB800',
+  erro: '#FF3366',
+  saida: '#FF8800',
+  fiscalizacao: '#A855F7',
+  texto: '#E8F4FD',
+  textoForte: '#FFFFFF',
+  textoSecundario: '#94A3B8',
+  textoFraco: '#7A8BA3',
+  sobrePrimaria: '#000000',
+  sobreErro: '#050B18',
+} as const;
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+export const raios = { controle: 8, cartao: 12, pilula: 999 } as const;
 
-export const Colors = {
-  light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
-  },
-  dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
-  },
+export const espaco = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
+
+export const fonte = {
+  corpo: 'Inter_400Regular',
+  corpoMedio: 'Inter_500Medium',
+  corpoSemi: 'Inter_600SemiBold',
+  titulo: 'SpaceGrotesk_700Bold',
+  tituloMedio: 'SpaceGrotesk_500Medium',
+} as const;
+
+export const texto = { xs: 12, sm: 13, md: 14, lg: 16, xl: 20, xxl: 24, display: 32 } as const;
+
+export const toque = { minimo: 48 } as const;
+
+export const movimento = { rapido: 150, normal: 200 } as const;
+
+/** Compatibilidade: código legado que lê `Colors.light/dark`. O app é só escuro. */
+const paletaEscura = {
+  text: cores.texto,
+  background: cores.fundo,
+  tint: cores.primaria,
+  icon: cores.textoSecundario,
+  tabIconDefault: cores.textoSecundario,
+  tabIconSelected: cores.primaria,
+  primary: cores.primaria,
+  secondary: cores.fiscalizacao,
+  accent: cores.primaria,
+  card: cores.superficie,
+  border: cores.borda,
 };
 
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-  },
-});
+export const Colors = {
+  light: paletaEscura,
+  dark: paletaEscura,
+};

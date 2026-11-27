@@ -5,6 +5,12 @@ import React, { useEffect, useState } from 'react';
 import { View, Text } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import 'react-native-reanimated';
+import { useFonts } from 'expo-font';
+import * as SplashScreen from 'expo-splash-screen';
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '@expo-google-fonts/inter';
+import { SpaceGrotesk_500Medium, SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk';
+import { cores, fonte } from '@/constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
@@ -23,6 +29,7 @@ function RootLayoutNav() {
   const segments = useSegments();
   const router = useRouter();
   const [isOffline, setIsOffline] = useState(false);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     // Escuta estado da rede para a UI
@@ -72,29 +79,45 @@ function RootLayoutNav() {
   return (
     <>
       {isOffline && (
-        <View style={{ backgroundColor: '#ff4444', padding: 4, paddingTop: 40, alignItems: 'center', zIndex: 999 }}>
-          <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 12 }}>MODO OFFLINE ATIVO</Text>
+        <View style={{ backgroundColor: cores.erro, paddingTop: insets.top + 4, paddingBottom: 4, paddingHorizontal: 16, alignItems: 'center', zIndex: 999 }}>
+          <Text style={{ color: cores.sobreErro, fontFamily: fonte.corpoSemi, fontSize: 12 }}>MODO OFFLINE ATIVO</Text>
         </View>
       )}
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: '#050B18' },
-          headerTintColor: '#00D4FF',
-          headerTitleStyle: { fontFamily: 'Orbitron-Bold', fontSize: 14 },
+          headerStyle: { backgroundColor: cores.fundo },
+          headerTintColor: cores.primaria,
+          headerTitleStyle: { fontFamily: fonte.titulo, fontSize: 14 },
           headerBackTitle: '',
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)/register" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'MODAL' }} />
       </Stack>
     </>
   );
 }
 
+
+// Segura a splash até as fontes carregarem (evita texto na fonte do sistema por um instante)
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const [fontesCarregadas, erroFontes] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    SpaceGrotesk_500Medium,
+    SpaceGrotesk_700Bold,
+  });
+
+  useEffect(() => {
+    if (fontesCarregadas || erroFontes) SplashScreen.hideAsync().catch(() => {});
+  }, [fontesCarregadas, erroFontes]);
+
+  if (!fontesCarregadas && !erroFontes) return null;
 
   return (
     <AuthProvider>

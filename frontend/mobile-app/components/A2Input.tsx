@@ -4,6 +4,7 @@ import { ThemedText } from './themed-text';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
+import { cores, fonte } from '@/constants/theme';
 interface A2InputProps extends TextInputProps {
     label?: string;
     error?: string;
@@ -21,12 +22,12 @@ export function A2Input({ label, error, containerStyle, ...props }: A2InputProps
                 styles.inputContainer,
                 {
                     backgroundColor: 'rgba(10, 22, 40, 0.4)',
-                    borderColor: error ? '#FF3366' : theme.border
+                    borderColor: error ? cores.erro : theme.border
                 }
             ]}>
                 <TextInput
                     placeholderTextColor="rgba(144, 164, 174, 0.5)"
-                    style={[styles.input, { color: '#FFFFFF' }]}
+                    style={[styles.input, { color: cores.textoForte }]}
                     {...props}
                 />
             </View>
@@ -42,9 +43,9 @@ const styles = StyleSheet.create({
     },
     label: {
         fontSize: 10,
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         letterSpacing: 2,
-        color: '#00D4FF',
+        color: cores.primaria,
         marginBottom: 8,
     },
     inputContainer: {
@@ -60,7 +61,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     errorText: {
-        color: '#FF3366',
+        color: cores.erro,
         fontSize: 10,
         fontWeight: '700',
         marginTop: 4,

@@ -8,6 +8,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 
+import { fonte, cores } from '@/constants/theme';
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const { t } = useTranslation();
@@ -20,7 +21,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarStyle: {
-          backgroundColor: '#050B18',
+          backgroundColor: cores.fundo,
           borderTopWidth: 1,
           borderTopColor: 'rgba(0, 212, 255, 0.2)',
           height: 64,
@@ -28,7 +29,7 @@ export default function TabLayout() {
           paddingTop: 8,
         },
         tabBarLabelStyle: {
-          fontFamily: 'Orbitron-Bold',
+          fontFamily: fonte.titulo,
           fontSize: 10,
           letterSpacing: 1,
         }

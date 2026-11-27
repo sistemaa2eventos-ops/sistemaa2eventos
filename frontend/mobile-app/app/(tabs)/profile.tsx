@@ -12,6 +12,7 @@ import { supabase } from '@/services/supabase';
 import { SyncManager } from '@/services/SyncManager';
 import { offlineService } from '@/services/offlineService';
 
+import { cores, fonte } from '@/constants/theme';
 const ProfileScreen = () => {
     const { user, profile, signOut } = useAuth();
     const router = useRouter();
@@ -100,7 +101,7 @@ const ProfileScreen = () => {
         }
     };
 
-    const MenuItem = ({ icon, label, onPress, color = '#00D4FF' }: any) => (
+    const MenuItem = ({ icon, label, onPress, color = cores.primaria }: any) => (
         <TouchableOpacity style={styles.menuItem} onPress={onPress}>
             <View style={[styles.menuIconContainer, { backgroundColor: `${color}15`, borderColor: `${color}33` }]}>
                 <Ionicons name={icon} size={22} color={color} />
@@ -114,7 +115,7 @@ const ProfileScreen = () => {
 
     const TerminalInput = ({ label, value, onChangeText }: any) => (
         <View style={{ width: '100%', marginBottom: 15 }}>
-            <ThemedText style={{ fontSize: 9, color: '#00D4FF', fontFamily: 'Orbitron-Bold', marginBottom: 5 }}>{label}</ThemedText>
+            <ThemedText style={{ fontSize: 9, color: cores.primaria, fontFamily: fonte.titulo, marginBottom: 5 }}>{label}</ThemedText>
             <TextInput
                 style={{
                     backgroundColor: 'rgba(5, 11, 24, 0.8)',
@@ -123,7 +124,7 @@ const ProfileScreen = () => {
                     borderRadius: 8,
                     color: '#fff',
                     padding: 12,
-                    fontFamily: 'Orbitron-Regular',
+                    fontFamily: fonte.corpo,
                     fontSize: 12
                 }}
                 value={value}
@@ -134,7 +135,7 @@ const ProfileScreen = () => {
     );
 
     return (
-        <LinearGradient colors={['#050B18', '#0A1628']} style={styles.container}>
+        <LinearGradient colors={[cores.fundo, cores.superficie]} style={styles.container}>
             <SafeAreaView style={styles.safeArea}>
                 <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                     {/* Profile Header */}
@@ -196,17 +197,17 @@ const ProfileScreen = () => {
                             <View style={styles.statsRow}>
                                 <View style={styles.statBox}>
                                     <ThemedText style={styles.statLabel}>CHECK-INS</ThemedText>
-                                    <ThemedText style={[styles.statValue, { color: '#00FF88' }]}>128</ThemedText>
+                                    <ThemedText style={[styles.statValue, { color: cores.sucesso }]}>128</ThemedText>
                                 </View>
                                 <View style={styles.statDivider} />
                                 <View style={styles.statBox}>
                                     <ThemedText style={styles.statLabel}>EVENTOS</ThemedText>
-                                    <ThemedText style={[styles.statValue, { color: '#00D4FF' }]}>04</ThemedText>
+                                    <ThemedText style={[styles.statValue, { color: cores.primaria }]}>04</ThemedText>
                                 </View>
                                 <View style={styles.statDivider} />
                                 <View style={styles.statBox}>
                                     <ThemedText style={styles.statLabel}>STATUS</ThemedText>
-                                    <ThemedText style={[styles.statValue, { color: '#7B2FBE' }]}>ATIVO</ThemedText>
+                                    <ThemedText style={[styles.statValue, { color: cores.fiscalizacao }]}>ATIVO</ThemedText>
                                 </View>
                             </View>
 
@@ -223,21 +224,21 @@ const ProfileScreen = () => {
                                 <MenuItem
                                     icon="shield-checkmark-outline"
                                     label="Segurança Nexus"
-                                    color="#7B2FBE"
+                                    color={cores.fiscalizacao}
                                     onPress={() => { }}
                                 />
 
                                 <MenuItem
                                     icon="hardware-chip-outline"
                                     label="Dispositivos Conectados"
-                                    color="#00FF88"
+                                    color={cores.sucesso}
                                     onPress={() => router.push('/devices')}
                                 />
 
                                 <MenuItem
                                     icon="cloud-upload-outline"
                                     label={`Forçar Sincronia (${pendingCount})`}
-                                    color={pendingCount > 0 ? "#FFC107" : "#00D4FF"}
+                                    color={pendingCount > 0 ? cores.alerta : cores.primaria}
                                     onPress={handleManualSync}
                                 />
                             </View>
@@ -247,7 +248,7 @@ const ProfileScreen = () => {
                                 variant="outline"
                                 onPress={handleLogout}
                                 style={styles.logoutBtn}
-                                textStyle={{ fontFamily: 'Orbitron-Bold', fontSize: 12, color: '#FF3366' }}
+                                textStyle={{ fontFamily: fonte.titulo, fontSize: 12, color: cores.erro }}
                             />
                         </>
                     )}
@@ -287,7 +288,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(0, 212, 255, 0.3)',
         marginBottom: 16,
-        shadowColor: '#00D4FF',
+        shadowColor: cores.primaria,
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.5,
         shadowRadius: 15,
@@ -296,28 +297,28 @@ const styles = StyleSheet.create({
         width: 84,
         height: 84,
         borderRadius: 42,
-        backgroundColor: '#050B18',
+        backgroundColor: cores.fundo,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: '#00D4FF',
+        borderColor: cores.primaria,
     },
     avatarInitial: {
         fontSize: 32,
-        fontFamily: 'Orbitron-Bold',
-        color: '#00D4FF',
+        fontFamily: fonte.titulo,
+        color: cores.primaria,
     },
     userId: {
         fontSize: 10,
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         color: 'rgba(144, 164, 174, 0.5)',
         letterSpacing: 2,
         marginBottom: 4,
     },
     userName: {
         fontSize: 22,
-        fontFamily: 'Orbitron-Bold',
-        color: '#FFFFFF',
+        fontFamily: fonte.titulo,
+        color: cores.textoForte,
         letterSpacing: 1,
         marginBottom: 12,
     },
@@ -335,13 +336,13 @@ const styles = StyleSheet.create({
         width: 6,
         height: 6,
         borderRadius: 3,
-        backgroundColor: '#00FF88',
+        backgroundColor: cores.sucesso,
         marginRight: 8,
     },
     statusText: {
         fontSize: 9,
-        fontFamily: 'Orbitron-Bold',
-        color: '#00FF88',
+        fontFamily: fonte.titulo,
+        color: cores.sucesso,
         letterSpacing: 1,
     },
     statsRow: {
@@ -364,20 +365,20 @@ const styles = StyleSheet.create({
     },
     statLabel: {
         fontSize: 9,
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         color: 'rgba(144, 164, 174, 0.6)',
         marginBottom: 4,
     },
     statValue: {
         fontSize: 16,
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
     },
     menuSection: {
         marginBottom: 32,
     },
     sectionLabel: {
         fontSize: 10,
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         color: 'rgba(144, 164, 174, 0.4)',
         letterSpacing: 2,
         marginBottom: 16,
@@ -407,8 +408,8 @@ const styles = StyleSheet.create({
     },
     menuTitle: {
         fontSize: 12,
-        fontFamily: 'Orbitron-Bold',
-        color: '#FFFFFF',
+        fontFamily: fonte.titulo,
+        color: cores.textoForte,
         marginBottom: 2,
     },
     logoutBtn: {
@@ -418,7 +419,7 @@ const styles = StyleSheet.create({
     versionText: {
         textAlign: 'center',
         fontSize: 9,
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         color: 'rgba(144, 164, 174, 0.3)',
         letterSpacing: 1,
     }

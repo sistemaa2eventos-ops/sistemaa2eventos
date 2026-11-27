@@ -5,6 +5,7 @@ import { ThemedText } from './themed-text';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
+import { cores, fonte } from '@/constants/theme';
 interface A2ButtonProps {
     title: string;
     onPress: () => void;
@@ -53,8 +54,8 @@ export function A2Button({
 
     const getTextColor = () => {
         if (disabled) return theme.icon;
-        if (variant === 'primary') return '#000000';
-        if (variant === 'secondary') return '#FFFFFF';
+        if (variant === 'primary') return cores.sobrePrimaria;
+        if (variant === 'secondary') return cores.textoForte;
         return theme.tint;
     };
 
@@ -69,6 +70,9 @@ export function A2Button({
             onPressIn={onPressIn}
             onPressOut={onPressOut}
             disabled={disabled || loading}
+            accessibilityRole="button"
+            accessibilityLabel={title}
+            accessibilityState={{ disabled: disabled || loading, busy: loading }}
             activeOpacity={0.8}
             style={[
                 styles.button,
@@ -92,7 +96,7 @@ export function A2Button({
             {loading ? (
                 <ActivityIndicator color={getTextColor()} />
             ) : (
-                <ThemedText style={[styles.text, { color: getTextColor(), fontFamily: 'Orbitron-Bold' }, textStyle]}>
+                <ThemedText style={[styles.text, { color: getTextColor(), fontFamily: fonte.titulo }, textStyle]}>
                     {title}
                 </ThemedText>
             )}

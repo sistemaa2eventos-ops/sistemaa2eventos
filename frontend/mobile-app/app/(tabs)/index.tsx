@@ -9,7 +9,6 @@ import { A2Card } from '@/components/A2Card';
 import { A2QRCodeModal } from '@/components/A2QRCodeModal';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { HelloWave } from '@/components/hello-wave';
 import { eventService, Event } from '@/services/eventService';
 import { apiService } from '@/services/apiService';
 import { useAuth } from '@/context/AuthContext';
@@ -17,6 +16,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
+import { cores, fonte } from '@/constants/theme';
 interface DashboardStats {
   total_empresas: number;
   total_pessoas: number;
@@ -85,7 +85,7 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} tintColor="#00D4FF" />
+          <RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} tintColor={cores.primaria} />
         }
       >
         {/* Header */}
@@ -94,14 +94,13 @@ export default function HomeScreen() {
             <ThemedText style={styles.brandingText}>NZT</ThemedText>
             <View style={styles.titleRow}>
               <ThemedText style={styles.mainTitle}>Core</ThemedText>
-              <HelloWave />
             </View>
             <ThemedText style={styles.subtitle}>
               {profile?.nome_completo?.toUpperCase() || user?.email?.split('@')[0]?.toUpperCase() || 'OPERADOR'}
             </ThemedText>
           </View>
           <View style={styles.statusIndicator}>
-            <View style={[styles.statusDot, { backgroundColor: '#00FF88' }]} />
+            <View style={[styles.statusDot, { backgroundColor: cores.sucesso }]} />
             <ThemedText style={styles.statusText}>{profile?.nivel_acesso?.toUpperCase() || 'OFFLINE'}</ThemedText>
           </View>
         </View>
@@ -123,11 +122,11 @@ export default function HomeScreen() {
                     {nextEvent.nome.toUpperCase()}
                   </ThemedText>
                   <View style={styles.infoRow}>
-                    <Ionicons name="location-outline" size={16} color="#90A4AE" />
+                    <Ionicons name="location-outline" size={16} color={cores.textoSecundario} />
                     <ThemedText style={styles.infoText}>{nextEvent.local || 'LOCAL NÃO DEFINIDO'}</ThemedText>
                   </View>
                   <View style={styles.infoRow}>
-                    <Ionicons name="time-outline" size={16} color="#90A4AE" />
+                    <Ionicons name="time-outline" size={16} color={cores.textoSecundario} />
                     <ThemedText style={styles.infoText}>
                       {new Date(nextEvent.data_inicio).toLocaleDateString('pt-BR', {
                         day: '2-digit',
@@ -144,7 +143,7 @@ export default function HomeScreen() {
                   />
                 </>
               ) : (
-                <ThemedText style={{ marginTop: 8, color: '#90A4AE', fontStyle: 'italic' }}>
+                <ThemedText style={{ marginTop: 8, color: cores.textoSecundario, fontStyle: 'italic' }}>
                   NENHUMA OPERAÇÃO AGENDADA NO MOMENTO.
                 </ThemedText>
               )}
@@ -159,28 +158,28 @@ export default function HomeScreen() {
                     icon="business-outline"
                     label="EMPRESAS"
                     value={stats.total_empresas}
-                    color="#00D4FF"
+                    color={cores.primaria}
                     sub="Credenciadas"
                   />
                   <StatCard
                     icon="people-outline"
                     label="PARTICIPANTES"
                     value={stats.total_pessoas}
-                    color="#7B2FBE"
+                    color={cores.fiscalizacao}
                     sub={`${stats.presentes || 0} presentes`}
                   />
                   <StatCard
                     icon="log-in-outline"
                     label="CHECK-INS"
                     value={stats.total_checkins_hoje}
-                    color="#00FF88"
+                    color={cores.sucesso}
                     sub="Hoje"
                   />
                   <StatCard
                     icon="wifi-outline"
                     label="LEITORES"
                     value={stats.dispositivos_online}
-                    color="#FFB800"
+                    color={cores.alerta}
                     sub="Online"
                   />
                 </View>
@@ -214,10 +213,10 @@ export default function HomeScreen() {
                 {!isOperador && (
                   <View style={styles.actionItem}>
                     <TouchableOpacity
-                      style={[styles.iconButton, { borderColor: '#FFB800' }]}
+                      style={[styles.iconButton, { borderColor: cores.alerta }]}
                       onPress={() => router.push('/devices')}
                     >
-                      <Ionicons name="hardware-chip-outline" size={32} color="#FFB800" />
+                      <Ionicons name="hardware-chip-outline" size={32} color={cores.alerta} />
                     </TouchableOpacity>
                     <ThemedText style={styles.actionLabel}>SISTEMAS</ThemedText>
                   </View>
@@ -249,16 +248,16 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   brandingText: {
-    fontSize: 10, color: '#00D4FF',
-    fontFamily: 'Orbitron-Bold', letterSpacing: 2,
+    fontSize: 10, color: cores.primaria,
+    fontFamily: fonte.titulo, letterSpacing: 2,
   },
   mainTitle: {
-    fontSize: 28, fontFamily: 'Orbitron-Black',
-    color: '#FFFFFF', marginTop: 4,
+    fontSize: 28, fontFamily: fonte.titulo,
+    color: cores.textoForte, marginTop: 4,
   },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   subtitle: {
-    fontSize: 10, color: '#90A4AE',
+    fontSize: 10, color: cores.textoSecundario,
     letterSpacing: 1, marginTop: 4, fontWeight: '700',
   },
   statusIndicator: {
@@ -268,7 +267,7 @@ const styles = StyleSheet.create({
   },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusText: {
-    fontSize: 8, fontWeight: '900', color: '#00FF88', letterSpacing: 1,
+    fontSize: 8, fontWeight: '900', color: cores.sucesso, letterSpacing: 1,
   },
   heroCard: {
     marginBottom: 32, borderWidth: 1,
@@ -278,20 +277,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16,
   },
   cardTag: {
-    fontSize: 10, fontWeight: '900', color: '#00D4FF', letterSpacing: 1.5,
+    fontSize: 10, fontWeight: '900', color: cores.primaria, letterSpacing: 1.5,
   },
   eventTitle: {
-    fontSize: 22, fontFamily: 'Orbitron-Bold',
-    color: '#FFFFFF', marginBottom: 16,
+    fontSize: 22, fontFamily: fonte.titulo,
+    color: cores.textoForte, marginBottom: 16,
   },
   infoRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8,
   },
-  infoText: { fontSize: 12, color: '#90A4AE', fontWeight: '600' },
+  infoText: { fontSize: 12, color: cores.textoSecundario, fontWeight: '600' },
   section: { marginBottom: 36 },
   sectionTitle: {
-    fontSize: 12, fontFamily: 'Orbitron-Bold',
-    color: '#FFFFFF', letterSpacing: 2, marginBottom: 20,
+    fontSize: 12, fontFamily: fonte.titulo,
+    color: cores.textoForte, letterSpacing: 2, marginBottom: 20,
   },
   statsGrid: {
     flexDirection: 'row', flexWrap: 'wrap', gap: 12,
@@ -304,10 +303,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.02)',
   },
   statValue: {
-    fontSize: 28, fontFamily: 'Orbitron-Black', fontWeight: '900',
+    fontSize: 28, fontFamily: fonte.titulo, fontWeight: '900',
   },
   statLabel: {
-    fontSize: 9, color: '#90A4AE',
+    fontSize: 9, color: cores.textoSecundario,
     fontWeight: '800', letterSpacing: 1.5, marginTop: 4,
   },
   statSub: {
@@ -323,6 +322,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center', marginBottom: 8,
   },
   actionLabel: {
-    fontSize: 9, fontWeight: '900', color: '#90A4AE', letterSpacing: 1,
+    fontSize: 9, fontWeight: '900', color: cores.textoSecundario, letterSpacing: 1,
   },
 });

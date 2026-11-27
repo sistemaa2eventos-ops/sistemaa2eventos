@@ -9,6 +9,7 @@ import { eventService, Event } from '@/services/eventService';
 import { companyService } from '@/services/companyService';
 import { A2CompanyConfig } from '@/components/A2CompanyConfig';
 
+import { cores } from '@/constants/theme';
 export default function EventDetailsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const [event, setEvent] = useState<Event | null>(null);
@@ -59,7 +60,7 @@ export default function EventDetailsScreen() {
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <View style={[styles.imageContainer, { backgroundColor: theme.secondary }]}>
                     <ThemedText style={styles.imageIcon}>📸</ThemedText>
-                    <ThemedText style={{ color: '#FFFFFF', opacity: 0.8 }}>Imagem do Evento</ThemedText>
+                    <ThemedText style={{ color: cores.textoForte, opacity: 0.8 }}>Imagem do Evento</ThemedText>
                 </View>
 
                 <View style={styles.details}>

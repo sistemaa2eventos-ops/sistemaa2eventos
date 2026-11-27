@@ -22,6 +22,7 @@ import { eventService } from '@/services/eventService';
  * - Offline: Busca no SQLite local, faz checkin local, enfileira sync
  * - Feedback visual instantâneo: verde (OK), vermelho (erro), amarelo (offline queued)
  */
+import { cores, fonte } from '@/constants/theme';
 export default function ScannerScreen() {
     const [permission, requestPermission] = useCameraPermissions();
     const [scanned, setScanned] = useState(false);
@@ -63,7 +64,7 @@ export default function ScannerScreen() {
     };
 
     if (!permission) {
-        return <View style={{ flex: 1, backgroundColor: '#050B18' }} />;
+        return <View style={{ flex: 1, backgroundColor: cores.fundo }} />;
     }
 
     if (!permission.granted) {
@@ -84,7 +85,7 @@ export default function ScannerScreen() {
             // ===== MODO ONLINE =====
             try {
                 const employee = await apiService.validateQRCode(data);
-                showFeedback('#00FF88', `✓ ${employee.nome}`, 1500);
+                showFeedback(cores.sucesso, `✓ ${employee.nome}`, 1500);
 
                 setTimeout(() => {
                     router.push(`/employee/${employee.id}` as any);
@@ -93,7 +94,7 @@ export default function ScannerScreen() {
                 }, 500);
 
             } catch (error: any) {
-                showFeedback('#FF3366', `✗ ${error.message || 'ERRO'}`, 2500);
+                showFeedback(cores.erro, `✗ ${error.message || 'ERRO'}`, 2500);
                 setTimeout(() => {
                     setScanned(false);
                     setProcessing(false);
@@ -104,7 +105,7 @@ export default function ScannerScreen() {
             try {
                 const cachedEvent = await eventService.getActiveEventCached();
                 if (!cachedEvent) {
-                    showFeedback('#FF3366', '✗ SEM EVENTO ATIVO NO CACHE', 2500);
+                    showFeedback(cores.erro, '✗ SEM EVENTO ATIVO NO CACHE', 2500);
                     setTimeout(() => { setScanned(false); setProcessing(false); }, 2500);
                     return;
                 }
@@ -113,7 +114,7 @@ export default function ScannerScreen() {
                 const pessoa = await offlineService.findPessoaByQRCode(data, cachedEvent.id);
 
                 if (!pessoa) {
-                    showFeedback('#FF3366', '✗ QR NÃO ENCONTRADO NO CACHE LOCAL', 2500);
+                    showFeedback(cores.erro, '✗ QR NÃO ENCONTRADO NO CACHE LOCAL', 2500);
                     setTimeout(() => { setScanned(false); setProcessing(false); }, 2500);
                     return;
                 }
@@ -139,7 +140,7 @@ export default function ScannerScreen() {
 
                 // Feedback amarelo (offline queued)
                 const statusLabel = tipo === 'checkin' ? 'CHECK-IN' : 'CHECK-OUT';
-                showFeedback('#FFB800', `⏳ ${statusLabel} OFFLINE: ${p.nome}`, 2000);
+                showFeedback(cores.alerta, `⏳ ${statusLabel} OFFLINE: ${p.nome}`, 2000);
 
                 setTimeout(() => {
                     setScanned(false);
@@ -148,7 +149,7 @@ export default function ScannerScreen() {
 
             } catch (error: any) {
                 console.error('Erro no modo offline:', error);
-                showFeedback('#FF3366', '✗ ERRO NO MODO OFFLINE', 2500);
+                showFeedback(cores.erro, '✗ ERRO NO MODO OFFLINE', 2500);
                 setTimeout(() => { setScanned(false); setProcessing(false); }, 2500);
             }
         }
@@ -158,9 +159,9 @@ export default function ScannerScreen() {
         <SafeAreaView style={styles.container}>
             <Stack.Screen options={{
                 headerTitle: 'SCANNER DE CREDENCIAIS',
-                headerTitleStyle: { fontFamily: 'Orbitron-Bold', fontSize: 12, color: '#00D4FF' },
-                headerStyle: { backgroundColor: '#050B18' },
-                headerTintColor: '#00D4FF',
+                headerTitleStyle: { fontFamily: fonte.titulo, fontSize: 12, color: cores.primaria },
+                headerStyle: { backgroundColor: cores.fundo },
+                headerTintColor: cores.primaria,
                 headerShown: true
             }} />
 
@@ -175,8 +176,8 @@ export default function ScannerScreen() {
                     <View style={styles.topOverlay}>
                         {/* Indicador Online/Offline */}
                         <View style={styles.statusBadge}>
-                            <View style={[styles.statusDot, { backgroundColor: isOnline ? '#00FF88' : '#FFB800' }]} />
-                            <ThemedText style={[styles.statusText, { color: isOnline ? '#00FF88' : '#FFB800' }]}>
+                            <View style={[styles.statusDot, { backgroundColor: isOnline ? cores.sucesso : cores.alerta }]} />
+                            <ThemedText style={[styles.statusText, { color: isOnline ? cores.sucesso : cores.alerta }]}>
                                 {isOnline ? 'ONLINE' : 'MODO OFFLINE'}
                             </ThemedText>
                         </View>
@@ -194,7 +195,7 @@ export default function ScannerScreen() {
 
                             {/* Scan Line */}
                             <LinearGradient
-                                colors={['transparent', isOnline ? '#00FF88' : '#FFB800', 'transparent']}
+                                colors={['transparent', isOnline ? cores.sucesso : cores.alerta, 'transparent']}
                                 style={styles.scanLine}
                             />
                         </View>
@@ -215,7 +216,7 @@ export default function ScannerScreen() {
                             style={styles.cancelButton}
                             onPress={() => router.back()}
                         >
-                            <Ionicons name="close-circle-outline" size={24} color="#FF3366" />
+                            <Ionicons name="close-circle-outline" size={24} color={cores.erro} />
                             <ThemedText style={styles.cancelText}>CANCELAR OPERAÇÃO</ThemedText>
                         </TouchableOpacity>
                     </View>
@@ -228,14 +229,14 @@ export default function ScannerScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#050B18',
+        backgroundColor: cores.fundo,
     },
     message: {
         textAlign: 'center',
         padding: 40,
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         fontSize: 12,
-        color: '#90A4AE',
+        color: cores.textoSecundario,
         letterSpacing: 1.5,
     },
     camera: {
@@ -269,14 +270,14 @@ const styles = StyleSheet.create({
         borderRadius: 4,
     },
     statusText: {
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         fontSize: 9,
         letterSpacing: 2,
     },
     scanText: {
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         fontSize: 10,
-        color: '#00FF88',
+        color: cores.sucesso,
         letterSpacing: 2,
     },
     middleContainer: {
@@ -303,7 +304,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         width: 30,
         height: 30,
-        borderColor: '#00D4FF',
+        borderColor: cores.primaria,
     },
     topLeft: {
         top: 0,
@@ -345,7 +346,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     feedbackText: {
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         fontSize: 12,
         letterSpacing: 1,
         textAlign: 'center',
@@ -362,9 +363,9 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255, 51, 102, 0.3)',
     },
     cancelText: {
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         fontSize: 10,
-        color: '#FF3366',
+        color: cores.erro,
         letterSpacing: 1,
     }
 });

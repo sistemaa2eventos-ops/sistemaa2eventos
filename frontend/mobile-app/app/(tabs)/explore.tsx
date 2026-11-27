@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
+import { cores, fonte } from '@/constants/theme';
 export default function EventsScreen() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +32,7 @@ export default function EventsScreen() {
     <A2Card style={styles.card}>
       <View style={styles.cardHeader}>
         <View style={styles.iconContainer}>
-          <Ionicons name="flash-outline" size={20} color="#00D4FF" />
+          <Ionicons name="flash-outline" size={20} color={cores.primaria} />
         </View>
         <View style={styles.headerText}>
           <ThemedText style={styles.eventTitle}>{item.nome.toUpperCase()}</ThemedText>
@@ -55,7 +56,7 @@ export default function EventsScreen() {
           onPress={() => router.push(`/event/${item.id}`)}
         >
           <ThemedText style={styles.detailsBtnText}>DETALHES</ThemedText>
-          <Ionicons name="chevron-forward" size={14} color="#00FF88" />
+          <Ionicons name="chevron-forward" size={14} color={cores.sucesso} />
         </TouchableOpacity>
       </View>
     </A2Card>
@@ -68,7 +69,7 @@ export default function EventsScreen() {
 
   return (
     <LinearGradient
-      colors={['#050B18', '#0A1628']}
+      colors={[cores.fundo, cores.superficie]}
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea}>
@@ -82,7 +83,7 @@ export default function EventsScreen() {
 
         {loading ? (
           <View style={styles.loader}>
-            <ActivityIndicator size="large" color="#00D4FF" />
+            <ActivityIndicator size="large" color={cores.primaria} />
           </View>
         ) : (
           <FlatList
@@ -126,21 +127,21 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#00FF88',
-    shadowColor: '#00FF88',
+    backgroundColor: cores.sucesso,
+    shadowColor: cores.sucesso,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 5,
   },
   title: {
     fontSize: 24,
-    fontFamily: 'Orbitron-Bold',
-    color: '#00D4FF',
+    fontFamily: fonte.titulo,
+    color: cores.primaria,
     letterSpacing: 2,
   },
   subtitle: {
     fontSize: 10,
-    fontFamily: 'Orbitron-Bold',
+    fontFamily: fonte.titulo,
     color: 'rgba(144, 164, 174, 0.6)',
     letterSpacing: 1,
   },
@@ -177,14 +178,14 @@ const styles = StyleSheet.create({
   },
   eventTitle: {
     fontSize: 14,
-    fontFamily: 'Orbitron-Bold',
-    color: '#FFFFFF',
+    fontFamily: fonte.titulo,
+    color: cores.textoForte,
     marginBottom: 4,
   },
   eventDate: {
     fontSize: 10,
-    fontFamily: 'Orbitron-Bold',
-    color: '#7B2FBE',
+    fontFamily: fonte.titulo,
+    color: cores.fiscalizacao,
     letterSpacing: 1,
   },
   description: {
@@ -209,7 +210,7 @@ const styles = StyleSheet.create({
   },
   location: {
     fontSize: 10,
-    fontFamily: 'Orbitron-Bold',
+    fontFamily: fonte.titulo,
     color: 'rgba(144, 164, 174, 0.5)',
   },
   detailsBtn: {
@@ -219,8 +220,8 @@ const styles = StyleSheet.create({
   },
   detailsBtnText: {
     fontSize: 10,
-    fontFamily: 'Orbitron-Bold',
-    color: '#00FF88',
+    fontFamily: fonte.titulo,
+    color: cores.sucesso,
     letterSpacing: 1,
   },
   empty: {
@@ -230,8 +231,8 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 10,
-    fontFamily: 'Orbitron-Bold',
-    color: '#90A4AE',
+    fontFamily: fonte.titulo,
+    color: cores.textoSecundario,
     marginTop: 16,
     textAlign: 'center',
     paddingHorizontal: 40,

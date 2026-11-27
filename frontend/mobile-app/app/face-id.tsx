@@ -1,3 +1,4 @@
+import { cores } from '@/constants/theme';
 import React, { useState, useRef } from 'react';
 import { StyleSheet, View, SafeAreaView, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -95,7 +96,7 @@ const styles = StyleSheet.create({
         borderRadius: 200, // Tentar manter circular
         overflow: 'hidden',
         borderWidth: 4,
-        borderColor: '#2196F3',
+        borderColor: cores.primaria,
     },
     camera: {
         flex: 1,

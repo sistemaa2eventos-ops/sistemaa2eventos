@@ -12,6 +12,7 @@ import { deviceService } from '@/services/deviceService';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
+import { cores, fonte, toque } from '@/constants/theme';
 export default function DeviceConfigScreen() {
     const router = useRouter();
     const colorScheme = useColorScheme();
@@ -80,9 +81,9 @@ export default function DeviceConfigScreen() {
         <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
             <Stack.Screen options={{
                 headerTitle: 'SISTEMAS EXTERNOS',
-                headerTitleStyle: { fontFamily: 'Orbitron-Bold', fontSize: 14, color: '#00D4FF' },
-                headerStyle: { backgroundColor: '#050B18' },
-                headerTintColor: '#00D4FF'
+                headerTitleStyle: { fontFamily: fonte.titulo, fontSize: 14, color: cores.primaria },
+                headerStyle: { backgroundColor: cores.fundo },
+                headerTintColor: cores.primaria
             }} />
 
             <A2Card style={styles.formCard}>
@@ -175,8 +176,8 @@ export default function DeviceConfigScreen() {
                             <ThemedText style={styles.deviceName}>{dev.nome.toUpperCase()}</ThemedText>
                             <ThemedText style={styles.deviceMeta}>{dev.marca.toUpperCase()} • {dev.ip_address}</ThemedText>
                         </View>
-                        <View style={[styles.statusBadge, { borderColor: dev.status === 'online' ? '#00FF88' : '#FF3366' }]}>
-                            <ThemedText style={[styles.statusText, { color: dev.status === 'online' ? '#00FF88' : '#FF3366' }]}>
+                        <View style={[styles.statusBadge, { borderColor: dev.status === 'online' ? cores.sucesso : cores.erro }]}>
+                            <ThemedText style={[styles.statusText, { color: dev.status === 'online' ? cores.sucesso : cores.erro }]}>
                                 {dev.status?.toUpperCase() || 'OFFLINE'}
                             </ThemedText>
                         </View>
@@ -204,15 +205,15 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     sectionTitle: {
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         fontSize: 12,
-        color: '#00D4FF',
+        color: cores.primaria,
         letterSpacing: 2,
     },
     label: {
         fontSize: 10,
-        fontFamily: 'Orbitron-Bold',
-        color: '#90A4AE',
+        fontFamily: fonte.titulo,
+        color: cores.textoSecundario,
         letterSpacing: 1.5,
         marginBottom: 8,
     },
@@ -224,7 +225,7 @@ const styles = StyleSheet.create({
     brandButton: {
         flex: 1,
         marginHorizontal: 4,
-        height: 40,
+        minHeight: toque.minimo,
     },
     actions: {
         marginTop: 24,
@@ -234,9 +235,9 @@ const styles = StyleSheet.create({
         paddingBottom: 60,
     },
     listTitle: {
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         fontSize: 12,
-        color: '#FFFFFF',
+        color: cores.textoForte,
         letterSpacing: 2,
         marginBottom: 20,
         paddingLeft: 4,
@@ -254,7 +255,7 @@ const styles = StyleSheet.create({
     deviceIndicator: {
         width: 3,
         height: 30,
-        backgroundColor: '#00D4FF',
+        backgroundColor: cores.primaria,
         borderRadius: 2,
         marginRight: 16,
     },
@@ -262,13 +263,13 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     deviceName: {
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         fontSize: 13,
-        color: '#FFFFFF',
+        color: cores.textoForte,
     },
     deviceMeta: {
         fontSize: 10,
-        color: '#90A4AE',
+        color: cores.textoSecundario,
         marginTop: 2,
         fontWeight: '600',
     },

@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '@/services/apiService';
 import { format } from 'date-fns';
 
+import { cores, fonte } from '@/constants/theme';
 export default function MonitoringScreen() {
     const colorScheme = useColorScheme() ?? 'dark';
     const theme = Colors[colorScheme];
@@ -56,19 +57,19 @@ export default function MonitoringScreen() {
                     borderColor: item.tipo === 'checkin' ? 'rgba(0, 255, 136, 0.3)' : 'rgba(255, 51, 102, 0.3)'
                 }]}>
                     <ThemedText style={[styles.statusText, {
-                        color: item.tipo === 'checkin' ? '#00FF88' : '#FF3366'
+                        color: item.tipo === 'checkin' ? cores.sucesso : cores.erro
                     }]}>
                         {item.tipo?.toUpperCase()}
                     </ThemedText>
                 </View>
             </View>
             <View style={styles.logFooter}>
-                <Ionicons name="time-outline" size={14} color="#90A4AE" />
+                <Ionicons name="time-outline" size={14} color={cores.textoSecundario} />
                 <ThemedText style={styles.timeText}>
                     {format(new Date(item.created_at), "HH:mm:ss 'em' dd/MM")}
                 </ThemedText>
                 <View style={{ flex: 1 }} />
-                <Ionicons name="hardware-chip-outline" size={14} color="#00D4FF" />
+                <Ionicons name="hardware-chip-outline" size={14} color={cores.primaria} />
                 <ThemedText style={styles.deviceText}>
                     {item.dispositivo_id || 'TERMINAL NEXUS'}
                 </ThemedText>
@@ -85,7 +86,7 @@ export default function MonitoringScreen() {
 
             {loading && !refreshing ? (
                 <View style={styles.center}>
-                    <ActivityIndicator size="large" color="#00D4FF" />
+                    <ActivityIndicator size="large" color={cores.primaria} />
                 </View>
             ) : (
                 <FlatList
@@ -100,7 +101,7 @@ export default function MonitoringScreen() {
                                 setRefreshing(true);
                                 loadLogs();
                             }}
-                            tintColor="#00D4FF"
+                            tintColor={cores.primaria}
                         />
                     }
                     ListEmptyComponent={
@@ -118,26 +119,26 @@ export default function MonitoringScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#050B18',
+        backgroundColor: cores.fundo,
     },
     header: {
         paddingTop: 60,
         paddingHorizontal: 20,
         paddingBottom: 20,
-        backgroundColor: '#0A1628',
+        backgroundColor: cores.superficie,
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(0, 212, 255, 0.2)',
     },
     title: {
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         fontSize: 18,
-        color: '#00D4FF',
+        color: cores.primaria,
         letterSpacing: 2,
     },
     subtitle: {
-        fontFamily: 'Orbitron-Medium',
+        fontFamily: fonte.corpoMedio,
         fontSize: 10,
-        color: '#90A4AE',
+        color: cores.textoSecundario,
         letterSpacing: 1,
         marginTop: 4,
     },
@@ -174,14 +175,14 @@ const styles = StyleSheet.create({
         marginLeft: 12,
     },
     name: {
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         fontSize: 12,
         color: '#fff',
     },
     meta: {
-        fontFamily: 'Orbitron-Regular',
+        fontFamily: fonte.corpo,
         fontSize: 9,
-        color: '#90A4AE',
+        color: cores.textoSecundario,
         marginTop: 2,
     },
     statusBadge: {
@@ -191,7 +192,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
     },
     statusText: {
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         fontSize: 8,
     },
     logFooter: {
@@ -204,14 +205,14 @@ const styles = StyleSheet.create({
         gap: 6,
     },
     timeText: {
-        fontFamily: 'Orbitron-Regular',
+        fontFamily: fonte.corpo,
         fontSize: 9,
-        color: '#546E7A',
+        color: cores.textoFraco,
     },
     deviceText: {
-        fontFamily: 'Orbitron-Medium',
+        fontFamily: fonte.corpoMedio,
         fontSize: 8,
-        color: '#00D4FF',
+        color: cores.primaria,
     },
     empty: {
         flex: 1,
@@ -221,9 +222,9 @@ const styles = StyleSheet.create({
         opacity: 0.5,
     },
     emptyText: {
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         fontSize: 12,
-        color: '#90A4AE',
+        color: cores.textoSecundario,
         marginTop: 15,
         letterSpacing: 2,
     }

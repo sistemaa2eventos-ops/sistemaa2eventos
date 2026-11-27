@@ -19,6 +19,7 @@ import * as Crypto from 'expo-crypto';
  * - Offline: busca do SQLite local (dados básicos do cache)
  * - Check-in funciona em ambos os modos
  */
+import { cores, fonte } from '@/constants/theme';
 export default function EmployeeDetailScreen() {
     const { id } = useLocalSearchParams();
     const router = useRouter();
@@ -154,7 +155,7 @@ export default function EmployeeDetailScreen() {
     if (loading) {
         return (
             <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color="#00D4FF" />
+                <ActivityIndicator size="large" color={cores.primaria} />
             </View>
         );
     }
@@ -163,9 +164,9 @@ export default function EmployeeDetailScreen() {
         <ScrollView style={styles.container}>
             <Stack.Screen options={{
                 headerTitle: 'IDENTIFICAÇÃO',
-                headerTitleStyle: { fontFamily: 'Orbitron-Bold', fontSize: 12, color: '#00D4FF' },
-                headerStyle: { backgroundColor: '#050B18' },
-                headerTintColor: '#00D4FF',
+                headerTitleStyle: { fontFamily: fonte.titulo, fontSize: 12, color: cores.primaria },
+                headerStyle: { backgroundColor: cores.fundo },
+                headerTintColor: cores.primaria,
                 headerShown: true
             }} />
 
@@ -173,8 +174,8 @@ export default function EmployeeDetailScreen() {
                 {/* Data Source Badge */}
                 {dataSource === 'offline' && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'rgba(255,184,0,0.1)', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,184,0,0.3)', alignSelf: 'flex-start' }}>
-                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#FFB800' }} />
-                        <ThemedText style={{ fontFamily: 'Orbitron-Bold', fontSize: 8, color: '#FFB800', letterSpacing: 1 }}>DADOS DO CACHE OFFLINE</ThemedText>
+                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: cores.alerta }} />
+                        <ThemedText style={{ fontFamily: fonte.titulo, fontSize: 8, color: cores.alerta, letterSpacing: 1 }}>DADOS DO CACHE OFFLINE</ThemedText>
                     </View>
                 )}
 
@@ -198,16 +199,16 @@ export default function EmployeeDetailScreen() {
 
                     <View style={styles.details}>
                         <View style={styles.detailRow}>
-                            <Ionicons name="card-outline" size={16} color="#00D4FF" />
+                            <Ionicons name="card-outline" size={16} color={cores.primaria} />
                             <ThemedText style={styles.detailText}>CPF: {employee.cpf}</ThemedText>
                         </View>
                         <View style={styles.detailRow}>
-                            <Ionicons name="ribbon-outline" size={16} color="#00FF88" />
+                            <Ionicons name="ribbon-outline" size={16} color={cores.sucesso} />
                             <ThemedText style={styles.detailText}>Acesso: {employee.status_acesso?.toUpperCase()}</ThemedText>
                         </View>
                         <View style={styles.detailRow}>
-                            <Ionicons name={employee.status_ingresso === 'ativo' ? "checkmark-circle" : "warning"} size={16} color={employee.status_ingresso === 'ativo' ? "#00FF88" : "#FF3366"} />
-                            <ThemedText style={[styles.detailText, { color: employee.status_ingresso === 'ativo' ? "#00FF88" : "#FF3366" }]}>
+                            <Ionicons name={employee.status_ingresso === 'ativo' ? "checkmark-circle" : "warning"} size={16} color={employee.status_ingresso === 'ativo' ? cores.sucesso : cores.erro} />
+                            <ThemedText style={[styles.detailText, { color: employee.status_ingresso === 'ativo' ? cores.sucesso : cores.erro }]}>
                                 Ticket: {employee.status_ingresso?.toUpperCase() || 'ATIVO'}
                             </ThemedText>
                         </View>
@@ -218,11 +219,11 @@ export default function EmployeeDetailScreen() {
                 <View style={styles.section}>
                     <ThemedText style={styles.sectionTitle}>VINCULAR PULSEIRA</ThemedText>
                     <View style={styles.inputContainer}>
-                        <Ionicons name="barcode-outline" size={20} color="#90A4AE" style={{ marginRight: 10 }} />
+                        <Ionicons name="barcode-outline" size={20} color={cores.textoSecundario} style={{ marginRight: 10 }} />
                         <TextInput
                             style={styles.input}
                             placeholder="NÚMERO DA PULSEIRA"
-                            placeholderTextColor="#546E7A"
+                            placeholderTextColor={cores.textoFraco}
                             value={pulseira}
                             onChangeText={setPulseira}
                         />
@@ -238,8 +239,8 @@ export default function EmployeeDetailScreen() {
                 {/* Actions */}
                 <View style={styles.actions}>
                     {employee.status_ingresso === 'transferencia_pendente' || employee.status_ingresso === 'transferido' || employee.status_ingresso === 'cancelado' ? (
-                        <View style={{ backgroundColor: 'rgba(255, 51, 102, 0.1)', padding: 15, borderRadius: 10, borderWidth: 1, borderColor: '#FF3366' }}>
-                            <ThemedText style={{ color: '#FF3366', textAlign: 'center', fontFamily: 'Orbitron-Bold', fontSize: 12 }}>
+                        <View style={{ backgroundColor: 'rgba(255, 51, 102, 0.1)', padding: 15, borderRadius: 10, borderWidth: 1, borderColor: cores.erro }}>
+                            <ThemedText style={{ color: cores.erro, textAlign: 'center', fontFamily: fonte.titulo, fontSize: 12 }}>
                                 INGRESSO BLOQUEADO (ANTI-FRAUDE/TRANSFERÊNCIA).
                             </ThemedText>
                         </View>
@@ -261,7 +262,7 @@ export default function EmployeeDetailScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#050B18',
+        backgroundColor: cores.fundo,
     },
     content: {
         padding: 20,
@@ -273,7 +274,7 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(0, 212, 255, 0.2)',
         padding: 20,
         marginBottom: 25,
-        shadowColor: '#00D4FF',
+        shadowColor: cores.primaria,
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.2,
         shadowRadius: 15,
@@ -289,7 +290,7 @@ const styles = StyleSheet.create({
         height: 100,
         borderRadius: 15,
         borderWidth: 2,
-        borderColor: '#00D4FF',
+        borderColor: cores.primaria,
         backgroundColor: '#000',
     },
     headerInfo: {
@@ -297,15 +298,15 @@ const styles = StyleSheet.create({
         marginLeft: 20,
     },
     name: {
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         fontSize: 14,
         color: '#fff',
         marginBottom: 2,
     },
     company: {
-        fontFamily: 'Orbitron-Regular',
+        fontFamily: fonte.corpo,
         fontSize: 10,
-        color: '#00D4FF',
+        color: cores.primaria,
         marginBottom: 8,
     },
     badge: {
@@ -318,9 +319,9 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(0, 255, 136, 0.3)',
     },
     badgeText: {
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         fontSize: 8,
-        color: '#00FF88',
+        color: cores.sucesso,
         letterSpacing: 1,
     },
     divider: {
@@ -337,17 +338,17 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     detailText: {
-        fontFamily: 'Orbitron-Regular',
+        fontFamily: fonte.corpo,
         fontSize: 11,
-        color: '#90A4AE',
+        color: cores.textoSecundario,
     },
     section: {
         marginBottom: 25,
     },
     sectionTitle: {
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         fontSize: 10,
-        color: '#90A4AE',
+        color: cores.textoSecundario,
         letterSpacing: 2,
         marginBottom: 15,
     },
@@ -364,7 +365,7 @@ const styles = StyleSheet.create({
     },
     input: {
         flex: 1,
-        fontFamily: 'Orbitron-Bold',
+        fontFamily: fonte.titulo,
         fontSize: 14,
         color: '#fff',
         letterSpacing: 2,
