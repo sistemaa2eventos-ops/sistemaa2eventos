@@ -745,6 +745,18 @@ docker system prune -af
 **Registre cada deploy aqui:**
 
 ```
+2026-11-26 - Deploy 81e44ef (segredo próprio do portal da empresa; cabeçalhos do domínio empresa no gateway)
+├─ Mudanças: PORTAL_EMPRESA_SEGREDO (GitHub Secret, gravado no .env da VPS pelo deploy se ainda não existir);
+│            portal não usa mais JWT_SECRET nem SUPABASE_JWT_SECRET; segredo ausente ou curto (<32) derruba só o portal;
+│            gateway: empresa.nzt.app.br com CSP própria (sem a CSP do painel), frame-ancestors none, noindex,
+│            Cache-Control no-store na API do portal; cabeçalhos duplicados removidos do nginx do portal
+├─ Efeito: sessões do portal e chaves de acesso já geradas deixam de valer; gerar chave nova no painel para cada empresa
+├─ Status: ✅ OK (GitHub Actions run 45914553842); empresa.nzt.app.br 200 com cada cabeçalho uma vez;
+│          /api/portal-empresa/perfil 401 sem login; painel /api/ready 200
+├─ Testes: backend 794 ✅ (2 testes do portal ajustados ao segredo novo + 1 novo: sem segredo não há fallback)
+├─ Não verificado: presença do segredo no .env da VPS (sem acesso SSH aqui); o primeiro login ou a geração de chave confirma
+└─ Rollback: tag antes-deploy-20261127-portal-seguranca (6ae15f2)
+
 2026-11-26 - Deploy f0d4364 (senha padrão de equipamento fora dos scripts e docs; guardião de integridade)
 ├─ Mudanças: scripts de teste e arquivos de diagnóstico leem INTELBRAS_DEFAULT_PASS do ambiente (sem senha literal);
 │            documentação usa <SENHA_DO_EQUIPAMENTO>; .playwright-mcp/ no .gitignore; GUARDIAN_SKILL.md e
