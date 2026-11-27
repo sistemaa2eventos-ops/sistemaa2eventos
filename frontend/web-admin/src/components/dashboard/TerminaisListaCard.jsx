@@ -14,6 +14,7 @@ import {
     Fingerprint as BiometricIcon
 } from '@mui/icons-material';
 import GlassCard from '../common/GlassCard';
+import { cores, tom } from '../../styles/tokens';
 
 /**
  * TerminaisListaCard
@@ -47,7 +48,7 @@ const TerminaisListaCard = ({ terminais = [] }) => {
                         fontSize: '0.75rem',
                         height: 22,
                         bgcolor: 'rgba(0, 255, 136, 0.12)',
-                        color: '#00FF88',
+                        color: cores.sucesso,
                         border: '1px solid rgba(0, 255, 136, 0.3)'
                     }}
                 />
@@ -65,7 +66,7 @@ const TerminaisListaCard = ({ terminais = [] }) => {
                         fontSize: '0.75rem',
                         height: 22,
                         bgcolor: 'rgba(255, 184, 0, 0.12)',
-                        color: '#FFB800',
+                        color: cores.alerta,
                         border: '1px solid rgba(255, 184, 0, 0.3)'
                     }}
                 />
@@ -81,8 +82,8 @@ const TerminaisListaCard = ({ terminais = [] }) => {
                     fontWeight: 700,
                     fontSize: '0.75rem',
                     height: 22,
-                    bgcolor: 'rgba(0, 212, 255, 0.12)',
-                    color: '#00D4FF',
+                    bgcolor: tom(cores.primaria, 0.12),
+                    color: cores.primaria,
                     border: '1px solid rgba(0, 212, 255, 0.3)'
                 }}
             />
@@ -110,7 +111,7 @@ const TerminaisListaCard = ({ terminais = [] }) => {
                         p: 1,
                         borderRadius: 1.5,
                         bgcolor: 'rgba(0, 255, 136, 0.12)',
-                        color: '#00FF88',
+                        color: cores.sucesso,
                         display: 'flex',
                         alignItems: 'center'
                     }}>
@@ -119,7 +120,7 @@ const TerminaisListaCard = ({ terminais = [] }) => {
                     <Box>
                         <Typography variant="h6" sx={{
                             fontWeight: 700,
-                            color: '#FFFFFF',
+                            color: cores.textoForte,
                             fontSize: '1rem',
                             fontFamily: '"Space Grotesk", sans-serif',
                             lineHeight: 1.2
@@ -146,7 +147,7 @@ const TerminaisListaCard = ({ terminais = [] }) => {
                         fontSize: '0.75rem',
                         height: 26,
                         bgcolor: totalOnline > 0 ? 'rgba(0, 255, 136, 0.12)' : 'rgba(255, 51, 102, 0.12)',
-                        color: totalOnline > 0 ? '#00FF88' : '#FF3366',
+                        color: totalOnline > 0 ? cores.sucesso : cores.erro,
                         border: '1px solid',
                         borderColor: totalOnline > 0 ? 'rgba(0, 255, 136, 0.3)' : 'rgba(255, 51, 102, 0.3)'
                     }}
@@ -187,8 +188,8 @@ const TerminaisListaCard = ({ terminais = [] }) => {
                                         bgcolor: 'rgba(255,255,255,0.03)',
                                         border: '1px solid rgba(255,255,255,0.06)',
                                         borderLeft: '4px solid',
-                                        borderLeftColor: isOnline ? '#00FF88' : (isSync ? '#FFB800' : '#FF3366'),
-                                        transition: 'all 0.2s',
+                                        borderLeftColor: isOnline ? cores.sucesso : (isSync ? cores.alerta : cores.erro),
+                                        transition: 'background-color 0.2s, border-color 0.2s, color 0.2s, opacity 0.2s, transform 0.2s',
                                         '&:hover': {
                                             bgcolor: 'rgba(255,255,255,0.06)',
                                             transform: 'translateX(3px)'
@@ -204,7 +205,7 @@ const TerminaisListaCard = ({ terminais = [] }) => {
                                         {/* Nome do Equipamento com Ícone */}
                                         <Stack direction="row" spacing={1} alignItems="center">
                                             <Box sx={{
-                                                color: isOnline ? '#00FF88' : '#94A3B8',
+                                                color: isOnline ? cores.sucesso : cores.textoSecundario,
                                                 display: 'flex',
                                                 alignItems: 'center'
                                             }}>
@@ -212,7 +213,7 @@ const TerminaisListaCard = ({ terminais = [] }) => {
                                             </Box>
                                             <Typography variant="body2" sx={{
                                                 fontWeight: 700,
-                                                color: '#FFFFFF',
+                                                color: cores.textoForte,
                                                 fontSize: '0.875rem',
                                                 fontFamily: '"Space Grotesk", sans-serif'
                                             }}>
@@ -224,13 +225,13 @@ const TerminaisListaCard = ({ terminais = [] }) => {
                                         <Stack direction="row" spacing={0.6} alignItems="center">
                                             <CircleIcon sx={{
                                                 fontSize: '0.75rem',
-                                                color: isOnline ? '#00FF88' : (isSync ? '#FFB800' : '#FF3366')
+                                                color: isOnline ? cores.sucesso : (isSync ? cores.alerta : cores.erro)
                                             }} />
                                             <Typography variant="caption" sx={{
                                                 fontWeight: 700,
                                                 fontSize: '0.75rem',
                                                 fontFamily: '"Inter", sans-serif',
-                                                color: isOnline ? '#00FF88' : (isSync ? '#FFB800' : '#FF3366')
+                                                color: isOnline ? cores.sucesso : (isSync ? cores.alerta : cores.erro)
                                             }}>
                                                 {isOnline ? 'Online' : (isSync ? 'Sincronizando' : 'Offline')}
                                             </Typography>
@@ -252,7 +253,7 @@ const TerminaisListaCard = ({ terminais = [] }) => {
                                             alignItems: 'center',
                                             gap: 0.5
                                         }}>
-                                            <PlaceIcon sx={{ fontSize: 14, color: '#00D4FF' }} />
+                                            <PlaceIcon sx={{ fontSize: 14, color: cores.primaria }} />
                                             <strong>Local:</strong> {t.local || 'Portaria Principal'}
                                         </Typography>
 

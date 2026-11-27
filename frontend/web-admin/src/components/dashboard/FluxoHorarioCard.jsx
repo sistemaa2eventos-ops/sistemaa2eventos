@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Typography, Stack, Button, Table, TableHead, TableBody, TableRow, TableCell } from '@mui/material';
 import GlassCard from '../common/GlassCard';
+import Secao from './editorial/Secao';
 import { cores } from '../../styles/tokens';
 
 // Tons validados contra a superfície escura (faixa de luminosidade, daltonismo, contraste):
 // os neon da marca são claros demais para preencher barras
-const COR = { ocupacao: '#0FA3C7', entradas: '#16A86A', saidas: '#D9700A' };
+const COR_PADRAO = { ocupacao: '#0FA3C7', entradas: '#16A86A', saidas: '#D9700A' };
 const GRADE = 'rgba(148,163,184,0.14)';
 const MARGEM = { esq: 36, dir: 12 };
 const ALT_OCUP = 120;
@@ -61,7 +62,11 @@ const Legenda = ({ cor, rotulo, linha }) => (
  * Fluxo de hoje por hora: ocupação (quem está dentro ao fim de cada hora) e, embaixo,
  * entradas × saídas. Dois gráficos com o mesmo eixo de horas, cada um com a sua escala.
  */
-const FluxoHorarioCard = ({ operacao }) => {
+const FluxoHorarioCard = ({ operacao, editorial = false }) => {
+    // Na direção editorial as cores seguem os tokens de função (entrada, saída) e o destaque
+    const COR = editorial
+        ? { ocupacao: cores.primaria, entradas: cores.sucesso, saidas: cores.saida }
+        : COR_PADRAO;
     const [ref, largura] = useLargura();
     const [hover, setHover] = useState(null);
     const [tabela, setTabela] = useState(false);
@@ -97,24 +102,21 @@ const FluxoHorarioCard = ({ operacao }) => {
         setHover(i >= 0 && i < horas.length ? i : null);
     };
 
-    return (
-        <GlassCard sx={{ p: { xs: 2, sm: 3 }, height: '100%', minWidth: 0 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
-                <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 700, color: cores.textoForte, fontFamily: '"Space Grotesk", sans-serif' }}>
-                        Fluxo de hoje
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: cores.textoSecundario }}>
-                        {operacao?.pico ? `Pico de ${operacao.pico.ocupacao} pessoas dentro às ${hh(operacao.pico.hora)}` : 'Ocupação e movimento por hora'}
-                        {` • ${operacao?.entradas_hoje || 0} entradas, ${operacao?.saidas_hoje || 0} saídas`}
-                    </Typography>
-                </Box>
-                <Button size="small" onClick={() => setTabela(t => !t)} sx={{ color: cores.primaria, fontWeight: 700 }}>
-                    {tabela ? 'Ver gráfico' : 'Ver tabela'}
-                </Button>
-            </Box>
+    const subtitulo = `${operacao?.pico ? `Pico de ${operacao.pico.ocupacao} pessoas dentro às ${hh(operacao.pico.hora)}` : 'Ocupação e movimento por hora'}`
+        + ` • ${operacao?.entradas_hoje || 0} entradas, ${operacao?.saidas_hoje || 0} saídas`;
 
-            {/* largura medida num bloco sempre montado (o gráfico só aparece quando há movimento) */}
+    const botao = (
+        <Button
+            size="small"
+            onClick={() => setTabela(t => !t)}
+            sx={{ color: editorial ? cores.textoForte : cores.primaria, fontWeight: 700, ...(editorial && { minHeight: 44 }) }}
+        >
+            {tabela ? 'Ver gráfico' : 'Ver tabela'}
+        </Button>
+    );
+
+    const corpo = (
+            /* largura medida num bloco sempre montado (o gráfico só aparece quando há movimento) */
             <Box ref={ref} sx={{ width: '100%', minWidth: 0, overflow: 'hidden' }}>
             {semMovimento ? (
                 <Typography variant="body2" sx={{ color: cores.textoSecundario, py: 6, textAlign: 'center' }}>
@@ -211,6 +213,28 @@ const FluxoHorarioCard = ({ operacao }) => {
                 </Box>
             )}
             </Box>
+    );
+
+    if (editorial) {
+        return (
+            <Secao id="secao-fluxo" cartao rotulo="Movimento" titulo="Fluxo de hoje" subtitulo={subtitulo} acao={botao}>
+                {corpo}
+            </Secao>
+        );
+    }
+
+    return (
+        <GlassCard sx={{ p: { xs: 2, sm: 3 }, height: '100%', minWidth: 0 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
+                <Box>
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: cores.textoForte, fontFamily: '"Space Grotesk", sans-serif' }}>
+                        Fluxo de hoje
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: cores.textoSecundario }}>{subtitulo}</Typography>
+                </Box>
+                {botao}
+            </Box>
+            {corpo}
         </GlassCard>
     );
 };

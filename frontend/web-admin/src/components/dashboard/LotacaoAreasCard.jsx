@@ -51,9 +51,9 @@ const LotacaoAreasCard = ({ operacao }) => {
                                             </Typography>
                                         </Typography>
                                     </Box>
-                                    <Box sx={{ height: 8, borderRadius: 4, bgcolor: 'rgba(148,163,184,0.14)', overflow: 'hidden' }}>
+                                    <Box sx={{ height: 8, borderRadius: 1.5, bgcolor: 'rgba(148,163,184,0.14)', overflow: 'hidden' }}>
                                         <Box sx={{
-                                            height: '100%', width: `${largura * 100}%`, borderRadius: 4,
+                                            height: '100%', width: `${largura * 100}%`, borderRadius: 1.5,
                                             bgcolor: lotada ? cores.erro : atencao ? cores.alerta : COR_BARRA,
                                             transition: 'width 0.4s ease'
                                         }} />

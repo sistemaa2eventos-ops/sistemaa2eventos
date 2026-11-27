@@ -27,7 +27,7 @@ const Alerta = ({ a }) => {
                 <Icone sx={{ color: cor, fontSize: 20, mt: '2px' }} />
                 <Box sx={{ flex: 1, minWidth: { xs: 'calc(100% - 32px)', sm: 0 } }}>
                     <Typography variant="body2" sx={{ fontWeight: 700, color: cores.textoForte }}>
-                        <Box component="span" sx={{ color: cor, mr: 0.75, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>{rotulo}</Box>
+                        <Box component="span" sx={{ color: cor, mr: 0.75, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>{rotulo}</Box>
                         {a.titulo}
                     </Typography>
                     {a.texto && <Typography variant="caption" sx={{ color: cores.textoSecundario, display: 'block' }}>{a.texto}</Typography>}

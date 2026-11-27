@@ -12,6 +12,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import PessoaFoto from '../common/PessoaFoto';
 import PessoaCardDialog from '../credenciamento/PessoaCardDialog';
+import { cores, tom } from '../../styles/tokens';
 
 const RecentAdditions = ({ pessoas = [] }) => {
   const [selectedPessoa, setSelectedPessoa] = useState(null);
@@ -41,7 +42,7 @@ const RecentAdditions = ({ pessoas = [] }) => {
                   alignItems: 'center',
                   transition: 'background 0.2s ease',
                   '&:hover': {
-                    background: 'rgba(0, 212, 255, 0.05)',
+                    background: tom(cores.primaria, 0.05),
                   }
                 }}
               >
@@ -52,12 +53,12 @@ const RecentAdditions = ({ pessoas = [] }) => {
                     nome={func.nome}
                     width={48}
                     borderRadius="10px"
-                    accentColor="#00D4FF"
+                    accentColor={cores.primaria}
                   />
                 </Box>
                 <ListItemText
                   primary={
-                    <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#FFFFFF' }}>
+                    <Typography variant="subtitle2" fontWeight={700} sx={{ color: cores.textoForte }}>
                       {func.nome}
                     </Typography>
                   }

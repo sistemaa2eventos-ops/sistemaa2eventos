@@ -13,9 +13,15 @@ import { useNavigate } from 'react-router-dom';
 
 import GlassCard from '../components/common/GlassCard';
 import KpiCard from '../components/common/KpiCard';
-import { cores, funcao } from '../styles/tokens';
+import { cores, direcao, fontes, funcao, tom } from '../styles/tokens';
 import PageHeader from '../components/common/PageHeader';
 import RecentAdditions from '../components/dashboard/RecentAdditions';
+import IndicadoresEditoriais from '../components/dashboard/IndicadoresEditoriais';
+import Secao from '../components/dashboard/editorial/Secao';
+import AlertasEditorial from '../components/dashboard/editorial/AlertasEditorial';
+import LotacaoEditorial from '../components/dashboard/editorial/LotacaoEditorial';
+import EmpresasEditorial from '../components/dashboard/editorial/EmpresasEditorial';
+import TerminaisEditorial from '../components/dashboard/editorial/TerminaisEditorial';
 import EmpresasMetricasCard from '../components/dashboard/EmpresasMetricasCard';
 import TerminaisListaCard from '../components/dashboard/TerminaisListaCard';
 import FluxoHorarioCard from '../components/dashboard/FluxoHorarioCard';
@@ -82,7 +88,7 @@ const Dashboard = () => {
     if (loading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60dvh' }}>
-                <CircularProgress sx={{ color: '#00D4FF' }} />
+                <CircularProgress sx={{ color: cores.primaria }} />
             </Box>
         );
     }
@@ -116,16 +122,16 @@ const Dashboard = () => {
                 >
                     {/* Leitores Online */}
                     <Chip 
-                        icon={<DevicesIcon sx={{ fontSize: 16, color: '#00FF88 !important' }} />}
-                        label={`${stats.dispositivos_online || 0} ${(stats.dispositivos_online || 0) === 1 ? t('dashboard.reader_online', { defaultValue: 'leitor online' }) : t('dashboard.readers_online', { defaultValue: 'leitores online' })}`} 
+                        icon={<DevicesIcon sx={{ fontSize: 16, color: `${cores.sucesso} !important` }} />}
+                        label={`${stats.dispositivos_online || 0} ${(stats.dispositivos_online || 0) === 1 ? t('dashboard.reader_online', { defaultValue: 'leitor online' }) : t('dashboard.readers_online', { defaultValue: 'leitores online' })}`}
                         sx={{
                             fontFamily: '"Inter", sans-serif',
                             fontWeight: 700,
                             height: 38,
-                            borderRadius: '10px',
-                            bgcolor: 'rgba(0, 255, 136, 0.1)',
-                            color: '#00FF88',
-                            border: '1px solid rgba(0, 255, 136, 0.3)',
+                            borderRadius: '8px',
+                            bgcolor: tom(cores.sucesso, 0.1),
+                            color: cores.sucesso,
+                            border: `1px solid ${tom(cores.sucesso, 0.3)}`,
                             fontSize: '0.75rem'
                         }} 
                     />
@@ -145,16 +151,16 @@ const Dashboard = () => {
                         onClick={refresh}
                         title={t('dashboard.refresh_data', { defaultValue: 'Atualizar dados' })}
                         sx={{
-                            color: '#00D4FF',
-                            bgcolor: 'rgba(0, 212, 255, 0.08)',
-                            border: '1px solid rgba(0, 212, 255, 0.25)',
-                            borderRadius: '10px',
+                            color: cores.primaria,
+                            bgcolor: tom(cores.primaria, 0.08),
+                            border: `1px solid ${tom(cores.primaria, 0.25)}`,
+                            borderRadius: '8px',
                             height: 38,
                             width: 38,
-                            transition: 'all 0.2s ease',
+                            transition: 'background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease',
                             '&:hover': {
-                                bgcolor: 'rgba(0, 212, 255, 0.18)',
-                                borderColor: '#00D4FF'
+                                bgcolor: tom(cores.primaria, 0.18),
+                                borderColor: cores.primaria
                             },
                             animation: refreshing ? 'spin 1.5s linear infinite' : 'none',
                             '@keyframes spin': {
@@ -168,7 +174,14 @@ const Dashboard = () => {
                 </Stack>
             </Box>
 
-            {/* 1. INDICADORES DO DIA + BASE CADASTRAL */}
+            {/* 1. INDICADORES DO DIA + BASE CADASTRAL (prévia editorial: direção A, B ou C) */}
+            {direcao.editorial ? (
+                <IndicadoresEditoriais
+                    stats={stats}
+                    totalEmpresas={stats.total_empresas}
+                    empresasAtivas={empresasMetricas.length}
+                />
+            ) : (
             <Grid container spacing={2} sx={{ mb: 3 }}>
                 <Grid item xs={6} sm={4} md={2.4}>
                     <KpiCard
@@ -204,7 +217,36 @@ const Dashboard = () => {
                     <KpiCard titulo={t('dashboard.registered_participants', { defaultValue: 'Participantes cadastrados' })} valor={stats.total_pessoas || 0} icone={<PeopleIcon />} />
                 </Grid>
             </Grid>
+            )}
 
+            {/* 2–4 na direção editorial (A, B, C): seções abertas com divisória, mesma anatomia em todas */}
+            {direcao.editorial ? (
+                <Box sx={{ display: 'grid', gap: { xs: 3, md: 4 } }}>
+                    {operacao && <AlertasEditorial operacao={operacao} />}
+
+                    {operacao && (
+                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 2fr) minmax(0, 1fr)' }, gap: { xs: 3, md: 4 } }}>
+                            <FluxoHorarioCard operacao={operacao} editorial />
+                            <LotacaoEditorial operacao={operacao} />
+                        </Box>
+                    )}
+
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 3fr) minmax(0, 2fr)' }, gap: { xs: 3, md: 4 } }}>
+                        <EmpresasEditorial empresas={empresasMetricas} />
+                        <TerminaisEditorial terminais={terminaisLista} />
+                    </Box>
+
+                    <Secao
+                        id="secao-recentes" cartao
+                        rotulo="Cadastro"
+                        titulo={t('dashboard.recent_participants', { defaultValue: 'Últimos participantes cadastrados' })}
+                        subtitulo={t('dashboard.recent_participants_sub', { defaultValue: 'Conferência imediata dos colaboradores recém-adicionados com foto e empresa' })}
+                    >
+                        <RecentAdditions pessoas={recentPessoas} />
+                    </Secao>
+                </Box>
+            ) : (
+            <>
             {/* 2. OPERAÇÃO DE HOJE: alertas, fluxo por hora e lotação por área */}
             {operacao && (
                 <Grid container spacing={{ xs: 2, md: 3 }} sx={{ mb: { xs: 2, md: 3 } }}>
@@ -239,12 +281,12 @@ const Dashboard = () => {
                             <Box>
                                 <Typography variant="h6" sx={{
                                     fontWeight: 700,
-                                    color: '#FFFFFF',
-                                    fontFamily: '"Space Grotesk", sans-serif'
+                                    color: cores.textoForte,
+                                    fontFamily: fontes.titulo
                                 }}>
                                     {t('dashboard.recent_participants', { defaultValue: 'Últimos participantes cadastrados' })}
                                 </Typography>
-                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                                <Typography variant="caption" sx={{ color: direcao.editorial ? cores.textoSecundario : 'rgba(255,255,255,0.5)' }}>
                                     {t('dashboard.recent_participants_sub', { defaultValue: 'Conferência imediata dos colaboradores recém-adicionados com foto e empresa' })}
                                 </Typography>
                             </Box>
@@ -253,6 +295,8 @@ const Dashboard = () => {
                     </GlassCard>
                 </Grid>
             </Grid>
+            </>
+            )}
         </Box>
     );
 };

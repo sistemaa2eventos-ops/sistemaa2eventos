@@ -31,6 +31,7 @@ import {
 import { FaceValidator } from '../../utils/FaceValidator';
 import FaceCropper from './FaceCropper';
 import { keyframes } from '@mui/material/styles';
+import { cores, tom } from '../../styles/tokens';
 
 const traduzirErroCamera = (err) => {
     const nome = err?.name || '';
@@ -49,12 +50,6 @@ const traduzirErroCamera = (err) => {
     }
     return 'Não foi possível iniciar o vídeo da câmera. Tente trocar de câmera abaixo ou enviar arquivo.';
 };
-
-const scanLine = keyframes`
-  0%   { top: 8%; opacity: 0.7; }
-  50%  { top: 88%; opacity: 1; }
-  100% { top: 8%; opacity: 0.7; }
-`;
 
 const pulse = keyframes`
   0%, 100% { opacity: 0.5; }
@@ -99,19 +94,6 @@ const FaceMask = ({ active }) => (
             animation: active ? `${pulse} 2s ease-in-out infinite` : 'none',
         }} />
 
-        {/* Linha de scan (só quando câmera ativa) */}
-        {active && (
-            <Box sx={{
-                position: 'absolute',
-                left: '19%',
-                right: '19%',
-                height: '1px',
-                bgcolor: 'rgba(0,212,255,0.7)',
-                boxShadow: '0 0 8px rgba(0,212,255,0.6)',
-                animation: `${scanLine} 2.8s ease-in-out infinite`,
-            }} />
-        )}
-
         {/* Cantos de enquadramento */}
         {[
             { top: '6%',  left: '8%',  borderTop: true,  borderLeft: true  },
@@ -129,7 +111,7 @@ const FaceMask = ({ active }) => (
                 borderRightWidth:  corner.borderRight  ? '2px' : 0,
                 borderBottomWidth: corner.borderBottom ? '2px' : 0,
                 borderStyle: 'solid',
-                borderColor: 'rgba(0,212,255,0.6)',
+                borderColor: tom(cores.primaria, 0.6),
                 borderRadius: 0,
             }} />
         ))}
@@ -153,7 +135,7 @@ const CRITERIOS = [
 const ChecklistItem = ({ label, passed }) => (
     <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1.5 }}>
         {passed
-            ? <CheckIcon sx={{ color: '#00FF88', fontSize: 18, flexShrink: 0 }} />
+            ? <CheckIcon sx={{ color: cores.sucesso, fontSize: 18, flexShrink: 0 }} />
             : <UncheckedIcon sx={{ color: 'rgba(255,255,255,0.2)', fontSize: 18, flexShrink: 0 }} />
         }
         <Typography variant="body2" sx={{
@@ -509,7 +491,7 @@ const PhotoCapture = ({ onPhotoCaptured, initialPhoto, modoDocumento = false, au
                                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                                 gap: 1.5, p: 2, textAlign: 'center'
                             }}>
-                                <CircularProgress size={28} sx={{ color: '#00D4FF' }} />
+                                <CircularProgress size={28} sx={{ color: cores.primaria }} />
                                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>
                                     Iniciando câmera...
                                 </Typography>
@@ -525,7 +507,7 @@ const PhotoCapture = ({ onPhotoCaptured, initialPhoto, modoDocumento = false, au
                                 <Typography variant="caption" sx={{ color: '#FF8A80', lineHeight: 1.4 }}>
                                     {cameraError}
                                 </Typography>
-                                <Button size="small" variant="outlined" onClick={abrirCamera} sx={{ color: '#00D4FF', borderColor: '#00D4FF', fontSize: '0.72rem' }}>
+                                <Button size="small" variant="outlined" onClick={abrirCamera} sx={{ color: cores.primaria, borderColor: cores.primaria, fontSize: '0.75rem' }}>
                                     Tentar novamente
                                 </Button>
                             </Box>
@@ -592,9 +574,9 @@ const PhotoCapture = ({ onPhotoCaptured, initialPhoto, modoDocumento = false, au
                         width: '100%',
                         height: 32,
                         fontSize: '0.75rem',
-                        color: '#FFFFFF',
+                        color: cores.textoForte,
                         bgcolor: 'rgba(0,0,0,0.35)',
-                        '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0,212,255,0.25)' }
+                        '.MuiOutlinedInput-notchedOutline': { borderColor: tom(cores.primaria, 0.25) }
                     }}
                 >
                     {devices.map((d, idx) => (
@@ -614,9 +596,9 @@ const PhotoCapture = ({ onPhotoCaptured, initialPhoto, modoDocumento = false, au
                             size="medium"
                             sx={{
                                 color: 'primary.main',
-                                bgcolor: 'rgba(0,212,255,0.08)',
+                                bgcolor: tom(cores.primaria, 0.08),
                                 border: '1px solid rgba(0,212,255,0.2)',
-                                '&:hover': { bgcolor: 'rgba(0,212,255,0.16)' },
+                                '&:hover': { bgcolor: tom(cores.primaria, 0.16) },
                             }}
                         >
                             <VideoIcon />
@@ -631,7 +613,7 @@ const PhotoCapture = ({ onPhotoCaptured, initialPhoto, modoDocumento = false, au
                                     disabled={!cameraReady || loading}
                                     size="medium"
                                     sx={{
-                                        color: '#00FF88',
+                                        color: cores.sucesso,
                                         bgcolor: 'rgba(0,255,136,0.08)',
                                         border: '1px solid rgba(0,255,136,0.25)',
                                         '&:hover': { bgcolor: 'rgba(0,255,136,0.16)' },
@@ -648,10 +630,10 @@ const PhotoCapture = ({ onPhotoCaptured, initialPhoto, modoDocumento = false, au
                                     onClick={trocarCamera}
                                     size="medium"
                                     sx={{
-                                        color: '#00D4FF',
-                                        bgcolor: 'rgba(0,212,255,0.08)',
+                                        color: cores.primaria,
+                                        bgcolor: tom(cores.primaria, 0.08),
                                         border: '1px solid rgba(0,212,255,0.2)',
-                                        '&:hover': { bgcolor: 'rgba(0,212,255,0.16)' },
+                                        '&:hover': { bgcolor: tom(cores.primaria, 0.16) },
                                     }}
                                 >
                                     <SwitchCameraIcon />
@@ -700,7 +682,7 @@ const PhotoCapture = ({ onPhotoCaptured, initialPhoto, modoDocumento = false, au
             {/* Status */}
             <Typography variant="caption" sx={{
                 mt: 1.5,
-                color: imgSrc ? '#00FF88' : 'text.disabled',
+                color: imgSrc ? cores.sucesso : 'text.disabled',
                 fontWeight: imgSrc ? 600 : 400,
                 display: 'flex',
                 alignItems: 'center',

@@ -13,6 +13,7 @@ import {
 } from '@mui/icons-material';
 import GlassCard from '../common/GlassCard';
 import { formatarCnpj } from '../../utils/formatadores';
+import { cores, tom } from '../../styles/tokens';
 
 /**
  * EmpresasMetricasCard
@@ -64,8 +65,8 @@ const EmpresasMetricasCard = ({ empresas = [] }) => {
                     <Box sx={{
                         p: 1,
                         borderRadius: 1.5,
-                        bgcolor: 'rgba(0, 212, 255, 0.12)',
-                        color: '#00D4FF',
+                        bgcolor: tom(cores.primaria, 0.12),
+                        color: cores.primaria,
                         display: 'flex',
                         alignItems: 'center'
                     }}>
@@ -74,7 +75,7 @@ const EmpresasMetricasCard = ({ empresas = [] }) => {
                     <Box>
                         <Typography variant="h6" sx={{
                             fontWeight: 700,
-                            color: '#FFFFFF',
+                            color: cores.textoForte,
                             fontSize: '1rem',
                             fontFamily: '"Space Grotesk", sans-serif',
                             lineHeight: 1.2
@@ -96,7 +97,7 @@ const EmpresasMetricasCard = ({ empresas = [] }) => {
                     InputProps={{
                         startAdornment: (
                             <InputAdornment position="start">
-                                <SearchIcon sx={{ color: '#00D4FF', fontSize: 18 }} />
+                                <SearchIcon sx={{ color: cores.primaria, fontSize: 18 }} />
                             </InputAdornment>
                         )
                     }}
@@ -107,9 +108,9 @@ const EmpresasMetricasCard = ({ empresas = [] }) => {
                         '& .MuiOutlinedInput-root': {
                             height: 38,
                             fontSize: '0.8125rem',
-                            color: '#FFFFFF',
-                            '& fieldset': { borderColor: 'rgba(0, 212, 255, 0.25)' },
-                            '&:hover fieldset': { borderColor: '#00D4FF' }
+                            color: cores.textoForte,
+                            '& fieldset': { borderColor: tom(cores.primaria, 0.25) },
+                            '&:hover fieldset': { borderColor: cores.primaria }
                         }
                     }}
                 />
@@ -124,7 +125,7 @@ const EmpresasMetricasCard = ({ empresas = [] }) => {
                 overflowY: 'auto',
                 overflowX: 'auto',
                 '&::-webkit-scrollbar': { width: 6, height: 6 },
-                '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0, 212, 255, 0.2)', borderRadius: 1.5 }
+                '&::-webkit-scrollbar-thumb': { bgcolor: tom(cores.primaria, 0.2), borderRadius: 1.5 }
             }}>
                 <Table stickyHeader size="small" sx={{ minWidth: { xs: 460, sm: '100%' } }}>
                     <TableHead>
@@ -151,14 +152,14 @@ const EmpresasMetricasCard = ({ empresas = [] }) => {
                                     sx={{
                                         borderBottom: '1px solid rgba(255,255,255,0.04)',
                                         transition: 'background 0.2s',
-                                        '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.05)' }
+                                        '&:hover': { bgcolor: tom(cores.primaria, 0.05) }
                                     }}
                                 >
                                     {/* Nome da Empresa */}
                                     <TableCell sx={{ py: 1.2 }}>
                                         <Typography variant="body2" sx={{
                                             fontWeight: 700,
-                                            color: '#FFFFFF',
+                                            color: cores.textoForte,
                                             fontSize: '0.875rem',
                                             fontFamily: '"Space Grotesk", sans-serif'
                                         }}>
@@ -184,7 +185,7 @@ const EmpresasMetricasCard = ({ empresas = [] }) => {
                                                 fontSize: '0.75rem',
                                                 height: 22,
                                                 bgcolor: 'rgba(255,255,255,0.06)',
-                                                color: '#FFFFFF'
+                                                color: cores.textoForte
                                             }}
                                         />
                                     </TableCell>
@@ -193,7 +194,7 @@ const EmpresasMetricasCard = ({ empresas = [] }) => {
                                     <TableCell align="center" sx={{ py: 1.2 }}>
                                         <Typography variant="body2" sx={{
                                             fontWeight: 700,
-                                            color: '#00FF88',
+                                            color: cores.sucesso,
                                             fontFamily: '"Inter", sans-serif',
                                             fontSize: '0.8125rem',
                                             display: 'flex',
@@ -210,7 +211,7 @@ const EmpresasMetricasCard = ({ empresas = [] }) => {
                                     <TableCell align="center" sx={{ py: 1.2 }}>
                                         <Typography variant="body2" sx={{
                                             fontWeight: 700,
-                                            color: '#FFB800',
+                                            color: cores.alerta,
                                             fontFamily: '"Inter", sans-serif',
                                             fontSize: '0.8125rem',
                                             display: 'flex',
@@ -235,7 +236,7 @@ const EmpresasMetricasCard = ({ empresas = [] }) => {
                                                 fontSize: '0.75rem',
                                                 height: 22,
                                                 bgcolor: emp.presentes > 0 ? 'rgba(0, 255, 136, 0.15)' : 'rgba(255,255,255,0.04)',
-                                                color: emp.presentes > 0 ? '#00FF88' : 'rgba(255,255,255,0.5)',
+                                                color: emp.presentes > 0 ? cores.sucesso : 'rgba(255,255,255,0.5)',
                                                 border: '1px solid',
                                                 borderColor: emp.presentes > 0 ? 'rgba(0, 255, 136, 0.35)' : 'transparent'
                                             }}
@@ -263,17 +264,17 @@ const EmpresasMetricasCard = ({ empresas = [] }) => {
                     Total consolidado:
                 </Typography>
                 <Stack direction="row" spacing={2} alignItems="center">
-                    <Typography variant="caption" sx={{ color: '#FFFFFF', fontFamily: '"Inter", sans-serif' }}>
-                        Cadastros: <strong style={{ color: '#00D4FF' }}>{totais.cadastros}</strong>
+                    <Typography variant="caption" sx={{ color: cores.textoForte, fontFamily: '"Inter", sans-serif' }}>
+                        Cadastros: <strong style={{ color: cores.primaria }}>{totais.cadastros}</strong>
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#FFFFFF', fontFamily: '"Inter", sans-serif' }}>
-                        Check-ins: <strong style={{ color: '#00FF88' }}>{totais.checkins}</strong>
+                    <Typography variant="caption" sx={{ color: cores.textoForte, fontFamily: '"Inter", sans-serif' }}>
+                        Check-ins: <strong style={{ color: cores.sucesso }}>{totais.checkins}</strong>
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#FFFFFF', fontFamily: '"Inter", sans-serif' }}>
-                        Checkouts: <strong style={{ color: '#FFB800' }}>{totais.checkouts}</strong>
+                    <Typography variant="caption" sx={{ color: cores.textoForte, fontFamily: '"Inter", sans-serif' }}>
+                        Checkouts: <strong style={{ color: cores.alerta }}>{totais.checkouts}</strong>
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#FFFFFF', fontFamily: '"Inter", sans-serif' }}>
-                        No Evento: <strong style={{ color: '#00FF88' }}>{totais.presentes}</strong>
+                    <Typography variant="caption" sx={{ color: cores.textoForte, fontFamily: '"Inter", sans-serif' }}>
+                        No Evento: <strong style={{ color: cores.sucesso }}>{totais.presentes}</strong>
                     </Typography>
                 </Stack>
             </Box>

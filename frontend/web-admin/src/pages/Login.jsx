@@ -26,38 +26,21 @@ import { styled } from '@mui/material/styles';
 import NeonButton from '../components/common/NeonButton';
 import nztEmblem from '../assets/images/nzt-emblem.png';
 import { useSystemBranding } from '../hooks/useSystemBranding';
+import { cores, direcao, fontes, sombras, tom } from '../styles/tokens';
 
+// Prévia editorial (direções A, B e C): fundo liso, sem halo nem grade, cartão sóbrio
+const ed = direcao.editorial;
+const fundoCampo = ed ? cores.superficieElevada : '#060D1A';
+
+// Fundo sólido e cartão com borda 1px (sem orbes, grade, scanline nem brilho)
 const LoginContainer = styled(Box)(() => ({
     minHeight: '100dvh',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'radial-gradient(circle at center, #0A1628 0%, #050B18 100%)',
+    background: cores.fundo,
     position: 'relative',
     overflow: 'hidden',
-    '&::before': {
-        content: '""',
-        position: 'absolute',
-        width: '100%',
-        height: '100%',
-        backgroundImage: 'linear-gradient(rgba(0, 212, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 212, 255, 0.05) 1px, transparent 1px)',
-        backgroundSize: '50px 50px',
-        animation: 'scanline 10s linear infinite',
-    }
-}));
-
-const GlowOrb = styled(Box)(({ color, top, left, size }) => ({
-    position: 'absolute',
-    top,
-    left,
-    width: size || 300,
-    height: size || 300,
-    background: color || '#00D4FF',
-    borderRadius: '50%',
-    filter: 'blur(100px)',
-    opacity: 0.1,
-    zIndex: 0,
-    animation: 'float 8s ease-in-out infinite',
 }));
 
 const GlassBox = styled(Box)(({ theme }) => ({
@@ -66,11 +49,10 @@ const GlassBox = styled(Box)(({ theme }) => ({
     width: '100%',
     maxWidth: 440,
     padding: theme.spacing(5, 4),
-    background: 'linear-gradient(180deg, rgba(8, 18, 36, 0.92) 0%, rgba(4, 9, 20, 0.96) 100%)',
-    backdropFilter: 'blur(24px)',
-    border: '1px solid rgba(0, 212, 255, 0.22)',
-    borderRadius: 16,
-    boxShadow: '0 24px 80px rgba(0, 0, 0, 0.75), 0 0 45px rgba(0, 212, 255, 0.1)',
+    background: cores.superficie,
+    border: `1px solid ${cores.borda}`,
+    borderRadius: 12,
+    boxShadow: sombras.cartao,
     textAlign: 'center',
     animation: 'fadeInUp 0.6s ease-out forwards',
 }));
@@ -78,45 +60,45 @@ const GlassBox = styled(Box)(({ theme }) => ({
 const inputSx = {
     my: 1,
     '& .MuiOutlinedInput-root': {
-        backgroundColor: '#060D1A !important',
-        borderRadius: 2,
-        transition: 'all 0.2s ease',
+        backgroundColor: `${fundoCampo} !important`,
+        borderRadius: 1.5,
+        transition: 'background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease',
         overflow: 'hidden',
         '& fieldset': {
-            borderColor: 'rgba(0, 212, 255, 0.25)',
+            borderColor: tom(cores.primaria, 0.25),
         },
         '&:hover fieldset': {
-            borderColor: 'rgba(0, 212, 255, 0.5)',
+            borderColor: tom(cores.primaria, 0.5),
         },
         '&.Mui-focused fieldset': {
-            borderColor: '#00D4FF',
+            borderColor: cores.primaria,
             boxShadow: '0 0 16px rgba(0, 212, 255, 0.25)',
         },
         '& .MuiInputAdornment-root': {
             backgroundColor: 'transparent',
-            color: '#00D4FF',
+            color: cores.primaria,
         },
         '& input': {
-            color: '#FFFFFF',
+            color: cores.textoForte,
             fontSize: '0.95rem',
             fontWeight: 500,
             backgroundColor: 'transparent !important',
             borderRadius: '0 !important',
             '&:-webkit-autofill, &:-webkit-autofill:hover, &:-webkit-autofill:focus, &:-webkit-autofill:active': {
-                WebkitBoxShadow: '0 0 0 1000px #060D1A inset !important',
-                boxShadow: '0 0 0 1000px #060D1A inset !important',
-                WebkitTextFillColor: '#FFFFFF !important',
-                caretColor: '#00D4FF',
+                WebkitBoxShadow: `0 0 0 1000px ${fundoCampo} inset !important`,
+                boxShadow: `0 0 0 1000px ${fundoCampo} inset !important`,
+                WebkitTextFillColor: `${cores.textoForte} !important`,
+                caretColor: cores.primaria,
                 borderRadius: '0 !important',
                 transition: 'background-color 5000s ease-in-out 0s',
             }
         }
     },
     '& .MuiInputLabel-root': {
-        color: '#94A3B8',
+        color: cores.textoSecundario,
         fontWeight: 500,
         '&.Mui-focused': {
-            color: '#00D4FF',
+            color: cores.primaria,
             fontWeight: 600,
         }
     }
@@ -200,9 +182,6 @@ const Login = () => {
 
     return (
         <LoginContainer>
-            <GlowOrb top="10%" left="10%" color="rgba(0, 212, 255, 0.2)" size={400} />
-            <GlowOrb top="60%" left="70%" color="rgba(123, 47, 190, 0.2)" size={400} />
-
             <Container maxWidth="xs" sx={{ display: 'flex', justifyContent: 'center' }}>
                 <GlassBox>
                     <Box sx={{ mb: 2.5, display: 'flex', justifyContent: 'center' }}>
@@ -214,11 +193,9 @@ const Login = () => {
                                 width: 110,
                                 height: 110,
                                 objectFit: 'contain',
-                                filter: 'drop-shadow(0 0 22px rgba(0, 212, 255, 0.45)) drop-shadow(0 0 45px rgba(0, 212, 255, 0.2))',
-                                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                                transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                                 '&:hover': {
-                                    transform: 'scale(1.05)',
-                                    filter: 'drop-shadow(0 0 30px rgba(0, 212, 255, 0.65)) drop-shadow(0 0 60px rgba(0, 212, 255, 0.3))'
+                                    transform: 'scale(1.03)'
                                 }
                             }}
                         />
@@ -227,11 +204,10 @@ const Login = () => {
                     <Typography
                         variant="h4"
                         sx={{
-                            fontFamily: '"Space Grotesk", sans-serif',
-                            fontWeight: 800,
-                            color: '#FFFFFF',
-                            letterSpacing: '5px',
-                            textShadow: '0 0 20px rgba(0, 212, 255, 0.35)',
+                            fontFamily: fontes.titulo,
+                            fontWeight: ed ? direcao.pesoTitulo : 800,
+                            color: cores.textoForte,
+                            letterSpacing: ed ? '0.02em' : '5px',
                             mb: 0.5
                         }}
                     >
@@ -241,7 +217,7 @@ const Login = () => {
                         variant="caption"
                         sx={{
                             display: 'block',
-                            color: '#00D4FF',
+                            color: cores.primaria,
                             letterSpacing: '2.5px',
                             fontSize: '0.75rem',
                             fontWeight: 600,
@@ -261,7 +237,7 @@ const Login = () => {
                                 borderRadius: 1.5,
                                 background: 'rgba(255, 51, 102, 0.1)',
                                 border: '1px solid rgba(255, 51, 102, 0.2)',
-                                color: '#FF3366'
+                                color: cores.erro
                             }}
                         >
                             {error}
@@ -276,7 +252,7 @@ const Login = () => {
                                 borderRadius: 1.5,
                                 background: 'rgba(0, 255, 136, 0.1)',
                                 border: '1px solid rgba(0, 255, 136, 0.2)',
-                                color: '#00FF88'
+                                color: cores.sucesso
                             }}
                         >
                             {forgotSuccess}
@@ -303,7 +279,7 @@ const Login = () => {
                             InputProps={{
                                 startAdornment: (
                                     <InputAdornment position="start">
-                                        <EmailIcon sx={{ color: '#00D4FF' }} />
+                                        <EmailIcon sx={{ color: cores.primaria }} />
                                     </InputAdornment>
                                 ),
                             }}
@@ -325,12 +301,12 @@ const Login = () => {
                                 InputProps={{
                                     startAdornment: (
                                         <InputAdornment position="start">
-                                            <LockIcon sx={{ color: '#00D4FF' }} />
+                                            <LockIcon sx={{ color: cores.primaria }} />
                                         </InputAdornment>
                                     ),
                                     endAdornment: (
                                         <InputAdornment position="end">
-                                            <IconButton onClick={() => setShowPassword(!showPassword)} edge="end" sx={{ color: '#94A3B8' }}>
+                                            <IconButton onClick={() => setShowPassword(!showPassword)} edge="end" sx={{ color: cores.textoSecundario }}>
                                                 {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
                                             </IconButton>
                                         </InputAdornment>
@@ -344,7 +320,7 @@ const Login = () => {
                                         <Checkbox 
                                             checked={rememberMe} 
                                             onChange={(e) => setRememberMe(e.target.checked)} 
-                                            sx={{ color: 'rgba(0, 212, 255, 0.4)', '&.Mui-checked': { color: '#00D4FF' } }}
+                                            sx={{ color: tom(cores.primaria, 0.4), '&.Mui-checked': { color: cores.primaria } }}
                                         />
                                     }
                                     label={<Typography variant="body2" sx={{ color: 'text.secondary' }}>{t('login.remember_me', { defaultValue: 'Lembrar de mim' })}</Typography>}
@@ -378,7 +354,7 @@ const Login = () => {
                                     type="button"
                                     variant="body2" 
                                     onClick={() => { setIsForgotMode(false); setError(null); setForgotSuccess(''); }} 
-                                    sx={{ color: '#00D4FF', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                                    sx={{ color: cores.primaria, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
                                 >
                                     {t('login.back_to_login', { defaultValue: 'Voltar ao login' })}
                                 </Link>
@@ -388,7 +364,7 @@ const Login = () => {
                                     type="button"
                                     variant="body2" 
                                     onClick={() => { setIsForgotMode(true); setError(null); setForgotSuccess(''); }} 
-                                    sx={{ color: '#00D4FF', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                                    sx={{ color: cores.primaria, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
                                 >
                                     {t('login.forgot_password', { defaultValue: 'Esqueci minha senha' })}
                                 </Link>
@@ -398,7 +374,7 @@ const Login = () => {
                         <Typography
                             variant="caption"
                             display="block"
-                            sx={{ mt: 4, color: '#64748B', fontWeight: 500, letterSpacing: '0.5px' }}
+                            sx={{ mt: 4, color: cores.textoFraco, fontWeight: 500, letterSpacing: '0.5px' }}
                         >
                             {t('login.footer', { defaultValue: '© 2026 NZT Intelligent Control Systems • Desenvolvido por A2' })}
                         </Typography>
