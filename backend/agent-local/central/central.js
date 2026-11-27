@@ -967,6 +967,165 @@
         aplicarControle();
     });
 
+    // ------------------------------------------------------------------ troca rápida de operador e inatividade
+    const TEMPO_INATIVIDADE_PADRAO_MS = 15 * 60 * 1000; // 15 minutos
+    let ultimoMovimento = Date.now();
+    let bloqueado = false;
+
+    function registrarAtividade() {
+        if (!bloqueado) ultimoMovimento = Date.now();
+    }
+    ['pointermove', 'keydown', 'click', 'wheel', 'touchstart'].forEach(evt => {
+        window.addEventListener(evt, registrarAtividade, { passive: true });
+    });
+
+    function bloquearPorInatividade() {
+        if (bloqueado) return;
+        bloqueado = true;
+        const b = $('bloqueioInatividade');
+        const opNome = $('bloqueioNomeOp');
+        const pinInp = $('inputPinDesbloqueio');
+        const err = $('erroDesbloqueio');
+        if (opNome) opNome.textContent = st.operador?.nome || 'Operador da Central';
+        if (err) { err.hidden = true; err.textContent = ''; }
+        if (pinInp) { pinInp.value = ''; }
+        if (b) {
+            b.hidden = false;
+            setTimeout(() => pinInp?.focus(), 50);
+        }
+    }
+
+    function desbloquearTela() {
+        bloqueado = false;
+        ultimoMovimento = Date.now();
+        const b = $('bloqueioInatividade');
+        if (b) b.hidden = true;
+    }
+
+    setInterval(() => {
+        if (!bloqueado && Date.now() - ultimoMovimento > TEMPO_INATIVIDADE_PADRAO_MS) {
+            bloquearPorInatividade();
+        }
+    }, 10000);
+
+    // Formulário de Desbloqueio
+    const formDesbloqueio = $('formDesbloqueio');
+    if (formDesbloqueio) {
+        formDesbloqueio.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const pinInp = $('inputPinDesbloqueio');
+            const err = $('erroDesbloqueio');
+            const val = (pinInp?.value || '').trim();
+            if (!val) return;
+            try {
+                const r = await api('/desbloquear', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pin: val })
+                });
+                const j = await r.json();
+                if (r.ok && j.ok) {
+                    st.operador = j.operador;
+                    desbloquearTela();
+                    atualizarEstados();
+                } else {
+                    if (err) { err.hidden = false; err.textContent = j.erro || 'PIN incorreto.'; }
+                }
+            } catch {
+                if (err) { err.hidden = false; err.textContent = 'Falha de comunicação com o agente.'; }
+            }
+        });
+    }
+
+    const btnBloqueioTrocarOp = $('btnBloqueioTrocarOp');
+    if (btnBloqueioTrocarOp) {
+        btnBloqueioTrocarOp.addEventListener('click', () => {
+            abrirModalTrocaOperador();
+        });
+    }
+
+    // Modal de Troca de Operador
+    function abrirModalTrocaOperador() {
+        const modal = $('modalTrocaOperador');
+        const pinInp = $('inputTrocaPin');
+        const err = $('erroTrocaOp');
+        const loginCampo = $('campoTrocaLoginSenha');
+        if (loginCampo) loginCampo.hidden = true;
+        if (err) { err.hidden = true; err.textContent = ''; }
+        if (pinInp) { pinInp.value = ''; }
+        if (modal) {
+            modal.hidden = false;
+            setTimeout(() => pinInp?.focus(), 50);
+        }
+    }
+
+    function fecharModalTrocaOperador() {
+        const modal = $('modalTrocaOperador');
+        if (modal) modal.hidden = true;
+    }
+
+    const btnTrocarOp = $('trocarOperador');
+    if (btnTrocarOp) {
+        btnTrocarOp.addEventListener('click', abrirModalTrocaOperador);
+    }
+    const btnCancelarTroca = $('btnCancelarTrocaOp');
+    if (btnCancelarTroca) {
+        btnCancelarTroca.addEventListener('click', fecharModalTrocaOperador);
+    }
+
+    const btnAlternarLogin = $('btnAlternarLogin');
+    if (btnAlternarLogin) {
+        btnAlternarLogin.addEventListener('click', () => {
+            const loginCampo = $('campoTrocaLoginSenha');
+            if (loginCampo) {
+                loginCampo.hidden = !loginCampo.hidden;
+                btnAlternarLogin.textContent = loginCampo.hidden ? 'Entrar com login e senha' : 'Entrar apenas com PIN rápido';
+            }
+        });
+    }
+
+    const formTrocaOperador = $('formTrocaOperador');
+    if (formTrocaOperador) {
+        formTrocaOperador.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const pinInp = $('inputTrocaPin');
+            const userInp = $('inputTrocaUsuario');
+            const passInp = $('inputTrocaSenha');
+            const err = $('erroTrocaOp');
+            const pinVal = (pinInp?.value || '').trim();
+            const userVal = (userInp?.value || '').trim();
+            const passVal = (passInp?.value || '').trim();
+
+            try {
+                const r = await api('/trocar-operador', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pin: pinVal, usuario: userVal, senha: passVal })
+                });
+                const j = await r.json();
+                if (r.ok && j.ok) {
+                    st.operador = j.operador;
+                    fecharModalTrocaOperador();
+                    desbloquearTela();
+                    atualizarEstados();
+                } else {
+                    if (err) { err.hidden = false; err.textContent = j.erro || 'Credenciais inválidas.'; }
+                }
+            } catch {
+                if (err) { err.hidden = false; err.textContent = 'Erro ao processar troca de operador.'; }
+            }
+        });
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 't' || e.key === 'T') {
+            if (!['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+                e.preventDefault();
+                abrirModalTrocaOperador();
+            }
+        }
+    });
+
     // ------------------------------------------------------------------ barra de estados
     function chip(txt, tipo, titulo) {
         const c = el('span', `chip ${tipo || ''}`, txt);

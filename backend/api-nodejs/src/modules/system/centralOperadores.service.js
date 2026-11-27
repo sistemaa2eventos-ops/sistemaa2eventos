@@ -12,11 +12,12 @@ const { gerarHashSenha } = require('../producao/producaoPortalAuth');
 const logger = require('../../services/logger');
 
 const LOGIN_VALIDO = /^[a-z0-9._-]{3,40}$/;
+const PIN_VALIDO = /^[0-9]{4,6}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const UID_REGISTRO = /^[A-Za-z0-9_-]{8,64}$/;
 const SENHA_MIN = 8;
 const LOTE_MAX = 500;
-const CAMPOS_PUBLICOS = 'id, nome, login, ativo, ultimo_acesso, created_at, updated_at';
+const CAMPOS_PUBLICOS = 'id, nome, login, ativo, ultimo_acesso, created_at, updated_at, pin_hash';
 
 /** Ações que a Central registra (o resto é descartado) */
 const ACOES = new Set([
@@ -49,6 +50,26 @@ function validarSenha(senha) {
     return s;
 }
 
+function validarPin(pin) {
+    const p = String(pin || '').trim();
+    if (!PIN_VALIDO.test(p)) throw erro('O PIN rápido precisa ter de 4 a 6 números.');
+    return p;
+}
+
+function formatarPublico(op) {
+    if (!op) return null;
+    return {
+        id: op.id,
+        nome: op.nome,
+        login: op.login,
+        ativo: op.ativo,
+        ultimo_acesso: op.ultimo_acesso,
+        tem_pin: !!op.pin_hash,
+        created_at: op.created_at,
+        updated_at: op.updated_at
+    };
+}
+
 function validarId(id) {
     if (!UUID.test(String(id || ''))) throw erro('Operador não encontrado.', 404);
     return id;
@@ -58,22 +79,29 @@ async function listar(eventoId) {
     const { data, error } = await supabase.from('central_operadores').select(CAMPOS_PUBLICOS)
         .eq('evento_id', eventoId).order('nome');
     if (error) throw error;
-    return data || [];
+    return (data || []).map(formatarPublico);
 }
 
 async function criar(eventoId, dados = {}, criadoPor = null) {
+    const senhaInformada = dados.senha && String(dados.senha).trim() !== '' ? validarSenha(dados.senha) : null;
+    const pinInformado = dados.pin && String(dados.pin).trim() !== '' ? validarPin(dados.pin) : null;
+    if (!senhaInformada && !pinInformado) {
+        throw erro(`Informe ao menos uma senha (mínimo ${SENHA_MIN} caracteres) ou um PIN rápido (4 a 6 dígitos).`);
+    }
+
     const linha = {
         evento_id: eventoId,
         nome: validarNome(dados.nome),
         login: validarLogin(dados.login),
-        senha_hash: gerarHashSenha(validarSenha(dados.senha)),
+        senha_hash: gerarHashSenha(senhaInformada || pinInformado),
+        pin_hash: pinInformado ? gerarHashSenha(pinInformado) : null,
         ativo: dados.ativo !== false,
         criado_por: UUID.test(String(criadoPor || '')) ? criadoPor : null
     };
     const { data, error } = await supabase.from('central_operadores').insert(linha).select(CAMPOS_PUBLICOS).single();
     if (error?.code === '23505') throw erro('Já existe um operador com esse login neste evento.', 409);
     if (error) throw error;
-    return data;
+    return formatarPublico(data);
 }
 
 async function atualizar(eventoId, id, dados = {}) {
@@ -81,13 +109,22 @@ async function atualizar(eventoId, id, dados = {}) {
     const mudancas = { updated_at: new Date().toISOString() };
     if (dados.nome !== undefined) mudancas.nome = validarNome(dados.nome);
     if (dados.ativo !== undefined) mudancas.ativo = dados.ativo === true;
-    if (dados.senha !== undefined && dados.senha !== '') mudancas.senha_hash = gerarHashSenha(validarSenha(dados.senha));
+    if (dados.senha !== undefined && String(dados.senha).trim() !== '') {
+        mudancas.senha_hash = gerarHashSenha(validarSenha(dados.senha));
+    }
+    if (dados.pin !== undefined) {
+        if (dados.pin === null || String(dados.pin).trim() === '') {
+            mudancas.pin_hash = null;
+        } else {
+            mudancas.pin_hash = gerarHashSenha(validarPin(dados.pin));
+        }
+    }
     if (Object.keys(mudancas).length === 1) throw erro('Nada para alterar.');
     const { data, error } = await supabase.from('central_operadores').update(mudancas)
         .eq('evento_id', eventoId).eq('id', id).select(CAMPOS_PUBLICOS).maybeSingle();
     if (error) throw error;
     if (!data) throw erro('Operador não encontrado.', 404);
-    return data;
+    return formatarPublico(data);
 }
 
 async function excluir(eventoId, id) {
@@ -119,7 +156,7 @@ async function auditoria(eventoId, filtros = {}) {
 /** Para o agente do evento: só os ativos, com o hash (o login no PC funciona sem internet) */
 async function paraAgente(eventoId) {
     if (!eventoId) return [];
-    const { data, error } = await supabase.from('central_operadores').select('id, nome, login, senha_hash')
+    const { data, error } = await supabase.from('central_operadores').select('id, nome, login, senha_hash, pin_hash')
         .eq('evento_id', eventoId).eq('ativo', true);
     if (error) throw error;
     return data || [];

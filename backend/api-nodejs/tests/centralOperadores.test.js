@@ -101,4 +101,16 @@ describe('registro de atividades vindo do agente', () => {
         expect(mockChamadas).toHaveLength(0);
         expect(await svc.paraAgente(null)).toEqual([]);
     });
+
+    test('permite cadastrar operador com PIN rápido de 4 a 6 dígitos', async () => {
+        mockRespostas.central_operadores = [
+            { data: { id: OP_DO_EVENTO, nome: 'Vigilante Turno', login: 'vigilante', pin_hash: 'scrypt$dummy$pin' }, error: null }
+        ];
+        const criado = await svc.criar(EVENTO, { nome: 'Vigilante Turno', login: 'vigilante', pin: '1234' });
+        expect(criado.tem_pin).toBe(true);
+
+        // PIN inválido (menos de 4 dígitos ou letras) deve rejeitar
+        await expect(svc.criar(EVENTO, { nome: 'Teste', login: 'teste', pin: '12' })).rejects.toThrow('PIN');
+        await expect(svc.criar(EVENTO, { nome: 'Teste', login: 'teste', pin: 'abcd' })).rejects.toThrow('PIN');
+    });
 });

@@ -5,6 +5,9 @@ import {
     Button,
     Chip,
     CircularProgress,
+    Dialog,
+    DialogActions,
+    DialogContent,
     Divider,
     Drawer,
     IconButton,
@@ -53,6 +56,7 @@ import portalProdutorApi, {
 import producaoSyncService from '../services/ProducaoSyncService';
 import GlassCard from '../components/common/GlassCard';
 import NeonButton from '../components/common/NeonButton';
+import TituloModal from '../components/common/TituloModal';
 import AbaVisaoGeralProducao from '../components/producao/AbaVisaoGeralProducao';
 import AbaTarefasChecklist from '../components/producao/AbaTarefasChecklist';
 import AbaProjetosPlantas from '../components/producao/AbaProjetosPlantas';
@@ -98,6 +102,74 @@ const PortalProdutor = () => {
     const [sincronizando, setSincronizando] = useState(false);
 
     const eventoId = sessao?.evento?.id || eventoParamUrl || '';
+
+    // Autenticação automática via Convite Mágico (WhatsApp ou QR Code)
+    useEffect(() => {
+        const conviteParam = searchParams.get('convite_producao') || searchParams.get('convite') || '';
+        const eid = eventoParamUrl;
+        if (!conviteParam || !eid || token) return;
+
+        let cancelado = false;
+        const autenticarConvite = async () => {
+            try {
+                setEntrando(true);
+                const res = await portalProdutorApi.post('/producao/portal/login-convite', {
+                    evento_id: eid,
+                    convite_token: conviteParam
+                });
+                if (cancelado) return;
+                const data = res.data?.data || res.data;
+                salvarSessaoPortalProdutor({
+                    token: data.token,
+                    evento: data.evento,
+                    produtor: data.produtor,
+                    politicas: data.politicas
+                });
+                setToken(data.token);
+                setSessao({
+                    evento: data.evento,
+                    produtor: data.produtor,
+                    politicas: data.politicas
+                });
+                enqueueSnackbar(`Bem-vindo(a), ${data.produtor?.nome || 'Produtor(a)'}! Acesso confirmado.`, { variant: 'success' });
+                if (typeof window !== 'undefined' && window.history?.replaceState) {
+                    const u = new URL(window.location.href);
+                    u.searchParams.delete('convite_producao');
+                    u.searchParams.delete('convite');
+                    window.history.replaceState({}, '', u.toString());
+                }
+            } catch (err) {
+                if (!cancelado) {
+                    enqueueSnackbar(err.response?.data?.error || 'Link de convite inválido ou expirado.', { variant: 'error' });
+                }
+            } finally {
+                if (!cancelado) setEntrando(false);
+            }
+        };
+
+        autenticarConvite();
+        return () => { cancelado = true; };
+    }, [searchParams, eventoParamUrl, token, enqueueSnackbar]);
+
+    // Aceite de termo LGPD no primeiro acesso
+    const [aceitandoLgpd, setAceitandoLgpd] = useState(false);
+    const lgpdPendente = Boolean(sessao?.politicas?.exigir_lgpd_primeiro_acesso);
+
+    const handleAceitarLgpd = async () => {
+        setAceitandoLgpd(true);
+        try {
+            await portalProdutorApi.post('/producao/portal/aceitar-lgpd', {});
+            setSessao((prev) => ({
+                ...prev,
+                politicas: { ...prev?.politicas, exigir_lgpd_primeiro_acesso: false }
+            }));
+            enqueueSnackbar('Termo de Confidencialidade aceito com sucesso.', { variant: 'success' });
+        } catch {
+            enqueueSnackbar('Erro ao registrar aceite do termo.', { variant: 'error' });
+        } finally {
+            setAceitandoLgpd(false);
+        }
+    };
 
     const handleSair = useCallback(() => {
         limparSessaoPortalProdutor();
@@ -820,6 +892,24 @@ const PortalProdutor = () => {
                     )}
                 </Box>
             </Box>
+
+            {/* Modal de Aceite Obrigatório do Termo LGPD / Confidencialidade */}
+            <Dialog open={lgpdPendente && Boolean(token)} disableEscapeKeyDown maxWidth="sm" fullWidth>
+                <TituloModal titulo="Termo de Confidencialidade e LGPD" subtitulo="Acesso Operacional à Produção" />
+                <DialogContent dividers>
+                    <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary', lineHeight: 1.6 }}>
+                        Para atuar na produção deste evento e acessar os dados de equipe, fornecedores e cronograma operacional, é necessário concordar com as diretrizes de proteção de dados (Lei 13.709/2018) e sigilo das informações do evento.
+                    </Typography>
+                    <Alert severity="info" variant="outlined" sx={{ mb: 1.5 }}>
+                        Suas ações, registros de presença e aprovações de campo são auditadas e vinculadas exclusivamente à sua credencial.
+                    </Alert>
+                </DialogContent>
+                <DialogActions sx={{ px: 3, py: 2 }}>
+                    <NeonButton onClick={handleAceitarLgpd} disabled={aceitandoLgpd}>
+                        {aceitandoLgpd ? 'Gravando…' : 'Concordar e Acessar Produção'}
+                    </NeonButton>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

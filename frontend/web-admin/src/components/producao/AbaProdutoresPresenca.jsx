@@ -920,8 +920,20 @@ const AbaProdutoresPresenca = ({ eventoId, resumo, headersExtra, aoAtualizar, ap
                 />
                 <DialogContent dividers>
                     {modalConviteInfo && (
-                        <Stack spacing={2} sx={{ pt: 0.5 }}>
-                            <TextField fullWidth size="small" label="Link de primeiro acesso" value={modalConviteInfo.link} InputProps={{ readOnly: true }} />
+                        <Stack spacing={2} sx={{ pt: 0.5, alignItems: 'center' }}>
+                            {modalConviteInfo.qr_code_url && (
+                                <Box sx={{ p: 1.5, bgcolor: '#FFFFFF', borderRadius: 2, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                    <img
+                                        src={modalConviteInfo.qr_code_url}
+                                        alt="QR Code de Acesso"
+                                        style={{ width: 180, height: 180, display: 'block' }}
+                                    />
+                                    <Typography variant="caption" sx={{ color: '#031018', mt: 0.5, fontWeight: 600 }}>
+                                        Aponte a câmera do celular para entrar
+                                    </Typography>
+                                </Box>
+                            )}
+                            <TextField fullWidth size="small" label="Link de primeiro acesso (sem senha)" value={modalConviteInfo.link} InputProps={{ readOnly: true }} />
                             <TextField fullWidth multiline rows={3} size="small" label="Mensagem pronta para envio" value={modalConviteInfo.mensagem_whatsapp} InputProps={{ readOnly: true }} />
                         </Stack>
                     )}

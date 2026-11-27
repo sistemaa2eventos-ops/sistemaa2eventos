@@ -596,4 +596,35 @@ describe('Módulo de Produção — Regras de Negócio, Segurança e Cálculos',
         expect(conf.sessao.itens_contados[0].acao_aplicada).toBe('alertar_saida_indevida');
         expect(conf.sessao.acoes_executadas.length).toBe(1);
     });
+
+    test('gera convite com link e QR Code, e autentica via convite mágico', async () => {
+        const prod = await producaoService.criarProdutor(EVENTO_ID, {
+            nome: 'Produtor Teste Convite',
+            papel_producao: 'produtor_area',
+            email: 'convite@teste.com'
+        }, ADMIN_USER);
+
+        const convite = await producaoService.gerarConviteProdutor(EVENTO_ID, prod.id, ADMIN_USER);
+        expect(convite.link).toContain('convite_producao=');
+        expect(convite.qr_code_url).toMatch(/^data:image\/png;base64,/);
+
+        // Extrai o token do convite do link
+        const urlObj = new URL(convite.link);
+        const tokenConvite = urlObj.searchParams.get('convite_producao');
+
+        // Autentica no portal usando o convite mágico
+        const sessao = await producaoService.autenticarPorConviteProdutor({
+            evento_id: EVENTO_ID,
+            convite_token: tokenConvite
+        });
+
+        expect(sessao.token).toBeTruthy();
+        expect(sessao.produtor.nome).toBe('Produtor Teste Convite');
+        expect(sessao.politicas.exigir_lgpd_primeiro_acesso).toBe(true);
+
+        // Aceita o termo LGPD
+        const termo = await producaoService.aceitarTermoLgpdProdutor(EVENTO_ID, prod.id, { id: prod.id, produtor_id: prod.id });
+        expect(termo.ok).toBe(true);
+        expect(termo.termo_lgpd_aceito).toBe(true);
+    });
 });

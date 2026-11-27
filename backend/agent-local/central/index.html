@@ -22,6 +22,7 @@
                 <button data-layout="16" title="4 × 4">16</button>
             </div>
             <span id="operador" class="relogio" title="Operador desta tela"></span>
+            <button id="trocarOperador" class="botao" title="Troca rápida de turno / assumir posto (tecla T)">Trocar operador</button>
             <button id="sair" class="botao" title="Encerrar a sua sessão nesta tela">Sair</button>
             <button id="controle" class="botao" title="Quem pode girar a câmera e falar com ela. Só uma tela por vez.">Assumir controle</button>
             <button id="som" class="botao" title="Som dos alertas">Ativar som</button>
@@ -67,6 +68,45 @@
                 <button id="modalVer" class="botao destaque">Ver câmera ao vivo</button>
                 <button id="modalCiente" class="botao">Ciente</button>
             </div>
+        </div>
+    </div>
+
+    <div class="modal" id="modalTrocaOperador" hidden>
+        <div class="modal-caixa modal-caixa-pequena">
+            <div class="modal-topo"><span id="modalTrocaTitulo">ASSUMIR POSTO / TROCA DE TURNO</span></div>
+            <form id="formTrocaOperador" class="modal-form">
+                <p>Aproxime o crachá ou digite o <b>PIN rápido</b> (4 a 6 números) do operador:</p>
+                <div class="campo-pin">
+                    <input id="inputTrocaPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="20" placeholder="••••" autocomplete="off" autofocus required>
+                </div>
+                <div id="campoTrocaLoginSenha" class="campo-login-senha" hidden>
+                    <input id="inputTrocaUsuario" type="text" placeholder="Login (se não tiver PIN)" autocomplete="off">
+                    <input id="inputTrocaSenha" type="password" placeholder="Senha" autocomplete="off">
+                </div>
+                <button type="button" id="btnAlternarLogin" class="link-secundario">Entrar com login e senha</button>
+                <p id="erroTrocaOp" class="erro" hidden></p>
+                <div class="modal-acoes">
+                    <button type="submit" class="botao destaque">Assumir Posto</button>
+                    <button type="button" id="btnCancelarTrocaOp" class="botao">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="bloqueio-inatividade" id="bloqueioInatividade" hidden>
+        <div class="bloqueio-caixa">
+            <div class="bloqueio-icone">🔒</div>
+            <h2>Central Bloqueada</h2>
+            <p class="bloqueio-desc">Tela protegida por inatividade prolongada.</p>
+            <div class="bloqueio-operador">Operador ativo: <strong id="bloqueioNomeOp">--</strong></div>
+            <form id="formDesbloqueio" class="bloqueio-form">
+                <input id="inputPinDesbloqueio" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="20" placeholder="PIN ou Senha" autocomplete="off" autofocus required>
+                <p id="erroDesbloqueio" class="erro" hidden></p>
+                <div class="bloqueio-acoes">
+                    <button type="submit" class="botao destaque">Desbloquear</button>
+                    <button type="button" id="btnBloqueioTrocarOp" class="botao">Trocar Operador</button>
+                </div>
+            </form>
         </div>
     </div>
 

@@ -179,3 +179,36 @@ body.entrada { align-items: center; justify-content: center; }
 .ptz-aviso { color: #FFB800; font-size: 12px; width: 100%; min-height: 1em; }
 .controles-camera .botao-falar { padding: 4px 10px; cursor: pointer; }
 .controles-camera .botao-falar.ligado { background: #FF3366; color: #fff; border-color: #FF3366; }
+
+/* Troca de Operador e Bloqueio por Inatividade */
+.modal-caixa-pequena { max-width: 420px; }
+.modal-form { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.campo-pin input { font-size: 24px; text-align: center; letter-spacing: 6px; padding: 10px; width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; }
+.campo-login-senha { display: flex; flex-direction: column; gap: 8px; }
+.campo-login-senha input { padding: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; }
+.link-secundario { background: none; border: none; color: #00E5FF; font-size: 13px; cursor: pointer; padding: 4px 0; text-align: left; }
+.link-secundario:hover { text-decoration: underline; }
+.erro { color: #FF3366; font-size: 13px; margin: 4px 0 0 0; }
+
+.bloqueio-inatividade {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(3, 10, 18, 0.96); backdrop-filter: blur(12px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999;
+}
+.bloqueio-caixa {
+    background: #0D1B2A; border: 1px solid rgba(0, 229, 255, 0.3); border-radius: 12px;
+    padding: 32px 28px; width: 90%; max-width: 380px; text-align: center;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.8), 0 0 24px rgba(0, 229, 255, 0.15);
+}
+.bloqueio-icone { font-size: 40px; margin-bottom: 8px; }
+.bloqueio-caixa h2 { margin: 0 0 6px 0; font-size: 20px; color: #fff; }
+.bloqueio-desc { margin: 0 0 14px 0; font-size: 13px; color: rgba(255, 255, 255, 0.6); }
+.bloqueio-operador { font-size: 14px; margin-bottom: 16px; padding: 8px; background: rgba(255, 255, 255, 0.04); border-radius: 6px; color: #00E5FF; }
+.bloqueio-form input {
+    font-size: 22px; text-align: center; letter-spacing: 4px; padding: 10px; width: 100%; box-sizing: border-box;
+    background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(0, 229, 255, 0.4); border-radius: 6px; color: #fff; margin-bottom: 12px;
+}
+.bloqueio-acoes { display: flex; gap: 8px; justify-content: center; }
+.bloqueio-acoes button { flex: 1; padding: 10px 14px; }
+

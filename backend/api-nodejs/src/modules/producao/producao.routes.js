@@ -22,6 +22,33 @@ router.post('/portal/login', rateLimiter.auth, async (req, res) => {
     }
 });
 
+// Login Mágico via Convite (QR Code ou Link WhatsApp sem senha)
+router.post('/portal/login-convite', rateLimiter.auth, async (req, res) => {
+    try {
+        const data = await producaoService.autenticarPorConviteProdutor(req.body || {});
+        return ApiResponse.success(res, data);
+    } catch (error) {
+        const status = error.status || 401;
+        logger.warn(`[Produção/Portal] Falha de login por convite: ${error.message}`);
+        return ApiResponse.error(res, error.message || 'Falha ao autenticar via link de acesso.', status);
+    }
+});
+
+// Aceite do termo LGPD/Confidencialidade no primeiro acesso do produtor
+router.post('/portal/aceitar-lgpd', rateLimiter.auth, async (req, res) => {
+    try {
+        const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '') || req.headers['x-portal-produtor-token'];
+        const payload = portalAuth.verificarTokenProdutor(token);
+        if (!payload?.produtor_id || !payload?.evento_id) {
+            return ApiResponse.error(res, 'Sessão do produtor inválida ou expirada.', 401);
+        }
+        const data = await producaoService.aceitarTermoLgpdProdutor(payload.evento_id, payload.produtor_id, { produtor_id: payload.produtor_id, id: payload.produtor_id }, req.headers);
+        return ApiResponse.success(res, data);
+    } catch (error) {
+        return ApiResponse.error(res, error.message || 'Erro ao registrar aceite do termo.', error.status || 400);
+    }
+});
+
 /**
  * Aceita sessão do Painel NZT (via Supabase + perfis) OU token dedicado do Portal do Produtor.
  */

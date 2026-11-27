@@ -1,6 +1,7 @@
 'use strict';
 
 const { v4: uuidv4 } = require('uuid');
+const qrcode = require('qrcode');
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const calculos = require('./producaoCalculos');
@@ -615,9 +616,83 @@ async function gerarConviteProdutor(eventoId, produtorId, user, headers = {}) {
     const link = `${baseUrl}/?evento_id=${eventoId}&convite_producao=${tokenConvite}`;
     const mensagemWhatsapp = `Olá ${produtor.nome}! Você foi convidado(a) para atuar na produção do evento "${evento?.nome || 'NZT Eventos'}". Acesse o Portal Exclusivo de Produtores pelo link: ${link}`;
 
+    let qrCodeUrl = null;
+    try {
+        qrCodeUrl = await qrcode.toDataURL(link, { width: 300, margin: 2 });
+    } catch { /* fallback sem qr code */ }
+
     registrarAuditoria(estado, ctx, 'GERAR_CONVITE_PRODUTOR', 'PRODUTOR', produtor.id, null, { login_acesso: produtor.login_acesso || produtor.email });
     await salvarEstadoEvento(eventoId, estado);
-    return { produtor_id: produtor.id, nome: produtor.nome, link, mensagem_whatsapp: mensagemWhatsapp };
+    return { produtor_id: produtor.id, nome: produtor.nome, link, qr_code_url: qrCodeUrl, mensagem_whatsapp: mensagemWhatsapp };
+}
+
+async function autenticarPorConviteProdutor({ evento_id, convite_token } = {}) {
+    const tokenConvite = String(convite_token || '').trim();
+    if (!tokenConvite) {
+        throw erroHttp('Link de convite inválido ou expirado.', 400);
+    }
+    if (!evento_id) {
+        throw erroHttp('Identificador do evento não informado.', 400);
+    }
+
+    const reg = await carregarEstadoEvento(evento_id, { criarSeVazio: false });
+    if (!reg?.estado) throw erroHttp('Evento não encontrado.', 404);
+
+    const { evento, estado } = reg;
+    const produtor = (estado.produtores || []).find(
+        (p) => p && p.convite_token === tokenConvite && p.status !== 'inativo' && p.ativo !== false
+    );
+    if (!produtor) {
+        throw erroHttp('Convite de produtor não encontrado ou já expirado.', 401);
+    }
+
+    const token = portalAuth.assinarTokenProdutor({
+        produtor_id: produtor.id,
+        evento_id: evento.id,
+        nome: produtor.nome,
+        login_acesso: produtor.login_acesso || produtor.email,
+        email: produtor.email || produtor.login_acesso,
+        papel_producao: produtor.papel_producao,
+        area_id: produtor.area_id
+    });
+
+    const ctx = calculos.resolverContextoUsuario(estado, {
+        eh_portal_produtor: true,
+        produtor_id: produtor.id,
+        login_acesso: produtor.login_acesso || produtor.email,
+        email: produtor.email,
+        nome: produtor.nome
+    });
+
+    registrarAuditoria(estado, ctx, 'LOGIN_MAGICO_PORTAL_PRODUTOR', 'PRODUTOR', produtor.id, null, {
+        convite_utilizado: true
+    });
+    await salvarEstadoEvento(evento.id, estado);
+
+    return {
+        token,
+        evento: { id: evento.id, nome: evento.nome || 'Evento em produção' },
+        produtor: calculos.sanitizarProdutorParaUsuario(produtor, ctx),
+        politicas: {
+            exigir_lgpd_primeiro_acesso: !produtor.termo_lgpd_aceito
+        }
+    };
+}
+
+async function aceitarTermoLgpdProdutor(eventoId, produtorId, user, headers = {}) {
+    const { estado } = await carregarEstadoEvento(eventoId, { usuario: user });
+    const produtor = (estado.produtores || []).find((p) => p.id === produtorId);
+    if (!produtor) throw erroHttp('Produtor não encontrado.', 404);
+
+    produtor.termo_lgpd_aceito = true;
+    produtor.termo_lgpd_data = new Date().toISOString();
+
+    const ctx = calculos.resolverContextoUsuario(estado, user, headers);
+    registrarAuditoria(estado, ctx, 'TERMO_LGPD_ACEITO_PRODUTOR', 'PRODUTOR', produtor.id, null, {
+        aceito_em: produtor.termo_lgpd_data
+    });
+    await salvarEstadoEvento(eventoId, estado);
+    return { ok: true, termo_lgpd_aceito: true, termo_lgpd_data: produtor.termo_lgpd_data };
 }
 
 async function anonimizarProdutorLgpd(eventoId, produtorId, user, headers = {}) {
@@ -2431,6 +2506,8 @@ async function sincronizarFilaOffline(eventoId, itens = [], user, headers = {}) 
 module.exports = {
     ...calculos,
     autenticarPortalProdutor,
+    autenticarPorConviteProdutor,
+    aceitarTermoLgpdProdutor,
     obterResumo,
     carregarSeed,
     criarArea,

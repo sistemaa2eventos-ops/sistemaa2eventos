@@ -299,6 +299,64 @@ test('operadores: login e senha substituem a chave; cada ação fica registrada 
     }
 });
 
+test('operadores: troca rápida de turno e desbloqueio por PIN', async () => {
+    const salt = 'cd'.repeat(16);
+    const pinHash1 = `scrypt$${salt}$${crypto.scryptSync('1234', salt, 64).toString('hex')}`;
+    const pinHash2 = `scrypt$${salt}$${crypto.scryptSync('5678', salt, 64).toString('hex')}`;
+    central.definirOperadores([
+        { id: 'op-1', nome: 'Operador Alfa', login: 'alfa', senha_hash: pinHash1, pin_hash: pinHash1 },
+        { id: 'op-2', nome: 'Operador Beta', login: 'beta', senha_hash: pinHash2, pin_hash: pinHash2 }
+    ]);
+
+    try {
+        // Login direto pelo PIN na rota de entrada
+        const loginPin = await pedir('/central/entrar', {
+            metodo: 'POST',
+            corpo: 'usuario=1234',
+            tipo: 'application/x-www-form-urlencoded'
+        });
+        assert.strictEqual(loginPin.status, 303);
+        const cookie = String(loginPin.headers['set-cookie'][0]).split(';')[0];
+        const est1 = JSON.parse((await pedir('/central/api/estado', { cookie })).corpo);
+        assert.strictEqual(est1.operador.nome, 'Operador Alfa');
+
+        // Troca rápida de turno via POST /central/api/trocar-operador
+        const troca = await pedir('/central/api/trocar-operador', {
+            metodo: 'POST',
+            cookie,
+            corpo: JSON.stringify({ pin: '5678' }),
+            tipo: 'application/json'
+        });
+        assert.strictEqual(troca.status, 200);
+        const corpoTroca = JSON.parse(troca.corpo);
+        assert.strictEqual(corpoTroca.operador.nome, 'Operador Beta');
+
+        // Estado agora reflete Operador Beta
+        const est2 = JSON.parse((await pedir('/central/api/estado', { cookie })).corpo);
+        assert.strictEqual(est2.operador.nome, 'Operador Beta');
+
+        // Desbloqueio com PIN correto
+        const desbloqOk = await pedir('/central/api/desbloquear', {
+            metodo: 'POST',
+            cookie,
+            corpo: JSON.stringify({ pin: '5678' }),
+            tipo: 'application/json'
+        });
+        assert.strictEqual(desbloqOk.status, 200);
+
+        // Desbloqueio com PIN incorreto
+        const desbloqErro = await pedir('/central/api/desbloquear', {
+            metodo: 'POST',
+            cookie,
+            corpo: JSON.stringify({ pin: '0000' }),
+            tipo: 'application/json'
+        });
+        assert.strictEqual(desbloqErro.status, 401);
+    } finally {
+        central.definirOperadores([]);
+    }
+});
+
 test('muitas chaves erradas seguidas bloqueiam por 1 minuto', async () => {
     for (let i = 0; i < 10; i++) await pedir('/central/entrar?chave=errada');
     const r = await pedir(`/central/entrar?chave=${CHAVE}`);

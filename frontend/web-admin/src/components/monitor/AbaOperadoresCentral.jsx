@@ -12,7 +12,7 @@ import api from '../../services/api';
 import GlassCard from '../common/GlassCard';
 import NeonButton from '../common/NeonButton';
 import TituloModal from '../common/TituloModal';
-import { funcao, tom, botaoSecundario, acaoTabela, acaoTabelaPerigo } from '../../styles/tokens';
+import { funcao, tom, botaoSecundario, acaoTabela, acaoTabelaPerigo, cores } from '../../styles/tokens';
 
 /**
  * Monitor > Operadores da Central (só admin).
@@ -34,7 +34,7 @@ const ROTULO_ACAO = {
     senha_app_camera: 'Alterou a senha do app da câmera'
 };
 
-const FORM_VAZIO = { nome: '', login: '', senha: '' };
+const FORM_VAZIO = { nome: '', login: '', senha: '', pin: '' };
 
 const erroDe = (err) => err?.response?.data?.error || 'Não deu para concluir. Tente de novo.';
 const dataHora = (iso) => (iso ? new Date(iso).toLocaleString('pt-BR') : '—');
@@ -98,7 +98,7 @@ const AbaOperadoresCentral = ({ cameras = [] }) => {
     useEffect(() => { carregarRegistros(); }, []);
 
     const abrir = (modo, op = null) => {
-        setForm(op ? { nome: op.nome, login: op.login, senha: '' } : FORM_VAZIO);
+        setForm(op ? { nome: op.nome, login: op.login, senha: '', pin: '' } : FORM_VAZIO);
         setTentou(false);
         setDialogo({ modo, op });
     };
@@ -107,14 +107,18 @@ const AbaOperadoresCentral = ({ cameras = [] }) => {
         setSalvando(true);
         try {
             if (dialogo.modo === 'novo') {
-                await api.post('/central-operadores', { nome: form.nome, login: form.login, senha: form.senha }, { hideDefaultError: true });
+                await api.post('/central-operadores', { nome: form.nome, login: form.login, senha: form.senha, pin: form.pin || undefined }, { hideDefaultError: true });
                 enqueueSnackbar('Operador criado. O PC do evento recebe o acesso em até 1 minuto.', { variant: 'success' });
             } else if (dialogo.modo === 'editar') {
-                await api.patch(`/central-operadores/${dialogo.op.id}`, { nome: form.nome }, { hideDefaultError: true });
-                enqueueSnackbar('Nome atualizado.', { variant: 'success' });
+                const dados = { nome: form.nome };
+                if (form.pin) dados.pin = form.pin;
+                await api.patch(`/central-operadores/${dialogo.op.id}`, dados, { hideDefaultError: true });
+                enqueueSnackbar('Dados atualizados.', { variant: 'success' });
             } else {
-                await api.patch(`/central-operadores/${dialogo.op.id}`, { senha: form.senha }, { hideDefaultError: true });
-                enqueueSnackbar('Senha redefinida. A senha antiga deixa de valer em até 1 minuto.', { variant: 'success' });
+                const dados = { senha: form.senha };
+                if (form.pin) dados.pin = form.pin;
+                await api.patch(`/central-operadores/${dialogo.op.id}`, dados, { hideDefaultError: true });
+                enqueueSnackbar('Credenciais atualizadas. A senha antiga deixa de valer em até 1 minuto.', { variant: 'success' });
             }
             setDialogo(null);
             carregarOperadores();
@@ -169,9 +173,10 @@ const AbaOperadoresCentral = ({ cameras = [] }) => {
         login: dialogo?.modo === 'novo' && !/^[a-z0-9._-]{3,40}$/.test(form.login)
             ? (form.login.length < 3 ? 'O login precisa de pelo menos 3 caracteres.' : 'Use só letras sem acento, números, ponto, hífen ou sublinhado (sem @ e sem espaço).')
             : '',
-        senha: dialogo?.modo !== 'editar' && form.senha.trim().length < 8 ? `A senha precisa de pelo menos 8 caracteres (tem ${form.senha.trim().length}).` : ''
+        senha: dialogo?.modo !== 'editar' && form.senha.trim().length < 8 ? `A senha precisa de pelo menos 8 caracteres (tem ${form.senha.trim().length}).` : '',
+        pin: form.pin && !/^[0-9]{4,6}$/.test(form.pin.trim()) ? 'O PIN rápido deve ter de 4 a 6 números.' : ''
     };
-    const formValido = !errosForm.nome && !errosForm.login && !errosForm.senha;
+    const formValido = !errosForm.nome && !errosForm.login && !errosForm.senha && !errosForm.pin;
     const tentarSalvar = () => {
         if (!formValido) { setTentou(true); return; }
         salvar();
@@ -219,8 +224,15 @@ const AbaOperadoresCentral = ({ cameras = [] }) => {
                                         <TableCell>{op.nome}</TableCell>
                                         <TableCell sx={{ fontFamily: 'monospace' }}>{op.login}</TableCell>
                                         <TableCell>
-                                            <Chip size="small" label={op.ativo ? 'Ativo' : 'Sem acesso'}
-                                                sx={{ bgcolor: tom(op.ativo ? funcao.liberado : funcao.neutro), color: op.ativo ? funcao.liberado : funcao.neutro }} />
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <Chip size="small" label={op.ativo ? 'Ativo' : 'Sem acesso'}
+                                                    sx={{ bgcolor: tom(op.ativo ? funcao.liberado : funcao.neutro), color: op.ativo ? funcao.liberado : funcao.neutro }} />
+                                                {op.tem_pin && (
+                                                    <Chip size="small" variant="outlined" label="PIN"
+                                                        title="PIN rápido configurado"
+                                                        sx={{ borderColor: cores.primaria, color: cores.primaria, height: 22, fontSize: '0.7rem' }} />
+                                                )}
+                                            </Box>
                                         </TableCell>
                                         <TableCell>{dataHora(op.ultimo_acesso)}</TableCell>
                                         <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
@@ -335,6 +347,12 @@ const AbaOperadoresCentral = ({ cameras = [] }) => {
                                     helperText={(tentou && errosForm.senha) || 'Pelo menos 8 caracteres. Entregue a senha ao operador por um canal seguro.'}
                                     onChange={e => setForm(f => ({ ...f, senha: e.target.value }))} />
                             )}
+                            <TextField id="central-op-pin" label="PIN rápido (4 a 6 dígitos)" type="password" value={form.pin}
+                                autoComplete="off"
+                                inputProps={{ maxLength: 6, inputMode: 'numeric', pattern: '[0-9]*' }}
+                                error={tentou && !!errosForm.pin}
+                                helperText={(tentou && errosForm.pin) || 'Opcional. Permite troca ágil de turno e desbloqueio por inatividade na tela da Central.'}
+                                onChange={e => setForm(f => ({ ...f, pin: e.target.value.replace(/\D/g, '') }))} />
                         </DialogContent>
                         <DialogActions sx={{ px: 3, pb: 2.5 }}>
                             <Button variant="outlined" sx={botaoSecundario} onClick={() => setDialogo(null)} disabled={salvando}>Cancelar</Button>

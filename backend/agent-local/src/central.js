@@ -131,7 +131,11 @@ function verificarSenha(senha, hash) {
 function definirOperadores(lista = [], { salvar = true } = {}) {
     const validos = (Array.isArray(lista) ? lista : []).filter(o => o && o.id && o.login && o.nome && String(o.senha_hash || '').startsWith('scrypt$'));
     estado.operadores = new Map(validos.map(o => [String(o.login).toLowerCase(), {
-        id: String(o.id), nome: String(o.nome).slice(0, 80), login: String(o.login).toLowerCase(), senha_hash: String(o.senha_hash)
+        id: String(o.id),
+        nome: String(o.nome).slice(0, 80),
+        login: String(o.login).toLowerCase(),
+        senha_hash: String(o.senha_hash),
+        pin_hash: o.pin_hash && String(o.pin_hash).startsWith('scrypt$') ? String(o.pin_hash) : null
     }]));
     // Operador desativado ou excluído no painel sai na hora
     for (const [t, s] of estado.sessoes) {
@@ -149,8 +153,21 @@ function carregarOperadoresSalvos() {
 /** Login e senha do operador; null se não confere. Tempo parecido com ou sem login (não revela quem existe). */
 function autenticar(login, senha) {
     const op = estado.operadores.get(String(login || '').trim().toLowerCase());
-    const ok = verificarSenha(senha, op ? op.senha_hash : 'scrypt$00$00');
-    return ok && op ? { id: op.id, nome: op.nome, login: op.login } : null;
+    const senhaOk = verificarSenha(senha, op ? op.senha_hash : 'scrypt$00$00');
+    const pinOk = !senhaOk && op && op.pin_hash ? verificarSenha(senha, op.pin_hash) : false;
+    return (senhaOk || pinOk) && op ? { id: op.id, nome: op.nome, login: op.login } : null;
+}
+
+/** Autentica procurando operador pelo PIN rápido */
+function autenticarPorPin(pin) {
+    const p = String(pin || '').trim();
+    if (!/^[0-9]{4,6}$/.test(p)) return null;
+    for (const op of estado.operadores.values()) {
+        if (op.pin_hash && verificarSenha(p, op.pin_hash)) {
+            return { id: op.id, nome: op.nome, login: op.login };
+        }
+    }
+    return null;
 }
 
 // ------------------------------------------------------------------ registro de atividades
@@ -484,11 +501,14 @@ async function tratar(req, res, url) {
         if (bloqueadoPorTentativas()) return pagina(429, 'Muitas tentativas. Aguarde 1 minuto.');
 
         if (usuario || senha) {
-            const operador = autenticar(usuario, senha);
+            let operador = autenticar(usuario, senha);
+            if (!operador && !senha && usuario && /^[0-9]{4,6}$/.test(usuario.trim())) {
+                operador = autenticarPorPin(usuario);
+            }
             if (operador) return entrar(operador);
             estado.tentativas.push(Date.now());
             auditar({ operador: null, acao: 'entrar_falhou', nomeTentado: usuario || '(vazio)' });
-            return pagina(401, 'Login ou senha incorretos.');
+            return pagina(401, 'Login, senha ou PIN incorretos.');
         }
         if (chave) {
             // A chave só vale na instalação (nenhum operador ainda): depois, todo acesso tem nome.
@@ -524,6 +544,85 @@ async function tratar(req, res, url) {
         liberarDaSessao(t);
         res.setHeader('Set-Cookie', `${COOKIE}=; HttpOnly; SameSite=Strict; Path=/central; Max-Age=0`);
         json(res, 200, { ok: true });
+        return true;
+    }
+
+    // Troca rápida de turno de operador (por PIN ou login/senha) sem descarregar a tela
+    if (p === '/central/api/trocar-operador' && req.method === 'POST') {
+        let corpo;
+        try { corpo = JSON.parse(await lerCorpo(req, 1024)) || {}; } catch { json(res, 400, { erro: 'pedido inválido' }); return true; }
+        const pin = String(corpo.pin || '').trim();
+        const usuario = String(corpo.usuario || '').trim();
+        const senha = String(corpo.senha || '').trim();
+
+        let novoOp = null;
+        if (pin) {
+            novoOp = autenticarPorPin(pin);
+            if (!novoOp && usuario) novoOp = autenticar(usuario, pin);
+        }
+        if (!novoOp && usuario && senha) {
+            novoOp = autenticar(usuario, senha);
+        }
+
+        if (!novoOp) {
+            auditar({ operador: null, acao: 'entrar_falhou', nomeTentado: usuario || '(pin rápido)' });
+            json(res, 401, { erro: 'PIN ou credenciais inválidos.' });
+            return true;
+        }
+
+        const anterior = operadorDe(req);
+        const t = lerCookie(req);
+        if (anterior && anterior.id !== novoOp.id) {
+            auditar({ operador: anterior, token: t, acao: 'sair', detalhe: { motivo: 'troca_turno' } });
+        }
+        if (t && estado.sessoes.has(t)) {
+            estado.sessoes.get(t).operador = novoOp;
+            estado.sessoes.get(t).ate = Date.now() + SESSAO_MS;
+        }
+        if (controle.token && controle.token === t) {
+            controle.nome = novoOp.nome;
+        }
+        auditar({ operador: novoOp, token: t, acao: 'entrar', detalhe: { modo: pin ? 'pin' : 'login' } });
+        json(res, 200, { ok: true, operador: { id: novoOp.id, nome: novoOp.nome, login: novoOp.login } });
+        return true;
+    }
+
+    // Desbloqueio da tela por inatividade (PIN do operador atual ou de outro ativo)
+    if (p === '/central/api/desbloquear' && req.method === 'POST') {
+        let corpo;
+        try { corpo = JSON.parse(await lerCorpo(req, 1024)) || {}; } catch { json(res, 400, { erro: 'pedido inválido' }); return true; }
+        const pin = String(corpo.pin || '').trim();
+        const usuario = String(corpo.usuario || '').trim();
+        const senha = String(corpo.senha || '').trim();
+
+        let op = null;
+        if (pin) {
+            op = autenticarPorPin(pin);
+            if (!op && usuario) op = autenticar(usuario, pin);
+            if (!op) {
+                const atual = operadorDe(req);
+                if (atual) {
+                    const opAtualCompleto = estado.operadores.get(atual.login);
+                    if (opAtualCompleto && ((opAtualCompleto.pin_hash && verificarSenha(pin, opAtualCompleto.pin_hash)) || verificarSenha(pin, opAtualCompleto.senha_hash))) {
+                        op = atual;
+                    }
+                }
+            }
+        } else if (usuario && senha) {
+            op = autenticar(usuario, senha);
+        }
+
+        if (!op) {
+            json(res, 401, { erro: 'PIN ou senha incorretos.' });
+            return true;
+        }
+
+        const t = lerCookie(req);
+        if (t && estado.sessoes.has(t)) {
+            estado.sessoes.get(t).ate = Date.now() + SESSAO_MS;
+            estado.sessoes.get(t).operador = op;
+        }
+        json(res, 200, { ok: true, operador: { id: op.id, nome: op.nome, login: op.login } });
         return true;
     }
 
