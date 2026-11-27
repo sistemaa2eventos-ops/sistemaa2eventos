@@ -230,14 +230,14 @@ export default function ClientePortal() {
                 {/* Card Header Promocional */}
                 <div className="bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 p-8 text-center relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-full opacity-10">
-                        <svg className="absolute w-64 h-64 -top-12 -left-12 text-white transform rotate-45" fill="currentColor" viewBox="0 0 100 100"><rect width="100" height="100" /></svg>
+                        <svg className="absolute w-64 h-64 -top-12 -left-12 text-texto-forte transform rotate-45" fill="currentColor" viewBox="0 0 100 100"><rect width="100" height="100" /></svg>
                     </div>
 
                     <div className="relative z-10 flex flex-col items-center justify-center space-y-4">
                         <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-inner">
-                            <svg className="w-8 h-8 text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" /></svg>
+                            <svg className="w-8 h-8 text-primaria" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" /></svg>
                         </div>
-                        <h2 className="text-2xl font-black text-white tracking-widest uppercase">E-TICKET A2</h2>
+                        <h2 className="text-2xl font-black text-texto-forte tracking-widest uppercase">E-TICKET A2</h2>
                         <p className="text-blue-200 text-sm font-medium">{ticket?.eventos?.nome || 'Credencial Oficial'}</p>
                     </div>
                 </div>
@@ -255,7 +255,7 @@ export default function ClientePortal() {
                         <button
                             onClick={handleAcceptTransfer}
                             disabled={isUploading}
-                            className={`w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl shadow-lg transition-colors flex items-center justify-center gap-2 ${isUploading ? 'opacity-50' : ''}`}
+                            className={`w-full bg-green-600 hover:bg-green-700 text-texto-forte font-bold py-4 rounded-xl shadow-lg transition-colors flex items-center justify-center gap-2 ${isUploading ? 'opacity-50' : ''}`}
                         >
                             {isUploading ? 'PROCESSANDO...' : 'ACEITAR TITULARIDADE AGORA'}
                         </button>
@@ -273,7 +273,7 @@ export default function ClientePortal() {
 
                         <div className="relative">
                             <button
-                                className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transition-colors flex items-center justify-center gap-2 ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`w-full bg-blue-600 hover:bg-blue-700 text-texto-forte font-bold py-4 rounded-xl shadow-lg transition-colors flex items-center justify-center gap-2 ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 {isUploading ? (
                                     <span className="animate-pulse">PROCESSANDO BIOMETRIA...</span>
@@ -377,7 +377,7 @@ export default function ClientePortal() {
                                 </div>
                                 <div className="flex gap-2">
                                     <button type="button" onClick={() => setShowEcmForm(false)} className="flex-1 py-2 bg-white border border-gray-300 rounded-lg text-sm font-semibold text-gray-600">Cancelar</button>
-                                    <button type="submit" disabled={isUploading} className="flex-1 py-2 bg-blue-600 rounded-lg text-sm font-semibold text-white">
+                                    <button type="submit" disabled={isUploading} className="flex-1 py-2 bg-blue-600 rounded-lg text-sm font-semibold text-texto-forte">
                                         {isUploading ? 'Enviando...' : 'Enviar'}
                                     </button>
                                 </div>

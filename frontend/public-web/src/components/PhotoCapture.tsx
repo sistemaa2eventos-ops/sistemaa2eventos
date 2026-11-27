@@ -241,7 +241,7 @@ export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: P
                             <button
                                 type="button"
                                 onClick={clearPhoto}
-                                className="absolute -top-3 -right-3 p-3 bg-red-600 text-white rounded-full hover:bg-red-500 shadow-lg transition-all hover:scale-110 z-20 backdrop-blur-md"
+                                className="absolute -top-3 -right-3 p-3 bg-red-600 text-texto-forte rounded-full hover:bg-erro shadow-lg transition-all hover:scale-110 z-20 backdrop-blur-md"
                             >
                                 <Trash2 className="w-5 h-5" />
                             </button>
@@ -255,7 +255,7 @@ export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: P
                     </div>
                 </div>
             ) : (
-                <div className="w-full max-w-lg mx-auto aspect-[3/4] sm:h-[500px] bg-slate-950 rounded-[2rem] border border-slate-800/50 flex flex-col items-center justify-center overflow-hidden relative shadow-2xl">
+                <div className="w-full max-w-lg mx-auto aspect-[3/4] sm:h-[500px] bg-fundo rounded-[2rem] border border-borda/50 flex flex-col items-center justify-center overflow-hidden relative shadow-2xl">
                     
                     {isCameraOpen ? (
                         <>
@@ -274,9 +274,9 @@ export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: P
                             />
 
                             {!cameraReady && !error && (
-                                <div className="absolute inset-0 z-15 bg-slate-950/80 flex flex-col items-center justify-center gap-3 p-6 text-center">
-                                    <RefreshCw className="w-8 h-8 text-cyan-400 animate-spin" />
-                                    <span className="text-xs font-semibold text-slate-300">Iniciando câmera...</span>
+                                <div className="absolute inset-0 z-15 bg-fundo/80 flex flex-col items-center justify-center gap-3 p-6 text-center">
+                                    <RefreshCw className="w-8 h-8 text-primaria animate-spin" />
+                                    <span className="text-xs font-semibold text-texto-secundario">Iniciando câmera...</span>
                                 </div>
                             )}
 
@@ -284,27 +284,27 @@ export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: P
                             <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
                                 {/* Face Silhouette Guide */}
                                 <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className={`w-[240px] h-[320px] xs:w-64 xs:h-80 rounded-[100%] border-2 ${faceDetected ? 'border-emerald-400' : 'border-cyan-400/50'} relative flex items-center justify-center transition-colors duration-500`}>
+                                    <div className={`w-[240px] h-[320px] xs:w-64 xs:h-80 rounded-[100%] border-2 ${faceDetected ? 'border-emerald-400' : 'border-primaria/50'} relative flex items-center justify-center transition-colors duration-500`}>
                                         <div className={`absolute inset-0 rounded-[100%] border-4 border-white/10 ${faceDetected ? 'animate-pulse' : ''}`}></div>
                                         
                                         {/* Corner Markers */}
-                                        <div className="absolute top-10 left-0 w-8 h-8 border-t-2 border-l-2 border-cyan-400/30 rounded-tl-2xl"></div>
-                                        <div className="absolute top-10 right-0 w-8 h-8 border-t-2 border-r-2 border-cyan-400/30 rounded-tr-2xl"></div>
-                                        <div className="absolute bottom-10 left-0 w-8 h-8 border-b-2 border-l-2 border-cyan-400/30 rounded-bl-2xl"></div>
-                                        <div className="absolute bottom-10 right-0 w-8 h-8 border-b-2 border-r-2 border-cyan-400/30 rounded-br-2xl"></div>
+                                        <div className="absolute top-10 left-0 w-8 h-8 border-t-2 border-l-2 border-primaria/30 rounded-tl-2xl"></div>
+                                        <div className="absolute top-10 right-0 w-8 h-8 border-t-2 border-r-2 border-primaria/30 rounded-tr-2xl"></div>
+                                        <div className="absolute bottom-10 left-0 w-8 h-8 border-b-2 border-l-2 border-primaria/30 rounded-bl-2xl"></div>
+                                        <div className="absolute bottom-10 right-0 w-8 h-8 border-b-2 border-r-2 border-primaria/30 rounded-br-2xl"></div>
                                     </div>
                                 </div>
 
                                 {/* Status and Guidance */}
                                 <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 w-[80%]">
-                                    <div className={`glass-panel px-4 py-2 rounded-full border text-center transition-all duration-500 ${faceDetected ? 'border-emerald-500/50 bg-emerald-500/20' : 'border-cyan-500/30'}`}>
-                                        <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-white">{guidance}</span>
+                                    <div className={`glass-panel px-4 py-2 rounded-full border text-center transition-all duration-500 ${faceDetected ? 'border-emerald-500/50 bg-emerald-500/20' : 'border-primaria/30'}`}>
+                                        <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-texto-forte">{guidance}</span>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Control Bar */}
-                            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-slate-900/80 backdrop-blur-xl p-3 rounded-3xl border border-white/10 shadow-2xl">
+                            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-superficie/80 backdrop-blur-xl p-3 rounded-3xl border border-white/10 shadow-2xl">
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -312,7 +312,7 @@ export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: P
                                         setCameraReady(false);
                                     }}
                                     title="Fechar câmera"
-                                    className="p-3 bg-white/5 text-slate-400 rounded-2xl hover:bg-white/10"
+                                    className="p-3 bg-white/5 text-texto-secundario rounded-2xl hover:bg-white/10"
                                 >
                                     <Trash2 className="w-6 h-6" />
                                 </button>
@@ -322,7 +322,7 @@ export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: P
                                         type="button"
                                         onClick={trocarCamera}
                                         title="Trocar câmera"
-                                        className="p-3 bg-white/5 text-cyan-400 rounded-2xl hover:bg-white/10"
+                                        className="p-3 bg-white/5 text-primaria rounded-2xl hover:bg-white/10"
                                     >
                                         <RefreshCw className="w-5 h-5" />
                                     </button>
@@ -334,8 +334,8 @@ export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: P
                                     disabled={loading || !cameraReady}
                                     className={`px-8 py-3 rounded-2xl font-black tracking-widest text-xs flex items-center gap-3 transition-all
                                         ${cameraReady && !loading
-                                            ? (faceDetected ? 'bg-emerald-600 text-white hover:bg-emerald-500' : 'bg-cyan-600 text-white hover:bg-cyan-500')
-                                            : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50'}`}
+                                            ? (faceDetected ? 'bg-emerald-600 text-texto-forte hover:bg-emerald-500' : 'bg-primaria text-texto-forte hover:bg-primaria')
+                                            : 'bg-superficie-elevada text-texto-fraco cursor-not-allowed opacity-50'}`}
                                 >
                                     {loading ? (
                                         <><RefreshCw className="w-4 h-4 animate-spin" /> PROCESSANDO</>
@@ -347,13 +347,13 @@ export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: P
                         </>
                     ) : (
                         <div className="flex flex-col items-center gap-6 p-10 text-center relative z-10">
-                            <div className="w-20 h-20 bg-cyan-600 rounded-2xl flex items-center justify-center shadow-xl">
-                                <Camera className="w-10 h-10 text-white" />
+                            <div className="w-20 h-20 bg-primaria rounded-2xl flex items-center justify-center shadow-xl">
+                                <Camera className="w-10 h-10 text-texto-forte" />
                             </div>
 
                             <div className="space-y-2">
-                                <h3 className="text-xl font-bold text-white uppercase tracking-tight">Biometria Facial</h3>
-                                <p className="text-slate-400 text-sm leading-relaxed">Capture uma foto para sua credencial.</p>
+                                <h3 className="text-xl font-bold text-texto-forte uppercase tracking-tight">Biometria Facial</h3>
+                                <p className="text-texto-secundario text-sm leading-relaxed">Capture uma foto para sua credencial.</p>
                             </div>
 
                             <div className="flex flex-col w-full gap-3">
@@ -364,7 +364,7 @@ export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: P
                                 >
                                     ATIVAR CÂMERA
                                 </button>
-                                <label className="w-full bg-slate-900 text-white font-bold py-3.5 rounded-xl text-sm border border-slate-800 cursor-pointer">
+                                <label className="w-full bg-superficie text-texto-forte font-bold py-3.5 rounded-xl text-sm border border-borda cursor-pointer">
                                     UPLOAD DE FOTO
                                     <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
                                 </label>
@@ -375,7 +375,7 @@ export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: P
             )}
 
             {error && (
-                <div className="p-4 bg-red-950/20 border border-red-500/30 text-red-400 rounded-xl text-xs flex items-center gap-3">
+                <div className="p-4 bg-red-950/20 border border-erro/30 text-erro rounded-xl text-xs flex items-center gap-3">
                     <AlertCircle className="w-4 h-4 shrink-0" />
                     <span>{error}</span>
                 </div>

@@ -45,53 +45,53 @@ export default function PrivacyPage() {
     };
 
     return (
-        <div className="min-h-screen bg-[#020617] text-slate-300 py-12 px-4 selection:bg-cyan-500/30">
+        <div className="min-h-screen bg-fundo text-texto-secundario py-12 px-4 selection:bg-primaria/30">
             <div className="max-w-2xl mx-auto">
-                <Link href="/" className="inline-flex items-center gap-2 text-slate-500 hover:text-white mb-8 transition-colors">
+                <Link href="/" className="inline-flex items-center gap-2 text-texto-fraco hover:text-texto-forte mb-8 transition-colors">
                     <ArrowLeft className="w-4 h-4" /> Voltar ao Início
                 </Link>
 
-                <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl overflow-hidden relative">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-600" />
+                <div className="bg-superficie/80 backdrop-blur-xl border border-borda rounded-3xl p-8 shadow-2xl overflow-hidden relative">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primaria via-blue-500 to-purple-600" />
                     
                     <div className="flex items-center gap-4 mb-6">
-                        <div className="p-3 bg-cyan-500/10 rounded-2xl border border-cyan-500/20">
-                            <Shield className="w-8 h-8 text-cyan-400" />
+                        <div className="p-3 bg-primaria/10 rounded-2xl border border-primaria/20">
+                            <Shield className="w-8 h-8 text-primaria" />
                         </div>
                         <div>
-                            <h1 className="text-3xl font-bold text-white tracking-tight">Central de Privacidade</h1>
-                            <p className="text-slate-400">Gerencie seus direitos conforme a LGPD (Lei 13.709/18)</p>
+                            <h1 className="text-3xl font-bold text-texto-forte tracking-tight">Central de Privacidade</h1>
+                            <p className="text-texto-secundario">Gerencie seus direitos conforme a LGPD (Lei 13.709/18)</p>
                         </div>
                     </div>
 
                     <div className="space-y-6">
-                        <div className="p-4 bg-slate-800/50 rounded-2xl border border-slate-700/50">
-                            <h2 className="text-white font-semibold mb-3">Identificação do Titular</h2>
+                        <div className="p-4 bg-superficie-elevada/50 rounded-2xl border border-borda/50">
+                            <h2 className="text-texto-forte font-semibold mb-3">Identificação do Titular</h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <label className="text-xs font-medium text-slate-500 uppercase">CPF</label>
+                                    <label className="text-xs font-medium text-texto-fraco uppercase">CPF</label>
                                     <input 
                                         type="text" 
                                         placeholder="000.000.000-00"
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 focus:ring-2 focus:ring-cyan-500 outline-none transition-all placeholder:text-slate-700"
+                                        className="w-full bg-fundo border border-borda rounded-xl p-3 focus:ring-2 focus:ring-primaria outline-none transition-all placeholder:text-texto-fraco"
                                         onChange={(e) => setFormData({...formData, cpf: e.target.value})}
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-xs font-medium text-slate-500 uppercase">E-mail Cadastrado</label>
+                                    <label className="text-xs font-medium text-texto-fraco uppercase">E-mail Cadastrado</label>
                                     <input 
                                         type="email" 
                                         placeholder="seu@e-mail.com"
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 focus:ring-2 focus:ring-cyan-500 outline-none transition-all placeholder:text-slate-700"
+                                        className="w-full bg-fundo border border-borda rounded-xl p-3 focus:ring-2 focus:ring-primaria outline-none transition-all placeholder:text-texto-fraco"
                                         onChange={(e) => setFormData({...formData, email: e.target.value})}
                                     />
                                 </div>
                                 <div className="md:col-span-2 space-y-2">
-                                    <label className="text-xs font-medium text-slate-500 uppercase">ID do Evento (Opcional)</label>
+                                    <label className="text-xs font-medium text-texto-fraco uppercase">ID do Evento (Opcional)</label>
                                     <input 
                                         type="text" 
                                         placeholder="UUID do Evento"
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 focus:ring-2 focus:ring-cyan-500 outline-none transition-all placeholder:text-slate-700"
+                                        className="w-full bg-fundo border border-borda rounded-xl p-3 focus:ring-2 focus:ring-primaria outline-none transition-all placeholder:text-texto-fraco"
                                         onChange={(e) => setFormData({...formData, eventoId: e.target.value})}
                                     />
                                 </div>
@@ -100,7 +100,7 @@ export default function PrivacyPage() {
 
                         {message && (
                             <div className={`p-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 ${
-                                message.type === 'success' ? 'bg-green-500/10 border border-green-500/20 text-green-400' : 'bg-red-500/10 border border-red-500/20 text-red-400'
+                                message.type === 'success' ? 'bg-sucesso/10 border border-sucesso/20 text-sucesso' : 'bg-erro/10 border border-erro/20 text-erro'
                             }`}>
                                 {message.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
                                 <span className="text-sm font-medium">{message.text}</span>
@@ -111,28 +111,28 @@ export default function PrivacyPage() {
                             <button
                                 onClick={() => handleSubmit('portability')}
                                 disabled={loading || !formData.cpf || !formData.email}
-                                className="group p-6 bg-slate-950 border border-slate-800 rounded-2xl text-left hover:border-cyan-500/50 hover:bg-slate-900 transition-all disabled:opacity-50"
+                                className="group p-6 bg-fundo border border-borda rounded-2xl text-left hover:border-primaria/50 hover:bg-superficie transition-all disabled:opacity-50"
                             >
-                                <Mail className="w-6 h-6 text-cyan-400 mb-3 group-hover:scale-110 transition-transform" />
-                                <h3 className="text-white font-bold mb-1">Portabilidade de Dados</h3>
-                                <p className="text-xs text-slate-500 leading-relaxed">Solicite um arquivo com todos os seus dados coletados. O relatório será enviado para o e-mail cadastrado.</p>
-                                {loading && <Loader2 className="w-4 h-4 animate-spin mt-4 text-cyan-400" />}
+                                <Mail className="w-6 h-6 text-primaria mb-3 group-hover:scale-110 transition-transform" />
+                                <h3 className="text-texto-forte font-bold mb-1">Portabilidade de Dados</h3>
+                                <p className="text-xs text-texto-fraco leading-relaxed">Solicite um arquivo com todos os seus dados coletados. O relatório será enviado para o e-mail cadastrado.</p>
+                                {loading && <Loader2 className="w-4 h-4 animate-spin mt-4 text-primaria" />}
                             </button>
 
                             <button
                                 onClick={() => handleSubmit('forget-me')}
                                 disabled={loading || !formData.cpf || !formData.email}
-                                className="group p-6 bg-slate-950 border border-slate-800 rounded-2xl text-left hover:border-red-500/50 hover:bg-slate-900 transition-all disabled:opacity-50"
+                                className="group p-6 bg-fundo border border-borda rounded-2xl text-left hover:border-erro/50 hover:bg-superficie transition-all disabled:opacity-50"
                             >
-                                <Trash2 className="w-6 h-6 text-red-400 mb-3 group-hover:scale-110 transition-transform" />
-                                <h3 className="text-white font-bold mb-1">Direito ao Esquecimento</h3>
-                                <p className="text-xs text-slate-500 leading-relaxed">Solicite a anonimização irreversível dos seus dados pessoais. Esta ação não pode ser desfeita.</p>
-                                {loading && <Loader2 className="w-4 h-4 animate-spin mt-4 text-red-400" />}
+                                <Trash2 className="w-6 h-6 text-erro mb-3 group-hover:scale-110 transition-transform" />
+                                <h3 className="text-texto-forte font-bold mb-1">Direito ao Esquecimento</h3>
+                                <p className="text-xs text-texto-fraco leading-relaxed">Solicite a anonimização irreversível dos seus dados pessoais. Esta ação não pode ser desfeita.</p>
+                                {loading && <Loader2 className="w-4 h-4 animate-spin mt-4 text-erro" />}
                             </button>
                         </div>
                     </div>
 
-                    <p className="mt-8 text-center text-[10px] text-slate-600 uppercase tracking-widest font-bold">
+                    <p className="mt-8 text-center text-[10px] text-texto-fraco uppercase tracking-widest font-bold">
                         A2 Eventos • Nexus Control • Compliance Team
                     </p>
                 </div>

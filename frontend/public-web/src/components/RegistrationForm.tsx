@@ -351,24 +351,24 @@ export default function RegistrationForm({ token, company, branding, requiredFie
 
     if (success) {
         return (
-            <div className="text-center p-10 bg-slate-800/50 backdrop-blur-xl rounded-3xl border border-green-500/30 shadow-2xl">
-                <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <CheckCircle className="w-10 h-10 text-green-400" />
+            <div className="text-center p-10 bg-superficie-elevada/50 backdrop-blur-xl rounded-3xl border border-sucesso/30 shadow-2xl">
+                <div className="w-20 h-20 bg-sucesso/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <CheckCircle className="w-10 h-10 text-sucesso" />
                 </div>
-                <h2 className="text-3xl font-bold text-white mb-3 tracking-tight">{t('registration.success_message', { defaultValue: 'Cadastro Realizado!' })}</h2>
-                <p className="text-slate-300 text-lg">Seus dados e documentos foram enviados de forma segura e estão sob análise da <span className="text-cyan-400 font-semibold">{company.nome}</span>.</p>
-                <div className="mt-8 pt-6 border-t border-slate-700/50 flex items-center justify-center gap-2 text-slate-400 text-sm">
-                    <ShieldCheck className="w-4 h-4 text-green-400" /> Seus dados estão protegidos pela LGPD.
+                <h2 className="text-3xl font-bold text-texto-forte mb-3 tracking-tight">{t('registration.success_message', { defaultValue: 'Cadastro Realizado!' })}</h2>
+                <p className="text-texto-secundario text-lg">Seus dados e documentos foram enviados de forma segura e estão sob análise da <span className="text-primaria font-semibold">{company.nome}</span>.</p>
+                <div className="mt-8 pt-6 border-t border-borda/50 flex items-center justify-center gap-2 text-texto-secundario text-sm">
+                    <ShieldCheck className="w-4 h-4 text-sucesso" /> Seus dados estão protegidos pela LGPD.
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="max-w-3xl mx-auto bg-slate-900/80 backdrop-blur-2xl rounded-3xl shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-slate-700/50 overflow-hidden relative">
+        <div className="max-w-3xl mx-auto bg-superficie/80 backdrop-blur-2xl rounded-3xl shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-borda/50 overflow-hidden relative">
 
             {/* Ambient Glow */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-40 bg-gradient-to-b from-cyan-500/10 to-transparent pointer-events-none"></div>
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-40 bg-gradient-to-b from-primaria/10 to-transparent pointer-events-none"></div>
 
             {/* Banner do Evento */}
             {branding?.banner_url && (
@@ -385,7 +385,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                 </div>
             )}
 
-            <div className="p-6 sm:p-8 pb-6 border-b border-slate-800 relative z-10">
+            <div className="p-6 sm:p-8 pb-6 border-b border-borda relative z-10">
                 {/* Header: Logo + Evento + Badge Vagas */}
                 <div className="flex items-start justify-between gap-4 mb-3">
                     <div className="flex items-center gap-3 min-w-0">
@@ -402,7 +402,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                     </div>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-slate-500 text-sm">Cadastro institucional — <span className="text-slate-300 font-medium">{company.nome}</span></p>
+                    <p className="text-texto-fraco text-sm">Cadastro institucional — <span className="text-texto-secundario font-medium">{company.nome}</span></p>
                     {!preFilledData && (
                         <a
                             href={PORTAL_EMPRESA_URL}
@@ -431,7 +431,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                         </div>
                         <div className="hidden sm:block">
                             <p className="text-xs font-bold leading-none" style={step >= 1 ? { color: step > 1 ? '#10b981' : 'var(--brand-primary, #06b6d4)' } : { color: '#64748b' }}>Etapa 1</p>
-                            <p className="text-[11px] text-slate-500 leading-none mt-0.5">Identificação</p>
+                            <p className="text-[11px] text-texto-fraco leading-none mt-0.5">Identificação</p>
                         </div>
                     </div>
 
@@ -449,7 +449,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                         >2</div>
                         <div className="hidden sm:block">
                             <p className="text-xs font-bold leading-none" style={step >= 2 ? { color: 'var(--brand-primary, #06b6d4)' } : { color: '#64748b' }}>Etapa 2</p>
-                            <p className="text-[11px] text-slate-500 leading-none mt-0.5">Profissional & LGPD</p>
+                            <p className="text-[11px] text-texto-fraco leading-none mt-0.5">Profissional & LGPD</p>
                         </div>
                     </div>
                 </div>
@@ -457,7 +457,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
 
             <form onSubmit={handleSubmit} className="p-8 space-y-8 relative z-10">
                 {error && (
-                    <div ref={erroRef} role="alert" className="p-4 bg-red-900/30 border border-red-500/50 text-red-400 rounded-xl flex items-center gap-3 backdrop-blur-sm">
+                    <div ref={erroRef} role="alert" className="p-4 bg-red-900/30 border border-erro/50 text-erro rounded-xl flex items-center gap-3 backdrop-blur-sm">
                         <AlertCircle className="w-6 h-6 shrink-0" />
                         <span className="text-sm">{error}</span>
                     </div>
@@ -466,9 +466,9 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                 {/* Passo 1: Dados Pessoais */}
                 {step === 1 && (
                     <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-                        <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
-                            <div className="p-2 bg-slate-800 rounded-lg"><User className="w-5 h-5 text-cyan-400" /></div>
-                            <h3 className="text-xl font-semibold text-white tracking-tight">Perfil e Biometria</h3>
+                        <div className="flex items-center gap-3 border-b border-borda pb-4">
+                            <div className="p-2 bg-superficie-elevada rounded-lg"><User className="w-5 h-5 text-primaria" /></div>
+                            <h3 className="text-xl font-semibold text-texto-forte tracking-tight">Perfil e Biometria</h3>
                         </div>
 
                         <PhotoCapture
@@ -504,7 +504,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="md:col-span-2 space-y-1.5">
-                                <label className="block text-sm font-medium text-slate-300">{t('registration.document', { defaultValue: 'CPF' })}</label>
+                                <label className="block text-sm font-medium text-texto-secundario">{t('registration.document', { defaultValue: 'CPF' })}</label>
                                 <input
                                     required
                                     name="cpf"
@@ -513,21 +513,21 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                                     onChange={handleInputChange}
                                     readOnly={!!preFilledData?.cpf || preCadastro === 'encontrado'}
                                     aria-describedby="cpf-ajuda"
-                                    className={`w-full p-3.5 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-inner ${(preFilledData?.cpf || preCadastro === 'encontrado') ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                    className={`w-full p-3.5 bg-superficie/50 border border-borda rounded-xl text-texto-forte placeholder-texto-fraco focus:ring-2 focus:ring-primaria focus:border-primaria transition-all shadow-inner ${(preFilledData?.cpf || preCadastro === 'encontrado') ? 'opacity-70 cursor-not-allowed' : ''}`}
                                     placeholder="000.000.000-00"
                                 />
-                                <p id="cpf-ajuda" className="text-xs text-slate-500">
+                                <p id="cpf-ajuda" className="text-xs text-texto-fraco">
                                     {preCadastro === 'buscando'
                                         ? 'Procurando o seu pré-cadastro...'
                                         : 'Comece pelo CPF: se a sua empresa já enviou os seus dados, eles aparecem preenchidos.'}
                                 </p>
                                 {preCadastro === 'encontrado' && (
-                                    <div role="status" className="mt-2 p-3 rounded-xl border border-green-500/40 bg-green-500/10 text-sm text-green-300 flex flex-wrap items-center justify-between gap-2">
+                                    <div role="status" className="mt-2 p-3 rounded-xl border border-sucesso/40 bg-sucesso/10 text-sm text-green-300 flex flex-wrap items-center justify-between gap-2">
                                         <span className="flex items-center gap-2">
                                             <CheckCircle className="w-4 h-4 flex-shrink-0" />
                                             Encontramos os dados enviados pela {company.nome}. Confira e corrija o que estiver errado.
                                         </span>
-                                        <button type="button" onClick={descartarPreCadastro} className="text-xs font-semibold underline underline-offset-4 text-green-200 hover:text-white">
+                                        <button type="button" onClick={descartarPreCadastro} className="text-xs font-semibold underline underline-offset-4 text-green-200 hover:text-texto-forte">
                                             Não é o meu CPF
                                         </button>
                                     </div>
@@ -535,54 +535,54 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                             </div>
 
                             <div className="md:col-span-2 space-y-1.5">
-                                <label className="block text-sm font-medium text-slate-300">{t('registration.full_name', { defaultValue: 'Nome Completo' })}</label>
+                                <label className="block text-sm font-medium text-texto-secundario">{t('registration.full_name', { defaultValue: 'Nome Completo' })}</label>
                                 <input
                                     required
                                     name="nome"
                                     value={formData.nome}
                                     onChange={handleInputChange}
                                     readOnly={!!preFilledData?.nome}
-                                    className={`w-full p-3.5 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-inner ${preFilledData?.nome ? 'opacity-70 cursor-not-allowed grayscale' : ''}`}
+                                    className={`w-full p-3.5 bg-superficie/50 border border-borda rounded-xl text-texto-forte placeholder-texto-fraco focus:ring-2 focus:ring-primaria focus:border-primaria transition-all shadow-inner ${preFilledData?.nome ? 'opacity-70 cursor-not-allowed grayscale' : ''}`}
                                     placeholder="Digite seu nome legal"
                                 />
                             </div>
 
                             <div className="md:col-span-2 space-y-1.5">
-                                <label className="block text-sm font-medium text-slate-300">E-mail (Opcional)</label>
+                                <label className="block text-sm font-medium text-texto-secundario">E-mail (Opcional)</label>
                                 <input
                                     type="email"
                                     name="email"
                                     value={formData.email}
                                     onChange={handleInputChange}
                                     readOnly={!!preFilledData?.email}
-                                    className={`w-full p-3.5 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-inner ${preFilledData?.email ? 'opacity-70 cursor-not-allowed grayscale' : ''}`}
+                                    className={`w-full p-3.5 bg-superficie/50 border border-borda rounded-xl text-texto-forte placeholder-texto-fraco focus:ring-2 focus:ring-primaria focus:border-primaria transition-all shadow-inner ${preFilledData?.email ? 'opacity-70 cursor-not-allowed grayscale' : ''}`}
                                     placeholder="seu.email@exemplo.com"
                                 />
                             </div>
 
                             {isVisible('data_nascimento') && (
                             <div className="space-y-1.5">
-                                <label className="block text-sm font-medium text-slate-300">Data de Nascimento</label>
+                                <label className="block text-sm font-medium text-texto-secundario">Data de Nascimento</label>
                                 <input
                                     required={isRequired('data_nascimento')}
                                     type="date"
                                     name="data_nascimento"
                                     value={formData.data_nascimento}
                                     onChange={handleInputChange}
-                                    className="w-full p-3.5 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-inner [color-scheme:dark]"
+                                    className="w-full p-3.5 bg-superficie/50 border border-borda rounded-xl text-texto-forte placeholder-texto-fraco focus:ring-2 focus:ring-primaria focus:border-primaria transition-all shadow-inner [color-scheme:dark]"
                                 />
                             </div>
                             )}
 
                             {isVisible('nome_mae') && (
                             <div className="space-y-1.5">
-                                <label className="block text-sm font-medium text-slate-300">Nome da Mãe</label>
+                                <label className="block text-sm font-medium text-texto-secundario">Nome da Mãe</label>
                                 <input
                                     required={isRequired('nome_mae')}
                                     name="nome_mae"
                                     value={formData.nome_mae}
                                     onChange={handleInputChange}
-                                    className="w-full p-3.5 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-inner"
+                                    className="w-full p-3.5 bg-superficie/50 border border-borda rounded-xl text-texto-forte placeholder-texto-fraco focus:ring-2 focus:ring-primaria focus:border-primaria transition-all shadow-inner"
                                     placeholder="Nome completo da mãe para validação"
                                 />
                             </div>
@@ -591,7 +591,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
 
                         <div className="pt-4 space-y-3">
                             {!formData.foto_base64 && (
-                                <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400 text-sm">
+                                <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-alerta text-sm">
                                     <AlertCircle className="w-4 h-4 flex-shrink-0" />
                                     <span>Tire ou envie uma foto biométrica para continuar.</span>
                                 </div>
@@ -600,7 +600,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                                 type="button"
                                 onClick={() => setStep(2)}
                                 disabled={!formData.foto_base64}
-                                className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold py-4 rounded-xl hover:from-cyan-400 hover:to-blue-500 transition-all shadow-[0_0_20px_rgba(6,182,212,0.25)] disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base"
+                                className="w-full bg-gradient-to-r from-primaria to-blue-600 text-texto-forte font-bold py-4 rounded-xl hover:from-cyan-400 hover:to-blue-500 transition-all shadow-[0_0_20px_rgba(6,182,212,0.25)] disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base"
                             >
                                 <Briefcase className="w-5 h-5" />
                                 Continuar para Etapa 2
@@ -613,14 +613,14 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                 {/* Passo 2: Dados Profissionais */}
                 {step === 2 && (
                     <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-                        <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
-                            <div className="p-2 bg-slate-800 rounded-lg"><Briefcase className="w-5 h-5 text-cyan-400" /></div>
-                            <h3 className="text-xl font-semibold text-white tracking-tight">Atuação e Conformidade</h3>
+                        <div className="flex items-center gap-3 border-b border-borda pb-4">
+                            <div className="p-2 bg-superficie-elevada rounded-lg"><Briefcase className="w-5 h-5 text-primaria" /></div>
+                            <h3 className="text-xl font-semibold text-texto-forte tracking-tight">Atuação e Conformidade</h3>
                         </div>
 
                         {isVisible('funcao') && (
                         <div className="space-y-1.5">
-                            <label className="block text-sm font-medium text-slate-300">{t('registration.role', { defaultValue: 'Função/Cargo' })}</label>
+                            <label className="block text-sm font-medium text-texto-secundario">{t('registration.role', { defaultValue: 'Função/Cargo' })}</label>
                             {/* Funções configuradas no evento: escolher na lista garante que a regra de documentos da função se aplique */}
                             {funcoesDoEvento.length > 0 && !preFilledData?.funcao && (
                                 <select
@@ -631,7 +631,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                                         setFuncaoOutra(outra);
                                         setFormData(prev => ({ ...prev, funcao: outra ? '' : e.target.value }));
                                     }}
-                                    className="w-full p-3.5 bg-slate-900/50 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-inner"
+                                    className="w-full p-3.5 bg-superficie/50 border border-borda rounded-xl text-texto-forte focus:ring-2 focus:ring-primaria focus:border-primaria transition-all shadow-inner"
                                 >
                                     <option value="" disabled>Selecione sua função</option>
                                     {funcoesDoEvento.map(f => <option key={f} value={f}>{f}</option>)}
@@ -645,7 +645,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                                 value={formData.funcao}
                                 onChange={handleInputChange}
                                 readOnly={!!preFilledData?.funcao}
-                                className={`w-full p-3.5 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-inner ${preFilledData?.funcao ? 'opacity-70 cursor-not-allowed grayscale' : ''}`}
+                                className={`w-full p-3.5 bg-superficie/50 border border-borda rounded-xl text-texto-forte placeholder-texto-fraco focus:ring-2 focus:ring-primaria focus:border-primaria transition-all shadow-inner ${preFilledData?.funcao ? 'opacity-70 cursor-not-allowed grayscale' : ''}`}
                                 placeholder="Descreva sua atribuição técnica"
                             />
                             )}
@@ -653,25 +653,25 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                         )}
 
                         {(docsMinimos.length > 0 || docsDaFuncao.length > 0) && (
-                        <div className="p-6 border border-slate-700/80 rounded-3xl bg-slate-900/40 shadow-inner space-y-4">
+                        <div className="p-6 border border-borda/80 rounded-3xl bg-superficie/40 shadow-inner space-y-4">
                             <div>
-                                <p className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                                    <span className="p-1.5 bg-cyan-500/10 rounded-lg"><ShieldCheck className="w-4 h-4 text-cyan-400" /></span>
+                                <p className="flex items-center gap-2 text-sm font-semibold text-texto-secundario">
+                                    <span className="p-1.5 bg-primaria/10 rounded-lg"><ShieldCheck className="w-4 h-4 text-primaria" /></span>
                                     Documentos do cadastro
                                 </p>
-                                <p className="text-xs text-slate-500 mt-1 ml-8">
+                                <p className="text-xs text-texto-fraco mt-1 ml-8">
                                     Os marcados com * são obrigatórios para enviar. Os demais são pedidos para a sua função e podem ser enviados agora ou depois (PDF, JPG ou PNG, até 3MB).
                                 </p>
                             </div>
                             {[...docsMinimos.map(t => ({ t, obrigatorio: true })), ...docsDaFuncao.map(t => ({ t, obrigatorio: false }))].map(({ t, obrigatorio }) => {
                                 const anexo = docsPorTipo[t.id];
                                 return (
-                                    <div key={t.id} className={`p-4 rounded-xl border ${anexo ? 'border-green-500/40 bg-green-500/5' : 'border-slate-700 bg-slate-800/40'}`}>
+                                    <div key={t.id} className={`p-4 rounded-xl border ${anexo ? 'border-sucesso/40 bg-sucesso/5' : 'border-borda bg-superficie-elevada/40'}`}>
                                         <div className="flex flex-wrap items-center justify-between gap-3">
-                                            <span className="text-sm font-medium text-slate-200">
-                                                {t.nome}{obrigatorio && <span className="text-red-400" aria-label="obrigatório"> *</span>}
+                                            <span className="text-sm font-medium text-texto">
+                                                {t.nome}{obrigatorio && <span className="text-erro" aria-label="obrigatório"> *</span>}
                                             </span>
-                                            <label className="relative cursor-pointer text-xs font-semibold px-3 py-2 rounded-lg border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10">
+                                            <label className="relative cursor-pointer text-xs font-semibold px-3 py-2 rounded-lg border border-primaria/40 text-primaria hover:bg-primaria/10">
                                                 {anexo ? 'Trocar arquivo' : 'Anexar'}
                                                 <input
                                                     type="file"
@@ -683,18 +683,18 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                                             </label>
                                         </div>
                                         {anexo && (
-                                            <p className="mt-2 text-xs text-green-400 flex items-center gap-1.5">
+                                            <p className="mt-2 text-xs text-sucesso flex items-center gap-1.5">
                                                 <CheckCircle className="w-3.5 h-3.5" /> <span className="truncate">{anexo.name}</span>
                                             </p>
                                         )}
                                         {anexo && t.exige_validade && (
-                                            <label className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                                            <label className="mt-3 flex flex-wrap items-center gap-2 text-xs text-texto-secundario">
                                                 Válido até
                                                 <input
                                                     type="date"
                                                     value={anexo.data_validade || ''}
                                                     onChange={(e) => setDocsPorTipo(prev => ({ ...prev, [t.id]: { ...prev[t.id], data_validade: e.target.value } }))}
-                                                    className="p-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white"
+                                                    className="p-2 bg-superficie/50 border border-borda rounded-lg text-texto-forte"
                                                 />
                                             </label>
                                         )}
@@ -704,13 +704,13 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                         </div>
                         )}
 
-                        <div className="bg-slate-800/40 border border-slate-700/60 rounded-3xl shadow-xl backdrop-blur-sm overflow-hidden">
-                            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-700/40">
+                        <div className="bg-superficie-elevada/40 border border-borda/60 rounded-3xl shadow-xl backdrop-blur-sm overflow-hidden">
+                            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-borda/40">
                                 <div className="flex items-center gap-2">
-                                    <div className="p-1.5 bg-cyan-500/10 rounded-lg"><Calendar className="w-4 h-4 text-cyan-400" /></div>
-                                    <span className="text-sm font-semibold text-slate-200">Período de Acesso</span>
+                                    <div className="p-1.5 bg-primaria/10 rounded-lg"><Calendar className="w-4 h-4 text-primaria" /></div>
+                                    <span className="text-sm font-semibold text-texto">Período de Acesso</span>
                                     {formData.dias_trabalho.length > 0 && (
-                                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-primaria/20 text-primaria border border-primaria/30">
                                             {formData.dias_trabalho.length} selecionada{formData.dias_trabalho.length > 1 ? 's' : ''}
                                         </span>
                                     )}
@@ -725,7 +725,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                                                 dias_trabalho: allSelected ? [] : [...company.datas_disponiveis]
                                             }));
                                         }}
-                                        className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 transition-colors"
+                                        className="text-xs font-semibold text-primaria hover:text-primaria transition-colors"
                                     >
                                         {company.datas_disponiveis.every(d => formData.dias_trabalho.includes(d)) ? 'Limpar' : 'Selecionar todas'}
                                     </button>
@@ -741,8 +741,8 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                                             type="button"
                                             onClick={() => toggleDate(date)}
                                             className={`px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-200 transform active:scale-95 ${isSelected
-                                                ? 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white border-cyan-400/50 shadow-[0_0_16px_rgba(6,182,212,0.35)]'
-                                                : 'bg-slate-900/60 text-slate-400 border-slate-700/50 hover:border-slate-500/80 hover:text-slate-200 hover:bg-slate-800/60'
+                                                ? 'bg-gradient-to-br from-primaria to-blue-600 text-texto-forte border-primaria/50 shadow-[0_0_16px_rgba(6,182,212,0.35)]'
+                                                : 'bg-superficie/60 text-texto-secundario border-borda/50 hover:border-slate-500/80 hover:text-texto hover:bg-superficie-elevada/60'
                                             }`}
                                         >
                                             {displayDate}
@@ -751,23 +751,23 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                                 })}
                             </div>
                             {formData.dias_trabalho.length === 0 && (
-                                <div className="px-5 pb-4 flex items-center gap-1.5 text-xs text-amber-400">
+                                <div className="px-5 pb-4 flex items-center gap-1.5 text-xs text-alerta">
                                     <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
                                     Selecione ao menos uma data para prosseguir.
                                 </div>
                             )}
                         </div>
 
-                        <div className="p-6 border border-slate-700/80 rounded-3xl bg-slate-900/40 shadow-inner group transition-all hover:border-slate-600">
-                            <label className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-1">
-                                <div className="p-1.5 bg-cyan-500/10 rounded-lg"><Upload className="w-4 h-4 text-cyan-400" /></div>
+                        <div className="p-6 border border-borda/80 rounded-3xl bg-superficie/40 shadow-inner group transition-all hover:border-borda">
+                            <label className="flex items-center gap-2 text-sm font-semibold text-texto-secundario mb-1">
+                                <div className="p-1.5 bg-primaria/10 rounded-lg"><Upload className="w-4 h-4 text-primaria" /></div>
                                 Outros documentos (opcional)
                             </label>
-                            <p className="text-xs text-slate-500 mb-5 ml-8">
+                            <p className="text-xs text-texto-fraco mb-5 ml-8">
                                 Envio seguro e criptografado de NRs, ASOs e certificações (PDF, JPG, PNG - máx 3MB).
                             </p>
 
-                            <div className="relative border-2 border-dashed border-slate-700 rounded-xl p-6 text-center hover:bg-slate-800/50 transition-colors group">
+                            <div className="relative border-2 border-dashed border-borda rounded-xl p-6 text-center hover:bg-superficie-elevada/50 transition-colors group">
                                 <input
                                     type="file"
                                     multiple
@@ -795,14 +795,14 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                                     }}
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                 />
-                                <Upload className="w-8 h-8 text-slate-600 group-hover:text-cyan-400 mx-auto mb-2 transition-colors" />
-                                <span className="text-sm text-slate-400 font-medium">Toque ou arraste os arquivos aqui</span>
+                                <Upload className="w-8 h-8 text-texto-fraco group-hover:text-primaria mx-auto mb-2 transition-colors" />
+                                <span className="text-sm text-texto-secundario font-medium">Toque ou arraste os arquivos aqui</span>
                             </div>
 
                             {formData.documentos.length > 0 && (
                                 <ul className="mt-4 space-y-2">
                                     {formData.documentos.map((doc, idx) => (
-                                        <li key={idx} className="text-sm flex justify-between items-center bg-slate-800 p-3 rounded-lg border border-slate-700 shadow-sm text-slate-300">
+                                        <li key={idx} className="text-sm flex justify-between items-center bg-superficie-elevada p-3 rounded-lg border border-borda shadow-sm text-texto-secundario">
                                             <span className="truncate flex-1 max-w-[200px] sm:max-w-xs">{doc.name}</span>
                                             <button
                                                 type="button"
@@ -812,7 +812,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                                                         documentos: prev.documentos.filter((_, i) => i !== idx)
                                                     }));
                                                 }}
-                                                className="text-red-400 hover:text-red-300 text-xs font-semibold px-3 py-1 bg-red-400/10 rounded border border-red-500/20 transition-colors"
+                                                className="text-erro hover:text-red-300 text-xs font-semibold px-3 py-1 bg-red-400/10 rounded border border-erro/20 transition-colors"
                                             >
                                                 Excluir
                                             </button>
@@ -826,8 +826,8 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                         <div
                             className={`p-6 border rounded-3xl flex items-start gap-4 transition-all duration-300 cursor-pointer ${
                                 formData.aceite_lgpd
-                                    ? 'border-cyan-500/50 bg-cyan-950/30 shadow-[0_0_20px_rgba(6,182,212,0.08)]'
-                                    : 'border-slate-700/80 bg-slate-900/40 hover:border-cyan-500/30 hover:bg-cyan-950/10'
+                                    ? 'border-primaria/50 bg-cyan-950/30 shadow-[0_0_20px_rgba(6,182,212,0.08)]'
+                                    : 'border-borda/80 bg-superficie/40 hover:border-primaria/30 hover:bg-cyan-950/10'
                             }`}
                             onClick={() => setFormData(prev => ({ ...prev, aceite_lgpd: !prev.aceite_lgpd }))}
                         >
@@ -835,11 +835,11 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                             <div className="relative flex-shrink-0 mt-0.5">
                                 <div className={`w-7 h-7 border-2 rounded-lg flex items-center justify-center transition-all duration-300 ${
                                     formData.aceite_lgpd
-                                        ? 'bg-cyan-500 border-cyan-500 shadow-lg shadow-cyan-500/30'
-                                        : 'bg-slate-900 border-slate-600'
+                                        ? 'bg-primaria border-primaria shadow-lg shadow-cyan-500/30'
+                                        : 'bg-superficie border-borda'
                                 }`}>
                                     {formData.aceite_lgpd && (
-                                        <CheckCircle className="w-5 h-5 text-white" />
+                                        <CheckCircle className="w-5 h-5 text-texto-forte" />
                                     )}
                                 </div>
                                 <input
@@ -852,13 +852,13 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                                     onClick={(e) => e.stopPropagation()}
                                 />
                             </div>
-                            <div className="text-sm text-slate-300 leading-relaxed select-none">
-                                <strong className="text-white block mb-1 text-base tracking-tight">Termo de Consentimento - LGPD</strong>
+                            <div className="text-sm text-texto-secundario leading-relaxed select-none">
+                                <strong className="text-texto-forte block mb-1 text-base tracking-tight">Termo de Consentimento - LGPD</strong>
                                 Declaro de forma livre, inequívoca e informada que li e aceito as{' '}
                                 <button
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); setShowLGPDModal(true); }}
-                                    className="text-cyan-400 hover:text-cyan-300 font-bold underline decoration-cyan-400/30 underline-offset-4"
+                                    className="text-primaria hover:text-primaria font-bold underline decoration-cyan-400/30 underline-offset-4"
                                 >
                                     Políticas de Privacidade
                                 </button>. Autorizo expressamente o tratamento da minha biometria facial e documentos anexados única e exclusivamente para fins de credenciamento, auditoria e controle de acesso rigoroso, em conformidade com a <strong>Lei 13.709/2018</strong>.
@@ -869,14 +869,14 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                             <button
                                 type="button"
                                 onClick={() => setStep(1)}
-                                className="flex-shrink-0 px-5 py-4 bg-slate-800/80 text-slate-300 font-semibold rounded-xl hover:bg-slate-700 border border-slate-700 transition-all flex items-center gap-2 text-sm"
+                                className="flex-shrink-0 px-5 py-4 bg-superficie-elevada/80 text-texto-secundario font-semibold rounded-xl hover:bg-superficie-elevada border border-borda transition-all flex items-center gap-2 text-sm"
                             >
                                 <ChevronRight className="w-4 h-4 rotate-180" /> Voltar
                             </button>
                             <button
                                 type="submit"
                                 disabled={loading || formData.dias_trabalho.length === 0 || !formData.aceite_lgpd}
-                                className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-4 rounded-xl hover:from-green-400 hover:to-emerald-500 transition-all shadow-[0_0_20px_rgba(16,185,129,0.25)] disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center gap-2.5 text-base tracking-wide"
+                                className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-texto-forte font-bold py-4 rounded-xl hover:from-green-400 hover:to-emerald-500 transition-all shadow-[0_0_20px_rgba(16,185,129,0.25)] disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center gap-2.5 text-base tracking-wide"
                             >
                                 {loading
                                     ? <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Enviando...</>
@@ -885,7 +885,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                             </button>
                         </div>
                         {(!formData.aceite_lgpd || formData.dias_trabalho.length === 0) && (
-                            <p className="text-center text-xs text-slate-500 pt-1">
+                            <p className="text-center text-xs text-texto-fraco pt-1">
                                 {!formData.aceite_lgpd && 'Aceite os termos LGPD'}
                                 {!formData.aceite_lgpd && formData.dias_trabalho.length === 0 && ' e '}
                                 {formData.dias_trabalho.length === 0 && 'selecione ao menos uma data'}
@@ -898,32 +898,32 @@ export default function RegistrationForm({ token, company, branding, requiredFie
 
             {/* LGPD Modal */}
             {showLGPDModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
-                    <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-                        <div className="p-6 border-b border-slate-800 flex items-center justify-between">
-                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                                <ShieldCheck className="w-6 h-6 text-cyan-400" />
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-fundo/80 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="bg-superficie border border-borda w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+                        <div className="p-6 border-b border-borda flex items-center justify-between">
+                            <h3 className="text-xl font-bold text-texto-forte flex items-center gap-2">
+                                <ShieldCheck className="w-6 h-6 text-primaria" />
                                 Políticas de Privacidade
                             </h3>
-                            <button onClick={() => setShowLGPDModal(false)} className="text-slate-400 hover:text-white p-2">&times;</button>
+                            <button onClick={() => setShowLGPDModal(false)} className="text-texto-secundario hover:text-texto-forte p-2">&times;</button>
                         </div>
-                        <div className="p-8 max-h-[60vh] overflow-y-auto text-slate-300 space-y-4 text-justify leading-relaxed">
+                        <div className="p-8 max-h-[60vh] overflow-y-auto text-texto-secundario space-y-4 text-justify leading-relaxed">
                             <p>{LGPD_TEXT}</p>
                             <p>Ao realizar o credenciamento, você concorda que sua imagem será coletada para fins de identificação segura em nossos pontos de acesso.</p>
                             {branding?.politica_url && (
-                                <div className="pt-4 mt-4 border-t border-slate-800">
+                                <div className="pt-4 mt-4 border-t border-borda">
                                     <p className="text-sm mb-2">Para termos específicos do evento, consulte o canal oficial:</p>
-                                    <a href={branding.politica_url} target="_blank" rel="noopener noreferrer" className="text-cyan-400 font-bold hover:underline">Ver documento completo &rarr;</a>
+                                    <a href={branding.politica_url} target="_blank" rel="noopener noreferrer" className="text-primaria font-bold hover:underline">Ver documento completo &rarr;</a>
                                 </div>
                             )}
                         </div>
-                        <div className="p-6 bg-slate-900/50 border-t border-slate-800 text-center">
+                        <div className="p-6 bg-superficie/50 border-t border-borda text-center">
                             <button
                                 onClick={() => {
                                     setFormData({ ...formData, aceite_lgpd: true });
                                     setShowLGPDModal(false);
                                 }}
-                                className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-cyan-600/20"
+                                className="w-full bg-primaria hover:bg-primaria text-texto-forte font-bold py-4 rounded-xl transition-all shadow-lg shadow-cyan-600/20"
                             >
                                 COMPREENDI E ACEITO
                             </button>

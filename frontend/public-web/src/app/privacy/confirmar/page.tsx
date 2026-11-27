@@ -48,12 +48,12 @@ function ConfirmarExclusao() {
     return (
         <div className="space-y-6">
             {!concluido && (
-                <div className="p-4 bg-red-500/10 rounded-2xl border border-red-500/20">
+                <div className="p-4 bg-erro/10 rounded-2xl border border-erro/20">
                     <div className="flex items-start gap-3">
-                        <AlertTriangle className="w-6 h-6 text-red-400 shrink-0 mt-0.5" />
+                        <AlertTriangle className="w-6 h-6 text-erro shrink-0 mt-0.5" />
                         <div className="space-y-2">
-                            <h2 className="text-white font-semibold">Esta ação é irreversível</h2>
-                            <p className="text-sm text-slate-300 leading-relaxed">
+                            <h2 className="text-texto-forte font-semibold">Esta ação é irreversível</h2>
+                            <p className="text-sm text-texto-secundario leading-relaxed">
                                 Ao confirmar, seus dados pessoais, sua foto e sua biometria facial serão apagados,
                                 e seu acesso ao evento será bloqueado. Não será possível desfazer.
                             </p>
@@ -64,7 +64,7 @@ function ConfirmarExclusao() {
 
             {message && (
                 <div className={`p-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 ${
-                    message.type === 'success' ? 'bg-green-500/10 border border-green-500/20 text-green-400' : 'bg-red-500/10 border border-red-500/20 text-red-400'
+                    message.type === 'success' ? 'bg-sucesso/10 border border-sucesso/20 text-sucesso' : 'bg-erro/10 border border-erro/20 text-erro'
                 }`}>
                     {message.type === 'success' ? <CheckCircle className="w-5 h-5 shrink-0" /> : <AlertCircle className="w-5 h-5 shrink-0" />}
                     <span className="text-sm font-medium">{message.text}</span>
@@ -75,7 +75,7 @@ function ConfirmarExclusao() {
                 <button
                     onClick={handleConfirmar}
                     disabled={loading || !token}
-                    className="w-full min-h-[48px] p-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="w-full min-h-[48px] p-4 bg-red-600 hover:bg-erro text-texto-forte font-bold rounded-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
                     Confirmar exclusão
@@ -87,30 +87,30 @@ function ConfirmarExclusao() {
 
 export default function ConfirmarEsquecimentoPage() {
     return (
-        <div className="min-h-screen bg-[#020617] text-slate-300 py-12 px-4 selection:bg-cyan-500/30">
+        <div className="min-h-screen bg-fundo text-texto-secundario py-12 px-4 selection:bg-primaria/30">
             <div className="max-w-2xl mx-auto">
-                <Link href="/privacy" className="inline-flex items-center gap-2 text-slate-500 hover:text-white mb-8 transition-colors">
+                <Link href="/privacy" className="inline-flex items-center gap-2 text-texto-fraco hover:text-texto-forte mb-8 transition-colors">
                     <ArrowLeft className="w-4 h-4" /> Voltar à Central de Privacidade
                 </Link>
 
-                <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl overflow-hidden relative">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-600" />
+                <div className="bg-superficie/80 backdrop-blur-xl border border-borda rounded-3xl p-8 shadow-2xl overflow-hidden relative">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primaria via-blue-500 to-purple-600" />
 
                     <div className="flex items-center gap-4 mb-6">
-                        <div className="p-3 bg-cyan-500/10 rounded-2xl border border-cyan-500/20">
-                            <Shield className="w-8 h-8 text-cyan-400" />
+                        <div className="p-3 bg-primaria/10 rounded-2xl border border-primaria/20">
+                            <Shield className="w-8 h-8 text-primaria" />
                         </div>
                         <div>
-                            <h1 className="text-3xl font-bold text-white tracking-tight">Confirmar exclusão</h1>
-                            <p className="text-slate-400">Direito ao esquecimento (LGPD, Lei 13.709/18)</p>
+                            <h1 className="text-3xl font-bold text-texto-forte tracking-tight">Confirmar exclusão</h1>
+                            <p className="text-texto-secundario">Direito ao esquecimento (LGPD, Lei 13.709/18)</p>
                         </div>
                     </div>
 
-                    <Suspense fallback={<Loader2 className="w-6 h-6 animate-spin text-cyan-400 mx-auto" />}>
+                    <Suspense fallback={<Loader2 className="w-6 h-6 animate-spin text-primaria mx-auto" />}>
                         <ConfirmarExclusao />
                     </Suspense>
 
-                    <p className="mt-8 text-center text-[10px] text-slate-600 uppercase tracking-widest font-bold">
+                    <p className="mt-8 text-center text-[10px] text-texto-fraco uppercase tracking-widest font-bold">
                         A2 Eventos • Nexus Control • Compliance Team
                     </p>
                 </div>

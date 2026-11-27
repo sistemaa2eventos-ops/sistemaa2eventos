@@ -1,67 +1,54 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Tokens do NZT (mesmos valores do painel). Ver skill nzt-design-public-web, seção 3. */
+@theme {
+  --color-fundo: #050B18;
+  --color-superficie: #0A1628;
+  --color-superficie-elevada: #0F1E37;
+  --color-borda: rgb(148 163 184 / 0.16);
+  --color-borda-destaque: rgb(0 212 255 / 0.35);
+  --color-primaria: #00D4FF;
+  --color-primaria-hover: #33DDFF;
+  --color-sucesso: #00FF88;
+  --color-alerta: #FFB800;
+  --color-erro: #FF3366;
+  --color-texto: #E8F4FD;
+  --color-texto-forte: #FFFFFF;
+  --color-texto-secundario: #94A3B8;
+  --color-texto-fraco: #7A8BA3;
+  --color-sobre-primaria: #000000;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --radius-controle: 8px;
+  --radius-cartao: 12px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Corpo sempre no fundo do sistema, com a fonte carregada por next/font (sem Arial) */
+@layer base {
+  html,
+  body {
+    background: var(--color-fundo);
+    color: var(--color-texto);
+    font-family: var(--font-sans);
   }
 }
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-/* UI-UX Pro Max - High Polish Utilities */
 
 @layer utilities {
   .glass-panel {
-    @apply bg-slate-900/40 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)];
-  }
-
-  .glass-card {
-    @apply bg-white/5 backdrop-blur-md border border-white/10 shadow-2xl;
-  }
-
-  .text-gradient-cyan {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500;
+    @apply bg-superficie/40 backdrop-blur-xl border border-white/10;
   }
 }
 
-@keyframes scan {
-  0% { transform: translateY(-100%); opacity: 0; }
-  50% { opacity: 1; }
-  100% { transform: translateY(100%); opacity: 0; }
+/* Acessibilidade: quem pede menos movimento não vê animações */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
-
-@keyframes pulse-glow {
-  0%, 100% { opacity: 0.5; filter: drop-shadow(0 0 5px rgba(34, 211, 238, 0.5)); }
-  50% { opacity: 1; filter: drop-shadow(0 0 15px rgba(34, 211, 238, 0.8)); }
-}
-
-@keyframes corner-draw {
-  from { stroke-dashoffset: 100; }
-  to { stroke-dashoffset: 0; }
-}
-
-.animate-scan {
-  animation: scan 3s ease-in-out infinite;
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
