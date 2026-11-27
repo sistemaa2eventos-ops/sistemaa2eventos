@@ -1,6 +1,8 @@
 import { createTheme } from '@mui/material/styles';
 import { ptBR } from '@mui/material/locale';
-import { cores, fontes, raios, sombras, tamanhos } from './tokens';
+import { cores, direcao, fontes, raios, sombras, tamanhos } from './tokens';
+
+const pesoTitulo = direcao.pesoTitulo;
 
 /**
  * Tema do NZT Intelligent Control System.
@@ -8,7 +10,7 @@ import { cores, fontes, raios, sombras, tamanhos } from './tokens';
  */
 const theme = createTheme({
     palette: {
-        mode: 'dark',
+        mode: direcao.modo,
         primary: { main: cores.primaria, light: cores.primariaHover, dark: cores.primariaEscura, contrastText: cores.textoSobrePrimaria },
         secondary: { main: cores.secundaria, light: cores.secundariaClara, dark: '#5B1F8E', contrastText: '#FFFFFF' },
         success: { main: cores.sucesso, contrastText: '#000000' },
@@ -21,12 +23,12 @@ const theme = createTheme({
     },
     typography: {
         fontFamily: fontes.texto,
-        h1: { fontFamily: fontes.titulo, fontSize: '2.25rem', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.2 },
-        h2: { fontFamily: fontes.titulo, fontSize: '2rem', fontWeight: 700, letterSpacing: '-0.015em', lineHeight: 1.25 },
-        h3: { fontFamily: fontes.titulo, fontSize: '1.75rem', fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.3 },
-        h4: { fontFamily: fontes.titulo, fontSize: '1.5rem', fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.3 },
-        h5: { fontFamily: fontes.titulo, fontSize: tamanhos.xl, fontWeight: 700, lineHeight: 1.35 },
-        h6: { fontFamily: fontes.titulo, fontSize: '1.0625rem', fontWeight: 700, lineHeight: 1.4 },
+        h1: { fontFamily: fontes.titulo, fontSize: '2.25rem', fontWeight: pesoTitulo, letterSpacing: '-0.02em', lineHeight: 1.2 },
+        h2: { fontFamily: fontes.titulo, fontSize: '2rem', fontWeight: pesoTitulo, letterSpacing: '-0.015em', lineHeight: 1.25 },
+        h3: { fontFamily: fontes.titulo, fontSize: '1.75rem', fontWeight: pesoTitulo, letterSpacing: '-0.01em', lineHeight: 1.3 },
+        h4: { fontFamily: fontes.titulo, fontSize: '1.5rem', fontWeight: pesoTitulo, letterSpacing: '-0.01em', lineHeight: 1.3 },
+        h5: { fontFamily: fontes.titulo, fontSize: tamanhos.xl, fontWeight: pesoTitulo, lineHeight: 1.35 },
+        h6: { fontFamily: fontes.titulo, fontSize: '1.0625rem', fontWeight: pesoTitulo, lineHeight: 1.4 },
         subtitle1: { fontSize: tamanhos.lg, fontWeight: 600, lineHeight: 1.5 },
         subtitle2: { fontSize: tamanhos.md, fontWeight: 600, lineHeight: 1.5 },
         body1: { fontSize: tamanhos.md, lineHeight: 1.6 },
@@ -107,7 +109,11 @@ const theme = createTheme({
             },
         },
         MuiIconButton: {
-            styleOverrides: { root: { borderRadius: raios.controle } },
+            styleOverrides: {
+                root: { borderRadius: raios.controle },
+                // Área de toque mínima de 44px (skill nzt-design-system, seção 4). O ícone continua no tamanho original.
+                sizeSmall: { minWidth: 44, minHeight: 44, padding: 8 },
+            },
         },
         MuiOutlinedInput: {
             styleOverrides: {

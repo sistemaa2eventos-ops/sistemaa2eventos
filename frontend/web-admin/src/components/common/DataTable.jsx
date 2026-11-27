@@ -1,4 +1,8 @@
 import React from 'react';
+import InboxOutlinedIcon from '@mui/icons-material/InboxOutlined';
+
+// Ícone do estado vazio: 40px, neutro (cor só do texto, sem estado)
+const EstadoVazioIcone = () => <InboxOutlinedIcon sx={{ fontSize: 40, color: 'text.secondary', opacity: 0.5 }} />;
 import {
   Table,
   TableBody,
@@ -18,6 +22,7 @@ import {
   Checkbox,
   Typography
 } from '@mui/material';
+import { cores, tom } from '../../styles/tokens';
 
 const DataTable = ({
   columns,
@@ -75,7 +80,7 @@ const DataTable = ({
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-        <CircularProgress sx={{ color: '#00D4FF' }} />
+        <CircularProgress sx={{ color: cores.primaria }} />
       </Box>
     );
   }
@@ -122,7 +127,11 @@ const DataTable = ({
         <Stack spacing={1.5} sx={{ mb: 1.5 }}>
           {paginatedData.length === 0 ? (
             <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <Typography variant="body2" color="text.secondary">Nenhum registro encontrado</Typography>
+              <Box sx={{ display: 'grid', justifyItems: 'center', gap: 1 }}>
+                <EstadoVazioIcone />
+                <Typography variant="body1" sx={{ fontWeight: 600 }}>Nenhum registro encontrado</Typography>
+                <Typography variant="body2" color="text.secondary">Ajuste a busca ou os filtros para ver outros resultados.</Typography>
+              </Box>
             </Paper>
           ) : (
             paginatedData.map((row, index) => (
@@ -130,9 +139,9 @@ const DataTable = ({
                 key={row.id || index}
                 variant="outlined"
                 sx={{
-                  bgcolor: isSelected(row.id) ? 'rgba(0, 212, 255, 0.05)' : 'rgba(255,255,255,0.02)',
-                  borderColor: isSelected(row.id) ? '#00D4FF' : 'rgba(255,255,255,0.1)',
-                  borderRadius: 2
+                  bgcolor: isSelected(row.id) ? tom(cores.primaria, 0.05) : 'rgba(255,255,255,0.02)',
+                  borderColor: isSelected(row.id) ? cores.primaria : 'rgba(255,255,255,0.1)',
+                  borderRadius: 1.5
                 }}
                 onDoubleClick={onRowDoubleClick ? () => onRowDoubleClick(row) : undefined}
               >
@@ -154,7 +163,7 @@ const DataTable = ({
                           size="small"
                           checked={isSelected(row.id)}
                           onChange={(event) => handleSelectOne(event, row.id)}
-                          sx={{ p: 0.5, color: 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: '#00D4FF' } }}
+                          sx={{ p: 0.5, color: 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: cores.primaria } }}
                         />
                       )}
                       {photoCol && (
@@ -167,7 +176,7 @@ const DataTable = ({
                           {typeof titleCol.format === 'function' ? (
                             titleCol.format(row[titleCol.id], row)
                           ) : (
-                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#FFFFFF' }} noWrap>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: cores.textoForte }} noWrap>
                               {row[titleCol.id]}
                             </Typography>
                           )}
@@ -258,7 +267,7 @@ const DataTable = ({
           overflowX: 'auto',
           borderRadius: 1.5,
           '&::-webkit-scrollbar': { height: 8, width: 8 },
-          '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0, 212, 255, 0.25)', borderRadius: 1.5 },
+          '&::-webkit-scrollbar-thumb': { bgcolor: tom(cores.primaria, 0.25), borderRadius: 1.5 },
           '&::-webkit-scrollbar-track': { bgcolor: 'rgba(0, 0, 0, 0.2)' }
         }} 
         component="div" 
@@ -281,7 +290,7 @@ const DataTable = ({
                     indeterminate={selected.length > 0 && selected.length < paginatedData.length}
                     checked={paginatedData.length > 0 && selected.length === paginatedData.length}
                     onChange={handleSelectAll}
-                    sx={{ color: 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: '#00D4FF' }, '&.MuiCheckbox-indeterminate': { color: '#00D4FF' } }}
+                    sx={{ color: 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: cores.primaria }, '&.MuiCheckbox-indeterminate': { color: cores.primaria } }}
                   />
                 </TableCell>
               )}
@@ -313,7 +322,11 @@ const DataTable = ({
             {paginatedData.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={columns.length + (checkboxSelection ? 1 : 0)} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                  Nenhum registro encontrado
+                  <Box sx={{ display: 'grid', justifyItems: 'center', gap: 1 }}>
+                    <EstadoVazioIcone />
+                    <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary' }}>Nenhum registro encontrado</Typography>
+                    <Typography variant="body2" color="text.secondary">Ajuste a busca ou os filtros para ver outros resultados.</Typography>
+                  </Box>
                 </TableCell>
               </TableRow>
             ) : (
@@ -327,7 +340,7 @@ const DataTable = ({
                     aria-selected={isItemSelected}
                     selected={isItemSelected}
                     sx={{ 
-                        '&.Mui-selected, &.Mui-selected:hover': { bgcolor: 'rgba(0, 212, 255, 0.05)' },
+                        '&.Mui-selected, &.Mui-selected:hover': { bgcolor: tom(cores.primaria, 0.05) },
                         '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.02) !important' },
                         cursor: onRowDoubleClick ? 'pointer' : 'default',
                         transition: 'background-color 0.15s ease',
@@ -340,7 +353,7 @@ const DataTable = ({
                           checked={isItemSelected}
                           onChange={(event) => handleSelectOne(event, row.id)}
                           inputProps={{ 'aria-label': `Selecionar linha ${index + 1}` }}
-                          sx={{ color: 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: '#00D4FF' }, '&:focus-visible': { outline: '2px solid #00D4FF', outlineOffset: 2 } }}
+                          sx={{ color: 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: cores.primaria }, '&:focus-visible': { outline: '2px solid #00D4FF', outlineOffset: 2 } }}
                         />
                       </TableCell>
                     )}
@@ -355,7 +368,7 @@ const DataTable = ({
                           py: 1.4,
                           px: 2,
                           borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                          color: '#CBD5E1',
+                          color: cores.textoSuave,
                           fontSize: '0.8125rem'
                         }}
                       >
@@ -380,9 +393,9 @@ const DataTable = ({
         labelRowsPerPage="Linhas por página"
         sx={{
           borderTop: '1px solid rgba(255, 255, 255, 0.05)',
-          color: '#94A3B8',
-          '.MuiTablePagination-select': { color: '#00D4FF', fontWeight: 700 },
-          '.MuiTablePagination-displayedRows': { color: '#CBD5E1', fontSize: '0.8125rem' }
+          color: cores.textoSecundario,
+          '.MuiTablePagination-select': { color: cores.primaria, fontWeight: 700 },
+          '.MuiTablePagination-displayedRows': { color: cores.textoSuave, fontSize: '0.8125rem' }
         }}
       />
     </Paper>
