@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Painel Radar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/*
+  Opção 1 · Radar. Inspirada na referência 1: barra superior com busca e usuário à direita,
+  menu lateral que recolhe para ícones, medidor circular como destaque e números grandes em grade.
+*/
+:root {
+  --bg: #0D0F15;
+  --panel: #141821;
+  --panel-2: #1A1F2B;
+  --line: rgba(230, 233, 240, 0.08);
+  --line-2: rgba(230, 233, 240, 0.16);
+  --fg: #E6E9F0;
+  --fg-2: #8B93A7;
+  --fg-3: #5A6275;
+  --accent: #00D4FF;
+  --ok: #3DDC97;
+  --warn: #F5B942;
+  --bad: #FF5470;
+  --out: #FF9A3D;
+  --fun: #A99BD6;
+  --display: "Space Grotesk", Inter, system-ui, sans-serif;
+  --text: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  color-scheme: dark;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.5 var(--text);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+svg.ic { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+
+/* Estrutura: menu lateral + área principal */
+.app { display: grid; grid-template-columns: 72px minmax(0, 1fr); min-height: 100dvh; transition: grid-template-columns 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
+.app.aberto { grid-template-columns: 232px minmax(0, 1fr); }
+
+.menu { border-right: 1px solid var(--line); padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100dvh; overflow: hidden; }
+.menu .marca { display: flex; align-items: center; gap: 10px; padding: 6px 8px 18px; font: 700 15px var(--display); letter-spacing: -0.02em; white-space: nowrap; }
+.menu .marca i { width: 28px; height: 28px; border-radius: 8px; background: var(--accent); flex-shrink: 0; }
+.menu a {
+  display: flex; align-items: center; gap: 12px; height: 42px; padding: 0 12px; border-radius: 10px;
+  color: var(--fg-2); text-decoration: none; white-space: nowrap;
+  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s;
+}
+.menu a:hover { background: var(--panel); color: var(--fg); }
+.menu a[aria-current="page"] { background: rgba(0, 212, 255, 0.10); color: var(--accent); box-shadow: inset 2px 0 0 var(--accent); }
+.menu .rotulo { display: none; font-size: 13.5px; font-weight: 500; }
+.app.aberto .menu .rotulo { display: inline; }
+.menu .recolher { margin-top: auto; }
+.menu button.recolher { background: none; border: 1px solid var(--line-2); color: var(--fg-2); height: 40px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; font: inherit; }
+.menu button.recolher:hover { color: var(--fg); border-color: var(--fg-3); }
+
+/* Barra superior: busca, ações e usuário à direita */
+.topo { display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-bottom: 1px solid var(--line); min-width: 0; flex-wrap: wrap; }
+.busca { flex: 1 1 240px; max-width: 460px; display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; color: var(--fg-3); transition: border-color 0.2s; }
+.busca:focus-within { border-color: var(--accent); }
+.busca input { flex: 1; min-width: 0; background: none; border: 0; color: var(--fg); font: inherit; outline: none; }
+.chip { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; border-radius: 999px; background: rgba(61, 220, 151, 0.10); color: var(--ok); font-size: 12.5px; font-weight: 600; border: 1px solid rgba(61, 220, 151, 0.25); }
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 4px rgba(61, 220, 151, 0.15); }
+.btn { height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line-2); background: transparent; color: var(--fg); font: 600 13px var(--text); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: background-color 0.2s, border-color 0.2s, transform 0.15s; }
+.btn:hover { background: var(--panel); border-color: var(--warn); }
+.btn:active { transform: translateY(1px); }
+.btn.ic-only { width: 40px; padding: 0; justify-content: center; }
+.usuario { margin-left: auto; display: flex; align-items: center; gap: 10px; padding: 4px 6px 4px 4px; border-radius: 999px; cursor: pointer; }
+.usuario:hover { background: var(--panel); }
+.avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #2E3A55, #1A2233); display: grid; place-items: center; font: 600 12px var(--text); color: var(--fg); border: 1px solid var(--line-2); }
+.usuario .nome { font-weight: 600; font-size: 13px; line-height: 1.2; }
+.usuario .papel { font-size: 11.5px; color: var(--fg-2); }
+
+/* Conteúdo */
+.principal { padding: 24px; display: grid; gap: 16px; min-width: 0; align-content: start; }
+.cabeca { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.cabeca h1 { margin: 0; font: 600 26px var(--display); letter-spacing: -0.03em; }
+.cabeca p { margin: 2px 0 0; color: var(--fg-2); font-size: 13px; }
+.cartao { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; min-width: 0; }
+.rotulo-cartao { font: 500 11px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-2); display: flex; justify-content: space-between; gap: 8px; }
+.grid { display: grid; gap: 16px; min-width: 0; }
+.r1 { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr); }
+.r2 { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+.r3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+
+/* Medidor de presentes */
+.medidor { display: grid; place-items: center; text-align: center; gap: 10px; height: 100%; }
+.medidor .roda { position: relative; width: 190px; height: 190px; max-width: 100%; margin-top: 8px; }
+.medidor svg { width: 100%; height: 100%; display: block; }
+.medidor .num { position: absolute; inset: 0; display: grid; place-items: center; font: 600 44px var(--display); letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+.medidor .sub { color: var(--fg-2); font-size: 12.5px; }
+
+/* Números em grade 3×2 */
+.metricas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; height: 100%; }
+.metrica { padding: 16px 16px 14px; border-left: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.metrica:nth-child(3n+1) { border-left: 0; }
+.metrica:nth-child(n+4) { border-top: 1px solid var(--line); }
+.metrica .valor { font: 600 30px var(--display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.metrica .nome { color: var(--fg-2); font-size: 12.5px; }
+.metrica .barra { height: 2px; background: var(--line-2); border-radius: 2px; overflow: hidden; margin-top: auto; }
+.metrica .barra span { display: block; height: 100%; }
+
+/* Alertas */
+.alertas { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 0; }
+.alertas li { display: grid; grid-template-columns: 8px 1fr auto; gap: 12px; align-items: start; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.alertas li:last-child { border-bottom: 0; }
+.alertas .pino { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; background: var(--warn); }
+.alertas b { display: block; font-weight: 600; font-size: 13.5px; }
+.alertas small { color: var(--fg-2); font-size: 12.5px; }
+.alertas .nivel { font: 500 11px var(--mono); letter-spacing: 0.04em; text-transform: uppercase; padding-top: 2px; }
+
+/* Fluxo e lotação */
+.legenda { display: flex; gap: 14px; color: var(--fg-2); font-size: 12px; }
+.legenda i { display: inline-block; width: 10px; height: 2px; vertical-align: middle; margin-right: 6px; background: var(--accent); }
+.fluxo svg { width: 100%; height: 240px; display: block; margin-top: 12px; }
+.fluxo text { fill: var(--fg-3); font: 11px var(--mono); }
+.lotacao { display: grid; gap: 16px; margin-top: 14px; }
+.lotacao .linha { display: grid; gap: 6px; }
+.lotacao .topo-l { display: flex; justify-content: space-between; font-size: 13px; }
+.lotacao .topo-l span:last-child { font: 500 12px var(--mono); color: var(--fg-2); }
+.lotacao .trilho { height: 6px; background: var(--panel-2); border-radius: 999px; overflow: hidden; }
+.lotacao .trilho span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, rgba(0, 212, 255, 0.5), var(--accent)); transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* Empresas (ranking) e terminais */
+.ranking { display: grid; gap: 0; margin-top: 10px; }
+.ranking .item { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.ranking .item:last-child { border-bottom: 0; }
+.ranking .pos { font: 500 12px var(--mono); color: var(--fg-3); }
+.ranking .nome { font-size: 13.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ranking .trilho { height: 4px; margin-top: 8px; background: var(--panel-2); border-radius: 999px; overflow: hidden; }
+.ranking .trilho span { display: block; height: 100%; background: var(--fun); border-radius: 999px; }
+.ranking .n { text-align: right; font: 500 13px var(--mono); font-variant-numeric: tabular-nums; }
+.tabela { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+.tabela th { text-align: left; font: 500 11px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-3); padding: 10px 8px 10px 0; border-bottom: 1px solid var(--line-2); }
+.tabela td { padding: 12px 8px 12px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.tabela tr:hover td { background: var(--panel-2); }
+.estado { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; }
+.estado::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.estado.ok { color: var(--ok); } .estado.off { color: var(--bad); } .estado.warn { color: var(--warn); }
+
+/* Últimos participantes */
+.recentes { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-top: 12px; }
+.recente { display: flex; gap: 12px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); min-width: 0; transition: border-color 0.2s, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+.recente:hover { border-color: var(--line-2); transform: translateY(-2px); }
+.recente .avatar { width: 40px; height: 40px; }
+.recente b { display: block; font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recente small { color: var(--fg-2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.exemplo { color: var(--fg-3); font-size: 12px; text-align: center; padding-top: 4px; }
+
+/* Visões das outras telas (Check-in, Participantes, Empresas) */
+.busca-grande { max-width: none; width: 100%; height: 46px; font-size: 14px; }
+.btn.primario { background: var(--accent); color: #05161C; border-color: var(--accent); }
+.btn.primario:hover { background: #A4F0FF; border-color: #A4F0FF; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.ok-txt { color: var(--ok); font-weight: 600; }
+.avatar.grande { width: 56px; height: 56px; font-size: 16px; }
+.ficha { display: grid; gap: 14px; justify-items: start; }
+.ficha > div:nth-child(2) b { font: 600 20px var(--display); display: block; }
+.ficha > div:nth-child(2) small { color: var(--fg-2); }
+.ficha-linhas { display: grid; grid-template-columns: 1fr 1fr; gap: 0; width: 100%; margin: 4px 0 8px; }
+.ficha-linhas > div { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.ficha-linhas dt { color: var(--fg-3); font-size: 12px; }
+.ficha-linhas dd { margin: 2px 0 0; font-size: 13.5px; }
+.registros { list-style: none; margin: 8px 0 0; padding: 0; }
+.registros li { display: grid; grid-template-columns: 48px 34px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.registros li:last-child { border-bottom: 0; }
+.registros time { color: var(--fg-3); font-size: 12.5px; }
+.registros b { font-size: 13.5px; font-weight: 600; display: block; }
+.registros small { color: var(--fg-2); font-size: 12px; }
+.tag-ok, .tag-neg { font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; }
+.tag-ok { color: var(--ok); background: rgba(61, 220, 151, 0.12); }
+.tag-neg { color: var(--bad); background: rgba(255, 84, 112, 0.12); }
+.abas-r { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 0; }
+.abas-r button { height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line-2); background: transparent; color: var(--fg-2); font: 500 13px var(--text); cursor: pointer; }
+.abas-r button em { font-style: normal; color: var(--fg-3); margin-left: 4px; font-variant-numeric: tabular-nums; }
+.abas-r button.ativa { background: rgba(0, 212, 255, 0.10); border-color: var(--accent); color: var(--fg); }
+.abas-r button.ativa em { color: var(--accent); }
+.tabela-larga { min-width: 620px; }
+.tabela-wrap { overflow-x: auto; }
+.tabela-larga td .avatar { width: 30px; height: 30px; font-size: 11px; }
+.acoes-l { display: flex; gap: 10px; color: var(--fg-2); padding-top: 14px; }
+.acoes-l svg { width: 17px; height: 17px; cursor: pointer; transition: color 0.2s; }
+.acoes-l svg:hover { color: var(--accent); }
+.vista[hidden] { display: none !important; }
+
+/* Responsivo */
+@media (max-width: 1100px) {
+  .r1 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .r1 > .cartao:last-child { grid-column: 1 / -1; }
+  .r2, .r3 { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+  .app, .app.aberto { grid-template-columns: minmax(0, 1fr); }
+  .menu { display: none; }
+  .app.aberto .menu { display: flex; position: fixed; inset: 0 auto 0 0; z-index: 10; background: var(--bg); width: 232px; }
+  .principal { padding: 16px; }
+  .r1 { grid-template-columns: minmax(0, 1fr); }
+  .metricas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .metrica:nth-child(3n+1) { border-left: 1px solid var(--line); }
+  .metrica:nth-child(2n+1) { border-left: 0; }
+  .metrica:nth-child(n+4) { border-top: 0; }
+  .metrica:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .usuario .texto { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <aside class="menu" aria-label="Menu principal">
+    <div class="marca"><i></i><span class="rotulo">NZT</span></div>
+    <a href="#painel" data-rota="painel" aria-current="page" title="Painel"><span data-ic="home"></span><span class="rotulo">Painel</span></a>
+    <a href="#checkin" data-rota="checkin" title="Check-in"><span data-ic="door"></span><span class="rotulo">Check-in</span></a>
+    <a href="#pessoas" data-rota="pessoas" title="Participantes"><span data-ic="users"></span><span class="rotulo">Participantes</span></a>
+    <a href="#empresas" data-rota="empresas" title="Empresas"><span data-ic="building"></span><span class="rotulo">Empresas</span></a>
+    <a href="#painel" class="fora" title="Fora da prévia"><span data-ic="login"></span><span class="rotulo">Check-out</span></a>
+    <a href="#painel" class="fora" title="Fora da prévia"><span data-ic="shield"></span><span class="rotulo">Fiscalização</span></a>
+    <a href="#"><span data-ic="device"></span><span class="rotulo">Terminais</span></a>
+    <a href="#"><span data-ic="chart"></span><span class="rotulo">Relatórios</span></a>
+    <button class="recolher" id="alternar" type="button" aria-expanded="false"><span data-ic="menu"></span><span class="rotulo">Recolher</span></button>
+  </aside>
+
+  <div>
+    <header class="topo">
+      <label class="busca">
+        <span data-ic="search"></span>
+        <input type="search" placeholder="Buscar pessoa, empresa ou pulseira" aria-label="Buscar">
+      </label>
+      <span class="chip">5 leitores online</span>
+      <button class="btn so-painel" type="button"><span data-ic="reset"></span>Reset diário</button>
+      <button class="btn ic-only so-painel" type="button" title="Atualizar dados" aria-label="Atualizar dados"><span data-ic="refresh"></span></button>
+      <div class="usuario" tabindex="0" role="button" aria-label="Conta do operador">
+        <div class="avatar">OP</div>
+        <div class="texto">
+          <div class="nome">Operador</div>
+          <div class="papel">Administrador</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="principal">
+    <div class="vista" data-vista="painel">
+      <div class="cabeca">
+        <div>
+          <h1>Painel operacional</h1>
+          <p>Evento de exemplo · dia 2 de 3 · atualizado agora</p>
+        </div>
+      </div>
+
+      <section class="grid r1">
+        <div class="cartao">
+          <div class="rotulo-cartao"><span>Presentes agora</span><span id="pct"></span></div>
+          <div class="medidor">
+            <div class="roda">
+              <svg viewBox="0 0 190 190" aria-hidden="true">
+                <circle cx="95" cy="95" r="82" fill="none" stroke="rgba(230,233,240,0.08)" stroke-width="10"/>
+                <circle id="anel" cx="95" cy="95" r="82" fill="none" stroke="#00D4FF" stroke-width="10" stroke-linecap="round" transform="rotate(-90 95 95)" stroke-dasharray="515.22" stroke-dashoffset="515.22" style="transition: stroke-dashoffset 1.2s cubic-bezier(0.16,1,0.3,1)"/>
+              </svg>
+              <div class="num" id="presentes"></div>
+            </div>
+            <div class="sub" id="capacidade"></div>
+          </div>
+        </div>
+
+        <div class="cartao" style="padding:0">
+          <div class="metricas" id="metricas"></div>
+        </div>
+
+        <div class="cartao">
+          <div class="rotulo-cartao"><span>Precisa de atenção</span><span>4</span></div>
+          <ul class="alertas">
+            <li><span class="pino" style="background:var(--bad)"></span><div><b>Acessos negados na Área VIP</b><small>4 tentativas de pessoa sem liberação para a área.</small></div><span class="nivel" style="color:var(--bad)">Erro</span></li>
+            <li><span class="pino"></span><div><b>Leitor offline</b><small>Leitor Portaria B não responde.</small></div><span class="nivel" style="color:var(--warn)">Atenção</span></li>
+            <li><span class="pino"></span><div><b>Documentos vencidos</b><small>3 documentos da Montagem Norte venceram.</small></div><span class="nivel" style="color:var(--warn)">Atenção</span></li>
+            <li><span class="pino" style="background:var(--fg-3)"></span><div><b>Área perto do limite</b><small>Entrada principal com 82% da capacidade.</small></div><span class="nivel" style="color:var(--fg-2)">Aviso</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="grid r2">
+        <div class="cartao fluxo">
+          <div class="rotulo-cartao"><span>Fluxo de entradas por hora</span><span class="legenda"><span><i></i>Entradas</span><span><i style="background:var(--out)"></i>Saídas</span></span></div>
+          <svg id="grafico" viewBox="0 0 640 240" preserveAspectRatio="none" role="img" aria-label="Entradas por hora"></svg>
+        </div>
+        <div class="cartao">
+          <div class="rotulo-cartao"><span>Lotação por área</span><span>ocupado / limite</span></div>
+          <div class="lotacao" id="lotacao"></div>
+        </div>
+      </section>
+
+      <section class="grid r3">
+        <div class="cartao">
+          <div class="rotulo-cartao"><span>Empresas no evento</span><span>entradas · dentro</span></div>
+          <div class="ranking" id="ranking"></div>
+        </div>
+        <div class="cartao">
+          <div class="rotulo-cartao"><span>Terminais</span><span>5 de 6 online</span></div>
+          <table class="tabela">
+            <thead><tr><th>Terminal</th><th>Local</th><th>Fluxo</th><th>Estado</th></tr></thead>
+            <tbody>
+              <tr><td>Leitor Portaria A</td><td>Entrada principal</td><td>Só entrada</td><td><span class="estado ok">Online</span></td></tr>
+              <tr><td>Leitor Portaria B</td><td>Montagem</td><td>Entrada e saída</td><td><span class="estado off">Offline</span></td></tr>
+              <tr><td>Leitor Saída Leste</td><td>Entrada principal</td><td>Só saída</td><td><span class="estado ok">Online</span></td></tr>
+              <tr><td>Leitor Backstage</td><td>Backstage</td><td>Entrada e saída</td><td><span class="estado ok">Online</span></td></tr>
+              <tr><td>Leitor Área VIP</td><td>Área VIP</td><td>Só entrada</td><td><span class="estado ok">Online</span></td></tr>
+              <tr><td>Quiosque credenciamento</td><td>Credenciamento</td><td>Entrada e saída</td><td><span class="estado ok">Online</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="cartao">
+        <div class="rotulo-cartao"><span>Últimos participantes cadastrados</span><span>conferência imediata</span></div>
+        <div class="recentes">
+          <div class="recente"><div class="avatar">AL</div><div style="min-width:0"><b>Ana Lima</b><small>Montadora · Montagem Norte</small><small>há 12 min</small></div></div>
+          <div class="recente"><div class="avatar">CS</div><div style="min-width:0"><b>Carlos Souza</b><small>Vigilante · Segurança Alfa</small><small>há 27 min</small></div></div>
+          <div class="recente"><div class="avatar">JR</div><div style="min-width:0"><b>Juliana Reis</b><small>Técnica de som · Som e Luz Prime</small><small>há 44 min</small></div></div>
+          <div class="recente"><div class="avatar">MD</div><div style="min-width:0"><b>Marcos Dias</b><small>Auxiliar · Limpeza Central</small><small>há 1 hora</small></div></div>
+        </div>
+        <p class="exemplo">Nomes e números fictícios, só para visualizar o layout.</p>
+      </section>
+    </div>
+
+    <div class="vista" data-vista="checkin" hidden>
+      <div class="cabeca"><div><h1>Check-in</h1><p>Entrada de participantes · Portaria A</p></div></div>
+      <label class="busca busca-grande">
+        <span data-ic="search"></span>
+        <input type="search" placeholder="Nome, CPF, empresa, função, pulseira… ou bipe o QR" aria-label="Buscar pessoa">
+      </label>
+      <section class="grid r3">
+        <div class="cartao">
+          <div class="rotulo-cartao"><span>Pessoa selecionada</span><span>busque ou bipe</span></div>
+          <div class="ficha">
+            <div class="avatar grande">AL</div>
+            <div><b>Ana Lima</b><small>Montadora · Montagem Norte</small></div>
+            <dl class="ficha-linhas">
+              <div><dt>CPF</dt><dd class="mono">•••.•••.•••-21</dd></div>
+              <div><dt>Pulseira</dt><dd class="mono">P-0481</dd></div>
+              <div><dt>Documentos</dt><dd class="ok-txt">Em dia</dd></div>
+              <div><dt>Área</dt><dd>Montagem · área de obra</dd></div>
+            </dl>
+            <button class="btn primario" type="button">Registrar entrada</button>
+          </div>
+        </div>
+        <div class="cartao" style="grid-column: span 2">
+          <div class="rotulo-cartao"><span>Entradas</span><span>cada entrada aparece aqui na hora</span></div>
+          <ul class="registros">
+            <li><time class="mono">14:20</time><div class="avatar">AL</div><div><b>Ana Lima</b><small>Montagem Norte · pulseira P-0481</small></div><span class="tag-ok">Entrada</span></li>
+            <li><time class="mono">14:18</time><div class="avatar">RB</div><div><b>Roberto Bastos</b><small>Segurança Alfa · pulseira P-0462</small></div><span class="tag-ok">Entrada</span></li>
+            <li><time class="mono">14:16</time><div class="avatar">PN</div><div><b>Patrícia Nunes</b><small>Som e Luz Prime · facial</small></div><span class="tag-ok">Entrada</span></li>
+            <li><time class="mono">14:11</time><div class="avatar">TK</div><div><b>Tiago Kuhn</b><small>Limpeza Central · sem documento</small></div><span class="tag-neg">Negada</span></li>
+            <li><time class="mono">14:09</time><div class="avatar">FS</div><div><b>Fernanda Sales</b><small>Produção Vértice · pulseira P-0455</small></div><span class="tag-ok">Entrada</span></li>
+          </ul>
+        </div>
+      </section>
+    </div>
+
+    <div class="vista" data-vista="pessoas" hidden>
+      <div class="cabeca">
+        <div><h1>Participantes</h1><p>Permissões de acesso e cadastro de cada pessoa</p></div>
+        <button class="btn primario" type="button">Novo participante</button>
+      </div>
+      <nav class="abas-r" aria-label="Filtro por situação">
+        <button type="button" class="ativa">Todos <em>6.210</em></button>
+        <button type="button">Ativos <em>5.980</em></button>
+        <button type="button">Pendentes <em>186</em></button>
+        <button type="button">Bloqueados <em>44</em></button>
+      </nav>
+      <label class="busca busca-grande">
+        <span data-ic="search"></span>
+        <input type="search" placeholder="Buscar participante por nome, CPF ou cargo…" aria-label="Buscar participante">
+      </label>
+      <div class="cartao" style="padding:0">
+        <div class="tabela-wrap">
+          <table class="tabela tabela-larga">
+            <thead><tr><th>Foto</th><th>Nome / participante</th><th>CPF</th><th>Empresa</th><th>Estado</th><th>Ações</th></tr></thead>
+            <tbody>
+              <tr><td><div class="avatar">AL</div></td><td><b>Ana Lima</b></td><td class="mono">•••.•••.•••-21</td><td>Montagem Norte</td><td><span class="estado ok">Ativo</span></td><td class="acoes-l"><span data-ic="qr"></span><span data-ic="lock"></span></td></tr>
+              <tr><td><div class="avatar">RB</div></td><td><b>Roberto Bastos</b></td><td class="mono">•••.•••.•••-84</td><td>Segurança Alfa</td><td><span class="estado ok">Ativo</span></td><td class="acoes-l"><span data-ic="qr"></span><span data-ic="lock"></span></td></tr>
+              <tr><td><div class="avatar">TK</div></td><td><b>Tiago Kuhn</b></td><td class="mono">•••.•••.•••-37</td><td>Limpeza Central</td><td><span class="estado warn">Documento pendente</span></td><td class="acoes-l"><span data-ic="qr"></span><span data-ic="lock"></span></td></tr>
+              <tr><td><div class="avatar">PN</div></td><td><b>Patrícia Nunes</b></td><td class="mono">•••.•••.•••-62</td><td>Som e Luz Prime</td><td><span class="estado off">Bloqueado</span></td><td class="acoes-l"><span data-ic="qr"></span><span data-ic="unlock"></span></td></tr>
+              <tr><td><div class="avatar">FS</div></td><td><b>Fernanda Sales</b></td><td class="mono">•••.•••.•••-15</td><td>Produção Vértice</td><td><span class="estado ok">Ativo</span></td><td class="acoes-l"><span data-ic="qr"></span><span data-ic="lock"></span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <p class="exemplo">Nomes e CPF fictícios; CPF mascarado como no sistema.</p>
+    </div>
+
+    <div class="vista" data-vista="empresas" hidden>
+      <div class="cabeca">
+        <div><h1>Empresas</h1><p>Entidades terceirizadas do evento</p></div>
+        <button class="btn primario" type="button">Nova empresa</button>
+      </div>
+      <label class="busca busca-grande">
+        <span data-ic="search"></span>
+        <input type="search" placeholder="Buscar por nome, CNPJ ou serviço…" aria-label="Buscar empresa">
+      </label>
+      <div class="cartao" style="padding:0">
+        <div class="tabela-wrap">
+          <table class="tabela tabela-larga">
+            <thead><tr><th>Empresa</th><th>Serviço</th><th>CNPJ</th><th>Cota base</th><th>Estado</th><th>Ações</th></tr></thead>
+            <tbody>
+              <tr><td><b>Montagem Norte</b></td><td>Montagem de estruturas</td><td class="mono">12.345.678/0001-90</td><td class="mono">200</td><td><span class="estado ok">Ativa</span></td><td class="acoes-l"><span data-ic="users"></span><span data-ic="file"></span><span data-ic="edit"></span></td></tr>
+              <tr><td><b>Segurança Alfa</b></td><td>Vigilância e portaria</td><td class="mono">23.456.789/0001-01</td><td class="mono">120</td><td><span class="estado ok">Ativa</span></td><td class="acoes-l"><span data-ic="users"></span><span data-ic="file"></span><span data-ic="edit"></span></td></tr>
+              <tr><td><b>Som e Luz Prime</b></td><td>Áudio e iluminação</td><td class="mono">34.567.890/0001-12</td><td class="mono">80</td><td><span class="estado warn">3 documentos vencidos</span></td><td class="acoes-l"><span data-ic="users"></span><span data-ic="file"></span><span data-ic="edit"></span></td></tr>
+              <tr><td><b>Limpeza Central</b></td><td>Limpeza e higiene</td><td class="mono">45.678.901/0001-23</td><td class="mono">60</td><td><span class="estado ok">Ativa</span></td><td class="acoes-l"><span data-ic="users"></span><span data-ic="file"></span><span data-ic="edit"></span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <p class="exemplo">Dados fictícios de empresas.</p>
+    </div>
+    </main>
+  </div>
+</div>
+
+<script>
+// Ícones (traço fino, 1.5)
+const IC = {
+  home: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.4 3.4-5 6.5-5s5.7 1.6 6.5 5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 15c1.6.6 2.8 2.2 3 5"/>',
+  door: '<path d="M5 21V4.5A1.5 1.5 0 0 1 6.5 3h11A1.5 1.5 0 0 1 19 4.5V21"/><path d="M3 21h18"/><circle cx="15" cy="12" r="1"/>',
+  login: '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/>',
+  shield: '<path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/>',
+  building: '<rect x="4" y="3" width="10" height="18" rx="1"/><path d="M14 9h6v12h-6M7 7h2M7 11h2M7 15h2"/>',
+  device: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+  chart: '<path d="M4 20V4M4 20h16"/><path d="M8 16l4-5 3 3 5-6"/>',
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',
+  reset: '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>',
+  refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>',
+  qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h3M20 17v3"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  unlock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.7-1.5"/>',
+  edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/>'
+};
+const svg = (p) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${p}</svg>`;
+document.querySelectorAll('[data-ic]').forEach((el) => { el.innerHTML = svg(IC[el.dataset.ic]); });
+
+// Menu recolhível (mostra só ícones)
+const app = document.getElementById('app');
+const alternar = document.getElementById('alternar');
+alternar.addEventListener('click', () => {
+  const aberto = app.classList.toggle('aberto');
+  alternar.setAttribute('aria-expanded', String(aberto));
+});
+
+// Dados de exemplo (mesmos do protótipo anterior)
+const fmt = (n) => n.toLocaleString('pt-BR');
+const dados = {
+  presentes: 1284, capacidade: 2000, entradas: 4821, saidas: 3537, negados: 37,
+  fiscalizacoes: 12, empresas: 48, empresasAtivas: 42, participantes: 6210
+};
+const pct = Math.round((dados.presentes / dados.capacidade) * 100);
+document.getElementById('presentes').textContent = fmt(dados.presentes);
+document.getElementById('capacidade').textContent = `${pct}% da capacidade de ${fmt(dados.capacidade)} lugares`;
+document.getElementById('pct').textContent = `${pct}%`;
+const C = 2 * Math.PI * 82;
+requestAnimationFrame(() => { document.getElementById('anel').style.strokeDashoffset = String(C * (1 - pct / 100)); });
+
+// Números em grade 3×2
+const metricas = [
+  { nome: 'Entradas hoje', valor: dados.entradas, cor: 'var(--ok)', barra: 80 },
+  { nome: 'Saídas hoje', valor: dados.saidas, cor: 'var(--out)', barra: 60 },
+  { nome: 'Acessos negados', valor: dados.negados, cor: 'var(--bad)', barra: 6 },
+  { nome: 'Fiscalizações hoje', valor: dados.fiscalizacoes, cor: 'var(--fun)', barra: 25 },
+  { nome: `Empresas credenciadas · ${dados.empresasAtivas} ativas`, valor: dados.empresas, cor: 'var(--fg)', barra: 88 },
+  { nome: 'Participantes cadastrados', valor: dados.participantes, cor: 'var(--fg)', barra: 70 }
+];
+document.getElementById('metricas').innerHTML = metricas.map((m) => `
+  <div class="metrica">
+    <div class="nome">${m.nome}</div>
+    <div class="valor" style="color:${m.cor}">${fmt(m.valor)}</div>
+    <div class="barra"><span style="width:${m.barra}%;background:${m.cor}"></span></div>
+  </div>`).join('');
+
+// Fluxo por hora (escala proporcional, curva suave)
+const horas = ['08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'];
+// Somas batem com os indicadores do dia: 4.821 entradas e 3.537 saídas
+const entradasH = [140, 430, 660, 840, 580, 490, 410, 365, 290, 255, 195, 110, 56];
+const saidasH = [20, 60, 140, 260, 410, 520, 470, 390, 360, 330, 300, 180, 97];
+const max = Math.max(...entradasH, ...saidasH);
+const W = 640, H = 240, topo = 26, base = 206;
+const pontos = (serie) => serie.map((v, i) => [i * (W / (serie.length - 1)), base - (v / max) * (base - topo)]);
+const curva = (pts) => {
+  let d = `M${pts[0][0]},${pts[0][1]}`;
+  for (let i = 1; i < pts.length; i++) {
+    const [x0, y0] = pts[i - 1], [x1, y1] = pts[i], mx = (x0 + x1) / 2;
+    d += ` C${mx},${y0} ${mx},${y1} ${x1},${y1}`;
+  }
+  return d;
+};
+const pE = pontos(entradasH), pS = pontos(saidasH);
+const dE = curva(pE), dS = curva(pS);
+const pico = entradasH.indexOf(Math.max(...entradasH));
+document.getElementById('grafico').innerHTML = `
+  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#00D4FF" stop-opacity="0.35"/><stop offset="1" stop-color="#00D4FF" stop-opacity="0"/></linearGradient></defs>
+  ${[0.25, 0.5, 0.75].map((f) => `<line x1="0" x2="${W}" y1="${base - f * (base - topo)}" y2="${base - f * (base - topo)}" stroke="rgba(230,233,240,0.06)"/>`).join('')}
+  <path d="${dE} L${W},${base} L0,${base} Z" fill="url(#g)"/>
+  <path d="${dE}" fill="none" stroke="#00D4FF" stroke-width="2"/>
+  <path d="${dS}" fill="none" stroke="#FF9A3D" stroke-width="2" stroke-dasharray="5 4"/>
+  <circle cx="${pE[pico][0]}" cy="${pE[pico][1]}" r="5" fill="#0D0F15" stroke="#00D4FF" stroke-width="2"/>
+  <text x="${pE[pico][0]}" y="${pE[pico][1] - 12}" text-anchor="middle" style="fill:#E6E9F0;font:600 12px var(--mono)">${fmt(entradasH[pico])} às ${horas[pico]}h</text>
+  ${pE.map((p, i) => `<text x="${p[0]}" y="${H - 6}" text-anchor="middle">${horas[i]}h</text>`).join('')}`;
+
+// Lotação por área
+const areas = [['Entrada principal', 412, 500], ['Montagem', 310, 400], ['Backstage', 88, 120], ['Área VIP', 46, 60], ['Credenciamento', 19, 50]];
+document.getElementById('lotacao').innerHTML = areas.map(([n, o, l]) => `
+  <div class="linha">
+    <div class="topo-l"><span>${n}</span><span>${o} / ${l}</span></div>
+    <div class="trilho"><span style="width:${Math.round((o / l) * 100)}%"></span></div>
+  </div>`).join('');
+
+// Empresas (ranking)
+// [nome, cadastros, entradas, dentro]
+const empresas = [['Montagem Norte', 186, 812, 140], ['Segurança Alfa', 92, 640, 88], ['Som e Luz Prime', 64, 455, 51], ['Limpeza Central', 58, 301, 47], ['Produção Vértice', 41, 178, 30]];
+const maxE = Math.max(...empresas.map((e) => e[2]));
+document.getElementById('ranking').innerHTML = empresas.map(([n, cad, v, dentro], i) => `
+  <div class="item">
+    <span class="pos">${String(i + 1).padStart(2, '0')}</span>
+    <div style="min-width:0"><div class="nome">${n} <span style="color:var(--fg-3);font-weight:400;font-size:12px">· ${cad} cadastrados</span></div><div class="trilho"><span style="width:${(v / maxE) * 100}%"></span></div></div>
+    <span class="n">${fmt(v)} <span style="color:var(--ok)">· ${dentro}</span></span>
+  </div>`).join('');
+// Roteamento por hash: cada menu mostra a sua visão (Painel, Check-in, Participantes, Empresas)
+const VISTAS = ['painel', 'checkin', 'pessoas', 'empresas'];
+const mostrarVista = () => {
+  const h = location.hash.slice(1);
+  const v = VISTAS.includes(h) ? h : 'painel';
+  document.querySelectorAll('.vista').forEach((s) => { s.hidden = s.dataset.vista !== v; });
+  document.querySelectorAll('[data-rota]').forEach((a) => { if (a.dataset.rota === v) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  window.scrollTo(0, 0);
+};
+window.addEventListener('hashchange', mostrarVista);
+mostrarVista();
+</script>
+</body>
+</html>

@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Sala de controle NZT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/*
+  Direção: Sala de controle editorial.
+  Um número enorme como manchete, registros em vez de cards, tabela como superfície principal,
+  um único gráfico. A cor diz função (ok, alerta, negado, saída); o ciano fica só na seleção e no foco.
+*/
+:root {
+  /* Superfícies: grafite com leve viés azul, nunca preto puro */
+  --bg: #0B0D12;
+  --surface: #11141B;
+  --surface-2: #171B24;
+  --line: rgba(233, 236, 241, 0.09);
+  --line-strong: rgba(233, 236, 241, 0.18);
+
+  /* Texto */
+  --fg: #E9ECF1;
+  --fg-2: #8A93A3;
+  --fg-3: #5C6575;
+
+  /* Accent (só seleção, foco e o número principal) */
+  --accent: #7CE7FF;
+  --accent-soft: rgba(124, 231, 255, 0.10);
+
+  /* Funções (semânticas, não decorativas) */
+  --ok: #3DDC97;
+  --warn: #F5B942;
+  --bad: #FF5470;
+  --out: #FF9A3D;
+
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --font-text: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data: "JetBrains Mono", ui-monospace, Consolas, monospace;
+
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  color-scheme: dark;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-text);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  overflow-x: hidden;
+}
+h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
+p { margin: 0; max-width: 62ch; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 28px 64px; }
+.mono { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.label {
+  font-family: var(--font-data);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+}
+.num { font-variant-numeric: tabular-nums; }
+
+/* Barra superior */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap;
+  padding-bottom: 20px; border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: baseline; gap: 12px; }
+.brand b { font-family: var(--font-display); font-size: 20px; letter-spacing: -0.03em; }
+.event { color: var(--fg-2); font-size: 14px; }
+.live { display: inline-flex; align-items: center; gap: 8px; color: var(--ok); }
+.live i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 4px rgba(61,220,151,0.14); }
+.clock { color: var(--fg-2); }
+
+/* Manchete: o número é o protagonista */
+.hero {
+  display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 48px; padding-block: 56px 40px; align-items: end;
+}
+.hero h1 { font-size: clamp(40px, 9vw, 116px); line-height: 0.92; letter-spacing: -0.045em; font-weight: 600; color: var(--fg); }
+.hero h1 span { color: var(--accent); }
+.hero .sub { margin-top: 20px; color: var(--fg-2); font-size: 16px; }
+.hero .sub strong { color: var(--fg); font-weight: 600; }
+
+/* Registros: lista de linhas, não cards */
+.ledger { border-top: 1px solid var(--line); }
+.row {
+  display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 16px;
+  padding: 14px 4px; border-bottom: 1px solid var(--line);
+  transition: background-color 0.25s var(--ease), padding 0.35s var(--ease);
+  cursor: default;
+}
+.row:hover { background: var(--surface); padding-left: 12px; }
+.row .v { font-family: var(--font-display); font-size: 30px; letter-spacing: -0.03em; font-weight: 500; }
+.row .n { color: var(--fg-2); font-size: 14px; }
+.row[data-tone="bad"] .v { color: var(--bad); }
+.row[data-tone="out"] .v { color: var(--out); }
+.row[data-tone="warn"] .v { color: var(--warn); }
+
+/* Seções: ritmo alternado (linha do tempo, tabela, lista de empresas) */
+section { padding-block: 40px; border-top: 1px solid var(--line); }
+.sec-head { display: flex; justify-content: space-between; align-items: end; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+.sec-head h2 { font-size: 28px; letter-spacing: -0.03em; font-weight: 600; }
+
+/* Fluxo por hora: gráfico em escala */
+.flow { display: grid; grid-template-columns: 1fr; gap: 16px; }
+.bars { display: flex; align-items: flex-end; gap: 6px; height: 200px; border-bottom: 1px solid var(--line-strong); }
+.bar {
+  flex: 1; min-width: 0; position: relative;
+  background: linear-gradient(to top, rgba(124,231,255,0.18), rgba(124,231,255,0.42));
+  border-radius: 3px 3px 0 0;
+  transition: background-color 0.25s var(--ease);
+}
+.bar:hover, .bar:focus-visible { background: var(--accent); outline: none; }
+.bar-axis { display: flex; gap: 6px; margin-top: 8px; }
+.bar-axis span { flex: 1; text-align: center; font-family: var(--font-data); font-size: 10px; color: var(--fg-3); }
+.bar-peak { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); font-family: var(--font-data); font-size: 11px; color: var(--fg); white-space: nowrap; }
+
+/* Alertas: faixa de gravidade à esquerda, sem fundo colorido */
+.alerts { list-style: none; margin: 0; padding: 0; }
+.alert {
+  display: grid; grid-template-columns: 4px 1fr auto; gap: 16px; align-items: center;
+  padding: 14px 0; border-bottom: 1px solid var(--line);
+  transition: transform 0.35s var(--ease);
+}
+.alert:hover { transform: translateX(4px); }
+.alert i { display: block; height: 100%; min-height: 36px; border-radius: 2px; background: var(--warn); }
+.alert[data-sev="bad"] i { background: var(--bad); }
+.alert[data-sev="info"] i { background: var(--fg-3); }
+.alert strong { font-weight: 600; display: block; }
+.alert small { color: var(--fg-2); font-size: 13px; }
+.alert time { font-family: var(--font-data); font-size: 12px; color: var(--fg-2); }
+
+/* Terminais: tabela */
+.table-wrap { overflow-x: auto; border-top: 1px solid var(--line); }
+table { width: 100%; border-collapse: collapse; min-width: 560px; }
+th { text-align: left; font-family: var(--font-data); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-2); font-weight: 500; padding: 12px 12px 12px 0; border-bottom: 1px solid var(--line); }
+td { padding: 14px 12px 14px 0; border-bottom: 1px solid var(--line); font-size: 14px; font-variant-numeric: tabular-nums; }
+tbody tr { transition: background-color 0.25s var(--ease); }
+tbody tr:hover { background: var(--surface); }
+.state { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+.state::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.state.ok { color: var(--ok); }
+.state.off { color: var(--bad); }
+.state.warn { color: var(--warn); }
+
+/* Empresas: barras horizontais, lidas como ranking */
+.companies { display: grid; gap: 14px; }
+.co { display: grid; grid-template-columns: minmax(0, 220px) 1fr auto; gap: 16px; align-items: center; font-size: 14px; }
+.co span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.co-track { height: 6px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.co-fill { height: 100%; background: var(--accent); border-radius: 999px; transition: filter 0.25s var(--ease); }
+.co:hover .co-fill { filter: brightness(1.25); }
+.co b { font-family: var(--font-data); font-weight: 500; color: var(--fg-2); font-size: 13px; }
+
+/* Botões e foco */
+.btn {
+  appearance: none; font: inherit; font-size: 14px; font-weight: 600;
+  padding: 10px 16px; border-radius: 8px; border: 1px solid var(--line-strong);
+  background: transparent; color: var(--fg); cursor: pointer;
+  transition: background-color 0.2s var(--ease), border-color 0.2s var(--ease), transform 0.15s var(--ease);
+}
+.btn:hover { background: var(--surface-2); border-color: var(--accent); }
+.btn:active { transform: translateY(1px) scale(0.99); }
+.btn.primary { background: var(--accent); color: #05161C; border-color: var(--accent); }
+.btn.primary:hover { background: #A4F0FF; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+.note { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--fg-3); font-size: 13px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+/* Divisão: manchete e registros lado a lado; no celular, empilha */
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; }
+.split > * { min-width: 0; }
+
+@media (max-width: 860px) {
+  .hero { grid-template-columns: 1fr; gap: 28px; padding-block: 36px 24px; }
+  .split { grid-template-columns: 1fr; gap: 40px; }
+  .co { grid-template-columns: 1fr auto; }
+  .co .co-track { grid-column: 1 / -1; grid-row: 2; }
+  .bar-axis span:nth-child(odd) { visibility: hidden; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="topbar">
+    <div class="brand">
+      <b>NZT</b>
+      <span class="event">Evento de exemplo · dia 2 de 3</span>
+    </div>
+    <div style="display:flex; gap:20px; align-items:center; flex-wrap:wrap;">
+      <span class="live"><i></i><span class="label" style="color:var(--ok)">Ao vivo</span></span>
+      <span class="clock mono" id="relogio">--:--</span>
+      <button class="btn" type="button">Atualizar</button>
+    </div>
+  </header>
+
+  <div class="hero">
+    <div>
+      <p class="label">Dentro do evento agora</p>
+      <h1 class="num"><span id="dentro">1.284</span></h1>
+      <p class="sub"><strong id="entradas">4.821</strong> entradas e <strong id="saidas">3.537</strong> saídas desde as 08h. Pico de entrada às <strong>11h</strong>.</p>
+    </div>
+    <div class="ledger" aria-label="Resumo do dia">
+      <div class="row" data-tone="bad"><span class="n">Acessos negados</span><span class="v num">37</span></div>
+      <div class="row" data-tone="out"><span class="n">Pulseiras não devolvidas</span><span class="v num">9</span></div>
+      <div class="row" data-tone="warn"><span class="n">Documentos vencendo em 7 dias</span><span class="v num">22</span></div>
+      <div class="row"><span class="n">Fiscalizações hoje</span><span class="v num">12</span></div>
+    </div>
+  </div>
+
+  <section>
+    <div class="sec-head">
+      <div>
+        <p class="label">Fluxo de entradas por hora</p>
+        <h2>Pico de entrada às 11h</h2>
+      </div>
+      <span class="label mono">Entradas · hoje</span>
+    </div>
+    <div class="flow">
+      <div class="bars" id="barras" role="img" aria-label="Entradas por hora de 08h a 20h"></div>
+      <div class="bar-axis" id="eixo"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="split">
+      <div>
+        <div class="sec-head" style="margin-bottom:12px">
+          <div>
+            <p class="label">Precisa de atenção</p>
+            <h2>Alertas</h2>
+          </div>
+        </div>
+        <ul class="alerts">
+          <li class="alert" data-sev="bad"><i></i><div><strong>Acesso negado repetido</strong><small>Pessoa tentou entrar 4 vezes na Área VIP sem liberação.</small></div><time>14:22</time></li>
+          <li class="alert" data-sev="warn"><i></i><div><strong>Terminal offline há 6 min</strong><small>Leitor da Portaria B parou de responder.</small></div><time>13:58</time></li>
+          <li class="alert" data-sev="warn"><i></i><div><strong>Empresa com 3 documentos vencidos</strong><small>Montagem Norte bloqueada para novos acessos.</small></div><time>12:10</time></li>
+          <li class="alert" data-sev="info"><i></i><div><strong>Lote de pulseira trocado</strong><small>Operador Carla trocou o lote 4 para o lote 5.</small></div><time>09:40</time></li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="sec-head" style="margin-bottom:12px">
+          <div>
+            <p class="label">Empresas com mais acessos</p>
+            <h2>Equipes no evento</h2>
+          </div>
+        </div>
+        <div class="companies" id="empresas"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <div>
+        <p class="label">Equipamentos</p>
+        <h2>Terminais</h2>
+      </div>
+      <button class="btn primary" type="button">Diagnosticar todos</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Terminal</th><th>Área</th><th>Estado</th><th>Último acesso</th><th>Entradas hoje</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Leitor Portaria A</td><td>Entrada principal</td><td><span class="state ok">Online</span></td><td class="mono">14:31:08</td><td class="num">2.104</td></tr>
+          <tr><td>Leitor Portaria B</td><td>Entrada de montagem</td><td><span class="state off">Offline</span></td><td class="mono">13:58:40</td><td class="num">1.377</td></tr>
+          <tr><td>Quiosque credenciamento</td><td>Credenciamento</td><td><span class="state ok">Online</span></td><td class="mono">14:30:51</td><td class="num">486</td></tr>
+          <tr><td>Câmera IA · Área VIP</td><td>Backstage</td><td><span class="state warn">Sem imagem</span></td><td class="mono">12:04:19</td><td class="num">96</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <p class="note">
+    <span>Dados fictícios para visualizar o layout. Nenhum número é do evento real.</span>
+    <span class="mono">NZT · layout em revisão</span>
+  </p>
+</div>
+
+<script>
+  // Gráfico em escala: a altura de cada barra é proporcional ao maior valor
+  const horas = [
+    ["08", 210], ["09", 640], ["10", 980], ["11", 1240], ["12", 860],
+    ["13", 720], ["14", 610], ["15", 540], ["16", 430], ["17", 380],
+    ["18", 290], ["19", 160], ["20", 70]
+  ];
+  const max = Math.max(...horas.map(h => h[1]));
+  const barras = document.getElementById("barras");
+  const eixo = document.getElementById("eixo");
+  horas.forEach(([hora, valor]) => {
+    const b = document.createElement("div");
+    b.className = "bar";
+    b.tabIndex = 0;
+    b.style.height = (valor / max * 100).toFixed(1) + "%";
+    b.setAttribute("aria-label", hora + "h: " + valor.toLocaleString("pt-BR") + " entradas");
+    if (valor === max) {
+      const pico = document.createElement("span");
+      pico.className = "bar-peak";
+      pico.textContent = valor.toLocaleString("pt-BR");
+      b.appendChild(pico);
+    }
+    barras.appendChild(b);
+    const t = document.createElement("span");
+    t.textContent = hora + "h";
+    eixo.appendChild(t);
+  });
+
+  // Ranking de empresas: a barra segue o maior valor
+  const empresas = [
+    ["Montagem Norte", 812], ["Segurança Alfa", 640], ["Som e Luz Prime", 455],
+    ["Limpeza Central", 301], ["Produção Vértice", 178]
+  ];
+  const maxEmp = Math.max(...empresas.map(e => e[1]));
+  const lista = document.getElementById("empresas");
+  empresas.forEach(([nome, n]) => {
+    const linha = document.createElement("div");
+    linha.className = "co";
+    linha.innerHTML = '<span></span><div class="co-track"><div class="co-fill"></div></div><b></b>';
+    linha.children[0].textContent = nome;
+    linha.children[1].firstChild.style.width = (n / maxEmp * 100).toFixed(1) + "%";
+    linha.children[2].textContent = n.toLocaleString("pt-BR");
+    lista.appendChild(linha);
+  });
+
+  // Relógio da barra superior
+  const relogio = document.getElementById("relogio");
+  const tick = () => relogio.textContent = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  tick(); setInterval(tick, 15000);
+</script>
+</body>
+</html>

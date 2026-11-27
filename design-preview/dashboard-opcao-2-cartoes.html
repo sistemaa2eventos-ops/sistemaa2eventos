@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Painel Cartões</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/*
+  Opção 2 · Cartões. Inspirada na referência 2: menu lateral azul-marinho com rótulos (recolhível),
+  faixa de cartões com ícone colorido em círculo, gráfico de área largo e listas com pílulas de estado.
+*/
+:root {
+  --bg: #0E1424;
+  --side: #0A0F1D;
+  --panel: #141C30;
+  --panel-2: #1A2339;
+  --line: rgba(226, 232, 255, 0.07);
+  --line-2: rgba(226, 232, 255, 0.14);
+  --fg: #E7EBF7;
+  --fg-2: #8C96B2;
+  --fg-3: #5B6583;
+  --azul: #3B82F6;
+  --ciano: #22D3EE;
+  --verde: #34D399;
+  --laranja: #FB923C;
+  --vermelho: #F43F5E;
+  --violeta: #A78BFA;
+  --ambar: #FBBF24;
+  --display: "Plus Jakarta Sans", Inter, system-ui, sans-serif;
+  --text: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  color-scheme: dark;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 14px/1.5 var(--text); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+svg.ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+
+.app { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100dvh; transition: grid-template-columns 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
+.app.icones { grid-template-columns: 76px minmax(0, 1fr); }
+
+/* Menu lateral com rótulos */
+.menu { background: var(--side); border-right: 1px solid var(--line); padding: 20px 14px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100dvh; overflow: hidden; }
+.marca { display: flex; align-items: center; gap: 10px; padding: 0 6px 6px; white-space: nowrap; }
+.marca .logo { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, var(--azul), var(--ciano)); flex-shrink: 0; display: grid; place-items: center; font: 700 13px var(--display); color: #fff; }
+.marca b { font: 700 16px var(--display); letter-spacing: -0.02em; }
+.marca b span { color: var(--ciano); }
+.descricao { color: var(--fg-3); font-size: 12px; font-style: italic; padding: 0 6px 14px; white-space: nowrap; }
+.evento { margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); cursor: pointer; display: flex; align-items: center; gap: 10px; white-space: nowrap; transition: border-color 0.2s; }
+.evento:hover { border-color: var(--azul); }
+.evento small { display: block; color: var(--fg-3); font-size: 11px; }
+.evento b { font-size: 13px; font-weight: 600; }
+.secao { font: 600 10.5px var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--fg-3); padding: 12px 8px 6px; white-space: nowrap; }
+.menu a { display: flex; align-items: center; gap: 12px; height: 38px; padding: 0 10px; border-radius: 8px; color: var(--fg-2); text-decoration: none; font-size: 13.5px; font-weight: 500; white-space: nowrap; transition: background-color 0.2s, color 0.2s; }
+.menu a:hover { color: var(--fg); background: rgba(255, 255, 255, 0.03); }
+.menu a[aria-current="page"] { color: #fff; background: linear-gradient(90deg, rgba(59, 130, 246, 0.25), rgba(59, 130, 246, 0.05)); }
+.menu a[aria-current="page"] svg { color: var(--ciano); }
+.menu .recolher { margin-top: auto; height: 38px; border-radius: 8px; border: 1px solid var(--line-2); background: transparent; color: var(--fg-2); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font: 500 13px var(--text); }
+.menu .recolher:hover { color: var(--fg); }
+.app.icones .some { display: none; }
+.app.icones .menu a { justify-content: center; padding: 0; }
+.app.icones .evento { justify-content: center; padding: 10px 0; }
+
+/* Barra superior: avisos à esquerda, busca e usuário à direita */
+.topo { display: flex; align-items: center; gap: 10px; padding: 14px 28px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.aviso { position: relative; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: var(--panel); border: 1px solid var(--line); color: var(--fg-2); cursor: pointer; }
+.aviso:hover { color: var(--fg); }
+.aviso em { position: absolute; top: -3px; right: -3px; min-width: 17px; height: 17px; border-radius: 9px; padding: 0 4px; font: 600 10px var(--text); font-style: normal; display: grid; place-items: center; color: #fff; }
+.busca { margin-left: auto; display: flex; align-items: center; gap: 8px; height: 38px; width: min(300px, 100%); padding: 0 14px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); color: var(--fg-3); }
+.busca:focus-within { border-color: var(--azul); }
+.busca input { flex: 1; min-width: 0; background: none; border: 0; outline: none; color: var(--fg); font: inherit; font-size: 13px; }
+.usuario { display: flex; align-items: center; gap: 10px; padding-left: 6px; cursor: pointer; }
+.avatar { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font: 600 13px var(--display); color: #fff; background: linear-gradient(135deg, #334155, #1E293B); border: 2px solid var(--panel-2); flex-shrink: 0; }
+.usuario .nome { color: var(--ciano); font-weight: 600; font-size: 13px; line-height: 1.2; }
+.usuario .papel { color: var(--fg-3); font-size: 11.5px; }
+
+.trilha { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 28px; font: 700 12px var(--display); letter-spacing: 0.06em; text-transform: uppercase; flex-wrap: wrap; }
+.trilha span:last-child { font: 500 12px var(--text); letter-spacing: 0; text-transform: none; color: var(--fg-2); }
+.acoes { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.botao { height: 34px; padding: 0 14px; border-radius: 8px; border: 0; cursor: pointer; font: 600 12.5px var(--text); display: inline-flex; align-items: center; gap: 8px; transition: filter 0.2s, transform 0.15s; }
+.botao:hover { filter: brightness(1.12); }
+.botao:active { transform: translateY(1px); }
+.botao.primario { background: var(--azul); color: #fff; }
+.botao.sutil { background: var(--panel); color: var(--fg); border: 1px solid var(--line-2); }
+.online { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 8px; background: rgba(52, 211, 153, 0.12); color: var(--verde); font: 600 12px var(--text); }
+
+.principal { padding: 0 28px 28px; display: grid; gap: 20px; min-width: 0; }
+.cartao { background: var(--panel); border-radius: 6px; padding: 18px 20px; min-width: 0; border: 1px solid var(--line); }
+.cartao h2 { margin: 0; font: 600 14px var(--display); letter-spacing: -0.01em; }
+.cartao .cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.cartao .cab small { color: var(--fg-3); font-size: 12px; }
+.grade { display: grid; gap: 20px; min-width: 0; }
+
+/* Cartões de indicador com ícone em círculo */
+.kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.kpi { display: flex; gap: 16px; align-items: center; transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s; cursor: default; }
+.kpi:hover { transform: translateY(-2px); border-color: var(--line-2); }
+.kpi .circulo { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; color: #fff; flex-shrink: 0; }
+.kpi .circulo svg { width: 22px; height: 22px; }
+.kpi .nome { color: var(--fg); font-size: 13.5px; font-weight: 500; }
+.kpi .valor { font: 300 30px var(--display); letter-spacing: -0.02em; color: var(--fg-2); font-variant-numeric: tabular-nums; line-height: 1.15; }
+.kpi .nota { color: var(--fg-3); font-size: 11.5px; }
+
+.linha2 { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+.linha3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.linha4 { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+
+/* Gráfico de área */
+.legenda { display: flex; gap: 16px; font-size: 12px; color: var(--fg-2); }
+.legenda i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+#grafico { width: 100%; height: 250px; display: block; }
+#grafico text { fill: var(--fg-3); font: 11px var(--text); }
+
+/* Rosca de ocupação */
+.rosca { display: grid; place-items: center; gap: 16px; }
+.rosca .roda { position: relative; width: 180px; height: 180px; max-width: 100%; }
+.rosca svg { width: 100%; height: 100%; display: block; }
+.rosca .centro { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.rosca .centro b { font: 600 30px var(--display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.rosca .centro small { color: var(--fg-3); font-size: 11.5px; }
+.base { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; text-align: center; }
+.base div { min-width: 0; }
+.base i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; }
+.base small { color: var(--fg-2); font-size: 11.5px; display: block; }
+.base b { font: 500 15px var(--display); color: var(--fg-2); font-variant-numeric: tabular-nums; }
+
+/* Alertas com pílulas */
+.lista { display: grid; }
+.lista .item { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--line); align-items: start; }
+.lista .item:last-child { border-bottom: 0; }
+.lista .marcador { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; }
+.lista b { font-size: 13.5px; font-weight: 600; display: block; }
+.lista p { margin: 2px 0 8px; color: var(--fg-3); font-size: 12.5px; }
+.lista time { color: var(--fg-3); font-size: 11.5px; white-space: nowrap; }
+.pilula { display: inline-flex; align-items: center; height: 22px; padding: 0 10px; border-radius: 999px; font: 600 11px var(--text); color: #fff; }
+
+/* Lotação com barras coloridas */
+.barras { display: grid; gap: 16px; }
+.barras .cab-l { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+.barras .cab-l span:last-child { color: var(--fg-2); font: 500 12px var(--mono); }
+.barras .trilho { height: 5px; border-radius: 999px; background: var(--panel-2); overflow: hidden; }
+.barras .trilho span { display: block; height: 100%; border-radius: 999px; }
+
+/* Tabelas */
+.tabela-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 420px; }
+th { text-align: left; color: var(--fg-3); font: 500 12px var(--text); padding: 8px 10px 10px 0; border-bottom: 1px solid var(--line); }
+td { padding: 12px 10px 12px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+tbody tr { transition: background-color 0.2s; }
+tbody tr:hover { background: var(--panel-2); }
+.empresa-barra { height: 4px; width: 120px; max-width: 100%; border-radius: 999px; background: var(--panel-2); overflow: hidden; }
+.empresa-barra span { display: block; height: 100%; background: linear-gradient(90deg, var(--azul), var(--ciano)); }
+
+.pessoa { display: flex; align-items: center; gap: 10px; }
+.pessoa .avatar { width: 32px; height: 32px; font-size: 11px; border-width: 1px; }
+.exemplo { color: var(--fg-3); font-size: 12px; text-align: center; }
+.vista[hidden] { display: none !important; }
+.cab-pagina { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; padding-top: 6px; }
+.cab-pagina h1 { margin: 0; font: 700 22px var(--display); letter-spacing: -0.02em; }
+.cab-pagina small { color: var(--fg-2); font-size: 13px; }
+.busca-larga { width: 100%; max-width: none; height: 44px; }
+.avatar.grande { width: 56px; height: 56px; font-size: 16px; }
+.ficha-c { display: grid; gap: 12px; justify-items: start; }
+.ficha-c > div:nth-child(2) b { font: 600 19px var(--display); display: block; }
+.ficha-c > div:nth-child(2) small { color: var(--fg-2); }
+.ficha-dl { display: grid; grid-template-columns: 1fr 1fr; width: 100%; margin: 4px 0; }
+.ficha-dl > div { padding: 9px 0; border-bottom: 1px solid var(--line); }
+.ficha-dl dt { color: var(--fg-3); font-size: 12px; }
+.ficha-dl dd { margin: 2px 0 0; font-size: 13.5px; }
+.lista-c { list-style: none; margin: 0; padding: 0; }
+.lista-c li { display: grid; grid-template-columns: 48px 34px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.lista-c li:last-child { border-bottom: 0; }
+.lista-c time { color: var(--fg-3); font-size: 12.5px; }
+.lista-c b { font-size: 13.5px; font-weight: 600; display: block; }
+.lista-c small { color: var(--fg-2); font-size: 12px; }
+.abas-c { display: flex; gap: 22px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.abas-c button { background: none; border: 0; padding: 8px 0; color: var(--fg-2); font: 500 13.5px var(--text); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.abas-c button em { font-style: normal; color: var(--fg-3); margin-left: 4px; font-variant-numeric: tabular-nums; }
+.abas-c button.ativa { color: var(--fg); border-color: var(--azul); }
+.abas-c button.ativa em { color: var(--ciano); }
+.acoes-c { display: flex; gap: 10px; color: var(--fg-2); }
+.acoes-c svg { width: 17px; height: 17px; cursor: pointer; transition: color 0.2s; }
+.acoes-c svg:hover { color: var(--ciano); }
+.tabela-wrap td .avatar { width: 30px; height: 30px; font-size: 11px; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 1100px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .linha2, .linha3, .linha4 { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+  .app, .app.icones { grid-template-columns: minmax(0, 1fr); }
+  .menu { display: none; }
+  .topo, .trilha { padding-left: 16px; padding-right: 16px; }
+  .principal { padding: 0 16px 16px; }
+  .kpis { grid-template-columns: minmax(0, 1fr); }
+  .usuario .texto { display: none; }
+  .busca { margin-left: 0; flex: 1; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <aside class="menu" aria-label="Menu principal">
+    <div class="marca"><div class="logo">N</div><b class="some">NZT<span>Control</span></b></div>
+    <div class="descricao some">Controle de acesso do evento</div>
+    <div class="evento" title="Trocar evento">
+      <span data-ic="calendar"></span>
+      <div class="some"><small>Evento ativo</small><b>Evento de exemplo</b></div>
+    </div>
+    <div class="secao some">Operação</div>
+    <a href="#painel" data-rota="painel" aria-current="page"><span data-ic="home"></span><span class="some">Painel</span></a>
+    <a href="#checkin" data-rota="checkin"><span data-ic="door"></span><span class="some">Check-in</span></a>
+    <a href="#"><span data-ic="login"></span><span class="some">Check-out</span></a>
+    <a href="#"><span data-ic="shield"></span><span class="some">Fiscalização</span></a>
+    <a href="#"><span data-ic="eye"></span><span class="some">Monitor</span></a>
+    <div class="secao some">Cadastros</div>
+    <a href="#empresas" data-rota="empresas"><span data-ic="building"></span><span class="some">Empresas</span></a>
+    <a href="#pessoas" data-rota="pessoas"><span data-ic="users"></span><span class="some">Pessoas</span></a>
+    <a href="#"><span data-ic="device"></span><span class="some">Terminais</span></a>
+    <a href="#"><span data-ic="chart"></span><span class="some">Relatórios</span></a>
+    <button class="recolher" id="alternar" type="button" aria-expanded="true"><span data-ic="menu"></span><span class="some">Só ícones</span></button>
+  </aside>
+
+  <div>
+    <header class="topo">
+      <div class="aviso" title="Alertas"><span data-ic="bell"></span><em style="background:var(--vermelho)">4</em></div>
+      <div class="aviso" title="Leitores online"><span data-ic="device"></span><em style="background:var(--verde)">5</em></div>
+      <label class="busca"><span data-ic="search"></span><input type="search" placeholder="Buscar pessoa, empresa…" aria-label="Buscar"></label>
+      <div class="usuario" tabindex="0" role="button" aria-label="Conta do operador">
+        <div class="avatar">OP</div>
+        <div class="texto"><div class="nome">Operador</div><div class="papel">Administrador</div></div>
+      </div>
+    </header>
+
+    <div class="trilha">
+      <span>Painel operacional</span>
+      <div class="acoes">
+        <span class="online">5 leitores online</span>
+        <button class="botao sutil" type="button"><span data-ic="refresh"></span>Atualizar</button>
+        <button class="botao primario" type="button"><span data-ic="reset"></span>Reset diário</button>
+      </div>
+    </div>
+
+    <main class="principal">
+      <div class="vista" data-vista="painel">
+      <section class="grade kpis" id="kpis"></section>
+
+      <section class="grade linha2">
+        <div class="cartao">
+          <div class="cab">
+            <h2>Fluxo de entradas por hora</h2>
+            <span class="legenda"><span><i style="background:var(--ciano)"></i>Entradas</span><span><i style="background:var(--laranja)"></i>Saídas</span></span>
+          </div>
+          <svg id="grafico" viewBox="0 0 640 250" preserveAspectRatio="none" role="img" aria-label="Entradas e saídas por hora"></svg>
+        </div>
+        <div class="cartao">
+          <div class="cab"><h2>Ocupação do evento</h2><small>agora</small></div>
+          <div class="rosca">
+            <div class="roda">
+              <svg viewBox="0 0 180 180" aria-hidden="true">
+                <defs><linearGradient id="gr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3B82F6"/><stop offset="1" stop-color="#22D3EE"/></linearGradient></defs>
+                <circle cx="90" cy="90" r="72" fill="none" stroke="#1A2339" stroke-width="18"/>
+                <circle id="anel" cx="90" cy="90" r="72" fill="none" stroke="url(#gr)" stroke-width="18" transform="rotate(-90 90 90)" stroke-dasharray="452.39" stroke-dashoffset="452.39" style="transition: stroke-dashoffset 1.2s cubic-bezier(0.16,1,0.3,1)"/>
+              </svg>
+              <div class="centro"><b id="presentes"></b><small id="capacidade"></small></div>
+            </div>
+            <div class="base">
+              <div><small><i style="background:var(--violeta)"></i>Fiscalizações</small><b>12</b></div>
+              <div><small><i style="background:var(--azul)"></i>Empresas</small><b>48</b></div>
+              <div><small><i style="background:var(--ciano)"></i>Cadastrados</small><b>6.210</b></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="grade linha3">
+        <div class="cartao">
+          <div class="cab"><h2>Alertas</h2><small>4 precisam de atenção</small></div>
+          <div class="lista">
+            <div class="item"><span class="marcador" style="background:rgba(244,63,94,.15);color:var(--vermelho)"><span data-ic="block"></span></span><div><b>Acessos negados na Área VIP</b><p>4 tentativas de pessoa sem liberação para a área.</p></div><span class="pilula" style="background:#BE123C">Erro</span></div>
+            <div class="item"><span class="marcador" style="background:rgba(251,191,36,.15);color:var(--ambar)"><span data-ic="device"></span></span><div><b>Leitor offline</b><p>Leitor Portaria B não responde.</p></div><span class="pilula" style="background:#B7791F">Atenção</span></div>
+            <div class="item"><span class="marcador" style="background:rgba(251,146,60,.15);color:var(--laranja)"><span data-ic="file"></span></span><div><b>Documentos vencidos</b><p>3 documentos da Montagem Norte venceram.</p></div><span class="pilula" style="background:#B7791F">Atenção</span></div>
+            <div class="item"><span class="marcador" style="background:rgba(59,130,246,.15);color:var(--azul)"><span data-ic="users"></span></span><div><b>Área perto do limite</b><p>Entrada principal com 82% da capacidade.</p></div><span class="pilula" style="background:#1D4ED8">Aviso</span></div>
+          </div>
+        </div>
+        <div class="cartao">
+          <div class="cab"><h2>Lotação por área</h2><small>ocupado / limite</small></div>
+          <div class="barras" id="lotacao"></div>
+        </div>
+      </section>
+
+      <section class="grade linha4">
+        <div class="cartao">
+          <div class="cab"><h2>Terminais</h2><small>5 de 6 online</small></div>
+          <div class="tabela-wrap">
+            <table>
+              <thead><tr><th>Terminal</th><th>Local</th><th>Fluxo</th><th>Estado</th></tr></thead>
+              <tbody>
+                <tr><td>Leitor Portaria A</td><td>Entrada principal</td><td>Só entrada</td><td><span class="pilula" style="background:#15803D">Online</span></td></tr>
+                <tr><td>Leitor Portaria B</td><td>Montagem</td><td>Entrada e saída</td><td><span class="pilula" style="background:#BE123C">Offline</span></td></tr>
+                <tr><td>Leitor Saída Leste</td><td>Entrada principal</td><td>Só saída</td><td><span class="pilula" style="background:#15803D">Online</span></td></tr>
+                <tr><td>Leitor Backstage</td><td>Backstage</td><td>Entrada e saída</td><td><span class="pilula" style="background:#15803D">Online</span></td></tr>
+                <tr><td>Leitor Área VIP</td><td>Área VIP</td><td>Só entrada</td><td><span class="pilula" style="background:#15803D">Online</span></td></tr>
+                <tr><td>Quiosque credenciamento</td><td>Credenciamento</td><td>Entrada e saída</td><td><span class="pilula" style="background:#15803D">Online</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="cartao">
+          <div class="cab"><h2>Empresas no evento</h2><small>hoje</small></div>
+          <div class="tabela-wrap">
+            <table>
+              <thead><tr><th>Empresa</th><th style="text-align:right">Cadastros</th><th>Entradas</th><th style="text-align:right">Saídas</th><th style="text-align:right">Dentro</th></tr></thead>
+              <tbody id="empresas"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="cartao">
+        <div class="cab"><h2>Últimos participantes cadastrados</h2><small>conferência com foto e empresa</small></div>
+        <div class="tabela-wrap">
+          <table>
+            <thead><tr><th>Participante</th><th>Função</th><th>Empresa</th><th>Cadastrado</th></tr></thead>
+            <tbody>
+              <tr><td><div class="pessoa"><div class="avatar">AL</div>Ana Lima</div></td><td>Montadora</td><td>Montagem Norte</td><td>há 12 min</td></tr>
+              <tr><td><div class="pessoa"><div class="avatar">CS</div>Carlos Souza</div></td><td>Vigilante</td><td>Segurança Alfa</td><td>há 27 min</td></tr>
+              <tr><td><div class="pessoa"><div class="avatar">JR</div>Juliana Reis</div></td><td>Técnica de som</td><td>Som e Luz Prime</td><td>há 44 min</td></tr>
+              <tr><td><div class="pessoa"><div class="avatar">MD</div>Marcos Dias</div></td><td>Auxiliar</td><td>Limpeza Central</td><td>há 1 hora</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <p class="exemplo">Nomes e números fictícios, só para visualizar o layout.</p>
+      </div>
+
+      <div class="vista" data-vista="checkin" hidden>
+        <div class="cab-pagina"><h1>Check-in</h1><small>Entrada de participantes · Portaria A</small></div>
+        <label class="busca busca-larga"><span data-ic="search"></span><input type="search" placeholder="Nome, CPF, empresa, função, pulseira… ou bipe o QR" aria-label="Buscar pessoa"></label>
+        <section class="grade linha2">
+          <div class="cartao">
+            <div class="cab"><h2>Pessoa selecionada</h2><small>busque ou bipe</small></div>
+            <div class="ficha-c">
+              <div class="avatar grande">AL</div>
+              <div><b>Ana Lima</b><small>Montadora · Montagem Norte</small></div>
+              <dl class="ficha-dl">
+                <div><dt>CPF</dt><dd class="mono">•••.•••.•••-21</dd></div>
+                <div><dt>Pulseira</dt><dd class="mono">P-0481</dd></div>
+                <div><dt>Documentos</dt><dd><span class="pilula" style="background:#15803D">Em dia</span></dd></div>
+                <div><dt>Área</dt><dd>Montagem · área de obra</dd></div>
+              </dl>
+              <button class="botao primario" type="button">Registrar entrada</button>
+            </div>
+          </div>
+          <div class="cartao">
+            <div class="cab"><h2>Entradas</h2><small>aparecem na hora</small></div>
+            <ul class="lista-c">
+              <li><time class="mono">14:20</time><div class="avatar">AL</div><div><b>Ana Lima</b><small>Montagem Norte · pulseira P-0481</small></div><span class="pilula" style="background:#15803D">Entrada</span></li>
+              <li><time class="mono">14:18</time><div class="avatar">RB</div><div><b>Roberto Bastos</b><small>Segurança Alfa · pulseira P-0462</small></div><span class="pilula" style="background:#15803D">Entrada</span></li>
+              <li><time class="mono">14:16</time><div class="avatar">PN</div><div><b>Patrícia Nunes</b><small>Som e Luz Prime · facial</small></div><span class="pilula" style="background:#15803D">Entrada</span></li>
+              <li><time class="mono">14:11</time><div class="avatar">TK</div><div><b>Tiago Kuhn</b><small>Limpeza Central · sem documento</small></div><span class="pilula" style="background:#BE123C">Negada</span></li>
+              <li><time class="mono">14:09</time><div class="avatar">FS</div><div><b>Fernanda Sales</b><small>Produção Vértice · pulseira P-0455</small></div><span class="pilula" style="background:#15803D">Entrada</span></li>
+            </ul>
+          </div>
+        </section>
+      </div>
+
+      <div class="vista" data-vista="pessoas" hidden>
+        <div class="cab-pagina"><div><h1>Participantes</h1><small>Permissões de acesso e cadastro</small></div><button class="botao primario" type="button">Novo participante</button></div>
+        <div class="abas-c" role="tablist">
+          <button type="button" class="ativa">Todos <em>6.210</em></button>
+          <button type="button">Ativos <em>5.980</em></button>
+          <button type="button">Pendentes <em>186</em></button>
+          <button type="button">Bloqueados <em>44</em></button>
+        </div>
+        <label class="busca busca-larga"><span data-ic="search"></span><input type="search" placeholder="Buscar participante por nome, CPF ou cargo…" aria-label="Buscar participante"></label>
+        <div class="cartao" style="padding:0">
+          <div class="tabela-wrap">
+            <table>
+              <thead><tr><th>Foto</th><th>Nome / participante</th><th>CPF</th><th>Empresa</th><th>Estado</th><th>Ações</th></tr></thead>
+              <tbody>
+                <tr><td><div class="avatar">AL</div></td><td><b>Ana Lima</b></td><td class="mono">•••.•••.•••-21</td><td>Montagem Norte</td><td><span class="pilula" style="background:#15803D">Ativo</span></td><td class="acoes-c"><span data-ic="qr"></span><span data-ic="lock"></span></td></tr>
+                <tr><td><div class="avatar">RB</div></td><td><b>Roberto Bastos</b></td><td class="mono">•••.•••.•••-84</td><td>Segurança Alfa</td><td><span class="pilula" style="background:#15803D">Ativo</span></td><td class="acoes-c"><span data-ic="qr"></span><span data-ic="lock"></span></td></tr>
+                <tr><td><div class="avatar">TK</div></td><td><b>Tiago Kuhn</b></td><td class="mono">•••.•••.•••-37</td><td>Limpeza Central</td><td><span class="pilula" style="background:#B7791F">Documento pendente</span></td><td class="acoes-c"><span data-ic="qr"></span><span data-ic="lock"></span></td></tr>
+                <tr><td><div class="avatar">PN</div></td><td><b>Patrícia Nunes</b></td><td class="mono">•••.•••.•••-62</td><td>Som e Luz Prime</td><td><span class="pilula" style="background:#BE123C">Bloqueado</span></td><td class="acoes-c"><span data-ic="qr"></span><span data-ic="unlock"></span></td></tr>
+                <tr><td><div class="avatar">FS</div></td><td><b>Fernanda Sales</b></td><td class="mono">•••.•••.•••-15</td><td>Produção Vértice</td><td><span class="pilula" style="background:#15803D">Ativo</span></td><td class="acoes-c"><span data-ic="qr"></span><span data-ic="lock"></span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <p class="exemplo">Nomes e CPF fictícios; CPF mascarado como no sistema.</p>
+      </div>
+
+      <div class="vista" data-vista="empresas" hidden>
+        <div class="cab-pagina"><div><h1>Empresas</h1><small>Entidades terceirizadas do evento</small></div><button class="botao primario" type="button">Nova empresa</button></div>
+        <label class="busca busca-larga"><span data-ic="search"></span><input type="search" placeholder="Buscar por nome, CNPJ ou serviço…" aria-label="Buscar empresa"></label>
+        <div class="cartao" style="padding:0">
+          <div class="tabela-wrap">
+            <table>
+              <thead><tr><th>Empresa</th><th>Serviço</th><th>CNPJ</th><th>Cota base</th><th>Estado</th><th>Ações</th></tr></thead>
+              <tbody>
+                <tr><td><b>Montagem Norte</b></td><td>Montagem de estruturas</td><td class="mono">12.345.678/0001-90</td><td class="mono">200</td><td><span class="pilula" style="background:#15803D">Ativa</span></td><td class="acoes-c"><span data-ic="users"></span><span data-ic="file"></span><span data-ic="edit"></span></td></tr>
+                <tr><td><b>Segurança Alfa</b></td><td>Vigilância e portaria</td><td class="mono">23.456.789/0001-01</td><td class="mono">120</td><td><span class="pilula" style="background:#15803D">Ativa</span></td><td class="acoes-c"><span data-ic="users"></span><span data-ic="file"></span><span data-ic="edit"></span></td></tr>
+                <tr><td><b>Som e Luz Prime</b></td><td>Áudio e iluminação</td><td class="mono">34.567.890/0001-12</td><td class="mono">80</td><td><span class="pilula" style="background:#B7791F">3 docs vencidos</span></td><td class="acoes-c"><span data-ic="users"></span><span data-ic="file"></span><span data-ic="edit"></span></td></tr>
+                <tr><td><b>Limpeza Central</b></td><td>Limpeza e higiene</td><td class="mono">45.678.901/0001-23</td><td class="mono">60</td><td><span class="pilula" style="background:#15803D">Ativa</span></td><td class="acoes-c"><span data-ic="users"></span><span data-ic="file"></span><span data-ic="edit"></span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <p class="exemplo">Dados fictícios de empresas.</p>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+const IC = {
+  home: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.4 3.4-5 6.5-5s5.7 1.6 6.5 5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 15c1.6.6 2.8 2.2 3 5"/>',
+  door: '<path d="M5 21V4.5A1.5 1.5 0 0 1 6.5 3h11A1.5 1.5 0 0 1 19 4.5V21"/><path d="M3 21h18"/><circle cx="15" cy="12" r="1"/>',
+  login: '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/>',
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
+  shield: '<path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/>',
+  eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  building: '<rect x="4" y="3" width="10" height="18" rx="1"/><path d="M14 9h6v12h-6M7 7h2M7 11h2M7 15h2"/>',
+  device: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+  chart: '<path d="M4 20V4M4 20h16"/><path d="M8 16l4-5 3 3 5-6"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+  tag: '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/>',
+  search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',
+  refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>',
+  reset: '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>',
+  block: '<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
+  file: '<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+  qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h3M20 17v3"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  unlock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.7-1.5"/>',
+  edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/>'
+};
+const svg = (p) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${p}</svg>`;
+document.querySelectorAll('[data-ic]').forEach((el) => { el.innerHTML = svg(IC[el.dataset.ic]); });
+
+const app = document.getElementById('app');
+const alternar = document.getElementById('alternar');
+alternar.addEventListener('click', () => {
+  const icones = app.classList.toggle('icones');
+  alternar.setAttribute('aria-expanded', String(!icones));
+});
+
+const fmt = (n) => n.toLocaleString('pt-BR');
+
+// Cartões de indicador
+const kpis = [
+  { nome: 'Presentes agora', valor: 1284, nota: '64% de 2.000 lugares', ic: 'users', fundo: 'linear-gradient(135deg,#3B82F6,#22D3EE)' },
+  { nome: 'Entradas hoje', valor: 4821, nota: 'desde as 08h', ic: 'login', fundo: 'linear-gradient(135deg,#10B981,#34D399)' },
+  { nome: 'Saídas hoje', valor: 3537, nota: 'desde as 08h', ic: 'logout', fundo: 'linear-gradient(135deg,#F97316,#FBBF24)' },
+  { nome: 'Acessos negados', valor: 37, nota: 'hoje', ic: 'block', fundo: 'linear-gradient(135deg,#E11D48,#F472B6)' }
+];
+document.getElementById('kpis').innerHTML = kpis.map((k) => `
+  <div class="cartao kpi">
+    <div class="circulo" style="background:${k.fundo}">${svg(IC[k.ic])}</div>
+    <div style="min-width:0">
+      <div class="nome">${k.nome}</div>
+      <div class="valor">${fmt(k.valor)}</div>
+      <div class="nota">${k.nota}</div>
+    </div>
+  </div>`).join('');
+
+// Rosca de ocupação
+const pct = 1284 / 2000;
+document.getElementById('presentes').textContent = fmt(1284);
+document.getElementById('capacidade').textContent = '64% de 2.000';
+requestAnimationFrame(() => { document.getElementById('anel').style.strokeDashoffset = String(452.39 * (1 - pct)); });
+
+// Gráfico de área (entradas e saídas, mesma escala)
+const horas = ['08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'];
+// Somas batem com os indicadores do dia: 4.821 entradas e 3.537 saídas
+const entradas = [140, 430, 660, 840, 580, 490, 410, 365, 290, 255, 195, 110, 56];
+const saidas = [20, 60, 140, 260, 410, 520, 470, 390, 360, 330, 300, 180, 97];
+const max = 1000, W = 640, base = 222, topo = 14;
+const X0 = 44; // espaço das legendas do eixo vertical
+const y = (v) => base - (v / max) * (base - topo);
+const x = (i, n) => X0 + i * ((W - X0 - 8) / (n - 1));
+const caminho = (serie) => {
+  const pts = serie.map((v, i) => [x(i, serie.length), y(v)]);
+  let d = `M${pts[0][0]},${pts[0][1]}`;
+  for (let i = 1; i < pts.length; i++) { const [x0, y0] = pts[i - 1], [x1, y1] = pts[i], mx = (x0 + x1) / 2; d += ` C${mx},${y0} ${mx},${y1} ${x1},${y1}`; }
+  return d;
+};
+const dE = caminho(entradas), dS = caminho(saidas);
+const marcas = [0, 250, 500, 750, 1000];
+document.getElementById('grafico').innerHTML = `
+  <defs>
+    <linearGradient id="ge" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22D3EE" stop-opacity=".45"/><stop offset="1" stop-color="#3B82F6" stop-opacity="0"/></linearGradient>
+    <linearGradient id="gs" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FB923C" stop-opacity=".3"/><stop offset="1" stop-color="#FB923C" stop-opacity="0"/></linearGradient>
+  </defs>
+  ${marcas.map((m) => `<line x1="${X0}" x2="${W}" y1="${y(m)}" y2="${y(m)}" stroke="rgba(226,232,255,0.06)"/><text x="${X0 - 8}" y="${y(m) + 4}" text-anchor="end">${fmt(m)}</text>`).join('')}
+  <path d="${dE} L${x(horas.length - 1, horas.length)},${base} L${X0},${base} Z" fill="url(#ge)"/>
+  <path d="${dE}" fill="none" stroke="#22D3EE" stroke-width="2"/>
+  <path d="${dS} L${x(horas.length - 1, horas.length)},${base} L${X0},${base} Z" fill="url(#gs)"/>
+  <path d="${dS}" fill="none" stroke="#FB923C" stroke-width="2"/>
+  ${horas.map((h, i) => `<text x="${x(i, horas.length)}" y="244" text-anchor="middle">${h}h</text>`).join('')}`;
+
+// Lotação por área (cor por faixa: até 75% azul, até 90% âmbar, acima vermelho)
+const areas = [['Entrada principal', 412, 500], ['Montagem', 310, 400], ['Backstage', 88, 120], ['Área VIP', 46, 60], ['Credenciamento', 19, 50]];
+const corFaixa = (p) => (p > 90 ? 'var(--vermelho)' : p > 75 ? 'var(--ambar)' : 'var(--azul)');
+document.getElementById('lotacao').innerHTML = areas.map(([n, o, l]) => {
+  const p = Math.round((o / l) * 100);
+  return `<div><div class="cab-l"><span>${n}</span><span>${o} / ${l} · ${p}%</span></div><div class="trilho"><span style="width:${p}%;background:${corFaixa(p)}"></span></div></div>`;
+}).join('');
+
+// Empresas
+// [nome, cadastros, entradas, saídas, dentro]
+const empresas = [['Montagem Norte', 186, 812, 672, 140], ['Segurança Alfa', 92, 640, 552, 88], ['Som e Luz Prime', 64, 455, 404, 51], ['Limpeza Central', 58, 301, 254, 47], ['Produção Vértice', 41, 178, 148, 30]];
+document.getElementById('empresas').innerHTML = empresas.map(([n, cad, ent, sai, dentro]) => `
+  <tr>
+    <td>${n}</td>
+    <td style="text-align:right">${cad}</td>
+    <td><div style="display:flex;align-items:center;gap:8px"><div class="empresa-barra" style="width:70px"><span style="width:${(ent / 812) * 100}%"></span></div>${fmt(ent)}</div></td>
+    <td style="text-align:right">${fmt(sai)}</td>
+    <td style="text-align:right;color:var(--verde);font-weight:600">${dentro}</td>
+  </tr>`).join('');
+// Roteamento por hash: cada menu mostra a sua visão
+const VISTAS = ['painel', 'checkin', 'pessoas', 'empresas'];
+const mostrarVista = () => {
+  const h = location.hash.slice(1);
+  const v = VISTAS.includes(h) ? h : 'painel';
+  document.querySelectorAll('.vista').forEach((s) => { s.hidden = s.dataset.vista !== v; });
+  document.querySelectorAll('[data-rota]').forEach((a) => { if (a.dataset.rota === v) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  window.scrollTo(0, 0);
+};
+window.addEventListener('hashchange', mostrarVista);
+mostrarVista();
+</script>
+</body>
+</html>

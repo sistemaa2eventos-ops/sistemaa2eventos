@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Painel Mesa de Operação</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/*
+  Opção 3 · Mesa de operação. Inspirada na referência 3: tudo em tabelas agrupadas,
+  cada grupo com uma cor na borda esquerda, células de estado preenchidas, linha de totais,
+  menu com seções em árvore e usuário no canto superior direito.
+*/
+:root {
+  --bg: #1B1E31;
+  --panel: #23273D;
+  --panel-2: #2B3049;
+  --line: rgba(238, 240, 247, 0.08);
+  --line-2: rgba(238, 240, 247, 0.16);
+  --fg: #EEF0F7;
+  --fg-2: #A3A9C2;
+  --fg-3: #6E7491;
+  --azul: #5B7CFA;
+  --ok: #2FB67C;
+  --warn: #EE9E35;
+  --bad: #E2475E;
+  --roxo: #A06BE8;
+  --ciano: #3BB8D6;
+  --font: Figtree, Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  color-scheme: dark;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 14px/1.45 var(--font); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+svg.ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+button { font: inherit; }
+
+/* Barra superior */
+.topo { display: flex; align-items: center; gap: 8px; height: 52px; padding: 0 16px; border-bottom: 1px solid var(--line); background: var(--bg); position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; }
+.marca { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 16px; letter-spacing: -0.02em; white-space: nowrap; }
+.marca i { width: 24px; height: 24px; border-radius: 6px; background: conic-gradient(from 210deg, var(--bad), var(--warn), var(--ok), var(--azul), var(--bad)); }
+.marca span { font-weight: 500; color: var(--fg-2); }
+.evento-pilula { margin-left: 10px; height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--line-2); color: var(--fg-2); display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; white-space: nowrap; }
+.direita { margin-left: auto; display: flex; align-items: center; gap: 2px; }
+.icone { position: relative; width: 36px; height: 36px; border-radius: 8px; border: 0; background: none; color: var(--fg-2); display: grid; place-items: center; cursor: pointer; transition: background-color 0.15s, color 0.15s; }
+.icone:hover { background: var(--panel); color: var(--fg); }
+.icone em { position: absolute; top: 4px; right: 3px; min-width: 15px; height: 15px; border-radius: 8px; font: 700 9.5px var(--font); font-style: normal; display: grid; place-items: center; padding: 0 3px; color: #fff; }
+.avatar { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font: 700 12px var(--font); background: linear-gradient(135deg, #5B7CFA, #A06BE8); color: #fff; margin-left: 8px; flex-shrink: 0; cursor: pointer; }
+
+/* Estrutura */
+.app { display: grid; grid-template-columns: 244px minmax(0, 1fr); min-height: calc(100dvh - 52px); transition: grid-template-columns 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.app.icones { grid-template-columns: 60px minmax(0, 1fr); }
+
+/* Menu com seções em árvore */
+.menu { border-right: 1px solid var(--line); padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+.menu a, .menu .grupo-menu { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 6px; color: var(--fg-2); text-decoration: none; font-size: 13.5px; white-space: nowrap; transition: background-color 0.15s, color 0.15s; }
+.menu a:hover { background: var(--panel); color: var(--fg); }
+.menu a[aria-current="page"] { background: rgba(91, 124, 250, 0.18); color: var(--fg); }
+.menu .titulo { font-size: 11.5px; font-weight: 600; color: var(--fg-3); padding: 14px 10px 6px; white-space: nowrap; display: flex; justify-content: space-between; }
+.workspace { display: flex; gap: 6px; padding: 4px 0 8px; }
+.workspace .sel { flex: 1; min-width: 0; height: 34px; border-radius: 6px; border: 1px solid var(--line-2); display: flex; align-items: center; gap: 8px; padding: 0 8px; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; }
+.workspace .sel b { width: 22px; height: 22px; border-radius: 5px; background: var(--ok); display: grid; place-items: center; font-size: 11px; color: #fff; flex-shrink: 0; }
+.workspace .mais { width: 34px; height: 34px; border-radius: 6px; border: 0; background: var(--azul); color: #fff; cursor: pointer; display: grid; place-items: center; flex-shrink: 0; }
+.menu .filho { padding-left: 32px; }
+.menu .grupo-menu { color: var(--fg); font-weight: 600; cursor: default; }
+.menu .rodape { margin-top: auto; }
+.menu .recolher { height: 34px; border-radius: 6px; border: 1px solid var(--line-2); background: transparent; color: var(--fg-2); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
+.app.icones .some { display: none; }
+.app.icones .menu a, .app.icones .menu .grupo-menu { justify-content: center; padding: 0; }
+.app.icones .menu .filho { padding-left: 0; }
+.app.icones .workspace .sel { justify-content: center; padding: 0; border: 0; }
+
+/* Conteúdo */
+.principal { padding: 20px 28px 32px; min-width: 0; display: grid; gap: 18px; align-content: start; }
+.cabeca h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; display: flex; align-items: center; gap: 6px; }
+.abas { display: flex; gap: 22px; border-bottom: 1px solid var(--line); margin-top: 10px; overflow-x: auto; }
+.abas a { padding: 8px 0; color: var(--fg-2); text-decoration: none; font-size: 13.5px; white-space: nowrap; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.abas a[aria-current="page"] { color: var(--fg); border-color: var(--azul); }
+.ferramentas { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dividido { display: inline-flex; border-radius: 6px; overflow: hidden; }
+.dividido button { height: 34px; border: 0; background: var(--azul); color: #fff; padding: 0 14px; font-weight: 600; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.dividido button + button { padding: 0 8px; border-left: 1px solid rgba(255, 255, 255, 0.25); }
+.dividido button:hover { filter: brightness(1.1); }
+.ferramenta { height: 34px; padding: 0 10px; border-radius: 6px; border: 0; background: none; color: var(--fg-2); display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+.ferramenta:hover { background: var(--panel); color: var(--fg); }
+.online { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ok); font-weight: 600; }
+.online::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+
+/* Faixa de totais (7 indicadores) */
+.faixa { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel); }
+.faixa div { padding: 12px 14px; border-left: 1px solid var(--line); min-width: 0; }
+.faixa div:first-child { border-left: 0; }
+.faixa small { display: block; color: var(--fg-2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.faixa b { display: block; font: 700 22px var(--font); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.faixa em { font-style: normal; font-size: 11.5px; color: var(--fg-3); }
+.faixa .seg { height: 4px; border-radius: 2px; margin-top: 8px; background: var(--panel-2); overflow: hidden; display: flex; }
+
+/* Grupos de tabela */
+.grupo { min-width: 0; }
+.grupo-cab { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.grupo-cab button { background: none; border: 0; color: var(--cor); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 17px; font-weight: 700; padding: 0; }
+.grupo-cab button svg { transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+.grupo.fechado .grupo-cab button svg { transform: rotate(-90deg); }
+.grupo.fechado .tabela-wrap { display: none; }
+.grupo-cab small { color: var(--fg-3); font-size: 12.5px; }
+.tabela-wrap { overflow-x: auto; border-radius: 6px; }
+table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; min-width: 640px; }
+th { text-align: center; font-weight: 500; color: var(--fg-2); font-size: 12.5px; padding: 8px 10px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); white-space: nowrap; background: var(--bg); }
+th:first-child { text-align: left; border-left: 4px solid var(--cor); border-top-left-radius: 6px; }
+th:last-child { border-top-right-radius: 6px; }
+td { padding: 0 10px; height: 38px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); text-align: center; background: var(--panel); white-space: nowrap; font-variant-numeric: tabular-nums; }
+td:first-child { text-align: left; border-left: 4px solid var(--cor); font-weight: 500; }
+tbody tr:hover td { background: var(--panel-2); }
+td.estado { padding: 0; color: #fff; font-weight: 600; font-size: 12.5px; }
+td.estado span { display: grid; place-items: center; height: 38px; }
+td.num { font-family: var(--mono); font-size: 12.5px; }
+.total td { background: transparent; border-right: 0; font-family: var(--mono); font-size: 12.5px; color: var(--fg-2); }
+.total td:first-child { border-left: 4px solid transparent; font-family: var(--font); }
+.total td.soma { border: 1px solid var(--line); border-top: 0; background: var(--bg); }
+.barra { height: 8px; border-radius: 4px; background: var(--panel-2); overflow: hidden; min-width: 90px; }
+.barra span { display: block; height: 100%; border-radius: 4px; }
+.pessoa { display: flex; align-items: center; gap: 8px; }
+.pessoa i { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 700 10px var(--font); font-style: normal; color: #fff; flex-shrink: 0; }
+.fluxo-tag { display: inline-flex; height: 22px; align-items: center; padding: 0 8px; border-radius: 4px; border: 1px solid var(--line-2); color: var(--fg-2); font-size: 12px; }
+.calor td.num { color: #fff; }
+.exemplo { color: var(--fg-3); font-size: 12px; }
+
+@media (max-width: 1200px) { .faixa { grid-template-columns: repeat(4, minmax(0, 1fr)); } .faixa div:nth-child(5) { border-left: 0; } .faixa div:nth-child(n+5) { border-top: 1px solid var(--line); } }
+@media (max-width: 760px) {
+  .app, .app.icones { grid-template-columns: minmax(0, 1fr); }
+  .menu { display: none; }
+  .principal { padding: 16px; }
+  .faixa { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .faixa div { border-left: 0 !important; border-top: 1px solid var(--line); }
+  .faixa div:nth-child(even) { border-left: 1px solid var(--line) !important; }
+  .faixa div:nth-child(-n+2) { border-top: 0; }
+  .evento-pilula, .marca span { display: none; }
+  .online { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+</style>
+</head>
+<body>
+<header class="topo">
+  <div class="marca"><i></i>NZT <span>Control</span></div>
+  <span class="evento-pilula"><span data-ic="calendar"></span>Evento de exemplo · dia 2 de 3</span>
+  <div class="direita">
+    <button class="icone" type="button" title="Alertas" aria-label="Alertas"><span data-ic="bell"></span><em style="background:var(--bad)">4</em></button>
+    <button class="icone" type="button" title="Leitores online" aria-label="Leitores online"><span data-ic="device"></span><em style="background:var(--ok)">5</em></button>
+    <button class="icone" type="button" title="Ajuda" aria-label="Ajuda"><span data-ic="help"></span></button>
+    <button class="icone" type="button" title="Configurações" aria-label="Configurações"><span data-ic="gear"></span></button>
+    <div class="avatar" tabindex="0" role="button" aria-label="Conta do operador" title="Operador · Administrador">OP</div>
+  </div>
+</header>
+
+<div class="app" id="app">
+  <aside class="menu" aria-label="Menu principal">
+    <a href="#"><span data-ic="home"></span><span class="some">Início</span></a>
+    <a href="#"><span data-ic="eye"></span><span class="some">Monitor</span></a>
+    <div class="titulo some"><span>Evento</span><span>···</span></div>
+    <div class="workspace">
+      <div class="sel"><b>E</b><span class="some">Evento de exemplo</span></div>
+      <button class="mais some" type="button" title="Novo evento" aria-label="Novo evento"><span data-ic="plus"></span></button>
+    </div>
+    <div class="grupo-menu"><span data-ic="pulse"></span><span class="some">Operação</span></div>
+    <a href="#" class="filho" aria-current="page"><span data-ic="grid"></span><span class="some">Painel do evento</span></a>
+    <a href="#" class="filho"><span data-ic="door"></span><span class="some">Check-in</span></a>
+    <a href="#" class="filho"><span data-ic="login"></span><span class="some">Check-out</span></a>
+    <a href="#" class="filho"><span data-ic="shield"></span><span class="some">Fiscalização</span></a>
+    <div class="grupo-menu"><span data-ic="folder"></span><span class="some">Cadastros</span></div>
+    <a href="#" class="filho"><span data-ic="building"></span><span class="some">Empresas</span></a>
+    <a href="#" class="filho"><span data-ic="users"></span><span class="some">Pessoas</span></a>
+    <a href="#" class="filho"><span data-ic="device"></span><span class="some">Terminais</span></a>
+    <a href="#"><span data-ic="chart"></span><span class="some">Relatórios</span></a>
+    <div class="rodape"><button class="recolher" id="alternar" type="button" aria-expanded="true"><span data-ic="menu"></span><span class="some">Só ícones</span></button></div>
+  </aside>
+
+  <main class="principal">
+    <div class="cabeca">
+      <h1>Painel do evento <span data-ic="down"></span></h1>
+      <nav class="abas" aria-label="Visões do painel">
+        <a href="#" aria-current="page">Visão geral</a>
+        <a href="#">Fluxo por hora</a>
+        <a href="#">Empresas</a>
+        <a href="#">Terminais</a>
+      </nav>
+    </div>
+
+    <div class="ferramentas">
+      <span class="dividido"><button type="button"><span data-ic="reset"></span>Reset diário</button><button type="button" aria-label="Mais ações"><span data-ic="down"></span></button></span>
+      <button class="ferramenta" type="button"><span data-ic="search"></span>Buscar</button>
+      <button class="ferramenta" type="button"><span data-ic="filter"></span>Hoje</button>
+      <button class="ferramenta" type="button"><span data-ic="refresh"></span>Atualizar</button>
+      <span class="online">5 leitores online</span>
+    </div>
+
+    <section class="faixa" id="faixa" aria-label="Indicadores do dia"></section>
+
+    <section class="grupo" style="--cor: var(--bad)">
+      <div class="grupo-cab"><button type="button" aria-expanded="true"><span data-ic="down"></span>Precisa de atenção</button><small>4 alertas</small></div>
+      <div class="tabela-wrap">
+        <table>
+          <thead><tr><th style="width:38%">Alerta</th><th>Detalhe</th><th style="width:140px">Nível</th></tr></thead>
+          <tbody>
+            <tr><td>Acessos negados na Área VIP</td><td>4 tentativas de pessoa sem liberação para a área</td><td class="estado" style="background:var(--bad)"><span>Erro</span></td></tr>
+            <tr><td>Leitor offline</td><td>Leitor Portaria B não responde</td><td class="estado" style="background:var(--warn)"><span>Atenção</span></td></tr>
+            <tr><td>Documentos vencidos</td><td>3 documentos da Montagem Norte venceram</td><td class="estado" style="background:var(--warn)"><span>Atenção</span></td></tr>
+            <tr><td>Área perto do limite</td><td>Entrada principal com 82% da capacidade</td><td class="estado" style="background:var(--azul)"><span>Aviso</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="grupo" style="--cor: var(--ciano)">
+      <div class="grupo-cab"><button type="button" aria-expanded="true"><span data-ic="down"></span>Fluxo por hora</button><small>cor mais forte = mais movimento</small></div>
+      <div class="tabela-wrap">
+        <table class="calor" id="fluxo"></table>
+      </div>
+    </section>
+
+    <section class="grupo" style="--cor: var(--ok)">
+      <div class="grupo-cab"><button type="button" aria-expanded="true"><span data-ic="down"></span>Lotação por área</button><small>área da última entrada de cada pessoa</small></div>
+      <div class="tabela-wrap">
+        <table>
+          <thead><tr><th style="width:28%">Área</th><th>Dentro</th><th>Capacidade</th><th style="width:30%">Ocupação</th><th style="width:140px">Situação</th></tr></thead>
+          <tbody id="areas"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="grupo" style="--cor: var(--azul)">
+      <div class="grupo-cab"><button type="button" aria-expanded="true"><span data-ic="down"></span>Empresas no evento</button><small>48 credenciadas · 42 ativas</small></div>
+      <div class="tabela-wrap">
+        <table>
+          <thead><tr><th style="width:28%">Empresa</th><th>Cadastros</th><th>Entradas</th><th>Saídas</th><th style="width:26%">Dentro agora</th></tr></thead>
+          <tbody id="empresas"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="grupo" style="--cor: var(--warn)">
+      <div class="grupo-cab"><button type="button" aria-expanded="true"><span data-ic="down"></span>Terminais</button><small>5 de 6 online</small></div>
+      <div class="tabela-wrap">
+        <table>
+          <thead><tr><th style="width:30%">Terminal</th><th>Local</th><th>Fluxo</th><th style="width:140px">Estado</th></tr></thead>
+          <tbody>
+            <tr><td>Leitor Portaria A</td><td>Entrada principal</td><td><span class="fluxo-tag">Só entrada</span></td><td class="estado" style="background:var(--ok)"><span>Online</span></td></tr>
+            <tr><td>Leitor Portaria B</td><td>Montagem</td><td><span class="fluxo-tag">Entrada e saída</span></td><td class="estado" style="background:var(--bad)"><span>Offline</span></td></tr>
+            <tr><td>Leitor Saída Leste</td><td>Entrada principal</td><td><span class="fluxo-tag">Só saída</span></td><td class="estado" style="background:var(--ok)"><span>Online</span></td></tr>
+            <tr><td>Leitor Backstage</td><td>Backstage</td><td><span class="fluxo-tag">Entrada e saída</span></td><td class="estado" style="background:var(--ok)"><span>Online</span></td></tr>
+            <tr><td>Leitor Área VIP</td><td>Área VIP</td><td><span class="fluxo-tag">Só entrada</span></td><td class="estado" style="background:var(--ok)"><span>Online</span></td></tr>
+            <tr><td>Quiosque credenciamento</td><td>Credenciamento</td><td><span class="fluxo-tag">Entrada e saída</span></td><td class="estado" style="background:var(--ok)"><span>Online</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="grupo" style="--cor: var(--roxo)">
+      <div class="grupo-cab"><button type="button" aria-expanded="true"><span data-ic="down"></span>Últimos participantes cadastrados</button><small>conferência com foto e empresa</small></div>
+      <div class="tabela-wrap">
+        <table>
+          <thead><tr><th style="width:30%">Participante</th><th>Função</th><th>Empresa</th><th>Cadastrado</th></tr></thead>
+          <tbody>
+            <tr><td><div class="pessoa"><i style="background:#5B7CFA">AL</i>Ana Lima</div></td><td>Montadora</td><td>Montagem Norte</td><td>há 12 min</td></tr>
+            <tr><td><div class="pessoa"><i style="background:#2FB67C">CS</i>Carlos Souza</div></td><td>Vigilante</td><td>Segurança Alfa</td><td>há 27 min</td></tr>
+            <tr><td><div class="pessoa"><i style="background:#A06BE8">JR</i>Juliana Reis</div></td><td>Técnica de som</td><td>Som e Luz Prime</td><td>há 44 min</td></tr>
+            <tr><td><div class="pessoa"><i style="background:#EE9E35">MD</i>Marcos Dias</div></td><td>Auxiliar</td><td>Limpeza Central</td><td>há 1 hora</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <p class="exemplo">Nomes e números fictícios, só para visualizar o layout.</p>
+  </main>
+</div>
+
+<script>
+const IC = {
+  home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>',
+  grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.4 3.4-5 6.5-5s5.7 1.6 6.5 5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 15c1.6.6 2.8 2.2 3 5"/>',
+  door: '<path d="M5 21V4.5A1.5 1.5 0 0 1 6.5 3h11A1.5 1.5 0 0 1 19 4.5V21"/><path d="M3 21h18"/><circle cx="15" cy="12" r="1"/>',
+  login: '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/>',
+  shield: '<path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/>',
+  eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  building: '<rect x="4" y="3" width="10" height="18" rx="1"/><path d="M14 9h6v12h-6M7 7h2M7 11h2M7 15h2"/>',
+  device: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+  chart: '<path d="M4 20V4M4 20h16"/><path d="M8 16l4-5 3 3 5-6"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+  search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',
+  refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>',
+  reset: '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>',
+  filter: '<path d="M4 5h16l-6 8v5l-4 2v-7z"/>',
+  down: '<path d="M6 9l6 6 6-6"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  pulse: '<path d="M3 12h4l3-7 4 14 3-7h4"/>',
+  folder: '<path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/>'
+};
+const svg = (p) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${p}</svg>`;
+document.querySelectorAll('[data-ic]').forEach((el) => { el.innerHTML = svg(IC[el.dataset.ic]); });
+
+// Menu recolhível
+const app = document.getElementById('app');
+const alternar = document.getElementById('alternar');
+alternar.addEventListener('click', () => {
+  const icones = app.classList.toggle('icones');
+  alternar.setAttribute('aria-expanded', String(!icones));
+});
+
+// Grupos recolhíveis
+document.querySelectorAll('.grupo-cab button').forEach((b) => {
+  b.addEventListener('click', () => {
+    const fechado = b.closest('.grupo').classList.toggle('fechado');
+    b.setAttribute('aria-expanded', String(!fechado));
+  });
+});
+
+const fmt = (n) => n.toLocaleString('pt-BR');
+
+// Faixa de indicadores (7)
+const faixa = [
+  { nome: 'Presentes agora', valor: 1284, nota: '64% de 2.000', cor: 'var(--ciano)', pct: 64 },
+  { nome: 'Entradas hoje', valor: 4821, nota: 'desde 08h', cor: 'var(--ok)', pct: 100 },
+  { nome: 'Saídas hoje', valor: 3537, nota: 'desde 08h', cor: 'var(--warn)', pct: 73 },
+  { nome: 'Negados hoje', valor: 37, nota: 'hoje', cor: 'var(--bad)', pct: 1 },
+  { nome: 'Fiscalizações hoje', valor: 12, nota: 'conferências', cor: 'var(--roxo)', pct: 12 },
+  { nome: 'Empresas credenciadas', valor: 48, nota: '42 ativas no evento', cor: 'var(--azul)', pct: 88 },
+  { nome: 'Participantes cadastrados', valor: 6210, nota: 'no evento', cor: 'var(--fg-2)', pct: 100 }
+];
+document.getElementById('faixa').innerHTML = faixa.map((f) => `
+  <div><small>${f.nome}</small><b>${fmt(f.valor)}</b><em>${f.nota}</em><div class="seg"><span style="width:${f.pct}%;background:${f.cor}"></span></div></div>`).join('');
+
+// Fluxo por hora: mapa de calor (somas batem com os indicadores do dia)
+const horas = ['08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'];
+const entradas = [140, 430, 660, 840, 580, 490, 410, 365, 290, 255, 195, 110, 56];
+const saidas = [20, 60, 140, 260, 410, 520, 470, 390, 360, 330, 300, 180, 97];
+const negados = [0, 2, 4, 6, 5, 4, 3, 4, 3, 2, 2, 1, 1];
+let acumulado = 0;
+const dentro = entradas.map((e, i) => (acumulado += e - saidas[i]));
+const linhas = [
+  ['Entradas', entradas, '47, 182, 124'],
+  ['Saídas', saidas, '238, 158, 53'],
+  ['Dentro (fim da hora)', dentro, '59, 184, 214'],
+  ['Negados', negados, '226, 71, 94']
+];
+document.getElementById('fluxo').innerHTML = `
+  <thead><tr><th style="width:170px">Hora</th>${horas.map((h) => `<th>${h}h</th>`).join('')}<th>Total</th></tr></thead>
+  <tbody>${linhas.map(([nome, serie, rgb]) => {
+    const max = Math.max(...serie);
+    const total = nome.startsWith('Dentro') ? serie[serie.length - 1] : serie.reduce((a, b) => a + b, 0);
+    return `<tr><td>${nome}</td>${serie.map((v) => `<td class="num" style="background:rgba(${rgb},${(0.12 + (v / max) * 0.78).toFixed(2)})">${fmt(v)}</td>`).join('')}<td class="num" style="font-weight:600;color:var(--fg)">${fmt(total)}</td></tr>`;
+  }).join('')}</tbody>`;
+
+// Lotação por área
+const areas = [['Entrada principal', 412, 500], ['Montagem', 310, 400], ['Backstage', 88, 120], ['Área VIP', 46, 60], ['Credenciamento', 19, 50]];
+document.getElementById('areas').innerHTML = areas.map(([n, o, l]) => {
+  const p = Math.round((o / l) * 100);
+  const [rot, cor] = p >= 95 ? ['Lotada', 'var(--bad)'] : p >= 80 ? ['Quase cheia', 'var(--warn)'] : ['Normal', 'var(--ok)'];
+  return `<tr><td>${n}</td><td class="num">${o}</td><td class="num">${l}</td><td><div style="display:flex;align-items:center;gap:8px"><div class="barra" style="flex:1"><span style="width:${p}%;background:${cor}"></span></div><span class="num" style="font-family:var(--mono);font-size:12px;width:36px;text-align:right">${p}%</span></div></td><td class="estado" style="background:${cor}"><span>${rot}</span></td></tr>`;
+}).join('');
+
+// Empresas, com linha de totais
+const empresas = [['Montagem Norte', 186, 812, 672, 140], ['Segurança Alfa', 92, 640, 552, 88], ['Som e Luz Prime', 64, 455, 404, 51], ['Limpeza Central', 58, 301, 254, 47], ['Produção Vértice', 41, 178, 148, 30]];
+const maxDentro = Math.max(...empresas.map((e) => e[4]));
+const soma = (i) => empresas.reduce((a, e) => a + e[i], 0);
+document.getElementById('empresas').innerHTML = empresas.map(([n, cad, ent, sai, den]) => `
+  <tr><td>${n}</td><td class="num">${cad}</td><td class="num">${fmt(ent)}</td><td class="num">${fmt(sai)}</td>
+  <td><div style="display:flex;align-items:center;gap:8px"><div class="barra" style="flex:1"><span style="width:${(den / maxDentro) * 100}%;background:var(--azul)"></span></div><span style="font-family:var(--mono);font-size:12px;width:36px;text-align:right">${den}</span></div></td></tr>`).join('') + `
+  <tr class="total"><td>Total das 5 maiores</td><td class="soma">${soma(1)}</td><td class="soma">${fmt(soma(2))}</td><td class="soma">${fmt(soma(3))}</td><td class="soma">${soma(4)}</td></tr>`;
+</script>
+</body>
+</html>
