@@ -132,7 +132,7 @@ const ModalCameraCaptura = ({
                     <Box
                         sx={{
                             position: 'relative',
-                            borderRadius: 2,
+                            borderRadius: 1.5,
                             overflow: 'hidden',
                             bgcolor: cores.fundo,
                             border: `1px solid ${cores.borda}`,

@@ -1,4 +1,4 @@
-import { funcao } from '../../styles/tokens';
+import { funcao, cores } from '../../styles/tokens';
 
 export const PAPEIS_PRODUCAO = [
     { valor: 'admin_master', rotulo: 'Admin master', cor: funcao.alerta },
@@ -58,13 +58,13 @@ export const CATEGORIAS_MATERIAL = [
 ];
 
 export const CORES_MATERIAL = [
-    { rotulo: 'Alumínio / Prata', hex: '#CBD5E1' },
-    { rotulo: 'Preto / Grafite', hex: '#1E293B' },
-    { rotulo: 'Branco', hex: '#F8FAFC' },
-    { rotulo: 'Cinza / Galvanizado', hex: '#94A3B8' },
+    { rotulo: 'Alumínio / Prata', hex: cores.textoSuave },
+    { rotulo: 'Preto / Grafite', hex: cores.superficieElevada },
+    { rotulo: 'Branco', hex: cores.textoForte },
+    { rotulo: 'Cinza / Galvanizado', hex: cores.textoSecundario },
     { rotulo: 'Amarelo', hex: '#FACC15' },
     { rotulo: 'Laranja', hex: '#FB923C' },
-    { rotulo: 'Azul', hex: '#38BDF8' },
+    { rotulo: 'Azul', hex: cores.primaria },
     { rotulo: 'Vermelho', hex: '#F87171' },
     { rotulo: 'Verde', hex: '#4ADE80' }
 ];

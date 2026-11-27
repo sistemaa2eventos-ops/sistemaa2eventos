@@ -30,7 +30,7 @@ export const cores = {
     textoForte: '#FFFFFF',
     textoSuave: '#CBD5E1',
     textoSecundario: '#94A3B8',
-    textoFraco: '#64748B',
+    textoFraco: '#7A8BA3',
     textoSobrePrimaria: '#000000',
 
     // Marcas de terceiros

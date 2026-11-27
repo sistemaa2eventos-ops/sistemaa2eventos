@@ -471,7 +471,7 @@ const PortalProdutor = () => {
                     )}
                 </Box>
 
-                <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: cores.superficie, border: `1px solid ${cores.borda}` }}>
+                <Box sx={{ p: 1.25, borderRadius: 1.5, bgcolor: cores.superficie, border: `1px solid ${cores.borda}` }}>
                     <Typography sx={{ fontSize: tamanhos.xs, color: cores.textoSecundario, fontWeight: 600 }}>
                         Evento ativo
                     </Typography>

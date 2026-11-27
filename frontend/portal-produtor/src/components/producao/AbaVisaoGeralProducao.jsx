@@ -162,11 +162,11 @@ const AbaVisaoGeralProducao = ({ resumo, aoTrocarAba }) => {
                                             value={pct}
                                             sx={{
                                                 height: 8,
-                                                borderRadius: 4,
+                                                borderRadius: 1.5,
                                                 bgcolor: 'rgba(148, 163, 184, 0.14)',
                                                 '& .MuiLinearProgress-bar': {
                                                     bgcolor: area.cor || cores.primaria,
-                                                    borderRadius: 4
+                                                    borderRadius: 1.5
                                                 }
                                             }}
                                         />
@@ -207,7 +207,7 @@ const AbaVisaoGeralProducao = ({ resumo, aoTrocarAba }) => {
                             onClick={() => aoTrocarAba(2)}
                             sx={{
                                 cursor: 'pointer',
-                                borderRadius: 2,
+                                borderRadius: 1.5,
                                 border: `1px solid ${cores.borda}`,
                                 bgcolor: cores.fundo,
                                 p: 1
@@ -236,7 +236,7 @@ const AbaVisaoGeralProducao = ({ resumo, aoTrocarAba }) => {
                                                 <text
                                                     x={s.poligono_coordenadas[0].x + 10}
                                                     y={s.poligono_coordenadas[0].y + 22}
-                                                    fill="#FFFFFF"
+                                                    fill={cores.textoForte}
                                                     fontSize="14"
                                                     fontWeight="600"
                                                 >
@@ -282,7 +282,7 @@ const AbaVisaoGeralProducao = ({ resumo, aoTrocarAba }) => {
                                         onClick={() => aoTrocarAba(1)}
                                         sx={{
                                             p: 1.5,
-                                            borderRadius: 2,
+                                            borderRadius: 1.5,
                                             border: `1px solid ${cores.borda}`,
                                             bgcolor: cores.superficieElevada,
                                             cursor: 'pointer',
@@ -333,7 +333,7 @@ const AbaVisaoGeralProducao = ({ resumo, aoTrocarAba }) => {
                                     key={ev.id}
                                     sx={{
                                         p: 1.5,
-                                        borderRadius: 2,
+                                        borderRadius: 1.5,
                                         border: `1px solid ${cores.borda}`,
                                         bgcolor: cores.superficieElevada,
                                         display: 'flex',

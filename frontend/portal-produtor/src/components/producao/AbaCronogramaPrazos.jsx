@@ -312,7 +312,7 @@ const AbaCronogramaPrazos = ({ resumo, headersExtra = {}, aoAtualizar, apiClient
                                     key={t.id}
                                     sx={{
                                         p: 1.75,
-                                        borderRadius: 2,
+                                        borderRadius: 1.5,
                                         bgcolor: cores.superficieElevada,
                                         border: `1px solid ${t.eh_caminho_critico ? tom(funcao.fiscalizacao, 0.5) : cores.borda}`
                                     }}
@@ -398,7 +398,7 @@ const AbaCronogramaPrazos = ({ resumo, headersExtra = {}, aoAtualizar, apiClient
                                 key={m.id}
                                 sx={{
                                     p: 1.5,
-                                    borderRadius: 2,
+                                    borderRadius: 1.5,
                                     border: `1px solid ${cores.borda}`,
                                     bgcolor: cores.superficieElevada,
                                     display: 'flex',
@@ -449,7 +449,7 @@ const AbaCronogramaPrazos = ({ resumo, headersExtra = {}, aoAtualizar, apiClient
                             const orig = tarefas.find((t) => t.id === d.tarefa_origem_id);
                             const dest = tarefas.find((t) => t.id === d.tarefa_dependente_id);
                             return (
-                                <Box key={d.id} sx={{ p: 1.5, borderRadius: 2, bgcolor: cores.superficieElevada, border: `1px solid ${cores.borda}` }}>
+                                <Box key={d.id} sx={{ p: 1.5, borderRadius: 1.5, bgcolor: cores.superficieElevada, border: `1px solid ${cores.borda}` }}>
                                     <Typography sx={{ fontSize: tamanhos.sm, color: cores.textoForte }}>
                                         <strong>{orig?.titulo || 'Tarefa origem'}</strong> → libera → <strong>{dest?.titulo || 'Tarefa dependente'}</strong>
                                     </Typography>
@@ -476,12 +476,12 @@ const AbaCronogramaPrazos = ({ resumo, headersExtra = {}, aoAtualizar, apiClient
                 <Grid container spacing={2}>
                     {produtividadePorProdutor.map((p) => (
                         <Grid item xs={12} sm={6} md={4} key={p.id}>
-                            <Box sx={{ p: 1.75, borderRadius: 2, border: `1px solid ${cores.borda}`, bgcolor: cores.superficieElevada }}>
+                            <Box sx={{ p: 1.75, borderRadius: 1.5, border: `1px solid ${cores.borda}`, bgcolor: cores.superficieElevada }}>
                                 <Typography sx={{ fontWeight: 700, color: cores.textoForte }}>{p.nome}</Typography>
                                 <Typography sx={{ fontSize: tamanhos.xs, color: cores.textoSecundario, mb: 1 }}>
                                     {p.concluidas} de {p.total} tarefa(s) concluída(s)
                                 </Typography>
-                                <LinearProgress variant="determinate" value={p.media} sx={{ height: 7, borderRadius: 4, mb: 0.5 }} />
+                                <LinearProgress variant="determinate" value={p.media} sx={{ height: 7, borderRadius: 1.5, mb: 0.5 }} />
                                 <Typography sx={{ fontSize: tamanhos.xs, color: cores.textoSuave, textAlign: 'right' }}>
                                     {p.media}% de entrega
                                 </Typography>

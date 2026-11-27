@@ -260,7 +260,7 @@ const DashboardContagemMateriais = ({
                                 px: 0.5,
                                 pt: 1.5,
                                 pb: 0.5,
-                                borderRadius: 2,
+                                borderRadius: 1.5,
                                 bgcolor: cores.fundo,
                                 border: `1px solid ${cores.borda}`
                             }}
@@ -334,9 +334,9 @@ const DashboardContagemMateriais = ({
                                             value={pct}
                                             sx={{
                                                 height: 7,
-                                                borderRadius: 4,
+                                                borderRadius: 1.5,
                                                 bgcolor: 'rgba(148,163,184,0.16)',
-                                                '& .MuiLinearProgress-bar': { bgcolor: corBarra, borderRadius: 4 }
+                                                '& .MuiLinearProgress-bar': { bgcolor: corBarra, borderRadius: 1.5 }
                                             }}
                                         />
                                     </Box>
@@ -364,7 +364,7 @@ const DashboardContagemMateriais = ({
                                 <Box
                                     onClick={() => aoAmpliarEvidencia && aoAmpliarEvidencia(ev.url)}
                                     sx={{
-                                        borderRadius: 2,
+                                        borderRadius: 1.5,
                                         overflow: 'hidden',
                                         border: `1px solid ${cores.borda}`,
                                         bgcolor: cores.fundo,
@@ -382,7 +382,7 @@ const DashboardContagemMateriais = ({
                                         <Typography sx={{ fontSize: tamanhos.xs, fontWeight: 700, color: cores.textoForte }} noWrap>
                                             {ev.titulo} ({ev.qtd} un.)
                                         </Typography>
-                                        <Typography sx={{ fontSize: '0.68rem', color: cores.textoSecundario }} noWrap>
+                                        <Typography sx={{ fontSize: '0.75rem', color: cores.textoSecundario }} noWrap>
                                             {ev.modelo} • {formatarDataHoraCurta(ev.data)}
                                         </Typography>
                                     </Box>

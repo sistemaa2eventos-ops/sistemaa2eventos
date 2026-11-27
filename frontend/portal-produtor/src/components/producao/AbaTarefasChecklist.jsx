@@ -478,7 +478,7 @@ const AbaTarefasChecklist = ({ eventoId, resumo, headersExtra, aoAtualizar, apiC
                                         <LinearProgress
                                             variant="determinate"
                                             value={t.percentual_concluido || 0}
-                                            sx={{ height: 7, borderRadius: 4, bgcolor: 'rgba(148,163,184,0.14)', mb: 1.5 }}
+                                            sx={{ height: 7, borderRadius: 1.5, bgcolor: 'rgba(148,163,184,0.14)', mb: 1.5 }}
                                         />
 
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
@@ -534,7 +534,7 @@ const AbaTarefasChecklist = ({ eventoId, resumo, headersExtra, aoAtualizar, apiC
                             </Typography>
 
                             {tarefaAtiva.motivo_bloqueio && (
-                                <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: tom(funcao.negado, 0.12), border: `1px solid ${funcao.negado}` }}>
+                                <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: tom(funcao.negado, 0.12), border: `1px solid ${funcao.negado}` }}>
                                     <Typography sx={{ color: funcao.negado, fontWeight: 600, fontSize: tamanhos.sm }}>
                                         Impedimento reportado: {tarefaAtiva.motivo_bloqueio}
                                     </Typography>
@@ -552,7 +552,7 @@ const AbaTarefasChecklist = ({ eventoId, resumo, headersExtra, aoAtualizar, apiC
                                             key={etapa.id}
                                             sx={{
                                                 p: 1.25,
-                                                borderRadius: 2,
+                                                borderRadius: 1.5,
                                                 border: `1px solid ${etapaAtivaId === etapa.id ? cores.primaria : cores.borda}`,
                                                 bgcolor: cores.superficieElevada
                                             }}
@@ -604,7 +604,7 @@ const AbaTarefasChecklist = ({ eventoId, resumo, headersExtra, aoAtualizar, apiC
                                                             <Typography sx={{ fontSize: tamanhos.xs, color: cores.textoSuave }}>
                                                                 {ev.texto_comentario || ev.transcricao_audio || 'Registro fotográfico'}
                                                             </Typography>
-                                                            <Typography sx={{ fontSize: '0.7rem', color: cores.textoSecundario }}>
+                                                            <Typography sx={{ fontSize: '0.75rem', color: cores.textoSecundario }}>
                                                                 {ev.autor_nome || 'Equipe'} • {formatarDataHoraCurta(ev.criado_em)}
                                                             </Typography>
                                                         </Box>
