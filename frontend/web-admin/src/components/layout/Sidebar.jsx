@@ -167,7 +167,7 @@ const Sidebar = ({ open, onClose, recolhido = false, onAlternarMenu, usuarioReco
     const { system_name: systemName, logo_url: customLogoUrl, emblem_url: customEmblemUrl } = useSystemBranding();
     const navigate = useNavigate();
     const location = useLocation();
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const [openSubMenus, setOpenSubMenus] = useState({});
     const [eventAnchorEl, setEventAnchorEl] = useState(null);
     const [availableEvents, setAvailableEvents] = useState([]);
@@ -557,10 +557,10 @@ const Sidebar = ({ open, onClose, recolhido = false, onAlternarMenu, usuarioReco
                     src={recolhido && !isMobile ? (customEmblemUrl || nztEmblem) : (customLogoUrl || nztLogoClean)}
                     alt={systemName || 'NZT Intelligent Control Systems'}
                     sx={{
-                        width: recolhido && !isMobile ? 36 : '100%',
-                        maxWidth: recolhido && !isMobile ? 36 : 145,
+                        width: recolhido && !isMobile ? 36 : 'auto',
+                        maxWidth: recolhido && !isMobile ? 36 : 112,
                         height: recolhido && !isMobile ? 36 : 'auto',
-                        maxHeight: recolhido && !isMobile ? 36 : 48,
+                        maxHeight: recolhido && !isMobile ? 36 : 30,
                         objectFit: 'contain',
                         filter: 'drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5))',
                         transition: 'background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',

@@ -144,7 +144,7 @@ const MainLayout = ({ children }) => {
                 }}
             >
                 {/* Barra superior (desktop): evento em foco à esquerda e o cartão pequeno do operador à direita */}
-                {!isMobile && (
+                {!isMobile && (menuRecolhido || !cartaoGrandeVisivel) && (
                     <Box
                         component="header"
                         className="app-barra"
@@ -162,10 +162,13 @@ const MainLayout = ({ children }) => {
                             borderBottom: `1px solid ${cores.borda}`
                         }}
                     >
-                        <Typography noWrap sx={{ fontSize: '0.8125rem', color: cores.textoSecundario, minWidth: 0 }}>
-                            <Box component="span" sx={{ color: cores.textoFraco }}>Evento em foco: </Box>
-                            <Box component="span" sx={{ color: cores.textoForte, fontWeight: 600 }}>{eventoNome || 'nenhum'}</Box>
-                        </Typography>
+                        {/* Evento em foco aparece aqui só com o menu recolhido (com o menu aberto, ele já está na lateral) */}
+                        {menuRecolhido ? (
+                            <Typography noWrap sx={{ fontSize: '0.8125rem', color: cores.textoSecundario, minWidth: 0 }}>
+                                <Box component="span" sx={{ color: cores.textoFraco }}>Evento em foco: </Box>
+                                <Box component="span" sx={{ color: cores.textoForte, fontWeight: 600 }}>{eventoNome || 'nenhum'}</Box>
+                            </Typography>
+                        ) : <Box />}
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0, ml: 'auto' }}>
                             {!cartaoGrandeVisivel && (
                                 <UsuarioChip onExpandir={() => setUsuarioRecolhido(false)} />

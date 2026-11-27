@@ -319,8 +319,8 @@ export const OperatorSection = () => {
 
     return (
         <UserSectionContainer>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                {/* Avatar: clique troca a foto; ponto verde = conectado */}
+            <Box sx={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 1.25, pt: 0.5 }}>
+                {/* Avatar grande e centralizado (estilo perfil): clique troca a foto; ponto verde = conectado */}
                 <Tooltip title="Trocar foto" arrow placement="top">
                     <ButtonBase
                         onClick={abrirTrocaDeFoto}
@@ -334,7 +334,7 @@ export const OperatorSection = () => {
                         <Avatar
                             src={currentAvatar}
                             alt={nomeExibido}
-                            sx={{ width: 44, height: 44, border: `2px solid ${papel.cor}`, bgcolor: cores.fundo, fontWeight: 700 }}
+                            sx={{ width: 84, height: 84, border: `3px solid ${papel.cor}`, bgcolor: cores.fundo, fontWeight: 700, fontSize: '1.75rem' }}
                         >
                             {nomeExibido.charAt(0)}
                         </Avatar>
@@ -352,30 +352,33 @@ export const OperatorSection = () => {
                     </ButtonBase>
                 </Tooltip>
 
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography noWrap title={nomeExibido} sx={{ fontWeight: 700, fontSize: tamanhos.md, color: cores.textoForte, lineHeight: 1.3 }}>
+                <Box sx={{ minWidth: 0, width: '100%' }}>
+                    <Typography noWrap title={nomeExibido} sx={{ fontWeight: 700, fontSize: tamanhos.lg, color: cores.textoForte, lineHeight: 1.3 }}>
                         {nomeExibido}
                     </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, minWidth: 0 }}>
-                        <Typography noWrap sx={{ fontSize: tamanhos.xs, color: papel.cor, fontWeight: 600, minWidth: 0 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, minWidth: 0, flexWrap: 'wrap', mt: 0.5 }}>
+                        <Typography noWrap sx={{ fontSize: tamanhos.sm, color: papel.cor, fontWeight: 600, minWidth: 0 }}>
                             {papel.rotulo}
                         </Typography>
+                        <Typography component="span" sx={{ color: cores.textoFraco, fontSize: tamanhos.xs }}>·</Typography>
                         <Tooltip title={`${t('operator.shift_since', { defaultValue: 'No turno desde' })} ${loginTimeFormatted}`} placement="top">
-                            <Typography sx={{ ml: 'auto', fontSize: tamanhos.xs, color: cores.textoSecundario, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                            <Typography sx={{ fontSize: tamanhos.sm, color: cores.textoSecundario, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
                                 <TempoNoTurno loginKey={loginKey} />
                             </Typography>
                         </Tooltip>
                     </Box>
                 </Box>
 
-                <Tooltip title={t('operator.operator_options', { defaultValue: 'Opções' })}>
-                    <IconButton size="small" onClick={handleMenuOpen} aria-label={t('operator.operator_options', { defaultValue: 'Opções do operador' })} sx={{ color: cores.textoSecundario }}>
-                        <MoreIcon fontSize="small" />
-                    </IconButton>
-                </Tooltip>
+                <Box sx={{ position: 'absolute', top: 0, right: 0 }}>
+                    <Tooltip title={t('operator.operator_options', { defaultValue: 'Opções' })}>
+                        <IconButton size="small" onClick={handleMenuOpen} aria-label={t('operator.operator_options', { defaultValue: 'Opções do operador' })} sx={{ color: cores.textoSecundario }}>
+                            <MoreIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+                </Box>
             </Box>
 
-            <Stack direction="row" spacing={1} sx={{ mt: 1.25 }}>
+            <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
                 <Button
                     size="small"
                     variant="outlined"
