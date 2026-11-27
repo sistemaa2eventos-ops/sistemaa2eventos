@@ -25,7 +25,7 @@ import { ptBR } from 'date-fns/locale';
 
 import GlassCard from '../components/common/GlassCard';
 import KpiCard from '../components/common/KpiCard';
-import { cores, botaoSecundario } from '../styles/tokens';
+import { cores, botaoSecundario, tom } from '../styles/tokens';
 import { Groups as KpiCadastradosIcon, HowToReg as KpiPresentesIcon, Logout as KpiSaidasIcon, PersonOff as KpiAusentesIcon, Timer as KpiTempoIcon } from '@mui/icons-material';
 import PageHeader from '../components/common/PageHeader';
 import DataTable from '../components/common/DataTable';
@@ -160,7 +160,7 @@ const Reports = () => {
             label: 'Nome da empresa',
             width: 220,
             format: (val) => (
-                <Typography variant="body2" sx={{ fontWeight: 700, color: '#00D4FF' }} noWrap>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: cores.primaria }} noWrap>
                     {val || 'Sem Empresa'}
                 </Typography>
             )
@@ -170,7 +170,7 @@ const Reports = () => {
             label: 'Nome do colaborador',
             width: 240,
             format: (val) => (
-                <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF' }} noWrap>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: cores.textoForte }} noWrap>
                     {val || '—'}
                 </Typography>
             )
@@ -180,7 +180,7 @@ const Reports = () => {
             label: 'CPF',
             width: 150,
             format: (val) => (
-                <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.875rem', color: '#94A3B8' }}>
+                <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.875rem', color: cores.textoSecundario }}>
                     {val || '—'}
                 </Typography>
             )
@@ -190,7 +190,7 @@ const Reports = () => {
             label: 'Função',
             width: 170,
             format: (val) => (
-                <Typography variant="body2" sx={{ color: '#CBD5E1', fontSize: '0.875rem' }} noWrap>
+                <Typography variant="body2" sx={{ color: cores.textoSuave, fontSize: '0.875rem' }} noWrap>
                     {val || '—'}
                 </Typography>
             )
@@ -205,15 +205,15 @@ const Reports = () => {
                     label={val}
                     size="small"
                     sx={{
-                        bgcolor: 'rgba(0, 212, 255, 0.12)',
-                        color: '#00D4FF',
+                        bgcolor: tom(cores.primaria, 0.12),
+                        color: cores.primaria,
                         fontFamily: '"Inter", sans-serif',
                         fontWeight: 700,
                         border: '1px solid rgba(0, 212, 255, 0.3)'
                     }}
                 />
             ) : (
-                <Typography variant="caption" sx={{ color: '#64748B' }}>—</Typography>
+                <Typography variant="caption" sx={{ color: cores.textoFraco }}>—</Typography>
             )
         },
         {
@@ -221,11 +221,11 @@ const Reports = () => {
             label: 'Check-in (entrada)',
             width: 175,
             format: (val) => val && val !== '—' ? (
-                <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem', color: '#00FF88', fontWeight: 700 }}>
+                <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem', color: cores.sucesso, fontWeight: 700 }}>
                     {val}
                 </Typography>
             ) : (
-                <Typography variant="caption" sx={{ color: '#64748B' }}>—</Typography>
+                <Typography variant="caption" sx={{ color: cores.textoFraco }}>—</Typography>
             )
         },
         {
@@ -241,7 +241,7 @@ const Reports = () => {
                             title="A pessoa não bateu a saída; o fechamento de turno encerrou o registro"
                             sx={{
                                 bgcolor: 'rgba(255, 51, 102, 0.12)',
-                                color: '#FF3366',
+                                color: cores.erro,
                                 fontWeight: 700,
                                 fontSize: '0.75rem',
                                 border: '1px solid rgba(255, 51, 102, 0.3)'
@@ -256,7 +256,7 @@ const Reports = () => {
                             size="small"
                             sx={{
                                 bgcolor: 'rgba(255, 184, 0, 0.15)',
-                                color: '#FFB800',
+                                color: cores.alerta,
                                 fontWeight: 700,
                                 fontSize: '0.75rem',
                                 border: '1px solid rgba(255, 184, 0, 0.3)'
@@ -266,12 +266,12 @@ const Reports = () => {
                 }
                 if (val && val !== '—') {
                     return (
-                        <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem', color: '#00D4FF', fontWeight: 700 }}>
+                        <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem', color: cores.primaria, fontWeight: 700 }}>
                             {val}
                         </Typography>
                     );
                 }
-                return <Typography variant="caption" sx={{ color: '#64748B' }}>—</Typography>;
+                return <Typography variant="caption" sx={{ color: cores.textoFraco }}>—</Typography>;
             }
         },
         {
@@ -280,7 +280,7 @@ const Reports = () => {
             width: 200,
             format: (val, row) => {
                 if (!val || val === '—') {
-                    return <Typography variant="caption" sx={{ color: '#64748B' }}>00h 00m</Typography>;
+                    return <Typography variant="caption" sx={{ color: cores.textoFraco }}>00h 00m</Typography>;
                 }
                 // sem horas no dia: saída não registrada (a conferir) ou turno contado no dia da entrada
                 if (val === 'Saída não registrada' || val === 'Turno do dia anterior') {
@@ -294,7 +294,7 @@ const Reports = () => {
                                 : 'As horas deste turno estão no relatório do dia da entrada'}
                             sx={{
                                 bgcolor: conferir ? 'rgba(255, 51, 102, 0.12)' : 'rgba(148, 163, 184, 0.12)',
-                                color: conferir ? '#FF3366' : '#94A3B8',
+                                color: conferir ? cores.erro : cores.textoSecundario,
                                 fontWeight: 700,
                                 fontSize: '0.75rem',
                                 border: `1px solid ${conferir ? 'rgba(255, 51, 102, 0.3)' : 'rgba(148, 163, 184, 0.3)'}`
@@ -305,12 +305,12 @@ const Reports = () => {
                 const isAndamento = val.includes('Em andamento');
                 const chip = (
                     <Chip
-                        icon={<TimeIcon sx={{ fontSize: '13px !important', color: (isAndamento ? '#FFB800' : '#00FF88') + ' !important' }} />}
+                        icon={<TimeIcon sx={{ fontSize: '13px !important', color: (isAndamento ? cores.alerta : cores.sucesso) + ' !important' }} />}
                         label={val}
                         size="small"
                         sx={{
                             bgcolor: isAndamento ? 'rgba(255, 184, 0, 0.12)' : 'rgba(0, 255, 136, 0.12)',
-                            color: isAndamento ? '#FFB800' : '#00FF88',
+                            color: isAndamento ? cores.alerta : cores.sucesso,
                             fontFamily: '"Inter", sans-serif',
                             fontWeight: 700,
                             fontSize: '0.75rem',
@@ -323,7 +323,7 @@ const Reports = () => {
                 return (
                     <Box title={row.observacao || undefined} sx={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.25 }}>
                         {chip}
-                        <Typography variant="caption" sx={{ color: '#FF3366', fontSize: '0.6875rem' }}>
+                        <Typography variant="caption" sx={{ color: cores.erro, fontSize: '0.6875rem' }}>
                             marcação fora de ordem
                         </Typography>
                     </Box>
@@ -345,13 +345,13 @@ const Reports = () => {
         {
             id: 'permanencia_minutos', label: 'Horas trabalhadas', width: 140, align: 'center',
             format: (val) => (
-                <Typography variant="body2" sx={{ fontWeight: 700, color: val > 0 ? '#00FF88' : '#64748B' }}>{fmtMin(val)}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: val > 0 ? cores.sucesso : cores.textoFraco }}>{fmtMin(val)}</Typography>
             )
         },
         {
             id: 'observacao', label: 'Observação', width: 230,
             format: (val, row) => val ? (
-                <Typography variant="caption" sx={{ color: row.saida_nao_registrada || row.inconsistencias > 0 ? '#FF3366' : '#94A3B8' }}>{val}</Typography>
+                <Typography variant="caption" sx={{ color: row.saida_nao_registrada || row.inconsistencias > 0 ? cores.erro : cores.textoSecundario }}>{val}</Typography>
             ) : '—'
         }
     ];
@@ -370,7 +370,7 @@ const Reports = () => {
                     size="small"
                     sx={{
                         bgcolor: (value === 'checkin' || value === 'entrada') ? 'rgba(0, 255, 136, 0.15)' : 'rgba(255, 51, 102, 0.15)',
-                        color: (value === 'checkin' || value === 'entrada') ? '#00FF88' : '#FF3366',
+                        color: (value === 'checkin' || value === 'entrada') ? cores.sucesso : cores.erro,
                         fontWeight: 700,
                         fontSize: '0.75rem'
                     }}
@@ -382,7 +382,7 @@ const Reports = () => {
             label: 'Horário', 
             width: 170,
             format: (value) => value && (
-                <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem', color: '#00D4FF' }}>
+                <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem', color: cores.primaria }}>
                     {format(new Date(value), "dd/MM HH:mm:ss", { locale: ptBR })}
                 </Typography>
             )
@@ -406,7 +406,7 @@ const Reports = () => {
                 <Chip
                     label={val || '—'}
                     size="small"
-                    sx={{ bgcolor: 'rgba(0, 212, 255, 0.12)', color: '#00D4FF', fontFamily: '"Inter", sans-serif', fontWeight: 700 }}
+                    sx={{ bgcolor: tom(cores.primaria, 0.12), color: cores.primaria, fontFamily: '"Inter", sans-serif', fontWeight: 700 }}
                 />
             )
         }
@@ -453,7 +453,7 @@ const Reports = () => {
                     size="small"
                     sx={{
                         bgcolor: val === 'autorizado' || val === 'ativo' ? 'rgba(0, 255, 136, 0.15)' : 'rgba(255, 184, 0, 0.15)',
-                        color: val === 'autorizado' || val === 'ativo' ? '#00FF88' : '#FFB800',
+                        color: val === 'autorizado' || val === 'ativo' ? cores.sucesso : cores.alerta,
                         fontWeight: 700
                     }}
                 />
@@ -470,11 +470,11 @@ const Reports = () => {
             width: 230,
             format: (val, row) => (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <Avatar sx={{ width: 32, height: 32, bgcolor: '#0A1628', border: '1px solid #00D4FF', color: '#00D4FF', fontSize: '0.8125rem', fontWeight: 700 }}>
+                    <Avatar sx={{ width: 32, height: 32, bgcolor: cores.superficie, border: '1px solid #00D4FF', color: cores.primaria, fontSize: '0.8125rem', fontWeight: 700 }}>
                         {val?.charAt(0) || 'O'}
                     </Avatar>
                     <Box sx={{ minWidth: 0 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF', fontSize: '0.875rem' }} noWrap>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: cores.textoForte, fontSize: '0.875rem' }} noWrap>
                             {val || 'Operador'}
                         </Typography>
                         <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.75rem' }} noWrap>
@@ -489,7 +489,7 @@ const Reports = () => {
             label: 'Entrada (login)',
             width: 170,
             format: (val) => val && (
-                <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem', color: '#00D4FF' }}>
+                <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem', color: cores.primaria }}>
                     {format(new Date(val), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
                 </Typography>
             )
@@ -499,11 +499,11 @@ const Reports = () => {
             label: 'Saída (logout)',
             width: 170,
             format: (val) => val ? (
-                <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem', color: '#FFB800' }}>
+                <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem', color: cores.alerta }}>
                     {format(new Date(val), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
                 </Typography>
             ) : (
-                <Chip label="Online agora" size="small" sx={{ bgcolor: 'rgba(0,255,136,0.15)', color: '#00FF88', fontWeight: 700, fontSize: '0.75rem' }} />
+                <Chip label="Online agora" size="small" sx={{ bgcolor: 'rgba(0,255,136,0.15)', color: cores.sucesso, fontWeight: 700, fontSize: '0.75rem' }} />
             )
         },
         {
@@ -517,7 +517,7 @@ const Reports = () => {
                     size="small"
                     sx={{
                         bgcolor: 'rgba(0, 255, 136, 0.1)',
-                        color: '#00FF88',
+                        color: cores.sucesso,
                         fontFamily: '"Inter", sans-serif',
                         fontWeight: 700,
                         border: '1px solid rgba(0, 255, 136, 0.3)'
@@ -534,7 +534,7 @@ const Reports = () => {
                 <Chip
                     label={`+${val || 0}`}
                     size="small"
-                    sx={{ bgcolor: 'rgba(0, 212, 255, 0.15)', color: '#00D4FF', fontWeight: 700, minWidth: 45 }}
+                    sx={{ bgcolor: tom(cores.primaria, 0.15), color: cores.primaria, fontWeight: 700, minWidth: 45 }}
                 />
             )
         },
@@ -547,7 +547,7 @@ const Reports = () => {
                 <Chip
                     label={`+${val || 0}`}
                     size="small"
-                    sx={{ bgcolor: 'rgba(123, 47, 190, 0.15)', color: '#A855F7', fontWeight: 700, minWidth: 45 }}
+                    sx={{ bgcolor: 'rgba(123, 47, 190, 0.15)', color: cores.secundariaClara, fontWeight: 700, minWidth: 45 }}
                 />
             )
         },
@@ -560,7 +560,7 @@ const Reports = () => {
                 <Chip
                     label={val || 0}
                     size="small"
-                    sx={{ bgcolor: val > 0 ? 'rgba(255, 51, 102, 0.15)' : 'rgba(255,255,255,0.05)', color: val > 0 ? '#FF3366' : 'text.secondary', fontWeight: 700, minWidth: 45 }}
+                    sx={{ bgcolor: val > 0 ? 'rgba(255, 51, 102, 0.15)' : 'rgba(255,255,255,0.05)', color: val > 0 ? cores.erro : 'text.secondary', fontWeight: 700, minWidth: 45 }}
                 />
             )
         },
@@ -573,7 +573,7 @@ const Reports = () => {
                 <Chip
                     label={val || 0}
                     size="small"
-                    sx={{ bgcolor: 'rgba(0, 255, 136, 0.15)', color: '#00FF88', fontWeight: 700, minWidth: 45 }}
+                    sx={{ bgcolor: 'rgba(0, 255, 136, 0.15)', color: cores.sucesso, fontWeight: 700, minWidth: 45 }}
                 />
             )
         },
@@ -590,7 +590,7 @@ const Reports = () => {
                         setNotasOperadorNome(row.operador_nome || 'Operador');
                         setModalNotasOpen(true);
                     }}
-                    sx={{ color: '#00D4FF', '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.15)' } }}
+                    sx={{ color: cores.primaria, '&:hover': { bgcolor: tom(cores.primaria, 0.15) } }}
                     title="Ver anotações do operador"
                 >
                     <NoteIcon fontSize="small" />
@@ -611,7 +611,7 @@ const Reports = () => {
                         setSelectedSessao(row);
                         setModalDetalhesOpen(true);
                     }}
-                    sx={{ color: '#00D4FF', '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.15)' } }}
+                    sx={{ color: cores.primaria, '&:hover': { bgcolor: tom(cores.primaria, 0.15) } }}
                     title="Ver resumo consolidado"
                 >
                     <InfoIcon fontSize="small" />
@@ -782,7 +782,7 @@ const Reports = () => {
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
-                                                <SearchIcon sx={{ color: '#00D4FF', fontSize: 18 }} />
+                                                <SearchIcon sx={{ color: cores.primaria, fontSize: 18 }} />
                                             </InputAdornment>
                                         )
                                     }}
@@ -796,7 +796,7 @@ const Reports = () => {
                                     variant="contained"
                                     fullWidth
                                     onClick={loadDiarioConsolidado}
-                                    sx={{ height: 40, minWidth: 40, p: 0, bgcolor: '#00D4FF', color: '#000000', '&:hover': { bgcolor: '#00FF88' } }}
+                                    sx={{ height: 40, minWidth: 40, p: 0, bgcolor: cores.primaria, color: '#000000', '&:hover': { bgcolor: cores.sucesso } }}
                                     title="Atualizar dados"
                                 >
                                     <RefreshIcon />
@@ -814,16 +814,16 @@ const Reports = () => {
                                 onChange={(e, val) => val && setStatusFiltroDiario(val)}
                                 sx={{
                                     '& .MuiToggleButton-root': {
-                                        color: '#94A3B8',
+                                        color: cores.textoSecundario,
                                         borderColor: 'rgba(255,255,255,0.1)',
                                         py: 0.4,
                                         px: 1.5,
                                         fontSize: '0.75rem',
                                         fontWeight: 700,
                                         '&.Mui-selected': {
-                                            bgcolor: 'rgba(0, 212, 255, 0.15)',
-                                            color: '#00D4FF',
-                                            borderColor: 'rgba(0, 212, 255, 0.4)'
+                                            bgcolor: tom(cores.primaria, 0.15),
+                                            color: cores.primaria,
+                                            borderColor: tom(cores.primaria, 0.4)
                                         }
                                     }
                                 }}
@@ -891,7 +891,7 @@ const Reports = () => {
                                     else if (tab === 'pulseiras') loadPulseiras();
                                     else loadTab(tab);
                                 }}
-                                sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700 }}
+                                sx={{ bgcolor: cores.primaria, color: '#000000', fontWeight: 700 }}
                             >
                                 Atualizar
                             </Button>
@@ -1045,7 +1045,7 @@ const Reports = () => {
                 </DialogTitle>
                 <DialogContent sx={{ pt: 2.5 }}>
                     <Paper sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 1.5, border: '1px solid rgba(255,255,255,0.06)' }}>
-                        <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', color: '#FFFFFF', lineHeight: 1.6 }}>
+                        <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', color: cores.textoForte, lineHeight: 1.6 }}>
                             {notasOperador || 'Nenhum lembrete registrado durante este turno.'}
                         </Typography>
                     </Paper>
@@ -1069,7 +1069,7 @@ const Reports = () => {
                         Relatório consolidado de turno
                     </Typography>
                     <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                        Operador: <strong style={{ color: '#FFFFFF' }}>{selectedSessao?.operador_nome}</strong> ({selectedSessao?.nivel_acesso?.toUpperCase()})
+                        Operador: <strong style={{ color: cores.textoForte }}>{selectedSessao?.operador_nome}</strong> ({selectedSessao?.nivel_acesso?.toUpperCase()})
                     </Typography>
                 </DialogTitle>
                 <DialogContent sx={{ pt: 2.5 }}>
@@ -1080,15 +1080,15 @@ const Reports = () => {
                                 <Grid item xs={6} sm={3}>
                                     <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'rgba(0, 255, 136, 0.08)', border: '1px solid rgba(0, 255, 136, 0.2)', borderRadius: 1.5 }}>
                                         <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>Tempo online</Typography>
-                                        <Typography variant="h6" sx={{ color: '#00FF88', fontWeight: 700, fontFamily: '"Inter", sans-serif' }}>
+                                        <Typography variant="h6" sx={{ color: cores.sucesso, fontWeight: 700, fontFamily: '"Inter", sans-serif' }}>
                                             {selectedSessao.tempo_online_formatado}
                                         </Typography>
                                     </Paper>
                                 </Grid>
                                 <Grid item xs={6} sm={3}>
-                                    <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'rgba(0, 212, 255, 0.08)', border: '1px solid rgba(0, 212, 255, 0.2)', borderRadius: 1.5 }}>
+                                    <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: tom(cores.primaria, 0.08), border: '1px solid rgba(0, 212, 255, 0.2)', borderRadius: 1.5 }}>
                                         <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>Pessoas criadas</Typography>
-                                        <Typography variant="h6" sx={{ color: '#00D4FF', fontWeight: 700 }}>
+                                        <Typography variant="h6" sx={{ color: cores.primaria, fontWeight: 700 }}>
                                             {selectedSessao.pessoas_criadas || 0}
                                         </Typography>
                                     </Paper>
@@ -1096,7 +1096,7 @@ const Reports = () => {
                                 <Grid item xs={6} sm={3}>
                                     <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'rgba(168, 85, 247, 0.08)', border: '1px solid rgba(168, 85, 247, 0.2)', borderRadius: 1.5 }}>
                                         <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>Empresas criadas</Typography>
-                                        <Typography variant="h6" sx={{ color: '#A855F7', fontWeight: 700 }}>
+                                        <Typography variant="h6" sx={{ color: cores.secundariaClara, fontWeight: 700 }}>
                                             {selectedSessao.empresas_criadas || 0}
                                         </Typography>
                                     </Paper>
@@ -1104,7 +1104,7 @@ const Reports = () => {
                                 <Grid item xs={6} sm={3}>
                                     <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'rgba(255, 51, 102, 0.08)', border: '1px solid rgba(255, 51, 102, 0.2)', borderRadius: 1.5 }}>
                                         <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>Itens apagados</Typography>
-                                        <Typography variant="h6" sx={{ color: '#FF3366', fontWeight: 700 }}>
+                                        <Typography variant="h6" sx={{ color: cores.erro, fontWeight: 700 }}>
                                             {selectedSessao.itens_apagados || 0}
                                         </Typography>
                                     </Paper>
@@ -1116,13 +1116,13 @@ const Reports = () => {
                                 <Grid container spacing={2}>
                                     <Grid item xs={12} sm={6}>
                                         <Typography variant="caption" sx={{ color: 'text.secondary' }}>Horário de início (login):</Typography>
-                                        <Typography variant="body1" sx={{ color: '#00D4FF', fontWeight: 700, fontFamily: '"Inter", sans-serif' }}>
+                                        <Typography variant="body1" sx={{ color: cores.primaria, fontWeight: 700, fontFamily: '"Inter", sans-serif' }}>
                                             {selectedSessao.login_at ? format(new Date(selectedSessao.login_at), "dd/MM/yyyy HH:mm:ss", { locale: ptBR }) : '--'}
                                         </Typography>
                                     </Grid>
                                     <Grid item xs={12} sm={6}>
                                         <Typography variant="caption" sx={{ color: 'text.secondary' }}>Horário de encerramento (logout):</Typography>
-                                        <Typography variant="body1" sx={{ color: '#FFB800', fontWeight: 700, fontFamily: '"Inter", sans-serif' }}>
+                                        <Typography variant="body1" sx={{ color: cores.alerta, fontWeight: 700, fontFamily: '"Inter", sans-serif' }}>
                                             {selectedSessao.logout_at ? format(new Date(selectedSessao.logout_at), "dd/MM/yyyy HH:mm:ss", { locale: ptBR }) : '--'}
                                         </Typography>
                                     </Grid>

@@ -22,6 +22,7 @@ import PessoaFoto from '../common/PessoaFoto';
 import { formatLocalDateTime } from '../../utils/dateUtils';
 import api from '../../services/api';
 import useFecharComVoltar from '../../hooks/useFecharComVoltar';
+import { cores, tom } from '../../styles/tokens';
 
 const PessoaCardDialog = ({
   open,
@@ -29,7 +30,7 @@ const PessoaCardDialog = ({
   log,
   pessoa,
   pessoaProp,
-  accentColor = '#00D4FF'
+  accentColor = cores.primaria
 }) => {
   const [detalhesPessoa, setDetalhesPessoa] = useState(null);
   const [_loading, setLoading] = useState(false);
@@ -113,20 +114,20 @@ const PessoaCardDialog = ({
   const ainda = Boolean(sit?.pulseira_anterior?.ainda_dentro);
 
   let statusLabel = 'Cadastrado';
-  let statusColor = '#00D4FF';
+  let statusColor = cores.primaria;
   const definir = (rotulo, cor) => { statusLabel = rotulo; statusColor = cor; };
   if (sit) {
-    if (isBloqueado) definir('Bloqueado', '#FF3366');
-    else if (!sit.credenciado) definir(`Não credenciado${sit.motivo_nao_credenciado ? ` · ${sit.motivo_nao_credenciado}` : ''}`, '#FF3366');
-    else if (ainda) definir('Ainda dentro com pulseira de outro dia', '#FF3366');
-    else if (sit.dentro_do_evento) definir('Dentro do evento', '#00FF88');
-    else if (sit.ultimo_evento_hoje === 'checkout') definir('Fora do evento (saiu hoje)', '#FFB800');
-    else definir('Sem check-in hoje', '#FFB800');
-  } else if (isBloqueado) definir('Bloqueado', '#FF3366');
-  else if (isSaida) definir('Saída registrada', '#FF3366');
-  else if (isPresente) definir('Credenciado / No evento', '#00FF88');
-  else if (isPendente) definir('Aguardando Credenciamento', '#FFB800');
-  else definir('Autorizado', '#00FF88');
+    if (isBloqueado) definir('Bloqueado', cores.erro);
+    else if (!sit.credenciado) definir(`Não credenciado${sit.motivo_nao_credenciado ? ` · ${sit.motivo_nao_credenciado}` : ''}`, cores.erro);
+    else if (ainda) definir('Ainda dentro com pulseira de outro dia', cores.erro);
+    else if (sit.dentro_do_evento) definir('Dentro do evento', cores.sucesso);
+    else if (sit.ultimo_evento_hoje === 'checkout') definir('Fora do evento (saiu hoje)', cores.alerta);
+    else definir('Sem check-in hoje', cores.alerta);
+  } else if (isBloqueado) definir('Bloqueado', cores.erro);
+  else if (isSaida) definir('Saída registrada', cores.erro);
+  else if (isPresente) definir('Credenciado / No evento', cores.sucesso);
+  else if (isPendente) definir('Aguardando Credenciamento', cores.alerta);
+  else definir('Autorizado', cores.sucesso);
   const statusBg = `${statusColor}26`;
 
   const temRegistroAcesso = Boolean(log || pessoaDados.horario_checkin);
@@ -139,7 +140,7 @@ const PessoaCardDialog = ({
       fullWidth
       PaperProps={{
         sx: {
-          color: '#FFFFFF',
+          color: cores.textoForte,
           maxHeight: { sm: '90dvh' },
           overflowY: 'auto',
           '&::-webkit-scrollbar': { width: 6 },
@@ -157,7 +158,7 @@ const PessoaCardDialog = ({
             right: 16,
             color: 'rgba(255,255,255,0.7)',
             bgcolor: 'rgba(255,255,255,0.05)',
-            '&:hover': { bgcolor: 'rgba(255,255,255,0.15)', color: '#FFFFFF' }
+            '&:hover': { bgcolor: 'rgba(255,255,255,0.15)', color: cores.textoForte }
           }}
         >
           <CloseIcon fontSize="small" />
@@ -198,7 +199,7 @@ const PessoaCardDialog = ({
                     size="small"
                     sx={{
                       bgcolor: 'rgba(255,255,255,0.08)',
-                      color: '#FFFFFF',
+                      color: cores.textoForte,
                       border: '1px solid rgba(255,255,255,0.2)',
                       fontWeight: 700,
                       height: 26
@@ -215,7 +216,7 @@ const PessoaCardDialog = ({
               <Typography variant="overline" sx={{ color: accentColor, fontWeight: 700, letterSpacing: 1.5 }}>
                 Cadastro de participante
               </Typography>
-              <Typography variant="h4" fontWeight={700} color="#FFFFFF" sx={{ lineHeight: 1.15, mb: 1 }}>
+              <Typography variant="h4" fontWeight={700} color={cores.textoForte} sx={{ lineHeight: 1.15, mb: 1 }}>
                 {nome}
               </Typography>
 
@@ -223,26 +224,26 @@ const PessoaCardDialog = ({
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
                   <CpfIcon sx={{ color: accentColor, fontSize: 20 }} />
                   <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>CPF:</Typography>
-                  <Typography variant="body2" fontWeight={700} color="#FFFFFF">{cpf}</Typography>
+                  <Typography variant="body2" fontWeight={700} color={cores.textoForte}>{cpf}</Typography>
                 </Box>
 
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
                   <CompanyIcon sx={{ color: accentColor, fontSize: 20 }} />
                   <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>Empresa:</Typography>
-                  <Typography variant="body2" fontWeight={700} color="#FFFFFF">{empresa}</Typography>
+                  <Typography variant="body2" fontWeight={700} color={cores.textoForte}>{empresa}</Typography>
                 </Box>
 
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
                   <BadgeIcon sx={{ color: accentColor, fontSize: 20 }} />
                   <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>Função:</Typography>
-                  <Typography variant="body2" fontWeight={700} color="#FFFFFF">{funcao}</Typography>
+                  <Typography variant="body2" fontWeight={700} color={cores.textoForte}>{funcao}</Typography>
                 </Box>
 
                 {telefone && (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
                     <PhoneIcon sx={{ color: accentColor, fontSize: 20 }} />
                     <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>Telefone:</Typography>
-                    <Typography variant="body2" fontWeight={700} color="#FFFFFF">{telefone}</Typography>
+                    <Typography variant="body2" fontWeight={700} color={cores.textoForte}>{telefone}</Typography>
                   </Box>
                 )}
 
@@ -250,7 +251,7 @@ const PessoaCardDialog = ({
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
                     <EmailIcon sx={{ color: accentColor, fontSize: 20 }} />
                     <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>E-mail:</Typography>
-                    <Typography variant="body2" fontWeight={700} color="#FFFFFF">{email}</Typography>
+                    <Typography variant="body2" fontWeight={700} color={cores.textoForte}>{email}</Typography>
                   </Box>
                 )}
 
@@ -258,7 +259,7 @@ const PessoaCardDialog = ({
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
                     <EventIcon sx={{ color: accentColor, fontSize: 20 }} />
                     <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>Cadastrado em:</Typography>
-                    <Typography variant="body2" fontWeight={700} color="#FFFFFF">{dataCadastro}</Typography>
+                    <Typography variant="body2" fontWeight={700} color={cores.textoForte}>{dataCadastro}</Typography>
                   </Box>
                 )}
 
@@ -274,8 +275,8 @@ const PessoaCardDialog = ({
                           label={area.nome_area}
                           size="small"
                           sx={{
-                            bgcolor: 'rgba(0, 212, 255, 0.08)',
-                            color: '#00D4FF',
+                            bgcolor: tom(cores.primaria, 0.08),
+                            color: cores.primaria,
                             border: '1px solid rgba(0, 212, 255, 0.25)',
                             fontSize: '0.75rem',
                             height: 22
@@ -303,7 +304,7 @@ const PessoaCardDialog = ({
                       : 'nenhuma'}
                     </Typography>
                     {sit.pulseira_anterior && (
-                      <Typography variant="body2" sx={{ color: ainda ? '#FF3366' : '#FFB800', fontWeight: 700 }}>
+                      <Typography variant="body2" sx={{ color: ainda ? cores.erro : cores.alerta, fontWeight: 700 }}>
                         Pulseira de outro dia não devolvida: nº {sit.pulseira_anterior.numero}, check-in em {formatLocalDateTime(sit.pulseira_anterior.colocada_em)}
                         {ainda ? ' — ainda no evento: credenciamento para trocar a pulseira e fazer check-in novamente.' : ` — saiu em ${formatLocalDateTime(sit.pulseira_anterior.saiu_em)} (fim de turno).`}
                       </Typography>
@@ -340,10 +341,10 @@ const PessoaCardDialog = ({
 
                     <Grid item xs={6}>
                       <Stack direction="row" spacing={1} alignItems="center">
-                        {isCheckout ? <LogoutIcon sx={{ color: '#FF3366', fontSize: 16 }} /> : <LoginIcon sx={{ color: '#00FF88', fontSize: 16 }} />}
+                        {isCheckout ? <LogoutIcon sx={{ color: cores.erro, fontSize: 16 }} /> : <LoginIcon sx={{ color: cores.sucesso, fontSize: 16 }} />}
                         <Box>
                           <Typography variant="caption" color="text.secondary" display="block">Operação</Typography>
-                          <Typography variant="body2" fontWeight={700} color={isCheckout ? '#FF3366' : '#00FF88'}>
+                          <Typography variant="body2" fontWeight={700} color={isCheckout ? cores.erro : cores.sucesso}>
                             {isCheckout ? 'Saída (Checkout)' : 'Entrada (Check-in)'}
                           </Typography>
                         </Box>
@@ -386,7 +387,7 @@ const PessoaCardDialog = ({
                   sx={{
                     mt: 3,
                     p: 2,
-                    bgcolor: 'rgba(0, 212, 255, 0.03)',
+                    bgcolor: tom(cores.primaria, 0.03),
                     borderRadius: 1.5,
                     border: '1px dashed rgba(0, 212, 255, 0.2)',
                     display: 'flex',

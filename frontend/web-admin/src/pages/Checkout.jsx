@@ -256,7 +256,7 @@ const Checkout = () => {
                 />
                 {/* Busca por nome em andamento: barra fina com altura fixa (nada pula) */}
                 <Box sx={{ height: 3, mt: { xs: -0.75, sm: -1 } }} aria-live="polite">
-                    {searchLoading && <LinearProgress aria-label="Buscando" sx={{ height: 3, borderRadius: 2, bgcolor: tom(COR, 0.12), '& .MuiLinearProgress-bar': { bgcolor: COR } }} />}
+                    {searchLoading && <LinearProgress aria-label="Buscando" sx={{ height: 3, borderRadius: 1.5, bgcolor: tom(COR, 0.12), '& .MuiLinearProgress-bar': { bgcolor: COR } }} />}
                 </Box>
 
                 {searchResults.length > 0 && (

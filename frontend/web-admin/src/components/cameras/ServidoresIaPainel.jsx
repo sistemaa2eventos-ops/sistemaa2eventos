@@ -8,6 +8,7 @@ import { useSnackbar } from 'notistack';
 import api from '../../services/api';
 import GlassCard from '../common/GlassCard';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
+import { cores } from '../../styles/tokens';
 
 /**
  * Servidores de IA centrais (PCs com placa de vídeo fora da rede do evento). Só Admin Master.
@@ -119,7 +120,7 @@ const ServidoresIaPainel = () => {
                 {ativos.map((s) => (
                     <Stack key={s.id} direction="row" spacing={1.5} alignItems="center" useFlexGap flexWrap="wrap"
                         sx={{ p: 1.25, borderRadius: 1.5, border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <ServidorIcon sx={{ color: s.online ? '#00FF88' : 'rgba(255,255,255,0.4)' }} />
+                        <ServidorIcon sx={{ color: s.online ? cores.sucesso : 'rgba(255,255,255,0.4)' }} />
                         <Box sx={{ minWidth: 0, flex: 1 }}>
                             <Typography fontWeight={700} noWrap>{s.nome}</Typography>
                             <Typography variant="caption" color="text.secondary">

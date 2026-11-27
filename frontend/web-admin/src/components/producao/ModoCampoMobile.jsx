@@ -677,7 +677,7 @@ const ModoCampoMobile = ({
                                                     {t.percentual_concluido || 0}%
                                                 </Typography>
                                             </Box>
-                                            <LinearProgress variant="determinate" value={t.percentual_concluido || 0} sx={{ height: 8, borderRadius: 4 }} />
+                                            <LinearProgress variant="determinate" value={t.percentual_concluido || 0} sx={{ height: 8, borderRadius: 1.5 }} />
                                         </Box>
 
                                         {(t.status === 'disponivel' || t.status === 'reaberta') && (
@@ -991,7 +991,7 @@ const ModoCampoMobile = ({
                                         const pts = (s.poligono_coordenadas || []).map((p) => `${p.x},${p.y}`).join(' ');
                                         return (
                                             <g key={s.id}>
-                                                <polygon points={pts} fill={tom(s.cor_hex || '#00D4FF', 0.14)} stroke={s.cor_hex || '#00D4FF'} strokeWidth={2} />
+                                                <polygon points={pts} fill={tom(s.cor_hex || cores.primaria, 0.14)} stroke={s.cor_hex || cores.primaria} strokeWidth={2} />
                                             </g>
                                         );
                                     })}
@@ -1005,8 +1005,8 @@ const ModoCampoMobile = ({
                                                     width={el.largura}
                                                     height={el.altura}
                                                     rx={6}
-                                                    fill={tom(el.cor || '#00D4FF', sel ? 0.35 : 0.2)}
-                                                    stroke={sel ? cores.textoForte : (el.cor || '#00D4FF')}
+                                                    fill={tom(el.cor || cores.primaria, sel ? 0.35 : 0.2)}
+                                                    stroke={sel ? cores.textoForte : (el.cor || cores.primaria)}
                                                     strokeWidth={sel ? 3 : 1.5}
                                                 />
                                                 <text
@@ -1044,7 +1044,7 @@ const ModoCampoMobile = ({
                                 {tarefas.filter((t) => t.elemento_planta_id === elementoSelecionado.id || t.elemento_planta_rotulo === elementoSelecionado.rotulo).map((t) => {
                                     const faseInfo = obterInfoFase(t.fase_operacional);
                                     return (
-                                        <Box key={t.id} sx={{ p: 1, borderRadius: 1.25, bgcolor: cores.fundo, border: `1px solid ${cores.borda}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+                                        <Box key={t.id} sx={{ p: 1, borderRadius: 1, bgcolor: cores.fundo, border: `1px solid ${cores.borda}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
                                             <Box sx={{ minWidth: 0 }}>
                                                 <Typography sx={{ fontSize: tamanhos.xs, fontWeight: 700, color: faseInfo.cor }}>
                                                     {faseInfo.rotulo}
@@ -1267,7 +1267,7 @@ const ModoCampoMobile = ({
                             color: `${cores.primaria} !important`
                         },
                         '& .MuiBottomNavigationAction-label': {
-                            fontSize: '0.7rem',
+                            fontSize: '0.75rem',
                             fontWeight: 600
                         }
                     }}

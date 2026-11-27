@@ -1,3 +1,4 @@
+import { cores } from '../styles/tokens';
 /**
  * Desenho único das etiquetas e crachás.
  *
@@ -102,7 +103,7 @@ export function gerarBarcodeSvg(texto, exibirTexto = true, cor = '#000000') {
     const totalWidth = curX + 10;
     const totalHeight = exibirTexto ? 56 : 44;
     const textSvg = exibirTexto ? `<text x="${totalWidth / 2}" y="52" text-anchor="middle" font-family="monospace, sans-serif" font-size="11" font-weight="600">${escapar(clean)}</text>` : '';
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalWidth} ${totalHeight}" width="100%" height="100%" preserveAspectRatio="none" style="display:block"><rect width="100%" height="100%" fill="#FFFFFF" /><g fill="${cor}">${bars.join('')}${textSvg}</g></svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalWidth} ${totalHeight}" width="100%" height="100%" preserveAspectRatio="none" style="display:block"><rect width="100%" height="100%" fill={cores.textoForte} /><g fill="${cor}">${bars.join('')}${textSvg}</g></svg>`;
 }
 
 /** QR de mentira, mas com cara de QR (cantos de posição + módulos), só para o editor e testes. */
@@ -123,7 +124,7 @@ export function gerarQrExemploSvg(semente = 'A2-EVENTOS', cor = '#000000') {
     [[0, 0], [n - 7, 0], [0, n - 7]].forEach(([fx, fy]) => {
         d += `M${fx} ${fy}h7v7h-7zM${fx + 1} ${fy + 1}v5h5v-5zM${fx + 2} ${fy + 2}h3v3h-3z`;
     });
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 ${n + 2} ${n + 2}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" shape-rendering="crispEdges" style="display:block"><rect x="-1" y="-1" width="${n + 2}" height="${n + 2}" fill="#FFFFFF"/><path fill="${cor}" fill-rule="evenodd" d="${d}"/></svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 ${n + 2} ${n + 2}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" shape-rendering="crispEdges" style="display:block"><rect x="-1" y="-1" width="${n + 2}" height="${n + 2}" fill={cores.textoForte}/><path fill="${cor}" fill-rule="evenodd" d="${d}"/></svg>`;
 }
 
 const SILHUETA = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" style="display:block"><rect width="24" height="24" fill="#E6EAF0"/><path fill="#A3ADBB" d="M12 12.6c2.35 0 4.25-1.9 4.25-4.25S14.35 4.1 12 4.1 7.75 6 7.75 8.35 9.65 12.6 12 12.6zm0 2.1c-2.84 0-8.5 1.42-8.5 4.25V24h17v-5.05c0-2.83-5.66-4.25-8.5-4.25z"/></svg>';
@@ -165,7 +166,7 @@ const tracejado = (estilo, sw) => {
 export function svgForma(el, w, h) {
     const sw = Math.max(0, Number(el.borderWidth ?? (el.borderColor ? 1 : 0)) || 0);
     const traco = sw > 0 ? (el.borderColor || '#000000') : 'none';
-    const fill = semPreenchimento(el) ? 'none' : (el.backgroundColor ?? '#00D4FF');
+    const fill = semPreenchimento(el) ? 'none' : (el.backgroundColor ?? cores.primaria);
     const attrs = `fill="${fill}" stroke="${traco}" stroke-width="${sw}"${tracejado(el.strokeStyle, sw)}`;
     const i = sw / 2;
     const W = Math.max(0.1, w - sw);
@@ -318,7 +319,7 @@ export function elementosHtml(layout, dados, u, { incluirReferencia = false } = 
 export function estiloFundoPapel(papel = {}) {
     const ehReferencia = Boolean(papel.fundo_como_referencia || papel.modo_referencia || papel.imprimir_fundo === false);
     const url = !ehReferencia ? (papel.background_url || papel.bg_url || null) : null;
-    const cor = papel.corFundo || '#FFFFFF';
+    const cor = papel.corFundo || cores.textoForte;
     return url
         ? `background-color:${cor};background-image:url('${String(url).replace(/'/g, '%27')}');background-size:cover;background-position:center;background-repeat:no-repeat;`
         : `background-color:${cor};`;

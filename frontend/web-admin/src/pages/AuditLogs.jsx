@@ -24,19 +24,20 @@ import { format } from 'date-fns';
 import GlassCard from '../components/common/GlassCard';
 import PageHeader from '../components/common/PageHeader';
 import { styled } from '@mui/material/styles';
+import { cores, tom } from '../styles/tokens';
 
 const StyledDataGrid = styled(DataGrid)(() => ({
     border: 'none',
-    color: '#CBD5E1',
+    color: cores.textoSuave,
     '& .MuiDataGrid-columnHeaders': {
-        background: 'rgba(0, 212, 255, 0.05)',
+        background: tom(cores.primaria, 0.05),
         borderBottom: '1px solid rgba(0, 212, 255, 0.2)',
         fontWeight: 700,
     },
     '& .MuiDataGrid-row': {
         borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
         '&:hover': {
-            background: 'rgba(0, 212, 255, 0.03)',
+            background: tom(cores.primaria, 0.03),
         },
     },
     '& .MuiDataGrid-cell': {
@@ -61,11 +62,11 @@ const AuditLogs = ({ embutido = false }) => {
     } = useAudit();
 
     const getActionColor = (acao) => {
-        if (acao.includes('DELETE')) return '#FF3366';
-        if (acao.includes('RESET') || acao.includes('BLOCK')) return '#FFB800';
-        if (acao.includes('CREATE') || acao.includes('SYNC')) return '#00D4FF';
-        if (acao.includes('APPROVE') || acao.includes('AUDIT')) return '#00FF88';
-        return '#CBD5E1';
+        if (acao.includes('DELETE')) return cores.erro;
+        if (acao.includes('RESET') || acao.includes('BLOCK')) return cores.alerta;
+        if (acao.includes('CREATE') || acao.includes('SYNC')) return cores.primaria;
+        if (acao.includes('APPROVE') || acao.includes('AUDIT')) return cores.sucesso;
+        return cores.textoSuave;
     };
 
     const columns = [
@@ -75,7 +76,7 @@ const AuditLogs = ({ embutido = false }) => {
             width: 165,
             minWidth: 150,
             renderCell: (params) => (
-                <Typography variant="body2" sx={{ fontWeight: 600, color: '#00D4FF', fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem' }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: cores.primaria, fontFamily: '"Inter", sans-serif', fontSize: '0.8125rem' }}>
                     {format(new Date(params.value), 'dd/MM/yy HH:mm:ss')}
                 </Typography>
             )
@@ -158,7 +159,7 @@ const AuditLogs = ({ embutido = false }) => {
                 <PageHeader
                     title="Logs de auditoria"
                     subtitle="Trilha de transparência operacional e histórico de ações administrativas."
-                    icon={<HistoryIcon sx={{ color: '#00D4FF', fontSize: 32 }} />}
+                    icon={<HistoryIcon sx={{ color: cores.primaria, fontSize: 32 }} />}
                     sx={{ mb: 0 }}
                 />
                 <Chip
@@ -167,7 +168,7 @@ const AuditLogs = ({ embutido = false }) => {
                     sx={{
                         background: 'rgba(0, 255, 136, 0.1)',
                         border: '1px solid rgba(0, 255, 136, 0.3)',
-                        color: '#00FF88',
+                        color: cores.sucesso,
                         fontWeight: 700,
                         fontSize: '0.75rem',
                         height: 32
@@ -250,11 +251,11 @@ const AuditLogs = ({ embutido = false }) => {
                             <GridToolbarContainer sx={{ p: 1.5, justifyContent: 'flex-end' }}>
                                 <GridToolbarExport
                                     sx={{
-                                        color: '#00D4FF',
+                                        color: cores.primaria,
                                         fontWeight: 700,
                                         border: '1px solid rgba(0, 212, 255, 0.3)',
                                         px: 2,
-                                        '&:hover': { background: 'rgba(0, 212, 255, 0.1)' }
+                                        '&:hover': { background: tom(cores.primaria, 0.1) }
                                     }}
                                 />
                             </GridToolbarContainer>

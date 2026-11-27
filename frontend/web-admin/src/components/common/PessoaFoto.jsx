@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography } from '@mui/material';
 import useFotoPessoa from '../../hooks/useFotoPessoa';
+import { cores } from '../../styles/tokens';
 
 /**
  * PessoaFoto: Componente padrão profissional para exibição de fotos de pessoas.
@@ -16,7 +17,7 @@ const PessoaFoto = ({
   height,
   aspectRatio = '3 / 4',
   borderRadius = '12px',
-  accentColor = '#00D4FF',
+  accentColor = cores.primaria,
   borderWidth = '2px',
   boxShadow,
   onClick,
@@ -55,7 +56,7 @@ const PessoaFoto = ({
         bgcolor: 'rgba(15, 23, 42, 0.85)',
         overflow: 'hidden',
         cursor: onClick ? 'pointer' : 'default',
-        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+        transition: 'background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1), color 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
         '&:hover': onClick ? {
           transform: 'translateY(-2px) scale(1.02)',
           borderColor: accentColor,
@@ -91,7 +92,7 @@ const PessoaFoto = ({
             alignItems: 'center',
             justifyContent: 'center',
             background: `linear-gradient(145deg, rgba(255,255,255,0.06) 0%, ${accentColor}18 100%)`,
-            color: '#FFFFFF',
+            color: cores.textoForte,
             userSelect: 'none'
           }}
         >
@@ -99,7 +100,7 @@ const PessoaFoto = ({
             sx={{
               fontWeight: 700,
               fontSize: typeof width === 'number' ? `${Math.max(16, Math.round(width * 0.42))}px` : '1.5rem',
-              color: '#FFFFFF',
+              color: cores.textoForte,
               textShadow: `0 0 10px ${accentColor}80`
             }}
           >

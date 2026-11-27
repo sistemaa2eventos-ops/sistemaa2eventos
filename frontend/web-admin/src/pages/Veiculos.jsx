@@ -52,7 +52,7 @@ import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-import { botaoSecundario, acaoTabela, acaoTabelaPerigo } from '../styles/tokens';
+import { botaoSecundario, acaoTabela, acaoTabelaPerigo, cores, tom } from '../styles/tokens';
 import { comoRotulo } from '../utils/formatadores';
 const Veiculos = () => {
     const { enqueueSnackbar } = useSnackbar();
@@ -131,7 +131,7 @@ const Veiculos = () => {
             minWidth: 120,
             format: (val) => (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <CarIcon sx={{ color: '#00D4FF', fontSize: 18 }} />
+                    <CarIcon sx={{ color: cores.primaria, fontSize: 18 }} />
                     <Typography variant="body2" sx={{ fontWeight: 700, letterSpacing: '1px' }}>{val}</Typography>
                 </Box>
             )
@@ -183,7 +183,7 @@ const Veiculos = () => {
                                 width: 34, 
                                 height: 34, 
                                 border: '1.5px solid rgba(0, 212, 255, 0.4)',
-                                background: 'rgba(0, 212, 255, 0.1)',
+                                background: tom(cores.primaria, 0.1),
                                 fontSize: '0.875rem',
                                 fontWeight: 700
                             }}
@@ -191,7 +191,7 @@ const Veiculos = () => {
                             {nome[0]}
                         </AvatarPessoa>
                         <Box sx={{ minWidth: 0 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }} noWrap>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: cores.textoForte }} noWrap>
                                 {nome}
                             </Typography>
                             <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }} noWrap>
@@ -262,7 +262,7 @@ const Veiculos = () => {
                     <IconButton
                         size="small"
                         onClick={() => handleDelete(row.id)}
-                        sx={{ color: '#FF3366', background: 'rgba(255,51,102,0.05)' }}
+                        sx={{ color: cores.erro, background: 'rgba(255,51,102,0.05)' }}
                     >
                         <DeleteIcon fontSize="small" />
                     </IconButton>
@@ -796,7 +796,7 @@ const Veiculos = () => {
                             <IconButton 
                                 size="small" 
                                 onClick={() => setResultadoConsulta(null)}
-                                sx={{ color: 'text.secondary', '&:hover': { color: '#FF3366', background: 'rgba(255,51,102,0.1)' } }}
+                                sx={{ color: 'text.secondary', '&:hover': { color: cores.erro, background: 'rgba(255,51,102,0.1)' } }}
                             >
                                 <CancelIcon fontSize="small" />
                             </IconButton>
@@ -814,12 +814,12 @@ const Veiculos = () => {
                                 alignItems: 'center',
                                 gap: 1.5
                             }}>
-                                <BlockIcon sx={{ color: '#FF3366', fontSize: 26, flexShrink: 0 }} />
+                                <BlockIcon sx={{ color: cores.erro, fontSize: 26, flexShrink: 0 }} />
                                 <Box sx={{ flexGrow: 1 }}>
-                                    <Typography variant="caption" sx={{ color: '#FF3366', fontWeight: 700, letterSpacing: '1px', display: 'block' }}>
+                                    <Typography variant="caption" sx={{ color: cores.erro, fontWeight: 700, letterSpacing: '1px', display: 'block' }}>
                                         Justificativa do bloqueio:
                                     </Typography>
-                                    <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600, mt: 0.3 }}>
+                                    <Typography variant="body2" sx={{ color: cores.textoForte, fontWeight: 600, mt: 0.3 }}>
                                         {resultadoConsulta.veiculo.motivo_bloqueio || resultadoConsulta.justificativa || 'Veículo com restrição cadastrada.'}
                                     </Typography>
                                     {resultadoConsulta.veiculo.bloqueado_em && (
@@ -847,31 +847,31 @@ const Veiculos = () => {
                                                 borderRadius: '12px',
                                                 border: resultadoConsulta.autorizado ? '2px solid #00FF88' : '2px solid #FF3366',
                                                 boxShadow: resultadoConsulta.autorizado ? '0 0 15px rgba(0,230,118,0.25)' : '0 0 15px rgba(255,51,102,0.25)',
-                                                bgcolor: 'rgba(0, 212, 255, 0.1)'
+                                                bgcolor: tom(cores.primaria, 0.1)
                                             }}
                                         >
-                                            <PersonIcon sx={{ fontSize: 48, color: '#00D4FF' }} />
+                                            <PersonIcon sx={{ fontSize: 48, color: cores.primaria }} />
                                         </AvatarPessoa>
                                     </Box>
-                                    <Typography variant="caption" sx={{ mt: 0.8, fontSize: '0.75rem', fontWeight: 700, color: '#00D4FF', letterSpacing: '1px' }}>
+                                    <Typography variant="caption" sx={{ mt: 0.8, fontSize: '0.75rem', fontWeight: 700, color: cores.primaria, letterSpacing: '1px' }}>
                                         Foto do motorista
                                     </Typography>
                                 </Grid>
 
                                 {/* Dados do Motorista */}
                                 <Grid item xs={12} sm={3.5}>
-                                    <Typography variant="caption" sx={{ color: 'rgba(0, 212, 255, 0.8)', fontWeight: 700, letterSpacing: '1px', display: 'block', mb: 0.5 }}>
+                                    <Typography variant="caption" sx={{ color: tom(cores.primaria, 0.8), fontWeight: 700, letterSpacing: '1px', display: 'block', mb: 0.5 }}>
                                         Motorista vinculado
                                     </Typography>
                                     {resultadoConsulta.veiculo.pessoas ? (
                                         <Box>
-                                            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#FFFFFF', lineHeight: 1.2 }}>
+                                            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: cores.textoForte, lineHeight: 1.2 }}>
                                                 {resultadoConsulta.veiculo.pessoas.nome_completo || resultadoConsulta.veiculo.pessoas.nome}
                                             </Typography>
                                             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mt: 0.4 }}>
-                                                CPF: <b style={{ color: '#FFFFFF' }}>{resultadoConsulta.veiculo.pessoas.cpf || 'Não informado'}</b>
+                                                CPF: <b style={{ color: cores.textoForte }}>{resultadoConsulta.veiculo.pessoas.cpf || 'Não informado'}</b>
                                             </Typography>
-                                            <Typography variant="caption" sx={{ color: 'rgba(0,212,255,0.85)', display: 'block', mt: 0.2 }}>
+                                            <Typography variant="caption" sx={{ color: tom(cores.primaria, 0.85), display: 'block', mt: 0.2 }}>
                                                 Função: {resultadoConsulta.veiculo.pessoas.funcao || 'Motorista / Credenciado'}
                                             </Typography>
                                             {resultadoConsulta.veiculo.pessoas.telefone && (
@@ -881,14 +881,14 @@ const Veiculos = () => {
                                             )}
                                         </Box>
                                     ) : (
-                                        <Box sx={{ p: 1, borderRadius: '6px', background: 'rgba(255,171,64,0.08)', border: '1px dashed rgba(255,171,64,0.3)' }}>
-                                            <Typography variant="body2" sx={{ color: '#FFB800', fontSize: '0.875rem' }}>
+                                        <Box sx={{ p: 1, borderRadius: '8px', background: 'rgba(255,171,64,0.08)', border: '1px dashed rgba(255,171,64,0.3)' }}>
+                                            <Typography variant="body2" sx={{ color: cores.alerta, fontSize: '0.875rem' }}>
                                                 Nenhum motorista vinculado a este veículo.
                                             </Typography>
                                             <Button 
                                                 size="small" 
                                                 onClick={() => handleOpenDialog(resultadoConsulta.veiculo)} 
-                                                sx={{ mt: 0.5, p: 0, minHeight: 0, color: '#00D4FF', textTransform: 'none', fontSize: '0.75rem' }}
+                                                sx={{ mt: 0.5, p: 0, minHeight: 0, color: cores.primaria, textTransform: 'none', fontSize: '0.75rem' }}
                                             >
                                                 + Vincular motorista agora
                                             </Button>
@@ -898,7 +898,7 @@ const Veiculos = () => {
 
                                 {/* Dados do Veículo & Placa ANPR */}
                                 <Grid item xs={12} sm={3}>
-                                    <Typography variant="caption" sx={{ color: 'rgba(0, 212, 255, 0.8)', fontWeight: 700, letterSpacing: '1px', display: 'block', mb: 0.5 }}>
+                                    <Typography variant="caption" sx={{ color: tom(cores.primaria, 0.8), fontWeight: 700, letterSpacing: '1px', display: 'block', mb: 0.5 }}>
                                         Dados do veículo
                                     </Typography>
                                     
@@ -907,16 +907,16 @@ const Veiculos = () => {
                                         display: 'inline-flex',
                                         flexDirection: 'column',
                                         border: '2px solid #00D4FF',
-                                        borderRadius: '6px',
+                                        borderRadius: '8px',
                                         overflow: 'hidden',
-                                        background: '#FFFFFF',
+                                        background: cores.textoForte,
                                         minWidth: 120,
                                         boxShadow: '0 0 10px rgba(0,212,255,0.25)',
                                         mb: 0.8
                                     }}>
                                         <Box sx={{ background: '#0099BB', px: 1, py: 0.2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <Typography sx={{ color: '#FFFFFF', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '1px' }}>Brasil</Typography>
-                                            <Box sx={{ width: 6, height: 4, bgcolor: '#00FF88', borderRadius: '1px' }} />
+                                            <Typography sx={{ color: cores.textoForte, fontSize: '0.75rem', fontWeight: 700, letterSpacing: '1px' }}>Brasil</Typography>
+                                            <Box sx={{ width: 6, height: 4, bgcolor: cores.sucesso, borderRadius: '1px' }} />
                                         </Box>
                                         <Typography sx={{
                                             fontFamily: '"Space Grotesk", sans-serif',
@@ -932,17 +932,17 @@ const Veiculos = () => {
                                         </Typography>
                                     </Box>
 
-                                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 600, color: cores.textoForte }}>
                                         {resultadoConsulta.veiculo.marca} {resultadoConsulta.veiculo.modelo}
                                     </Typography>
                                     <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-                                        Empresa: <span style={{ color: '#FFFFFF' }}>{resultadoConsulta.veiculo.empresas?.nome || 'Não informada'}</span>
+                                        Empresa: <span style={{ color: cores.textoForte }}>{resultadoConsulta.veiculo.empresas?.nome || 'Não informada'}</span>
                                     </Typography>
                                 </Grid>
 
                                 {/* Operações do Veículo Consultados (Botões Compactos e Harmônicos) */}
                                 <Grid item xs={12} sm={3.5}>
-                                    <Typography variant="caption" sx={{ color: 'rgba(0, 212, 255, 0.8)', fontWeight: 700, letterSpacing: '1px', display: 'block', mb: 0.8 }}>
+                                    <Typography variant="caption" sx={{ color: tom(cores.primaria, 0.8), fontWeight: 700, letterSpacing: '1px', display: 'block', mb: 0.8 }}>
                                         Ações rápidas
                                     </Typography>
                                     <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 0.8 }}>
@@ -955,14 +955,14 @@ const Veiculos = () => {
                                             sx={{
                                                 height: 32,
                                                 minHeight: 32,
-                                                borderRadius: '6px',
-                                                background: resultadoConsulta.autorizado ? 'linear-gradient(45deg, #00FF88, #00FF88)' : '#0F1E37',
+                                                borderRadius: '8px',
+                                                background: resultadoConsulta.autorizado ? 'linear-gradient(45deg, #00FF88, #00FF88)' : cores.superficieElevada,
                                                 color: '#000000',
                                                 fontWeight: 700,
                                                 fontSize: '0.75rem',
                                                 p: '4px 6px',
                                                 whiteSpace: 'nowrap',
-                                                '&:hover': { background: '#00FF88' }
+                                                '&:hover': { background: cores.sucesso }
                                             }}
                                         >
                                             Passagem
@@ -977,14 +977,14 @@ const Veiculos = () => {
                                             sx={{
                                                 height: 32,
                                                 minHeight: 32,
-                                                borderRadius: '6px',
+                                                borderRadius: '8px',
                                                 background: 'linear-gradient(45deg, #00D4FF, #00D4FF)',
                                                 color: '#000000',
                                                 fontWeight: 700,
                                                 fontSize: '0.75rem',
                                                 p: '4px 6px',
                                                 whiteSpace: 'nowrap',
-                                                '&:hover': { background: '#00D4FF' }
+                                                '&:hover': { background: cores.primaria }
                                             }}
                                         >
                                             Foto / vistoria
@@ -1000,14 +1000,14 @@ const Veiculos = () => {
                                                 sx={{
                                                     height: 32,
                                                     minHeight: 32,
-                                                    borderRadius: '6px',
+                                                    borderRadius: '8px',
                                                     borderColor: 'rgba(255, 51, 102, 0.5)',
-                                                    color: '#FF3366',
+                                                    color: cores.erro,
                                                     fontWeight: 700,
                                                     fontSize: '0.75rem',
                                                     p: '4px 6px',
                                                     whiteSpace: 'nowrap',
-                                                    '&:hover': { borderColor: '#FF3366', background: 'rgba(255, 51, 102, 0.1)' }
+                                                    '&:hover': { borderColor: cores.erro, background: 'rgba(255, 51, 102, 0.1)' }
                                                 }}
                                             >
                                                 Bloquear
@@ -1021,14 +1021,14 @@ const Veiculos = () => {
                                                 sx={{
                                                     height: 32,
                                                     minHeight: 32,
-                                                    borderRadius: '6px',
+                                                    borderRadius: '8px',
                                                     borderColor: 'rgba(0, 230, 118, 0.5)',
-                                                    color: '#00FF88',
+                                                    color: cores.sucesso,
                                                     fontWeight: 700,
                                                     fontSize: '0.75rem',
                                                     p: '4px 6px',
                                                     whiteSpace: 'nowrap',
-                                                    '&:hover': { borderColor: '#00FF88', background: 'rgba(0, 230, 118, 0.1)' }
+                                                    '&:hover': { borderColor: cores.sucesso, background: 'rgba(0, 230, 118, 0.1)' }
                                                 }}
                                             >
                                                 Liberar
@@ -1044,14 +1044,14 @@ const Veiculos = () => {
                                             sx={{
                                                 height: 32,
                                                 minHeight: 32,
-                                                borderRadius: '6px',
-                                                borderColor: 'rgba(0, 212, 255, 0.4)',
-                                                color: '#00D4FF',
+                                                borderRadius: '8px',
+                                                borderColor: tom(cores.primaria, 0.4),
+                                                color: cores.primaria,
                                                 fontSize: '0.75rem',
                                                 fontWeight: 700,
                                                 p: '4px 6px',
                                                 whiteSpace: 'nowrap',
-                                                '&:hover': { borderColor: '#00D4FF', background: 'rgba(0,212,255,0.05)' }
+                                                '&:hover': { borderColor: cores.primaria, background: tom(cores.primaria, 0.05) }
                                             }}
                                         >
                                             Histórico
@@ -1066,14 +1066,14 @@ const Veiculos = () => {
                                             sx={{
                                                 height: 32,
                                                 minHeight: 32,
-                                                borderRadius: '6px',
+                                                borderRadius: '8px',
                                                 borderColor: 'rgba(255, 171, 64, 0.4)',
-                                                color: '#FFB800',
+                                                color: cores.alerta,
                                                 fontSize: '0.75rem',
                                                 fontWeight: 700,
                                                 p: '4px 6px',
                                                 whiteSpace: 'nowrap',
-                                                '&:hover': { borderColor: '#FFB800', background: 'rgba(255, 171, 64, 0.05)' }
+                                                '&:hover': { borderColor: cores.alerta, background: 'rgba(255, 171, 64, 0.05)' }
                                             }}
                                         >
                                             Editar
@@ -1088,14 +1088,14 @@ const Veiculos = () => {
                                             sx={{
                                                 height: 32,
                                                 minHeight: 32,
-                                                borderRadius: '6px',
+                                                borderRadius: '8px',
                                                 borderColor: 'rgba(255, 51, 102, 0.3)',
                                                 color: 'rgba(255, 51, 102, 0.8)',
                                                 fontSize: '0.75rem',
                                                 fontWeight: 700,
                                                 p: '4px 6px',
                                                 whiteSpace: 'nowrap',
-                                                '&:hover': { borderColor: '#FF3366', color: '#FF3366', background: 'rgba(255,51,102,0.08)' }
+                                                '&:hover': { borderColor: cores.erro, color: cores.erro, background: 'rgba(255,51,102,0.08)' }
                                             }}
                                         >
                                             Excluir
@@ -1107,11 +1107,11 @@ const Veiculos = () => {
                             /* Veículo Não Encontrado */
                             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center" justifyContent="space-between">
                                 <Stack direction="row" spacing={2} alignItems="center">
-                                    <Avatar sx={{ bgcolor: 'rgba(255,171,64,0.15)', color: '#FFB800', width: 48, height: 48 }}>
+                                    <Avatar sx={{ bgcolor: 'rgba(255,171,64,0.15)', color: cores.alerta, width: 48, height: 48 }}>
                                         <CarIcon sx={{ fontSize: 28 }} />
                                     </Avatar>
                                     <Box>
-                                        <Typography variant="subtitle1" sx={{ color: '#FFB800', fontWeight: 700 }}>
+                                        <Typography variant="subtitle1" sx={{ color: cores.alerta, fontWeight: 700 }}>
                                             PLACA NÃO CADASTRADA: {resultadoConsulta.placa || consultaPlaca}
                                         </Typography>
                                         <Typography variant="body2" sx={{ color: 'text.secondary' }}>
@@ -1141,7 +1141,7 @@ const Veiculos = () => {
                 )}
             </GlassCard>
 
-            <GlassCard glowColor="#00D4FF" sx={{ p: 0 }}>
+            <GlassCard glowColor={cores.primaria} sx={{ p: 0 }}>
                 <Box sx={{ p: { xs: 2, md: 3 }, pb: 2 }}>
                     <TextField
                         fullWidth
@@ -1155,7 +1155,7 @@ const Veiculos = () => {
                         InputProps={{
                             startAdornment: (
                                 <InputAdornment position="start">
-                                    <SearchIcon sx={{ color: '#00D4FF', fontSize: 20 }} />
+                                    <SearchIcon sx={{ color: cores.primaria, fontSize: 20 }} />
                                 </InputAdornment>
                             ),
                         }}
@@ -1176,7 +1176,7 @@ const Veiculos = () => {
                         setPage(0);
                     }}
                     sx={{
-                        '& .MuiTableHead-root': { background: 'rgba(0,212,255,0.05)' },
+                        '& .MuiTableHead-root': { background: tom(cores.primaria, 0.05) },
                         borderTop: '1px solid rgba(255,255,255,0.05)'
                     }}
                 />
@@ -1258,12 +1258,12 @@ const Veiculos = () => {
                                         <AvatarPessoa
                                             src={option.foto_url}
                                             pessoaId={option.id}
-                                            sx={{ width: 34, height: 34, border: '1px solid rgba(0, 212, 255, 0.4)', bgcolor: 'rgba(0, 212, 255, 0.1)' }}
+                                            sx={{ width: 34, height: 34, border: '1px solid rgba(0, 212, 255, 0.4)', bgcolor: tom(cores.primaria, 0.1) }}
                                         >
-                                            <PersonIcon sx={{ fontSize: 18, color: '#00D4FF' }} />
+                                            <PersonIcon sx={{ fontSize: 18, color: cores.primaria }} />
                                         </AvatarPessoa>
                                         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }} noWrap>
+                                            <Typography variant="body2" sx={{ fontWeight: 600, color: cores.textoForte }} noWrap>
                                                 {option.nome_completo || option.nome}
                                             </Typography>
                                             <Typography variant="caption" sx={{ color: 'text.secondary' }} noWrap display="block">
@@ -1413,7 +1413,7 @@ const Veiculos = () => {
                                                             }}
                                                         />
                                                     )}
-                                                    <Typography variant="caption" sx={{ color: '#FFFFFF' }}>
+                                                    <Typography variant="caption" sx={{ color: cores.textoForte }}>
                                                         {parsed.texto || (parsed.foto_url ? 'Foto de vistoria' : '—')}
                                                     </Typography>
                                                 </Stack>
@@ -1443,13 +1443,13 @@ const Veiculos = () => {
                     }
                 }}
             >
-                <DialogTitle sx={{ color: '#FF3366', fontWeight: 700 }}>Confirmar exclusão</DialogTitle>
+                <DialogTitle sx={{ color: cores.erro, fontWeight: 700 }}>Confirmar exclusão</DialogTitle>
                 <DialogContent>
                     A remoção desta placa impedirá o reconhecimento automático e invalidará o cadastro de trânsito vinculado.
                 </DialogContent>
                 <DialogActions sx={{ p: 2.5, gap: 1 }}>
                     <Button variant="outlined" onClick={() => setOpenDeleteConfirm(false)} sx={botaoSecundario}>Cancelar</Button>
-                    <Button onClick={confirmDelete} sx={{ color: '#FF3366', fontWeight: 'bold', height: 38, minHeight: 38, borderRadius: '8px' }} variant="outlined">Excluir definitivamente</Button>
+                    <Button onClick={confirmDelete} sx={{ color: cores.erro, fontWeight: 'bold', height: 38, minHeight: 38, borderRadius: '8px' }} variant="outlined">Excluir definitivamente</Button>
                 </DialogActions>
             </Dialog>
 
@@ -1467,8 +1467,8 @@ const Veiculos = () => {
                     }
                 }}
             >
-                <DialogTitle sx={{ color: '#FF3366', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <BlockIcon sx={{ color: '#FF3366' }} />
+                <DialogTitle sx={{ color: cores.erro, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <BlockIcon sx={{ color: cores.erro }} />
                     BLOQUEAR ACESSO — {veiculoParaBloquear?.placa}
                 </DialogTitle>
                 <DialogContent>
@@ -1499,9 +1499,9 @@ const Veiculos = () => {
                             height: 38,
                             borderRadius: '8px',
                             background: 'linear-gradient(45deg, #FF3366, #FF3366)',
-                            color: '#FFFFFF',
+                            color: cores.textoForte,
                             fontWeight: 700,
-                            '&:hover': { background: '#FF3366' }
+                            '&:hover': { background: cores.erro }
                         }}
                     >
                         {saving ? <CircularProgress size={20} color="inherit" /> : 'Confirmar bloqueio'}
@@ -1548,7 +1548,7 @@ const Veiculos = () => {
                                     size="small"
                                     variant="contained"
                                     onClick={() => { setFotoCaptured(null); startCamera(); }}
-                                    sx={{ position: 'absolute', bottom: 10, right: 10, height: 30, fontSize: '0.75rem', background: 'rgba(0,0,0,0.7)', borderRadius: '6px' }}
+                                    sx={{ position: 'absolute', bottom: 10, right: 10, height: 30, fontSize: '0.75rem', background: 'rgba(0,0,0,0.7)', borderRadius: '8px' }}
                                 >
                                     Tirar outra foto
                                 </Button>
@@ -1562,7 +1562,7 @@ const Veiculos = () => {
                                         size="small"
                                         onClick={capturePhoto}
                                         startIcon={<PhotoCameraIcon />}
-                                        sx={{ height: 34, background: '#00FF88', color: '#000000', fontWeight: 700, borderRadius: '6px' }}
+                                        sx={{ height: 34, background: cores.sucesso, color: '#000000', fontWeight: 700, borderRadius: '8px' }}
                                     >
                                         Capturar
                                     </Button>
@@ -1570,7 +1570,7 @@ const Veiculos = () => {
                                         variant="outlined"
                                         size="small"
                                         onClick={stopCamera}
-                                        sx={{ height: 34, color: '#FFFFFF', borderColor: '#FFFFFF', borderRadius: '6px' }}
+                                        sx={{ height: 34, color: cores.textoForte, borderColor: cores.textoForte, borderRadius: '8px' }}
                                     >
                                         Fechar câmera
                                     </Button>
@@ -1578,7 +1578,7 @@ const Veiculos = () => {
                             </>
                         ) : (
                             <Stack spacing={1.5} alignItems="center">
-                                <CameraIcon sx={{ fontSize: 44, color: '#00D4FF', opacity: 0.7 }} />
+                                <CameraIcon sx={{ fontSize: 44, color: cores.primaria, opacity: 0.7 }} />
                                 <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center' }}>
                                     Tire uma foto ao vivo no portão ou anexe da galeria
                                 </Typography>
@@ -1588,7 +1588,7 @@ const Veiculos = () => {
                                         size="small"
                                         startIcon={<PhotoCameraIcon />}
                                         onClick={startCamera}
-                                        sx={{ height: 34, borderRadius: '6px', background: 'linear-gradient(45deg, #00D4FF, #00D4FF)', color: '#000000', fontWeight: 700 }}
+                                        sx={{ height: 34, borderRadius: '8px', background: 'linear-gradient(45deg, #00D4FF, #00D4FF)', color: '#000000', fontWeight: 700 }}
                                     >
                                         Abrir câmera
                                     </Button>
@@ -1596,7 +1596,7 @@ const Veiculos = () => {
                                         variant="outlined"
                                         size="small"
                                         component="label"
-                                        sx={{ height: 34, borderRadius: '6px', borderColor: 'rgba(0,212,255,0.4)', color: '#00D4FF' }}
+                                        sx={{ height: 34, borderRadius: '8px', borderColor: tom(cores.primaria, 0.4), color: cores.primaria }}
                                     >
                                         Anexar arquivo
                                         <input type="file" accept="image/*" hidden onChange={handleFileUpload} />
@@ -1609,7 +1609,7 @@ const Veiculos = () => {
                     {/* Campo de Texto com Transcrição por Áudio */}
                     <Box>
                         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.8 }}>
-                            <Typography variant="caption" sx={{ color: 'rgba(0, 212, 255, 0.8)', fontWeight: 700, letterSpacing: '1px', }}>
+                            <Typography variant="caption" sx={{ color: tom(cores.primaria, 0.8), fontWeight: 700, letterSpacing: '1px', }}>
                                 Observação / Descrição da Vistoria
                             </Typography>
                             
@@ -1627,8 +1627,8 @@ const Veiculos = () => {
                                     fontWeight: 700,
                                     borderRadius: '14px',
                                     px: 1.5,
-                                    borderColor: isRecording ? '#FF3366' : '#00D4FF',
-                                    color: isRecording ? '#FFFFFF' : '#00D4FF',
+                                    borderColor: isRecording ? cores.erro : cores.primaria,
+                                    color: isRecording ? cores.textoForte : cores.primaria,
                                     animation: isRecording ? 'pulse 1.5s infinite' : 'none',
                                     '@keyframes pulse': {
                                         '0%': { transform: 'scale(1)', boxShadow: '0 0 0 0 rgba(255, 51, 102, 0.7)' },
@@ -1672,7 +1672,7 @@ const Veiculos = () => {
                 <Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                     <IconButton
                         onClick={() => setPreviewFotoUrl(null)}
-                        sx={{ position: 'absolute', top: 10, right: 10, background: 'rgba(0,0,0,0.7)', color: '#FFFFFF' }}
+                        sx={{ position: 'absolute', top: 10, right: 10, background: 'rgba(0,0,0,0.7)', color: cores.textoForte }}
                     >
                         <CancelIcon />
                     </IconButton>

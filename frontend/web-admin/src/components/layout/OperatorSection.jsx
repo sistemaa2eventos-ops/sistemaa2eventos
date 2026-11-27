@@ -412,7 +412,7 @@ export const OperatorSection = () => {
                 transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
                 PaperProps={{
                     sx: {
-                        background: '#0A1628',
+                        background: cores.superficie,
                         border: '1px solid rgba(0, 212, 255, 0.25)',
                         boxShadow: '0 10px 40px rgba(0,0,0,0.7)',
                         minWidth: 220,
@@ -423,10 +423,10 @@ export const OperatorSection = () => {
             >
                 <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.06)', mb: 1 }}>
                     <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Conectado como</Typography>
-                    <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 700, fontSize: '0.8125rem' }} noWrap>
+                    <Typography variant="body2" sx={{ color: cores.textoForte, fontWeight: 700, fontSize: '0.8125rem' }} noWrap>
                         {user?.email}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#00D4FF', fontFamily: '"Inter", sans-serif' }}>
+                    <Typography variant="caption" sx={{ color: cores.primaria, fontFamily: '"Inter", sans-serif' }}>
                         {t('operator.shift_time_prefix', { defaultValue: 'No turno há' })} <TempoNoTurno loginKey={loginKey} formato="longo" />
                     </Typography>
                 </Box>
@@ -436,9 +436,9 @@ export const OperatorSection = () => {
                         handleMenuClose();
                         abrirTrocaDeFoto();
                     }}
-                    sx={{ gap: 1.5, mx: 1, borderRadius: 1.5, '&:hover': { background: 'rgba(0, 212, 255, 0.1)' } }}
+                    sx={{ gap: 1.5, mx: 1, borderRadius: 1.5, '&:hover': { background: tom(cores.primaria, 0.1) } }}
                 >
-                    <PhotoCameraIcon fontSize="small" sx={{ color: '#00D4FF' }} />
+                    <PhotoCameraIcon fontSize="small" sx={{ color: cores.primaria }} />
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>{t('operator.change_photo', { defaultValue: 'Trocar foto' })}</Typography>
                 </MenuItem>
 
@@ -447,9 +447,9 @@ export const OperatorSection = () => {
                         handleMenuClose();
                         setNotesModalOpen(true);
                     }}
-                    sx={{ gap: 1.5, mx: 1, borderRadius: 1.5, '&:hover': { background: 'rgba(0, 212, 255, 0.1)' } }}
+                    sx={{ gap: 1.5, mx: 1, borderRadius: 1.5, '&:hover': { background: tom(cores.primaria, 0.1) } }}
                 >
-                    <NoteIcon fontSize="small" sx={{ color: '#00FF88' }} />
+                    <NoteIcon fontSize="small" sx={{ color: cores.sucesso }} />
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>{t('operator.shift_notes', { defaultValue: 'Notas do turno' })}</Typography>
                 </MenuItem>
 
@@ -459,9 +459,9 @@ export const OperatorSection = () => {
                         handleMenuClose();
                         setChamarMasterOpen(true);
                     }}
-                    sx={{ gap: 1.5, mx: 1, borderRadius: 1.5, '&:hover': { background: 'rgba(255, 51, 102, 0.1)', color: '#FF3366' } }}
+                    sx={{ gap: 1.5, mx: 1, borderRadius: 1.5, '&:hover': { background: 'rgba(255, 51, 102, 0.1)', color: cores.erro } }}
                 >
-                    <EmergencyIcon fontSize="small" sx={{ color: '#FF3366' }} />
+                    <EmergencyIcon fontSize="small" sx={{ color: cores.erro }} />
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>Chamar admin master</Typography>
                 </MenuItem>
                 )}
@@ -476,10 +476,10 @@ export const OperatorSection = () => {
                         mx: 1,
                         my: 0.5,
                         borderRadius: 1.5,
-                        color: '#FF3366',
+                        color: cores.erro,
                         borderTop: '1px solid rgba(255,255,255,0.05)',
                         pt: 1,
-                        '&:hover': { background: 'rgba(255, 51, 102, 0.15)', color: '#FF3366' }
+                        '&:hover': { background: 'rgba(255, 51, 102, 0.15)', color: cores.erro }
                     }}
                 >
                     <LogoutIcon fontSize="small" />
@@ -522,7 +522,7 @@ export const OperatorSection = () => {
                                                 bgcolor: isSelected ? tom(funcao.acao, 0.14) : 'rgba(255,255,255,0.03)',
                                                 border: `1px solid ${isSelected ? funcao.acao : cores.borda}`,
                                                 boxShadow: isSelected ? `0 0 12px ${tom(funcao.acao, 0.35)}` : 'none',
-                                                transition: 'all 0.15s ease-in-out',
+                                                transition: 'background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, color 0.15s ease-in-out, opacity 0.15s ease-in-out, transform 0.15s ease-in-out',
                                                 '&:hover': { borderColor: funcao.acao, bgcolor: tom(funcao.acao, 0.08) },
                                                 '&:focus-visible': { outline: `2px solid ${funcao.acao}`, outlineOffset: 2 }
                                             }}
@@ -616,9 +616,9 @@ export const OperatorSection = () => {
             >
                 <DialogTitle sx={{ pb: 1, borderBottom: '1px solid rgba(255, 51, 102, 0.2)' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <EmergencyIcon sx={{ color: '#FF3366', fontSize: 28 }} />
+                        <EmergencyIcon sx={{ color: cores.erro, fontSize: 28 }} />
                         <Box>
-                            <Typography variant="h6" sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, color: '#FF3366' }}>
+                            <Typography variant="h6" sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, color: cores.erro }}>
                                 Solicitar administrador master
                             </Typography>
                             <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
@@ -631,17 +631,17 @@ export const OperatorSection = () => {
                 <DialogContent sx={{ pt: 2.5 }}>
                     {chamadoEnviado ? (
                         <Box sx={{ textAlign: 'center', py: 4 }}>
-                            <CheckCircleIcon sx={{ fontSize: 64, color: '#00FF88', mb: 2 }} />
-                            <Typography variant="h6" sx={{ color: '#FFFFFF', fontWeight: 700 }}>
+                            <CheckCircleIcon sx={{ fontSize: 64, color: cores.sucesso, mb: 2 }} />
+                            <Typography variant="h6" sx={{ color: cores.textoForte, fontWeight: 700 }}>
                                 Alerta enviado com sucesso!
                             </Typography>
-                            <Typography variant="body2" sx={{ color: '#00FF88', mt: 1 }}>
+                            <Typography variant="body2" sx={{ color: cores.sucesso, mt: 1 }}>
                                 O Administrador Master foi notificado e está ciente da sua solicitação.
                             </Typography>
                         </Box>
                     ) : (
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <Alert severity="warning" icon={<WarningIcon />} sx={{ bgcolor: 'rgba(255, 184, 0, 0.1)', color: '#FFB800', border: '1px solid rgba(255, 184, 0, 0.3)' }}>
+                            <Alert severity="warning" icon={<WarningIcon />} sx={{ bgcolor: 'rgba(255, 184, 0, 0.1)', color: cores.alerta, border: '1px solid rgba(255, 184, 0, 0.3)' }}>
                                 Este chamado gera um alerta sonoro e visual prioritário no painel de controle do Master.
                             </Alert>
 
@@ -677,8 +677,8 @@ export const OperatorSection = () => {
                                             clickable
                                             sx={{
                                                 bgcolor: motivoMaster === m ? 'rgba(255, 51, 102, 0.3)' : 'rgba(255,255,255,0.05)',
-                                                color: motivoMaster === m ? '#FF3366' : '#FFFFFF',
-                                                border: `1px solid ${motivoMaster === m ? '#FF3366' : 'rgba(255,255,255,0.1)'}`,
+                                                color: motivoMaster === m ? cores.erro : cores.textoForte,
+                                                border: `1px solid ${motivoMaster === m ? cores.erro : 'rgba(255,255,255,0.1)'}`,
                                                 fontWeight: 700,
                                                 fontSize: '0.75rem'
                                             }}
@@ -716,7 +716,7 @@ export const OperatorSection = () => {
                         startIcon={enviandoChamado ? <CircularProgress size={18} color="inherit" /> : <EmergencyIcon />}
                         sx={{
                             background: 'linear-gradient(135deg, #FF3366 0%, #FF3366 100%)',
-                            color: '#FFFFFF',
+                            color: cores.textoForte,
                             fontWeight: 700,
                             px: 3,
                             boxShadow: '0 0 20px rgba(255, 51, 102, 0.5)',
@@ -764,7 +764,7 @@ export const OperatorSection = () => {
                                 icon={<CheckCircleIcon sx={{ fontSize: 14, color: '#00FF88 !important' }} />}
                                 label="Salvo!"
                                 size="small"
-                                sx={{ bgcolor: 'rgba(0, 255, 136, 0.15)', color: '#00FF88', fontWeight: 700 }}
+                                sx={{ bgcolor: 'rgba(0, 255, 136, 0.15)', color: cores.sucesso, fontWeight: 700 }}
                             />
                         )}
                     </Box>
@@ -786,7 +786,7 @@ export const OperatorSection = () => {
                             '& .MuiInputBase-root': {
                                 fontFamily: '"Inter", sans-serif',
                                 fontSize: '0.875rem',
-                                color: '#FFFFFF',
+                                color: cores.textoForte,
                                 background: 'rgba(255,255,255,0.03)'
                             }
                         }}
@@ -803,7 +803,7 @@ export const OperatorSection = () => {
                                 setNotesText('');
                                 localStorage.removeItem(notesKey);
                             }}
-                            sx={{ color: '#FF3366', fontSize: '0.75rem' }}
+                            sx={{ color: cores.erro, fontSize: '0.75rem' }}
                         >
                             Limpar notas
                         </Button>

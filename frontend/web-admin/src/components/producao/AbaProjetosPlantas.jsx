@@ -70,18 +70,18 @@ import {
 } from './plantaImportador';
 
 const BIBLIOTECA_BLOCOS = [
-    { tipo: 'palco', rotulo: 'Palco', largura: 160, altura: 90, cor: '#00D4FF' },
-    { tipo: 'tenda', rotulo: 'Tenda', largura: 110, altura: 80, cor: '#00FF88' },
-    { tipo: 'bar', rotulo: 'Bar e A e B', largura: 130, altura: 60, cor: '#00FF88' },
-    { tipo: 'gerador', rotulo: 'Gerador', largura: 75, altura: 50, cor: '#FFB800' },
-    { tipo: 'camarim', rotulo: 'Camarim', largura: 95, altura: 65, cor: '#A855F7' },
-    { tipo: 'portaria', rotulo: 'Portaria', largura: 110, altura: 50, cor: '#FF8800' },
-    { tipo: 'banheiro', rotulo: 'Banheiro', largura: 65, altura: 45, cor: '#94A3B8' },
-    { tipo: 'som', rotulo: 'Torre de som', largura: 48, altura: 48, cor: '#33DDFF' },
-    { tipo: 'luz', rotulo: 'Ponto de luz', largura: 36, altura: 36, cor: '#A855F7' },
-    { tipo: 'grade', rotulo: 'Grade', largura: 110, altura: 18, cor: '#CBD5E1' },
-    { tipo: 'extintor', rotulo: 'Extintor', largura: 28, altura: 28, cor: '#FF3366' },
-    { tipo: 'texto', rotulo: 'Personalizado', largura: 120, altura: 44, cor: '#FFFFFF' }
+    { tipo: 'palco', rotulo: 'Palco', largura: 160, altura: 90, cor: cores.primaria },
+    { tipo: 'tenda', rotulo: 'Tenda', largura: 110, altura: 80, cor: cores.sucesso },
+    { tipo: 'bar', rotulo: 'Bar e A e B', largura: 130, altura: 60, cor: cores.sucesso },
+    { tipo: 'gerador', rotulo: 'Gerador', largura: 75, altura: 50, cor: cores.alerta },
+    { tipo: 'camarim', rotulo: 'Camarim', largura: 95, altura: 65, cor: cores.secundariaClara },
+    { tipo: 'portaria', rotulo: 'Portaria', largura: 110, altura: 50, cor: cores.saida },
+    { tipo: 'banheiro', rotulo: 'Banheiro', largura: 65, altura: 45, cor: cores.textoSecundario },
+    { tipo: 'som', rotulo: 'Torre de som', largura: 48, altura: 48, cor: cores.primariaHover },
+    { tipo: 'luz', rotulo: 'Ponto de luz', largura: 36, altura: 36, cor: cores.secundariaClara },
+    { tipo: 'grade', rotulo: 'Grade', largura: 110, altura: 18, cor: cores.textoSuave },
+    { tipo: 'extintor', rotulo: 'Extintor', largura: 28, altura: 28, cor: cores.erro },
+    { tipo: 'texto', rotulo: 'Personalizado', largura: 120, altura: 44, cor: cores.textoForte }
 ];
 
 function pontoDentroPoligono(pt, poligono = []) {
@@ -286,7 +286,7 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
     const [formSetor, setFormSetor] = useState({
         nome: '',
         area_id: '',
-        cor_hex: '#00D4FF',
+        cor_hex: cores.primaria,
         responsavel_nome: '',
         x: 160,
         y: 120,
@@ -577,7 +577,7 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
                 setFormSetor({
                     nome: '',
                     area_id: areas[0]?.id || '',
-                    cor_hex: areas[0]?.cor || '#00D4FF',
+                    cor_hex: areas[0]?.cor || cores.primaria,
                     responsavel_nome: '',
                     x,
                     y,
@@ -609,7 +609,7 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
         setFormSetor({
             nome: '',
             area_id: areas[0]?.id || '',
-            cor_hex: areas[0]?.cor || '#00D4FF',
+            cor_hex: areas[0]?.cor || cores.primaria,
             responsavel_nome: '',
             x: Math.min(...xs),
             y: Math.min(...ys),
@@ -935,7 +935,7 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
                 await httpClient.put(`/producao/plantas/${planta.id}/setores/${setorEditandoId}`, {
                     nome: formSetor.nome.trim(),
                     area_id: formSetor.area_id || null,
-                    cor_hex: formSetor.cor_hex || '#00D4FF',
+                    cor_hex: formSetor.cor_hex || cores.primaria,
                     responsavel_nome: formSetor.responsavel_nome || '',
                     poligono_coordenadas: poligonoFinal
                 }, { headers: headersExtra });
@@ -944,7 +944,7 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
                 const resp = await httpClient.post(`/producao/plantas/${planta.id}/setores`, {
                     nome: formSetor.nome.trim(),
                     area_id: formSetor.area_id || null,
-                    cor_hex: formSetor.cor_hex || '#00D4FF',
+                    cor_hex: formSetor.cor_hex || cores.primaria,
                     responsavel_nome: formSetor.responsavel_nome || '',
                     poligono_coordenadas: poligonoFinal
                 }, { headers: headersExtra });
@@ -1326,7 +1326,7 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
                 </Box>
 
                 {!planta ? (
-                    <Box sx={{ p: 4, textAlign: 'center', borderRadius: 2, bgcolor: cores.fundo, border: `1px dashed ${cores.bordaDestaque}` }}>
+                    <Box sx={{ p: 4, textAlign: 'center', borderRadius: 1.5, bgcolor: cores.fundo, border: `1px dashed ${cores.bordaDestaque}` }}>
                         <ArquivoIcon sx={{ fontSize: 44, color: cores.primaria, mb: 1 }} />
                         <Typography variant="h6" sx={{ color: cores.textoForte, mb: 0.75 }}>
                             Nenhum projeto importado na planta ainda
@@ -1492,7 +1492,7 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
                                         </Box>
 
                                         <Stack spacing={1}>
-                                            <Box sx={{ p: 1, borderRadius: 1.25, bgcolor: cores.fundo, border: `1px solid ${cores.borda}` }}>
+                                            <Box sx={{ p: 1, borderRadius: 1, bgcolor: cores.fundo, border: `1px solid ${cores.borda}` }}>
                                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                     <Typography sx={{ fontSize: tamanhos.xs, fontWeight: 600, color: cores.texto }} noWrap>
                                                         {versaoExibida?.imagem_fundo_url ? (versaoExibida.nome_arquivo_base || 'Desenho base') : 'Grade sem desenho base'}
@@ -1518,7 +1518,7 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
                                                 const visivel = local.visivel !== undefined ? local.visivel : cam.visivel !== false;
                                                 const opacidade = local.opacidade !== undefined ? local.opacidade : Number(cam.opacidade ?? 0.85);
                                                 return (
-                                                    <Box key={cam.id} sx={{ p: 1, borderRadius: 1.25, bgcolor: cores.fundo, border: `1px solid ${cores.borda}` }}>
+                                                    <Box key={cam.id} sx={{ p: 1, borderRadius: 1, bgcolor: cores.fundo, border: `1px solid ${cores.borda}` }}>
                                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 0.5 }}>
                                                             <Typography sx={{ fontSize: tamanhos.xs, color: cores.textoSuave, flex: 1 }} noWrap>
                                                                 {cam.nome}
@@ -1586,7 +1586,7 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
                                                         setFormSetor({
                                                             nome: '',
                                                             area_id: areas[0]?.id || '',
-                                                            cor_hex: areas[0]?.cor || '#00D4FF',
+                                                            cor_hex: areas[0]?.cor || cores.primaria,
                                                             responsavel_nome: '',
                                                             x: 150,
                                                             y: 120,
@@ -1611,7 +1611,7 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
                                                         onClick={() => { setSetorSelecionadoId(s.id); setElementoSelecionadoId(null); }}
                                                         sx={{
                                                             p: 1,
-                                                            borderRadius: 1.25,
+                                                            borderRadius: 1,
                                                             cursor: 'pointer',
                                                             bgcolor: cores.fundo,
                                                             border: `1px solid ${sel ? (s.cor_hex || cores.primaria) : cores.borda}`,
@@ -1625,7 +1625,7 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
                                                             <Typography sx={{ fontSize: tamanhos.xs, fontWeight: 700, color: s.cor_hex || cores.textoForte }} noWrap>
                                                                 {s.nome}
                                                             </Typography>
-                                                            <Typography sx={{ fontSize: '0.7rem', color: cores.textoSecundario }} noWrap>
+                                                            <Typography sx={{ fontSize: '0.75rem', color: cores.textoSecundario }} noWrap>
                                                                 {obterNomeArea(areas, s.area_id)}
                                                             </Typography>
                                                         </Box>
@@ -1638,7 +1638,7 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
                                                                     setFormSetor({
                                                                         nome: s.nome,
                                                                         area_id: s.area_id || '',
-                                                                        cor_hex: s.cor_hex || '#00D4FF',
+                                                                        cor_hex: s.cor_hex || cores.primaria,
                                                                         responsavel_nome: s.responsavel_nome || '',
                                                                         x: s.poligono_coordenadas?.[0]?.x || 120,
                                                                         y: s.poligono_coordenadas?.[0]?.y || 120,
@@ -1738,7 +1738,7 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
                                     sx={{
                                         position: 'relative',
                                         border: `1px solid ${modoEdicao || ferramentaCanvas !== 'selecionar' ? cores.primaria : cores.borda}`,
-                                        borderRadius: 2,
+                                        borderRadius: 1.5,
                                         bgcolor: cores.fundo,
                                         overflow: 'hidden',
                                         touchAction: 'none',
@@ -1822,14 +1822,14 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
                                                 >
                                                     <polygon
                                                         points={pts}
-                                                        fill={s.cor_hex || '#00D4FF'}
+                                                        fill={s.cor_hex || cores.primaria}
                                                         fillOpacity={selSetor ? 0.24 : 0.13}
-                                                        stroke={selSetor ? '#FFFFFF' : (s.cor_hex || '#00D4FF')}
+                                                        stroke={selSetor ? cores.textoForte : (s.cor_hex || cores.primaria)}
                                                         strokeWidth={selSetor ? 3 : 2}
                                                         strokeDasharray={selSetor ? undefined : '6 4'}
                                                     />
                                                     {s.poligono_coordenadas?.[0] && (
-                                                        <text x={s.poligono_coordenadas[0].x + 8} y={s.poligono_coordenadas[0].y + 18} fill={s.cor_hex || '#00D4FF'} fontSize="13" fontWeight="700">
+                                                        <text x={s.poligono_coordenadas[0].x + 8} y={s.poligono_coordenadas[0].y + 18} fill={s.cor_hex || cores.primaria} fontSize="13" fontWeight="700">
                                                             {s.nome}
                                                         </text>
                                                     )}
@@ -1842,13 +1842,13 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
                                             <g>
                                                 <polygon
                                                     points={pontosPoligono.map((p) => `${p.x},${p.y}`).join(' ')}
-                                                    fill="rgba(0, 212, 255, 0.16)"
+                                                    fill={tom(cores.primaria, 0.16)}
                                                     stroke={cores.primaria}
                                                     strokeWidth="2.5"
                                                     strokeDasharray="6 3"
                                                 />
                                                 {pontosPoligono.map((p, idx) => (
-                                                    <circle key={idx} cx={p.x} cy={p.y} r="5" fill={cores.primaria} stroke="#FFFFFF" strokeWidth="1.5" />
+                                                    <circle key={idx} cx={p.x} cy={p.y} r="5" fill={cores.primaria} stroke={cores.textoForte} strokeWidth="1.5" />
                                                 ))}
                                             </g>
                                         )}
@@ -1860,7 +1860,7 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
                                                 y={Math.min(retanguloInicio.y, retanguloAtual.y)}
                                                 width={Math.abs(retanguloAtual.x - retanguloInicio.x)}
                                                 height={Math.abs(retanguloAtual.y - retanguloInicio.y)}
-                                                fill="rgba(0, 212, 255, 0.18)"
+                                                fill={tom(cores.primaria, 0.18)}
                                                 stroke={cores.primaria}
                                                 strokeWidth="2.5"
                                                 strokeDasharray="6 3"
@@ -1893,19 +1893,19 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
                                                         height={el.altura}
                                                         rx="6"
                                                         fill="rgba(10, 22, 40, 0.86)"
-                                                        stroke={sel ? '#FFFFFF' : (el.cor || cores.primaria)}
+                                                        stroke={sel ? cores.textoForte : (el.cor || cores.primaria)}
                                                         strokeWidth={sel ? 3 : 1.75}
                                                     />
-                                                    <text x={cx} y={cy - 2} textAnchor="middle" fill="#FFFFFF" fontSize="11" fontWeight="700">
+                                                    <text x={cx} y={cy - 2} textAnchor="middle" fill={cores.textoForte} fontSize="11" fontWeight="700">
                                                         {el.rotulo}
                                                     </text>
-                                                    <text x={cx} y={cy + 13} textAnchor="middle" fill="#CBD5E1" fontSize="9.5">
+                                                    <text x={cx} y={cy + 13} textAnchor="middle" fill={cores.textoSuave} fontSize="9.5">
                                                         {el.texto || `${(el.largura / pxPorMetro).toFixed(1)}x${(el.altura / pxPorMetro).toFixed(1)}m`}
                                                     </text>
                                                     {listaTarefas.length > 0 && (
                                                         <g transform={`translate(${el.x + el.largura - 36}, ${el.y - 9})`}>
                                                             <rect width="42" height="16" rx="8" fill={corBadge} />
-                                                            <text x="21" y="11" textAnchor="middle" fill="#050B18" fontSize="9.5" fontWeight="800">
+                                                            <text x="21" y="11" textAnchor="middle" fill={cores.fundo} fontSize="9.5" fontWeight="800">
                                                                 {mediaPct}%
                                                             </text>
                                                         </g>
@@ -1920,7 +1920,7 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
                                                 {(propostaEmRevisao.diff?.inalterados || []).map((el) => (
                                                     <g key={el.id} opacity={0.45}>
                                                         <rect x={el.x} y={el.y} width={el.largura} height={el.altura} rx="6" fill="rgba(15,30,55,0.8)" stroke={el.cor} strokeWidth="1.5" />
-                                                        <text x={el.x + el.largura / 2} y={el.y + el.altura / 2 + 4} textAnchor="middle" fill="#CBD5E1" fontSize="10">{el.rotulo}</text>
+                                                        <text x={el.x + el.largura / 2} y={el.y + el.altura / 2 + 4} textAnchor="middle" fill={cores.textoSuave} fontSize="10">{el.rotulo}</text>
                                                     </g>
                                                 ))}
                                                 {(propostaEmRevisao.diff?.removidos || []).map((el) => (
@@ -1948,7 +1948,7 @@ const AbaProjetosPlantas = ({ resumo, headersExtra, aoAtualizar, apiClient }) =>
                                                             </>
                                                         )}
                                                         <rect x={el.x} y={el.y} width={el.largura} height={el.altura} rx="6" fill="rgba(255,184,0,0.22)" stroke={funcao.alerta} strokeWidth="2.5" />
-                                                        <text x={el.x + el.largura / 2} y={el.y + el.altura / 2 + 4} textAnchor="middle" fill="#FFFFFF" fontSize="10.5" fontWeight="700">
+                                                        <text x={el.x + el.largura / 2} y={el.y + el.altura / 2 + 4} textAnchor="middle" fill={cores.textoForte} fontSize="10.5" fontWeight="700">
                                                             Movido: {el.rotulo}
                                                         </text>
                                                     </g>

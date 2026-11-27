@@ -21,6 +21,7 @@ import NeonButton from '../../components/common/NeonButton';
 import PageHeader from '../../components/common/PageHeader';
 import api from '../../services/api';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
+import { cores, tom } from '../../styles/tokens';
 
 // Todas as horas do dia em intervalos de 30 min
 const HORAS = Array.from({ length: 48 }, (_, i) => {
@@ -122,7 +123,7 @@ const ConfigCron = () => {
             />
 
             {/* Aviso: mudanças de horário são aplicadas em tempo real */}
-            <Alert severity="info" sx={{ mb: 3, bgcolor: 'rgba(0,212,255,0.05)', color: '#E8F4FD', border: '1px solid rgba(0,212,255,0.2)' }}>
+            <Alert severity="info" sx={{ mb: 3, bgcolor: tom(cores.primaria, 0.05), color: cores.texto, border: '1px solid rgba(0,212,255,0.2)' }}>
                 Alterações nos horários configuráveis são aplicadas <b>imediatamente</b> sem reiniciar o servidor.
                 Os jobs com horário fixo abaixo não são configuráveis pela interface.
             </Alert>
@@ -131,17 +132,17 @@ const ConfigCron = () => {
 
                 {/* ── JOBS CONFIGURÁVEIS ── */}
                 <Grid item xs={12}>
-                    <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <CronIcon sx={{ color: '#00D4FF' }} fontSize="small" /> Jobs Configuráveis
+                    <Typography variant="subtitle1" sx={{ color: cores.textoForte, fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CronIcon sx={{ color: cores.primaria }} fontSize="small" /> Jobs Configuráveis
                     </Typography>
                 </Grid>
 
                 {/* Reset Diário */}
                 <Grid item xs={12} md={6} lg={4}>
-                    <GlassCard glowColor="rgba(0,212,255,0.3)" sx={{ p: 3, height: '100%' }}>
+                    <GlassCard glowColor={tom(cores.primaria, 0.3)} sx={{ p: 3, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                            <CronIcon sx={{ color: '#00D4FF' }} fontSize="small" />
-                            <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700 }}>
+                            <CronIcon sx={{ color: cores.primaria }} fontSize="small" />
+                            <Typography variant="subtitle1" sx={{ color: cores.textoForte, fontWeight: 700 }}>
                                 Reset de turno diário
                             </Typography>
                         </Box>
@@ -165,8 +166,8 @@ const ConfigCron = () => {
                 <Grid item xs={12} md={6} lg={4}>
                     <GlassCard glowColor="rgba(0,255,136,0.3)" sx={{ p: 3, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                            <ReportIcon sx={{ color: '#00FF88' }} fontSize="small" />
-                            <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700 }}>
+                            <ReportIcon sx={{ color: cores.sucesso }} fontSize="small" />
+                            <Typography variant="subtitle1" sx={{ color: cores.textoForte, fontWeight: 700 }}>
                                 Relatório diário
                             </Typography>
                         </Box>
@@ -190,8 +191,8 @@ const ConfigCron = () => {
                 <Grid item xs={12} md={6} lg={4}>
                     <GlassCard glowColor="rgba(255,51,102,0.3)" sx={{ p: 3, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                            <CleanupIcon sx={{ color: '#FF3366' }} fontSize="small" />
-                            <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700 }}>
+                            <CleanupIcon sx={{ color: cores.erro }} fontSize="small" />
+                            <Typography variant="subtitle1" sx={{ color: cores.textoForte, fontWeight: 700 }}>
                                 Retenção de logs
                             </Typography>
                         </Box>
@@ -216,8 +217,8 @@ const ConfigCron = () => {
 
                 {/* ── JOBS FIXOS (informativos) ── */}
                 <Grid item xs={12} sx={{ mt: 1 }}>
-                    <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <FixedIcon sx={{ color: '#FFB800' }} fontSize="small" /> Jobs de Sistema (Fixos, não configuráveis)
+                    <Typography variant="subtitle1" sx={{ color: cores.textoForte, fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <FixedIcon sx={{ color: cores.alerta }} fontSize="small" /> Jobs de Sistema (Fixos, não configuráveis)
                     </Typography>
                 </Grid>
 
@@ -228,12 +229,12 @@ const ConfigCron = () => {
                                 <Grid item xs={12} sm={6} md={4} key={i}>
                                     <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 1.5, border: '1px solid rgba(255,255,255,0.06)', height: '100%' }}>
                                         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-                                            <SyncIcon sx={{ fontSize: 14, color: '#FFB800' }} />
-                                            <Typography variant="body2" fontWeight={700} color="#FFFFFF" sx={{ fontSize: '0.8125rem' }}>
+                                            <SyncIcon sx={{ fontSize: 14, color: cores.alerta }} />
+                                            <Typography variant="body2" fontWeight={700} color={cores.textoForte} sx={{ fontSize: '0.8125rem' }}>
                                                 {job.label}
                                             </Typography>
                                         </Stack>
-                                        <Chip label={job.schedule} size="small" sx={{ mb: 0.75, fontSize: '0.75rem', fontWeight: 700, bgcolor: 'rgba(255,170,0,0.1)', color: '#FFB800' }} />
+                                        <Chip label={job.schedule} size="small" sx={{ mb: 0.75, fontSize: '0.75rem', fontWeight: 700, bgcolor: 'rgba(255,170,0,0.1)', color: cores.alerta }} />
                                         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: '0.75rem' }}>
                                             {job.desc}
                                         </Typography>
@@ -247,8 +248,8 @@ const ConfigCron = () => {
                 {/* ── AÇÕES MANUAIS ── */}
                 <Grid item xs={12}>
                     <GlassCard sx={{ p: 3, border: '1px solid rgba(0,212,255,0.1)' }}>
-                        <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <TriggerIcon sx={{ color: '#00D4FF' }} fontSize="small" /> Ações Manuais
+                        <Typography variant="subtitle1" sx={{ color: cores.textoForte, fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <TriggerIcon sx={{ color: cores.primaria }} fontSize="small" /> Ações Manuais
                         </Typography>
                         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                             <Tooltip title="Gera e faz download do relatório Excel do evento ativo">
@@ -265,7 +266,7 @@ const ConfigCron = () => {
                             <Tooltip title="Força checkout de pessoas presas e limpa turnos do dia">
                                 <span>
                                     <NeonButton
-                                        neonColor="#FFB800"
+                                        neonColor={cores.alerta}
                                         startIcon={runningReset ? <CircularProgress size={16} /> : <PlayIcon />}
                                         disabled={runningReset}
                                         onClick={handleManualReset}
@@ -277,7 +278,7 @@ const ConfigCron = () => {
                             <Tooltip title="Executa sincronização de dispositivos imediatamente">
                                 <span>
                                     <NeonButton
-                                        neonColor="#00FF88"
+                                        neonColor={cores.sucesso}
                                         startIcon={runningSync ? <CircularProgress size={16} /> : <SyncIcon />}
                                         disabled={runningSync}
                                         onClick={handleManualSync}

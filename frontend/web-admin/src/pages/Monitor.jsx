@@ -59,7 +59,7 @@ import { useSomAlertas } from '../utils/alertSound';
 import KpiCards from '../components/monitor/KpiCards';
 import AbaSaude from '../components/monitor/AbaSaude';
 
-import { botaoSecundario } from '../styles/tokens';
+import { botaoSecundario, cores, tom } from '../styles/tokens';
 import AbaOperadoresCentral from '../components/monitor/AbaOperadoresCentral';
 import useVisaoNoturna from '../hooks/useVisaoNoturna';
 import { comoRotulo } from '../utils/formatadores';
@@ -68,10 +68,10 @@ import { comoRotulo } from '../utils/formatadores';
 const CENTRAL_LOCAL_URL = 'http://localhost:8766/central/';
 // Selo de conexão em tempo real
 const SELO_CONEXAO = {
-  conectado: { label: 'Ao vivo', cor: '#00FF88' },
-  conectando: { label: 'Conectando...', cor: '#FFB800' },
-  reconectando: { label: 'Reconectando...', cor: '#FFB800' },
-  offline: { label: 'Sem conexão', cor: '#FF3366' }
+  conectado: { label: 'Ao vivo', cor: cores.sucesso },
+  conectando: { label: 'Conectando...', cor: cores.alerta },
+  reconectando: { label: 'Reconectando...', cor: cores.alerta },
+  offline: { label: 'Sem conexão', cor: cores.erro }
 };
 
 const LogItem = styled(Box, { shouldForwardProp: (p) => !['tipo', 'monitorado'].includes(p) })(({ theme, tipo, monitorado }) => ({
@@ -83,17 +83,17 @@ const LogItem = styled(Box, { shouldForwardProp: (p) => !['tipo', 'monitorado'].
     },
     borderBottom: '1px solid rgba(148,163,184,0.08)',
     borderLeft: `3px solid ${
-        monitorado ? '#FFB800' : 
-        tipo === 'negado' ? '#FF3366' : 
-        tipo === 'checkin' ? '#00FF88' : 
-        tipo === 'checkout' ? '#FF8800' : 
-        tipo === 'fiscalizacao' ? '#00D4FF' :
+        monitorado ? cores.alerta : 
+        tipo === 'negado' ? cores.erro : 
+        tipo === 'checkin' ? cores.sucesso : 
+        tipo === 'checkout' ? cores.saida : 
+        tipo === 'fiscalizacao' ? cores.primaria :
         'transparent'
     }`,
     background: tipo === 'negado' ? 'rgba(255, 51, 102, 0.05)' : 
                monitorado ? 'rgba(255, 184, 0, 0.05)' : 
-               tipo === 'fiscalizacao' ? 'rgba(0, 212, 255, 0.03)' : 'transparent',
-    transition: 'all 0.2s ease'
+               tipo === 'fiscalizacao' ? tom(cores.primaria, 0.03) : 'transparent',
+    transition: 'background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease'
 }));
 
 const Monitor = () => {
@@ -548,7 +548,7 @@ const Monitor = () => {
         <PageHeader
           title="Monitor em tempo real"
           subtitle="Passagens, leitores, câmeras e saúde do sistema ao vivo."
-          icon={<MonitorIcon sx={{ fontSize: 36, color: '#00D4FF' }} />}
+          icon={<MonitorIcon sx={{ fontSize: 36, color: cores.primaria }} />}
           sx={{ mb: 0 }}
         />
         <Tooltip title={ultimaAtualizacao ? `Dados atualizados às ${ultimaAtualizacao.toLocaleTimeString('pt-BR')}` : 'Aguardando dados'}>
@@ -563,7 +563,7 @@ const Monitor = () => {
               color: (SELO_CONEXAO[conexao] || SELO_CONEXAO.offline).cor,
               border: `1px solid ${(SELO_CONEXAO[conexao] || SELO_CONEXAO.offline).cor}4D`,
               height: 36,
-              borderRadius: '10px',
+              borderRadius: '8px',
               alignSelf: { xs: 'flex-start', sm: 'center' }
             }}
           />
@@ -578,7 +578,7 @@ const Monitor = () => {
           scrollButtons="auto"
           allowScrollButtonsMobile
           textColor="inherit" 
-          TabIndicatorProps={{ style: { backgroundColor: '#00D4FF' } }}
+          TabIndicatorProps={{ style: { backgroundColor: cores.primaria } }}
         >
           {TABS_CONFIG.map(tab => (
             <Tab 
@@ -601,7 +601,7 @@ const Monitor = () => {
             right: { xs: 12, sm: 24 }, 
             zIndex: 99999, 
             width: { xs: 'calc(100% - 24px)', sm: 420 },
-            bgcolor: '#0A1628', 
+            bgcolor: cores.superficie, 
             borderRadius: 1.5,
             p: 2, 
             boxShadow: '0 10px 40px rgba(0,0,0,0.85), 0 0 1px 1px rgba(255, 184, 0, 0.4)',
@@ -616,10 +616,10 @@ const Monitor = () => {
                   border: '1px solid rgba(255, 184, 0, 0.3)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center'
                 }}>
-                  <SecurityIcon sx={{ fontSize: 18, color: '#FFB800' }} />
+                  <SecurityIcon sx={{ fontSize: 18, color: cores.alerta }} />
                 </Box>
                 <Box>
-                  <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#FFB800', lineHeight: 1.15 }}>
+                  <Typography variant="subtitle2" fontWeight={700} sx={{ color: cores.alerta, lineHeight: 1.15 }}>
                     Notificação sigilosa de segurança
                   </Typography>
                   <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.75rem' }}>
@@ -630,17 +630,17 @@ const Monitor = () => {
               <IconButton 
                 size="small" 
                 onClick={() => setActiveAlert(null)} 
-                sx={{ color: 'rgba(255,255,255,0.6)', '&:hover': { color: '#FFFFFF' } }}
+                sx={{ color: 'rgba(255,255,255,0.6)', '&:hover': { color: cores.textoForte } }}
               >
                 <CloseIcon fontSize="small" />
               </IconButton>
             </Stack>
 
             <Box sx={{ mt: 1.5, p: 1.2, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <Typography variant="body2" fontWeight={700} color="#FFFFFF" noWrap>
+              <Typography variant="body2" fontWeight={700} color={cores.textoForte} noWrap>
                 {activeAlert?.target_name || activeAlert?.pessoa?.nome || 'Alvo em Monitoramento'}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#00D4FF', display: 'block', mt: 0.3, fontWeight: 700 }}>
+              <Typography variant="caption" sx={{ color: cores.primaria, display: 'block', mt: 0.3, fontWeight: 700 }}>
                 {activeAlert?.localizacao?.nome_area || activeAlert?.location || 'Câmera CFTV'}
               </Typography>
               <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block', fontSize: '0.75rem', mt: 0.2 }}>
@@ -655,11 +655,11 @@ const Monitor = () => {
                 size="small"
                 onClick={() => setOpenSecretAlertModal(true)}
                 sx={{ 
-                  bgcolor: '#FFB800', 
+                  bgcolor: cores.alerta, 
                   color: '#000000', 
                   fontWeight: 700, 
                   fontSize: '0.75rem',
-                  '&:hover': { bgcolor: '#FFB800' } 
+                  '&:hover': { bgcolor: cores.alerta } 
                 }}
               >
                 Abrir ocorrência (sigiloso)
@@ -668,7 +668,7 @@ const Monitor = () => {
                 variant="outlined"
                 size="small"
                 onClick={() => setActiveAlert(null)}
-                sx={{ borderColor: 'rgba(255,255,255,0.15)', color: '#94A3B8', fontSize: '0.75rem' }}
+                sx={{ borderColor: 'rgba(255,255,255,0.15)', color: cores.textoSecundario, fontSize: '0.75rem' }}
               >
                 Dispensar
               </Button>
@@ -703,10 +703,10 @@ const Monitor = () => {
                 border: '1px solid #FFB800',
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>
-                <SecurityIcon sx={{ fontSize: 20, color: '#FFB800' }} />
+                <SecurityIcon sx={{ fontSize: 20, color: cores.alerta }} />
               </Box>
               <Box>
-                <Typography variant="h6" fontWeight={700} sx={{ color: '#FFB800', fontSize: '1rem', lineHeight: 1.2 }}>
+                <Typography variant="h6" fontWeight={700} sx={{ color: cores.alerta, fontSize: '1rem', lineHeight: 1.2 }}>
                   Central de inteligência • ocorrência sigilosa
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.65)' }}>
@@ -717,7 +717,7 @@ const Monitor = () => {
             <IconButton 
               onClick={() => { setOpenSecretAlertModal(false); setActiveAlert(null); }} 
               size="small" 
-              sx={{ color: '#94A3B8', '&:hover': { color: '#FFFFFF' } }}
+              sx={{ color: cores.textoSecundario, '&:hover': { color: cores.textoForte } }}
             >
               <CloseIcon />
             </IconButton>
@@ -735,8 +735,8 @@ const Monitor = () => {
             mb: 2
           }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1} mb={1.5}>
-              <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: 0.5, display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                <SecurityIcon sx={{ fontSize: 16, color: '#00D4FF' }} />
+              <Typography variant="caption" sx={{ color: cores.primaria, fontWeight: 700, letterSpacing: 0.5, display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                <SecurityIcon sx={{ fontSize: 16, color: cores.primaria }} />
                 Comprovação biométrica facial
               </Typography>
               <Chip
@@ -744,10 +744,10 @@ const Monitor = () => {
                 size="small"
                 sx={{
                   bgcolor: 'rgba(0, 230, 118, 0.15)',
-                  color: '#00FF88',
+                  color: cores.sucesso,
                   border: '1px solid rgba(0, 230, 118, 0.4)',
                   fontWeight: 700,
-                  fontSize: '0.72rem'
+                  fontSize: '0.75rem'
                 }}
               />
             </Stack>
@@ -773,7 +773,7 @@ const Monitor = () => {
                   borderRadius: 1.5,
                   overflow: 'hidden',
                   border: '2px solid #00D4FF',
-                  bgcolor: '#050B18',
+                  bgcolor: cores.fundo,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -790,7 +790,7 @@ const Monitor = () => {
                         objectFit: 'contain',
                         objectPosition: 'center',
                         display: 'block',
-                        backgroundColor: '#050B18'
+                        backgroundColor: cores.fundo
                       }}
                     />
                   ) : (
@@ -817,8 +817,8 @@ const Monitor = () => {
                     alignItems: 'center',
                     gap: 0.6
                   }}>
-                    <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#00D4FF', boxShadow: '0 0 6px #00D4FF' }} />
-                    <Typography variant="caption" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.72rem', color: '#00D4FF', fontWeight: 700 }}>
+                    <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: cores.primaria, boxShadow: '0 0 6px #00D4FF' }} />
+                    <Typography variant="caption" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.75rem', color: cores.primaria, fontWeight: 700 }}>
                       ID BIOMÉTRICO (3:4)
                     </Typography>
                   </Box>
@@ -839,16 +839,16 @@ const Monitor = () => {
                       size="small"
                       sx={{
                         height: 22,
-                        fontSize: '0.72rem',
+                        fontSize: '0.75rem',
                         fontWeight: 700,
-                        bgcolor: '#00D4FF',
+                        bgcolor: cores.primaria,
                         color: '#000000',
                         letterSpacing: 0.5
                       }}
                     />
                   </Box>
                 </Box>
-                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', mt: 0.5, textAlign: 'center', fontSize: '0.72rem', fontWeight: 600 }}>
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', mt: 0.5, textAlign: 'center', fontSize: '0.75rem', fontWeight: 600 }}>
                   Foto oficial de perfil (sem cortes)
                 </Typography>
               </Box>
@@ -891,8 +891,8 @@ const Monitor = () => {
                     />
                   ) : (
                     <Stack alignItems="center" spacing={1}>
-                      <PhotoCameraIcon sx={{ fontSize: 44, color: '#FFB800', opacity: 0.8 }} />
-                      <Typography variant="caption" sx={{ fontSize: '0.75rem', color: '#FFB800', fontWeight: 700 }}>
+                      <PhotoCameraIcon sx={{ fontSize: 44, color: cores.alerta, opacity: 0.8 }} />
+                      <Typography variant="caption" sx={{ fontSize: '0.75rem', color: cores.alerta, fontWeight: 700 }}>
                         Aguardando frame da câmera
                       </Typography>
                     </Stack>
@@ -912,8 +912,8 @@ const Monitor = () => {
                     alignItems: 'center',
                     gap: 0.6
                   }}>
-                    <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: '#FFB800', boxShadow: '0 0 6px #FFB800' }} />
-                    <Typography variant="caption" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.75rem', color: '#FFB800', fontWeight: 700 }}>
+                    <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: cores.alerta, boxShadow: '0 0 6px #FFB800' }} />
+                    <Typography variant="caption" sx={{ fontFamily: '"Inter", sans-serif', fontSize: '0.75rem', color: cores.alerta, fontWeight: 700 }}>
                       CFTV • captura real da câmera
                     </Typography>
                   </Box>
@@ -938,7 +938,7 @@ const Monitor = () => {
                           fontSize: '0.75rem',
                           fontWeight: 700,
                           bgcolor: 'rgba(0,0,0,0.85)',
-                          color: '#FFB800',
+                          color: cores.alerta,
                           border: '1px solid rgba(255, 184, 0, 0.5)',
                           borderRadius: 1,
                           '&:hover': { bgcolor: 'rgba(255, 184, 0, 0.25)' }
@@ -955,7 +955,7 @@ const Monitor = () => {
                           width: 22,
                           height: 22,
                           bgcolor: 'rgba(0,0,0,0.85)',
-                          color: '#FFB800',
+                          color: cores.alerta,
                           border: '1px solid rgba(255, 184, 0, 0.5)',
                           borderRadius: 1,
                           '&:hover': { bgcolor: 'rgba(255, 184, 0, 0.25)' }
@@ -984,7 +984,7 @@ const Monitor = () => {
                         height: 22,
                         fontSize: '0.75rem',
                         fontWeight: 700,
-                        bgcolor: '#FFB800',
+                        bgcolor: cores.alerta,
                         color: '#000000',
                         letterSpacing: 0.5
                       }}
@@ -1002,10 +1002,10 @@ const Monitor = () => {
           <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', mb: 2 }}>
             <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={1}>
               <Box>
-                <Typography variant="h6" fontWeight={700} sx={{ color: '#FFFFFF', fontSize: '1rem', lineHeight: 1.2 }}>
+                <Typography variant="h6" fontWeight={700} sx={{ color: cores.textoForte, fontSize: '1rem', lineHeight: 1.2 }}>
                   {activeAlert?.target_name || activeAlert?.pessoa?.nome || 'Alvo em Monitoramento'}
                 </Typography>
-                <Typography variant="body2" sx={{ color: '#00D4FF', fontWeight: 700, fontFamily: '"Inter", sans-serif', mt: 0.3 }}>
+                <Typography variant="body2" sx={{ color: cores.primaria, fontWeight: 700, fontFamily: '"Inter", sans-serif', mt: 0.3 }}>
                   CPF: {activeAlert?.pessoa?.cpf || 'Não informado'}
                 </Typography>
                 {activeAlert?.pessoa?.funcao && (
@@ -1017,28 +1017,28 @@ const Monitor = () => {
               <Chip
                 label={comoRotulo(activeAlert?.watchlist?.nivel_alerta) || 'Crítico'}
                 size="small"
-                sx={{ bgcolor: '#FFB800', color: '#000000', fontWeight: 700, fontSize: '0.75rem' }}
+                sx={{ bgcolor: cores.alerta, color: '#000000', fontWeight: 700, fontSize: '0.75rem' }}
               />
             </Stack>
 
             <Divider sx={{ my: 1.5, borderColor: 'rgba(255,255,255,0.08)' }} />
 
-            <Typography variant="body2" sx={{ fontSize: '0.8125rem', color: '#FFB800', lineHeight: 1.4 }}>
+            <Typography variant="body2" sx={{ fontSize: '0.8125rem', color: cores.alerta, lineHeight: 1.4 }}>
               <b>Motivo da restrição:</b> {activeAlert?.watchlist?.motivo || 'Indivíduo cadastrado na Watchlist com restrição de acesso.'}
             </Typography>
           </Box>
 
           {/* LOCALIZAÇÃO E DISPOSITIVO */}
-          <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: 'rgba(0, 212, 255, 0.04)', border: '1px solid rgba(0, 212, 255, 0.2)' }}>
+          <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: tom(cores.primaria, 0.04), border: '1px solid rgba(0, 212, 255, 0.2)' }}>
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6}>
                 <Stack direction="row" spacing={1} alignItems="flex-start">
-                  <CameraIcon sx={{ color: '#00D4FF', fontSize: 20, mt: 0.2 }} />
+                  <CameraIcon sx={{ color: cores.primaria, fontSize: 20, mt: 0.2 }} />
                   <Box>
                     <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, fontSize: '0.75rem', }}>
                       Dispositivo CFTV
                     </Typography>
-                    <Typography variant="body2" fontWeight={700} color="#FFFFFF">
+                    <Typography variant="body2" fontWeight={700} color={cores.textoForte}>
                       {activeAlert?.dispositivo?.nome || activeAlert?.location || 'Câmera IP'}
                     </Typography>
                     <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.65)', fontFamily: '"Inter", sans-serif', display: 'block' }}>
@@ -1051,12 +1051,12 @@ const Monitor = () => {
 
               <Grid item xs={12} sm={6}>
                 <Stack direction="row" spacing={1} alignItems="flex-start">
-                  <AreaIcon sx={{ color: '#FFB800', fontSize: 20, mt: 0.2 }} />
+                  <AreaIcon sx={{ color: cores.alerta, fontSize: 20, mt: 0.2 }} />
                   <Box>
                     <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, fontSize: '0.75rem', }}>
                       Localização no evento
                     </Typography>
-                    <Typography variant="body2" fontWeight={700} sx={{ color: '#FFB800' }}>
+                    <Typography variant="body2" fontWeight={700} sx={{ color: cores.alerta }}>
                       {activeAlert?.localizacao?.nome_area || 'Área Principal do Evento'}
                     </Typography>
                     <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.65)', display: 'block' }}>
@@ -1085,7 +1085,7 @@ const Monitor = () => {
                 setOpenSecretAlertModal(false);
                 setActiveAlert(null);
               }}
-              sx={{ borderColor: '#00D4FF', color: '#00D4FF', fontWeight: 700, flex: { xs: '1 1 100%', sm: '0 0 auto' } }}
+              sx={{ borderColor: cores.primaria, color: cores.primaria, fontWeight: 700, flex: { xs: '1 1 100%', sm: '0 0 auto' } }}
             >
               Ver câmera ao vivo
             </Button>
@@ -1103,12 +1103,12 @@ const Monitor = () => {
               setActiveAlert(null);
             }}
             sx={{
-              bgcolor: '#00FF88',
+              bgcolor: cores.sucesso,
               color: '#000000',
               fontWeight: 700,
               flex: { xs: '1 1 auto', sm: '0 0 auto' },
               boxShadow: '0 4px 14px rgba(0, 230, 118, 0.4)',
-              '&:hover': { bgcolor: '#00FF88', color: '#000000' }
+              '&:hover': { bgcolor: cores.sucesso, color: '#000000' }
             }}
           >
             Concluir rastreamento
@@ -1138,16 +1138,16 @@ const Monitor = () => {
                  width: { xs: 'calc(100vw - 24px)', sm: 450 },
                  zIndex: 9999,
                  background: 'linear-gradient(135deg, rgba(255, 30, 86, 0.96) 0%, rgba(180, 0, 40, 0.98) 100%)',
-                 color: '#FFFFFF', borderRadius: 1.5,
+                 color: cores.textoForte, borderRadius: 1.5,
                  p: { xs: 2, sm: 3 }, boxShadow: '0 20px 50px rgba(255,0,80,0.4)', border: '2px solid #FF3366',
                  backdropFilter: 'blur(10px)'
              }}>
                  <Stack direction="row" spacing={1.5} justifyContent="space-between" alignItems="center">
                     <Stack direction="row" spacing={1} alignItems="center">
-                        <ShieldIcon sx={{ fontSize: { xs: 28, sm: 36 }, color: '#FFFFFF' }} />
+                        <ShieldIcon sx={{ fontSize: { xs: 28, sm: 36 }, color: cores.textoForte }} />
                         <Typography variant="h6" fontWeight={700} letterSpacing={0.5} sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>Acesso não autorizado!</Typography>
                     </Stack>
-                    <IconButton onClick={() => setActiveAreaAlert(null)} size="small" sx={{ color: '#FFFFFF' }}><CloseIcon /></IconButton>
+                    <IconButton onClick={() => setActiveAreaAlert(null)} size="small" sx={{ color: cores.textoForte }}><CloseIcon /></IconButton>
                  </Stack>
 
                  <Stack direction="row" spacing={2} mt={2} alignItems="center">
@@ -1157,12 +1157,12 @@ const Monitor = () => {
                         nome={activeAreaAlert?.pessoa_nome}
                         width={64}
                         borderRadius="10px"
-                        accentColor="#FF3366"
+                        accentColor={cores.erro}
                         borderWidth="2px"
                     />
                     <Box sx={{ minWidth: 0 }}>
                         <Typography fontWeight={700} sx={{ fontSize: { xs: '1.1rem', sm: '1.4rem' }, lineHeight: 1.2 }}>{activeAreaAlert?.pessoa_nome || 'Indivíduo Não Autorizado'}</Typography>
-                        <Chip label="Área restrita" sx={{ mt: 0.5, bgcolor: '#FFFFFF', color: '#FF3366', fontWeight: 700, height: 22 }} />
+                        <Chip label="Área restrita" sx={{ mt: 0.5, bgcolor: cores.textoForte, color: cores.erro, fontWeight: 700, height: 22 }} />
                     </Box>
                  </Stack>
                  <Divider sx={{ my: 1.5, borderColor: 'rgba(255,255,255,0.25)' }} />
@@ -1181,7 +1181,7 @@ const Monitor = () => {
           {/* CARROSSEL / SELETOR DE ÁREAS EM TEMPO REAL COM FILTRO DE 1 CLIQUE */}
           {stats.areas && stats.areas.length > 0 && (
               <Box sx={{ mb: 2.5 }}>
-                  <Typography variant="caption" fontWeight={700} color="#94A3B8" sx={{ letterSpacing: 1, mb: 1, display: 'block' }}>
+                  <Typography variant="caption" fontWeight={700} color={cores.textoSecundario} sx={{ letterSpacing: 1, mb: 1, display: 'block' }}>
                       Filtrar por área
                   </Typography>
                   <Stack direction="row" spacing={1.25} sx={{ overflowX: 'auto', pb: 1 }}>
@@ -1206,7 +1206,7 @@ const Monitor = () => {
                                   variant={isSelected ? 'filled' : 'outlined'}
                                   sx={{
                                       fontWeight: 700,
-                                      borderColor: isSelected ? '#00D4FF' : area.total_negados_hoje > 0 ? '#FF3366' : 'rgba(255,255,255,0.15)',
+                                      borderColor: isSelected ? cores.primaria : area.total_negados_hoje > 0 ? cores.erro : 'rgba(255,255,255,0.15)',
                                       boxShadow: isSelected ? '0 0 10px rgba(0,212,255,0.4)' : 'none'
                                   }}
                               />
@@ -1228,7 +1228,7 @@ const Monitor = () => {
                     flexWrap: 'wrap'
                 }}>
                     <Stack direction="row" spacing={1} alignItems="center" sx={{ display: { xs: 'none', md: 'flex' } }}>
-                        <FilterIcon sx={{ color: '#00D4FF', fontSize: 22 }} />
+                        <FilterIcon sx={{ color: cores.primaria, fontSize: 22 }} />
                     </Stack>
                     <FormControl size="small" sx={{ flex: { xs: '1 1 100%', sm: '1 1 180px' }, minWidth: 140 }}>
                         <InputLabel>Área</InputLabel>
@@ -1294,10 +1294,10 @@ const Monitor = () => {
                     flexDirection: 'column' 
                 }}>
                     <Box sx={{ p: 2, background: 'rgba(0,0,0,0.3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography variant="subtitle2" fontWeight={700} color="#FFFFFF">Acessos em tempo real</Typography>
+                        <Typography variant="subtitle2" fontWeight={700} color={cores.textoForte}>Acessos em tempo real</Typography>
                         <Stack direction="row" spacing={1} alignItems="center">
-                            {loading && <CircularProgress size={12} sx={{ color: '#00D4FF' }} />}
-                            <Typography variant="caption" color="#94A3B8">{logs.length} registros</Typography>
+                            {loading && <CircularProgress size={12} sx={{ color: cores.primaria }} />}
+                            <Typography variant="caption" color={cores.textoSecundario}>{logs.length} registros</Typography>
                         </Stack>
                     </Box>
                     {loading && logs.length === 0 && <LinearProgress sx={{ height: 2 }} />}
@@ -1305,7 +1305,7 @@ const Monitor = () => {
                         flex: 1, 
                         overflowY: 'auto',
                         '&::-webkit-scrollbar': { width: 6 },
-                        '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0, 212, 255, 0.2)', borderRadius: 1.5 }
+                        '&::-webkit-scrollbar-thumb': { bgcolor: tom(cores.primaria, 0.2), borderRadius: 1.5 }
                     }}>
                         {logsSemPermissao && (
                             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', p: 2 }}>
@@ -1314,7 +1314,7 @@ const Monitor = () => {
                         )}
                         {!loading && logs.length === 0 && !logsSemPermissao && (
                             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 2, opacity: 0.5 }}>
-                                <MonitorIcon sx={{ fontSize: 48, color: '#00D4FF' }} />
+                                <MonitorIcon sx={{ fontSize: 48, color: cores.primaria }} />
                                 <Typography variant="body2" color="text.secondary">Nenhum acesso registrado ainda.</Typography>
                                 <Typography variant="caption" color="text.secondary">Os eventos aparecerão aqui em tempo real conforme as pessoas passam pelos leitores.</Typography>
                             </Box>
@@ -1331,12 +1331,12 @@ const Monitor = () => {
                                         nome={log.pessoas?.nome_completo || log.pessoas?.nome || log.pessoa_nome}
                                         width={44}
                                         borderRadius="8px"
-                                        accentColor={isNegado ? '#FF3366' : isWatchlist ? '#FFB800' : isFiscalizacao ? '#00D4FF' : log.tipo === 'checkin' ? '#00FF88' : '#FF8800'}
+                                        accentColor={isNegado ? cores.erro : isWatchlist ? cores.alerta : isFiscalizacao ? cores.primaria : log.tipo === 'checkin' ? cores.sucesso : cores.saida}
                                     />
                                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                                        <Typography component="div" variant="body2" fontWeight={700} color={isWatchlist ? '#FFB800' : '#FFFFFF'} noWrap sx={{ fontSize: { xs: '0.875rem', sm: '0.9375rem' } }}>
+                                        <Typography component="div" variant="body2" fontWeight={700} color={isWatchlist ? cores.alerta : cores.textoForte} noWrap sx={{ fontSize: { xs: '0.875rem', sm: '0.9375rem' } }}>
                                             {log.pessoas?.nome_completo || log.pessoas?.nome || log.pessoa_nome || 'Anônimo'}
-                                            {isWatchlist && <Chip label="Monitorado" size="small" sx={{ ml: 1, bgcolor: '#FFB800', color: '#000000', fontWeight: 700, height: 18, fontSize: '0.6875rem' }} />}
+                                            {isWatchlist && <Chip label="Monitorado" size="small" sx={{ ml: 1, bgcolor: cores.alerta, color: '#000000', fontWeight: 700, height: 18, fontSize: '0.6875rem' }} />}
                                         </Typography>
                                         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 0, sm: 2 }}>
                                             <Typography variant="caption" color="text.secondary" noWrap>{log.area_nome || 'Sem área'}</Typography>
@@ -1345,18 +1345,18 @@ const Monitor = () => {
                                     </Box>
                                     <Box sx={{ textAlign: 'right', minWidth: { xs: 78, sm: 120 }, flexShrink: 0 }}>
                                         <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center">
-                                            {isNegado ? <BlockIcon sx={{ color: '#FF3366', fontSize: 16 }} /> : 
-                                             isFiscalizacao ? <SecurityIcon sx={{ color: '#00D4FF', fontSize: 16 }} /> :
-                                             log.tipo === 'checkin' ? <LoginIcon sx={{ color: '#00FF88', fontSize: 16 }} /> : 
-                                             <CheckoutIcon sx={{ color: '#FF8800', fontSize: 16 }} />}
+                                            {isNegado ? <BlockIcon sx={{ color: cores.erro, fontSize: 16 }} /> : 
+                                             isFiscalizacao ? <SecurityIcon sx={{ color: cores.primaria, fontSize: 16 }} /> :
+                                             log.tipo === 'checkin' ? <LoginIcon sx={{ color: cores.sucesso, fontSize: 16 }} /> : 
+                                             <CheckoutIcon sx={{ color: cores.saida, fontSize: 16 }} />}
                                             <Typography
                                                 variant="caption"
                                                 fontWeight={700}
                                                 sx={{ fontSize: { xs: '0.75rem', sm: '0.8125rem' } }}
                                                 color={
-                                                    isNegado ? '#FF3366' : 
-                                                    isFiscalizacao ? '#00D4FF' :
-                                                    log.tipo === 'checkin' ? '#00FF88' : '#FF8800'
+                                                    isNegado ? cores.erro : 
+                                                    isFiscalizacao ? cores.primaria :
+                                                    log.tipo === 'checkin' ? cores.sucesso : cores.saida
                                                 }
                                             >
                                                 {isNegado ? 'Negado' : isFiscalizacao ? 'Fiscaliz.' : log.tipo === 'checkin' ? 'Entrada' : 'Saída'}
@@ -1365,7 +1365,7 @@ const Monitor = () => {
                                         <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
                                             {formatLocalTime(log.created_at)}
                                         </Typography>
-                                        {isNegado && <Typography variant="caption" display="block" color="#FF3366" noWrap sx={{ maxWidth: { xs: 110, sm: 260 } }}>{log.observacao}</Typography>}
+                                        {isNegado && <Typography variant="caption" display="block" color={cores.erro} noWrap sx={{ maxWidth: { xs: 110, sm: 260 } }}>{log.observacao}</Typography>}
                                     </Box>
                                 </LogItem>
                             );
@@ -1400,23 +1400,23 @@ const Monitor = () => {
                           }}
                       >
                           <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1} mb={0.75}>
-                              <Typography variant="subtitle2" fontWeight={700} color="#FFFFFF" noWrap>
+                              <Typography variant="subtitle2" fontWeight={700} color={cores.textoForte} noWrap>
                                   {t.nome}
                               </Typography>
                               <Chip
                                   label={comoRotulo(t.status)}
                                   size="small"
                                   color={t.status === 'online' ? 'success' : 'error'}
-                                  sx={{ fontWeight: 700, height: 20, fontSize: '0.72rem' }}
+                                  sx={{ fontWeight: 700, height: 20, fontSize: '0.75rem' }}
                               />
                           </Stack>
                           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap mb={0.5}>
-                              <Chip label={comoRotulo(t.tipo)} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.7rem' }} />
+                              <Chip label={comoRotulo(t.tipo)} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.75rem' }} />
                               <Typography variant="caption" color="text.secondary">
-                                  Área: <b style={{ color: '#E2E8F0' }}>{t.evento_areas?.nome_area || t.evento_areas?.nome || 'Sem área'}</b>
+                                  Área: <b style={{ color: cores.textoSuave }}>{t.evento_areas?.nome_area || t.evento_areas?.nome || 'Sem área'}</b>
                               </Typography>
                           </Stack>
-                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: '0.72rem' }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: '0.75rem' }}>
                               Último contato: {t.ultimo_ping ? format(new Date(t.ultimo_ping), 'dd/MM HH:mm:ss') : 'Nunca conectado'}
                           </Typography>
                       </Box>
@@ -1429,7 +1429,7 @@ const Monitor = () => {
                   background: 'transparent',
                   overflowX: 'auto',
                   '&::-webkit-scrollbar': { height: 6 },
-                  '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0, 212, 255, 0.2)', borderRadius: 1.5 }
+                  '&::-webkit-scrollbar-thumb': { bgcolor: tom(cores.primaria, 0.2), borderRadius: 1.5 }
               }}>
                   <Table sx={{ minWidth: 620 }}>
                       <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.4)' }}>
@@ -1511,10 +1511,10 @@ const Monitor = () => {
                                   >
                                       <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1} mb={0.5}>
                                           <Box sx={{ minWidth: 0 }}>
-                                              <Typography variant="subtitle2" fontWeight={700} color="#FFFFFF" noWrap>
+                                              <Typography variant="subtitle2" fontWeight={700} color={cores.textoForte} noWrap>
                                                   {w.nome || 'Alvo Monitorado'}
                                               </Typography>
-                                              <Typography variant="caption" sx={{ fontFamily: '"Inter", sans-serif', color: '#FFB800', fontWeight: 700 }}>
+                                              <Typography variant="caption" sx={{ fontFamily: '"Inter", sans-serif', color: cores.alerta, fontWeight: 700 }}>
                                                   CPF: {w.cpf}
                                               </Typography>
                                           </Box>
@@ -1522,7 +1522,7 @@ const Monitor = () => {
                                               label={comoRotulo(w.nivel_alerta || 'alto')}
                                               size="small"
                                               color={w.nivel_alerta === 'critico' ? 'error' : w.nivel_alerta === 'alto' ? 'warning' : 'info'}
-                                              sx={{ fontWeight: 700, height: 20, fontSize: '0.7rem' }}
+                                              sx={{ fontWeight: 700, height: 20, fontSize: '0.75rem' }}
                                           />
                                       </Stack>
                                       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.25 }}>
@@ -1536,10 +1536,10 @@ const Monitor = () => {
                                               startIcon={<VisibilityOffIcon fontSize="small" />}
                                               onClick={() => handleOpenDeixarMonitorar(w)}
                                               sx={{
-                                                  fontSize: '0.72rem',
+                                                  fontSize: '0.75rem',
                                                   fontWeight: 700,
-                                                  borderColor: '#00D4FF',
-                                                  color: '#00D4FF',
+                                                  borderColor: cores.primaria,
+                                                  color: cores.primaria,
                                                   py: 0.5
                                               }}
                                           >
@@ -1552,7 +1552,7 @@ const Monitor = () => {
                                               size="small"
                                               startIcon={<CheckCircleIcon fontSize="small" />}
                                               onClick={() => handleOpenUnblock(w)}
-                                              sx={{ fontSize: '0.72rem', fontWeight: 700, py: 0.5 }}
+                                              sx={{ fontSize: '0.75rem', fontWeight: 700, py: 0.5 }}
                                           >
                                               Desbloquear
                                           </Button>
@@ -1604,11 +1604,11 @@ const Monitor = () => {
                                                           sx={{ 
                                                               fontSize: '0.75rem', 
                                                               fontWeight: 700, 
-                                                              borderColor: '#00D4FF', 
-                                                              color: '#00D4FF',
+                                                              borderColor: cores.primaria, 
+                                                              color: cores.primaria,
                                                               px: 1.2,
                                                               py: 0.5,
-                                                              '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.1)', borderColor: '#00D4FF' } 
+                                                              '&:hover': { bgcolor: tom(cores.primaria, 0.1), borderColor: cores.primaria } 
                                                           }}
                                                       >
                                                           Localizado
@@ -1655,7 +1655,7 @@ const Monitor = () => {
                           <IconButton 
                               size="small" 
                               onClick={() => setOpenContactDialog(true)}
-                              sx={{ bgcolor: 'rgba(0,212,255,0.1)', color: '#00D4FF', '&:hover': { bgcolor: 'rgba(0,212,255,0.2)' } }}
+                              sx={{ bgcolor: tom(cores.primaria, 0.1), color: cores.primaria, '&:hover': { bgcolor: tom(cores.primaria, 0.2) } }}
                           >
                               <AddIcon fontSize="small" />
                           </IconButton>
@@ -1667,7 +1667,7 @@ const Monitor = () => {
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                                       <Avatar sx={{ 
                                           bgcolor: c.canal === 'telegram' ? 'rgba(0, 136, 204, 0.2)' : c.canal === 'whatsapp' ? 'rgba(37, 211, 102, 0.2)' : 'rgba(255, 136, 0, 0.2)',
-                                          color: c.canal === 'telegram' ? '#0099BB' : c.canal === 'whatsapp' ? '#25D366' : '#FF8800',
+                                          color: c.canal === 'telegram' ? '#0099BB' : c.canal === 'whatsapp' ? cores.whatsapp : cores.saida,
                                           width: 36, height: 36
                                       }}>
                                           {c.canal === 'telegram' ? <TelegramIcon sx={{ fontSize: 20 }} /> : c.canal === 'whatsapp' ? <WhatsAppIcon sx={{ fontSize: 20 }} /> : <EmailIcon sx={{ fontSize: 20 }} />}
@@ -1702,7 +1702,7 @@ const Monitor = () => {
                               variant="outlined" 
                               startIcon={<AddIcon />} 
                               onClick={() => setOpenContactDialog(true)}
-                              sx={{ mt: 1, borderColor: '#00D4FF', color: '#00D4FF' }}
+                              sx={{ mt: 1, borderColor: cores.primaria, color: cores.primaria }}
                           >
                               Adicionar contato
                           </Button>
@@ -1720,11 +1720,11 @@ const Monitor = () => {
                 <Box sx={{ width: '100%' }}>
                     <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.5 }}>
                         <Typography variant="h5" fontWeight={700} sx={{ fontSize: { xs: '1.1rem', sm: '1.35rem' }, letterSpacing: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <DvrIcon sx={{ color: '#00D4FF', fontSize: { xs: 22, sm: 28 } }} />
+                            <DvrIcon sx={{ color: cores.primaria, fontSize: { xs: 22, sm: 28 } }} />
                             Central de monitoramento CFTV
                         </Typography>
                         {(() => {
-                            const cor = iaErro ? '#FF3366' : iaStatus ? (iaStatus.hardware_acceleration === 'CPU' ? '#FFB800' : '#00FF88') : '#94A3B8';
+                            const cor = iaErro ? cores.erro : iaStatus ? (iaStatus.hardware_acceleration === 'CPU' ? cores.alerta : cores.sucesso) : cores.textoSecundario;
                             const rotulo = iaErro ? 'IA offline'
                                 : iaStatus ? `IA ativa • ${iaStatus.hardware_acceleration}`
                                 : 'Verificando IA...';
@@ -1734,7 +1734,7 @@ const Monitor = () => {
                                         icon={<DotIcon sx={{ fontSize: 10, color: `${cor} !important` }} />}
                                         label={rotulo}
                                         size="small"
-                                        sx={{ bgcolor: `${cor}1F`, color: cor, border: '1px solid currentColor', fontWeight: 700, fontSize: '0.72rem', height: 22 }}
+                                        sx={{ bgcolor: `${cor}1F`, color: cor, border: '1px solid currentColor', fontWeight: 700, fontSize: '0.75rem', height: 22 }}
                                     />
                                 </Tooltip>
                             );
@@ -1743,11 +1743,11 @@ const Monitor = () => {
                             label={`${displayedCameras.length}/${cameras.length} no mosaico`}
                             size="small"
                             sx={{
-                                bgcolor: 'rgba(0, 212, 255, 0.12)',
-                                color: '#00D4FF',
+                                bgcolor: tom(cores.primaria, 0.12),
+                                color: cores.primaria,
                                 border: '1px solid rgba(0, 212, 255, 0.3)',
                                 fontWeight: 700,
-                                fontSize: '0.72rem',
+                                fontSize: '0.75rem',
                                 height: 22
                             }}
                         />
@@ -1766,7 +1766,7 @@ const Monitor = () => {
                         rel="noopener noreferrer"
                         variant="contained"
                         startIcon={<AbrirIcon />}
-                        sx={{ flexShrink: 0, whiteSpace: 'nowrap', fontWeight: 700, bgcolor: '#00D4FF', color: '#031018', '&:hover': { bgcolor: '#33DDFF' } }}
+                        sx={{ flexShrink: 0, whiteSpace: 'nowrap', fontWeight: 700, bgcolor: cores.primaria, color: '#031018', '&:hover': { bgcolor: cores.primariaHover } }}
                     >
                         Central em tempo real
                     </Button>
@@ -1836,10 +1836,10 @@ const Monitor = () => {
                                     fontWeight: 700,
                                     px: 1.25,
                                     minWidth: 44,
-                                    bgcolor: active ? '#00D4FF' : 'transparent',
-                                    color: active ? '#000000' : '#94A3B8',
+                                    bgcolor: active ? cores.primaria : 'transparent',
+                                    color: active ? '#000000' : cores.textoSecundario,
                                     borderColor: 'rgba(255,255,255,0.15)',
-                                    '&:hover': { bgcolor: active ? '#00D4FF' : 'rgba(255,255,255,0.05)' }
+                                    '&:hover': { bgcolor: active ? cores.primaria : 'rgba(255,255,255,0.05)' }
                                 }}
                             >
                                 {label}
@@ -1864,10 +1864,10 @@ const Monitor = () => {
                                     fontWeight: 700,
                                     px: 1.2,
                                     whiteSpace: 'nowrap',
-                                    bgcolor: gridColumns === id ? '#00D4FF' : 'transparent',
-                                    color: gridColumns === id ? '#000000' : '#94A3B8',
+                                    bgcolor: gridColumns === id ? cores.primaria : 'transparent',
+                                    color: gridColumns === id ? '#000000' : cores.textoSecundario,
                                     borderColor: 'rgba(255,255,255,0.15)',
-                                    '&:hover': { bgcolor: gridColumns === id ? '#00D4FF' : 'rgba(255,255,255,0.05)' }
+                                    '&:hover': { bgcolor: gridColumns === id ? cores.primaria : 'rgba(255,255,255,0.05)' }
                                 }}
                             >
                                 {label}
@@ -1886,8 +1886,8 @@ const Monitor = () => {
                                 px: 1.2,
                                 whiteSpace: 'nowrap',
                                 bgcolor: liveStreamInGrid ? 'rgba(0, 255, 136, 0.15)' : 'transparent',
-                                color: liveStreamInGrid ? '#00FF88' : '#94A3B8',
-                                borderColor: liveStreamInGrid ? '#00FF88' : 'rgba(255,255,255,0.15)',
+                                color: liveStreamInGrid ? cores.sucesso : cores.textoSecundario,
+                                borderColor: liveStreamInGrid ? cores.sucesso : 'rgba(255,255,255,0.15)',
                                 '&:hover': { bgcolor: 'rgba(0, 255, 136, 0.2)' }
                             }}
                         >
@@ -1901,10 +1901,10 @@ const Monitor = () => {
                                 fontWeight: 700,
                                 px: 1.2,
                                 whiteSpace: 'nowrap',
-                                bgcolor: !liveStreamInGrid ? 'rgba(0, 212, 255, 0.15)' : 'transparent',
-                                color: !liveStreamInGrid ? '#00D4FF' : '#94A3B8',
-                                borderColor: !liveStreamInGrid ? '#00D4FF' : 'rgba(255,255,255,0.15)',
-                                '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.2)' }
+                                bgcolor: !liveStreamInGrid ? tom(cores.primaria, 0.15) : 'transparent',
+                                color: !liveStreamInGrid ? cores.primaria : cores.textoSecundario,
+                                borderColor: !liveStreamInGrid ? cores.primaria : 'rgba(255,255,255,0.15)',
+                                '&:hover': { bgcolor: tom(cores.primaria, 0.2) }
                             }}
                         >
                             Snapshots
@@ -1921,7 +1921,7 @@ const Monitor = () => {
                             display: { xs: 'none', sm: 'inline-flex' },
                             height: 32,
                             borderColor: 'rgba(0, 255, 136, 0.5)',
-                            color: '#00FF88',
+                            color: cores.sucesso,
                             fontWeight: 700,
                             fontSize: '0.75rem',
                             px: 1.5,
@@ -1929,7 +1929,7 @@ const Monitor = () => {
                             whiteSpace: 'nowrap',
                             bgcolor: 'rgba(0, 255, 136, 0.05)',
                             '&:hover': {
-                                borderColor: '#00FF88',
+                                borderColor: cores.sucesso,
                                 bgcolor: 'rgba(0, 255, 136, 0.15)'
                             }
                         }}
@@ -1947,7 +1947,7 @@ const Monitor = () => {
                                     height: 32,
                                     width: 32,
                                     border: '1px solid rgba(255,255,255,0.18)',
-                                    color: somAtivo ? '#00FF88' : '#FF3366',
+                                    color: somAtivo ? cores.sucesso : cores.erro,
                                     borderRadius: 1.5
                                 }}
                             >
@@ -1964,9 +1964,9 @@ const Monitor = () => {
                                     height: 32,
                                     width: 32,
                                     border: '1px solid rgba(255,255,255,0.18)',
-                                    color: '#00D4FF',
+                                    color: cores.primaria,
                                     borderRadius: 1.5,
-                                    '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.1)', borderColor: '#00D4FF' }
+                                    '&:hover': { bgcolor: tom(cores.primaria, 0.1), borderColor: cores.primaria }
                                 }}
                             >
                                 <RefreshIcon sx={{ fontSize: 16 }} />
@@ -1980,7 +1980,7 @@ const Monitor = () => {
             {displayedCameras.length === 0 ? (
                 <GlassCard sx={{ p: { xs: 3, sm: 5 }, textAlign: 'center', border: '1px dashed rgba(0, 212, 255, 0.3)' }}>
                     <CameraIcon sx={{ fontSize: 52, color: 'text.secondary', mb: 1.5, opacity: 0.5 }} />
-                    <Typography variant="h6" fontWeight={700} color="#FFFFFF" gutterBottom sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
+                    <Typography variant="h6" fontWeight={700} color={cores.textoForte} gutterBottom sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
                         {cameras.length === 0 ? 'Nenhuma câmera IP cadastrada no sistema' : 'Nenhuma câmera selecionada no mosaico'}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 520, mx: 'auto', mb: 2.5 }}>
@@ -1994,7 +1994,7 @@ const Monitor = () => {
                                 variant="contained"
                                 startIcon={<GridViewIcon />}
                                 onClick={() => setOpenSelectCamerasDialog(true)}
-                                sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700 }}
+                                sx={{ bgcolor: cores.primaria, color: '#000000', fontWeight: 700 }}
                             >
                                 Selecionar câmeras no mosaico
                             </Button>
@@ -2003,7 +2003,7 @@ const Monitor = () => {
                                 variant="contained"
                                 startIcon={<SettingsIcon />}
                                 onClick={() => setOpenGerenciarCamerasModal(true)}
-                                sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700 }}
+                                sx={{ bgcolor: cores.primaria, color: '#000000', fontWeight: 700 }}
                             >
                                 Gerenciar câmeras agora
                             </Button>
@@ -2034,14 +2034,14 @@ const Monitor = () => {
                                 <GlassCard sx={{
                                     p: 0,
                                     overflow: 'hidden',
-                                    transition: 'all 0.3s ease',
+                                    transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, opacity 0.3s ease, transform 0.3s ease',
                                     opacity: isDesativada ? 0.72 : 1,
                                     border: isAlertActive
                                         ? '2px solid #FF3366'
                                         : isDesativada
                                             ? '1px dashed rgba(255, 184, 0, 0.35)'
                                             : '1px solid rgba(0, 212, 255, 0.2)',
-                                    bgcolor: '#050B18',
+                                    bgcolor: cores.fundo,
                                     boxShadow: isAlertActive ? '0 0 30px rgba(255, 30, 86, 0.7)' : '0 10px 25px rgba(0,0,0,0.6)',
                                     display: 'flex',
                                     flexDirection: 'column'
@@ -2057,15 +2057,15 @@ const Monitor = () => {
                                         borderBottom: '1px solid rgba(255,255,255,0.06)'
                                     }}>
                                         <Stack direction="row" spacing={0.75} alignItems="center" sx={{ overflow: 'hidden', flex: 1, mr: 0.75 }}>
-                                            <CameraIcon sx={{ fontSize: 15, color: isDesativada ? '#FFB800' : '#00D4FF', flexShrink: 0 }} />
-                                            <Typography variant="subtitle2" fontWeight={700} noWrap sx={{ fontSize: { xs: isCompactMobile ? '0.75rem' : '0.8125rem', sm: '0.8125rem' }, color: '#FFFFFF' }}>
+                                            <CameraIcon sx={{ fontSize: 15, color: isDesativada ? cores.alerta : cores.primaria, flexShrink: 0 }} />
+                                            <Typography variant="subtitle2" fontWeight={700} noWrap sx={{ fontSize: { xs: isCompactMobile ? '0.75rem' : '0.8125rem', sm: '0.8125rem' }, color: cores.textoForte }}>
                                                 {cam.nome}
                                             </Typography>
                                             {cam.area?.nome_area && (
                                                 <Chip
                                                     label={cam.area.nome_area}
                                                     size="small"
-                                                    sx={{ display: { xs: isCompactMobile ? 'none' : 'inline-flex', sm: 'inline-flex' }, height: 18, fontSize: '0.7rem', bgcolor: 'rgba(255,255,255,0.08)', color: '#94A3B8', fontWeight: 700 }}
+                                                    sx={{ display: { xs: isCompactMobile ? 'none' : 'inline-flex', sm: 'inline-flex' }, height: 18, fontSize: '0.75rem', bgcolor: 'rgba(255,255,255,0.08)', color: cores.textoSecundario, fontWeight: 700 }}
                                                 />
                                             )}
                                         </Stack>
@@ -2073,7 +2073,7 @@ const Monitor = () => {
                                             label={isDesativada ? 'Pausada' : (comoRotulo(cam.status) || 'Offline')}
                                             size="small"
                                             color={isDesativada ? 'warning' : cam.status === 'online' ? 'success' : 'error'}
-                                            sx={{ height: 18, fontSize: '0.68rem', fontWeight: 700, '& .MuiChip-label': { px: 0.75 } }}
+                                            sx={{ height: 18, fontSize: '0.75rem', fontWeight: 700, '& .MuiChip-label': { px: 0.75 } }}
                                         />
                                     </Box>
 
@@ -2110,14 +2110,14 @@ const Monitor = () => {
                                             display: 'flex', alignItems: 'center', gap: 0.5,
                                             border: '1px solid rgba(255,255,255,0.1)'
                                         }}>
-                                            <DotIcon sx={{ fontSize: 8, color: isDesativada ? '#FFB800' : (stCam ? stCam.conectada : cam.status === 'online') ? '#00FF88' : '#94A3B8' }} />
-                                            <Typography variant="caption" sx={{ fontFamily: '"Inter", sans-serif', fontSize: { xs: isCompactMobile ? '0.65rem' : '0.72rem', sm: '0.75rem' }, color: '#FFFFFF', fontWeight: 700 }}>
+                                            <DotIcon sx={{ fontSize: 8, color: isDesativada ? cores.alerta : (stCam ? stCam.conectada : cam.status === 'online') ? cores.sucesso : cores.textoSecundario }} />
+                                            <Typography variant="caption" sx={{ fontFamily: '"Inter", sans-serif', fontSize: { xs: isCompactMobile ? '0.65rem' : '0.72rem', sm: '0.75rem' }, color: cores.textoForte, fontWeight: 700 }}>
                                                 {isDesativada ? 'PAUSADA' : `${aoVivo ? 'AO VIVO' : 'SNAP'}${stCam?.conectada ? ` • ${Math.round(stCam.video_fps)} fps` : ''}`}
                                             </Typography>
                                             {stCam?.rostos > 0 && (
                                                 <>
-                                                    <RostoIcon sx={{ fontSize: 11, color: '#00D4FF', ml: 0.3 }} />
-                                                    <Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#00D4FF', fontWeight: 700 }}>
+                                                    <RostoIcon sx={{ fontSize: 11, color: cores.primaria, ml: 0.3 }} />
+                                                    <Typography variant="caption" sx={{ fontSize: '0.75rem', color: cores.primaria, fontWeight: 700 }}>
                                                         {stCam.rostos}
                                                     </Typography>
                                                 </>
@@ -2137,15 +2137,15 @@ const Monitor = () => {
 
                                             {!isDesativada && (
                                                 <Box sx={{
-                                                    bgcolor: 'rgba(0, 212, 255, 0.2)',
+                                                    bgcolor: tom(cores.primaria, 0.2),
                                                     border: '1px solid rgba(0, 212, 255, 0.4)',
                                                     borderRadius: 1,
                                                     px: 0.6, py: 0.15,
                                                     display: 'flex', alignItems: 'center', gap: 0.3,
                                                     flexShrink: 0
                                                 }}>
-                                                    <FullscreenIcon sx={{ fontSize: 12, color: '#00D4FF' }} />
-                                                    <Typography variant="caption" sx={{ display: { xs: isCompactMobile ? 'none' : 'inline', sm: 'inline' }, fontSize: '0.7rem', color: '#00D4FF', fontWeight: 700 }}>
+                                                    <FullscreenIcon sx={{ fontSize: 12, color: cores.primaria }} />
+                                                    <Typography variant="caption" sx={{ display: { xs: isCompactMobile ? 'none' : 'inline', sm: 'inline' }, fontSize: '0.75rem', color: cores.primaria, fontWeight: 700 }}>
                                                         Expandir
                                                     </Typography>
                                                 </Box>
@@ -2161,7 +2161,7 @@ const Monitor = () => {
                                                 startIcon={isToggling ? <CircularProgress size={14} color="inherit" /> : <PowerIcon sx={{ fontSize: 15 }} />}
                                                 disabled={isToggling}
                                                 onClick={() => handleToggleCameraStatus(cam)}
-                                                sx={{ height: 30, minHeight: 30, fontWeight: 700, fontSize: '0.72rem', px: 1 }}
+                                                sx={{ height: 30, minHeight: 30, fontWeight: 700, fontSize: '0.75rem', px: 1 }}
                                             >
                                                 Ativar
                                             </Button>
@@ -2171,7 +2171,7 @@ const Monitor = () => {
                                                     size="small" fullWidth variant="outlined"
                                                     startIcon={<CameraIcon sx={{ fontSize: 15, display: { xs: isCompactMobile ? 'none' : 'inline-flex', sm: 'inline-flex' } }} />}
                                                     onClick={() => setActiveStreamCam(cam)}
-                                                    sx={{ ...botaoSecundario, height: 30, minHeight: 30, fontSize: '0.72rem', px: 1 }}
+                                                    sx={{ ...botaoSecundario, height: 30, minHeight: 30, fontSize: '0.75rem', px: 1 }}
                                                 >
                                                     Ao vivo
                                                 </Button>
@@ -2179,7 +2179,7 @@ const Monitor = () => {
                                                     size="small" fullWidth variant="outlined"
                                                     disabled={testResults[cam.id] === 'testing'}
                                                     onClick={() => handleTestCamera(cam.id)}
-                                                    sx={{ ...botaoSecundario, height: 30, minHeight: 30, fontSize: '0.72rem', px: 1, display: { xs: isCompactMobile ? 'none' : 'inline-flex', sm: 'inline-flex' } }}
+                                                    sx={{ ...botaoSecundario, height: 30, minHeight: 30, fontSize: '0.75rem', px: 1, display: { xs: isCompactMobile ? 'none' : 'inline-flex', sm: 'inline-flex' } }}
                                                 >
                                                     {testResults[cam.id] === 'testing' ? <CircularProgress size={14} /> : 'Testar'}
                                                 </Button>
@@ -2192,7 +2192,7 @@ const Monitor = () => {
                                                             height: 30,
                                                             width: 30,
                                                             flexShrink: 0,
-                                                            color: '#FFB800',
+                                                            color: cores.alerta,
                                                             border: '1px solid rgba(255, 184, 0, 0.35)',
                                                             borderRadius: 1.5,
                                                             '&:hover': { bgcolor: 'rgba(255, 184, 0, 0.15)' }
@@ -2208,7 +2208,7 @@ const Monitor = () => {
                                                 size="small"
                                                 label={testResults[cam.id] === 'online' ? 'Online' : 'Offline'}
                                                 color={testResults[cam.id] === 'online' ? 'success' : 'error'}
-                                                sx={{ display: { xs: isCompactMobile ? 'none' : 'inline-flex', sm: 'inline-flex' }, height: 24, fontSize: '0.7rem', fontWeight: 700 }}
+                                                sx={{ display: { xs: isCompactMobile ? 'none' : 'inline-flex', sm: 'inline-flex' }, height: 24, fontSize: '0.75rem', fontWeight: 700 }}
                                             />
                                         )}
                                     </Box>
@@ -2223,7 +2223,7 @@ const Monitor = () => {
             {isAdminMaster && historicoAlertas.length > 0 && (
                 <GlassCard sx={{ mt: 2, p: 2 }}>
                     <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <AlarmIcon sx={{ fontSize: 18, color: '#FF3366' }} /> Últimos alertas das câmeras
+                        <AlarmIcon sx={{ fontSize: 18, color: cores.erro }} /> Últimos alertas das câmeras
                     </Typography>
                     <Stack spacing={0.5}>
                         {historicoAlertas.map(a => (
@@ -2344,7 +2344,7 @@ const Monitor = () => {
         {activeStreamCam && visaoNoturna?.noturno && (
             <Box sx={{ position: 'absolute', top: 12, left: 12, zIndex: 5, pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: 0.75,
                 bgcolor: 'rgba(0,0,0,0.7)', border: '1px solid rgba(255,255,255,0.35)', borderRadius: 1.5, px: 1, py: 0.4 }}>
-                <Typography variant="caption" sx={{ color: '#FFFFFF', fontWeight: 700, fontSize: '0.75rem' }}>
+                <Typography variant="caption" sx={{ color: cores.textoForte, fontWeight: 700, fontSize: '0.75rem' }}>
                     Visão noturna (infravermelho): IA reconhece menos sem luz
                 </Typography>
             </Box>
@@ -2365,12 +2365,12 @@ const Monitor = () => {
                     zIndex: 21,
                     width: 40,
                     height: 40,
-                    borderRadius: 2,
-                    color: '#FFFFFF',
+                    borderRadius: 1.5,
+                    color: cores.textoForte,
                     bgcolor: 'rgba(0, 0, 0, 0.45)',
                     border: '1px solid rgba(255, 255, 255, 0.25)',
                     backdropFilter: 'blur(8px)',
-                    '&:hover': { bgcolor: 'rgba(255, 51, 102, 0.35)', borderColor: '#FF3366' }
+                    '&:hover': { bgcolor: 'rgba(255, 51, 102, 0.35)', borderColor: cores.erro }
                 }}
             >
                 <CloseIcon fontSize="small" />
@@ -2411,7 +2411,7 @@ const Monitor = () => {
                                 width: { xs: 34, sm: 38 },
                                 height: { xs: 34, sm: 38 },
                                 borderRadius: 1.5,
-                                bgcolor: 'rgba(0, 212, 255, 0.2)',
+                                bgcolor: tom(cores.primaria, 0.2),
                                 backdropFilter: 'blur(8px)',
                                 border: '1px solid rgba(0, 212, 255, 0.4)',
                                 display: 'flex',
@@ -2419,13 +2419,13 @@ const Monitor = () => {
                                 justifyContent: 'center',
                                 flexShrink: 0
                             }}>
-                                <CameraIcon sx={{ fontSize: { xs: 20, sm: 22 }, color: '#00D4FF' }} />
+                                <CameraIcon sx={{ fontSize: { xs: 20, sm: 22 }, color: cores.primaria }} />
                             </Box>
                             <Box sx={{ minWidth: 0, flex: 1 }}>
-                                <Typography variant="h6" fontWeight={700} color="#FFFFFF" noWrap sx={{ fontSize: { xs: '0.95rem', sm: '1.15rem' }, lineHeight: 1.25, textShadow: '0 2px 8px rgba(0,0,0,0.9)' }}>
+                                <Typography variant="h6" fontWeight={700} color={cores.textoForte} noWrap sx={{ fontSize: { xs: '0.95rem', sm: '1.15rem' }, lineHeight: 1.25, textShadow: '0 2px 8px rgba(0,0,0,0.9)' }}>
                                     {activeStreamCam?.nome || 'Transmissão ao vivo'}
                                 </Typography>
-                                <Typography variant="caption" noWrap sx={{ color: '#00D4FF', fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' }, textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}>
+                                <Typography variant="caption" noWrap sx={{ color: cores.primaria, fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' }, textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}>
                                     {activeStreamCam?.area?.nome_area
                                         ? `Área: ${activeStreamCam.area.nome_area} • Reconhecimento Facial IA`
                                         : 'Stream IP / RTSP • Reconhecimento Facial ArcFace'}
@@ -2436,25 +2436,25 @@ const Monitor = () => {
                         {/* Botões do Topo: Zoom + Alternador Janela/Full (Desktop) + Fechar */}
                         <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexShrink: 0 }}>
                             {/* Controles de Zoom */}
-                            <ButtonGroup size="small" sx={{ height: 32, bgcolor: 'rgba(0, 0, 0, 0.55)', backdropFilter: 'blur(8px)', borderRadius: 2, border: '1px solid rgba(255,255,255,0.18)' }}>
+                            <ButtonGroup size="small" sx={{ height: 32, bgcolor: 'rgba(0, 0, 0, 0.55)', backdropFilter: 'blur(8px)', borderRadius: 1.5, border: '1px solid rgba(255,255,255,0.18)' }}>
                                 <IconButton
                                     size="small"
                                     onClick={(e) => { e.stopPropagation(); resetPlayerControlsTimer(); setStreamZoom(z => Math.max(80, z - 15)); }}
-                                    sx={{ color: '#E2E8F0', width: 28, height: 32 }}
+                                    sx={{ color: cores.textoSuave, width: 28, height: 32 }}
                                 >
                                     <ZoomOutIcon sx={{ fontSize: 16 }} />
                                 </IconButton>
                                 <Button
                                     size="small"
                                     onClick={(e) => { e.stopPropagation(); resetPlayerControlsTimer(); setStreamZoom(100); }}
-                                    sx={{ fontSize: '0.72rem', fontWeight: 700, px: 0.8, minWidth: 40, height: 32, color: '#00D4FF' }}
+                                    sx={{ fontSize: '0.75rem', fontWeight: 700, px: 0.8, minWidth: 40, height: 32, color: cores.primaria }}
                                 >
                                     {streamZoom}%
                                 </Button>
                                 <IconButton
                                     size="small"
                                     onClick={(e) => { e.stopPropagation(); resetPlayerControlsTimer(); setStreamZoom(z => Math.min(220, z + 15)); }}
-                                    sx={{ color: '#E2E8F0', width: 28, height: 32 }}
+                                    sx={{ color: cores.textoSuave, width: 28, height: 32 }}
                                 >
                                     <ZoomInIcon sx={{ fontSize: 16 }} />
                                 </IconButton>
@@ -2471,14 +2471,14 @@ const Monitor = () => {
                                             setStreamModalSize(s => s === 'fullscreen' ? 'lg' : 'fullscreen');
                                         }}
                                         sx={{
-                                            color: streamModalSize === 'fullscreen' ? '#00D4FF' : '#E2E8F0',
+                                            color: streamModalSize === 'fullscreen' ? cores.primaria : cores.textoSuave,
                                             bgcolor: 'rgba(0, 0, 0, 0.55)',
                                             backdropFilter: 'blur(8px)',
                                             border: '1px solid rgba(255,255,255,0.18)',
                                             width: 34,
                                             height: 34,
-                                            borderRadius: 2,
-                                            '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.2)', borderColor: '#00D4FF' }
+                                            borderRadius: 1.5,
+                                            '&:hover': { bgcolor: tom(cores.primaria, 0.2), borderColor: cores.primaria }
                                         }}
                                     >
                                         {streamModalSize === 'fullscreen' ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
@@ -2492,14 +2492,14 @@ const Monitor = () => {
                                 size="small"
                                 aria-label="Fechar câmera"
                                 sx={{
-                                    color: '#FFFFFF',
+                                    color: cores.textoForte,
                                     bgcolor: 'rgba(255, 255, 255, 0.15)',
                                     backdropFilter: 'blur(8px)',
                                     border: '1px solid rgba(255, 255, 255, 0.25)',
                                     width: 34,
                                     height: 34,
-                                    borderRadius: 2,
-                                    '&:hover': { bgcolor: 'rgba(255, 51, 102, 0.35)', borderColor: '#FF3366' }
+                                    borderRadius: 1.5,
+                                    '&:hover': { bgcolor: 'rgba(255, 51, 102, 0.35)', borderColor: cores.erro }
                                 }}
                             >
                                 <CloseIcon fontSize="small" />
@@ -2522,9 +2522,9 @@ const Monitor = () => {
                                     sx={{
                                         bgcolor: 'rgba(0, 255, 136, 0.18)',
                                         border: '1px solid rgba(0, 255, 136, 0.35)',
-                                        color: '#00FF88',
+                                        color: cores.sucesso,
                                         fontWeight: 700,
-                                        fontSize: '0.72rem',
+                                        fontSize: '0.75rem',
                                         height: 24,
                                         backdropFilter: 'blur(8px)'
                                     }}
@@ -2536,7 +2536,7 @@ const Monitor = () => {
 
                 {/* CENTRO: AVISO SUTIL DE INTERAÇÃO (TOCAR NA TELA OCULTA / MOSTRA) */}
                 <Box sx={{ textAlign: 'center', pointerEvents: 'none', px: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.4)', textShadow: '0 1px 4px rgba(0,0,0,0.9)', fontSize: '0.7rem' }}>
+                    <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.4)', textShadow: '0 1px 4px rgba(0,0,0,0.9)', fontSize: '0.75rem' }}>
                         Toque no vídeo para ocultar / exibir os controles
                     </Typography>
                 </Box>
@@ -2561,7 +2561,7 @@ const Monitor = () => {
                             <Chip
                                 label={activeStreamCam.fabricante}
                                 size="small"
-                                sx={{ height: 20, fontSize: '0.68rem', bgcolor: 'rgba(255,255,255,0.1)', color: '#CBD5E1', border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(6px)' }}
+                                sx={{ height: 20, fontSize: '0.75rem', bgcolor: 'rgba(255,255,255,0.1)', color: cores.textoSuave, border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(6px)' }}
                             />
                         )}
                     </Stack>
@@ -2582,10 +2582,10 @@ const Monitor = () => {
                                     fontWeight: 700,
                                     flex: { xs: 1, sm: 'initial' },
                                     minHeight: { xs: 42, sm: 36 },
-                                    borderRadius: 2,
+                                    borderRadius: 1.5,
                                     bgcolor: 'rgba(255, 184, 0, 0.25)',
                                     border: '1px solid #FFB800',
-                                    color: '#FFB800',
+                                    color: cores.alerta,
                                     backdropFilter: 'blur(8px)',
                                     textTransform: 'none',
                                     whiteSpace: 'nowrap',
@@ -2608,14 +2608,14 @@ const Monitor = () => {
                                 fontWeight: 700,
                                 flex: { xs: 1, sm: 'initial' },
                                 minHeight: { xs: 42, sm: 36 },
-                                borderRadius: 2,
-                                bgcolor: 'rgba(0, 212, 255, 0.25)',
+                                borderRadius: 1.5,
+                                bgcolor: tom(cores.primaria, 0.25),
                                 border: '1px solid #00D4FF',
-                                color: '#00D4FF',
+                                color: cores.primaria,
                                 backdropFilter: 'blur(8px)',
                                 textTransform: 'none',
                                 whiteSpace: 'nowrap',
-                                '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.4)' }
+                                '&:hover': { bgcolor: tom(cores.primaria, 0.4) }
                             }}
                         >
                             Sair da tela cheia
@@ -2640,9 +2640,9 @@ const Monitor = () => {
       >
           <DialogTitle sx={{ pb: 1, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
               <Stack direction="row" spacing={1.5} alignItems="center">
-                  <GridViewIcon sx={{ fontSize: 24, color: '#00D4FF', flexShrink: 0 }} />
+                  <GridViewIcon sx={{ fontSize: 24, color: cores.primaria, flexShrink: 0 }} />
                   <Box sx={{ minWidth: 0 }}>
-                      <Typography variant="h6" fontWeight={700} color="#FFFFFF" noWrap sx={{ fontSize: { xs: '1rem', sm: '1.15rem' } }}>
+                      <Typography variant="h6" fontWeight={700} color={cores.textoForte} noWrap sx={{ fontSize: { xs: '1rem', sm: '1.15rem' } }}>
                           Selecionar câmeras no mosaico
                       </Typography>
                       <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
@@ -2660,7 +2660,7 @@ const Monitor = () => {
                           size="small" 
                           variant="outlined" 
                           onClick={handleSelectAllCameras}
-                          sx={{ fontSize: '0.72rem', borderColor: 'rgba(255,255,255,0.2)', color: '#00D4FF' }}
+                          sx={{ fontSize: '0.75rem', borderColor: 'rgba(255,255,255,0.2)', color: cores.primaria }}
                       >
                           Marcar todas ({cameras.length})
                       </Button>
@@ -2668,7 +2668,7 @@ const Monitor = () => {
                           size="small" 
                           variant="outlined" 
                           onClick={handleClearSelectedCameras}
-                          sx={{ fontSize: '0.72rem', borderColor: 'rgba(255,255,255,0.2)', color: '#94A3B8' }}
+                          sx={{ fontSize: '0.75rem', borderColor: 'rgba(255,255,255,0.2)', color: cores.textoSecundario }}
                       >
                           Limpar
                       </Button>
@@ -2676,7 +2676,7 @@ const Monitor = () => {
                   <Chip
                       label={`${selectedCameraIds.length === 0 ? 'Exibindo todas (' + cameras.length + ')' : selectedCameraIds.length + ' selecionada(s)'}`}
                       size="small"
-                      sx={{ bgcolor: 'rgba(0, 212, 255, 0.1)', color: '#00D4FF', fontWeight: 700, fontSize: '0.72rem' }}
+                      sx={{ bgcolor: tom(cores.primaria, 0.1), color: cores.primaria, fontWeight: 700, fontSize: '0.75rem' }}
                   />
               </Stack>
 
@@ -2684,7 +2684,7 @@ const Monitor = () => {
               {cameras.length === 0 ? (
                   <Box sx={{ p: 4, textAlign: 'center', bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 1.5 }}>
                       <CameraIcon sx={{ fontSize: 48, color: 'text.secondary', opacity: 0.5, mb: 1 }} />
-                      <Typography variant="subtitle2" color="#FFFFFF" fontWeight={700}>
+                      <Typography variant="subtitle2" color={cores.textoForte} fontWeight={700}>
                           Nenhuma câmera cadastrada no sistema.
                       </Typography>
                       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
@@ -2695,7 +2695,7 @@ const Monitor = () => {
                           size="small"
                           startIcon={<SettingsIcon />}
                           onClick={() => { setOpenSelectCamerasDialog(false); setOpenGerenciarCamerasModal(true); }}
-                          sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700 }}
+                          sx={{ bgcolor: cores.primaria, color: '#000000', fontWeight: 700 }}
                       >
                           Gerenciar câmeras agora
                       </Button>
@@ -2711,7 +2711,7 @@ const Monitor = () => {
                                   sx={{ 
                                       mb: 1, 
                                       borderRadius: 1.5, 
-                                      bgcolor: isChecked ? 'rgba(0, 212, 255, 0.06)' : 'rgba(255,255,255,0.02)',
+                                      bgcolor: isChecked ? tom(cores.primaria, 0.06) : 'rgba(255,255,255,0.02)',
                                       border: isChecked ? '1px solid rgba(0, 212, 255, 0.3)' : '1px solid rgba(255,255,255,0.06)'
                                   }}
                               >
@@ -2722,20 +2722,20 @@ const Monitor = () => {
                                               checked={isChecked}
                                               tabIndex={-1}
                                               disableRipple
-                                              sx={{ color: '#00D4FF', '&.Mui-checked': { color: '#00D4FF' } }}
+                                              sx={{ color: cores.primaria, '&.Mui-checked': { color: cores.primaria } }}
                                           />
                                       </ListItemIcon>
                                       <ListItemText
                                           primary={
                                               <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                                                  <Typography variant="subtitle2" fontWeight={700} color="#FFFFFF">
+                                                  <Typography variant="subtitle2" fontWeight={700} color={cores.textoForte}>
                                                       {cam.nome}
                                                   </Typography>
                                                   <Chip
                                                       label={comoRotulo(cam.status) || 'Offline'}
                                                       size="small"
                                                       color={cam.status === 'online' ? 'success' : 'default'}
-                                                      sx={{ height: 18, fontSize: '0.7rem', fontWeight: 700 }}
+                                                      sx={{ height: 18, fontSize: '0.75rem', fontWeight: 700 }}
                                                   />
                                               </Stack>
                                           }
@@ -2764,7 +2764,7 @@ const Monitor = () => {
                           variant="outlined"
                           startIcon={<SettingsIcon sx={{ fontSize: 16 }} />}
                           onClick={() => { setOpenSelectCamerasDialog(false); setOpenGerenciarCamerasModal(true); }}
-                          sx={{ fontSize: '0.75rem', borderColor: 'rgba(0, 212, 255, 0.35)', color: '#00D4FF', fontWeight: 700, whiteSpace: 'nowrap' }}
+                          sx={{ fontSize: '0.75rem', borderColor: tom(cores.primaria, 0.35), color: cores.primaria, fontWeight: 700, whiteSpace: 'nowrap' }}
                       >
                           Gerenciar câmeras
                       </Button>
@@ -2786,7 +2786,7 @@ const Monitor = () => {
                       setOpenSelectCamerasDialog(false);
                       enqueueSnackbar('Mosaico CFTV atualizado!', { variant: 'success' });
                   }}
-                  sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700, flex: { xs: 1, sm: 'initial' }, '&:hover': { bgcolor: '#00D4FF' } }}
+                  sx={{ bgcolor: cores.primaria, color: '#000000', fontWeight: 700, flex: { xs: 1, sm: 'initial' }, '&:hover': { bgcolor: cores.primaria } }}
               >
                   Aplicar mosaico
               </Button>
@@ -2803,7 +2803,7 @@ const Monitor = () => {
               sx: { maxHeight: { sm: '90dvh' } }
           }}
       >
-          <DialogTitle sx={{ fontWeight: 700, color: '#FFB800' }}>Cadastrar alvo na watchlist</DialogTitle>
+          <DialogTitle sx={{ fontWeight: 700, color: cores.alerta }}>Cadastrar alvo na watchlist</DialogTitle>
           <DialogContent sx={{ overflowY: 'auto' }}>
               <Stack spacing={2} pt={1}>
                   <TextField
@@ -2945,8 +2945,8 @@ const Monitor = () => {
           maxWidth="sm" 
           fullWidth
       >
-          <DialogTitle sx={{ color: '#00FF88', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <CheckCircleIcon sx={{ color: '#00FF88' }} />
+          <DialogTitle sx={{ color: cores.sucesso, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <CheckCircleIcon sx={{ color: cores.sucesso }} />
               Desbloqueio de alvo • liberação geral multi-evento
           </DialogTitle>
           <DialogContent>
@@ -2956,10 +2956,10 @@ const Monitor = () => {
 
               {targetToUnblock && (
                   <Paper sx={{ p: 2, mb: 2.5, bgcolor: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 1.5 }}>
-                      <Typography variant="subtitle1" fontWeight={700} color="#FFFFFF">
+                      <Typography variant="subtitle1" fontWeight={700} color={cores.textoForte}>
                           {targetToUnblock.nome || 'Nome Não Informado'}
                       </Typography>
-                      <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', color: '#FFB800', mt: 0.5 }}>
+                      <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', color: cores.alerta, mt: 0.5 }}>
                           CPF: {targetToUnblock.cpf}
                       </Typography>
                       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
@@ -3017,10 +3017,10 @@ const Monitor = () => {
 
               {targetToStopMonitoring && (
                   <Paper sx={{ p: 2, mb: 2, bgcolor: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 1.5 }}>
-                      <Typography variant="subtitle1" fontWeight={700} color="#FFFFFF">
+                      <Typography variant="subtitle1" fontWeight={700} color={cores.textoForte}>
                           {targetToStopMonitoring.nome || 'Nome Não Informado'}
                       </Typography>
-                      <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', color: '#00D4FF', mt: 0.5 }}>
+                      <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', color: cores.primaria, mt: 0.5 }}>
                           CPF: {targetToStopMonitoring.cpf}
                       </Typography>
                       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
@@ -3049,7 +3049,7 @@ const Monitor = () => {
                   onClick={handleConfirmDeixarMonitorar}
                   disabled={stopMonitoringLoading}
                   startIcon={stopMonitoringLoading ? <CircularProgress size={16} color="inherit" /> : <VisibilityOffIcon />}
-                  sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700, '&:hover': { bgcolor: '#00D4FF' } }}
+                  sx={{ bgcolor: cores.primaria, color: '#000000', fontWeight: 700, '&:hover': { bgcolor: cores.primaria } }}
               >
                   {stopMonitoringLoading ? 'Encerrando...' : 'Confirmar e deixar de monitorar'}
               </Button>
@@ -3066,16 +3066,16 @@ const Monitor = () => {
         PaperProps={{
           sx: {
             border: isMobile ? 'none' : '2px solid #FFB800',
-            bgcolor: '#050B18'
+            bgcolor: cores.fundo
           }
         }}
       >
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-          <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#FFB800', display: 'flex', alignItems: 'center', gap: 1 }}>
-            <PhotoCameraIcon sx={{ color: '#FFB800' }} />
+          <Typography variant="subtitle1" fontWeight={700} sx={{ color: cores.alerta, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <PhotoCameraIcon sx={{ color: cores.alerta }} />
             Inspeção pericial • captura original da câmera em alta resolução
           </Typography>
-          <IconButton onClick={() => setZoomSnapshotModal(false)} size="small" sx={{ color: '#94A3B8', '&:hover': { color: '#FFFFFF' } }}>
+          <IconButton onClick={() => setZoomSnapshotModal(false)} size="small" sx={{ color: cores.textoSecundario, '&:hover': { color: cores.textoForte } }}>
             <CloseIcon />
           </IconButton>
         </DialogTitle>

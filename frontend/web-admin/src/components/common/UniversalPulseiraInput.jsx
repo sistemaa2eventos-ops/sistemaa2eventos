@@ -11,6 +11,7 @@ import {
     Close as ClearIcon,
     CameraAlt as CameraAltIcon
 } from '@mui/icons-material';
+import { cores } from '../../styles/tokens';
 
 /**
  * UniversalPulseiraInput
@@ -74,7 +75,7 @@ export const UniversalPulseiraInput = ({
     label = 'Código ou número da pulseira',
     disabled = false,
     helperText,
-    accentColor = '#00D4FF',
+    accentColor = cores.primaria,
     // Quando informado, o ícone dentro da caixa abre a câmera do aparelho
     onAbrirCamera,
     mostrarBotaoCamera = true,
@@ -392,7 +393,7 @@ export const UniversalPulseiraInput = ({
                                 icon={<WarningIcon sx={{ fontSize: '14px !important' }} />}
                                 label="Faixa avulsa"
                                 size="small"
-                                sx={{ fontSize: '0.75rem', height: 22, bgcolor: 'rgba(255, 170, 0, 0.15)', color: '#FFB800' }}
+                                sx={{ fontSize: '0.75rem', height: 22, bgcolor: 'rgba(255, 170, 0, 0.15)', color: cores.alerta }}
                             />
                         </Tooltip>
                     ) : null}
@@ -401,7 +402,7 @@ export const UniversalPulseiraInput = ({
                             label={`Aguardando: ${leiturasAguardando}`}
                             size="small"
                             aria-live="polite"
-                            sx={{ bgcolor: 'rgba(255, 184, 0, 0.15)', color: '#FFB800', fontWeight: 700, fontSize: '0.75rem', height: 22, border: '1px solid rgba(255, 184, 0, 0.4)' }}
+                            sx={{ bgcolor: 'rgba(255, 184, 0, 0.15)', color: cores.alerta, fontWeight: 700, fontSize: '0.75rem', height: 22, border: '1px solid rgba(255, 184, 0, 0.4)' }}
                         />
                     )}
                     {codigoLidoBadge && (
@@ -412,7 +413,7 @@ export const UniversalPulseiraInput = ({
                                 size="small"
                                 sx={{
                                     bgcolor: 'rgba(0, 255, 136, 0.15)',
-                                    color: '#00FF88',
+                                    color: cores.sucesso,
                                     fontWeight: 700,
                                     fontSize: '0.75rem',
                                     height: 22,
@@ -447,7 +448,7 @@ export const UniversalPulseiraInput = ({
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: 0.5,
-                                    color: origemLeitura === 'barcode' ? '#00FF88' : accentColor
+                                    color: origemLeitura === 'barcode' ? cores.sucesso : accentColor
                                 }}
                             >
                                 {/* Câmera dentro da caixa (só o ícone): o espaço fica para o número aparecer inteiro */}
@@ -475,7 +476,7 @@ export const UniversalPulseiraInput = ({
                                 )}
                                 {origemLeitura === 'barcode' && (
                                     <Tooltip title="Leitura automática via QR Code / Código de Barras">
-                                        <FlashIcon sx={{ fontSize: 16, color: '#00FF88' }} />
+                                        <FlashIcon sx={{ fontSize: 16, color: cores.sucesso }} />
                                     </Tooltip>
                                 )}
                             </Box>
@@ -495,7 +496,7 @@ export const UniversalPulseiraInput = ({
                                                 size="small"
                                                 onClick={handleClear}
                                                 disabled={disabled}
-                                                sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: '#FFFFFF' } }}
+                                                sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: cores.textoForte } }}
                                             >
                                                 <ClearIcon fontSize="small" />
                                             </IconButton>
@@ -531,7 +532,7 @@ export const UniversalPulseiraInput = ({
                 sx={{
                     '& .MuiOutlinedInput-root': {
                         bgcolor: 'rgba(0, 0, 0, 0.35)',
-                        color: '#FFFFFF',
+                        color: cores.textoForte,
                         fontSize: { xs: '1rem', sm: '1.15rem' },
                         fontWeight: 700,
                         letterSpacing: { xs: '0.5px', sm: '1px' },
@@ -540,7 +541,7 @@ export const UniversalPulseiraInput = ({
                         height: { xs: 48, sm: 58 },
                         // O código digitado fica grande; o texto de ajuda, menor (antes saía cortado)
                         '& input::placeholder': { fontSize: { xs: '0.8125rem', sm: '0.9375rem' }, fontWeight: 500, letterSpacing: 0, opacity: 0.6 },
-                        transition: 'all 0.25s ease',
+                        transition: 'background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, opacity 0.25s ease, transform 0.25s ease',
                         boxShadow: pulseAnimation
                             ? '0 0 25px rgba(0, 255, 136, 0.6)'
                             : `0 0 10px ${accentColor}25`,

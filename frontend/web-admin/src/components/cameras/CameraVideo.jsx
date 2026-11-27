@@ -4,6 +4,7 @@ import { VideocamOff as SemVideoIcon, PauseCircleOutline as PausadoIcon } from '
 import api from '../../services/api';
 import { pedirIngressoCamera, urlComIngresso } from '../../utils/cameraMedia';
 import { visorDisponivel, tokenVisor, urlVisorMp4, urlVisorDeteccoes, esquecerToken, abrirWebrtcVisor } from '../../utils/visorLocal';
+import { cores, tom } from '../../styles/tokens';
 
 const IMAGEM_VAZIA = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 const ESPERAS_MS = [2000, 5000, 10000, 30000];
@@ -39,7 +40,7 @@ function areaDaImagem(caixa, largura, altura, fit) {
     return { x: (cw - w) / 2, y: (ch - h) / 2, w, h };
 }
 
-const corDaCaixa = (r) => (r.pessoa?.bloqueado ? '#FF3366' : r.pessoa ? '#00FF88' : r.qualidade === 'optimal' ? '#FFD400' : '#94A3B8');
+const corDaCaixa = (r) => (r.pessoa?.bloqueado ? cores.erro : r.pessoa ? cores.sucesso : r.qualidade === 'optimal' ? '#FFD400' : cores.textoSecundario);
 const textoDaCaixa = (r) => {
     if (r.pessoa) return r.pessoa.bloqueado ? `ALERTA: ${r.pessoa.nome}` : `${r.pessoa.nome} ${Math.round((r.pessoa.semelhanca || 0) * 100)}%`;
     return ({ profile_view: 'De lado', low_resolution: 'Distante', blurry: 'Em movimento' })[r.qualidade] || 'Desconhecido';
@@ -326,13 +327,13 @@ const CameraVideo = ({
             {carregou && remoto && qualidade === 'foco' && (
                 <Typography variant="caption" sx={{
                     position: 'absolute', left: 8, bottom: 8, px: 1, py: 0.25, borderRadius: 1, pointerEvents: 'none',
-                    bgcolor: 'rgba(0,0,0,0.65)', color: '#FFD400', fontWeight: 600, fontSize: '0.7rem'
+                    bgcolor: 'rgba(0,0,0,0.65)', color: '#FFD400', fontWeight: 600, fontSize: '0.75rem'
                 }}>
                     Pela internet: 1 imagem por segundo • tempo real na Central do PC do evento
                 </Typography>
             )}
             {ativo && !erro && !carregou && (
-                <CircularProgress size={22} sx={{ position: 'absolute', color: 'rgba(0,212,255,0.7)' }} />
+                <CircularProgress size={22} sx={{ position: 'absolute', color: tom(cores.primaria, 0.7) }} />
             )}
             {(erro || pausado) && (
                 <Box sx={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 0.5, color: 'rgba(255,255,255,0.55)' }}>

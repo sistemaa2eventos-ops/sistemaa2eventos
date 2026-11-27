@@ -23,7 +23,7 @@ import {
 import PageHeader from '../components/common/PageHeader';
 import GlassCard from '../components/common/GlassCard';
 import KpiCard from '../components/common/KpiCard';
-import { cores, botaoSecundario } from '../styles/tokens';
+import { cores, botaoSecundario, tom } from '../styles/tokens';
 import NeonButton from '../components/common/NeonButton';
 import DataTable from '../components/common/DataTable';
 import api from '../services/api';
@@ -258,7 +258,7 @@ const AuditoriaDocumental = () => {
             minWidth: 220,
             format: (val, row) => (
                 <Box sx={{ cursor: 'pointer' }} onClick={() => handleQuickPreview(row)}>
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF', '&:hover': { color: '#00D4FF' } }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: cores.textoForte, '&:hover': { color: cores.primaria } }}>
                         {String(val || 'Nome Indisponível')}
                     </Typography>
                     <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
@@ -288,11 +288,11 @@ const AuditoriaDocumental = () => {
                     label={comoRotulo(val || 'pessoa')}
                     size="small"
                     sx={{
-                        bgcolor: val === 'empresa' ? 'rgba(0,212,255,0.15)' : 'rgba(123,47,190,0.15)',
-                        color: val === 'empresa' ? '#00D4FF' : '#A855F7',
+                        bgcolor: val === 'empresa' ? tom(cores.primaria, 0.15) : 'rgba(123,47,190,0.15)',
+                        color: val === 'empresa' ? cores.primaria : cores.secundariaClara,
                         fontWeight: 700,
                         border: '1px solid',
-                        borderColor: val === 'empresa' ? 'rgba(0,212,255,0.3)' : 'rgba(123,47,190,0.3)'
+                        borderColor: val === 'empresa' ? tom(cores.primaria, 0.3) : 'rgba(123,47,190,0.3)'
                     }}
                 />
             )
@@ -303,8 +303,8 @@ const AuditoriaDocumental = () => {
             minWidth: 180,
             format: (val, row) => (
                 <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }}>{val || 'Sem Título'}</Typography>
-                    <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 600 }}>{row.tipo_doc}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: cores.textoForte }}>{val || 'Sem Título'}</Typography>
+                    <Typography variant="caption" sx={{ color: cores.primaria, fontWeight: 600 }}>{row.tipo_doc}</Typography>
                 </Box>
             )
         },
@@ -329,7 +329,7 @@ const AuditoriaDocumental = () => {
                         <IconButton
                             size="small"
                             onClick={() => handleQuickPreview(row)}
-                            sx={{ color: '#00D4FF', bgcolor: 'rgba(0,212,255,0.1)', '&:hover': { bgcolor: 'rgba(0,212,255,0.25)' } }}
+                            sx={{ color: cores.primaria, bgcolor: tom(cores.primaria, 0.1), '&:hover': { bgcolor: tom(cores.primaria, 0.25) } }}
                         >
                             <ViewIcon fontSize="small" />
                         </IconButton>
@@ -339,7 +339,7 @@ const AuditoriaDocumental = () => {
                         <IconButton
                             size="small"
                             onClick={() => handleOpenAction(row, 'aprovado')}
-                            sx={{ color: '#00FF88', bgcolor: 'rgba(0,255,136,0.1)', '&:hover': { bgcolor: 'rgba(0,255,136,0.25)' } }}
+                            sx={{ color: cores.sucesso, bgcolor: 'rgba(0,255,136,0.1)', '&:hover': { bgcolor: 'rgba(0,255,136,0.25)' } }}
                         >
                             <CheckIcon fontSize="small" />
                         </IconButton>
@@ -349,7 +349,7 @@ const AuditoriaDocumental = () => {
                         <IconButton
                             size="small"
                             onClick={() => handleOpenAction(row, 'reenvio_solicitado')}
-                            sx={{ color: '#FFB800', bgcolor: 'rgba(255,170,0,0.1)', '&:hover': { bgcolor: 'rgba(255,170,0,0.25)' } }}
+                            sx={{ color: cores.alerta, bgcolor: 'rgba(255,170,0,0.1)', '&:hover': { bgcolor: 'rgba(255,170,0,0.25)' } }}
                         >
                             <ResubmitIcon fontSize="small" />
                         </IconButton>
@@ -359,7 +359,7 @@ const AuditoriaDocumental = () => {
                         <IconButton
                             size="small"
                             onClick={() => handleOpenAction(row, 'reprovado')}
-                            sx={{ color: '#FF3366', bgcolor: 'rgba(255,51,102,0.1)', '&:hover': { bgcolor: 'rgba(255,51,102,0.25)' } }}
+                            sx={{ color: cores.erro, bgcolor: 'rgba(255,51,102,0.1)', '&:hover': { bgcolor: 'rgba(255,51,102,0.25)' } }}
                         >
                             <RejectIcon fontSize="small" />
                         </IconButton>
@@ -395,7 +395,7 @@ const AuditoriaDocumental = () => {
 
             <Tabs value={aba} onChange={(e, v) => setAba(v)} sx={{
                 mb: 2, '& .MuiTab-root': { color: 'rgba(255,255,255,0.6)', fontWeight: 700 },
-                '& .Mui-selected': { color: '#00D4FF !important' }, '& .MuiTabs-indicator': { bgcolor: '#00D4FF' }
+                '& .Mui-selected': { color: '#00D4FF !important' }, '& .MuiTabs-indicator': { bgcolor: cores.primaria }
             }}>
                 <Tab label={`Fila de análise (${stats.pendentes})`} />
                 <Tab label="Colaboradores" />
@@ -437,10 +437,10 @@ const AuditoriaDocumental = () => {
                         bgcolor: 'rgba(255,255,255,0.03)',
                         borderRadius: 1.5,
                         '& .MuiOutlinedInput-root': {
-                            color: '#FFFFFF',
+                            color: cores.textoForte,
                             '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-                            '&:hover fieldset': { borderColor: '#00D4FF' },
-                            '&.Mui-focused fieldset': { borderColor: '#00D4FF' }
+                            '&:hover fieldset': { borderColor: cores.primaria },
+                            '&.Mui-focused fieldset': { borderColor: cores.primaria }
                         }
                     }}
                 />
@@ -464,7 +464,7 @@ const AuditoriaDocumental = () => {
                         display: 'flex', alignItems: 'center', gap: 2,
                         backdropFilter: 'blur(16px)'
                     }}>
-                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#00D4FF' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: cores.primaria }}>
                             {selectedDocs.length} selecionado(s)
                         </Typography>
                         <Divider orientation="vertical" flexItem sx={{ borderColor: 'rgba(255,255,255,0.2)' }} />
@@ -504,8 +504,8 @@ const AuditoriaDocumental = () => {
 
                 {documentos.length === 0 && !loading ? (
                     <Box sx={{ textAlign: 'center', py: 8 }}>
-                        <AssigIcon sx={{ fontSize: 64, color: '#00FF88', mb: 2, opacity: 0.6 }} />
-                        <Typography variant="h5" sx={{ color: '#00FF88', fontWeight: 700 }}>Fila zero</Typography>
+                        <AssigIcon sx={{ fontSize: 64, color: cores.sucesso, mb: 2, opacity: 0.6 }} />
+                        <Typography variant="h5" sx={{ color: cores.sucesso, fontWeight: 700 }}>Fila zero</Typography>
                         <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)', mt: 1 }}>
                             Parabéns! Todos os documentos enviados foram analisados.
                         </Typography>
@@ -574,7 +574,7 @@ const AuditoriaDocumental = () => {
                     <>
                         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                             <Box>
-                                <Typography variant="h6" sx={{ color: '#FFFFFF', fontWeight: 700 }}>
+                                <Typography variant="h6" sx={{ color: cores.textoForte, fontWeight: 700 }}>
                                     {previewDoc.titulo || 'Visualização do documento'}
                                 </Typography>
                                 <Typography variant="caption" sx={{ fontWeight: 700 }}>
@@ -606,10 +606,10 @@ const AuditoriaDocumental = () => {
                                 <Grid item xs={12} md={4}>
                                     <GlassCard sx={{ p: 2.5, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                                         <Box>
-                                            <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: '1.5px' }}>
+                                            <Typography variant="overline" sx={{ color: cores.primaria, fontWeight: 700, letterSpacing: '1.5px' }}>
                                                 Dados do titular
                                             </Typography>
-                                            <Typography variant="h6" sx={{ color: '#FFFFFF', fontWeight: 700, mt: 1 }}>
+                                            <Typography variant="h6" sx={{ color: cores.textoForte, fontWeight: 700, mt: 1 }}>
                                                 {previewDoc.entidade_nome}
                                             </Typography>
                                             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mt: 0.5 }}>
@@ -624,7 +624,7 @@ const AuditoriaDocumental = () => {
 
                                             <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)', my: 2 }} />
 
-                                            <Typography variant="caption" sx={{ color: '#FFB800', display: 'block', mb: 1, fontWeight: 700 }}>
+                                            <Typography variant="caption" sx={{ color: cores.alerta, display: 'block', mb: 1, fontWeight: 700 }}>
                                                 Critérios de conferência:
                                             </Typography>
                                             <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', display: 'block' }}>
@@ -685,12 +685,12 @@ const AuditoriaDocumental = () => {
                 fullWidth
                 PaperProps={{
                     sx: {
-                        borderColor: acao === 'aprovado' ? '#00FF88' : acao === 'reenvio_solicitado' ? '#FFB800' : '#FF3366'
+                        borderColor: acao === 'aprovado' ? cores.sucesso : acao === 'reenvio_solicitado' ? cores.alerta : cores.erro
                     }
                 }}
             >
                 <DialogTitle sx={{
-                    color: acao === 'aprovado' ? '#00FF88' : acao === 'reenvio_solicitado' ? '#FFB800' : '#FF3366',
+                    color: acao === 'aprovado' ? cores.sucesso : acao === 'reenvio_solicitado' ? cores.alerta : cores.erro,
                     fontWeight: 700
                 }}>
                     {acao === 'aprovado' && 'Aprovar documento'}
@@ -700,18 +700,18 @@ const AuditoriaDocumental = () => {
 
                 <DialogContent>
                     <Box sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <Typography variant="body2" sx={{ color: '#FFFFFF' }}>
+                        <Typography variant="body2" sx={{ color: cores.textoForte }}>
                             {isBatch ? (
                                 <>Aplicando ação para <b>{selectedDocs.length}</b> documento(s) selecionado(s).</>
                             ) : (
                                 <>Colaborador/empresa: <b>{actionDoc?.entidade_nome}</b><br />
-                                Documento: <span style={{ color: '#00D4FF' }}>{actionDoc?.tipo_nome || actionDoc?.titulo} ({actionDoc?.tipo_doc})</span></>
+                                Documento: <span style={{ color: cores.primaria }}>{actionDoc?.tipo_nome || actionDoc?.titulo} ({actionDoc?.tipo_doc})</span></>
                             )}
                         </Typography>
 
                         {/* Mensagem Explicativa */}
                         {acao === 'reenvio_solicitado' && (
-                            <Alert severity="warning" sx={{ bgcolor: 'rgba(255,170,0,0.1)', color: '#FFB800' }}>
+                            <Alert severity="warning" sx={{ bgcolor: 'rgba(255,170,0,0.1)', color: cores.alerta }}>
                                 {actionDoc?.tipo_entidade === 'empresa'
                                     ? 'O responsável da empresa visualizará o motivo apontado abaixo no link de documentação da empresa para reenviar o arquivo correto.'
                                     : 'O colaborador receberá notificação no portal de auto-cadastro com o motivo apontado abaixo para reenviar o arquivo correto.'}
@@ -719,7 +719,7 @@ const AuditoriaDocumental = () => {
                         )}
 
                         {acao === 'reprovado' && (
-                            <Alert severity="error" sx={{ bgcolor: 'rgba(255,51,102,0.1)', color: '#FF3366' }}>
+                            <Alert severity="error" sx={{ bgcolor: 'rgba(255,51,102,0.1)', color: cores.erro }}>
                                 {actionDoc?.tipo_entidade === 'empresa'
                                     ? 'O documento da empresa será marcado como reprovado com a justificativa abaixo.'
                                     : 'O status do colaborador será marcado como irregular, bloqueando seu credenciamento e emissão de pulseira no evento.'}
@@ -735,7 +735,7 @@ const AuditoriaDocumental = () => {
                                     label="Motivo pré-definido"
                                     onChange={(e) => setMotivoPredefinido(e.target.value)}
                                     sx={{
-                                        color: '#FFFFFF',
+                                        color: cores.textoForte,
                                         '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.2)' }
                                     }}
                                 >
@@ -754,7 +754,7 @@ const AuditoriaDocumental = () => {
                                     value={tipoDocumentoId}
                                     label="Tipo do documento"
                                     onChange={(e) => setTipoDocumentoId(e.target.value)}
-                                    sx={{ color: '#FFFFFF', '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.2)' } }}
+                                    sx={{ color: cores.textoForte, '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.2)' } }}
                                 >
                                     <MenuItem value=""><em>Não classificado</em></MenuItem>
                                     {tiposDocumento.map(t => (
@@ -777,8 +777,8 @@ const AuditoriaDocumental = () => {
                                 sx={{
                                     mt: 1,
                                     '& .MuiOutlinedInput-root': {
-                                        color: '#FFFFFF',
-                                        '& fieldset': { borderColor: tipoSelecionado?.exige_validade && !dataValidade ? '#FFB800' : 'rgba(255,255,255,0.2)' }
+                                        color: cores.textoForte,
+                                        '& fieldset': { borderColor: tipoSelecionado?.exige_validade && !dataValidade ? cores.alerta : 'rgba(255,255,255,0.2)' }
                                     }
                                 }}
                             />
@@ -796,7 +796,7 @@ const AuditoriaDocumental = () => {
                                 sx={{
                                     mt: 1,
                                     '& .MuiOutlinedInput-root': {
-                                        color: '#FFFFFF',
+                                        color: cores.textoForte,
                                         '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' }
                                     }
                                 }}
@@ -814,7 +814,7 @@ const AuditoriaDocumental = () => {
                             placeholder={acao === 'reenvio_solicitado' ? 'Ex: Por favor envie uma foto nítida da frente e do verso.' : 'Observações...'}
                             sx={{
                                 '& .MuiOutlinedInput-root': {
-                                    color: '#FFFFFF',
+                                    color: cores.textoForte,
                                     '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' }
                                 }
                             }}

@@ -16,6 +16,7 @@ import { useSystemSettings } from '../../hooks/useSystemSettings';
 import GlassCard from '../../components/common/GlassCard';
 import api from '../../services/api';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
+import { cores, tom } from '../../styles/tokens';
 
 const ConfigEvento = () => {
     const confirmar = useConfirmacao();
@@ -82,24 +83,24 @@ const ConfigEvento = () => {
                 {/* SEÇÃO: Resumo do Evento */}
                 <Grid item xs={12}>
                     <GlassCard sx={{ p: 3 }}>
-                        <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="subtitle1" sx={{ color: cores.textoForte, fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
                             <EventIcon fontSize="small" color="primary" /> Evento em Foco
                         </Typography>
                         {evento ? (
                             <Box sx={{ display: 'flex', gap: 4 }}>
                                 <Box>
                                     <Typography variant="caption" color="text.secondary">Nome:</Typography>
-                                    <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600 }}>{evento.nome}</Typography>
+                                    <Typography variant="body2" sx={{ color: cores.textoForte, fontWeight: 600 }}>{evento.nome}</Typography>
                                 </Box>
                                 <Box>
                                     <Typography variant="caption" color="text.secondary">Datas:</Typography>
-                                    <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600 }}>
+                                    <Typography variant="body2" sx={{ color: cores.textoForte, fontWeight: 600 }}>
                                         {new Date(evento.data_inicio).toLocaleDateString()} a {new Date(evento.data_fim).toLocaleDateString()}
                                     </Typography>
                                 </Box>
                                 <Box>
                                     <Typography variant="caption" color="text.secondary">Status:</Typography>
-                                    <Box sx={{ bgcolor: 'rgba(0, 255, 136, 0.1)', color: '#00FF88', px: 1, borderRadius: 1, fontSize: '0.75rem', fontWeight: 700, textAlign: 'center' }}>
+                                    <Box sx={{ bgcolor: 'rgba(0, 255, 136, 0.1)', color: cores.sucesso, px: 1, borderRadius: 1, fontSize: '0.75rem', fontWeight: 700, textAlign: 'center' }}>
                                         Ativo
                                     </Box>
                                 </Box>
@@ -113,7 +114,7 @@ const ConfigEvento = () => {
                 {/* SEÇÃO: Reset Diário */}
                 <Grid item xs={12} md={6}>
                     <GlassCard sx={{ p: 3, height: '100%' }}>
-                        <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700, mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="subtitle1" sx={{ color: cores.textoForte, fontWeight: 700, mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
                             <CronIcon fontSize="small" color="primary" /> Automação de Reset
                         </Typography>
                         
@@ -135,7 +136,7 @@ const ConfigEvento = () => {
                         </FormControl>
 
                         <Alert severity="warning" sx={{ mb: 2, bgcolor: 'rgba(255, 184, 0, 0.05)', border: '1px solid rgba(255, 184, 0, 0.1)' }}>
-                            <Typography variant="caption" sx={{ color: '#FFB800' }}>
+                            <Typography variant="caption" sx={{ color: cores.alerta }}>
                                 O reset forçará o checkout de todos os perfis logados no dispositivo.
                             </Typography>
                         </Alert>
@@ -156,13 +157,13 @@ const ConfigEvento = () => {
                 {/* SEÇÃO: Relatório Diário */}
                 <Grid item xs={12} md={6}>
                     <GlassCard sx={{ p: 3, height: '100%' }}>
-                        <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700, mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="subtitle1" sx={{ color: cores.textoForte, fontWeight: 700, mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
                             <MailIcon fontSize="small" color="primary" /> Relatórios Automáticos
                         </Typography>
 
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                             <Box>
-                                <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 600 }}>Receber por email</Typography>
+                                <Typography variant="body2" sx={{ color: cores.textoForte, fontWeight: 600 }}>Receber por email</Typography>
                                 <Typography variant="caption" color="text.secondary">Disparo automático pós-reset</Typography>
                             </Box>
                             <Switch 
@@ -179,7 +180,7 @@ const ConfigEvento = () => {
                                     label={email} 
                                     onDelete={() => handleRemoveEmail(email)} 
                                     size="small"
-                                    sx={{ bgcolor: 'rgba(0, 212, 255, 0.1)', color: 'primary.main', border: '1px solid rgba(0, 212, 255, 0.2)' }}
+                                    sx={{ bgcolor: tom(cores.primaria, 0.1), color: 'primary.main', border: '1px solid rgba(0, 212, 255, 0.2)' }}
                                 />
                             ))}
                         </Box>

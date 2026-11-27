@@ -6,19 +6,19 @@ import {
 } from '@mui/icons-material';
 import KpiCard from '../common/KpiCard';
 import DataTable from '../common/DataTable';
-import { cores } from '../../styles/tokens';
+import { cores, tom } from '../../styles/tokens';
 import { formatarMoeda, formatarHoras } from '../../hooks/useRemuneracao';
 
 // Código do dia → [fundo, texto, explicação]
 const CODIGOS = {
-    '1': ['rgba(0,255,136,0.15)', '#00FF88', 'Diária'],
-    '½': ['rgba(255,184,0,0.15)', '#FFB800', 'Meia diária'],
-    'D': ['rgba(0,212,255,0.18)', '#00D4FF', 'Dobra (2 diárias)'],
-    '0': ['rgba(148,163,184,0.12)', '#94A3B8', 'Abaixo do mínimo de horas'],
-    'F': ['rgba(255,51,102,0.15)', '#FF3366', 'Falta: escalado e sem registro'],
-    '?': ['rgba(255,136,0,0.18)', '#FF8800', 'A conferir: sem horário de saída real'],
-    'A': ['rgba(255,184,0,0.10)', '#FFB800', 'Turno em andamento'],
-    'S': ['rgba(148,163,184,0.18)', '#CBD5E1', 'Sem regra de remuneração: horas sem valor']
+    '1': ['rgba(0,255,136,0.15)', cores.sucesso, 'Diária'],
+    '½': ['rgba(255,184,0,0.15)', cores.alerta, 'Meia diária'],
+    'D': [tom(cores.primaria, 0.18), cores.primaria, 'Dobra (2 diárias)'],
+    '0': ['rgba(148,163,184,0.12)', cores.textoSecundario, 'Abaixo do mínimo de horas'],
+    'F': ['rgba(255,51,102,0.15)', cores.erro, 'Falta: escalado e sem registro'],
+    '?': ['rgba(255,136,0,0.18)', cores.saida, 'A conferir: sem horário de saída real'],
+    'A': ['rgba(255,184,0,0.10)', cores.alerta, 'Turno em andamento'],
+    'S': ['rgba(148,163,184,0.18)', cores.textoSuave, 'Sem regra de remuneração: horas sem valor']
 };
 
 const CelulaDia = ({ c }) => {

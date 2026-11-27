@@ -9,6 +9,7 @@ import api from '../../services/api';
 import ListaDocumentos from './ListaDocumentos';
 import { SITUACAO_DOCUMENTAL, MOTIVO_PENDENCIA, chipSx } from './documentosUtils';
 import NeonButton from '../common/NeonButton';
+import { cores } from '../../styles/tokens';
 
 const POR_PAGINA = 30;
 
@@ -83,11 +84,11 @@ const AbaColaboradores = ({ onAuditar, recarregarToken }) => {
                     value={busca}
                     onChange={(e) => setBusca(e.target.value)}
                     InputProps={{ startAdornment: <SearchIcon sx={{ color: 'rgba(255,255,255,0.4)', mr: 1.5 }} /> }}
-                    sx={{ '& .MuiOutlinedInput-root': { color: '#FFFFFF', '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' } } }}
+                    sx={{ '& .MuiOutlinedInput-root': { color: cores.textoForte, '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' } } }}
                 />
                 <FormControlLabel
                     control={<Switch checked={somentePendentes} onChange={(e) => setSomentePendentes(e.target.checked)} />}
-                    label={<Typography variant="body2" sx={{ color: '#FFFFFF', whiteSpace: 'nowrap' }}>Só com pendência</Typography>}
+                    label={<Typography variant="body2" sx={{ color: cores.textoForte, whiteSpace: 'nowrap' }}>Só com pendência</Typography>}
                 />
             </Stack>
 
@@ -103,10 +104,10 @@ const AbaColaboradores = ({ onAuditar, recarregarToken }) => {
                         mb: 1, bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
                         borderRadius: '8px !important', '&:before': { display: 'none' }
                     }}>
-                        <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ color: '#00D4FF' }} />}>
+                        <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ color: cores.primaria }} />}>
                             <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ md: 'center' }} sx={{ width: '100%', pr: 1 }}>
                                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                                    <Typography sx={{ color: '#FFFFFF', fontWeight: 700 }} noWrap>{p.nome_completo}</Typography>
+                                    <Typography sx={{ color: cores.textoForte, fontWeight: 700 }} noWrap>{p.nome_completo}</Typography>
                                     <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.55)' }}>
                                         CPF {p.cpf || '—'} · {p.funcao || 'sem função'}{p.empresa_nome ? ` · ${p.empresa_nome}` : ''}
                                         {p.email ? ` · ${p.email}` : ''}
@@ -114,18 +115,18 @@ const AbaColaboradores = ({ onAuditar, recarregarToken }) => {
                                 </Box>
                                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                                     <Chip size="small" label={sit.label} sx={chipSx(sit.color)} />
-                                    <Chip size="small" label={`${p.documentos.length} doc(s)`} sx={chipSx('#00D4FF')} />
+                                    <Chip size="small" label={`${p.documentos.length} doc(s)`} sx={chipSx(cores.primaria)} />
                                     {p.pendencias.length > 0 && (
-                                        <Chip size="small" label={`${p.pendencias.length} pendência(s)`} sx={chipSx('#FFB800')} />
+                                        <Chip size="small" label={`${p.pendencias.length} pendência(s)`} sx={chipSx(cores.alerta)} />
                                     )}
                                     {p.vencendo.length > 0 && (
-                                        <Chip size="small" label={`${p.vencendo.length} a vencer`} sx={chipSx('#FFB800')} />
+                                        <Chip size="small" label={`${p.vencendo.length} a vencer`} sx={chipSx(cores.alerta)} />
                                     )}
                                     {p.liberacao_ativa && (
-                                        <Chip size="small" icon={<LiberadoIcon sx={{ fontSize: 14 }} />} label="Liberado no turno" sx={chipSx('#A855F7')} />
+                                        <Chip size="small" icon={<LiberadoIcon sx={{ fontSize: 14 }} />} label="Liberado no turno" sx={chipSx(cores.secundariaClara)} />
                                     )}
                                     {p.liberado_hoje && (
-                                        <Chip size="small" icon={<LiberadoIcon sx={{ fontSize: 14 }} />} label="Liberado hoje" sx={chipSx('#00D4FF')} />
+                                        <Chip size="small" icon={<LiberadoIcon sx={{ fontSize: 14 }} />} label="Liberado hoje" sx={chipSx(cores.primaria)} />
                                     )}
                                 </Stack>
                             </Stack>
@@ -133,21 +134,21 @@ const AbaColaboradores = ({ onAuditar, recarregarToken }) => {
                         <AccordionDetails>
                             {p.exigidos.length > 0 && (
                                 <Box sx={{ mb: 2 }}>
-                                    <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700 }}>Exigidos para a função</Typography>
+                                    <Typography variant="overline" sx={{ color: cores.primaria, fontWeight: 700 }}>Exigidos para a função</Typography>
                                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                                         {p.exigidos.map((t) => {
                                             const pend = p.pendencias.find(x => x.tipo_documento_id === t.id);
                                             return (
                                                 <Chip key={t.id} size="small"
                                                     label={pend ? `${t.nome} — ${MOTIVO_PENDENCIA[pend.motivo] || pend.motivo}` : `${t.nome} ✓`}
-                                                    sx={chipSx(pend ? '#FFB800' : '#00FF88')} />
+                                                    sx={chipSx(pend ? cores.alerta : cores.sucesso)} />
                                             );
                                         })}
                                     </Stack>
                                 </Box>
                             )}
                             {p.liberacao_ativa && (
-                                <Typography variant="caption" sx={{ color: '#A855F7', display: 'block', mb: 1 }}>
+                                <Typography variant="caption" sx={{ color: cores.secundariaClara, display: 'block', mb: 1 }}>
                                     Liberado manualmente até {new Date(p.liberacao_manual_ate).toLocaleString('pt-BR')} — {p.liberacao_manual_motivo || 'sem motivo'}
                                 </Typography>
                             )}
@@ -155,7 +156,7 @@ const AbaColaboradores = ({ onAuditar, recarregarToken }) => {
                                 <Box sx={{ mb: 2, p: 1.5, bgcolor: 'rgba(255, 184, 0, 0.1)', border: '1px solid #FFB800', borderRadius: 1 }}>
                                     <Stack direction="row" spacing={1} alignItems="center">
                                         <Box sx={{ flex: 1 }}>
-                                            <Typography variant="caption" sx={{ color: '#FFB800', fontWeight: 700 }}>
+                                            <Typography variant="caption" sx={{ color: cores.alerta, fontWeight: 700 }}>
                                                 {p.liberado_hoje ? 'Entrada liberada hoje' : 'Documentação pendente: entrada barrada no check-in'}
                                             </Typography>
                                             <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', display: 'block' }}>
@@ -168,7 +169,7 @@ const AbaColaboradores = ({ onAuditar, recarregarToken }) => {
                                             <Button
                                                 size="small"
                                                 onClick={() => { setPessoaLiberacao(p); setMotivoLiberacao(''); setOpenLiberarModal(true); }}
-                                                sx={{ color: '#FFB800', '&:hover': { bgcolor: 'rgba(255, 184, 0, 0.1)' } }}
+                                                sx={{ color: cores.alerta, '&:hover': { bgcolor: 'rgba(255, 184, 0, 0.1)' } }}
                                             >
                                                 Liberar por um dia
                                             </Button>
@@ -176,26 +177,26 @@ const AbaColaboradores = ({ onAuditar, recarregarToken }) => {
                                     </Stack>
                                 </Box>
                             )}
-                            <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700 }}>Documentos entregues</Typography>
+                            <Typography variant="overline" sx={{ color: cores.primaria, fontWeight: 700 }}>Documentos entregues</Typography>
                             <ListaDocumentos documentos={docs} onAuditar={onAuditar} />
                         </AccordionDetails>
                     </Accordion>
                 );
             })}
 
-            {carregando && <Box sx={{ textAlign: 'center', py: 3 }}><CircularProgress sx={{ color: '#00D4FF' }} /></Box>}
+            {carregando && <Box sx={{ textAlign: 'center', py: 3 }}><CircularProgress sx={{ color: cores.primaria }} /></Box>}
             {!carregando && itens.length === 0 && (
                 <Typography sx={{ color: 'rgba(255,255,255,0.5)', textAlign: 'center', py: 6 }}>Nenhum colaborador encontrado.</Typography>
             )}
             {!carregando && itens.length < total && (
                 <Box sx={{ textAlign: 'center', mt: 2 }}>
-                    <Button onClick={() => carregar(pagina + 1)} sx={{ color: '#00D4FF' }}>Carregar mais</Button>
+                    <Button onClick={() => carregar(pagina + 1)} sx={{ color: cores.primaria }}>Carregar mais</Button>
                 </Box>
             )}
 
             {/* Modal: Liberar por um dia */}
             <Dialog open={openLiberarModal} onClose={() => !liberandoHoje && setOpenLiberarModal(false)} maxWidth="sm" fullWidth>
-                <DialogTitle sx={{ bgcolor: 'rgba(255, 184, 0, 0.1)', borderBottom: '1px solid #FFB800', color: '#FFFFFF' }}>
+                <DialogTitle sx={{ bgcolor: 'rgba(255, 184, 0, 0.1)', borderBottom: '1px solid #FFB800', color: cores.textoForte }}>
                     Liberar por um dia
                 </DialogTitle>
                 <DialogContent sx={{ bgcolor: 'rgba(0,0,0,0.3)', pt: 2 }}>
@@ -215,7 +216,7 @@ const AbaColaboradores = ({ onAuditar, recarregarToken }) => {
                         onChange={(e) => setMotivoLiberacao(e.target.value)}
                         placeholder="Ex: Aguardando entrega do documento"
                         disabled={liberandoHoje}
-                        sx={{ '& .MuiOutlinedInput-root': { color: '#FFFFFF', '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' } } }}
+                        sx={{ '& .MuiOutlinedInput-root': { color: cores.textoForte, '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' } } }}
                     />
                 </DialogContent>
                 <DialogActions sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.3)' }}>

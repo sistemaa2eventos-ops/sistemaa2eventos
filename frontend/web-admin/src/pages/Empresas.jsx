@@ -56,7 +56,7 @@ import { useEmpresas } from '../hooks/useEmpresas';
 import api from '../services/api';
 import { useConfirmacao } from '../contexts/ConfirmacaoContext';
 import TituloModal from '../components/common/TituloModal';
-import { acaoTabela, acaoTabelaPerigo, botaoSecundario } from '../styles/tokens';
+import { acaoTabela, acaoTabelaPerigo, botaoSecundario, cores, tom } from '../styles/tokens';
 import { formatarCnpj } from '../utils/formatadores';
 import { useRemuneracao } from '../hooks/useRemuneracao';
 import RegrasRemuneracaoDialog from '../components/remuneracao/RegrasRemuneracaoDialog';
@@ -244,12 +244,12 @@ const Empresas = () => {
 
     return (
       <Box sx={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-        <Alert severity="info" sx={{ bgcolor: 'rgba(0, 212, 255, 0.08)', color: '#E2E8F0', border: '1px solid rgba(0, 212, 255, 0.25)' }}>
+        <Alert severity="info" sx={{ bgcolor: tom(cores.primaria, 0.08), color: cores.textoSuave, border: '1px solid rgba(0, 212, 255, 0.25)' }}>
           Os documentos anexados aqui ou enviados pelo responsável através do link da empresa entram na fila de <strong>Auditoria documental</strong> e são salvos automaticamente na pasta <strong>{empresaAlvo.nome} / Documentos da empresa</strong> no Google Drive.
         </Alert>
 
-        <Box sx={{ p: { xs: 2, sm: 2.5 }, border: '1px dashed rgba(0, 212, 255, 0.35)', borderRadius: 2, bgcolor: 'rgba(0,0,0,0.2)' }}>
-          <Typography variant="subtitle2" sx={{ color: '#00D4FF', fontWeight: 700, mb: 2 }}>
+        <Box sx={{ p: { xs: 2, sm: 2.5 }, border: '1px dashed rgba(0, 212, 255, 0.35)', borderRadius: 1.5, bgcolor: 'rgba(0,0,0,0.2)' }}>
+          <Typography variant="subtitle2" sx={{ color: cores.primaria, fontWeight: 700, mb: 2 }}>
             Anexar novo documento da empresa
           </Typography>
 
@@ -301,7 +301,7 @@ const Empresas = () => {
               disabled={saving}
               startIcon={<UploadIcon />}
               onClick={() => handleSelecionarArquivoEmpresa(empresaAlvo.id)}
-              sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700, '&:hover': { bgcolor: '#00B8E6' } }}
+              sx={{ bgcolor: cores.primaria, color: '#000000', fontWeight: 700, '&:hover': { bgcolor: '#00B8E6' } }}
             >
               Anexar arquivo (PDF / imagem)
             </Button>
@@ -313,7 +313,7 @@ const Empresas = () => {
                 setEmpresaDocsAlvo(empresaAlvo);
                 setOpenCameraDocEmpresa(true);
               }}
-              sx={{ bgcolor: '#7B2FBE', color: '#FFFFFF', fontWeight: 700, '&:hover': { bgcolor: '#6924A8' } }}
+              sx={{ bgcolor: cores.secundaria, color: cores.textoForte, fontWeight: 700, '&:hover': { bgcolor: '#6924A8' } }}
             >
               Tirar foto com a câmera
             </Button>
@@ -321,7 +321,7 @@ const Empresas = () => {
         </Box>
 
         <Box>
-          <Typography variant="subtitle2" sx={{ color: '#FFFFFF', fontWeight: 700, mb: 1.5 }}>
+          <Typography variant="subtitle2" sx={{ color: cores.textoForte, fontWeight: 700, mb: 1.5 }}>
             Documentos enviados ({docsFormatados.length})
           </Typography>
           <ListaDocumentos
@@ -340,7 +340,7 @@ const Empresas = () => {
       minWidth: 200,
       format: (val) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <BusinessIcon sx={{ color: '#00D4FF', fontSize: 20 }} />
+          <BusinessIcon sx={{ color: cores.primaria, fontSize: 20 }} />
           <Typography variant="body2" sx={{ fontWeight: 700 }}>{val}</Typography>
         </Box>
       )
@@ -613,7 +613,7 @@ const Empresas = () => {
         </Stack>
       </Box>
 
-      <GlassCard glowColor="#00D4FF" sx={{ p: 3, mb: 3 }}>
+      <GlassCard glowColor={cores.primaria} sx={{ p: 3, mb: 3 }}>
         <TextField
           fullWidth
           size="small"
@@ -622,7 +622,7 @@ const Empresas = () => {
           onChange={(e) => setSearch(e.target.value)}
           InputProps={{
             startAdornment: <SearchIcon sx={{ color: 'rgba(255,255,255,0.4)', mr: 1, fontSize: 20 }} />,
-            sx: { bgcolor: 'rgba(0,0,0,0.25)', borderRadius: 1.5, color: '#FFFFFF', fontSize: '0.875rem', mb: 2.5 }
+            sx: { bgcolor: 'rgba(0,0,0,0.25)', borderRadius: 1.5, color: cores.textoForte, fontSize: '0.875rem', mb: 2.5 }
           }}
         />
 
@@ -636,7 +636,7 @@ const Empresas = () => {
           rowsPerPage={rowsPerPage}
           onRowsPerPageChange={setRowsPerPage}
           sx={{
-            '& .MuiTableHead-root': { background: 'rgba(0,212,255,0.05)' },
+            '& .MuiTableHead-root': { background: tom(cores.primaria, 0.05) },
             border: '1px solid rgba(0,212,255,0.05)'
           }}
         />
@@ -671,7 +671,7 @@ const Empresas = () => {
           overflowY: 'auto', 
           flex: '1 1 auto',
           '&::-webkit-scrollbar': { width: '6px' }, 
-          '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.4)', borderRadius: '10px' }, 
+          '&::-webkit-scrollbar-thumb': { background: tom(cores.primaria, 0.4), borderRadius: '8px' }, 
           '&::-webkit-scrollbar-track': { background: 'rgba(255,255,255,0.02)' } 
         }}>
           <Box sx={{ pr: { xs: 0, md: 0.5 }, display: 'flex', flexDirection: 'column' }}>
@@ -733,7 +733,7 @@ const Empresas = () => {
                 <Box sx={{ display: 'flex', flexDirection: 'column', mt: 1 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
                     <Box>
-                      <Typography variant="subtitle2" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: '0.5px' }}>
+                      <Typography variant="subtitle2" sx={{ color: cores.primaria, fontWeight: 700, letterSpacing: '0.5px' }}>
                         Dias permitidos para acesso (terceirizados)
                       </Typography>
                       <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>
@@ -745,7 +745,7 @@ const Empresas = () => {
                         size="small" 
                         variant="outlined" 
                         onClick={handleSelectAllDatesEmpresa} 
-                        sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#00FF88', borderColor: 'rgba(0,255,136,0.3)', py: 0.3, px: 1.5, '&:hover': { borderColor: '#00FF88', bgcolor: 'rgba(0,255,136,0.08)' } }}
+                        sx={{ fontSize: '0.75rem', fontWeight: 700, color: cores.sucesso, borderColor: 'rgba(0,255,136,0.3)', py: 0.3, px: 1.5, '&:hover': { borderColor: cores.sucesso, bgcolor: 'rgba(0,255,136,0.08)' } }}
                       >
                         Marcar todos
                       </Button>
@@ -753,7 +753,7 @@ const Empresas = () => {
                         size="small" 
                         variant="outlined" 
                         onClick={handleClearAllDatesEmpresa} 
-                        sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#FF3366', borderColor: 'rgba(255,51,102,0.3)', py: 0.3, px: 1.5, '&:hover': { borderColor: '#FF3366', bgcolor: 'rgba(255,51,102,0.08)' } }}
+                        sx={{ fontSize: '0.75rem', fontWeight: 700, color: cores.erro, borderColor: 'rgba(255,51,102,0.3)', py: 0.3, px: 1.5, '&:hover': { borderColor: cores.erro, bgcolor: 'rgba(255,51,102,0.08)' } }}
                       >
                         Limpar
                       </Button>
@@ -763,10 +763,10 @@ const Empresas = () => {
                   {/* Botões de Navegação Direta de Fases para Empresas */}
                   <Stack direction="row" spacing={1} sx={{ mb: 1.5, flexWrap: 'wrap', gap: 0.5 }}>
                     {[
-                      { id: 'todas', label: 'Todas as fases', color: '#00D4FF' },
-                      { id: 'montagem', label: 'Montagem', color: '#00D4FF' },
-                      { id: 'evento', label: 'Evento', color: '#00FF88' },
-                      { id: 'desmontagem', label: 'Desmontagem', color: '#FFB800' }
+                      { id: 'todas', label: 'Todas as fases', color: cores.primaria },
+                      { id: 'montagem', label: 'Montagem', color: cores.primaria },
+                      { id: 'evento', label: 'Evento', color: cores.sucesso },
+                      { id: 'desmontagem', label: 'Desmontagem', color: cores.alerta }
                     ].map(tab => (
                       <Button
                         key={tab.id}
@@ -777,7 +777,7 @@ const Empresas = () => {
                           fontSize: '0.75rem',
                           fontWeight: 700,
                           letterSpacing: '0.5px',
-                          color: activePhaseTabEmpresa === tab.id ? '#0a1628' : tab.color,
+                          color: activePhaseTabEmpresa === tab.id ? cores.superficie : tab.color,
                           bgcolor: activePhaseTabEmpresa === tab.id ? tab.color : 'transparent',
                           borderColor: tab.color,
                           py: 0.3,
@@ -806,9 +806,9 @@ const Empresas = () => {
                     }}
                   >
                     {[
-                      { id: 'montagem', label: 'Montagem', color: '#00D4FF', bg: 'rgba(0,212,255,0.04)', border: 'rgba(0,212,255,0.2)' },
-                      { id: 'evento', label: 'Evento', color: '#00FF88', bg: 'rgba(0,255,136,0.04)', border: 'rgba(0,255,136,0.2)' },
-                      { id: 'desmontagem', label: 'Desmontagem', color: '#FFB800', bg: 'rgba(255,184,0,0.05)', border: 'rgba(255,184,0,0.25)' }
+                      { id: 'montagem', label: 'Montagem', color: cores.primaria, bg: tom(cores.primaria, 0.04), border: tom(cores.primaria, 0.2) },
+                      { id: 'evento', label: 'Evento', color: cores.sucesso, bg: 'rgba(0,255,136,0.04)', border: 'rgba(0,255,136,0.2)' },
+                      { id: 'desmontagem', label: 'Desmontagem', color: cores.alerta, bg: 'rgba(255,184,0,0.05)', border: 'rgba(255,184,0,0.25)' }
                     ]
                       .filter(phase => activePhaseTabEmpresa === 'todas' || activePhaseTabEmpresa === phase.id)
                       .map(phase => {
@@ -847,7 +847,7 @@ const Empresas = () => {
                                 <Button 
                                   size="small" 
                                   onClick={() => handleClearPhaseEmpresa ? handleClearPhaseEmpresa(phase.id) : null}
-                                  sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', py: 0.2, px: 1, minWidth: 'auto', border: '1px solid rgba(255,255,255,0.1)', '&:hover': { color: '#FF3366', borderColor: '#FF3366' } }}
+                                  sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', py: 0.2, px: 1, minWidth: 'auto', border: '1px solid rgba(255,255,255,0.1)', '&:hover': { color: cores.erro, borderColor: cores.erro } }}
                                 >
                                   Limpar
                                 </Button>
@@ -879,7 +879,7 @@ const Empresas = () => {
                                       border: `1px solid ${isChecked ? phase.color : 'rgba(255,255,255,0.1)'}`,
                                       bgcolor: isChecked ? `${phase.color}18` : 'rgba(255,255,255,0.02)',
                                       boxShadow: isChecked ? `0 0 10px ${phase.color}30` : 'none',
-                                      transition: 'all 0.15s ease',
+                                      transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.15s ease',
                                       '&:hover': {
                                         borderColor: phase.color,
                                         bgcolor: `${phase.color}10`
@@ -896,9 +896,9 @@ const Empresas = () => {
                                       bgcolor: isChecked ? phase.color : 'transparent',
                                       border: `1px solid ${isChecked ? phase.color : 'rgba(255,255,255,0.3)'}`
                                     }}>
-                                      {isChecked && <CheckIcon sx={{ fontSize: 13, color: '#0a1628', fontWeight: 700 }} />}
+                                      {isChecked && <CheckIcon sx={{ fontSize: 13, color: cores.superficie, fontWeight: 700 }} />}
                                     </Box>
-                                    <Typography variant="caption" sx={{ color: isChecked ? '#FFFFFF' : 'rgba(255,255,255,0.7)', fontWeight: isChecked ? 700 : 500, fontSize: '0.75rem' }}>
+                                    <Typography variant="caption" sx={{ color: isChecked ? cores.textoForte : 'rgba(255,255,255,0.7)', fontWeight: isChecked ? 700 : 500, fontSize: '0.75rem' }}>
                                       {date ? format(new Date(date + 'T00:00:00'), "dd/MM") : '--/--'}
                                     </Typography>
                                   </Box>
@@ -976,7 +976,7 @@ const Empresas = () => {
             ) : (
               <Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-                  <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700 }}>Planejamento diário</Typography>
+                  <Typography variant="overline" sx={{ color: cores.primaria, fontWeight: 700 }}>Planejamento diário</Typography>
                   <Button size="small" variant="outlined" onClick={() => {
                       const newQuotas = {};
                       getAllEventDates().forEach(d => newQuotas[d] = selectedEmpresa?.max_colaboradores ?? 50);
@@ -1014,7 +1014,7 @@ const Empresas = () => {
             </Typography>
             {carregandoAcesso && <Typography variant="caption" sx={{ color: 'text.secondary' }}>Carregando o acesso...</Typography>}
             {!carregandoAcesso && acessoPortal?.erro && (
-              <Typography variant="caption" sx={{ color: '#FFB800' }}>{acessoPortal.erro}</Typography>
+              <Typography variant="caption" sx={{ color: cores.alerta }}>{acessoPortal.erro}</Typography>
             )}
             {!carregandoAcesso && acessoPortal && !acessoPortal.erro && (
               <Stack spacing={1}>
@@ -1025,7 +1025,7 @@ const Empresas = () => {
                   <Stack key={item.rotulo} direction="row" spacing={1} alignItems="center" justifyContent="space-between">
                     <Box sx={{ minWidth: 0 }}>
                       <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>{item.rotulo}</Typography>
-                      <Typography variant="body2" sx={{ color: '#FFFFFF', wordBreak: 'break-all' }}>{item.valor}</Typography>
+                      <Typography variant="body2" sx={{ color: cores.textoForte, wordBreak: 'break-all' }}>{item.valor}</Typography>
                     </Box>
                     {item.copiar && (
                       <IconButton size="small" onClick={() => copiar(item.valor, item.copiar)} sx={acaoTabela} title={`Copiar ${item.rotulo.toLowerCase()}`}>
@@ -1037,7 +1037,7 @@ const Empresas = () => {
                 <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
                   <Box sx={{ minWidth: 0 }}>
                     <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Chave de acesso (senha)</Typography>
-                    <Typography variant="body2" sx={{ color: '#FFFFFF', fontFamily: 'monospace', letterSpacing: 1 }}>
+                    <Typography variant="body2" sx={{ color: cores.textoForte, fontFamily: 'monospace', letterSpacing: 1 }}>
                       {acessoPortal.chave ? (mostrarChave ? acessoPortal.chave : '••••-••••-••••') : 'Ainda não gerada'}
                     </Typography>
                   </Box>
@@ -1052,7 +1052,7 @@ const Empresas = () => {
                         </IconButton>
                       </>
                     )}
-                    <Button size="small" onClick={trocarChavePortal} disabled={!acessoPortal.login} sx={{ textTransform: 'none', color: '#FFB800' }}>
+                    <Button size="small" onClick={trocarChavePortal} disabled={!acessoPortal.login} sx={{ textTransform: 'none', color: cores.alerta }}>
                       {acessoPortal.chave ? 'Trocar chave' : 'Gerar chave'}
                     </Button>
                   </Stack>
@@ -1064,9 +1064,9 @@ const Empresas = () => {
             )}
           </Box>
 
-          <Box sx={{ p: 2, bgcolor: 'rgba(0, 212, 255, 0.06)', border: '1px solid rgba(0, 212, 255, 0.25)', borderRadius: 1.5, mb: 3 }}>
+          <Box sx={{ p: 2, bgcolor: tom(cores.primaria, 0.06), border: '1px solid rgba(0, 212, 255, 0.25)', borderRadius: 1.5, mb: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5, gap: 1 }}>
-              <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700 }}>
+              <Typography variant="caption" sx={{ color: cores.primaria, fontWeight: 700 }}>
                 2. Link para cadastro de colaboradores (Equipe)
               </Typography>
               <Button
@@ -1077,12 +1077,12 @@ const Empresas = () => {
                   navigator.clipboard.writeText(inviteResult.link);
                   enqueueSnackbar('Link de cadastro de colaboradores copiado!', { variant: 'success' });
                 }}
-                sx={{ borderColor: 'rgba(0,212,255,0.4)', color: '#00D4FF', fontSize: '0.72rem', py: 0.2 }}
+                sx={{ borderColor: tom(cores.primaria, 0.4), color: cores.primaria, fontSize: '0.75rem', py: 0.2 }}
               >
                 Copiar
               </Button>
             </Box>
-            <Typography variant="caption" sx={{ color: '#FFFFFF', wordBreak: 'break-all', display: 'block' }}>
+            <Typography variant="caption" sx={{ color: cores.textoForte, wordBreak: 'break-all', display: 'block' }}>
               {inviteResult.link}
             </Typography>
           </Box>
@@ -1096,7 +1096,7 @@ const Empresas = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setOpenInviteDialog(false)}
-                sx={{ borderColor: '#25D366', color: '#25D366', fontWeight: 700, '&:hover': { bgcolor: 'rgba(37, 211, 102, 0.1)', borderColor: '#25D366' } }}
+                sx={{ borderColor: cores.whatsapp, color: cores.whatsapp, fontWeight: 700, '&:hover': { bgcolor: 'rgba(37, 211, 102, 0.1)', borderColor: cores.whatsapp } }}
             >
                 Enviar no WhatsApp
             </Button>
@@ -1107,7 +1107,7 @@ const Empresas = () => {
                 disabled={enviandoEmailConvite}
                 startIcon={<EmailIcon />}
                 onClick={handleEnviarConvitePorEmail}
-                sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700 }}
+                sx={{ bgcolor: cores.primaria, color: '#000000', fontWeight: 700 }}
             >
                 {enviandoEmailConvite ? 'Enviando e-mail...' : 'Enviar para o e-mail do responsável'}
             </Button>

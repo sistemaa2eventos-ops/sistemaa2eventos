@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Box } from '@mui/material';
+import { cores } from '../../../styles/tokens';
 
 /**
  * Réguas profissional de prancheta gráfica (superior e lateral).
@@ -67,7 +68,7 @@ export const ReguaEditor = ({
                     zIndex: 20,
                     fontSize: '9px',
                     fontFamily: 'monospace',
-                    color: '#00D4FF',
+                    color: cores.primaria,
                     fontWeight: 'bold',
                     userSelect: 'none'
                 }}
@@ -132,7 +133,7 @@ export const ReguaEditor = ({
                             bottom: 0,
                             left: cursorX * zoom,
                             width: '2px',
-                            bgcolor: '#00D4FF',
+                            bgcolor: cores.primaria,
                             boxShadow: '0 0 4px #00D4FF',
                             zIndex: 2
                         }}
@@ -197,7 +198,7 @@ export const ReguaEditor = ({
                             right: 0,
                             top: cursorY * zoom,
                             height: '2px',
-                            bgcolor: '#00D4FF',
+                            bgcolor: cores.primaria,
                             boxShadow: '0 0 4px #00D4FF',
                             zIndex: 2
                         }}

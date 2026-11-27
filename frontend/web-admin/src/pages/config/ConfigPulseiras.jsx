@@ -33,11 +33,11 @@ import PageHeader from '../../components/common/PageHeader';
 import NeonButton from '../../components/common/NeonButton';
 import DataTable from '../../components/common/DataTable';
 
-import { botaoSecundario } from '../../styles/tokens';
+import { botaoSecundario, cores, tom } from '../../styles/tokens';
 const MenuProps = {
     PaperProps: {
         sx: {
-            background: '#0A1628',
+            background: cores.superficie,
             border: '1px solid rgba(0, 212, 255, 0.2)',
         },
     },
@@ -55,7 +55,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
 
     const [formData, setFormData] = useState({
         nome_tipo: '',
-        cor_hex: '#00D4FF',
+        cor_hex: cores.primaria,
         fase: 'todas',
         data_especifica: '',
         hora_inicio: '',
@@ -116,9 +116,9 @@ const ConfigPulseiras = ({ embedded = false }) => {
             minWidth: 140,
             format: (val, row) => {
                 const mapFase = {
-                    'todas': { label: 'Todas as fases', color: '#00D4FF', bg: 'rgba(0, 212, 255, 0.1)' },
-                    'montagem': { label: 'Montagem', color: '#FFB800', bg: 'rgba(255, 184, 0, 0.1)' },
-                    'evento': { label: 'Evento (Show)', color: '#00FF88', bg: 'rgba(0, 255, 136, 0.1)' },
+                    'todas': { label: 'Todas as fases', color: cores.primaria, bg: tom(cores.primaria, 0.1) },
+                    'montagem': { label: 'Montagem', color: cores.alerta, bg: 'rgba(255, 184, 0, 0.1)' },
+                    'evento': { label: 'Evento (Show)', color: cores.sucesso, bg: 'rgba(0, 255, 136, 0.1)' },
                     'desmontagem': { label: 'Desmontagem', color: '#FF0055', bg: 'rgba(255, 0, 85, 0.1)' }
                 };
                 const config = mapFase[val || 'todas'] || mapFase.todas;
@@ -131,13 +131,13 @@ const ConfigPulseiras = ({ embedded = false }) => {
                                 background: config.bg,
                                 color: config.color,
                                 border: `1px solid ${config.color}33`,
-                                fontSize: '0.72rem',
+                                fontSize: '0.75rem',
                                 fontWeight: 700,
                                 width: 'fit-content'
                             }}
                         />
                         {(row.data_especifica || (row.hora_inicio && row.hora_fim)) && (
-                            <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.7rem' }}>
+                            <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.75rem' }}>
                                 {row.data_especifica && `📅 ${row.data_especifica} `}
                                 {row.hora_inicio && row.hora_fim && `⏰ ${row.hora_inicio.slice(0, 5)} - ${row.hora_fim.slice(0, 5)}`}
                             </Typography>
@@ -167,7 +167,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
                             key={i}
                             label={p.evento_areas?.nome_area}
                             size="small"
-                            sx={{ background: 'rgba(0, 212, 255, 0.1)', color: '#00D4FF', fontSize: '0.75rem', fontWeight: 700 }}
+                            sx={{ background: tom(cores.primaria, 0.1), color: cores.primaria, fontSize: '0.75rem', fontWeight: 700 }}
                         />
                     ))}
                     {!permits?.length && <Typography variant="caption" color="error">Sem acesso</Typography>}
@@ -184,7 +184,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
                     <IconButton
                         size="small"
                         onClick={() => handleOpenDialog(row)}
-                        sx={{ color: '#00D4FF', background: 'rgba(0,212,255,0.05)' }}
+                        sx={{ color: cores.primaria, background: tom(cores.primaria, 0.05) }}
                         title="Editar"
                     >
                         <EditIcon fontSize="small" />
@@ -192,7 +192,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
                     <IconButton
                         size="small"
                         onClick={() => handleDelete(row.id)}
-                        sx={{ color: '#FF3366', background: 'rgba(255,51,102,0.05)' }}
+                        sx={{ color: cores.erro, background: 'rgba(255,51,102,0.05)' }}
                         title="Excluir"
                     >
                         <DeleteIcon fontSize="small" />
@@ -228,7 +228,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
             setEditingId(pulseira.id);
             setFormData({
                 nome_tipo: pulseira.nome_tipo || '',
-                cor_hex: pulseira.cor_hex || '#00D4FF',
+                cor_hex: pulseira.cor_hex || cores.primaria,
                 fase: pulseira.fase || 'todas',
                 data_especifica: pulseira.data_especifica || '',
                 hora_inicio: pulseira.hora_inicio ? pulseira.hora_inicio.slice(0, 5) : '',
@@ -245,7 +245,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
             setEditingId(null);
             setFormData({
                 nome_tipo: '',
-                cor_hex: '#00D4FF',
+                cor_hex: cores.primaria,
                 fase: 'todas',
                 data_especifica: '',
                 hora_inicio: '',
@@ -359,7 +359,7 @@ const ConfigPulseiras = ({ embedded = false }) => {
                 </Box>
             )}
 
-            <GlassCard glowColor="#7B2FBE" sx={{ p: { xs: 2, sm: 2.5, md: 3 }, mb: 3 }}>
+            <GlassCard glowColor={cores.secundaria} sx={{ p: { xs: 2, sm: 2.5, md: 3 }, mb: 3 }}>
                 <DataTable
                     columns={columns}
                     data={pulseiras}
@@ -379,9 +379,9 @@ const ConfigPulseiras = ({ embedded = false }) => {
                 disableRestoreFocus
                 PaperProps={{
                     sx: {
-                        background: '#0A1628',
+                        background: cores.superficie,
                         border: '1px solid rgba(0, 212, 255, 0.2)',
-                        borderRadius: 2,
+                        borderRadius: 1.5,
                         maxHeight: '90vh'
                     }
                 }}

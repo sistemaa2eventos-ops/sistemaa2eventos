@@ -7,6 +7,7 @@ import NeonButton from '../../components/common/NeonButton';
 import PageHeader from '../../components/common/PageHeader';
 import GlassCard from '../../components/common/GlassCard';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
+import { cores, tom } from '../../styles/tokens';
 
 const ConfigWebhooks = () => {
     const confirmar = useConfirmacao();
@@ -134,12 +135,12 @@ const ConfigWebhooks = () => {
                     <GlassCard sx={{ p: { xs: 2.5, md: 3 }, height: '100%' }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <CodeIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
-                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                                <CodeIcon sx={{ color: cores.primaria, fontSize: 28 }} />
+                                <Typography variant="h6" sx={{ fontWeight: 700, color: cores.textoForte }}>
                                     API keys geradas (tokens)
                                 </Typography>
                             </Box>
-                            <Button onClick={handleCreateApiKey} startIcon={<AddIcon />} variant="outlined" sx={{ color: '#00D4FF', borderColor: 'rgba(0,212,255,0.3)' }} size="small">
+                            <Button onClick={handleCreateApiKey} startIcon={<AddIcon />} variant="outlined" sx={{ color: cores.primaria, borderColor: tom(cores.primaria, 0.3) }} size="small">
                                 Gerar novo
                             </Button>
                         </Box>
@@ -158,12 +159,12 @@ const ConfigWebhooks = () => {
                                     <ListItemText
                                         primary={key.name}
                                         secondary={`Gerado em: ${formatDate(key.created_at)}`}
-                                        primaryTypographyProps={{ color: '#FFFFFF', fontWeight: 600, fontSize: '1rem' }}
+                                        primaryTypographyProps={{ color: cores.textoForte, fontWeight: 600, fontSize: '1rem' }}
                                         secondaryTypographyProps={{ color: 'text.secondary', fontSize: '0.75rem' }}
                                     />
                                     <Box sx={{ display: 'flex', gap: 1 }}>
-                                        <IconButton onClick={() => handleCopy(key.api_key)} size="small" sx={{ color: '#00D4FF', bgcolor: 'rgba(0,212,255,0.05)' }}><CopyIcon fontSize="small" /></IconButton>
-                                        <IconButton onClick={() => handleDeleteApiKey(key.id)} size="small" sx={{ color: '#FF3366', bgcolor: 'rgba(255,51,102,0.05)' }}><DeleteIcon fontSize="small" /></IconButton>
+                                        <IconButton onClick={() => handleCopy(key.api_key)} size="small" sx={{ color: cores.primaria, bgcolor: tom(cores.primaria, 0.05) }}><CopyIcon fontSize="small" /></IconButton>
+                                        <IconButton onClick={() => handleDeleteApiKey(key.id)} size="small" sx={{ color: cores.erro, bgcolor: 'rgba(255,51,102,0.05)' }}><DeleteIcon fontSize="small" /></IconButton>
                                     </Box>
                                 </ListItem>
                             ))}
@@ -174,8 +175,8 @@ const ConfigWebhooks = () => {
                 <Grid item xs={12} lg={6}>
                     <GlassCard sx={{ p: { xs: 2.5, md: 3 }, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
-                            <WebhookIcon sx={{ color: '#7B2FBE', fontSize: 28 }} />
-                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                            <WebhookIcon sx={{ color: cores.secundaria, fontSize: 28 }} />
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: cores.textoForte }}>
                                 Ações reativas / webhooks
                             </Typography>
                         </Box>
@@ -192,12 +193,12 @@ const ConfigWebhooks = () => {
                             ) : webhooks.map((wh) => (
                                 <ListItem key={wh.id} sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', mb: 1 }}>
-                                        <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700 }}>
+                                        <Typography variant="caption" sx={{ color: cores.primaria, fontWeight: 700 }}>
                                             {wh.trigger_event}
                                         </Typography>
-                                        <IconButton onClick={() => handleDeleteWebhook(wh.id)} size="small" sx={{ color: '#FF3366' }}><DeleteIcon fontSize="small" /></IconButton>
+                                        <IconButton onClick={() => handleDeleteWebhook(wh.id)} size="small" sx={{ color: cores.erro }}><DeleteIcon fontSize="small" /></IconButton>
                                     </Box>
-                                    <Typography variant="body2" sx={{ color: '#FFFFFF', wordBreak: 'break-all' }}>
+                                    <Typography variant="body2" sx={{ color: cores.textoForte, wordBreak: 'break-all' }}>
                                         {wh.target_url}
                                     </Typography>
                                 </ListItem>

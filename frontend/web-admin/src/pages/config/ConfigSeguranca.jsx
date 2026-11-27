@@ -103,8 +103,8 @@ const ConfigSeguranca = () => {
                 <Grid item xs={12} md={5}>
                     <GlassCard sx={{ p: 3, mb: 4, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
-                            <LockIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
-                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                            <LockIcon sx={{ color: cores.primaria, fontSize: 28 }} />
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: cores.textoForte }}>
                                 Sessões de login
                             </Typography>
                         </Box>
@@ -125,12 +125,12 @@ const ConfigSeguranca = () => {
 
                         <FormControlLabel
                             control={<Switch checked={force2FA} onChange={(e) => setForce2FA(e.target.checked)} color="primary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Exigir verificação em duas etapas para admins</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: cores.textoForte }}>Exigir verificação em duas etapas para admins</Typography>}
                             sx={{ mb: 2 }}
                         />
                         <FormControlLabel
                             control={<Switch checked={ddosShield} onChange={(e) => setDdosShield(e.target.checked)} color="primary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Bloquear IPs com tentativas suspeitas</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: cores.textoForte }}>Bloquear IPs com tentativas suspeitas</Typography>}
                             sx={{ mb: 4 }}
                         />
 
@@ -147,7 +147,7 @@ const ConfigSeguranca = () => {
                         <Box>
                             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 2 }}>
                                 <SecurityIcon sx={{ color: funcao.negado, fontSize: 28 }} />
-                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                                <Typography variant="h6" sx={{ fontWeight: 700, color: cores.textoForte }}>
                                     Revogação de sessões em tempo real
                                 </Typography>
                             </Box>
@@ -156,7 +156,7 @@ const ConfigSeguranca = () => {
                                 Em caso de troca urgente de equipe, perda de equipamento em campo ou suspeita de credencial compartilhada, encerre todas as sessões abertas dos operadores imediatamente.
                             </Typography>
 
-                            <Box sx={{ p: 2.5, borderRadius: 2, bgcolor: cores.fundo, border: `1px solid ${tom(cores.erro, 0.3)}`, mb: 3 }}>
+                            <Box sx={{ p: 2.5, borderRadius: 1.5, bgcolor: cores.fundo, border: `1px solid ${tom(cores.erro, 0.3)}`, mb: 3 }}>
                                 <Typography sx={{ fontSize: tamanhos.md, fontWeight: 700, color: cores.textoForte, mb: 0.5 }}>
                                     Desconexão global de emergência
                                 </Typography>

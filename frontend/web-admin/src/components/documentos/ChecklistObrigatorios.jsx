@@ -1,14 +1,15 @@
 import React from 'react';
 import { Box, Chip, Stack, Typography } from '@mui/material';
+import { cores } from '../../styles/tokens';
 
 /** Situação de cada documento obrigatório (texto e cor). */
 export const SITUACAO_OBRIGATORIO = {
-    ok: { rotulo: 'Aprovado', cor: '#00FF88' },
-    em_analise: { rotulo: 'Em análise', cor: '#FFB800' },
-    reenvio_solicitado: { rotulo: 'Reenvio solicitado', cor: '#FFB800' },
-    vencido: { rotulo: 'Vencido', cor: '#FF3366' },
-    reprovado: { rotulo: 'Reprovado', cor: '#FF3366' },
-    falta_anexar: { rotulo: 'Falta anexar', cor: '#FF3366' }
+    ok: { rotulo: 'Aprovado', cor: cores.sucesso },
+    em_analise: { rotulo: 'Em análise', cor: cores.alerta },
+    reenvio_solicitado: { rotulo: 'Reenvio solicitado', cor: cores.alerta },
+    vencido: { rotulo: 'Vencido', cor: cores.erro },
+    reprovado: { rotulo: 'Reprovado', cor: cores.erro },
+    falta_anexar: { rotulo: 'Falta anexar', cor: cores.erro }
 };
 
 /**
@@ -34,7 +35,7 @@ const ChecklistObrigatorios = ({ obrigatorios = [], titulo = 'Documentos obrigat
                             size="small"
                             label={compacto ? `${o.nome}: ${s.rotulo}` : `${o.nome} — ${s.rotulo}`}
                             sx={{
-                                bgcolor: `${s.cor}1F`, color: s.cor, fontWeight: 600, fontSize: '0.72rem',
+                                bgcolor: `${s.cor}1F`, color: s.cor, fontWeight: 600, fontSize: '0.75rem',
                                 border: `1px solid ${s.cor}66`
                             }}
                         />

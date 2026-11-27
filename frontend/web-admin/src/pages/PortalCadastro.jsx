@@ -9,6 +9,7 @@ import { CloudUpload } from '@mui/icons-material';
 import PhotoCapture from '../components/common/PhotoCapture';
 import api from '../services/api';
 import { reduzirFoto } from '../utils/FaceValidator';
+import { cores } from '../styles/tokens';
 
 const PortalCadastro = () => {
     const [searchParams] = useSearchParams();
@@ -124,17 +125,17 @@ const PortalCadastro = () => {
 
     if (loading) {
         return (
-            <Box sx={{ minHeight: '100dvh', display: 'flex', justifyContent: 'center', alignItems: 'center', bgcolor: '#0A1628' }}>
-                <CircularProgress sx={{ color: '#00D4FF' }} />
+            <Box sx={{ minHeight: '100dvh', display: 'flex', justifyContent: 'center', alignItems: 'center', bgcolor: cores.superficie }}>
+                <CircularProgress sx={{ color: cores.primaria }} />
             </Box>
         );
     }
 
     if (error && !empresaData) {
         return (
-            <Box sx={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', bgcolor: '#0A1628', p: 3 }}>
+            <Box sx={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', bgcolor: cores.superficie, p: 3 }}>
                 <Paper sx={{ p: 5, borderRadius: 1.5, maxWidth: 500, textAlign: 'center', bgcolor: 'rgba(10, 22, 40, 0.9)', border: '1px solid rgba(255, 51, 102, 0.3)' }}>
-                    <Typography variant="h5" color="#FF3366" sx={{ mb: 2, fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 }}>Acesso negado</Typography>
+                    <Typography variant="h5" color={cores.erro} sx={{ mb: 2, fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 }}>Acesso negado</Typography>
                     <Typography color="text.secondary">{error}</Typography>
                 </Paper>
             </Box>
@@ -143,9 +144,9 @@ const PortalCadastro = () => {
 
     if (success) {
         return (
-            <Box sx={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', bgcolor: '#0A1628', p: 3 }}>
+            <Box sx={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', bgcolor: cores.superficie, p: 3 }}>
                 <Paper sx={{ p: 5, borderRadius: 1.5, maxWidth: 500, textAlign: 'center', bgcolor: 'rgba(10, 22, 40, 0.9)', border: '1px solid rgba(0, 255, 136, 0.3)' }}>
-                    <Typography variant="h5" color="#00FF88" sx={{ mb: 2, fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 }}>Cadastro recebido</Typography>
+                    <Typography variant="h5" color={cores.sucesso} sx={{ mb: 2, fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 }}>Cadastro recebido</Typography>
                     <Typography color="text.secondary">{success}</Typography>
                 </Paper>
             </Box>
@@ -153,10 +154,10 @@ const PortalCadastro = () => {
     }
 
     return (
-        <Box sx={{ minHeight: '100dvh', bgcolor: '#050B18', py: 6 }}>
+        <Box sx={{ minHeight: '100dvh', bgcolor: cores.fundo, py: 6 }}>
             <Container maxWidth="md">
                 <Box sx={{ textAlign: 'center', mb: 5 }}>
-                    <Typography variant="h3" sx={{ fontFamily: '"Space Grotesk", sans-serif', color: '#00D4FF', fontWeight: 700, letterSpacing: '2px', textShadow: '0 0 20px rgba(0,212,255,0.4)' }}>
+                    <Typography variant="h3" sx={{ fontFamily: '"Space Grotesk", sans-serif', color: cores.primaria, fontWeight: 700, letterSpacing: '2px', textShadow: '0 0 20px rgba(0,212,255,0.4)' }}>
                         NZT Intelligent Control System
                     </Typography>
                     <Typography variant="subtitle1" sx={{ color: 'text.secondary', mt: 1 }}>
@@ -172,19 +173,19 @@ const PortalCadastro = () => {
                     backdropFilter: 'blur(10px)'
                 }}>
                     <Box sx={{ textAlign: 'center', mb: 4, pb: 3, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <Typography variant="h5" color="#FFFFFF" sx={{ fontWeight: 700 }}>{empresaData.eventos?.nome || 'Evento Principal'}</Typography>
+                        <Typography variant="h5" color={cores.textoForte} sx={{ fontWeight: 700 }}>{empresaData.eventos?.nome || 'Evento Principal'}</Typography>
                         <Typography color="text.secondary" sx={{ mt: 1 }}>Credenciamento via <strong>{empresaData.nome}</strong></Typography>
                     </Box>
 
                     {error && (
-                        <Alert severity="error" sx={{ mb: 4, bgcolor: 'rgba(255,51,102,0.1)', color: '#FF3366', border: '1px solid rgba(255,51,102,0.3)' }}>
+                        <Alert severity="error" sx={{ mb: 4, bgcolor: 'rgba(255,51,102,0.1)', color: cores.erro, border: '1px solid rgba(255,51,102,0.3)' }}>
                             {error}
                         </Alert>
                     )}
 
                     <form onSubmit={handleSubmit}>
                         {/* SEÇÃO 1: FOTO */}
-                        <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700, fontSize: '1rem' }}>1. Biometria facial</Typography>
+                        <Typography variant="overline" sx={{ color: cores.primaria, fontWeight: 700, fontSize: '1rem' }}>1. Biometria facial</Typography>
                         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', my: 3 }}>
                             <PhotoCapture
                                 onPhotoCaptured={handlePhotoCaptured}
@@ -196,7 +197,7 @@ const PortalCadastro = () => {
                         <Divider sx={{ my: 4, borderColor: 'rgba(255,255,255,0.05)' }} />
 
                         {/* SEÇÃO 2: DADOS PESSOAIS */}
-                        <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700, fontSize: '1rem', mb: 2, display: 'block' }}>2. Dados pessoais</Typography>
+                        <Typography variant="overline" sx={{ color: cores.primaria, fontWeight: 700, fontSize: '1rem', mb: 2, display: 'block' }}>2. Dados pessoais</Typography>
                         <Grid container spacing={3}>
                             <Grid item xs={12}>(
                                 <TextField fullWidth required label="Nome completo *" value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} />
@@ -224,7 +225,7 @@ const PortalCadastro = () => {
                         <Divider sx={{ my: 4, borderColor: 'rgba(255,255,255,0.05)' }} />
 
                         {/* SEÇÃO 3: EVENTO */}
-                        <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700, fontSize: '1rem', mb: 2, display: 'block' }}>3. Integração</Typography>
+                        <Typography variant="overline" sx={{ color: cores.primaria, fontWeight: 700, fontSize: '1rem', mb: 2, display: 'block' }}>3. Integração</Typography>
                         <Grid container spacing={3}>
                             <Grid item xs={12}>
                                 <TextField fullWidth label="Evento de destino" value={empresaData.eventos?.nome || 'Evento'} disabled />
@@ -234,13 +235,13 @@ const PortalCadastro = () => {
                             </Grid>
                             <Grid item xs={12}>
                                 <FormControlLabel 
-                                    control={<Checkbox checked={true} disabled sx={{ color: '#00D4FF' }} />} 
+                                    control={<Checkbox checked={true} disabled sx={{ color: cores.primaria }} />} 
                                     label="Desejo acesso irrestrito conforme datas do evento programadas."
                                 />
                             </Grid>
                             <Grid item xs={12}>
                                 <FormControlLabel
-                                    control={<Checkbox checked={!!formData.aceite_lgpd} onChange={e => setFormData({...formData, aceite_lgpd: e.target.checked})} sx={{ color: '#00D4FF' }} />}
+                                    control={<Checkbox checked={!!formData.aceite_lgpd} onChange={e => setFormData({...formData, aceite_lgpd: e.target.checked})} sx={{ color: cores.primaria }} />}
                                     label="Aceito os termos de uso e a coleta de imagem para identificação (LGPD)."
                                 />
                             </Grid>
@@ -249,17 +250,17 @@ const PortalCadastro = () => {
                         <Divider sx={{ my: 4, borderColor: 'rgba(255,255,255,0.05)' }} />
 
                         {/* SEÇÃO 4: DOCUMENTOS */}
-                        <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700, fontSize: '1rem', mb: 2, display: 'block' }}>4. Auditoria documental</Typography>
+                        <Typography variant="overline" sx={{ color: cores.primaria, fontWeight: 700, fontSize: '1rem', mb: 2, display: 'block' }}>4. Auditoria documental</Typography>
                         <Grid container spacing={3}>
                             <Grid item xs={12} sm={6} textAlign="center">
                                 <input type="file" accept="image/*,.pdf" style={{ display: 'none' }} ref={docFrenteRef} onChange={e => handleDocUpload(e, 'frente')} />
-                                <Button fullWidth variant="outlined" startIcon={<CloudUpload />} sx={{ height: 100, borderColor: 'rgba(255,255,255,0.1)', color: '#FFFFFF' }} onClick={() => docFrenteRef.current.click()}>
+                                <Button fullWidth variant="outlined" startIcon={<CloudUpload />} sx={{ height: 100, borderColor: 'rgba(255,255,255,0.1)', color: cores.textoForte }} onClick={() => docFrenteRef.current.click()}>
                                     {formData.documentos.find(d => d.name.includes('frente')) ? 'Documento Frente Anexado' : 'Enviar RG/CNH (Frente)'}
                                 </Button>
                             </Grid>
                             <Grid item xs={12} sm={6} textAlign="center">
                                 <input type="file" accept="image/*,.pdf" style={{ display: 'none' }} ref={docVersoRef} onChange={e => handleDocUpload(e, 'verso')} />
-                                <Button fullWidth variant="outlined" startIcon={<CloudUpload />} sx={{ height: 100, borderColor: 'rgba(255,255,255,0.1)', color: '#FFFFFF' }} onClick={() => docVersoRef.current.click()}>
+                                <Button fullWidth variant="outlined" startIcon={<CloudUpload />} sx={{ height: 100, borderColor: 'rgba(255,255,255,0.1)', color: cores.textoForte }} onClick={() => docVersoRef.current.click()}>
                                     {formData.documentos.find(d => d.name.includes('verso')) ? 'Documento Verso Anexado' : 'Enviar RG/CNH (Verso)'}
                                 </Button>
                             </Grid>
@@ -273,7 +274,7 @@ const PortalCadastro = () => {
                                 disabled={submitting}
                                 sx={{ 
                                     py: 2, 
-                                    bgcolor: '#00D4FF', 
+                                    bgcolor: cores.primaria, 
                                     color: '#000000', 
                                     fontWeight: 700,
                                     fontSize: '1.25rem',

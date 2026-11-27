@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Divider } from '@mui/material';
+import { cores, tom } from '../../styles/tokens';
 
 /**
  * Markdown simples dos manuais do sistema (títulos, parágrafos, listas com sub-itens, lista de conferência
@@ -112,7 +113,7 @@ export function Inline({ texto }) {
         if (m.index > ultimo) saida.push(texto.slice(ultimo, m.index));
         if (m[1] !== undefined) saida.push(<strong key={n++}><Inline texto={m[1]} /></strong>);
         else if (m[2] !== undefined) saida.push(
-            <Box key={n++} component="code" sx={{ fontFamily: 'monospace', fontSize: '0.85em', px: 0.5, py: 0.1, borderRadius: 0.5, bgcolor: 'rgba(0,212,255,0.08)', color: '#7DD3FC', wordBreak: 'break-all' }}>{m[2]}</Box>
+            <Box key={n++} component="code" sx={{ fontFamily: 'monospace', fontSize: '0.85em', px: 0.5, py: 0.1, borderRadius: 0.5, bgcolor: tom(cores.primaria, 0.08), color: '#7DD3FC', wordBreak: 'break-all' }}>{m[2]}</Box>
         );
         else saida.push(<em key={n++}>{m[3]}</em>);
         ultimo = m.index + m[0].length;
@@ -128,8 +129,8 @@ function Lista({ itens }) {
         <Box component={numerada ? 'ol' : 'ul'} sx={{ pl: 3, my: 1, '& li': { mb: 0.5 } }}>
             {itens.map((it, idx) => (
                 <Box component="li" key={idx} sx={it.marcado !== null ? { listStyle: 'none', ml: -2.5 } : null}>
-                    <Typography component="span" variant="body2" sx={{ color: '#CBD5E1', lineHeight: 1.7 }}>
-                        {it.marcado !== null && <Box component="span" sx={{ mr: 1, color: '#00D4FF' }} aria-hidden>{it.marcado ? '☑' : '☐'}</Box>}
+                    <Typography component="span" variant="body2" sx={{ color: cores.textoSuave, lineHeight: 1.7 }}>
+                        {it.marcado !== null && <Box component="span" sx={{ mr: 1, color: cores.primaria }} aria-hidden>{it.marcado ? '☑' : '☐'}</Box>}
                         <Inline texto={it.texto} />
                     </Typography>
                     {it.filhos.length > 0 && <Lista itens={it.filhos} />}
@@ -145,7 +146,7 @@ export function Bloco({ bloco }) {
             const v = { 1: 'h5', 2: 'h6', 3: 'subtitle1', 4: 'subtitle2' }[bloco.nivel];
             return (
                 <Typography id={ancora(bloco.texto)} variant={v} component={`h${bloco.nivel}`}
-                    sx={{ fontWeight: 700, color: bloco.nivel <= 2 ? '#FFFFFF' : '#E2E8F0', mt: bloco.nivel <= 2 ? 3 : 2, mb: 1, scrollMarginTop: 80 }}>
+                    sx={{ fontWeight: 700, color: bloco.nivel <= 2 ? cores.textoForte : cores.textoSuave, mt: bloco.nivel <= 2 ? 3 : 2, mb: 1, scrollMarginTop: 80 }}>
                     <Inline texto={bloco.texto} />
                 </Typography>
             );
@@ -162,11 +163,11 @@ export function Bloco({ bloco }) {
                 <TableContainer sx={{ my: 1.5, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 1, overflowX: 'auto' }}>
                     <Table size="small">
                         <TableHead>
-                            <TableRow>{bloco.cabecalho.map((c, i) => <TableCell key={i} sx={{ fontWeight: 700, color: '#FFFFFF', bgcolor: 'rgba(255,255,255,0.04)' }}><Inline texto={c} /></TableCell>)}</TableRow>
+                            <TableRow>{bloco.cabecalho.map((c, i) => <TableCell key={i} sx={{ fontWeight: 700, color: cores.textoForte, bgcolor: 'rgba(255,255,255,0.04)' }}><Inline texto={c} /></TableCell>)}</TableRow>
                         </TableHead>
                         <TableBody>
                             {bloco.linhas.map((l, i) => (
-                                <TableRow key={i}>{l.map((c, j) => <TableCell key={j} sx={{ color: '#CBD5E1', verticalAlign: 'top' }}><Inline texto={c} /></TableCell>)}</TableRow>
+                                <TableRow key={i}>{l.map((c, j) => <TableCell key={j} sx={{ color: cores.textoSuave, verticalAlign: 'top' }}><Inline texto={c} /></TableCell>)}</TableRow>
                             ))}
                         </TableBody>
                     </Table>
@@ -174,6 +175,6 @@ export function Bloco({ bloco }) {
             );
         case 'lista': return <Lista itens={bloco.itens} />;
         default:
-            return <Typography variant="body2" sx={{ color: '#CBD5E1', my: 1, lineHeight: 1.7 }}><Inline texto={bloco.texto} /></Typography>;
+            return <Typography variant="body2" sx={{ color: cores.textoSuave, my: 1, lineHeight: 1.7 }}><Inline texto={bloco.texto} /></Typography>;
     }
 }

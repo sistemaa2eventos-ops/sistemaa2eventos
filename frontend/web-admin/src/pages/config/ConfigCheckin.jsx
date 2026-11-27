@@ -7,7 +7,7 @@ import PageHeader from '../../components/common/PageHeader';
 import GlassCard from '../../components/common/GlassCard';
 import NeonButton from '../../components/common/NeonButton';
 
-import { funcao, tom } from '../../styles/tokens';
+import { funcao, tom, cores } from '../../styles/tokens';
 const ConfigCheckin = () => {
     const { enqueueSnackbar } = useSnackbar();
     const [loading, setLoading] = useState(true);
@@ -79,7 +79,7 @@ const ConfigCheckin = () => {
                     <GlassCard sx={{ p: { xs: 2.5, md: 3 }, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                             <TimerIcon sx={{ color: funcao.acao, fontSize: 28 }} />
-                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: cores.textoForte }}>
                                 Bloqueio temporal (anti-passback)
                             </Typography>
                         </Box>
@@ -90,7 +90,7 @@ const ConfigCheckin = () => {
 
                         <FormControlLabel
                             control={<Switch checked={apbEnabled} onChange={(e) => setApbEnabled(e.target.checked)} />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Ativar anti-passback</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: cores.textoForte }}>Ativar anti-passback</Typography>}
                             sx={{ mb: 3 }}
                         />
 
@@ -140,7 +140,7 @@ const ConfigCheckin = () => {
                     <GlassCard sx={{ p: { xs: 2.5, md: 3 }, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
                             <GroupIcon sx={{ color: funcao.acao, fontSize: 28 }} />
-                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: cores.textoForte }}>
                                 Contenção e lotação
                             </Typography>
                         </Box>
@@ -151,13 +151,13 @@ const ConfigCheckin = () => {
 
                         <FormControlLabel
                             control={<Switch checked={hardBlock} onChange={(e) => setHardBlock(e.target.checked)} color="primary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Bloquear entradas ao atingir a capacidade</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: cores.textoForte }}>Bloquear entradas ao atingir a capacidade</Typography>}
                             sx={{ mb: 3 }}
                         />
 
                         <FormControlLabel
                             control={<Switch checked={vipBypass} onChange={(e) => setVipBypass(e.target.checked)} color="primary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>VIPs entram mesmo com a lotação cheia</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: cores.textoForte }}>VIPs entram mesmo com a lotação cheia</Typography>}
                             sx={{ mb: 4 }}
                         />
 

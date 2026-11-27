@@ -14,7 +14,7 @@ const ATALHOS = [
     { rotulo: 'Roteador', portas: '80, 443' }
 ];
 
-const COR = { ok: '#00FF88', erro: '#FF3366' };
+const COR = { ok: cores.sucesso, erro: cores.erro };
 
 /**
  * Ferramenta de rede: testa, A PARTIR DO PC DO EVENTO, se um IP responde (ping) e se as portas abrem.
@@ -72,7 +72,7 @@ const FerramentaRede = () => {
                     <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
                         {ATALHOS.map(a => (
                             <Chip key={a.rotulo} size="small" label={`${a.rotulo}: ${a.portas}`} onClick={() => setPortas(a.portas)}
-                                variant={portas === a.portas ? 'filled' : 'outlined'} sx={{ fontSize: '0.72rem' }} />
+                                variant={portas === a.portas ? 'filled' : 'outlined'} sx={{ fontSize: '0.75rem' }} />
                         ))}
                     </Stack>
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
@@ -115,7 +115,7 @@ const Linha = ({ ok, titulo, detalhe }) => (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Box sx={{ width: 9, height: 9, borderRadius: '50%', bgcolor: ok ? COR.ok : COR.erro, flexShrink: 0 }} />
         <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 80 }}>{titulo}</Typography>
-        <Typography variant="body2" sx={{ color: '#CBD5E1' }}>{detalhe}</Typography>
+        <Typography variant="body2" sx={{ color: cores.textoSuave }}>{detalhe}</Typography>
     </Box>
 );
 

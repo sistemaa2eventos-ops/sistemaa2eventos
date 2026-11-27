@@ -28,6 +28,7 @@ import AcoesPulseiraCheckin from '../components/checkin/AcoesPulseiraCheckin';
 import RecusadosSincronizacao from '../components/checkin/RecusadosSincronizacao';
 import PassagensRecusadas from '../components/checkin/PassagensRecusadas';
 import RelogioSincronizado from '../components/common/RelogioSincronizado';
+import { cores, tom } from '../styles/tokens';
 
 // Tela inteira acima da ficha da pessoa (Dialog = zIndex.modal) e abaixo dos avisos (snackbar).
 // Não captura clique nem foco: o leitor continua digitando no campo da ficha enquanto ela aparece.
@@ -84,7 +85,7 @@ const Checkin = () => {
   const [cardLog, setCardLog] = useState(null);
   // Estáveis entre renderizações: a lista (memo) não redesenha as 50 linhas à toa
   const abrirCardLog = useCallback((log) => setCardLog(log), []);
-  const acoesLista = useMemo(() => <BotaoJanelaRegistros tipo="checkin" cor="#00D4FF" />, []);
+  const acoesLista = useMemo(() => <BotaoJanelaRegistros tipo="checkin" cor={cores.primaria} />, []);
   const [barcodeValue, setBarcodeValue] = useState('');
   const [ultimoCodigoLido, setUltimoCodigoLido] = useState('');
   const [lendoCamera, setLendoCamera] = useState(false);
@@ -191,7 +192,7 @@ const Checkin = () => {
       <CabecalhoOperacao
           titulo="Check-in"
           icone={<ScannerIcon />}
-          cor="#00D4FF"
+          cor={cores.primaria}
           dataHora={<RelogioSincronizado />}
           estacao={{
               sessaoAtiva,
@@ -237,7 +238,7 @@ const Checkin = () => {
                         setBarcodeValue('');
                         handleSearch('');
                     }}
-                    accentColor="#00FF88"
+                    accentColor={cores.sucesso}
                     label="Buscar pessoa"
                     placeholder="Nome, CPF, empresa, função, pulseira... ou bipe o QR"
                     helperText="Busca por qualquer dado do cadastro, em ordem alfabética • Bipe ou câmera: check-in automático • Digitado: Enter ou OK"
@@ -251,7 +252,7 @@ const Checkin = () => {
                 />
                 {/* Busca por nome em andamento: barra fina com altura fixa (nada pula) */}
                 <Box sx={{ height: 3, mt: 0.75 }} aria-live="polite">
-                    {searchLoading && <LinearProgress aria-label="Buscando" sx={{ height: 3, borderRadius: 2, bgcolor: 'rgba(0,255,136,0.12)', '& .MuiLinearProgress-bar': { bgcolor: '#00FF88' } }} />}
+                    {searchLoading && <LinearProgress aria-label="Buscando" sx={{ height: 3, borderRadius: 1.5, bgcolor: 'rgba(0,255,136,0.12)', '& .MuiLinearProgress-bar': { bgcolor: cores.sucesso } }} />}
                 </Box>
 
                 <Box sx={{ mt: 1.5, flex: 1, overflowY: 'auto', minHeight: { xs: searchResults.length > 0 ? 180 : 0, lg: 0 }, maxHeight: { xs: 280, lg: 'none' } }}>
@@ -281,8 +282,8 @@ const Checkin = () => {
                                         border: '1px solid rgba(255,255,255,0.06)',
                                         bgcolor: 'rgba(255,255,255,0.02)',
                                         '&:hover': {
-                                            bgcolor: 'rgba(0, 212, 255, 0.08)',
-                                            borderColor: 'rgba(0, 212, 255, 0.4)'
+                                            bgcolor: tom(cores.primaria, 0.08),
+                                            borderColor: tom(cores.primaria, 0.4)
                                         }
                                     }}
                                 >
@@ -293,7 +294,7 @@ const Checkin = () => {
                                             nome={p.nome}
                                             width={40}
                                             borderRadius="8px"
-                                            accentColor="#00D4FF"
+                                            accentColor={cores.primaria}
                                         />
                                     </Box>
                                     <ListItemText
@@ -325,11 +326,11 @@ const Checkin = () => {
                 {/* Números do turno */}
                 {!modoQuiosque && (
                     <Box sx={{ display: 'flex', gap: 1, mt: 1.5, pt: 1.5, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                        <NumeroTurno rotulo="Presentes" valor={realtimeStats?.presentes || 0} cor="#00D4FF" />
+                        <NumeroTurno rotulo="Presentes" valor={realtimeStats?.presentes || 0} cor={cores.primaria} />
                         <NumeroTurno
                             rotulo="Aguardando envio"
                             valor={offlineCount}
-                            cor={offlineCount > 0 ? '#FFB800' : 'rgba(255,255,255,0.85)'}
+                            cor={offlineCount > 0 ? cores.alerta : 'rgba(255,255,255,0.85)'}
                             dica="Acessos feitos sem internet que ainda serão enviados"
                         />
                     </Box>
@@ -343,7 +344,7 @@ const Checkin = () => {
                 <RecentAccessList
                     logs={recentLogs}
                     title="Entradas"
-                    accentColor="#00D4FF"
+                    accentColor={cores.primaria}
                     badgeLabel="Entrada"
                     firstLabel="Última entrada"
                     emptyTitle="Nenhuma entrada registrada ainda"
@@ -363,7 +364,7 @@ const Checkin = () => {
           <FeedbackOverlay status={checkinResult}>
               <Zoom in={!!checkinResult}>
                   <Box sx={{ textAlign: 'center', p: 2 }}>
-                      {checkinResult === 'sucesso' ? <SuccessIcon sx={{ fontSize: { xs: 84, sm: 130 }, color: '#00FF88' }} /> : <ErrorIcon sx={{ fontSize: { xs: 84, sm: 130 }, color: '#FF3366' }} />}
+                      {checkinResult === 'sucesso' ? <SuccessIcon sx={{ fontSize: { xs: 84, sm: 130 }, color: cores.sucesso }} /> : <ErrorIcon sx={{ fontSize: { xs: 84, sm: 130 }, color: cores.erro }} />}
                       <Typography fontWeight={700} mt={2} sx={{ fontSize: { xs: '1.65rem', sm: '2.5rem' } }}>
                           {checkinResult === 'sucesso' ? 'Entrada liberada' : 'Entrada negada'}
                       </Typography>
@@ -419,7 +420,7 @@ const Checkin = () => {
           open={!!cardLog}
           log={cardLog}
           onClose={() => setCardLog(null)}
-          accentColor="#00D4FF"
+          accentColor={cores.primaria}
       />
 
     </Box>

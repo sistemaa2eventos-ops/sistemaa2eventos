@@ -7,12 +7,13 @@ import {
 } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import api from '../../services/api';
+import { cores, tom } from '../../styles/tokens';
 
 // Enquanto o botão está apertado, a câmera recebe um comando a cada 700 ms. Cada comando dura 1 s na
 // câmera: se o navegador travar ou a conexão cair, ela para sozinha.
 const INTERVALO_MOVIMENTO_MS = 700;
 
-const BOTAO = { color: '#FFFFFF', bgcolor: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.2)', '&:hover': { bgcolor: 'rgba(0,212,255,0.35)' }, width: 40, height: 40 };
+const BOTAO = { color: cores.textoForte, bgcolor: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.2)', '&:hover': { bgcolor: tom(cores.primaria, 0.35) }, width: 40, height: 40 };
 
 /**
  * Controle de giro da câmera (ONVIF): setas que seguem enquanto o botão está apertado, velocidade,
@@ -118,7 +119,7 @@ const PainelGiro = ({ cameraId, onAcao }) => {
 
     return (
         <Box onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}
-            sx={{ bgcolor: 'rgba(0,0,0,0.55)', borderRadius: 2, p: 1.25, border: '1px solid rgba(255,255,255,0.12)', width: 'fit-content', maxWidth: '100%' }}>
+            sx={{ bgcolor: 'rgba(0,0,0,0.55)', borderRadius: 1.5, p: 1.25, border: '1px solid rgba(255,255,255,0.12)', width: 'fit-content', maxWidth: '100%' }}>
             <Stack direction="row" spacing={2} alignItems="flex-start" flexWrap="wrap" useFlexGap>
                 {/* Setas: mantenha apertado para girar; solte para parar */}
                 <Box sx={{ display: 'grid', gridTemplateColumns: '40px 40px 40px', gridTemplateRows: '40px 40px 40px', gap: 0.5, userSelect: 'none', touchAction: 'none' }}>
@@ -131,7 +132,7 @@ const PainelGiro = ({ cameraId, onAcao }) => {
                     </Tooltip>
                     {seta('Girar para a esquerda', LeftIcon, -1, 0)}
                     <Tooltip title="Parar">
-                        <IconButton aria-label="Parar a câmera" sx={{ ...BOTAO, color: '#FFB800' }} onClick={() => { pararTudo(); enviar({ acao: 'parar' }).catch(falhou); }}>
+                        <IconButton aria-label="Parar a câmera" sx={{ ...BOTAO, color: cores.alerta }} onClick={() => { pararTudo(); enviar({ acao: 'parar' }).catch(falhou); }}>
                             <StopIcon />
                         </IconButton>
                     </Tooltip>
@@ -146,17 +147,17 @@ const PainelGiro = ({ cameraId, onAcao }) => {
                 </Box>
 
                 <Box sx={{ minWidth: 200, flex: 1 }}>
-                    <Typography variant="caption" sx={{ color: '#CBD5E1' }}>Velocidade</Typography>
+                    <Typography variant="caption" sx={{ color: cores.textoSuave }}>Velocidade</Typography>
                     <Slider size="small" min={0.2} max={1} step={0.1} value={velocidade} onChange={(_, v) => setVelocidade(v)}
-                        aria-label="Velocidade do giro" sx={{ color: '#00D4FF' }} />
+                        aria-label="Velocidade do giro" sx={{ color: cores.primaria }} />
 
-                    <Typography variant="caption" sx={{ color: '#CBD5E1', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Typography variant="caption" sx={{ color: cores.textoSuave, display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <PosicaoIcon sx={{ fontSize: 14 }} /> Posições salvas na câmera
                     </Typography>
                     <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap" sx={{ mt: 0.5, mb: 1 }}>
-                        {carregandoPresets && <Typography variant="caption" sx={{ color: '#94A3B8' }}>carregando...</Typography>}
+                        {carregandoPresets && <Typography variant="caption" sx={{ color: cores.textoSecundario }}>carregando...</Typography>}
                         {!carregandoPresets && presets.length === 0 && (
-                            <Typography variant="caption" sx={{ color: '#94A3B8' }}>Nenhuma ainda. Gire até o ponto e grave abaixo.</Typography>
+                            <Typography variant="caption" sx={{ color: cores.textoSecundario }}>Nenhuma ainda. Gire até o ponto e grave abaixo.</Typography>
                         )}
                         {presets.map(p => (
                             <Chip key={p.token} size="small" label={p.nome} onClick={() => irPara(p)} sx={{ fontWeight: 600 }} />
@@ -166,7 +167,7 @@ const PainelGiro = ({ cameraId, onAcao }) => {
                         <TextField size="small" placeholder="Nome da posição" value={nomePosicao} onChange={e => setNomePosicao(e.target.value)}
                             inputProps={{ maxLength: 40, 'aria-label': 'Nome da posição' }} sx={{ flex: 1, minWidth: 120 }} />
                         <Button size="small" variant="outlined" startIcon={<GravarIcon />} onClick={gravarPosicao} disabled={gravando}
-                            sx={{ color: '#FFFFFF', borderColor: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap' }}>
+                            sx={{ color: cores.textoForte, borderColor: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap' }}>
                             Gravar aqui
                         </Button>
                     </Stack>

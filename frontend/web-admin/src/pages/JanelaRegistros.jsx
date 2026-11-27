@@ -6,6 +6,7 @@ import api from '../services/api';
 import { usarConexao } from '../services/realtime';
 import RecentAccessList from '../components/credenciamento/RecentAccessList';
 import PessoaCardDialog from '../components/credenciamento/PessoaCardDialog';
+import { cores } from '../styles/tokens';
 
 /**
  * Janela avulsa (sem menu) com os registros de entrada ou saída em tempo real,
@@ -18,7 +19,7 @@ const JanelaRegistros = () => {
   const tipo = params.get('tipo') === 'checkout' ? 'checkout' : 'checkin';
   const eventoId = localStorage.getItem('active_evento_id');
   const eventoNome = localStorage.getItem('active_evento_nome') || '';
-  const cor = tipo === 'checkout' ? '#FF3366' : '#00D4FF';
+  const cor = tipo === 'checkout' ? cores.erro : cores.primaria;
 
   const [logs, setLogs] = useState([]);
   const [cardLog, setCardLog] = useState(null);

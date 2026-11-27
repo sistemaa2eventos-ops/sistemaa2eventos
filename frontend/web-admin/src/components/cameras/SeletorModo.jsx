@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@mui/material';
+import { cores, tom } from '../../styles/tokens';
 
 /**
  * Seletor de 3 opções (modo de IA ou de gravação) — o mesmo no cartão da câmera e no formulário.
@@ -25,9 +26,9 @@ const SeletorModo = ({ rotulo, opcoes, valor, onChange, disabled = false, compac
                     borderColor: 'rgba(255,255,255,0.12)'
                 },
                 '& .MuiToggleButton-root.Mui-selected': {
-                    bgcolor: 'rgba(0,212,255,0.18)', color: '#00D4FF', borderColor: 'rgba(0,212,255,0.45)'
+                    bgcolor: tom(cores.primaria, 0.18), color: cores.primaria, borderColor: tom(cores.primaria, 0.45)
                 },
-                '& .MuiToggleButton-root.Mui-selected:hover': { bgcolor: 'rgba(0,212,255,0.26)' }
+                '& .MuiToggleButton-root.Mui-selected:hover': { bgcolor: tom(cores.primaria, 0.26) }
             }}
         >
             {opcoes.map(o => (

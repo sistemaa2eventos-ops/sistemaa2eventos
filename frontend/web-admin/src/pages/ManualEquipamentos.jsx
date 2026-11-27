@@ -218,7 +218,7 @@ const ManualEquipamentos = () => {
                                             color: ativo ? cores.primariaHover : cores.texto,
                                             border: `1px solid ${ativo ? cores.primaria : tom(cores.primaria, 0.2)}`,
                                             cursor: 'pointer',
-                                            transition: 'all 0.15s ease',
+                                            transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.15s ease',
                                             '&:hover': {
                                                 bgcolor: tom(cores.primaria, 0.2),
                                                 borderColor: cores.primariaHover

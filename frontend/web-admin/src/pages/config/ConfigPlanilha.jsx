@@ -207,11 +207,11 @@ const ConfigPlanilha = () => {
                 <Grid item xs={12}>
                     <GlassCard sx={{ p: 3 }}>
                         {tituloSecao('Pré-visualização')}
-                        <Box sx={{ overflowX: 'auto', borderRadius: 1, border: `1px solid ${cores.borda}`, bgcolor: '#FFFFFF' }}>
+                        <Box sx={{ overflowX: 'auto', borderRadius: 1, border: `1px solid ${cores.borda}`, bgcolor: cores.textoForte }}>
                             <Box sx={{ minWidth: modelo.colunas.length * 140 }}>
-                                <Box sx={{ bgcolor: modelo.cor_cabecalho, color: '#FFFFFF', px: 1.5, py: 1, fontWeight: 700, fontSize: '1rem' }}>{modelo.titulo || ' '}</Box>
+                                <Box sx={{ bgcolor: modelo.cor_cabecalho, color: cores.textoForte, px: 1.5, py: 1, fontWeight: 700, fontSize: '1rem' }}>{modelo.titulo || ' '}</Box>
                                 {(modelo.mostrar_evento || modelo.mostrar_empresa) && (
-                                    <Box sx={{ px: 1.5, py: 0.5, color: '#0F172A', fontWeight: 700, fontSize: '0.8125rem' }}>
+                                    <Box sx={{ px: 1.5, py: 0.5, color: cores.superficie, fontWeight: 700, fontSize: '0.8125rem' }}>
                                         {[modelo.mostrar_evento && `Evento: ${eventoNome}`, modelo.mostrar_empresa && 'Empresa: (nome da empresa)'].filter(Boolean).join('   •   ')}
                                     </Box>
                                 )}
@@ -221,7 +221,7 @@ const ConfigPlanilha = () => {
                                 <Box sx={{ height: 14 }} />
                                 <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${modelo.colunas.length}, minmax(140px, 1fr))` }}>
                                     {modelo.colunas.map(c => (
-                                        <Box key={c.campo} sx={{ bgcolor: modelo.cor_cabecalho, color: '#FFFFFF', fontWeight: 700, fontSize: '0.75rem', textAlign: 'center', px: 1, py: 0.75, borderRight: '1px solid rgba(255,255,255,0.2)' }}>
+                                        <Box key={c.campo} sx={{ bgcolor: modelo.cor_cabecalho, color: cores.textoForte, fontWeight: 700, fontSize: '0.75rem', textAlign: 'center', px: 1, py: 0.75, borderRight: '1px solid rgba(255,255,255,0.2)' }}>
                                             {c.rotulo}{c.obrigatoria ? ' *' : ''}
                                         </Box>
                                     ))}

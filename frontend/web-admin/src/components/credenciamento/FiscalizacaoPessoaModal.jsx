@@ -18,6 +18,7 @@ import {
     MeetingRoom as PortariaIcon
 } from '@mui/icons-material';
 import PessoaFoto from '../common/PessoaFoto';
+import { cores, tom } from '../../styles/tokens';
 
 // Tudo vem da própria resposta da fiscalização (situação de hoje). Não busca o cadastro: lá a pulseira e
 // o check-in podem ser de outro dia e misturariam dados antigos com os de agora.
@@ -65,7 +66,7 @@ const Secao = ({ titulo, cor = 'rgba(255,255,255,0.5)', children }) => (
 const Linha = ({ rotulo, valor }) => (
     <Box sx={{ mb: 0.75 }}>
         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>{rotulo}</Typography>
-        <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 700 }}>{valor}</Typography>
+        <Typography variant="body2" sx={{ color: cores.textoForte, fontWeight: 700 }}>{valor}</Typography>
     </Box>
 );
 
@@ -83,7 +84,7 @@ const FiscalizacaoPessoaModal = ({
 
     const autorizado = Boolean(resultado?.autorizado);
     const mensagem = resultado?.mensagem || (autorizado ? 'ACESSO LIBERADO' : 'ACESSO NEGADO');
-    const corDecisao = autorizado ? '#00FF88' : '#FF3366';
+    const corDecisao = autorizado ? cores.sucesso : cores.erro;
 
     const nome = pessoa.nome_completo || pessoa.nome || 'Participante';
     const empresa = pessoa.empresas?.nome || pessoa.empresa_nome || 'Pessoa física';
@@ -101,7 +102,7 @@ const FiscalizacaoPessoaModal = ({
 
     const dentro = Boolean(pessoa.dentro_do_evento);
     const ainda = Boolean(anterior?.ainda_dentro);
-    const corPresenca = dentro ? '#00FF88' : (ainda ? '#FF3366' : '#FFB800');
+    const corPresenca = dentro ? cores.sucesso : (ainda ? cores.erro : cores.alerta);
     const textoPresenca = dentro
         ? 'DENTRO DO EVENTO'
         : ainda ? 'AINDA DENTRO COM PULSEIRA DE OUTRO DIA'
@@ -120,11 +121,11 @@ const FiscalizacaoPessoaModal = ({
             fullWidth
             PaperProps={{
                 sx: {
-                    color: '#FFFFFF',
+                    color: cores.textoForte,
                     maxHeight: { sm: '90dvh' },
                     overflowY: 'auto',
                     '&::-webkit-scrollbar': { width: '6px' },
-                    '&::-webkit-scrollbar-thumb': { bgcolor: `${corDecisao}55`, borderRadius: '10px' }
+                    '&::-webkit-scrollbar-thumb': { bgcolor: `${corDecisao}55`, borderRadius: '8px' }
                 }
             }}
         >
@@ -132,12 +133,12 @@ const FiscalizacaoPessoaModal = ({
                 <IconButton
                     onClick={onClose}
                     aria-label="Fechar ficha"
-                    sx={{ position: 'absolute', top: 16, right: 16, color: 'rgba(255,255,255,0.7)', bgcolor: 'rgba(255,255,255,0.06)', '&:hover': { bgcolor: 'rgba(255,255,255,0.18)', color: '#FFFFFF' } }}
+                    sx={{ position: 'absolute', top: 16, right: 16, color: 'rgba(255,255,255,0.7)', bgcolor: 'rgba(255,255,255,0.06)', '&:hover': { bgcolor: 'rgba(255,255,255,0.18)', color: cores.textoForte } }}
                 >
                     <CloseIcon fontSize="small" />
                 </IconButton>
 
-                <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: '1.5px', display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                <Typography variant="caption" sx={{ color: cores.primaria, fontWeight: 700, letterSpacing: '1.5px', display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
                     <PortariaIcon sx={{ fontSize: 18 }} />
                     Ficha do participante · situação de hoje
                 </Typography>
@@ -161,40 +162,40 @@ const FiscalizacaoPessoaModal = ({
                             <Typography variant="body2" sx={{ color: corDecisao, fontWeight: 800, textAlign: 'left' }}>{mensagem}</Typography>
                         </Box>
 
-                        <Box sx={{ mt: 2, p: 1.5, borderRadius: 1.5, bgcolor: 'rgba(0, 212, 255, 0.08)', border: '1px solid rgba(0, 212, 255, 0.25)', textAlign: 'center' }}>
+                        <Box sx={{ mt: 2, p: 1.5, borderRadius: 1.5, bgcolor: tom(cores.primaria, 0.08), border: '1px solid rgba(0, 212, 255, 0.25)', textAlign: 'center' }}>
                             <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.8 }}>
-                                <PulseiraIcon sx={{ fontSize: 16, color: '#00D4FF' }} />
+                                <PulseiraIcon sx={{ fontSize: 16, color: cores.primaria }} />
                                 Pulseira em uso hoje
                             </Typography>
                             {pulseira ? (
                                 <>
-                                    <Typography variant="h6" sx={{ color: '#00D4FF', fontWeight: 800, letterSpacing: '1px', mt: 0.5 }}>{pulseira.numero}</Typography>
-                                    {pulseira.tipo_nome && <Chip size="small" label={pulseira.tipo_nome} sx={{ fontWeight: 700, bgcolor: pulseira.cor_hex ? `${pulseira.cor_hex}33` : 'rgba(255,255,255,0.08)', color: pulseira.cor_hex || '#FFFFFF', border: `1px solid ${pulseira.cor_hex || 'rgba(255,255,255,0.2)'}`, mt: 0.5 }} />}
-                                    <Typography variant="caption" sx={{ color: '#CBD5E1', display: 'block', mt: 0.75 }}>
+                                    <Typography variant="h6" sx={{ color: cores.primaria, fontWeight: 800, letterSpacing: '1px', mt: 0.5 }}>{pulseira.numero}</Typography>
+                                    {pulseira.tipo_nome && <Chip size="small" label={pulseira.tipo_nome} sx={{ fontWeight: 700, bgcolor: pulseira.cor_hex ? `${pulseira.cor_hex}33` : 'rgba(255,255,255,0.08)', color: pulseira.cor_hex || cores.textoForte, border: `1px solid ${pulseira.cor_hex || 'rgba(255,255,255,0.2)'}`, mt: 0.5 }} />}
+                                    <Typography variant="caption" sx={{ color: cores.textoSuave, display: 'block', mt: 0.75 }}>
                                         Colocada em {dataHora(pulseira.colocada_em) || '—'}
                                         {pulseira.forma ? ` · ${pulseira.forma}` : ''}
                                         {pulseira.usuario_nome ? ` por ${pulseira.usuario_nome}` : ''}
                                     </Typography>
                                 </>
                             ) : (
-                                <Typography variant="body2" sx={{ color: '#FFB800', fontWeight: 700, mt: 0.5 }}>Nenhuma pulseira em uso hoje</Typography>
+                                <Typography variant="body2" sx={{ color: cores.alerta, fontWeight: 700, mt: 0.5 }}>Nenhuma pulseira em uso hoje</Typography>
                             )}
                         </Box>
 
                         {anterior && (
-                            <Box sx={{ mt: 2, p: 1.5, borderRadius: 1.5, textAlign: 'left', bgcolor: ainda ? 'rgba(255,51,102,0.08)' : 'rgba(255,184,0,0.08)', border: `1px solid ${ainda ? '#FF3366' : '#FFB800'}88` }}>
-                                <Typography variant="caption" sx={{ color: ainda ? '#FF3366' : '#FFB800', fontWeight: 800, letterSpacing: '0.5px', display: 'block', mb: 0.5 }}>
+                            <Box sx={{ mt: 2, p: 1.5, borderRadius: 1.5, textAlign: 'left', bgcolor: ainda ? 'rgba(255,51,102,0.08)' : 'rgba(255,184,0,0.08)', border: `1px solid ${ainda ? cores.erro : cores.alerta}88` }}>
+                                <Typography variant="caption" sx={{ color: ainda ? cores.erro : cores.alerta, fontWeight: 800, letterSpacing: '0.5px', display: 'block', mb: 0.5 }}>
                                     PULSEIRA DE OUTRO DIA — NÃO DEVOLVIDA
                                 </Typography>
-                                <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 800 }}>
+                                <Typography variant="body2" sx={{ color: cores.textoForte, fontWeight: 800 }}>
                                     Nº {anterior.numero}{anterior.tipo_nome ? ` · ${anterior.tipo_nome}` : ''}
                                 </Typography>
-                                <Typography variant="caption" sx={{ color: '#CBD5E1', display: 'block' }}>
+                                <Typography variant="caption" sx={{ color: cores.textoSuave, display: 'block' }}>
                                     Check-in em {dataHora(anterior.colocada_em) || '—'}
                                     {anterior.forma ? ` · ${anterior.forma}` : ''}
                                     {anterior.usuario_nome ? ` por ${anterior.usuario_nome}` : ''}
                                 </Typography>
-                                <Typography variant="caption" sx={{ color: ainda ? '#FF3366' : '#FFB800', fontWeight: 700, display: 'block', mt: 0.75 }}>
+                                <Typography variant="caption" sx={{ color: ainda ? cores.erro : cores.alerta, fontWeight: 700, display: 'block', mt: 0.75 }}>
                                     {ainda
                                         ? 'Ainda está no evento com esta pulseira. Dirija-se ao CREDENCIAMENTO para trocar a pulseira e fazer check-in novamente.'
                                         : `Saiu em ${dataHora(anterior.saiu_em) || '—'} (fim de turno). Pulseira ainda não devolvida.`}
@@ -205,12 +206,12 @@ const FiscalizacaoPessoaModal = ({
 
                     {/* Direita: identificação, credencial, presença, movimentos e áreas */}
                     <Grid item xs={12} sm={7.5}>
-                        <Typography variant="h4" sx={{ fontWeight: 700, color: '#FFFFFF', fontFamily: '"Space Grotesk", sans-serif', lineHeight: 1.2, mb: 1 }}>
+                        <Typography variant="h4" sx={{ fontWeight: 700, color: cores.textoForte, fontFamily: '"Space Grotesk", sans-serif', lineHeight: 1.2, mb: 1 }}>
                             {nome}
                         </Typography>
                         <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 1, mb: 2.5 }}>
-                            <Chip icon={<BadgeIcon sx={{ fontSize: 16, color: '#FFFFFF !important' }} />} label={pessoa.funcao || 'Participante'} sx={{ bgcolor: 'rgba(255,255,255,0.08)', color: '#FFFFFF', fontWeight: 700 }} />
-                            <Chip icon={<CompanyIcon sx={{ fontSize: 16, color: '#00D4FF !important' }} />} label={empresa} sx={{ bgcolor: 'rgba(0,212,255,0.08)', color: '#00D4FF', border: '1px solid rgba(0,212,255,0.2)', fontWeight: 700 }} />
+                            <Chip icon={<BadgeIcon sx={{ fontSize: 16, color: '#FFFFFF !important' }} />} label={pessoa.funcao || 'Participante'} sx={{ bgcolor: 'rgba(255,255,255,0.08)', color: cores.textoForte, fontWeight: 700 }} />
+                            <Chip icon={<CompanyIcon sx={{ fontSize: 16, color: '#00D4FF !important' }} />} label={empresa} sx={{ bgcolor: tom(cores.primaria, 0.08), color: cores.primaria, border: '1px solid rgba(0,212,255,0.2)', fontWeight: 700 }} />
                         </Stack>
 
                         <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)', mb: 2.5 }} />
@@ -219,14 +220,14 @@ const FiscalizacaoPessoaModal = ({
                             <Grid container spacing={2}>
                                 <Grid item xs={6}>
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <CpfIcon sx={{ color: '#00D4FF', fontSize: 18 }} />
+                                        <CpfIcon sx={{ color: cores.primaria, fontSize: 18 }} />
                                         <Linha rotulo="CPF / Documento" valor={cpfFormatado} />
                                     </Box>
                                 </Grid>
                                 {pessoa.telefone && (
                                     <Grid item xs={6}>
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                            <PhoneIcon sx={{ color: '#00D4FF', fontSize: 18 }} />
+                                            <PhoneIcon sx={{ color: cores.primaria, fontSize: 18 }} />
                                             <Linha rotulo="Telefone" valor={pessoa.telefone} />
                                         </Box>
                                     </Grid>
@@ -234,9 +235,9 @@ const FiscalizacaoPessoaModal = ({
                             </Grid>
                         </Secao>
 
-                        <Secao titulo="Credencial" cor={pessoa.credenciado ? '#00FF88' : '#FF3366'}>
+                        <Secao titulo="Credencial" cor={pessoa.credenciado ? cores.sucesso : cores.erro}>
                             <Box sx={{ p: 1.5, borderRadius: 1.5, border: `1px solid ${pessoa.credenciado ? '#00FF8866' : '#FF336688'}`, bgcolor: pessoa.credenciado ? 'rgba(0,255,136,0.05)' : 'rgba(255,51,102,0.06)' }}>
-                                <Typography sx={{ color: pessoa.credenciado ? '#00FF88' : '#FF3366', fontWeight: 800 }}>
+                                <Typography sx={{ color: pessoa.credenciado ? cores.sucesso : cores.erro, fontWeight: 800 }}>
                                     {pessoa.credenciado ? 'CREDENCIADO' : 'NÃO CREDENCIADO'}
                                 </Typography>
                                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', display: 'block' }}>
@@ -255,11 +256,11 @@ const FiscalizacaoPessoaModal = ({
                                     <Typography sx={{ color: corPresenca, fontWeight: 800 }}>{textoPresenca}</Typography>
                                 </Stack>
                                 {entrada ? (
-                                    <Typography variant="body2" sx={{ color: '#E2E8F0', mt: 0.75 }}>
+                                    <Typography variant="body2" sx={{ color: cores.textoSuave, mt: 0.75 }}>
                                         Entrada: {textoEntrada(entrada)}
                                     </Typography>
                                 ) : (
-                                    <Typography variant="body2" sx={{ color: '#94A3B8', mt: 0.75 }}>Nenhuma entrada registrada hoje.</Typography>
+                                    <Typography variant="body2" sx={{ color: cores.textoSecundario, mt: 0.75 }}>Nenhuma entrada registrada hoje.</Typography>
                                 )}
                             </Box>
                         </Secao>
@@ -270,8 +271,8 @@ const FiscalizacaoPessoaModal = ({
                                     {historico.map((h, idx) => {
                                         const entradaHoje = h.tipo === 'checkin';
                                         return (
-                                            <Typography key={idx} variant="body2" sx={{ color: '#E2E8F0' }}>
-                                                <Box component="span" sx={{ color: entradaHoje ? '#00FF88' : '#FFB800', fontWeight: 800 }}>
+                                            <Typography key={idx} variant="body2" sx={{ color: cores.textoSuave }}>
+                                                <Box component="span" sx={{ color: entradaHoje ? cores.sucesso : cores.alerta, fontWeight: 800 }}>
                                                     {horaComSegundos(h.horario)} {entradaHoje ? 'ENTRADA' : 'SAÍDA'}
                                                 </Box>
                                                 {' · '}{h.area_nome || 'Geral'}
@@ -283,11 +284,11 @@ const FiscalizacaoPessoaModal = ({
                                     })}
                                 </Stack>
                             ) : (
-                                <Typography variant="body2" sx={{ color: '#94A3B8' }}>Nenhuma entrada ou saída hoje.</Typography>
+                                <Typography variant="body2" sx={{ color: cores.textoSecundario }}>Nenhuma entrada ou saída hoje.</Typography>
                             )}
                         </Secao>
 
-                        <Secao titulo={`Áreas que pode acessar (${areas.length})`} cor="#00D4FF">
+                        <Secao titulo={`Áreas que pode acessar (${areas.length})`} cor={cores.primaria}>
                             {areas.length === 0 ? (
                                 <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>Nenhuma área específica cadastrada.</Typography>
                             ) : (
@@ -302,7 +303,7 @@ const FiscalizacaoPessoaModal = ({
                                                 size="small"
                                                 sx={{
                                                     bgcolor: atual ? 'rgba(0, 255, 136, 0.25)' : 'rgba(255,255,255,0.06)',
-                                                    color: atual ? '#00FF88' : '#FFFFFF',
+                                                    color: atual ? cores.sucesso : cores.textoForte,
                                                     border: atual ? '1.5px solid #00FF88' : '1px solid rgba(255,255,255,0.15)',
                                                     fontWeight: atual ? 900 : 600,
                                                 }}
@@ -314,7 +315,7 @@ const FiscalizacaoPessoaModal = ({
                         </Secao>
 
                         {!autorizado && resultado?.status === 'area_negada' && (
-                            <Stack direction="row" spacing={1} alignItems="center" sx={{ color: '#FFB800' }}>
+                            <Stack direction="row" spacing={1} alignItems="center" sx={{ color: cores.alerta }}>
                                 <WarningIcon fontSize="small" />
                                 <Typography variant="body2" sx={{ fontWeight: 700 }}>Área restrita para esta pessoa.</Typography>
                             </Stack>
@@ -323,7 +324,7 @@ const FiscalizacaoPessoaModal = ({
                 </Grid>
 
                 <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'flex-end' }}>
-                    <Button variant="outlined" onClick={onClose} sx={{ height: 38, color: '#FFFFFF', borderColor: 'rgba(255,255,255,0.2)', fontWeight: 700, borderRadius: '8px', px: 3, '&:hover': { bgcolor: 'rgba(255,255,255,0.08)', borderColor: '#FFFFFF' } }}>
+                    <Button variant="outlined" onClick={onClose} sx={{ height: 38, color: cores.textoForte, borderColor: 'rgba(255,255,255,0.2)', fontWeight: 700, borderRadius: '8px', px: 3, '&:hover': { bgcolor: 'rgba(255,255,255,0.08)', borderColor: cores.textoForte } }}>
                         Fechar ficha
                     </Button>
                 </Box>

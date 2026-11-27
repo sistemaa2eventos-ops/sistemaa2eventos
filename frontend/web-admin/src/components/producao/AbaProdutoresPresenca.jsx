@@ -109,7 +109,7 @@ const AbaProdutoresPresenca = ({ eventoId, resumo, headersExtra, aoAtualizar, ap
         data_fim_turno: new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 16)
     });
 
-    const [formArea, setFormArea] = useState({ nome: '', cor: '#00D4FF', responsavel_nome: '', descricao: '' });
+    const [formArea, setFormArea] = useState({ nome: '', cor: cores.primaria, responsavel_nome: '', descricao: '' });
     const [formPresenca, setFormPresenca] = useState({
         produtor_id: '',
         qr_code_credencial: '',
@@ -315,7 +315,7 @@ const AbaProdutoresPresenca = ({ eventoId, resumo, headersExtra, aoAtualizar, ap
             await httpClient.post('/producao/areas', formArea, { headers: headersExtra });
             enqueueSnackbar('Área criada com sucesso.', { variant: 'success' });
             setModalAreaAberto(false);
-            setFormArea({ nome: '', cor: '#00D4FF', responsavel_nome: '', descricao: '' });
+            setFormArea({ nome: '', cor: cores.primaria, responsavel_nome: '', descricao: '' });
             await aoAtualizar();
         } catch (err) {
             enqueueSnackbar(err.response?.data?.error || 'Erro ao criar área.', { variant: 'error' });

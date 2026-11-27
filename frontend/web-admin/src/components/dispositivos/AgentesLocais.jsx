@@ -9,8 +9,8 @@ import { useSnackbar } from 'notistack';
 import api from '../../services/api';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
 
-import { botaoSecundario } from '../../styles/tokens';
-const CYAN = '#00D4FF';
+import { botaoSecundario, cores, tom } from '../../styles/tokens';
+const CYAN = cores.primaria;
 
 /**
  * Agentes locais: programa instalado num computador da rede do evento que liga
@@ -59,12 +59,12 @@ const AgentesLocais = ({ agentes = [], onChange }) => {
     const ativos = agentes.filter(a => a.ativo !== false);
 
     return (
-        <Box sx={{ mb: 3, p: 2, borderRadius: 1.5, border: `1px solid ${CYAN}33`, bgcolor: 'rgba(0,212,255,0.03)' }}>
+        <Box sx={{ mb: 3, p: 2, borderRadius: 1.5, border: `1px solid ${CYAN}33`, bgcolor: tom(cores.primaria, 0.03) }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: ativos.length ? 1.5 : 0 }}>
                 <Stack direction="row" spacing={1} alignItems="center">
                     <AgentIcon sx={{ color: CYAN }} />
                     <Box>
-                        <Typography sx={{ color: '#FFFFFF', fontWeight: 700 }}>Agentes locais</Typography>
+                        <Typography sx={{ color: cores.textoForte, fontWeight: 700 }}>Agentes locais</Typography>
                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.55)' }}>
                             Necessário quando o servidor está na nuvem: liga os leitores, as câmeras e a IA facial da rede do evento ao sistema.
                         </Typography>
@@ -78,8 +78,8 @@ const AgentesLocais = ({ agentes = [], onChange }) => {
                     <Stack key={a.id} direction="row" spacing={1.5} alignItems="center"
                         sx={{ p: 1, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.03)' }}>
                         <Chip size="small" label={a.conectado ? 'CONECTADO' : 'DESCONECTADO'}
-                            sx={{ fontWeight: 700, bgcolor: a.conectado ? 'rgba(0,255,136,0.15)' : 'rgba(255,51,102,0.15)', color: a.conectado ? '#00FF88' : '#FF3366' }} />
-                        <Typography sx={{ color: '#FFFFFF', fontWeight: 700, flex: 1 }}>{a.nome}</Typography>
+                            sx={{ fontWeight: 700, bgcolor: a.conectado ? 'rgba(0,255,136,0.15)' : 'rgba(255,51,102,0.15)', color: a.conectado ? cores.sucesso : cores.erro }} />
+                        <Typography sx={{ color: cores.textoForte, fontWeight: 700, flex: 1 }}>{a.nome}</Typography>
                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.55)' }}>
                             {a.dispositivos?.length ? `Leitores: ${a.dispositivos.map(d => d.nome).join(', ')}` : 'Nenhum leitor vinculado'}
                             {a.last_connected_at && ` · última conexão ${new Date(a.last_connected_at).toLocaleString('pt-BR')}`}
@@ -95,7 +95,7 @@ const AgentesLocais = ({ agentes = [], onChange }) => {
                             </Tooltip>
                         )}
                         <Tooltip title="Desativar agente">
-                            <IconButton size="small" onClick={() => desativar(a)} sx={{ color: '#FF3366' }}><DeleteIcon fontSize="small" /></IconButton>
+                            <IconButton size="small" onClick={() => desativar(a)} sx={{ color: cores.erro }}><DeleteIcon fontSize="small" /></IconButton>
                         </Tooltip>
                     </Stack>
                 ))}
@@ -114,7 +114,7 @@ const AgentesLocais = ({ agentes = [], onChange }) => {
                             <Alert severity="warning">
                                 Copie agora: o token é exibido <b>uma única vez</b>.
                             </Alert>
-                            <Box sx={{ position: 'relative', p: 1.5, borderRadius: 1, bgcolor: 'rgba(0,0,0,0.4)', fontFamily: '"Inter", sans-serif', fontSize: '0.75rem', color: '#FFFFFF', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                            <Box sx={{ position: 'relative', p: 1.5, borderRadius: 1, bgcolor: 'rgba(0,0,0,0.4)', fontFamily: '"Inter", sans-serif', fontSize: '0.75rem', color: cores.textoForte, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                                 {envExemplo}
                                 <IconButton size="small" onClick={() => copiar(envExemplo)} sx={{ position: 'absolute', top: 4, right: 4, color: CYAN }}>
                                     <CopyIcon fontSize="small" />

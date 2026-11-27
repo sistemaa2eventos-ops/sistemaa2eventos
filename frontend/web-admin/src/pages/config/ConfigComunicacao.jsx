@@ -31,7 +31,7 @@ import PageHeader from '../../components/common/PageHeader';
 import GoogleDriveCard from '../../components/integracoes/GoogleDriveCard';
 import GlassCard from '../../components/common/GlassCard';
 import NeonButton from '../../components/common/NeonButton';
-import { botaoSecundario } from '../../styles/tokens';
+import { botaoSecundario, cores, tom } from '../../styles/tokens';
 
 const ConfigComunicacao = ({ defaultTab = null }) => {
     const location = useLocation();
@@ -236,7 +236,7 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
             offline: { label: 'Não configurado', color: 'default', icon: <ErrorIcon sx={{ fontSize: 14 }} /> },
         };
         const current = config[type] || config.loading;
-        return <Chip icon={current.icon} label={current.label} color={current.color} size="small" variant="outlined" sx={{ fontWeight: 700, fontSize: '0.72rem' }} />;
+        return <Chip icon={current.icon} label={current.label} color={current.color} size="small" variant="outlined" sx={{ fontWeight: 700, fontSize: '0.75rem' }} />;
     };
 
     if (loading) {
@@ -291,7 +291,7 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                     {/* STATUS DO ECOSSISTEMA */}
                     <Grid item xs={12}>
                         <GlassCard sx={{ p: 2.5 }}>
-                            <Typography variant="subtitle2" sx={{ color: '#FFFFFF', fontWeight: 700, mb: 2 }}>
+                            <Typography variant="subtitle2" sx={{ color: cores.textoForte, fontWeight: 700, mb: 2 }}>
                                 Status do ecossistema de conexões
                             </Typography>
                             <Stack
@@ -308,28 +308,28 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                                     </Box>
                                 </Box>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                    <CloudIcon sx={{ color: '#00D4FF' }} />
+                                    <CloudIcon sx={{ color: cores.primaria }} />
                                     <Box>
                                         <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Storage Bucket</Typography>
                                         <StatusChip type={status.storage} />
                                     </Box>
                                 </Box>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                    <MailIcon sx={{ color: '#00FF88' }} />
+                                    <MailIcon sx={{ color: cores.sucesso }} />
                                     <Box>
                                         <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Servidor SMTP</Typography>
                                         <StatusChip type={status.smtp} />
                                     </Box>
                                 </Box>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                    <TelegramIcon sx={{ color: '#00B0FF' }} />
+                                    <TelegramIcon sx={{ color: cores.primaria }} />
                                     <Box>
                                         <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Bot Telegram</Typography>
                                         <StatusChip type={status.telegram} />
                                     </Box>
                                 </Box>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                    <WhatsAppIcon sx={{ color: '#25D366' }} />
+                                    <WhatsAppIcon sx={{ color: cores.whatsapp }} />
                                     <Box>
                                         <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>WhatsApp API</Typography>
                                         <StatusChip type={status.whatsapp} />
@@ -344,8 +344,8 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                         <GlassCard sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                             <Box>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                                    <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <MailIcon fontSize="small" sx={{ color: '#00D4FF' }} /> Servidor de E-mail (SMTP)
+                                    <Typography variant="subtitle1" sx={{ color: cores.textoForte, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <MailIcon fontSize="small" sx={{ color: cores.primaria }} /> Servidor de E-mail (SMTP)
                                     </Typography>
                                     <FormControlLabel
                                         control={
@@ -458,7 +458,7 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                                     size="small"
                                     onClick={handleSendTestEmail}
                                     disabled={testingEmail}
-                                    sx={{ borderColor: '#00D4FF', color: '#00D4FF', fontWeight: 600 }}
+                                    sx={{ borderColor: cores.primaria, color: cores.primaria, fontWeight: 600 }}
                                     startIcon={<SendIcon sx={{ fontSize: 14 }} />}
                                 >
                                     {testingEmail ? 'Enviando...' : 'Enviar e-mail teste'}
@@ -472,8 +472,8 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                         <GlassCard sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                             <Box>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                                    <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <TelegramIcon fontSize="small" sx={{ color: '#00B0FF' }} /> Telegram (Alertas & CFTV)
+                                    <Typography variant="subtitle1" sx={{ color: cores.textoForte, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <TelegramIcon fontSize="small" sx={{ color: cores.primaria }} /> Telegram (Alertas & CFTV)
                                     </Typography>
                                     <FormControlLabel
                                         control={
@@ -538,9 +538,9 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                                 </Stack>
 
                                 <Box sx={{ mt: 2.5, p: 1.5, bgcolor: 'rgba(0, 176, 255, 0.05)', border: '1px dashed rgba(0, 176, 255, 0.2)', borderRadius: 1.5, display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-                                    <InfoIcon sx={{ color: '#00B0FF', fontSize: 18, mt: 0.2 }} />
-                                    <Typography variant="caption" sx={{ color: '#94A3B8' }}>
-                                        <b style={{ color: '#00B0FF' }}>Como funciona:</b> Ao detectar um CPF da Watchlist, a IA do CFTV salva a foto da câmera e dispara a notificação com foto e ficha completa diretamente neste chat.
+                                    <InfoIcon sx={{ color: cores.primaria, fontSize: 18, mt: 0.2 }} />
+                                    <Typography variant="caption" sx={{ color: cores.textoSecundario }}>
+                                        <b style={{ color: cores.primaria }}>Como funciona:</b> Ao detectar um CPF da Watchlist, a IA do CFTV salva a foto da câmera e dispara a notificação com foto e ficha completa diretamente neste chat.
                                     </Typography>
                                 </Box>
                             </Box>
@@ -551,7 +551,7 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                                     size="small"
                                     onClick={handleTestTelegram}
                                     disabled={testingTg}
-                                    sx={{ borderColor: '#00B0FF', color: '#00B0FF', fontWeight: 600 }}
+                                    sx={{ borderColor: cores.primaria, color: cores.primaria, fontWeight: 600 }}
                                     startIcon={<SendIcon sx={{ fontSize: 14 }} />}
                                 >
                                     {testingTg ? 'Enviando...' : 'Enviar mensagem de teste no Telegram'}
@@ -564,8 +564,8 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                     <Grid item xs={12}>
                         <GlassCard sx={{ p: 3 }}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                                <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <WhatsAppIcon fontSize="small" sx={{ color: '#25D366' }} /> WhatsApp Gateway (Mensageria Ativa)
+                                <Typography variant="subtitle1" sx={{ color: cores.textoForte, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <WhatsAppIcon fontSize="small" sx={{ color: cores.whatsapp }} /> WhatsApp Gateway (Mensageria Ativa)
                                 </Typography>
                                 <FormControlLabel
                                     control={
@@ -650,7 +650,7 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                                     size="small"
                                     onClick={handleTestWpp}
                                     disabled={testingWpp}
-                                    sx={{ borderColor: '#25D366', color: '#25D366', fontWeight: 600 }}
+                                    sx={{ borderColor: cores.whatsapp, color: cores.whatsapp, fontWeight: 600 }}
                                 >
                                     {testingWpp ? 'Testando...' : 'Testar Conexão WhatsApp'}
                                 </Button>
@@ -670,7 +670,7 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                 <Grid container spacing={3}>
                     <Grid item xs={12}>
                         <GlassCard sx={{ p: 3 }}>
-                            <Typography variant="subtitle1" sx={{ color: '#FFFFFF', fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography variant="subtitle1" sx={{ color: cores.textoForte, fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <NotifyIcon fontSize="small" color="primary" /> Regras de Disparo Automático
                             </Typography>
                             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 3 }}>
@@ -680,13 +680,13 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                             <List disablePadding>
                                 {/* ALERTA WATCHLIST */}
                                 <ListItem sx={{ py: 2 }}>
-                                    <ListItemIcon sx={{ color: '#FF3366', minWidth: 48 }}>
+                                    <ListItemIcon sx={{ color: cores.erro, minWidth: 48 }}>
                                         <SecurityIcon />
                                     </ListItemIcon>
                                     <ListItemText
                                         primary="Alerta Crítico: Alvo da Watchlist Detectado"
                                         secondary="Notifica imediatamente via Telegram e WhatsApp quando câmeras CFTV ou leitores identificarem um CPF em monitoramento."
-                                        primaryTypographyProps={{ fontWeight: 600, color: '#FFFFFF' }}
+                                        primaryTypographyProps={{ fontWeight: 600, color: cores.textoForte }}
                                         secondaryTypographyProps={{ fontSize: '0.75rem', color: 'text.secondary' }}
                                     />
                                     <ListItemSecondaryAction>
@@ -701,13 +701,13 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
 
                                 {/* RELATÓRIO DIÁRIO EMAIL */}
                                 <ListItem sx={{ py: 2 }}>
-                                    <ListItemIcon sx={{ color: '#00FF88', minWidth: 48 }}>
+                                    <ListItemIcon sx={{ color: cores.sucesso, minWidth: 48 }}>
                                         <MailIcon />
                                     </ListItemIcon>
                                     <ListItemText
                                         primary="Relatório Diário por E-mail (03:30)"
                                         secondary="Gera e despacha a planilha consolidada em Excel (.xlsx) após o fechamento noturno para os administradores master."
-                                        primaryTypographyProps={{ fontWeight: 600, color: '#FFFFFF' }}
+                                        primaryTypographyProps={{ fontWeight: 600, color: cores.textoForte }}
                                         secondaryTypographyProps={{ fontSize: '0.75rem', color: 'text.secondary' }}
                                     />
                                     <ListItemSecondaryAction>
@@ -722,13 +722,13 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
 
                                 {/* RELATÓRIO DIÁRIO TELEGRAM */}
                                 <ListItem sx={{ py: 2 }}>
-                                    <ListItemIcon sx={{ color: '#00B0FF', minWidth: 48 }}>
+                                    <ListItemIcon sx={{ color: cores.primaria, minWidth: 48 }}>
                                         <TelegramIcon />
                                     </ListItemIcon>
                                     <ListItemText
                                         primary="Resumo do Relatório Diário no Telegram"
                                         secondary="Envia o resumo de participantes, check-ins e taxa de ocupação no Chat ID configurado às 03:30."
-                                        primaryTypographyProps={{ fontWeight: 600, color: '#FFFFFF' }}
+                                        primaryTypographyProps={{ fontWeight: 600, color: cores.textoForte }}
                                         secondaryTypographyProps={{ fontSize: '0.75rem', color: 'text.secondary' }}
                                     />
                                     <ListItemSecondaryAction>
@@ -753,7 +753,7 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                                                 ? `Ativo no limiar de ${settings.alert_peak_threshold || 90}% da capacidade (configurado em Geral).`
                                                 : 'Desativado em Configurações → Geral.'
                                         }
-                                        primaryTypographyProps={{ fontWeight: 600, color: '#FFFFFF' }}
+                                        primaryTypographyProps={{ fontWeight: 600, color: cores.textoForte }}
                                         secondaryTypographyProps={{ fontSize: '0.75rem', color: 'text.secondary' }}
                                     />
                                     <ListItemSecondaryAction>
@@ -764,7 +764,7 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                                                 sx={{
                                                     fontWeight: 700,
                                                     bgcolor: settings.alert_event_peak !== false ? 'rgba(255, 184, 0, 0.14)' : 'rgba(148, 163, 184, 0.14)',
-                                                    color: settings.alert_event_peak !== false ? '#FFB800' : '#94A3B8'
+                                                    color: settings.alert_event_peak !== false ? cores.alerta : cores.textoSecundario
                                                 }}
                                             />
                                             <Button
@@ -782,13 +782,13 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
 
                                 {/* SHADOW LOGIN */}
                                 <ListItem sx={{ py: 2 }}>
-                                    <ListItemIcon sx={{ color: '#00D4FF', minWidth: 48 }}>
+                                    <ListItemIcon sx={{ color: cores.primaria, minWidth: 48 }}>
                                         <SecurityIcon />
                                     </ListItemIcon>
                                     <ListItemText
                                         primary="Alerta: Shadow Login (Operador fora do horário)"
                                         secondary="Avisa masters quando um operador se autentica em horários atípicos (22:00 às 06:00)."
-                                        primaryTypographyProps={{ fontWeight: 600, color: '#FFFFFF' }}
+                                        primaryTypographyProps={{ fontWeight: 600, color: cores.textoForte }}
                                         secondaryTypographyProps={{ fontSize: '0.75rem', color: 'text.secondary' }}
                                     />
                                     <ListItemSecondaryAction>
@@ -802,7 +802,7 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
 
                             {/* DESTINATÁRIOS ADICIONAIS */}
                             <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                                <Typography variant="subtitle2" sx={{ color: '#FFFFFF', fontWeight: 600, mb: 1 }}>
+                                <Typography variant="subtitle2" sx={{ color: cores.textoForte, fontWeight: 600, mb: 1 }}>
                                     E-mails adicionais para recebimento do relatório diário
                                 </Typography>
                                 <TextField
@@ -827,7 +827,7 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                 <Grid container spacing={3}>
                     <Grid item xs={12} md={4}>
                         <GlassCard sx={{ p: 2, height: '100%' }}>
-                            <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 700, color: '#00D4FF' }}>
+                            <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 700, color: cores.primaria }}>
                                 Lista de templates
                             </Typography>
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -840,10 +840,10 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                                             justifyContent: 'flex-start',
                                             textAlign: 'left',
                                             py: 1.5,
-                                            color: '#FFFFFF',
+                                            color: cores.textoForte,
                                             borderColor: selectedTemplate?.id === t.id ? 'primary.main' : 'rgba(255,255,255,0.1)'
                                         }}
-                                        startIcon={t.canal === 'email' ? <MailIcon /> : <WhatsAppIcon sx={{ color: '#25D366' }} />}
+                                        startIcon={t.canal === 'email' ? <MailIcon /> : <WhatsAppIcon sx={{ color: cores.whatsapp }} />}
                                     >
                                         <Box>
                                             <Typography variant="body2" sx={{ fontWeight: 700 }}>
@@ -869,7 +869,7 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                             {selectedTemplate ? (
                                 <Box>
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                                        <Typography variant="h6" sx={{ fontWeight: 700, color: cores.textoForte }}>
                                             Editando: {selectedTemplate.slug.toUpperCase()} ({selectedTemplate.canal})
                                         </Typography>
                                         <NeonButton onClick={handleSaveTemplate} disabled={savingTemplate} startIcon={<SaveIcon />}>
@@ -897,12 +897,12 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                                         onChange={(e) => setTempContent(e.target.value)}
                                         helperText="Clique nas variáveis abaixo para inseri-las dinamicamente."
                                         sx={{
-                                            '& .MuiInputBase-root': { fontFamily: '"Inter", sans-serif', fontSize: '0.875rem', color: '#FFFFFF' }
+                                            '& .MuiInputBase-root': { fontFamily: '"Inter", sans-serif', fontSize: '0.875rem', color: cores.textoForte }
                                         }}
                                     />
 
                                     <Box sx={{ mt: 3, p: 2, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 1.5, border: '1px solid rgba(255,255,255,0.06)' }}>
-                                        <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block', mb: 1 }}>
+                                        <Typography variant="caption" sx={{ color: cores.textoSecundario, fontWeight: 600, display: 'block', mb: 1 }}>
                                             Variáveis dinâmicas suportadas:
                                         </Typography>
                                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
@@ -912,15 +912,15 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                                                     sx={{
                                                         px: 1,
                                                         py: 0.5,
-                                                        bgcolor: 'rgba(0,212,255,0.08)',
+                                                        bgcolor: tom(cores.primaria, 0.08),
                                                         border: '1px solid rgba(0,212,255,0.25)',
                                                         borderRadius: 1,
                                                         cursor: 'pointer',
-                                                        '&:hover': { bgcolor: 'rgba(0,212,255,0.18)' }
+                                                        '&:hover': { bgcolor: tom(cores.primaria, 0.18) }
                                                     }}
                                                     onClick={() => setTempContent(prev => prev + ` {{${v}}}`)}
                                                 >
-                                                    <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700 }}>
+                                                    <Typography variant="caption" sx={{ color: cores.primaria, fontWeight: 700 }}>
                                                         {`{{${v}}}`}
                                                     </Typography>
                                                 </Box>
@@ -930,7 +930,7 @@ const ConfigComunicacao = ({ defaultTab = null }) => {
                                 </Box>
                             ) : (
                                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', minHeight: 250 }}>
-                                    <Typography sx={{ color: '#94A3B8' }}>Selecione um template à esquerda para visualizar e editar</Typography>
+                                    <Typography sx={{ color: cores.textoSecundario }}>Selecione um template à esquerda para visualizar e editar</Typography>
                                 </Box>
                             )}
                         </GlassCard>

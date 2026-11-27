@@ -1,15 +1,16 @@
 import { Box, Typography, Stack, Chip } from '@mui/material';
+import { cores } from '../../styles/tokens';
 
 /**
  * Exibe chips das áreas autorizadas de uma pessoa.
  * Só renderiza quando a pessoa tem areas_info e não tem pulseira_info
  * (pulseira tem exibição própria que já mostra áreas).
- * accentColor: cor hex do tema (ex: '#00D4FF' ou '#FF3366').
+ * accentColor: cor hex do tema (ex: cores.primaria ou cores.erro).
  */
-const AuthorizedAreasChips = ({ pessoa, accentColor = '#00D4FF' }) => {
+const AuthorizedAreasChips = ({ pessoa, accentColor = cores.primaria }) => {
   if (!pessoa?.areas_info?.length || pessoa?.pulseira_info) return null;
 
-  const rgb = accentColor === '#FF3366' ? '255,51,102' : '0,212,255';
+  const rgb = accentColor === cores.erro ? '255,51,102' : '0,212,255';
 
   return (
     <Box sx={{ mt: 2, p: 1.5, borderRadius: 1.5, bgcolor: `rgba(${rgb},0.05)`, border: `1px solid rgba(${rgb},0.15)` }}>

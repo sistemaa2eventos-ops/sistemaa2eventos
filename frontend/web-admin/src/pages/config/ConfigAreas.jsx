@@ -27,7 +27,7 @@ import PageHeader from '../../components/common/PageHeader';
 import NeonButton from '../../components/common/NeonButton';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
 
-import { botaoSecundario } from '../../styles/tokens';
+import { botaoSecundario, cores, tom } from '../../styles/tokens';
 const ConfigAreas = () => {
     const confirmar = useConfirmacao();
     const [areas, setAreas] = useState([]);
@@ -73,7 +73,7 @@ const ConfigAreas = () => {
                     <IconButton
                         size="small"
                         onClick={() => handleOpenDialog(row)}
-                        sx={{ color: 'primary.main', bgcolor: 'rgba(0, 212, 255, 0.05)' }}
+                        sx={{ color: 'primary.main', bgcolor: tom(cores.primaria, 0.05) }}
                     >
                         <EditIcon fontSize="small" />
                     </IconButton>

@@ -4,6 +4,7 @@ import { Lock as LockIcon, Visibility as VisibilityIcon, VisibilityOff as Visibi
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import NeonButton from '../components/common/NeonButton';
+import { cores, tom } from '../styles/tokens';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -63,7 +64,7 @@ const DefinirSenha = () => {
             fullWidth label={label} type={mostrar ? 'text' : 'password'} margin="normal" autoComplete={autoComplete}
             value={valor} onChange={(e) => setValor(e.target.value)} error={!!erroCampo} helperText={erroCampo}
             InputProps={{
-                startAdornment: <InputAdornment position="start"><LockIcon sx={{ color: 'rgba(0, 212, 255, 0.4)' }} /></InputAdornment>,
+                startAdornment: <InputAdornment position="start"><LockIcon sx={{ color: tom(cores.primaria, 0.4) }} /></InputAdornment>,
                 endAdornment: (
                     <InputAdornment position="end">
                         <IconButton onClick={() => setMostrar(!mostrar)} edge="end">{mostrar ? <VisibilityOffIcon /> : <VisibilityIcon />}</IconButton>
@@ -81,7 +82,7 @@ const DefinirSenha = () => {
                     background: 'linear-gradient(135deg, rgba(10,22,40,0.8) 0%, rgba(15,30,55,0.8) 100%)',
                     border: '1px solid rgba(0, 212, 255, 0.2)', boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 40px rgba(0, 212, 255, 0.1)'
                 }}>
-                    <Typography variant="h5" sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, color: '#FFFFFF', mb: 0.5 }}>
+                    <Typography variant="h5" sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, color: cores.textoForte, mb: 0.5 }}>
                         {link.tipo === 'invite' ? 'Ativar conta' : 'Definir nova senha'}
                     </Typography>
                     <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>NZT Intelligent Control System</Typography>
@@ -112,7 +113,7 @@ const DefinirSenha = () => {
 
                     <Box sx={{ mt: 2 }}>
                         <Link component="button" type="button" variant="body2" onClick={() => navigate('/login')}
-                            sx={{ color: '#00D4FF', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}>
+                            sx={{ color: cores.primaria, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}>
                             Voltar ao login
                         </Link>
                     </Box>

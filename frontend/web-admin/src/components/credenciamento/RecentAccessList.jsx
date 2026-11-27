@@ -9,6 +9,7 @@ import {
 } from '@mui/icons-material';
 import PessoaFoto from '../common/PessoaFoto';
 import { formatLocalTime } from '../../utils/dateUtils';
+import { cores } from '../../styles/tokens';
 
 /**
  * Lista dos últimos acessos (check-in/checkout) em tempo real.
@@ -18,7 +19,7 @@ const RecentAccessList = ({
   logs = [],
   title = 'Registros recentes',
   icon: IconComponent = HistoryIcon,
-  accentColor = '#00D4FF',
+  accentColor = cores.primaria,
   badgeLabel = 'Registrado',
   firstLabel = 'Último registro',
   emptyTitle = 'Nenhum registro ainda',
@@ -56,7 +57,7 @@ const RecentAccessList = ({
       >
         <Stack direction="row" alignItems="center" spacing={1} sx={{ flex: 1, minWidth: 160 }}>
           <IconComponent sx={{ color: accentColor, fontSize: 22 }} />
-          <Typography variant="h6" fontWeight={700} color="#FFFFFF" sx={{ fontSize: { xs: '1rem', sm: '1.0625rem' } }}>
+          <Typography variant="h6" fontWeight={700} color={cores.textoForte} sx={{ fontSize: { xs: '1rem', sm: '1.0625rem' } }}>
             {title}
           </Typography>
           <Chip
@@ -79,7 +80,7 @@ const RecentAccessList = ({
           sx={{ width: { xs: '100%', sm: 240 } }}
           InputProps={{
             startAdornment: <SearchIcon sx={{ color: 'rgba(255,255,255,0.4)', mr: 1, fontSize: 18 }} />,
-            sx: { bgcolor: 'rgba(0,0,0,0.25)', borderRadius: 1.5, color: '#FFFFFF', fontSize: '0.8125rem', height: 36 }
+            sx: { bgcolor: 'rgba(0,0,0,0.25)', borderRadius: 1.5, color: cores.textoForte, fontSize: '0.8125rem', height: 36 }
           }}
         />
         {acoes}
@@ -132,7 +133,7 @@ const RecentAccessList = ({
 
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Stack direction="row" alignItems="center" spacing={0.75} sx={{ minWidth: 0 }}>
-                    <Typography variant="subtitle2" fontWeight={700} color="#FFFFFF" noWrap sx={{ fontSize: { xs: '0.875rem', sm: '0.9375rem' } }}>
+                    <Typography variant="subtitle2" fontWeight={700} color={cores.textoForte} noWrap sx={{ fontSize: { xs: '0.875rem', sm: '0.9375rem' } }}>
                       {nome}
                     </Typography>
                     {isFirst && (
@@ -148,7 +149,7 @@ const RecentAccessList = ({
                     {empresa}{funcao ? ` · ${funcao}` : ''}
                   </Typography>
                   {pulseira && (
-                    <Typography variant="caption" sx={{ display: { xs: 'inline-block', sm: 'none' }, color: accentColor, fontWeight: 700, fontSize: '0.7rem', mt: 0.25 }}>
+                    <Typography variant="caption" sx={{ display: { xs: 'inline-block', sm: 'none' }, color: accentColor, fontWeight: 700, fontSize: '0.75rem', mt: 0.25 }}>
                       Pulseira #{pulseira}
                     </Typography>
                   )}
@@ -166,10 +167,10 @@ const RecentAccessList = ({
                 )}
 
                 <Box sx={{ textAlign: 'right', minWidth: { xs: 52, sm: 72 }, flexShrink: 0 }}>
-                  <Typography variant="body2" fontWeight={700} color="#FFFFFF" sx={{ fontVariantNumeric: 'tabular-nums', fontSize: { xs: '0.8125rem', sm: '0.9375rem' } }}>
+                  <Typography variant="body2" fontWeight={700} color={cores.textoForte} sx={{ fontVariantNumeric: 'tabular-nums', fontSize: { xs: '0.8125rem', sm: '0.9375rem' } }}>
                     {hora}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: accentColor, fontWeight: 600, fontSize: '0.7rem' }}>
+                  <Typography variant="caption" sx={{ color: accentColor, fontWeight: 600, fontSize: '0.75rem' }}>
                     {badgeLabel}
                   </Typography>
                 </Box>
@@ -180,7 +181,7 @@ const RecentAccessList = ({
           {filteredLogs.length === 0 && (
             <Box sx={{ textAlign: 'center', py: 5, px: 2, opacity: 0.6 }}>
               <IconComponent sx={{ fontSize: 44, mb: 1, color: accentColor }} />
-              <Typography variant="subtitle1" fontWeight={700} color="#FFFFFF">
+              <Typography variant="subtitle1" fontWeight={700} color={cores.textoForte}>
                 {filterText ? `Nada encontrado para "${filterText}"` : emptyTitle}
               </Typography>
               {!filterText && (

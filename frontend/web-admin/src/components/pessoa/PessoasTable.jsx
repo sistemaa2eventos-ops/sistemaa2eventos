@@ -12,17 +12,17 @@ import {
 } from '@mui/icons-material';
 import DataTable from '../common/DataTable';
 import PessoaFoto from '../common/PessoaFoto';
-import { acaoTabela, acaoTabelaPerigo } from '../../styles/tokens';
+import { acaoTabela, acaoTabelaPerigo, cores, tom } from '../../styles/tokens';
 import { formatarCpf } from '../../utils/formatadores';
 
 import { comoRotulo } from '../../utils/formatadores';
 const StatusChip = styled(Chip)(({ status }) => {
   const colors = {
-    'ativo': { bg: 'rgba(0, 255, 136, 0.1)', text: '#00FF88', border: 'rgba(0, 255, 136, 0.2)' },
-    'autorizado': { bg: 'rgba(0, 255, 136, 0.1)', text: '#00FF88', border: 'rgba(0, 255, 136, 0.2)' },
-    'pendente': { bg: 'rgba(255, 170, 0, 0.1)', text: '#FFB800', border: 'rgba(255, 170, 0, 0.2)' },
-    'verificacao': { bg: 'rgba(0, 212, 255, 0.1)', text: '#00D4FF', border: 'rgba(0, 212, 255, 0.2)' },
-    'bloqueado': { bg: 'rgba(255, 51, 102, 0.1)', text: '#FF3366', border: 'rgba(255, 51, 102, 0.2)' }
+    'ativo': { bg: 'rgba(0, 255, 136, 0.1)', text: cores.sucesso, border: 'rgba(0, 255, 136, 0.2)' },
+    'autorizado': { bg: 'rgba(0, 255, 136, 0.1)', text: cores.sucesso, border: 'rgba(0, 255, 136, 0.2)' },
+    'pendente': { bg: 'rgba(255, 170, 0, 0.1)', text: cores.alerta, border: 'rgba(255, 170, 0, 0.2)' },
+    'verificacao': { bg: tom(cores.primaria, 0.1), text: cores.primaria, border: tom(cores.primaria, 0.2) },
+    'bloqueado': { bg: 'rgba(255, 51, 102, 0.1)', text: cores.erro, border: 'rgba(255, 51, 102, 0.2)' }
   };
 
   const current = colors[status] || colors['ativo'];
@@ -68,7 +68,7 @@ const PessoasTable = ({
           nome={row?.nome}
           width={42}
           borderRadius="8px"
-          accentColor="#00D4FF"
+          accentColor={cores.primaria}
         />
       )
     },
@@ -79,7 +79,7 @@ const PessoasTable = ({
       format: (val, row) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Box>
-            <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF' }}>{val}</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 700, color: cores.textoForte }}>{val}</Typography>
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
               <Typography variant="caption" sx={{ color: 'text.secondary' }}>{row.funcao || 'Participante'}</Typography>
               <Chip
@@ -88,8 +88,8 @@ const PessoasTable = ({
                 sx={{
                   height: 16,
                   fontSize: '0.75rem',
-                  bgcolor: row.tipo_pessoa === 'visitante' ? 'rgba(0, 212, 255, 0.1)' : (row.tipo_pessoa === 'participante' ? 'rgba(0, 255, 136, 0.1)' : 'rgba(123, 47, 190, 0.1)'),
-                  color: row.tipo_pessoa === 'visitante' ? '#00D4FF' : (row.tipo_pessoa === 'participante' ? '#00FF88' : '#7B2FBE'),
+                  bgcolor: row.tipo_pessoa === 'visitante' ? tom(cores.primaria, 0.1) : (row.tipo_pessoa === 'participante' ? 'rgba(0, 255, 136, 0.1)' : 'rgba(123, 47, 190, 0.1)'),
+                  color: row.tipo_pessoa === 'visitante' ? cores.primaria : (row.tipo_pessoa === 'participante' ? cores.sucesso : cores.secundaria),
                   border: 'none'
                 }}
               />

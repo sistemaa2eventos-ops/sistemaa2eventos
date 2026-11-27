@@ -14,6 +14,7 @@ import api from '../../services/api';
 import PageHeader from '../../components/common/PageHeader';
 import GlassCard from '../../components/common/GlassCard';
 import NeonButton from '../../components/common/NeonButton';
+import { cores } from '../../styles/tokens';
 
 const ConfigGamificacao = () => {
     const { enqueueSnackbar } = useSnackbar();
@@ -94,15 +95,15 @@ const ConfigGamificacao = () => {
                 <Grid item xs={12} md={6}>
                     <GlassCard sx={{ p: 3, mb: 4, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
-                            <TrophyIcon sx={{ color: '#FFB800', fontSize: 28 }} />
-                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                            <TrophyIcon sx={{ color: cores.alerta, fontSize: 28 }} />
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: cores.textoForte }}>
                                 Motores de recompensa (pontos)
                             </Typography>
                         </Box>
 
                         <FormControlLabel
                             control={<Switch checked={gamificationEnabled} onChange={(e) => setGamificationEnabled(e.target.checked)} color="primary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Computar pontuação por ações isoladas</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: cores.textoForte }}>Computar pontuação por ações isoladas</Typography>}
                             sx={{ mb: 4 }}
                         />
 
@@ -129,8 +130,8 @@ const ConfigGamificacao = () => {
                 <Grid item xs={12} md={6}>
                     <GlassCard sx={{ p: 3, mb: 4, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
-                            <TimelineIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
-                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                            <TimelineIcon sx={{ color: cores.primaria, fontSize: 28 }} />
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: cores.textoForte }}>
                                 Líderes de engajamento (top 5)
                             </Typography>
                         </Box>
@@ -147,16 +148,16 @@ const ConfigGamificacao = () => {
                                         bgcolor: 'rgba(255,255,255,0.03)',
                                         border: index === 0 ? '1px solid rgba(0, 212, 255, 0.3)' : '1px solid transparent'
                                     }}>
-                                        <Typography variant="h6" sx={{ color: index === 0 ? '#00D4FF' : 'text.secondary', width: 25, fontWeight: 700 }}>
+                                        <Typography variant="h6" sx={{ color: index === 0 ? cores.primaria : 'text.secondary', width: 25, fontWeight: 700 }}>
                                             {index + 1}
                                         </Typography>
                                         <Avatar src={user.foto} sx={{ border: '2px solid rgba(255,255,255,0.1)' }} />
                                         <Box sx={{ flex: 1 }}>
-                                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF' }}>{user.nome?.toUpperCase()}</Typography>
+                                            <Typography variant="body2" sx={{ fontWeight: 700, color: cores.textoForte }}>{user.nome?.toUpperCase()}</Typography>
                                             <Typography variant="caption" sx={{ color: 'text.secondary' }}>{user.empresa}</Typography>
                                         </Box>
                                         <Box sx={{ textAlign: 'right' }}>
-                                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#00FF88' }}>{user.score} pts</Typography>
+                                            <Typography variant="body2" sx={{ fontWeight: 700, color: cores.sucesso }}>{user.score} pts</Typography>
                                             <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>{user.atividades} ações</Typography>
                                         </Box>
                                     </Box>

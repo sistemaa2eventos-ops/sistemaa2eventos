@@ -8,6 +8,7 @@ import {
 } from '@mui/icons-material';
 import EstacaoFacialSelector from '../common/EstacaoFacialSelector';
 import AreaSelector from '../common/AreaSelector';
+import { cores } from '../../styles/tokens';
 
 /** Abre os registros de entrada/saída numa janela separada (pode ir para outro monitor). */
 export const abrirJanelaRegistros = (tipo) => {
@@ -54,7 +55,7 @@ const CabecalhoOperacao = ({
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mr: 'auto', minWidth: 0 }}>
       {React.cloneElement(icone, { sx: { fontSize: { xs: 26, sm: 30 }, color: cor } })}
       <Box sx={{ minWidth: 0 }}>
-        <Typography variant="h5" fontWeight={700} lineHeight={1.2} color="#FFFFFF" sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
+        <Typography variant="h5" fontWeight={700} lineHeight={1.2} color={cores.textoForte} sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
           {titulo}
         </Typography>
         <Typography variant="body2" noWrap sx={{ color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums', fontSize: { xs: '0.75rem', sm: '0.8125rem' } }}>
@@ -71,9 +72,9 @@ const CabecalhoOperacao = ({
             bgcolor: imprimirAtivo ? 'rgba(0, 255, 136, 0.12)' : 'rgba(255, 255, 255, 0.04)',
             border: `1px solid ${imprimirAtivo ? 'rgba(0, 255, 136, 0.4)' : 'rgba(255, 255, 255, 0.12)'}`,
             borderRadius: 1.5,
-            transition: 'all 0.2s ease'
+            transition: 'background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease'
           }}>
-            <PrintIcon sx={{ fontSize: 18, color: imprimirAtivo ? '#00FF88' : 'rgba(255, 255, 255, 0.5)', mr: 1 }} />
+            <PrintIcon sx={{ fontSize: 18, color: imprimirAtivo ? cores.sucesso : 'rgba(255, 255, 255, 0.5)', mr: 1 }} />
             <FormControlLabel
               control={
                 <Switch
@@ -81,11 +82,11 @@ const CabecalhoOperacao = ({
                   checked={!!imprimirAtivo}
                   onChange={(e) => onToggleImprimir(e.target.checked)}
                   color="success"
-                  sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: '#00FF88' } }}
+                  sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: cores.sucesso } }}
                 />
               }
               label={
-                <Typography variant="caption" sx={{ color: imprimirAtivo ? '#00FF88' : 'rgba(255, 255, 255, 0.7)', fontWeight: 600, userSelect: 'none' }}>
+                <Typography variant="caption" sx={{ color: imprimirAtivo ? cores.sucesso : 'rgba(255, 255, 255, 0.7)', fontWeight: 600, userSelect: 'none' }}>
                   {imprimirAtivo ? 'Imprimir etiqueta: ON' : 'Imprimir etiqueta: OFF'}
                 </Typography>
               }

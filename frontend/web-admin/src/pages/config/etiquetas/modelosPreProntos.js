@@ -1,3 +1,4 @@
+import { cores } from '../../../styles/tokens';
 /**
  * Modelos profissionais pré-prontos de crachás, credenciais e etiquetas.
  * Cada modelo define papel_config e uma lista balanceada de elementos.
@@ -16,14 +17,14 @@ export const MODELOS_SISTEMA = [
             corFundo: '#0B1120'
         },
         elementos: [
-            { id: 'm1_tarja_sup', type: 'shape', forma: 'retangulo', x: 0, y: 0, width: 162, height: 18, backgroundColor: '#00D4FF', semPreenchimento: false, zIndex: 10, locked: true },
-            { id: 'm1_evento', type: 'text', content: '{evento}', x: 9, y: 24, width: 144, height: 22, fontSize: 10, fontWeight: 'bold', color: '#00D4FF', textAlign: 'center', textTransform: 'uppercase', letterSpacing: 1.5, zIndex: 11 },
-            { id: 'm1_foto', type: 'foto', content: '{foto_url}', circular: true, x: 45, y: 52, width: 72, height: 72, borderColor: '#00D4FF', borderWidth: 2, zIndex: 12 },
-            { id: 'm1_nome', type: 'text', content: '{nome_pessoa}', x: 6, y: 132, width: 150, height: 28, fontSize: 15, fontWeight: 'bold', color: '#FFFFFF', textAlign: 'center', autoAjuste: true, zIndex: 13 },
-            { id: 'm1_funcao_bg', type: 'shape', forma: 'pilula', x: 27, y: 164, width: 108, height: 22, backgroundColor: '#00D4FF', semPreenchimento: false, zIndex: 14 },
+            { id: 'm1_tarja_sup', type: 'shape', forma: 'retangulo', x: 0, y: 0, width: 162, height: 18, backgroundColor: cores.primaria, semPreenchimento: false, zIndex: 10, locked: true },
+            { id: 'm1_evento', type: 'text', content: '{evento}', x: 9, y: 24, width: 144, height: 22, fontSize: 10, fontWeight: 'bold', color: cores.primaria, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 1.5, zIndex: 11 },
+            { id: 'm1_foto', type: 'foto', content: '{foto_url}', circular: true, x: 45, y: 52, width: 72, height: 72, borderColor: cores.primaria, borderWidth: 2, zIndex: 12 },
+            { id: 'm1_nome', type: 'text', content: '{nome_pessoa}', x: 6, y: 132, width: 150, height: 28, fontSize: 15, fontWeight: 'bold', color: cores.textoForte, textAlign: 'center', autoAjuste: true, zIndex: 13 },
+            { id: 'm1_funcao_bg', type: 'shape', forma: 'pilula', x: 27, y: 164, width: 108, height: 22, backgroundColor: cores.primaria, semPreenchimento: false, zIndex: 14 },
             { id: 'm1_funcao', type: 'text', content: '{funcao}', x: 27, y: 167, width: 108, height: 18, fontSize: 10, fontWeight: 'bold', color: '#0B1120', textAlign: 'center', textTransform: 'uppercase', zIndex: 15 },
-            { id: 'm1_empresa', type: 'text', content: '{empresa}', x: 9, y: 192, width: 144, height: 18, fontSize: 9, fontWeight: 'normal', color: '#94A3B8', textAlign: 'center', zIndex: 16 },
-            { id: 'm1_divisoria', type: 'line', x: 18, y: 214, width: 126, height: 3, color: '#1E293B', borderColor: '#1E293B', borderWidth: 1, zIndex: 17 },
+            { id: 'm1_empresa', type: 'text', content: '{empresa}', x: 9, y: 192, width: 144, height: 18, fontSize: 9, fontWeight: 'normal', color: cores.textoSecundario, textAlign: 'center', zIndex: 16 },
+            { id: 'm1_divisoria', type: 'line', x: 18, y: 214, width: 126, height: 3, color: cores.superficieElevada, borderColor: cores.superficieElevada, borderWidth: 1, zIndex: 17 },
             { id: 'm1_qr', type: 'qrcode', content: '{qr_code}', x: 53, y: 220, width: 56, height: 56, lockAspectRatio: true, color: '#000000', zIndex: 18 }
         ]
     },
@@ -36,15 +37,15 @@ export const MODELOS_SISTEMA = [
             layout: 'cr80_vertical',
             width: 54,
             height: 86,
-            corFundo: '#FFFFFF'
+            corFundo: cores.textoForte
         },
         elementos: [
             { id: 'm2_tarja', type: 'shape', forma: 'retangulo', x: 0, y: 0, width: 162, height: 8, backgroundColor: '#2563EB', semPreenchimento: false, zIndex: 10, locked: true },
-            { id: 'm2_evento', type: 'text', content: '{evento}', x: 9, y: 15, width: 144, height: 20, fontSize: 11, fontWeight: 'bold', color: '#1E293B', textAlign: 'center', zIndex: 11 },
-            { id: 'm2_foto', type: 'foto', content: '{foto_url}', x: 43, y: 40, width: 76, height: 88, borderRadius: 6, borderColor: '#CBD5E1', borderWidth: 1, zIndex: 12 },
-            { id: 'm2_nome', type: 'text', content: '{nome_pessoa}', x: 6, y: 134, width: 150, height: 30, fontSize: 15, fontWeight: 'bold', color: '#0F172A', textAlign: 'center', autoAjuste: true, zIndex: 13 },
+            { id: 'm2_evento', type: 'text', content: '{evento}', x: 9, y: 15, width: 144, height: 20, fontSize: 11, fontWeight: 'bold', color: cores.superficieElevada, textAlign: 'center', zIndex: 11 },
+            { id: 'm2_foto', type: 'foto', content: '{foto_url}', x: 43, y: 40, width: 76, height: 88, borderRadius: 6, borderColor: cores.textoSuave, borderWidth: 1, zIndex: 12 },
+            { id: 'm2_nome', type: 'text', content: '{nome_pessoa}', x: 6, y: 134, width: 150, height: 30, fontSize: 15, fontWeight: 'bold', color: cores.superficie, textAlign: 'center', autoAjuste: true, zIndex: 13 },
             { id: 'm2_funcao', type: 'text', content: '{funcao}', x: 9, y: 164, width: 144, height: 18, fontSize: 11, fontWeight: 'bold', color: '#2563EB', textAlign: 'center', textTransform: 'uppercase', zIndex: 14 },
-            { id: 'm2_empresa', type: 'text', content: '{empresa}', x: 9, y: 184, width: 144, height: 18, fontSize: 10, fontWeight: 'normal', color: '#64748B', textAlign: 'center', zIndex: 15 },
+            { id: 'm2_empresa', type: 'text', content: '{empresa}', x: 9, y: 184, width: 144, height: 18, fontSize: 10, fontWeight: 'normal', color: cores.textoFraco, textAlign: 'center', zIndex: 15 },
             { id: 'm2_qr', type: 'qrcode', content: '{qr_code}', x: 53, y: 206, width: 56, height: 56, lockAspectRatio: true, color: '#000000', zIndex: 16 }
         ]
     },
@@ -61,12 +62,12 @@ export const MODELOS_SISTEMA = [
         },
         elementos: [
             { id: 'm3_topo_bg', type: 'shape', forma: 'retangulo', x: 0, y: 0, width: 300, height: 60, backgroundColor: '#1E1B4B', semPreenchimento: false, zIndex: 10, locked: true },
-            { id: 'm3_evento', type: 'text', content: '{evento}', x: 15, y: 15, width: 270, height: 32, fontSize: 18, fontWeight: 'bold', color: '#38BDF8', textAlign: 'center', letterSpacing: 2, zIndex: 11 },
+            { id: 'm3_evento', type: 'text', content: '{evento}', x: 15, y: 15, width: 270, height: 32, fontSize: 18, fontWeight: 'bold', color: cores.primaria, textAlign: 'center', letterSpacing: 2, zIndex: 11 },
             { id: 'm3_setor_bg', type: 'shape', forma: 'pilula', x: 60, y: 72, width: 180, height: 38, backgroundColor: '#F43F5E', semPreenchimento: false, zIndex: 12 },
-            { id: 'm3_funcao', type: 'text', content: '{funcao}', x: 60, y: 78, width: 180, height: 26, fontSize: 15, fontWeight: 'bold', color: '#FFFFFF', textAlign: 'center', textTransform: 'uppercase', zIndex: 13 },
-            { id: 'm3_foto', type: 'foto', content: '{foto_url}', x: 95, y: 125, width: 110, height: 125, borderRadius: 8, borderColor: '#38BDF8', borderWidth: 2, zIndex: 14 },
-            { id: 'm3_nome', type: 'text', content: '{nome_pessoa}', x: 15, y: 262, width: 270, height: 38, fontSize: 20, fontWeight: 'bold', color: '#FFFFFF', textAlign: 'center', autoAjuste: true, zIndex: 15 },
-            { id: 'm3_empresa', type: 'text', content: '{empresa}', x: 15, y: 302, width: 270, height: 24, fontSize: 13, fontWeight: 'normal', color: '#94A3B8', textAlign: 'center', zIndex: 16 },
+            { id: 'm3_funcao', type: 'text', content: '{funcao}', x: 60, y: 78, width: 180, height: 26, fontSize: 15, fontWeight: 'bold', color: cores.textoForte, textAlign: 'center', textTransform: 'uppercase', zIndex: 13 },
+            { id: 'm3_foto', type: 'foto', content: '{foto_url}', x: 95, y: 125, width: 110, height: 125, borderRadius: 8, borderColor: cores.primaria, borderWidth: 2, zIndex: 14 },
+            { id: 'm3_nome', type: 'text', content: '{nome_pessoa}', x: 15, y: 262, width: 270, height: 38, fontSize: 20, fontWeight: 'bold', color: cores.textoForte, textAlign: 'center', autoAjuste: true, zIndex: 15 },
+            { id: 'm3_empresa', type: 'text', content: '{empresa}', x: 15, y: 302, width: 270, height: 24, fontSize: 13, fontWeight: 'normal', color: cores.textoSecundario, textAlign: 'center', zIndex: 16 },
             { id: 'm3_qr', type: 'qrcode', content: '{qr_code}', x: 30, y: 334, width: 72, height: 72, lockAspectRatio: true, color: '#000000', zIndex: 17 },
             { id: 'm3_bar', type: 'barcode', content: '{pulseira}', x: 115, y: 342, width: 155, height: 55, exibirTexto: true, zIndex: 18 }
         ]
@@ -80,10 +81,10 @@ export const MODELOS_SISTEMA = [
             layout: 'adesiva_100x50',
             width: 100,
             height: 50,
-            corFundo: '#FFFFFF'
+            corFundo: cores.textoForte
         },
         elementos: [
-            { id: 'm4_borda', type: 'shape', forma: 'retangulo', semPreenchimento: true, x: 6, y: 6, width: 288, height: 138, borderColor: '#000000', borderWidth: 2, borderRadius: 4, zIndex: 10, locked: true },
+            { id: 'm4_borda', type: 'shape', forma: 'retangulo', semPreenchimento: true, x: 6, y: 6, width: 288, height: 138, borderColor: '#000000', borderWidth: 2, borderRadius: 1.5, zIndex: 10, locked: true },
             { id: 'm4_nome', type: 'text', content: '{nome_pessoa}', x: 16, y: 16, width: 185, height: 36, fontSize: 18, fontWeight: 'bold', color: '#000000', textAlign: 'left', autoAjuste: true, zIndex: 11 },
             { id: 'm4_empresa', type: 'text', content: '{empresa}', x: 16, y: 54, width: 185, height: 22, fontSize: 12, fontWeight: 'normal', color: '#333333', textAlign: 'left', zIndex: 12 },
             { id: 'm4_funcao', type: 'text', content: '{funcao}', x: 16, y: 78, width: 185, height: 22, fontSize: 13, fontWeight: 'bold', color: '#000000', textAlign: 'left', zIndex: 13 },
@@ -101,15 +102,15 @@ export const MODELOS_SISTEMA = [
             layout: 'cr80_horizontal',
             width: 86,
             height: 54,
-            corFundo: '#FFFFFF'
+            corFundo: cores.textoForte
         },
         elementos: [
-            { id: 'm5_topo', type: 'shape', forma: 'retangulo', x: 0, y: 0, width: 258, height: 16, backgroundColor: '#0EA5E9', semPreenchimento: false, zIndex: 10, locked: true },
-            { id: 'm5_evento', type: 'text', content: '{evento}', x: 12, y: 2, width: 234, height: 14, fontSize: 8, fontWeight: 'bold', color: '#FFFFFF', textAlign: 'left', textTransform: 'uppercase', zIndex: 11 },
-            { id: 'm5_foto', type: 'foto', content: '{foto_url}', x: 14, y: 28, width: 62, height: 76, borderRadius: 6, borderColor: '#0EA5E9', borderWidth: 1.5, zIndex: 12 },
-            { id: 'm5_nome', type: 'text', content: '{nome_pessoa}', x: 84, y: 28, width: 110, height: 30, fontSize: 13, fontWeight: 'bold', color: '#0F172A', textAlign: 'left', autoAjuste: true, zIndex: 13 },
-            { id: 'm5_funcao', type: 'text', content: '{funcao}', x: 84, y: 60, width: 110, height: 18, fontSize: 10, fontWeight: 'bold', color: '#0EA5E9', textAlign: 'left', textTransform: 'uppercase', zIndex: 14 },
-            { id: 'm5_empresa', type: 'text', content: '{empresa}', x: 84, y: 80, width: 110, height: 18, fontSize: 9, fontWeight: 'normal', color: '#64748B', textAlign: 'left', zIndex: 15 },
+            { id: 'm5_topo', type: 'shape', forma: 'retangulo', x: 0, y: 0, width: 258, height: 16, backgroundColor: cores.primaria, semPreenchimento: false, zIndex: 10, locked: true },
+            { id: 'm5_evento', type: 'text', content: '{evento}', x: 12, y: 2, width: 234, height: 14, fontSize: 8, fontWeight: 'bold', color: cores.textoForte, textAlign: 'left', textTransform: 'uppercase', zIndex: 11 },
+            { id: 'm5_foto', type: 'foto', content: '{foto_url}', x: 14, y: 28, width: 62, height: 76, borderRadius: 6, borderColor: cores.primaria, borderWidth: 1.5, zIndex: 12 },
+            { id: 'm5_nome', type: 'text', content: '{nome_pessoa}', x: 84, y: 28, width: 110, height: 30, fontSize: 13, fontWeight: 'bold', color: cores.superficie, textAlign: 'left', autoAjuste: true, zIndex: 13 },
+            { id: 'm5_funcao', type: 'text', content: '{funcao}', x: 84, y: 60, width: 110, height: 18, fontSize: 10, fontWeight: 'bold', color: cores.primaria, textAlign: 'left', textTransform: 'uppercase', zIndex: 14 },
+            { id: 'm5_empresa', type: 'text', content: '{empresa}', x: 84, y: 80, width: 110, height: 18, fontSize: 9, fontWeight: 'normal', color: cores.textoFraco, textAlign: 'left', zIndex: 15 },
             { id: 'm5_qr', type: 'qrcode', content: '{qr_code}', x: 198, y: 32, width: 48, height: 48, lockAspectRatio: true, color: '#000000', zIndex: 16 }
         ]
     }

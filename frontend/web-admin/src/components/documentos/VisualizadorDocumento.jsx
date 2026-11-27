@@ -3,6 +3,7 @@ import { Box, Button, CircularProgress, Typography, useMediaQuery } from '@mui/m
 import { useTheme } from '@mui/material/styles';
 import { OpenInNew as AbrirIcon } from '@mui/icons-material';
 import { ehPdf, obterUrlDocumento } from './documentosUtils';
+import { cores } from '../../styles/tokens';
 
 /**
  * Exibe o arquivo do documento (PDF ou imagem) usando URL assinada.
@@ -34,7 +35,7 @@ const VisualizadorDocumento = ({ doc, height = '65dvh', onUrl }) => {
             border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center',
             justifyContent: 'center', overflow: 'hidden'
         }}>
-            {carregando && <CircularProgress sx={{ color: '#00D4FF' }} />}
+            {carregando && <CircularProgress sx={{ color: cores.primaria }} />}
             {!carregando && !url && (
                 <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>Arquivo indisponível</Typography>
             )}

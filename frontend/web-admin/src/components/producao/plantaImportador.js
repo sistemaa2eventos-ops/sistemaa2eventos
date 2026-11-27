@@ -1,4 +1,5 @@
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { cores } from '../../styles/tokens';
 
 let workerConfigurado = false;
 
@@ -107,7 +108,7 @@ export async function renderizarPaginaPdfParaImagem(file, numeroPagina = 1, opco
     ctx2d.imageSmoothingQuality = 'high';
 
     if (!transparente) {
-        ctx2d.fillStyle = '#FFFFFF';
+        ctx2d.fillStyle = cores.textoForte;
         ctx2d.fillRect(0, 0, canvas.width, canvas.height);
     }
 
@@ -260,7 +261,7 @@ export async function inspecionarArquivoArquitetura(file) {
     ctx2d.imageSmoothingEnabled = true;
     ctx2d.imageSmoothingQuality = 'high';
     if (!preservaAlpha) {
-        ctx2d.fillStyle = '#FFFFFF';
+        ctx2d.fillStyle = cores.textoForte;
         ctx2d.fillRect(0, 0, canvas.width, canvas.height);
     }
     ctx2d.drawImage(img, 0, 0, canvas.width, canvas.height);

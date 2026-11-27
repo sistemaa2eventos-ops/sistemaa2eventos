@@ -12,7 +12,7 @@ import GlassCard from '../../components/common/GlassCard';
 import NeonButton from '../../components/common/NeonButton';
 import CatalogoDocumentosDialog from '../../components/documentos/CatalogoDocumentosDialog';
 import CopiarConfiguracaoDialog from '../../components/documentos/CopiarConfiguracaoDialog';
-import { cores, botaoSecundario, acaoTabelaPerigo } from '../../styles/tokens';
+import { cores, botaoSecundario, acaoTabelaPerigo, tom } from '../../styles/tokens';
 
 const PADRAO = '*';
 const normalizar = (f) => String(f || '').trim().replace(/\s+/g, ' ').toUpperCase();
@@ -197,7 +197,7 @@ const ConfigDocumentos = () => {
             />
 
             {semRegras && (
-                <Alert severity="info" sx={{ mb: 3, bgcolor: 'rgba(0,212,255,0.05)', color: '#E8F4FD', border: '1px solid rgba(0,212,255,0.2)' }}>
+                <Alert severity="info" sx={{ mb: 3, bgcolor: tom(cores.primaria, 0.05), color: cores.texto, border: '1px solid rgba(0,212,255,0.2)' }}>
                     Nenhum documento obrigatório definido. Mesmo assim, participante externo só fica autorizado com documentos
                     enviados e aprovados: quem não enviou nada continua pendente. Marque abaixo o que cada função precisa entregar.
                 </Alert>

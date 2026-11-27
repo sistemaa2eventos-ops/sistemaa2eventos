@@ -9,6 +9,7 @@ import api from '../../services/api';
 import ListaDocumentos from './ListaDocumentos';
 import { SITUACAO_DOCUMENTAL, chipSx } from './documentosUtils';
 import { formatarCnpj } from '../../utils/formatadores';
+import { cores } from '../../styles/tokens';
 
 const POR_PAGINA = 30;
 
@@ -60,11 +61,11 @@ const AbaEmpresas = ({ onAuditar, recarregarToken }) => {
                     value={busca}
                     onChange={(e) => setBusca(e.target.value)}
                     InputProps={{ startAdornment: <SearchIcon sx={{ color: 'rgba(255,255,255,0.4)', mr: 1.5 }} /> }}
-                    sx={{ '& .MuiOutlinedInput-root': { color: '#FFFFFF', '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' } } }}
+                    sx={{ '& .MuiOutlinedInput-root': { color: cores.textoForte, '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' } } }}
                 />
                 <FormControlLabel
                     control={<Switch checked={somentePendentes} onChange={(e) => setSomentePendentes(e.target.checked)} />}
-                    label={<Typography variant="body2" sx={{ color: '#FFFFFF', whiteSpace: 'nowrap' }}>Só com pendência</Typography>}
+                    label={<Typography variant="body2" sx={{ color: cores.textoForte, whiteSpace: 'nowrap' }}>Só com pendência</Typography>}
                 />
             </Stack>
 
@@ -80,10 +81,10 @@ const AbaEmpresas = ({ onAuditar, recarregarToken }) => {
                         mb: 1, bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
                         borderRadius: '8px !important', '&:before': { display: 'none' }
                     }}>
-                        <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ color: '#00D4FF' }} />}>
+                        <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ color: cores.primaria }} />}>
                             <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ md: 'center' }} sx={{ width: '100%', pr: 1 }}>
                                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                                    <Typography sx={{ color: '#FFFFFF', fontWeight: 700 }} noWrap>{emp.nome}</Typography>
+                                    <Typography sx={{ color: cores.textoForte, fontWeight: 700 }} noWrap>{emp.nome}</Typography>
                                     <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.55)' }}>
                                         CNPJ {emp.cnpj ? formatarCnpj(emp.cnpj) : '—'}
                                         {emp.servico ? ` · ${emp.servico}` : ''}
@@ -93,25 +94,25 @@ const AbaEmpresas = ({ onAuditar, recarregarToken }) => {
                                 </Box>
                                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                                     <Chip size="small" label={sit.label} sx={chipSx(sit.color)} />
-                                    <Chip size="small" label={`${docs.length} doc(s)`} sx={chipSx('#00D4FF')} />
+                                    <Chip size="small" label={`${docs.length} doc(s)`} sx={chipSx(cores.primaria)} />
                                 </Stack>
                             </Stack>
                         </AccordionSummary>
                         <AccordionDetails>
-                            <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700 }}>Documentos da empresa</Typography>
+                            <Typography variant="overline" sx={{ color: cores.primaria, fontWeight: 700 }}>Documentos da empresa</Typography>
                             <ListaDocumentos documentos={docs} onAuditar={onAuditar} />
                         </AccordionDetails>
                     </Accordion>
                 );
             })}
 
-            {carregando && <Box sx={{ textAlign: 'center', py: 3 }}><CircularProgress sx={{ color: '#00D4FF' }} /></Box>}
+            {carregando && <Box sx={{ textAlign: 'center', py: 3 }}><CircularProgress sx={{ color: cores.primaria }} /></Box>}
             {!carregando && itens.length === 0 && (
                 <Typography sx={{ color: 'rgba(255,255,255,0.5)', textAlign: 'center', py: 6 }}>Nenhuma empresa encontrada.</Typography>
             )}
             {!carregando && itens.length < total && (
                 <Box sx={{ textAlign: 'center', mt: 2 }}>
-                    <Button onClick={() => carregar(pagina + 1)} sx={{ color: '#00D4FF' }}>Carregar mais</Button>
+                    <Button onClick={() => carregar(pagina + 1)} sx={{ color: cores.primaria }}>Carregar mais</Button>
                 </Box>
             )}
         </Box>

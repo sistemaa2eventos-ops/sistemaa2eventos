@@ -9,6 +9,7 @@ import NeonButton from '../../components/common/NeonButton';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
 
 import { comoRotulo } from '../../utils/formatadores';
+import { cores } from '../../styles/tokens';
 // embutido: aba de "Auditoria e logs" (sem cabeçalho e margem próprios)
 const ConfigLogs = ({ embutido = false }) => {
     const confirmar = useConfirmacao();
@@ -144,7 +145,7 @@ const ConfigLogs = ({ embutido = false }) => {
             {/* FILTROS */}
             <GlassCard sx={{ p: 2, mb: 3 }}>
                 <Stack direction={{ xs: 'flex', md: 'row' }} spacing={2} alignItems="center">
-                    <FilterIcon sx={{ color: '#00D4FF' }} />
+                    <FilterIcon sx={{ color: cores.primaria }} />
                     <FormControl size="small" sx={{ minWidth: 120 }}>
                         <InputLabel>Nível</InputLabel>
                         <Select
@@ -185,15 +186,15 @@ const ConfigLogs = ({ embutido = false }) => {
                     <GlassCard sx={{ p: 3, height: '100%' }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <LogsIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
-                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                                <LogsIcon sx={{ color: cores.primaria, fontSize: 28 }} />
+                                <Typography variant="h6" sx={{ fontWeight: 700, color: cores.textoForte }}>
                                     Registros
                                 </Typography>
                             </Box>
                             <Button 
                                 startIcon={<DownloadIcon />} 
                                 variant="outlined" 
-                                sx={{ color: '#FFFFFF', borderColor: 'rgba(255,255,255,0.2)' }} 
+                                sx={{ color: cores.textoForte, borderColor: 'rgba(255,255,255,0.2)' }} 
                                 size="small"
                                 onClick={handleExportCSV}
                             >
@@ -218,12 +219,12 @@ const ConfigLogs = ({ embutido = false }) => {
                                         <Box>
                                             {level === 'error' ? <BugIcon color="error" /> :
                                                 (level === 'warn' || level === 'warning') ? <WarningIcon color="warning" /> :
-                                                    <Box sx={{ width: 24, height: 24, borderRadius: '50%', bgcolor: '#00D4FF', opacity: 0.2 }} />}
+                                                    <Box sx={{ width: 24, height: 24, borderRadius: '50%', bgcolor: cores.primaria, opacity: 0.2 }} />}
                                         </Box>
                                         <ListItemText
                                             primary={msg}
                                             secondary={timeStr}
-                                            primaryTypographyProps={{ color: level === 'error' ? '#FF3366' : '#FFFFFF', fontWeight: 600, fontSize: '0.875rem' }}
+                                            primaryTypographyProps={{ color: level === 'error' ? cores.erro : cores.textoForte, fontWeight: 600, fontSize: '0.875rem' }}
                                             secondaryTypographyProps={{ color: 'text.secondary', fontSize: '0.75rem' }}
                                         />
                                         <Chip label={comoRotulo(level)} size="small" color={level === 'error' ? 'error' : (level === 'warn' || level === 'warning') ? 'warning' : 'info'} variant="outlined" sx={{ fontWeight: 700, fontSize: '0.75rem' }} />
@@ -236,7 +237,7 @@ const ConfigLogs = ({ embutido = false }) => {
 
                 <Grid item xs={12} lg={4}>
                     <GlassCard sx={{ p: 3 }}>
-                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#FF3366', mb: 3 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: cores.erro, mb: 3 }}>
                             Retenção
                         </Typography>
 

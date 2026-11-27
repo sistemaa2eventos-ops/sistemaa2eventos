@@ -23,7 +23,7 @@ import { useSnackbar } from 'notistack';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
 import CameraFormDialog from './CameraFormDialog';
 
-import { botaoSecundario } from '../../styles/tokens';
+import { botaoSecundario, cores, tom } from '../../styles/tokens';
 
 const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, onCamerasChange, areas = [], eventoId }) => {
     const confirmar = useConfirmacao();
@@ -141,18 +141,18 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
             fullWidth
             PaperProps={{
                 sx: {
-                    color: '#FFFFFF'
+                    color: cores.textoForte
                 }
             }}
         >
             <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, borderBottom: '1px solid rgba(255,255,255,0.08)', gap: 1 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, minWidth: 0 }}>
-                    <CameraIcon sx={{ color: '#00D4FF', flexShrink: 0 }} />
+                    <CameraIcon sx={{ color: cores.primaria, flexShrink: 0 }} />
                     <Typography variant="h6" noWrap sx={{ fontWeight: 700, fontFamily: '"Space Grotesk", sans-serif', fontSize: { xs: '1rem', sm: '1.2rem' } }}>
                         Gerenciar câmeras
                     </Typography>
                 </Box>
-                <IconButton onClick={onClose} size="small" sx={{ color: '#94A3B8', '&:hover': { color: '#FFFFFF' } }}>
+                <IconButton onClick={onClose} size="small" sx={{ color: cores.textoSecundario, '&:hover': { color: cores.textoForte } }}>
                     <CloseIcon />
                 </IconButton>
             </DialogTitle>
@@ -190,7 +190,7 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
                                     startIcon={<AddIcon />}
                                     onClick={() => handleOpenForm()}
                                     sx={{
-                                        bgcolor: '#00D4FF',
+                                        bgcolor: cores.primaria,
                                         color: '#000000',
                                         fontWeight: 700,
                                         fontSize: '0.8125rem',
@@ -206,11 +206,11 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
 
                         {cameras.length === 0 ? (
                             <Box sx={{ textAlign: 'center', py: 5, px: 2, bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 1.5 }}>
-                                <CameraIcon sx={{ fontSize: 48, color: '#64748B', mb: 1 }} />
-                                <Typography variant="body1" sx={{ color: '#94A3B8', fontWeight: 700 }}>
+                                <CameraIcon sx={{ fontSize: 48, color: cores.textoFraco, mb: 1 }} />
+                                <Typography variant="body1" sx={{ color: cores.textoSecundario, fontWeight: 700 }}>
                                     Nenhuma câmera cadastrada ainda
                                 </Typography>
-                                <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.5 }}>
+                                <Typography variant="caption" sx={{ color: cores.textoFraco, display: 'block', mt: 0.5 }}>
                                     Toque no botão acima para adicionar sua primeira câmera IP ou stream RTSP.
                                 </Typography>
                             </Box>
@@ -242,22 +242,22 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
                                             <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0, flex: 1 }}>
                                                 <Box sx={{
                                                     width: 38, height: 38, borderRadius: 1.5, flexShrink: 0,
-                                                    bgcolor: isDesativada ? 'rgba(255, 184, 0, 0.1)' : 'rgba(0, 212, 255, 0.1)',
+                                                    bgcolor: isDesativada ? 'rgba(255, 184, 0, 0.1)' : tom(cores.primaria, 0.1),
                                                     border: isDesativada ? '1px solid rgba(255, 184, 0, 0.3)' : '1px solid rgba(0, 212, 255, 0.3)',
                                                     display: 'flex', alignItems: 'center', justifyContent: 'center'
                                                 }}>
                                                     {isDesativada
-                                                        ? <VideocamOffIcon sx={{ color: '#FFB800', fontSize: 20 }} />
-                                                        : <CameraIcon sx={{ color: '#00D4FF', fontSize: 20 }} />}
+                                                        ? <VideocamOffIcon sx={{ color: cores.alerta, fontSize: 20 }} />
+                                                        : <CameraIcon sx={{ color: cores.primaria, fontSize: 20 }} />}
                                                 </Box>
 
                                                 <Box sx={{ minWidth: 0, flex: 1 }}>
                                                     <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                                                        <Typography variant="body2" noWrap sx={{ fontWeight: 700, color: '#FFFFFF', maxWidth: '100%' }}>
+                                                        <Typography variant="body2" noWrap sx={{ fontWeight: 700, color: cores.textoForte, maxWidth: '100%' }}>
                                                             {c.nome}
                                                         </Typography>
                                                         {isDesativada && (
-                                                            <Chip label="Desativada" size="small" color="warning" sx={{ height: 18, fontSize: '0.68rem', fontWeight: 700 }} />
+                                                            <Chip label="Desativada" size="small" color="warning" sx={{ height: 18, fontSize: '0.75rem', fontWeight: 700 }} />
                                                         )}
                                                     </Stack>
                                                     <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.55)', fontFamily: '"Inter", sans-serif', display: 'block', wordBreak: 'break-word' }}>
@@ -286,10 +286,10 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
                                                             size="small"
                                                             sx={{
                                                                 height: 22,
-                                                                fontSize: '0.72rem',
+                                                                fontSize: '0.75rem',
                                                                 fontWeight: 700,
                                                                 bgcolor: test.online ? 'rgba(0,255,136,0.15)' : 'rgba(255,51,102,0.15)',
-                                                                color: test.online ? '#00FF88' : '#FF3366'
+                                                                color: test.online ? cores.sucesso : cores.erro
                                                             }}
                                                         />
                                                     ) : (
@@ -306,7 +306,7 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
                                                             onClick={() => handleToggleStatus(c)}
                                                             disabled={isToggling}
                                                             sx={{
-                                                                color: isDesativada ? '#00FF88' : '#FFB800',
+                                                                color: isDesativada ? cores.sucesso : cores.alerta,
                                                                 bgcolor: isDesativada ? 'rgba(0, 255, 136, 0.12)' : 'rgba(255, 184, 0, 0.1)'
                                                             }}
                                                         >
@@ -320,7 +320,7 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
                                                                 size="small"
                                                                 onClick={() => handleTest(c.id)}
                                                                 disabled={isTesting}
-                                                                sx={{ color: '#00D4FF', bgcolor: 'rgba(0, 212, 255, 0.08)' }}
+                                                                sx={{ color: cores.primaria, bgcolor: tom(cores.primaria, 0.08) }}
                                                             >
                                                                 {isTesting ? <CircularProgress size={16} color="inherit" /> : <TestIcon fontSize="small" />}
                                                             </IconButton>
@@ -333,7 +333,7 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
                                                                 size="small"
                                                                 aria-label={`Diagnosticar ${c.nome}`}
                                                                 onClick={() => setDiagnosticando(c)}
-                                                                sx={{ color: '#00FF88', bgcolor: 'rgba(0, 255, 136, 0.08)' }}
+                                                                sx={{ color: cores.sucesso, bgcolor: 'rgba(0, 255, 136, 0.08)' }}
                                                             >
                                                                 <DiagIcon fontSize="small" />
                                                             </IconButton>
@@ -344,7 +344,7 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
                                                         <IconButton
                                                             size="small"
                                                             onClick={() => handleOpenForm(c)}
-                                                            sx={{ color: '#94A3B8', bgcolor: 'rgba(255,255,255,0.04)', '&:hover': { color: '#FFFFFF' } }}
+                                                            sx={{ color: cores.textoSecundario, bgcolor: 'rgba(255,255,255,0.04)', '&:hover': { color: cores.textoForte } }}
                                                         >
                                                             <EditIcon fontSize="small" />
                                                         </IconButton>
@@ -354,7 +354,7 @@ const GerenciarCamerasModal = ({ open, onClose, cameras = [], onCamerasUpdated, 
                                                         <IconButton
                                                             size="small"
                                                             onClick={() => handleDelete(c.id, c.nome)}
-                                                            sx={{ color: '#94A3B8', bgcolor: 'rgba(255,255,255,0.04)', '&:hover': { color: '#FF3366' } }}
+                                                            sx={{ color: cores.textoSecundario, bgcolor: 'rgba(255,255,255,0.04)', '&:hover': { color: cores.erro } }}
                                                         >
                                                             <DeleteIcon fontSize="small" />
                                                         </IconButton>

@@ -19,6 +19,7 @@ import {
 } from '@mui/icons-material';
 import NeonButton from './NeonButton';
 import GlassCard from './GlassCard';
+import { cores } from '../../styles/tokens';
 
 /**
  * Estação do operador (check-in / check-out): quem identifica a pessoa. Pode ser um leitor facial,
@@ -101,7 +102,7 @@ export const EstacaoFacialSelector = ({
 
     const dispositivoAtivo = sessaoAtiva?.dispositivos_acesso;
     const camerasAtivas = sessaoAtiva?.cameras || [];
-    const corStatus = sessaoAtiva ? '#00FF88' : 'rgba(255, 255, 255, 0.45)';
+    const corStatus = sessaoAtiva ? cores.sucesso : 'rgba(255, 255, 255, 0.45)';
     // "Leitor X · câmeras Y, Z" — o que identifica a pessoa nesta estação
     const fontesAtivas = [
         dispositivoAtivo ? `leitor ${dispositivoAtivo.nome || 'facial'}` : null,
@@ -128,7 +129,7 @@ export const EstacaoFacialSelector = ({
                     {sessaoAtiva
                         ? <SensorsIcon sx={{ color: corStatus, fontSize: 18 }} />
                         : <SensorsOffIcon sx={{ color: corStatus, fontSize: 18 }} />}
-                    <Typography variant="body2" fontWeight={600} sx={{ color: '#FFFFFF', whiteSpace: 'nowrap' }}>
+                    <Typography variant="body2" fontWeight={600} sx={{ color: cores.textoForte, whiteSpace: 'nowrap' }}>
                         {sessaoAtiva ? (sessaoAtiva.estacao_nome || 'Estação') : 'Sem identificação facial'}
                     </Typography>
                     {sessaoAtiva && <ExpandMoreIcon sx={{ fontSize: 18, color: 'rgba(255,255,255,0.6)' }} />}
@@ -139,7 +140,7 @@ export const EstacaoFacialSelector = ({
                 <MenuItem
                     onClick={() => { setMenuAnchor(null); handleConfirmarDesvinculo(); }}
                     disabled={saving}
-                    sx={{ color: '#FF3366' }}
+                    sx={{ color: cores.erro }}
                 >
                     Desconectar
                 </MenuItem>
@@ -176,12 +177,12 @@ export const EstacaoFacialSelector = ({
                             alignItems: 'center',
                             justifyContent: 'center',
                             backgroundColor: sessaoAtiva ? 'rgba(0, 255, 136, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                            border: `2px solid ${sessaoAtiva ? '#00FF88' : 'rgba(255, 255, 255, 0.2)'}`,
+                            border: `2px solid ${sessaoAtiva ? cores.sucesso : 'rgba(255, 255, 255, 0.2)'}`,
                             boxShadow: sessaoAtiva ? '0 0 12px rgba(0, 255, 136, 0.5)' : 'none'
                         }}
                     >
                         {sessaoAtiva ? (
-                            <SensorsIcon sx={{ color: '#00FF88', fontSize: 24 }} />
+                            <SensorsIcon sx={{ color: cores.sucesso, fontSize: 24 }} />
                         ) : (
                             <SensorsOffIcon sx={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: 24 }} />
                         )}
@@ -189,7 +190,7 @@ export const EstacaoFacialSelector = ({
 
                     <Box>
                         <Stack direction="row" spacing={1} alignItems="center">
-                            <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#FFFFFF' }}>
+                            <Typography variant="subtitle1" fontWeight={700} sx={{ color: cores.textoForte }}>
                                 {sessaoAtiva ? (sessaoAtiva.estacao_nome || 'Baia Operador') : 'Identificação facial desconectada'}
                             </Typography>
                             {sessaoAtiva && (
@@ -201,7 +202,7 @@ export const EstacaoFacialSelector = ({
                                         fontSize: '0.75rem',
                                         fontWeight: 700,
                                         backgroundColor: 'rgba(0, 255, 136, 0.2)',
-                                        color: '#00FF88',
+                                        color: cores.sucesso,
                                         border: '1px solid #00FF88'
                                     }}
                                 />
@@ -220,7 +221,7 @@ export const EstacaoFacialSelector = ({
 
                 <Stack direction="row" spacing={1}>
                     <NeonButton
-                        neonColor={sessaoAtiva ? '#00FF88' : '#00D4FF'}
+                        neonColor={sessaoAtiva ? cores.sucesso : cores.primaria}
                         onClick={handleOpen}
                         disabled={loading}
                         sx={{ minHeight: 38, py: 0.5, px: 2, fontSize: '0.875rem' }}
@@ -230,7 +231,7 @@ export const EstacaoFacialSelector = ({
 
                     {sessaoAtiva && (
                         <NeonButton
-                            neonColor="#FF3366"
+                            neonColor={cores.erro}
                             onClick={handleConfirmarDesvinculo}
                             disabled={loading || saving}
                             sx={{ minHeight: 38, py: 0.5, px: 2, fontSize: '0.875rem' }}
@@ -252,7 +253,7 @@ export const EstacaoFacialSelector = ({
                 <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
                     <Stack direction="row" spacing={1.5} alignItems="center">
                         <FaceIcon sx={{ fontSize: 24 }} />
-                        <Typography variant="subtitle1" fontWeight={700} color="#FFFFFF">
+                        <Typography variant="subtitle1" fontWeight={700} color={cores.textoForte}>
                             Identificação desta estação
                         </Typography>
                     </Stack>
@@ -272,12 +273,12 @@ export const EstacaoFacialSelector = ({
                             placeholder="Ex: Baia 01, Guichê A, Recepção 2"
                             sx={{
                                 '& .MuiOutlinedInput-root': {
-                                    color: '#FFFFFF',
+                                    color: cores.textoForte,
                                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                     borderRadius: 1.5,
                                     '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.2)' },
-                                    '&:hover fieldset': { borderColor: '#00D4FF' },
-                                    '&.Mui-focused fieldset': { borderColor: '#00D4FF' }
+                                    '&:hover fieldset': { borderColor: cores.primaria },
+                                    '&.Mui-focused fieldset': { borderColor: cores.primaria }
                                 },
                                 '& .MuiInputLabel-root': { color: 'rgba(255, 255, 255, 0.6)' },
                                 '& .MuiFormHelperText-root': { color: 'rgba(255, 255, 255, 0.4)' }
@@ -286,11 +287,11 @@ export const EstacaoFacialSelector = ({
 
                         <Box>
                             <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
-                                <Typography variant="subtitle2" fontWeight={700} color="#FFFFFF">
+                                <Typography variant="subtitle2" fontWeight={700} color={cores.textoForte}>
                                     Leitor facial (opcional)
                                 </Typography>
                                 <Tooltip title="Atualizar leitores e câmeras">
-                                    <IconButton size="small" onClick={onRecarregar} sx={{ color: '#00D4FF' }}>
+                                    <IconButton size="small" onClick={onRecarregar} sx={{ color: cores.primaria }}>
                                         <RefreshIcon fontSize="small" />
                                     </IconButton>
                                 </Tooltip>
@@ -337,7 +338,7 @@ export const EstacaoFacialSelector = ({
                                                 >
                                                     <Box sx={{ mr: 1.5 }}>
                                                         {isSelected ? (
-                                                            <CheckCircleIcon sx={{ color: '#00D4FF' }} />
+                                                            <CheckCircleIcon sx={{ color: cores.primaria }} />
                                                         ) : (
                                                             <UncheckedIcon sx={{ color: 'rgba(255, 255, 255, 0.3)' }} />
                                                         )}
@@ -346,7 +347,7 @@ export const EstacaoFacialSelector = ({
                                                     <ListItemText
                                                         primary={
                                                             <Stack direction="row" spacing={1} alignItems="center">
-                                                                <Typography fontWeight={700} color="#FFFFFF">
+                                                                <Typography fontWeight={700} color={cores.textoForte}>
                                                                     {dev.nome}
                                                                 </Typography>
                                                                 {dev.status_online === 'online' && (
@@ -357,7 +358,7 @@ export const EstacaoFacialSelector = ({
                                                                             height: 18,
                                                                             fontSize: '0.75rem',
                                                                             bgcolor: 'rgba(0,255,136,0.15)',
-                                                                            color: '#00FF88'
+                                                                            color: cores.sucesso
                                                                         }}
                                                                     />
                                                                 )}
@@ -369,7 +370,7 @@ export const EstacaoFacialSelector = ({
                                                                             height: 18,
                                                                             fontSize: '0.75rem',
                                                                             bgcolor: 'rgba(255,51,102,0.15)',
-                                                                            color: '#FF3366'
+                                                                            color: cores.erro
                                                                         }}
                                                                     />
                                                                 )}
@@ -390,7 +391,7 @@ export const EstacaoFacialSelector = ({
                         </Box>
 
                         <Box>
-                            <Typography variant="subtitle2" fontWeight={700} color="#FFFFFF" sx={{ mb: 0.5 }}>
+                            <Typography variant="subtitle2" fontWeight={700} color={cores.textoForte} sx={{ mb: 0.5 }}>
                                 Câmeras com IA
                             </Typography>
                             <Typography variant="caption" color="rgba(255, 255, 255, 0.5)" sx={{ display: 'block', mb: 1 }}>
@@ -423,22 +424,22 @@ export const EstacaoFacialSelector = ({
                                                 >
                                                     <Box sx={{ mr: 1.5, display: 'flex' }}>
                                                         {marcada
-                                                            ? <CaixaMarcadaIcon sx={{ color: '#00D4FF' }} />
+                                                            ? <CaixaMarcadaIcon sx={{ color: cores.primaria }} />
                                                             : <CaixaVaziaIcon sx={{ color: 'rgba(255, 255, 255, 0.3)' }} />}
                                                     </Box>
                                                     <ListItemText
                                                         primary={
                                                             <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
                                                                 <CameraIcon sx={{ fontSize: 16, color: 'rgba(255,255,255,0.6)' }} />
-                                                                <Typography fontWeight={700} color="#FFFFFF">{cam.nome}</Typography>
+                                                                <Typography fontWeight={700} color={cores.textoForte}>{cam.nome}</Typography>
                                                                 {cam.ocupada && (
                                                                     <Chip label={`Na estação ${cam.estacao_nome || 'de outro operador'}`} size="small"
-                                                                        sx={{ height: 18, fontSize: '0.75rem', bgcolor: 'rgba(255,51,102,0.15)', color: '#FF3366' }} />
+                                                                        sx={{ height: 18, fontSize: '0.75rem', bgcolor: 'rgba(255,51,102,0.15)', color: cores.erro }} />
                                                                 )}
                                                             </Stack>
                                                         }
                                                         secondary={
-                                                            <Typography variant="caption" color={cam.ia_24h ? 'rgba(255, 255, 255, 0.5)' : '#FFB800'}>
+                                                            <Typography variant="caption" color={cam.ia_24h ? 'rgba(255, 255, 255, 0.5)' : cores.alerta}>
                                                                 {cam.area_nome ? `${cam.area_nome} • ` : ''}
                                                                 {cam.ia_24h ? 'IA 24 h' : 'IA ao assistir: só identifica com a câmera aberta no Monitor'}
                                                             </Typography>
@@ -453,7 +454,7 @@ export const EstacaoFacialSelector = ({
                         </Box>
 
                         {errorMsg && (
-                            <Typography variant="caption" sx={{ color: '#FF3366', fontWeight: 600 }}>
+                            <Typography variant="caption" sx={{ color: cores.erro, fontWeight: 600 }}>
                                 {errorMsg}
                             </Typography>
                         )}
@@ -471,7 +472,7 @@ export const EstacaoFacialSelector = ({
                     </NeonButton>
 
                     <NeonButton
-                        neonColor="#00D4FF"
+                        neonColor={cores.primaria}
                         onClick={handleConfirmarVinculo}
                         disabled={saving || (!selectedDispositivoId && selectedCameraIds.length === 0)}
                         loading={saving}

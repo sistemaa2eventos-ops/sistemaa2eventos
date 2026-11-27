@@ -5,7 +5,7 @@ import { Close as CloseIcon, CheckCircle as SuccessIcon } from '@mui/icons-mater
 import GlassCard from '../common/GlassCard';
 import PessoaFoto from '../common/PessoaFoto';
 import UniversalPulseiraInput from '../common/UniversalPulseiraInput';
-import { tom } from '../../styles/tokens';
+import { tom, cores } from '../../styles/tokens';
 
 /**
  * Diz se a leitura é a pulseira desta pessoa. Só ela registra a saída (CPF, QR do crachá ou nome não valem).
@@ -31,7 +31,7 @@ export const ConferenciaSaidaDialog = ({
     // Número já digitado na tela de check-out: a janela abre com ele e um Enter registra a saída
     codigoInicial = '',
     ocupado = false,
-    accentColor = '#FF3366'
+    accentColor = cores.erro
 }) => {
     const [valor, setValor] = useState('');
     const [pendentes, setPendentes] = useState(0);
@@ -98,7 +98,7 @@ export const ConferenciaSaidaDialog = ({
                             onClick={() => onCloseRef.current?.()}
                             disabled={!podeFechar}
                             aria-label="Fechar conferência"
-                            sx={{ color: 'rgba(255, 255, 255, 0.6)', '&:hover': { color: '#FF3366' } }}
+                            sx={{ color: 'rgba(255, 255, 255, 0.6)', '&:hover': { color: cores.erro } }}
                         >
                             <CloseIcon />
                         </IconButton>
@@ -117,7 +117,7 @@ export const ConferenciaSaidaDialog = ({
                             <Box sx={{ minWidth: 0 }}>
                                 <Typography fontWeight={700} noWrap sx={{ fontSize: '1.1rem', lineHeight: 1.25 }}>{nome}</Typography>
                                 <Typography variant="body2" noWrap sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>{linhaDados}</Typography>
-                                <Typography variant="body2" sx={{ color: pessoa.numero_pulseira ? accentColor : '#FFB800', fontWeight: 700 }}>
+                                <Typography variant="body2" sx={{ color: pessoa.numero_pulseira ? accentColor : cores.alerta, fontWeight: 700 }}>
                                     {pessoa.numero_pulseira ? `Pulseira ${pessoa.numero_pulseira}` : 'Sem pulseira cadastrada'}
                                 </Typography>
                             </Box>
@@ -139,7 +139,7 @@ export const ConferenciaSaidaDialog = ({
                     />
 
                     {sucesso && (
-                        <Stack direction="row" alignItems="center" spacing={1} mt={2} aria-live="polite" sx={{ color: '#00FF88' }}>
+                        <Stack direction="row" alignItems="center" spacing={1} mt={2} aria-live="polite" sx={{ color: cores.sucesso }}>
                             <SuccessIcon />
                             <Typography fontWeight={700}>Saída registrada</Typography>
                         </Stack>
@@ -150,7 +150,7 @@ export const ConferenciaSaidaDialog = ({
                         variant="outlined"
                         onClick={() => onCloseRef.current?.()}
                         disabled={!podeFechar}
-                        sx={{ mt: 2.5, height: 44, textTransform: 'none', fontWeight: 700, borderColor: 'rgba(255,255,255,0.2)', color: '#FFFFFF' }}
+                        sx={{ mt: 2.5, height: 44, textTransform: 'none', fontWeight: 700, borderColor: 'rgba(255,255,255,0.2)', color: cores.textoForte }}
                     >
                         Fechar
                     </Button>

@@ -31,12 +31,12 @@ import ConfiancaFacial from '../../components/dispositivos/ConfiancaFacial';
 import ServidorLeitores from '../../components/dispositivos/ServidorLeitores';
 import FerramentaRede from '../../components/dispositivos/FerramentaRede';
 
-import { botaoSecundario } from '../../styles/tokens';
+import { botaoSecundario, cores, tom } from '../../styles/tokens';
 // ── Paleta padronizada do sistema
-const CYAN = '#00D4FF';
-const GREEN = '#00FF88';
-const RED = '#FF3366';
-const PURP = '#7B2FBE';
+const CYAN = cores.primaria;
+const GREEN = cores.sucesso;
+const RED = cores.erro;
+const PURP = cores.secundaria;
 const BG = 'rgba(5,11,24,0.85)';
 
 // ── Helpers visuais
@@ -70,8 +70,8 @@ const urlRtspPrevia = (f) => {
 const MetricaItem = ({ rotulo, valor, cor, dica }) => {
   const conteudo = (
     <Box>
-      <Typography variant="caption" sx={{ color: '#64748B', display: 'block', fontSize: '0.68rem', lineHeight: 1.2 }}>{rotulo}</Typography>
-      <Typography variant="body2" sx={{ color: cor || '#CBD5E1', fontSize: '0.78rem', fontWeight: 600, lineHeight: 1.3 }}>{valor}</Typography>
+      <Typography variant="caption" sx={{ color: cores.textoFraco, display: 'block', fontSize: '0.75rem', lineHeight: 1.2 }}>{rotulo}</Typography>
+      <Typography variant="body2" sx={{ color: cor || cores.textoSuave, fontSize: '0.78rem', fontWeight: 600, lineHeight: 1.3 }}>{valor}</Typography>
     </Box>
   );
   return dica ? <Tooltip title={dica}><span>{conteudo}</span></Tooltip> : conteudo;
@@ -447,7 +447,7 @@ export default function DispositivosPage() {
                 <Typography variant="subtitle1" sx={{ color: CYAN, fontWeight: 700, fontSize: '1rem' }}>
                   {device.nome}
                 </Typography>
-                <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '0.75rem' }}>
+                <Typography variant="caption" sx={{ color: cores.textoSecundario, fontSize: '0.75rem' }}>
                   {device.marca?.toUpperCase() || 'N/A'} · {device.tipo?.replace('_', ' ') || ''}
                 </Typography>
               </Box>
@@ -468,39 +468,39 @@ export default function DispositivosPage() {
               </Box>
             </Box>
 
-            <Box sx={{ fontSize: '0.8125rem', color: '#94A3B8', lineHeight: 1.8 }}>
-              <Box><code style={{ color: '#CBD5E1' }}>{device.ip_address}:{device.porta || 80}</code></Box>
+            <Box sx={{ fontSize: '0.8125rem', color: cores.textoSecundario, lineHeight: 1.8 }}>
+              <Box><code style={{ color: cores.textoSuave }}>{device.ip_address}:{device.porta || 80}</code></Box>
               
               <Box sx={{ my: 0.8, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                 {device.modo === 'credenciamento' ? (
-                  <Chip label="Credenciamento" size="small" sx={{ bgcolor: 'rgba(123,47,190,0.25)', color: '#A855F7', border: '1px solid rgba(123,47,190,0.5)', fontWeight: 700, fontSize: '0.75rem' }} />
+                  <Chip label="Credenciamento" size="small" sx={{ bgcolor: 'rgba(123,47,190,0.25)', color: cores.secundariaClara, border: '1px solid rgba(123,47,190,0.5)', fontWeight: 700, fontSize: '0.75rem' }} />
                 ) : device.modo === 'area_restrita' ? (
-                  <Chip label={`Área restrita: ${device.area_nome || 'não definida'}`} size="small" sx={{ bgcolor: 'rgba(0,212,255,0.18)', color: '#00D4FF', border: '1px solid rgba(0,212,255,0.4)', fontWeight: 700, fontSize: '0.75rem' }} />
+                  <Chip label={`Área restrita: ${device.area_nome || 'não definida'}`} size="small" sx={{ bgcolor: tom(cores.primaria, 0.18), color: cores.primaria, border: '1px solid rgba(0,212,255,0.4)', fontWeight: 700, fontSize: '0.75rem' }} />
                 ) : device.modo === 'checkout' ? (
-                  <Chip label="Saída" size="small" sx={{ bgcolor: 'rgba(255,119,0,0.2)', color: '#FFB800', border: '1px solid rgba(255,119,0,0.4)', fontWeight: 700, fontSize: '0.75rem' }} />
+                  <Chip label="Saída" size="small" sx={{ bgcolor: 'rgba(255,119,0,0.2)', color: cores.alerta, border: '1px solid rgba(255,119,0,0.4)', fontWeight: 700, fontSize: '0.75rem' }} />
                 ) : (
-                  <Chip label={device.area_nome ? `${device.area_nome}` : "Portaria geral"} size="small" sx={{ bgcolor: 'rgba(0,255,136,0.15)', color: '#00FF88', border: '1px solid rgba(0,255,136,0.4)', fontWeight: 700, fontSize: '0.75rem' }} />
+                  <Chip label={device.area_nome ? `${device.area_nome}` : "Portaria geral"} size="small" sx={{ bgcolor: 'rgba(0,255,136,0.15)', color: cores.sucesso, border: '1px solid rgba(0,255,136,0.4)', fontWeight: 700, fontSize: '0.75rem' }} />
                 )}
 
                 {device.config?.fluxo && (
-                  <Chip label={`Fluxo: ${({ toggle: 'entrada e saída', entrada: 'só entrada', saida: 'só saída' })[device.config.fluxo] || device.config.fluxo}`} size="small" variant="outlined" sx={{ fontSize: '0.75rem', borderColor: 'rgba(255,255,255,0.2)', color: '#CBD5E1' }} />
+                  <Chip label={`Fluxo: ${({ toggle: 'entrada e saída', entrada: 'só entrada', saida: 'só saída' })[device.config.fluxo] || device.config.fluxo}`} size="small" variant="outlined" sx={{ fontSize: '0.75rem', borderColor: 'rgba(255,255,255,0.2)', color: cores.textoSuave }} />
                 )}
               </Box>
               {device.config?.esvaziado_em && (
-                <Box sx={{ fontSize: '0.75rem', color: '#FFB800' }}>
+                <Box sx={{ fontSize: '0.75rem', color: cores.alerta }}>
                   Esvaziado em {formatarMomento(device.config.esvaziado_em)}: não recebe ninguém até um “Sync”
                 </Box>
               )}
               {device.config?.controla_rele === false && (
-                <Box sx={{ fontSize: '0.75rem', color: '#FFB800' }}>Sem controle de relé (modo online)</Box>
+                <Box sx={{ fontSize: '0.75rem', color: cores.alerta }}>Sem controle de relé (modo online)</Box>
               )}
               {device.offline_mode === 'fail_open' && (
-                <Box sx={{ fontSize: '0.75rem', color: '#FFB800' }}>
+                <Box sx={{ fontSize: '0.75rem', color: cores.alerta }}>
                   Marcado para liberar sem servidor, mas o leitor ainda nega nesse caso (configuração não aplicada no equipamento)
                 </Box>
               )}
               {device.ultimo_ping && (
-                <Box sx={{ fontSize: '0.75rem', color: '#64748B', mt: 0.5 }}>
+                <Box sx={{ fontSize: '0.75rem', color: cores.textoFraco, mt: 0.5 }}>
                   Último ping: {new Date(device.ultimo_ping).toLocaleTimeString('pt-BR')}
                 </Box>
               )}
@@ -510,14 +510,14 @@ export default function DispositivosPage() {
             <Box sx={{ mt: 1.2, pt: 1, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.6 }}>
               <MetricaItem rotulo="Alcance"
                 valor={medindoCartao ? 'medindo...' : !m ? '–' : m.online ? (m.latencia_ms != null ? `${m.latencia_ms} ms` : 'online') : 'sem resposta'}
-                cor={!m ? '#94A3B8' : m.online ? GREEN : RED} />
+                cor={!m ? cores.textoSecundario : m.online ? GREEN : RED} />
               <MetricaItem rotulo="Último evento" valor={m ? formatarMomento(m.ultimo_evento_at) : '–'} />
               <MetricaItem rotulo="Faces no leitor" valor={m?.faces_sincronizadas ?? '–'} />
               <MetricaItem rotulo="Erros (24 h)"
                 valor={m?.erros_24h ?? '–'}
                 cor={m?.erros_24h > 0 ? RED : undefined}
                 dica={m?.ultimo_erro ? `${m.ultimo_erro.operacao}: ${m.ultimo_erro.mensagem || 'sem mensagem'} (${formatarMomento(m.ultimo_erro.at)})` : null} />
-              <MetricaItem rotulo="Fila pendente" valor={m?.fila_pendente ?? pending} cor={(m?.fila_pendente ?? pending) > 0 ? '#FFB800' : undefined} />
+              <MetricaItem rotulo="Fila pendente" valor={m?.fila_pendente ?? pending} cor={(m?.fila_pendente ?? pending) > 0 ? cores.alerta : undefined} />
               <MetricaItem rotulo="Medido" valor={m ? formatarMomento(m.medido_em) : medindoCartao ? 'medindo...' : '–'} />
             </Box>
           </CardContent>
@@ -541,7 +541,7 @@ export default function DispositivosPage() {
                 aria-label={`Diagnosticar ${device.nome}`}
                 startIcon={<PingIcon />}
                 onClick={() => diagnosticar(device)}
-                sx={{ color: '#00FF88', fontSize: '0.75rem', minWidth: 0 }}>
+                sx={{ color: cores.sucesso, fontSize: '0.75rem', minWidth: 0 }}>
                 Diagnosticar
               </Button>
             </Tooltip>
@@ -552,7 +552,7 @@ export default function DispositivosPage() {
                   startIcon={isDevLoading(device.id, 'reset') ? <CircularProgress size={12} /> : null}
                   onClick={() => handleReset(device)}
                   disabled={isDevLoading(device.id, 'reset') || !isOnline}
-                  sx={{ color: '#FFB800', fontSize: '0.75rem', minWidth: 0 }}>
+                  sx={{ color: cores.alerta, fontSize: '0.75rem', minWidth: 0 }}>
                   Limpar e sincronizar
                 </Button>
               </span>
@@ -566,7 +566,7 @@ export default function DispositivosPage() {
                     startIcon={isDevLoading(device.id, 'snap') ? <CircularProgress size={12} /> : <SnapshotIcon />}
                     onClick={() => handleSnapshot(device)}
                     disabled={isDevLoading(device.id, 'snap') || !isOnline}
-                    sx={{ color: '#FFB800', fontSize: '0.75rem', minWidth: 0 }}>
+                    sx={{ color: cores.alerta, fontSize: '0.75rem', minWidth: 0 }}>
                     Câmera
                   </Button>
                 </span>
@@ -587,7 +587,7 @@ export default function DispositivosPage() {
             <Box sx={{ ml: 'auto' }}>
               <Tooltip title={expanded ? 'Fechar controles' : 'Abrir controles de hardware'}>
                 <IconButton size="small" onClick={() => setExpandedCards(p => ({ ...p, [device.id]: !expanded }))}
-                  sx={{ color: '#94A3B8' }}>
+                  sx={{ color: cores.textoSecundario }}>
                   {expanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
                 </IconButton>
               </Tooltip>
@@ -596,7 +596,7 @@ export default function DispositivosPage() {
 
           {/* ── Painel expandível: controles de hardware */}
           <Collapse in={expanded} unmountOnExit>
-            <Divider sx={{ borderColor: 'rgba(0,212,255,0.1)' }} />
+            <Divider sx={{ borderColor: tom(cores.primaria, 0.1) }} />
             <Box sx={{ p: 1.5, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
 
               {/* Abertura / bloqueio de porta */}
@@ -618,7 +618,7 @@ export default function DispositivosPage() {
                     startIcon={isDevLoading(device.id, 'unlock') ? <CircularProgress size={10} /> : <UnlockIcon />}
                     onClick={() => handleUnlockDoor(device.id)}
                     disabled={isDevLoading(device.id, 'unlock')}
-                    sx={{ color: '#FFB800', borderColor: '#FFB80044', fontSize: '0.75rem' }}>
+                    sx={{ color: cores.alerta, borderColor: '#FFB80044', fontSize: '0.75rem' }}>
                     Liberar
                   </Button>
                 </span>
@@ -642,7 +642,7 @@ export default function DispositivosPage() {
                     startIcon={isDevLoading(device.id, 'close') ? <CircularProgress size={10} /> : <DoorIcon />}
                     onClick={() => handleCloseDoor(device.id)}
                     disabled={isDevLoading(device.id, 'close')}
-                    sx={{ color: '#94A3B8', borderColor: '#33333388', fontSize: '0.75rem' }}>
+                    sx={{ color: cores.textoSecundario, borderColor: '#33333388', fontSize: '0.75rem' }}>
                     Normal
                   </Button>
                 </span>
@@ -684,7 +684,7 @@ export default function DispositivosPage() {
                       startIcon={isDevLoading(device.id, 'queue') ? <CircularProgress size={10} /> : <QueueIcon />}
                       onClick={() => handleForceQueue(device.id)}
                       disabled={isDevLoading(device.id, 'queue')}
-                      sx={{ color: '#FFB800', borderColor: '#FFB80044', fontSize: '0.75rem' }}>
+                      sx={{ color: cores.alerta, borderColor: '#FFB80044', fontSize: '0.75rem' }}>
                       Fila ({pending})
                     </Button>
                   </span>
@@ -748,7 +748,7 @@ export default function DispositivosPage() {
                 inputProps={{ 'aria-label': 'Ativar atualização automática de terminais' }}
               />
             }
-            label={<Typography variant="caption" sx={{ color: '#94A3B8' }}>Atualização automática (60 s)</Typography>}
+            label={<Typography variant="caption" sx={{ color: cores.textoSecundario }}>Atualização automática (60 s)</Typography>}
           />
         </Box>
       </Box>
@@ -778,7 +778,7 @@ export default function DispositivosPage() {
               ))}
             </Grid>
           ) : dispositivos.length === 0 ? (
-            <Alert severity="info" sx={{ background: 'rgba(0,212,255,0.05)', border: '1px solid rgba(0,212,255,0.15)' }}>
+            <Alert severity="info" sx={{ background: tom(cores.primaria, 0.05), border: '1px solid rgba(0,212,255,0.15)' }}>
               Nenhum dispositivo cadastrado. Clique em <b>&quot;Novo dispositivo&quot;</b> para começar.
             </Alert>
           ) : (
@@ -816,8 +816,8 @@ export default function DispositivosPage() {
                 <TableBody>
                   {queue.map(item => (
                     <TableRow key={item.id} sx={{ '&:hover': { background: `${CYAN}08` } }}>
-                      <TableCell sx={{ color: '#CBD5E1', fontSize: '0.8125rem' }}>{item.device_name ?? item.dispositivo_id?.slice(0, 8)}</TableCell>
-                      <TableCell sx={{ fontSize: '0.75rem', color: '#94A3B8' }}>
+                      <TableCell sx={{ color: cores.textoSuave, fontSize: '0.8125rem' }}>{item.device_name ?? item.dispositivo_id?.slice(0, 8)}</TableCell>
+                      <TableCell sx={{ fontSize: '0.75rem', color: cores.textoSecundario }}>
                         {item.tipo_comando === 'enroll_face' ? 'Cadastrar face'
                           : item.tipo_comando === 'delete_face' ? 'Remover face'
                             : item.tipo_comando}
@@ -825,7 +825,7 @@ export default function DispositivosPage() {
                       <TableCell>
                         <Chip label={item.status} size="small" color={queueChip(item.status)} sx={{ fontSize: '0.75rem' }} />
                       </TableCell>
-                      <TableCell sx={{ color: '#94A3B8', fontSize: '0.75rem' }}>{item.attempt_count}/{item.max_attempts ?? 5}</TableCell>
+                      <TableCell sx={{ color: cores.textoSecundario, fontSize: '0.75rem' }}>{item.attempt_count}/{item.max_attempts ?? 5}</TableCell>
                       <TableCell sx={{ fontSize: '0.75rem', color: RED, maxWidth: 140 }}>
                         <Tooltip title={item.error_message ?? ''}>
                           <span>{item.error_message ? item.error_message.substring(0, 35) + (item.error_message.length > 35 ? '…' : '') : '–'}</span>
@@ -929,10 +929,10 @@ export default function DispositivosPage() {
                       placeholder={caminhoRtspPadrao(formData.marca, formData.config?.canal)} />
                   </Grid>
                 </Grid>
-                <Typography variant="caption" sx={{ color: '#64748B', wordBreak: 'break-all' }}>
-                  Vídeo: <code style={{ color: '#94A3B8' }}>{urlRtspPrevia(formData)}</code>
+                <Typography variant="caption" sx={{ color: cores.textoFraco, wordBreak: 'break-all' }}>
+                  Vídeo: <code style={{ color: cores.textoSecundario }}>{urlRtspPrevia(formData)}</code>
                 </Typography>
-                <Typography variant="caption" sx={{ color: '#94A3B8' }}>
+                <Typography variant="caption" sx={{ color: cores.textoSecundario }}>
                   Eventos em tempo real (modo online): depois de salvar, use o botão <b>Config online</b> no cartão.
                   {formData.marca === 'hikvision'
                     ? ' Hikvision: o aparelho envia para o servidor pelo listening host (Event > httpHosts).'
@@ -943,10 +943,10 @@ export default function DispositivosPage() {
 
             {isEditing && formData.control_token && (
               <Box sx={{
-                background: 'rgba(0,212,255,0.05)', border: `1px solid ${CYAN}33`,
+                background: tom(cores.primaria, 0.05), border: `1px solid ${CYAN}33`,
                 borderRadius: 1.5, p: 1.5
               }}>
-                <Typography variant="caption" sx={{ color: '#94A3B8', display: 'block', mb: 0.5 }}>
+                <Typography variant="caption" sx={{ color: cores.textoSecundario, display: 'block', mb: 0.5 }}>
                   Token do dispositivo — use este token na URL de configuração do hardware
                 </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -962,9 +962,9 @@ export default function DispositivosPage() {
                     </IconButton>
                   </Tooltip>
                 </Box>
-                <Typography variant="caption" sx={{ color: '#64748B', mt: 0.5, display: 'block' }}>
+                <Typography variant="caption" sx={{ color: cores.textoFraco, mt: 0.5, display: 'block' }}>
                   Caminho do modo online (o botão Config Online grava no leitor):{' '}
-                  <code style={{ color: '#94A3B8' }}>/api/intelbras/online?token={formData.control_token}</code>
+                  <code style={{ color: cores.textoSecundario }}>/api/intelbras/online?token={formData.control_token}</code>
                 </Typography>
               </Box>
             )}
@@ -1006,7 +1006,7 @@ export default function DispositivosPage() {
             </Grid>
 
             <Divider sx={{ borderColor: `${CYAN}22`, my: 1 }} />
-            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, letterSpacing: 1 }}>
+            <Typography variant="caption" sx={{ color: cores.textoSecundario, fontWeight: 600, letterSpacing: 1 }}>
               Configurações de controle de acesso
             </Typography>
 
@@ -1032,7 +1032,7 @@ export default function DispositivosPage() {
                     <MenuItem value="fail_closed">Negar acesso (sem servidor)</MenuItem>
                     <MenuItem value="fail_open">Liberar acesso (sem servidor)</MenuItem>
                   </Select>
-                  <Box sx={{ fontSize: '0.72rem', color: '#94A3B8', mt: 0.5 }}>
+                  <Box sx={{ fontSize: '0.75rem', color: cores.textoSecundario, mt: 0.5 }}>
                     Em modo online, se o leitor não alcança o servidor, ele nega o acesso. Liberar sem servidor ainda não está disponível.
                   </Box>
                 </FormControl>
@@ -1047,7 +1047,7 @@ export default function DispositivosPage() {
                     <MenuItem value="suspender">Manter cadastrada e suspensa (desbloqueio volta na hora)</MenuItem>
                     <MenuItem value="remover">Remover do leitor</MenuItem>
                   </Select>
-                  <Box sx={{ fontSize: '0.72rem', color: '#94A3B8', mt: 0.5 }}>
+                  <Box sx={{ fontSize: '0.75rem', color: cores.textoSecundario, mt: 0.5 }}>
                     Suspensa: o rosto fica no leitor com a validade vencida e ele nega a passagem até o sistema desbloquear.
                     Confira no equipamento (teste do manual) antes de usar sem internet. Leitor que não suporta suspensão remove a pessoa.
                   </Box>
@@ -1078,7 +1078,7 @@ export default function DispositivosPage() {
                 />
               }
               label={
-                <Typography variant="caption" sx={{ color: '#CBD5E1' }}>
+                <Typography variant="caption" sx={{ color: cores.textoSuave }}>
                   Acionar relé/catraca via servidor (modo Push)
                 </Typography>
               }
@@ -1099,7 +1099,7 @@ export default function DispositivosPage() {
                     <MenuItem value="ia">Leitor + confirmação da IA (mais seguro)</MenuItem>
                   </Select>
                 </FormControl>
-                <Typography variant="caption" sx={{ color: '#94A3B8', mt: -0.5 }}>
+                <Typography variant="caption" sx={{ color: cores.textoSecundario, mt: -0.5 }}>
                   {formData.config?.ia_confirmacao === true
                     ? 'O motor de IA do evento compara a foto tirada pelo leitor com o cadastro da pessoa identificada. Rosto diferente: acesso negado e alerta. Exige o leitor em modo online e o motor ligado.'
                     : 'O leitor identifica a pessoa sozinho e o servidor aplica as regras de área, horário e bloqueio.'}
@@ -1127,7 +1127,7 @@ export default function DispositivosPage() {
                     />
                   }
                   label={
-                    <Typography variant="caption" sx={{ color: '#CBD5E1' }}>
+                    <Typography variant="caption" sx={{ color: cores.textoSuave }}>
                       Usar também como câmera (aparece no Monitor; IA e gravação se escolhem em Câmeras)
                     </Typography>
                   }
@@ -1198,7 +1198,7 @@ export default function DispositivosPage() {
           {diag.carregando && (
             <Box sx={{ py: 3, textAlign: 'center' }}>
               <CircularProgress size={28} />
-              <Typography variant="body2" sx={{ mt: 1, color: '#94A3B8' }}>Testando o leitor (até 30 s)...</Typography>
+              <Typography variant="body2" sx={{ mt: 1, color: cores.textoSecundario }}>Testando o leitor (até 30 s)...</Typography>
             </Box>
           )}
           {diag.erro && <Alert severity="error">Não deu para diagnosticar: {diag.erro}</Alert>}
@@ -1208,7 +1208,7 @@ export default function DispositivosPage() {
                 {diag.dados.resumo}
               </Alert>
               {diag.dados.itens.map((i) => {
-                const cor = { ok: '#00FF88', alerta: '#FFB800', erro: RED, nao_testado: '#64748B' }[i.estado] || '#94A3B8';
+                const cor = { ok: cores.sucesso, alerta: cores.alerta, erro: RED, nao_testado: cores.textoFraco }[i.estado] || cores.textoSecundario;
                 const rotuloAcao = {
                   editar: 'Editar leitor', config_online: 'Config Online', acertar_relogio: 'Acertar relógio',
                   sync: 'Sync', limpar_sincronizar: 'Limpar e sincronizar', fila: 'Reprocessar fila'
@@ -1218,11 +1218,11 @@ export default function DispositivosPage() {
                     <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: cor, mt: 0.75, flexShrink: 0 }} />
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>{i.titulo}</Typography>
-                      <Typography variant="body2" sx={{ color: '#CBD5E1' }}>{i.detalhe}</Typography>
+                      <Typography variant="body2" sx={{ color: cores.textoSuave }}>{i.detalhe}</Typography>
                       {i.como_corrigir && <Typography variant="caption" sx={{ color: cor, display: 'block', mt: 0.25 }}>{i.como_corrigir}</Typography>}
                     </Box>
                     {rotuloAcao && (
-                      <Button size="small" variant="outlined" onClick={() => corrigir(i.acao, diag.device)} sx={{ alignSelf: 'center', flexShrink: 0, fontSize: '0.72rem' }}>
+                      <Button size="small" variant="outlined" onClick={() => corrigir(i.acao, diag.device)} sx={{ alignSelf: 'center', flexShrink: 0, fontSize: '0.75rem' }}>
                         {rotuloAcao}
                       </Button>
                     )}
@@ -1285,7 +1285,7 @@ export default function DispositivosPage() {
           <Button variant="outlined" onClick={() => setEsvaziar({ open: false, device: null, nome: '' })} sx={botaoSecundario}>Cancelar</Button>
           <Button onClick={confirmarEsvaziar} variant="contained"
             disabled={!esvaziar.device || esvaziar.nome.trim() !== String(esvaziar.device.nome).trim()}
-            sx={{ background: RED, color: '#FFFFFF', fontWeight: 700 }}>
+            sx={{ background: RED, color: cores.textoForte, fontWeight: 700 }}>
             Esvaziar
           </Button>
         </DialogActions>

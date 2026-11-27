@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Box, Typography, Button } from '@mui/material';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 
-import { botaoSecundario } from '../../styles/tokens';
+import { botaoSecundario, cores } from '../../styles/tokens';
 export const MODULE_ROUTES = [
   { modulo: 'checkin', path: '/checkin', label: 'Check-in' },
   { modulo: 'checkout', path: '/checkout', label: 'Check-out' },
@@ -94,9 +94,9 @@ const AccessDenied = () => {
           justifyContent: 'center'
         }}
       >
-        <LockOutlinedIcon sx={{ fontSize: 56, color: '#FF3366' }} />
+        <LockOutlinedIcon sx={{ fontSize: 56, color: cores.erro }} />
       </Box>
-      <Typography variant="h5" fontWeight={700} sx={{ color: '#FFFFFF', fontFamily: '"Space Grotesk", sans-serif' }}>
+      <Typography variant="h5" fontWeight={700} sx={{ color: cores.textoForte, fontFamily: '"Space Grotesk", sans-serif' }}>
         Acesso restrito
       </Typography>
       <Typography variant="body2" sx={{ color: 'text.secondary', maxWidth: 420, lineHeight: 1.6 }}>

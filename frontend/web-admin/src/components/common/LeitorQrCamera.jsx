@@ -99,7 +99,7 @@ const AreaLeitura = ({ frontal, onLeitura, onErro }) => {
     }, [id, frontal]);
 
     return (
-        <Box sx={{ position: 'relative', width: '100%', maxWidth: 480, mx: 'auto', borderRadius: 2, overflow: 'hidden', bgcolor: '#000', minHeight: 240 }}>
+        <Box sx={{ position: 'relative', width: '100%', maxWidth: 480, mx: 'auto', borderRadius: 1.5, overflow: 'hidden', bgcolor: '#000', minHeight: 240 }}>
             <div id={id} style={{ width: '100%' }} />
             {abrindo && (
                 <Box sx={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1.5, color: 'rgba(255,255,255,0.75)' }}>
@@ -143,7 +143,7 @@ const LeitorQrCamera = ({
             <TituloModal titulo={titulo} subtitulo={instrucao} onFechar={onClose} />
             <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '16px !important' }}>
                 {erro ? (
-                    <Box sx={{ p: 2, borderRadius: 2, border: '1px solid rgba(255,51,102,0.4)', bgcolor: 'rgba(255,51,102,0.08)' }}>
+                    <Box sx={{ p: 2, borderRadius: 1.5, border: '1px solid rgba(255,51,102,0.4)', bgcolor: 'rgba(255,51,102,0.08)' }}>
                         <Typography variant="body2" sx={{ color: '#FF8FA8' }}>{erro}</Typography>
                     </Box>
                 ) : (

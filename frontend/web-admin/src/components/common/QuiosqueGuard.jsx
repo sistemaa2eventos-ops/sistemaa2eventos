@@ -4,6 +4,7 @@ import { Box, Typography, TextField, Button, Stack, Alert } from '@mui/material'
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
 import { MODULE_ROUTES } from './ProtectedRoute';
+import { cores } from '../../styles/tokens';
 
 /**
  * Modo de tela de cada usuário (Usuários > Modo de tela), configurado por quem administra:
@@ -94,8 +95,8 @@ export const QuiosqueGuard = () => {
                 alignItems: 'center', justifyContent: 'center', p: 2
             }}
         >
-            <Box sx={{ width: '100%', maxWidth: 380, p: 3, borderRadius: 2, border: '1px solid rgba(0,212,255,0.3)', bgcolor: '#0A121B' }}>
-                <Typography id="quiosque-titulo" variant="h6" fontWeight={700} sx={{ color: '#FFFFFF' }}>
+            <Box sx={{ width: '100%', maxWidth: 380, p: 3, borderRadius: 1.5, border: '1px solid rgba(0,212,255,0.3)', bgcolor: '#0A121B' }}>
+                <Typography id="quiosque-titulo" variant="h6" fontWeight={700} sx={{ color: cores.textoForte }}>
                     Tela bloqueada
                 </Typography>
                 <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mt: 0.5, mb: 2 }}>

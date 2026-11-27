@@ -8,7 +8,7 @@ import api from '../../services/api';
 import TituloModal from '../common/TituloModal';
 import NeonButton from '../common/NeonButton';
 import { baixarModeloPlanilha } from './planilhaEmpresa';
-import { botaoSecundario, cores } from '../../styles/tokens';
+import { botaoSecundario, cores, tom } from '../../styles/tokens';
 
 const Numero = ({ valor, rotulo, cor }) => (
     <Box sx={{ p: 1.5, borderRadius: 1.5, border: `1px solid ${cores.borda}`, bgcolor: cores.superficieElevada }}>
@@ -79,7 +79,7 @@ const ImportarPlanilhaDialog = ({ open, onClose, empresa, onImportado }) => {
                         Use o modelo do evento. Cada linha vira um pré-cadastro desta empresa: o participante abre o link de cadastro,
                         digita o CPF e os dados aparecem preenchidos para ele conferir, corrigir e completar (foto e documentos).
                     </Typography>
-                    <Alert severity="info" sx={{ bgcolor: 'rgba(0,212,255,0.05)', color: cores.texto, border: '1px solid rgba(0,212,255,0.2)' }}>
+                    <Alert severity="info" sx={{ bgcolor: tom(cores.primaria, 0.05), color: cores.texto, border: '1px solid rgba(0,212,255,0.2)' }}>
                         CPF que já está nesta empresa é atualizado. Se o participante já concluiu o cadastro, a planilha só preenche o que
                         estiver vazio. CPF de outra empresa do evento não é importado.
                     </Alert>

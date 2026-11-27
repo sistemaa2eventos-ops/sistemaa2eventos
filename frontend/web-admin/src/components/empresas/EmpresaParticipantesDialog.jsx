@@ -7,7 +7,7 @@ import api from '../../services/api';
 import TituloModal from '../common/TituloModal';
 import DataTable from '../common/DataTable';
 import ChecklistObrigatorios from '../documentos/ChecklistObrigatorios';
-import { acaoTabela, cores } from '../../styles/tokens';
+import { acaoTabela, cores, tom } from '../../styles/tokens';
 
 const hora = (iso) => (iso ? new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—');
 
@@ -43,7 +43,7 @@ const CartaoMetrica = ({ valor, rotulo, cor, ativo, onClick }) => (
     sx={{
       width: '100%', textAlign: 'left', cursor: 'pointer', p: 1.5, borderRadius: 1.5, minWidth: 0,
       border: `1px solid ${ativo ? cores.primaria : cores.borda}`,
-      bgcolor: ativo ? 'rgba(0,212,255,0.08)' : cores.superficieElevada,
+      bgcolor: ativo ? tom(cores.primaria, 0.08) : cores.superficieElevada,
       color: 'inherit', font: 'inherit',
       '&:hover': { borderColor: cores.primaria },
       '&:focus-visible': { outline: `2px solid ${cores.primaria}`, outlineOffset: 2 }

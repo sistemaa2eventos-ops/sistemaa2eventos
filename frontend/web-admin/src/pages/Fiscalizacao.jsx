@@ -23,7 +23,7 @@ import PageHeader from '../components/common/PageHeader';
 import GlassCard from '../components/common/GlassCard';
 import LeitorQrCamera from '../components/common/LeitorQrCameraSobDemanda';
 import KpiCard from '../components/common/KpiCard';
-import { cores } from '../styles/tokens';
+import { cores, tom } from '../styles/tokens';
 import { FactCheck as KpiFiscalizadosIcon, CheckCircle as KpiLiberadosIcon, Block as KpiNegadosIcon } from '@mui/icons-material';
 import { UniversalPulseiraInput } from '../components/common/UniversalPulseiraInput';
 import PessoaFoto from '../components/common/PessoaFoto';
@@ -69,7 +69,7 @@ const playFeedbackSound = (type, soundEnabled = true) => {
 
 // Caixinha de um dado da ficha (credencial, presença, pulseira)
 const Bloco = ({ titulo, cor, children }) => (
-    <Box sx={{ height: '100%', p: 1.25, borderRadius: 1.25, bgcolor: 'rgba(255,255,255,0.03)', border: `1px solid ${cor}55` }}>
+    <Box sx={{ height: '100%', p: 1.25, borderRadius: 1, bgcolor: 'rgba(255,255,255,0.03)', border: `1px solid ${cor}55` }}>
         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', display: 'block', fontWeight: 700, letterSpacing: 0.5, mb: 0.5 }}>
             {titulo.toUpperCase()}
         </Typography>
@@ -304,10 +304,10 @@ const Fiscalizacao = () => {
                             fontWeight: 700,
                             fontSize: '0.75rem',
                             bgcolor: 'rgba(0, 255, 136, 0.1)',
-                            color: '#00FF88',
+                            color: cores.sucesso,
                             border: '1px solid rgba(0, 255, 136, 0.3)',
                             height: 36,
-                            borderRadius: '10px'
+                            borderRadius: '8px'
                         }}
                     />
 
@@ -316,7 +316,7 @@ const Fiscalizacao = () => {
                         <IconButton
                             onClick={() => setSoundEnabled(!soundEnabled)}
                             sx={{
-                                color: soundEnabled ? '#00FF88' : '#94A3B8',
+                                color: soundEnabled ? cores.sucesso : cores.textoSecundario,
                                 bgcolor: 'rgba(255,255,255,0.05)',
                                 border: '1px solid rgba(255,255,255,0.1)',
                                 height: 36,
@@ -333,12 +333,12 @@ const Fiscalizacao = () => {
                         <IconButton
                             onClick={alternarTelaCheia}
                             sx={{
-                                color: '#00D4FF',
-                                bgcolor: 'rgba(0,212,255,0.08)',
+                                color: cores.primaria,
+                                bgcolor: tom(cores.primaria, 0.08),
                                 border: '1px solid rgba(0,212,255,0.25)',
                                 height: 36,
                                 width: 36,
-                                '&:hover': { bgcolor: 'rgba(0,212,255,0.18)' }
+                                '&:hover': { bgcolor: tom(cores.primaria, 0.18) }
                             }}
                         >
                             {telaCheia ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
@@ -351,9 +351,9 @@ const Fiscalizacao = () => {
             <Grid container spacing={{ xs: 1.5, sm: 2, md: 2.5 }} sx={{ mb: { xs: 2, sm: 2.5, md: 3 } }}>
                 <Grid item xs={12} md={5}>
                     <GlassCard sx={{ p: { xs: 1.5, sm: 2 }, display: 'flex', alignItems: 'center', gap: 1.5, height: '100%' }}>
-                        <AreaIcon sx={{ color: '#00D4FF', fontSize: { xs: 24, sm: 32 } }} />
+                        <AreaIcon sx={{ color: cores.primaria, fontSize: { xs: 24, sm: 32 } }} />
                         <FormControl fullWidth size="small">
-                            <InputLabel sx={{ color: '#00D4FF', fontWeight: 700, fontFamily: '"Space Grotesk", sans-serif', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                            <InputLabel sx={{ color: cores.primaria, fontWeight: 700, fontFamily: '"Space Grotesk", sans-serif', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                                 POSTO DE FISCALIZAÇÃO
                             </InputLabel>
                             <Select
@@ -362,12 +362,12 @@ const Fiscalizacao = () => {
                                 onChange={handleAreaChange}
                                 sx={{
                                     bgcolor: 'rgba(0,0,0,0.4)',
-                                    color: '#FFFFFF',
+                                    color: cores.textoForte,
                                     fontWeight: 700,
                                     borderRadius: 1.5,
                                     fontFamily: '"Space Grotesk", sans-serif',
                                     fontSize: { xs: '0.8125rem', sm: '0.875rem' },
-                                    '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 212, 255, 0.4)' }
+                                    '.MuiOutlinedInput-notchedOutline': { borderColor: tom(cores.primaria, 0.4) }
                                 }}
                             >
                                 <MenuItem value=""><em>Todas as áreas (portaria geral)</em></MenuItem>
@@ -420,12 +420,12 @@ const Fiscalizacao = () => {
                     label="Buscar pessoa"
                     placeholder="Nome, CPF, empresa, função, pulseira... ou bipe o QR"
                     helperText="Busca por qualquer dado do cadastro, em ordem alfabética • Bipe ou câmera: fiscalização automática • Digitado: Enter ou OK"
-                    accentColor="#00D4FF"
+                    accentColor={cores.primaria}
                     onAbrirCamera={() => setCameraActive(true)}
                 />
                 {/* Busca por nome em andamento: barra fina com altura fixa (nada pula) */}
                 <Box sx={{ height: 3, mt: 0.75 }} aria-live="polite">
-                    {loadingBuscaNome && <LinearProgress aria-label="Buscando" sx={{ height: 3, borderRadius: 2, bgcolor: 'rgba(0,212,255,0.12)', '& .MuiLinearProgress-bar': { bgcolor: '#00D4FF' } }} />}
+                    {loadingBuscaNome && <LinearProgress aria-label="Buscando" sx={{ height: 3, borderRadius: 1.5, bgcolor: tom(cores.primaria, 0.12), '& .MuiLinearProgress-bar': { bgcolor: cores.primaria } }} />}
                 </Box>
 
                 {buscaNomeOptions.length > 0 && (
@@ -444,13 +444,13 @@ const Fiscalizacao = () => {
                                             border: '1px solid rgba(0, 212, 255, 0.2)',
                                             bgcolor: 'rgba(255,255,255,0.02)',
                                             '&:hover': {
-                                                bgcolor: 'rgba(0, 212, 255, 0.1)',
-                                                borderColor: '#00D4FF'
+                                                bgcolor: tom(cores.primaria, 0.1),
+                                                borderColor: cores.primaria
                                             }
                                         }}
                                     >
                                         <Box sx={{ mr: 1.5 }}>
-                                            <PessoaFoto src={option.foto_url} pessoaId={option.id} nome={option.nome_completo} width={40} borderRadius="8px" accentColor="#00D4FF" />
+                                            <PessoaFoto src={option.foto_url} pessoaId={option.id} nome={option.nome_completo} width={40} borderRadius="8px" accentColor={cores.primaria} />
                                         </Box>
                                         <ListItemText
                                             primary={option.nome_completo || option.nome}
@@ -460,8 +460,8 @@ const Fiscalizacao = () => {
                                                 option.numero_pulseira ? `Pulseira ${option.numero_pulseira}` : null,
                                                 option.empresa_nome || option.empresas?.nome
                                             ].filter(Boolean).join(' – ')}
-                                            primaryTypographyProps={{ fontWeight: 700, fontSize: '0.9rem', color: '#FFFFFF', noWrap: true }}
-                                            secondaryTypographyProps={{ fontSize: '0.78rem', color: '#94A3B8', noWrap: true }}
+                                            primaryTypographyProps={{ fontWeight: 700, fontSize: '0.9rem', color: cores.textoForte, noWrap: true }}
+                                            secondaryTypographyProps={{ fontSize: '0.78rem', color: cores.textoSecundario, noWrap: true }}
                                         />
                                     </ListItemButton>
                                 </ListItem>
@@ -488,7 +488,7 @@ const Fiscalizacao = () => {
                     sx={{
                         p: { xs: 2, sm: 3, md: 4 },
                         border: '2px solid',
-                        borderColor: resultado.autorizado ? '#00FF88' : '#FF3366',
+                        borderColor: resultado.autorizado ? cores.sucesso : cores.erro,
                         boxShadow: resultado.autorizado ? '0 0 40px rgba(0,255,136,0.25)' : '0 0 40px rgba(255,51,102,0.25)',
                         background: resultado.autorizado
                             ? 'linear-gradient(135deg, rgba(0,255,136,0.06) 0%, rgba(10,25,20,0.98) 100%)'
@@ -509,19 +509,19 @@ const Fiscalizacao = () => {
                         borderRadius: 1.5,
                         bgcolor: resultado.autorizado ? 'rgba(0,255,136,0.15)' : 'rgba(255,51,102,0.15)',
                         border: '1.5px solid',
-                        borderColor: resultado.autorizado ? '#00FF88' : '#FF3366'
+                        borderColor: resultado.autorizado ? cores.sucesso : cores.erro
                     }}>
                         {resultado.autorizado ? (
-                            <SuccessIcon sx={{ color: '#00FF88', fontSize: { xs: 28, sm: 38 } }} />
+                            <SuccessIcon sx={{ color: cores.sucesso, fontSize: { xs: 28, sm: 38 } }} />
                         ) : (
-                            <ErrorIcon sx={{ color: '#FF3366', fontSize: { xs: 28, sm: 38 } }} />
+                            <ErrorIcon sx={{ color: cores.erro, fontSize: { xs: 28, sm: 38 } }} />
                         )}
                         <Typography sx={{
                             fontWeight: 700,
                             fontSize: { xs: '1.1rem', sm: '1.5rem' },
                             letterSpacing: '0.75px',
                             textAlign: 'center',
-                            color: resultado.autorizado ? '#00FF88' : '#FF3366',
+                            color: resultado.autorizado ? cores.sucesso : cores.erro,
                             fontFamily: '"Space Grotesk", sans-serif'
                         }}>
                             {resultado.autorizado ? 'ACESSO LIBERADO' : (resultado.mensagem || 'ACESSO NEGADO')}
@@ -552,7 +552,7 @@ const Fiscalizacao = () => {
                                             nome={resultado.pessoa.nome_completo}
                                             width={isMobile ? 110 : 160}
                                             borderRadius="16px"
-                                            accentColor={resultado.autorizado ? '#00FF88' : '#FF3366'}
+                                            accentColor={resultado.autorizado ? cores.sucesso : cores.erro}
                                             borderWidth="3px"
                                         />
                                     </Box>
@@ -567,13 +567,13 @@ const Fiscalizacao = () => {
                                         sx={{
                                             height: 36,
                                             minHeight: 36,
-                                            color: '#00D4FF',
-                                            borderColor: 'rgba(0, 212, 255, 0.4)',
+                                            color: cores.primaria,
+                                            borderColor: tom(cores.primaria, 0.4),
                                             fontWeight: 700,
                                             fontSize: '0.75rem',
                                             borderRadius: '8px',
                                             px: 2,
-                                            '&:hover': { borderColor: '#00D4FF', bgcolor: 'rgba(0, 212, 255, 0.1)' }
+                                            '&:hover': { borderColor: cores.primaria, bgcolor: tom(cores.primaria, 0.1) }
                                         }}
                                     >
                                         Ver ficha completa
@@ -583,7 +583,7 @@ const Fiscalizacao = () => {
 
                             {/* Ficha de fiscalização: credencial, presença de hoje, pulseira em uso, movimentos e áreas */}
                             <Grid item xs={12} sm={8} md={8.5}>
-                                <Typography sx={{ color: '#FFFFFF', fontWeight: 700, fontFamily: '"Space Grotesk", sans-serif', fontSize: { xs: '1.2rem', sm: '1.5rem', md: '2rem' }, lineHeight: 1.2, mb: 0.8, textAlign: { xs: 'center', sm: 'left' } }}>
+                                <Typography sx={{ color: cores.textoForte, fontWeight: 700, fontFamily: '"Space Grotesk", sans-serif', fontSize: { xs: '1.2rem', sm: '1.5rem', md: '2rem' }, lineHeight: 1.2, mb: 0.8, textAlign: { xs: 'center', sm: 'left' } }}>
                                     {resultado.pessoa.nome_completo}
                                 </Typography>
 
@@ -591,20 +591,20 @@ const Fiscalizacao = () => {
                                     <Chip
                                         icon={<BadgeIcon sx={{ fontSize: 16 }} />}
                                         label={resultado.pessoa.funcao || 'Participante'}
-                                        sx={{ bgcolor: 'rgba(255,255,255,0.08)', color: '#FFFFFF', fontWeight: 700 }}
+                                        sx={{ bgcolor: 'rgba(255,255,255,0.08)', color: cores.textoForte, fontWeight: 700 }}
                                     />
                                     <Chip
                                         icon={<CompanyIcon sx={{ fontSize: 16 }} />}
                                         label={resultado.pessoa.empresas?.nome || resultado.pessoa.empresa_nome || 'Pessoa física'}
-                                        sx={{ bgcolor: 'rgba(255,255,255,0.08)', color: '#FFFFFF', fontWeight: 700 }}
+                                        sx={{ bgcolor: 'rgba(255,255,255,0.08)', color: cores.textoForte, fontWeight: 700 }}
                                     />
                                 </Stack>
 
                                 <Grid container spacing={1.25}>
                                     {/* Credencial */}
                                     <Grid item xs={12} sm={4}>
-                                        <Bloco titulo="Credencial" cor={resultado.pessoa.credenciado ? '#00FF88' : '#FF3366'}>
-                                            <Typography sx={{ color: resultado.pessoa.credenciado ? '#00FF88' : '#FF3366', fontWeight: 800 }}>
+                                        <Bloco titulo="Credencial" cor={resultado.pessoa.credenciado ? cores.sucesso : cores.erro}>
+                                            <Typography sx={{ color: resultado.pessoa.credenciado ? cores.sucesso : cores.erro, fontWeight: 800 }}>
                                                 {resultado.pessoa.credenciado ? 'CREDENCIADO' : 'NÃO CREDENCIADO'}
                                             </Typography>
                                             {!resultado.pessoa.credenciado && resultado.pessoa.motivo_nao_credenciado && (
@@ -618,7 +618,7 @@ const Fiscalizacao = () => {
                                         {(() => {
                                             const p = resultado.pessoa;
                                             const ainda = Boolean(p.pulseira_anterior?.ainda_dentro);
-                                            const cor = p.dentro_do_evento ? '#00FF88' : (ainda ? '#FF3366' : '#FFB800');
+                                            const cor = p.dentro_do_evento ? cores.sucesso : (ainda ? cores.erro : cores.alerta);
                                             const rotulo = p.dentro_do_evento
                                                 ? 'DENTRO DO EVENTO'
                                                 : ainda ? 'AINDA DENTRO (PULSEIRA DE OUTRO DIA)'
@@ -628,7 +628,7 @@ const Fiscalizacao = () => {
                                                 <Bloco titulo="Presença de hoje" cor={cor}>
                                                     <Typography sx={{ color: cor, fontWeight: 800 }}>{rotulo}</Typography>
                                                     {entrada && (
-                                                        <Typography variant="caption" sx={{ color: '#CBD5E1', display: 'block', mt: 0.5 }}>
+                                                        <Typography variant="caption" sx={{ color: cores.textoSuave, display: 'block', mt: 0.5 }}>
                                                             Entrou em {formatarDataHora(entrada.horario) || '—'} · {entrada.forma}
                                                             {entrada.usuario_nome ? ` por ${entrada.usuario_nome}` : ''}
                                                         </Typography>
@@ -640,12 +640,12 @@ const Fiscalizacao = () => {
 
                                     {/* Pulseira em uso hoje: só a de hoje; de outro dia nunca aparece */}
                                     <Grid item xs={12} sm={4}>
-                                        <Bloco titulo="Pulseira em uso hoje" cor={resultado.pessoa.pulseira ? '#00D4FF' : '#FFB800'}>
+                                        <Bloco titulo="Pulseira em uso hoje" cor={resultado.pessoa.pulseira ? cores.primaria : cores.alerta}>
                                             {resultado.pessoa.pulseira ? (
                                                 <>
                                                     <Stack direction="row" alignItems="center" flexWrap="wrap" sx={{ gap: 0.75 }}>
-                                                        <PulseiraIcon sx={{ fontSize: 18, color: '#00D4FF' }} />
-                                                        <Typography sx={{ color: '#00D4FF', fontWeight: 800, fontSize: '1.15rem' }}>
+                                                        <PulseiraIcon sx={{ fontSize: 18, color: cores.primaria }} />
+                                                        <Typography sx={{ color: cores.primaria, fontWeight: 800, fontSize: '1.15rem' }}>
                                                             {resultado.pessoa.pulseira.numero}
                                                         </Typography>
                                                         {resultado.pessoa.pulseira.tipo_nome && (
@@ -655,20 +655,20 @@ const Fiscalizacao = () => {
                                                                 sx={{
                                                                     fontWeight: 700,
                                                                     bgcolor: resultado.pessoa.pulseira.cor_hex ? `${resultado.pessoa.pulseira.cor_hex}33` : 'rgba(255,255,255,0.08)',
-                                                                    color: resultado.pessoa.pulseira.cor_hex || '#FFFFFF',
+                                                                    color: resultado.pessoa.pulseira.cor_hex || cores.textoForte,
                                                                     border: `1px solid ${resultado.pessoa.pulseira.cor_hex || 'rgba(255,255,255,0.2)'}`
                                                                 }}
                                                             />
                                                         )}
                                                     </Stack>
-                                                    <Typography variant="caption" sx={{ color: '#CBD5E1', display: 'block', mt: 0.5 }}>
+                                                    <Typography variant="caption" sx={{ color: cores.textoSuave, display: 'block', mt: 0.5 }}>
                                                         Colocada em {formatarDataHora(resultado.pessoa.pulseira.colocada_em) || '—'}
                                                         {resultado.pessoa.pulseira.forma ? ` · ${resultado.pessoa.pulseira.forma}` : ''}
                                                         {resultado.pessoa.pulseira.usuario_nome ? ` por ${resultado.pessoa.pulseira.usuario_nome}` : ''}
                                                     </Typography>
                                                 </>
                                             ) : (
-                                                <Typography variant="body2" sx={{ color: '#FFB800', fontWeight: 700 }}>
+                                                <Typography variant="body2" sx={{ color: cores.alerta, fontWeight: 700 }}>
                                                     Nenhuma pulseira em uso hoje
                                                 </Typography>
                                             )}
@@ -679,26 +679,26 @@ const Fiscalizacao = () => {
                                 {/* Pulseira de outro dia que não foi devolvida: aparece com data e forma; ainda dentro = credenciamento */}
                                 {resultado.pessoa.pulseira_anterior && (() => {
                                     const ant = resultado.pessoa.pulseira_anterior;
-                                    const cor = ant.ainda_dentro ? '#FF3366' : '#FFB800';
+                                    const cor = ant.ainda_dentro ? cores.erro : cores.alerta;
                                     return (
-                                        <Box sx={{ mt: 1.25, p: 1.25, borderRadius: 1.25, bgcolor: `${cor}14`, border: `1px solid ${cor}88` }}>
+                                        <Box sx={{ mt: 1.25, p: 1.25, borderRadius: 1, bgcolor: `${cor}14`, border: `1px solid ${cor}88` }}>
                                             <Typography variant="caption" sx={{ color: cor, fontWeight: 800, letterSpacing: 0.5, display: 'block', mb: 0.5 }}>
                                                 PULSEIRA DE OUTRO DIA — NÃO DEVOLVIDA
                                             </Typography>
-                                            <Typography sx={{ color: '#FFFFFF', fontWeight: 800 }}>
+                                            <Typography sx={{ color: cores.textoForte, fontWeight: 800 }}>
                                                 Nº {ant.numero}{ant.tipo_nome ? ` · ${ant.tipo_nome}` : ''}
                                             </Typography>
-                                            <Typography variant="body2" sx={{ color: '#CBD5E1' }}>
+                                            <Typography variant="body2" sx={{ color: cores.textoSuave }}>
                                                 Check-in em {formatarDataHora(ant.colocada_em) || '—'}
                                                 {ant.forma ? ` · ${ant.forma}` : ''}
                                                 {ant.usuario_nome ? ` por ${ant.usuario_nome}` : ''}
                                             </Typography>
                                             {ant.ainda_dentro ? (
-                                                <Typography variant="body2" sx={{ color: '#FF3366', fontWeight: 700, mt: 0.5 }}>
+                                                <Typography variant="body2" sx={{ color: cores.erro, fontWeight: 700, mt: 0.5 }}>
                                                     Ainda está no evento com esta pulseira. Dirija-se ao CREDENCIAMENTO para trocar a pulseira e fazer check-in novamente.
                                                 </Typography>
                                             ) : (
-                                                <Typography variant="body2" sx={{ color: '#FFB800', mt: 0.5 }}>
+                                                <Typography variant="body2" sx={{ color: cores.alerta, mt: 0.5 }}>
                                                     Saiu em {formatarDataHora(ant.saiu_em) || '—'} (fim de turno). Pulseira ainda não devolvida.
                                                 </Typography>
                                             )}
@@ -717,8 +717,8 @@ const Fiscalizacao = () => {
                                         {resultado.pessoa.historico_hoje.map((h, idx) => {
                                             const entrada = h.tipo === 'checkin';
                                             return (
-                                                <Typography key={idx} variant="body2" sx={{ color: '#E2E8F0' }}>
-                                                    <Box component="span" sx={{ color: entrada ? '#00FF88' : '#FFB800', fontWeight: 800 }}>
+                                                <Typography key={idx} variant="body2" sx={{ color: cores.textoSuave }}>
+                                                    <Box component="span" sx={{ color: entrada ? cores.sucesso : cores.alerta, fontWeight: 800 }}>
                                                         {formatarHora(h.horario)} {entrada ? 'ENTRADA' : 'SAÍDA'}
                                                     </Box>
                                                     {' · '}{h.area_nome || 'Geral'}
@@ -730,7 +730,7 @@ const Fiscalizacao = () => {
                                         })}
                                     </Stack>
                                 ) : (
-                                    <Typography variant="body2" sx={{ color: '#94A3B8', mb: 1.5 }}>Nenhuma entrada ou saída hoje.</Typography>
+                                    <Typography variant="body2" sx={{ color: cores.textoSecundario, mb: 1.5 }}>Nenhuma entrada ou saída hoje.</Typography>
                                 )}
 
                                 {/* Áreas que a pessoa pode acessar */}
@@ -747,8 +747,8 @@ const Fiscalizacao = () => {
                                                     label={isThisArea ? `★ ${ar.nome_area} (POSTO ATUAL)` : ar.nome_area}
                                                     size="small"
                                                     sx={{
-                                                        bgcolor: isThisArea ? '#00FF88' : 'rgba(255,255,255,0.06)',
-                                                        color: isThisArea ? '#000000' : '#CBD5E1',
+                                                        bgcolor: isThisArea ? cores.sucesso : 'rgba(255,255,255,0.06)',
+                                                        color: isThisArea ? '#000000' : cores.textoSuave,
                                                         fontWeight: isThisArea ? 900 : 600,
                                                         border: isThisArea ? 'none' : '1px solid rgba(255,255,255,0.12)'
                                                     }}
@@ -756,7 +756,7 @@ const Fiscalizacao = () => {
                                             );
                                         })
                                     ) : (
-                                        <Typography variant="caption" sx={{ color: '#94A3B8' }}>Nenhuma área cadastrada para esta pessoa.</Typography>
+                                        <Typography variant="caption" sx={{ color: cores.textoSecundario }}>Nenhuma área cadastrada para esta pessoa.</Typography>
                                     )}
                                 </Stack>
                             </Grid>
@@ -765,8 +765,8 @@ const Fiscalizacao = () => {
                 </GlassCard>
             ) : (
                 <GlassCard sx={{ p: { xs: 3, sm: 6 }, textAlign: 'center', bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 1.5 }}>
-                    <PortariaIcon sx={{ fontSize: { xs: 48, sm: 68 }, color: '#00D4FF', opacity: 0.35, mb: 1.5 }} />
-                    <Typography variant="h6" sx={{ color: '#FFFFFF', fontWeight: 700, fontFamily: '"Space Grotesk", sans-serif', fontSize: { xs: '1.1rem', sm: '1.5rem' } }}>
+                    <PortariaIcon sx={{ fontSize: { xs: 48, sm: 68 }, color: cores.primaria, opacity: 0.35, mb: 1.5 }} />
+                    <Typography variant="h6" sx={{ color: cores.textoForte, fontWeight: 700, fontFamily: '"Space Grotesk", sans-serif', fontSize: { xs: '1.1rem', sm: '1.5rem' } }}>
                         Posto de fiscalização pronto para leitura
                     </Typography>
                     <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.55)', maxWidth: 540, mx: 'auto', mt: 1 }}>

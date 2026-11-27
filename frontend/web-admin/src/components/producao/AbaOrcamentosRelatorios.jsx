@@ -198,13 +198,13 @@ const AbaOrcamentosRelatorios = ({ resumo, headersExtra, aoAtualizar, apiClient 
                     <>
                         <Grid container spacing={2} sx={{ mb: 2 }}>
                             <Grid item xs={12} sm={6} md={3}>
-                                <Box sx={{ p: 1.75, borderRadius: 2, bgcolor: cores.superficieElevada, border: `1px solid ${cores.borda}` }}>
+                                <Box sx={{ p: 1.75, borderRadius: 1.5, bgcolor: cores.superficieElevada, border: `1px solid ${cores.borda}` }}>
                                     <Typography sx={{ fontSize: tamanhos.xs, color: cores.textoSecundario }}>Total previsto (itens)</Typography>
                                     <Typography variant="h6" sx={{ color: cores.textoForte }}>{formatarMoedaCentavos(totalOrcPrev)}</Typography>
                                 </Box>
                             </Grid>
                             <Grid item xs={12} sm={6} md={3}>
-                                <Box sx={{ p: 1.75, borderRadius: 2, bgcolor: cores.superficieElevada, border: `1px solid ${cores.borda}` }}>
+                                <Box sx={{ p: 1.75, borderRadius: 1.5, bgcolor: cores.superficieElevada, border: `1px solid ${cores.borda}` }}>
                                     <Typography sx={{ fontSize: tamanhos.xs, color: cores.textoSecundario }}>Total realizado (itens)</Typography>
                                     <Typography variant="h6" sx={{ color: totalOrcReal > totalOrcPrev ? funcao.alerta : funcao.liberado }}>
                                         {formatarMoedaCentavos(totalOrcReal)}
@@ -212,13 +212,13 @@ const AbaOrcamentosRelatorios = ({ resumo, headersExtra, aoAtualizar, apiClient 
                                 </Box>
                             </Grid>
                             <Grid item xs={12} sm={6} md={3}>
-                                <Box sx={{ p: 1.75, borderRadius: 2, bgcolor: cores.superficieElevada, border: `1px solid ${cores.borda}` }}>
+                                <Box sx={{ p: 1.75, borderRadius: 1.5, bgcolor: cores.superficieElevada, border: `1px solid ${cores.borda}` }}>
                                     <Typography sx={{ fontSize: tamanhos.xs, color: cores.textoSecundario }}>Soma de cachês cadastrados</Typography>
                                     <Typography variant="h6" sx={{ color: funcao.acao }}>{formatarMoedaCentavos(totalCachesCentavos)}</Typography>
                                 </Box>
                             </Grid>
                             <Grid item xs={12} sm={6} md={3}>
-                                <Box sx={{ p: 1.75, borderRadius: 2, bgcolor: cores.superficieElevada, border: `1px solid ${cores.borda}` }}>
+                                <Box sx={{ p: 1.75, borderRadius: 1.5, bgcolor: cores.superficieElevada, border: `1px solid ${cores.borda}` }}>
                                     <Typography sx={{ fontSize: tamanhos.xs, color: cores.textoSecundario }}>Impacto estimado de dobras</Typography>
                                     <Typography variant="h6" sx={{ color: (kpis.custo_dobras_centavos || 0) > 0 ? funcao.alerta : funcao.liberado }}>
                                         {formatarMoedaCentavos(kpis.custo_dobras_centavos || 0)}
@@ -337,7 +337,7 @@ const AbaOrcamentosRelatorios = ({ resumo, headersExtra, aoAtualizar, apiClient 
                                         fullWidth
                                         size="small"
                                         label="Cor do cabeçalho (hex)"
-                                        value={tpl.cor_cabecalho_hex || '#0A1628'}
+                                        value={tpl.cor_cabecalho_hex || cores.superficie}
                                         onChange={(e) => setTpl({ ...tpl, cor_cabecalho_hex: e.target.value })}
                                     />
                                 </Grid>
@@ -451,7 +451,7 @@ const AbaOrcamentosRelatorios = ({ resumo, headersExtra, aoAtualizar, apiClient 
                                     <TableCell>{formatarDataHoraCurta(log.criado_em)}</TableCell>
                                     <TableCell sx={{ fontWeight: 600 }}>{log.usuario_nome || 'Sistema'}</TableCell>
                                     <TableCell>
-                                        <Chip size="small" label={log.acao} sx={{ bgcolor: tom(funcao.fiscalizacao, 0.14), color: funcao.fiscalizacao, fontSize: '0.7rem' }} />
+                                        <Chip size="small" label={log.acao} sx={{ bgcolor: tom(funcao.fiscalizacao, 0.14), color: funcao.fiscalizacao, fontSize: '0.75rem' }} />
                                     </TableCell>
                                     <TableCell>{log.entidade}</TableCell>
                                     <TableCell sx={{ fontSize: tamanhos.xs, color: cores.textoSecundario }}>

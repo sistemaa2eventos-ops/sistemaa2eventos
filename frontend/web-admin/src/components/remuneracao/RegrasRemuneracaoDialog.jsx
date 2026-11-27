@@ -7,7 +7,7 @@ import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/ico
 import TituloModal from '../common/TituloModal';
 import NeonButton from '../common/NeonButton';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
-import { acaoTabela, acaoTabelaPerigo, botaoSecundario, cores } from '../../styles/tokens';
+import { acaoTabela, acaoTabelaPerigo, botaoSecundario, cores, tom } from '../../styles/tokens';
 import { simularDia, formatarMoeda, formatarHoras } from '../../hooks/useRemuneracao';
 
 const REGRA_NOVA = {
@@ -38,7 +38,7 @@ const Exemplos = ({ regra }) => {
     const amostras = [...new Set([3, Math.max(1, jornada / 2), jornada, jornada + 2, Math.max(jornada + 4, Number(regra.horas_para_dobra) + 1 || 0)])]
         .filter(h => h > 0 && h <= 24).sort((a, b) => a - b);
     return (
-        <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'rgba(0,212,255,0.05)', border: `1px solid ${cores.borda}` }}>
+        <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: tom(cores.primaria, 0.05), border: `1px solid ${cores.borda}` }}>
             <Typography variant="caption" sx={{ color: cores.textoSecundario, fontWeight: 700, display: 'block', mb: 1 }}>
                 Exemplo com esta regra (horas do check-in ao check-out)
             </Typography>

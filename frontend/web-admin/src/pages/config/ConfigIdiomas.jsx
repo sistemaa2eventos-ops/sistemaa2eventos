@@ -16,6 +16,7 @@ import PageHeader from '../../components/common/PageHeader';
 import GlassCard from '../../components/common/GlassCard';
 import NeonButton from '../../components/common/NeonButton';
 import api from '../../services/api';
+import { cores, tom } from '../../styles/tokens';
 
 const normalizeLanguageCode = (code) => {
     if (!code) return 'pt-BR';
@@ -158,9 +159,9 @@ const ConfigIdiomas = () => {
             <GlassCard sx={{ p: { xs: 2, md: 4 }, mt: 4 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, pb: 2, borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap', gap: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <LangIcon sx={{ color: '#00D4FF', fontSize: 32 }} />
+                        <LangIcon sx={{ color: cores.primaria, fontSize: 32 }} />
                         <Box>
-                            <Typography variant="h5" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                            <Typography variant="h5" sx={{ fontWeight: 700, color: cores.textoForte }}>
                                 {t('idiomas.default_language', { defaultValue: 'Idioma padrão' })}
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
@@ -175,9 +176,9 @@ const ConfigIdiomas = () => {
                         startIcon={<RefreshIcon />}
                         onClick={() => window.location.reload()}
                         sx={{
-                            color: '#00D4FF',
-                            borderColor: 'rgba(0, 212, 255, 0.4)',
-                            '&:hover': { borderColor: '#00D4FF', bgcolor: 'rgba(0, 212, 255, 0.1)' }
+                            color: cores.primaria,
+                            borderColor: tom(cores.primaria, 0.4),
+                            '&:hover': { borderColor: cores.primaria, bgcolor: tom(cores.primaria, 0.1) }
                         }}
                     >
                         Recarregar página
@@ -185,7 +186,7 @@ const ConfigIdiomas = () => {
                 </Box>
 
                 {/* Seleção visual por Cards com bandeiras */}
-                <Typography variant="subtitle2" sx={{ color: '#00D4FF', fontWeight: 700, mb: 2, textTransform: 'uppercase', letterSpacing: 1 }}>
+                <Typography variant="subtitle2" sx={{ color: cores.primaria, fontWeight: 700, mb: 2, textTransform: 'uppercase', letterSpacing: 1 }}>
                     Escolha o idioma do sistema:
                 </Typography>
 
@@ -196,15 +197,15 @@ const ConfigIdiomas = () => {
                             <Grid item xs={12} sm={6} md={3} key={item.code}>
                                 <Card
                                     sx={{
-                                        background: isAtivo ? 'rgba(0, 212, 255, 0.12)' : 'rgba(10, 22, 40, 0.6)',
+                                        background: isAtivo ? tom(cores.primaria, 0.12) : 'rgba(10, 22, 40, 0.6)',
                                         border: isAtivo ? '2px solid #00D4FF' : '1px solid rgba(255, 255, 255, 0.1)',
                                         boxShadow: isAtivo ? '0 0 20px rgba(0, 212, 255, 0.25)' : 'none',
-                                        borderRadius: 2,
-                                        transition: 'all 0.25s ease',
+                                        borderRadius: 1.5,
+                                        transition: 'background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, opacity 0.25s ease, transform 0.25s ease',
                                         cursor: 'pointer',
                                         '&:hover': {
                                             transform: 'translateY(-3px)',
-                                            borderColor: '#00D4FF',
+                                            borderColor: cores.primaria,
                                             boxShadow: '0 8px 24px rgba(0, 212, 255, 0.2)'
                                         }
                                     }}
@@ -222,7 +223,7 @@ const ConfigIdiomas = () => {
                                                     size="small"
                                                     sx={{
                                                         bgcolor: 'rgba(0, 255, 136, 0.15)',
-                                                        color: '#00FF88',
+                                                        color: cores.sucesso,
                                                         border: '1px solid rgba(0, 255, 136, 0.4)',
                                                         fontWeight: 700
                                                     }}
@@ -235,7 +236,7 @@ const ConfigIdiomas = () => {
                                         </Box>
 
                                         <Box sx={{ width: '100%' }}>
-                                            <Typography variant="h6" sx={{ fontWeight: 700, color: isAtivo ? '#00D4FF' : '#FFFFFF', mb: 0.2 }}>
+                                            <Typography variant="h6" sx={{ fontWeight: 700, color: isAtivo ? cores.primaria : cores.textoForte, mb: 0.2 }}>
                                                 {item.name}
                                             </Typography>
                                             <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', display: 'block' }}>
@@ -250,10 +251,10 @@ const ConfigIdiomas = () => {
                 </Grid>
 
                 {/* Seleção alternativa por Dropdown com botão Aplicar */}
-                <Box sx={{ p: 2.5, borderRadius: 2, bgcolor: 'rgba(0, 0, 0, 0.25)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                <Box sx={{ p: 2.5, borderRadius: 1.5, bgcolor: 'rgba(0, 0, 0, 0.25)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
                     <Grid container spacing={2} alignItems="center">
                         <Grid item xs={12} md={7}>
-                            <Typography variant="body1" sx={{ fontWeight: 600, color: '#FFFFFF' }}>
+                            <Typography variant="body1" sx={{ fontWeight: 600, color: cores.textoForte }}>
                                 {t('idiomas.system_default', { defaultValue: 'Idioma padrão do sistema' })}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
@@ -269,8 +270,8 @@ const ConfigIdiomas = () => {
                                     disabled={saving}
                                     sx={{
                                         minWidth: 180,
-                                        color: '#00D4FF',
-                                        '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 212, 255, 0.4)' }
+                                        color: cores.primaria,
+                                        '& .MuiOutlinedInput-notchedOutline': { borderColor: tom(cores.primaria, 0.4) }
                                     }}
                                 >
                                     <MenuItem value="pt-BR">🇧🇷 Português (Brasil)</MenuItem>

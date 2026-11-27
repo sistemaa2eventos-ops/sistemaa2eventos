@@ -75,7 +75,7 @@ import {
     FORMAS,
     ICONES
 } from '../../services/etiquetaRender';
-import { botaoSecundario, cores } from '../../styles/tokens';
+import { botaoSecundario, cores, tom } from '../../styles/tokens';
 import {
     Z_BASE, ordenarPorCamada, normalizarCamadas, expandirGrupos, reordenarCamadas,
     agruparElementos, desagruparElementos, caixaDoGrupo, idsNaArea, escalarItem,
@@ -119,19 +119,19 @@ const PRESETS = [
 
 const CORES_PALETA = [
     { label: 'Preto', hex: '#000000' },
-    { label: 'Branco', hex: '#FFFFFF' },
-    { label: 'Ciano Neon', hex: '#00D4FF' },
-    { label: 'Verde Neon', hex: '#00FF88' },
+    { label: 'Branco', hex: cores.textoForte },
+    { label: 'Ciano Neon', hex: cores.primaria },
+    { label: 'Verde Neon', hex: cores.sucesso },
     { label: 'Rosa Neon', hex: '#FF0077' },
     { label: 'Amarelo Ouro', hex: '#FFD700' },
-    { label: 'Azul Escuro', hex: '#0A1628' },
+    { label: 'Azul Escuro', hex: cores.superficie },
     { label: 'Cinza', hex: '#666666' }
 ];
 
 const CORES_GRADE = [
     { label: 'Azul', hex: '#0080FF' },
     { label: 'Magenta', hex: '#FF0077' },
-    { label: 'Branca', hex: '#FFFFFF' },
+    { label: 'Branca', hex: cores.textoForte },
     { label: 'Preta', hex: '#000000' }
 ];
 
@@ -156,12 +156,12 @@ const ELEMENTOS_INICIAIS = normalizarCamadas([
     { id: '1', type: 'text', content: '{nome_pessoa}', x: 10, y: 15, width: 220, height: 35, fontSize: 18, fontWeight: 'bold', color: '#000000', textAlign: 'center', zIndex: 10 },
     { id: '2', type: 'text', content: '{funcao}', x: 10, y: 55, width: 220, height: 25, fontSize: 14, fontWeight: 'normal', color: '#555555', textAlign: 'center', zIndex: 9 },
     { id: '3', type: 'qrcode', content: '{qr_code}', x: 75, y: 95, width: 90, height: 90, lockAspectRatio: true, zIndex: 8 },
-    { id: '4', type: 'foto', content: '{foto_url}', x: 80, y: 200, width: 80, height: 80, borderRadius: 8, borderColor: '#00D4FF', borderWidth: 2, lockAspectRatio: true, zIndex: 7 }
+    { id: '4', type: 'foto', content: '{foto_url}', x: 80, y: 200, width: 80, height: 80, borderRadius: 8, borderColor: cores.primaria, borderWidth: 2, lockAspectRatio: true, zIndex: 7 }
 ]);
 
 const alcasDeRedimensionar = (cor, redondo) => {
     const canto = {
-        width: 12, height: 12, background: '#FFFFFF', border: `2px solid ${cor}`,
+        width: 12, height: 12, background: cores.textoForte, border: `2px solid ${cor}`,
         borderRadius: redondo ? '50%' : 2, boxShadow: `0 0 6px ${cor}`, pointerEvents: 'auto', zIndex: 2
     };
     const barra = (horizontal) => ({
@@ -182,8 +182,8 @@ const alcasDeRedimensionar = (cor, redondo) => {
         right: barra(false)
     };
 };
-const ALCAS_SIMPLES = alcasDeRedimensionar('#00D4FF', false);
-const ALCAS_GRUPO = alcasDeRedimensionar('#00FF88', true);
+const ALCAS_SIMPLES = alcasDeRedimensionar(cores.primaria, false);
+const ALCAS_GRUPO = alcasDeRedimensionar(cores.sucesso, true);
 
 const PREFS_KEY = 'nzt_etiquetas_editor_prefs';
 const lerPrefs = () => {
@@ -231,9 +231,9 @@ const BotaoFerramenta = ({ titulo, onClick, disabled, ativo, cor, children }) =>
                     height: 34,
                     borderRadius: '8px',
                     color: ativo ? (cor || cores.primaria) : cores.textoSuave,
-                    bgcolor: ativo ? 'rgba(0, 212, 255, 0.12)' : 'transparent',
-                    border: `1px solid ${ativo ? 'rgba(0, 212, 255, 0.45)' : 'rgba(148, 163, 184, 0.18)'}`,
-                    '&:hover': { color: cor || cores.primaria, borderColor: 'rgba(0, 212, 255, 0.45)', bgcolor: 'rgba(0, 212, 255, 0.08)' },
+                    bgcolor: ativo ? tom(cores.primaria, 0.12) : 'transparent',
+                    border: `1px solid ${ativo ? tom(cores.primaria, 0.45) : 'rgba(148, 163, 184, 0.18)'}`,
+                    '&:hover': { color: cor || cores.primaria, borderColor: tom(cores.primaria, 0.45), bgcolor: tom(cores.primaria, 0.08) },
                     '&.Mui-disabled': { color: 'rgba(148, 163, 184, 0.3)', borderColor: 'rgba(148, 163, 184, 0.08)' }
                 }}
             >
@@ -285,7 +285,7 @@ const ConfigEtiquetas = () => {
         layout: 'zebra_tlp2844',
         width: 100,
         height: 150,
-        corFundo: '#FFFFFF',
+        corFundo: cores.textoForte,
         background_url: '',
         fundo_como_referencia: false,
         imprimir_fundo: true,
@@ -421,11 +421,11 @@ const ConfigEtiquetas = () => {
             text: { content: '{nome_pessoa}', fontSize: 16, fontWeight: 'bold', color: '#000000', textAlign: 'left', autoAjuste: true },
             qrcode: { content: '{qr_code}', width: 80, height: 80, lockAspectRatio: true, color: '#000000' },
             barcode: { content: '{pulseira}', width: 160, height: 55, exibirTexto: true, color: '#000000' },
-            foto: { content: '{foto_url}', width: 80, height: 80, borderRadius: 8, borderColor: '#00D4FF', borderWidth: 2, lockAspectRatio: true },
-            shape: { width: 200, height: 35, backgroundColor: '#00D4FF', semPreenchimento: false, forma: 'retangulo', borderColor: '#000000', borderWidth: 0, borderRadius: 4, opacity: 1 },
-            circle: { width: 60, height: 60, backgroundColor: '#00FF88', semPreenchimento: false, forma: 'elipse', borderColor: '#000000', borderWidth: 0, opacity: 1, lockAspectRatio: true },
+            foto: { content: '{foto_url}', width: 80, height: 80, borderRadius: 8, borderColor: cores.primaria, borderWidth: 2, lockAspectRatio: true },
+            shape: { width: 200, height: 35, backgroundColor: cores.primaria, semPreenchimento: false, forma: 'retangulo', borderColor: '#000000', borderWidth: 0, borderRadius: 1.5, opacity: 1 },
+            circle: { width: 60, height: 60, backgroundColor: cores.sucesso, semPreenchimento: false, forma: 'elipse', borderColor: '#000000', borderWidth: 0, opacity: 1, lockAspectRatio: true },
             line: { width: 200, height: 4, borderColor: '#000000', borderWidth: 2, opacity: 1 },
-            icone: { width: 40, height: 40, icone: 'estrela', color: '#00D4FF', lockAspectRatio: true }
+            icone: { width: 40, height: 40, icone: 'estrela', color: cores.primaria, lockAspectRatio: true }
         };
         inserir({ ...base, ...(porTipo[type] || {}), ...extra });
     };
@@ -1074,7 +1074,7 @@ const ConfigEtiquetas = () => {
             return (
                 <Stack spacing={2.25}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Chip size="small" label={TIPO_ROTULO[el.type] || el.type} sx={{ bgcolor: 'rgba(0, 212, 255, 0.15)', color: cores.primaria, fontWeight: 700, fontSize: '0.75rem' }} />
+                        <Chip size="small" label={TIPO_ROTULO[el.type] || el.type} sx={{ bgcolor: tom(cores.primaria, 0.15), color: cores.primaria, fontWeight: 700, fontSize: '0.75rem' }} />
                         {el.groupId && <Chip size="small" icon={<AgruparIcon sx={{ fontSize: 14 }} />} label="Em grupo" sx={{ bgcolor: 'rgba(0,255,136,0.12)', color: cores.sucesso, fontSize: '0.75rem' }} />}
                         <Box sx={{ flex: 1 }} />
                         <BotaoFerramenta titulo="Duplicar (Ctrl+D)" onClick={duplicarSelecionados}><DuplicateIcon fontSize="small" /></BotaoFerramenta>
@@ -1142,7 +1142,7 @@ const ConfigEtiquetas = () => {
 
                             {!el.semPreenchimento && (
                                 <>
-                                    <TextField label="Cor do Fundo" type="color" fullWidth size="small" value={el.backgroundColor || '#00D4FF'} onChange={e => updateElement(el.id, { backgroundColor: e.target.value })} />
+                                    <TextField label="Cor do Fundo" type="color" fullWidth size="small" value={el.backgroundColor || cores.primaria} onChange={e => updateElement(el.id, { backgroundColor: e.target.value })} />
                                     <Paleta onEscolher={hex => updateElement(el.id, { backgroundColor: hex })} />
                                 </>
                             )}
@@ -1185,7 +1185,7 @@ const ConfigEtiquetas = () => {
                                         label={item.label}
                                         size="small"
                                         onClick={() => updateElement(el.id, { content: item.tag })}
-                                        sx={{ fontSize: '0.75rem', bgcolor: 'rgba(0, 212, 255, 0.08)', color: cores.primaria, cursor: 'pointer', border: '1px solid rgba(0, 212, 255, 0.25)' }}
+                                        sx={{ fontSize: '0.75rem', bgcolor: tom(cores.primaria, 0.08), color: cores.primaria, cursor: 'pointer', border: '1px solid rgba(0, 212, 255, 0.25)' }}
                                     />
                                 ))}
                             </Stack>
@@ -1252,7 +1252,7 @@ const ConfigEtiquetas = () => {
                                     <TextField label="Borda (px)" type="number" fullWidth size="small" value={el.borderWidth ?? 1} onChange={e => updateElement(el.id, { borderWidth: Number(e.target.value) })} />
                                 </Grid>
                                 <Grid item xs={6}>
-                                    <TextField label="Cor" type="color" fullWidth size="small" value={el.borderColor || '#00D4FF'} onChange={e => updateElement(el.id, { borderColor: e.target.value })} />
+                                    <TextField label="Cor" type="color" fullWidth size="small" value={el.borderColor || cores.primaria} onChange={e => updateElement(el.id, { borderColor: e.target.value })} />
                                 </Grid>
                             </Grid>
                         </Stack>
@@ -1278,7 +1278,7 @@ const ConfigEtiquetas = () => {
                                     {Object.entries(ICONES).map(([k, v]) => <MenuItem key={k} value={k}>{v.rotulo}</MenuItem>)}
                                 </Select>
                             </FormControl>
-                            <TextField label="Cor do Ícone" type="color" fullWidth size="small" value={el.color || '#00D4FF'} onChange={e => updateElement(el.id, { color: e.target.value })} />
+                            <TextField label="Cor do Ícone" type="color" fullWidth size="small" value={el.color || cores.primaria} onChange={e => updateElement(el.id, { color: e.target.value })} />
                             <Paleta onEscolher={hex => updateElement(el.id, { color: hex })} />
                         </Stack>
                     )}
@@ -1297,7 +1297,7 @@ const ConfigEtiquetas = () => {
                         Selecione um elemento para editar ou use os botões da barra superior.
                     </Typography>
                 </Box>
-                <Box sx={{ p: 1.5, borderRadius: '8px', bgcolor: 'rgba(0, 212, 255, 0.05)', border: '1px dashed rgba(0, 212, 255, 0.25)' }}>
+                <Box sx={{ p: 1.5, borderRadius: '8px', bgcolor: tom(cores.primaria, 0.05), border: '1px dashed rgba(0, 212, 255, 0.25)' }}>
                     <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                         <KeyboardIcon sx={{ fontSize: 18, color: cores.primaria }} />
                         <Secao>Atalhos Profissionais</Secao>
@@ -1350,14 +1350,14 @@ const ConfigEtiquetas = () => {
                             variant="outlined"
                             startIcon={<TemplateIcon />}
                             onClick={() => setModalModelosAberto(true)}
-                            sx={{ ...botaoSecundario, color: cores.primaria, borderColor: 'rgba(0, 212, 255, 0.45)' }}
+                            sx={{ ...botaoSecundario, color: cores.primaria, borderColor: tom(cores.primaria, 0.45) }}
                         >
                             Modelos prontos
                         </Button>
                         <NeonButton startIcon={<PrintIcon />} variant="outlined" onClick={handleImprimirTeste}>
                             Imprimir teste
                         </NeonButton>
-                        <NeonButton startIcon={<SaveIcon />} onClick={handleSave} loading={saving} neonColor="#00FF88">
+                        <NeonButton startIcon={<SaveIcon />} onClick={handleSave} loading={saving} neonColor={cores.sucesso}>
                             Salvar layout
                         </NeonButton>
                     </Stack>
@@ -1412,7 +1412,7 @@ const ConfigEtiquetas = () => {
                                             <TextField label="Altura (mm)" type="number" fullWidth size="small" value={config.height} onChange={(e) => handleChangeConfig('height', Number(e.target.value))} />
                                         </Grid>
                                     </Grid>
-                                    <TextField label="Cor de Fundo da Base" type="color" fullWidth size="small" value={config.corFundo || '#FFFFFF'} onChange={(e) => handleChangeConfig('corFundo', e.target.value)} />
+                                    <TextField label="Cor de Fundo da Base" type="color" fullWidth size="small" value={config.corFundo || cores.textoForte} onChange={(e) => handleChangeConfig('corFundo', e.target.value)} />
                                 </Stack>
 
                                 <Divider sx={{ borderColor: cores.borda }} />
@@ -1426,13 +1426,13 @@ const ConfigEtiquetas = () => {
                                         variant="outlined"
                                         startIcon={<UploadIcon />}
                                         onClick={() => fileArteInputRef.current?.click()}
-                                        sx={{ ...botaoSecundario, color: cores.primaria, borderColor: 'rgba(0, 212, 255, 0.45)', textTransform: 'none', borderRadius: '8px' }}
+                                        sx={{ ...botaoSecundario, color: cores.primaria, borderColor: tom(cores.primaria, 0.45), textTransform: 'none', borderRadius: '8px' }}
                                     >
                                         Subir arte (PNG/JPG)
                                     </Button>
 
                                     {camadasDeArte.map(arte => (
-                                        <Box key={arte.id} sx={{ p: 1.25, borderRadius: '8px', border: `1px solid ${selectedIds.includes(arte.id) ? 'rgba(0,212,255,0.5)' : cores.borda}`, bgcolor: 'rgba(0,0,0,0.25)' }}>
+                                        <Box key={arte.id} sx={{ p: 1.25, borderRadius: '8px', border: `1px solid ${selectedIds.includes(arte.id) ? tom(cores.primaria, 0.5) : cores.borda}`, bgcolor: 'rgba(0,0,0,0.25)' }}>
                                             <Stack direction="row" spacing={1.25} alignItems="center">
                                                 <Box component="img" src={arte.content} alt="" sx={{ width: 40, height: 52, objectFit: 'cover', borderRadius: '4px', border: `1px solid ${cores.borda}`, opacity: arte.oculto ? 0.3 : 1 }} />
                                                 <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -1507,11 +1507,11 @@ const ConfigEtiquetas = () => {
                                                 alignItems: 'center',
                                                 gap: 1,
                                                 cursor: 'pointer',
-                                                bgcolor: sel ? (isMulti ? 'rgba(0, 255, 136, 0.12)' : 'rgba(0, 212, 255, 0.12)') : 'rgba(0,0,0,0.2)',
-                                                border: `1px solid ${sel ? (isMulti ? 'rgba(0,255,136,0.6)' : 'rgba(0,212,255,0.6)') : cores.borda}`,
+                                                bgcolor: sel ? (isMulti ? 'rgba(0, 255, 136, 0.12)' : tom(cores.primaria, 0.12)) : 'rgba(0,0,0,0.2)',
+                                                border: `1px solid ${sel ? (isMulti ? 'rgba(0,255,136,0.6)' : tom(cores.primaria, 0.6)) : cores.borda}`,
                                                 borderLeft: el.groupId ? `3px solid ${cores.sucesso}` : undefined,
                                                 opacity: el.oculto ? 0.5 : 1,
-                                                '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.08)' }
+                                                '&:hover': { bgcolor: tom(cores.primaria, 0.08) }
                                             }}
                                         >
                                             <Icone sx={{ fontSize: 18, color: el.apenasReferencia ? '#FF5FA2' : cores.primaria, flexShrink: 0 }} />
@@ -1636,7 +1636,7 @@ const ConfigEtiquetas = () => {
                                             sx={{
                                                 width: canvasWidth,
                                                 height: canvasHeight,
-                                                backgroundColor: config.corFundo || '#FFFFFF',
+                                                backgroundColor: config.corFundo || cores.textoForte,
                                                 backgroundImage: 'none',
                                                 position: 'relative',
                                                 borderRadius: config.layout?.includes('cr80') ? '12px' : '4px',
@@ -1760,7 +1760,7 @@ const ConfigEtiquetas = () => {
                                 width: marquee.width,
                                 height: marquee.height,
                                 border: '1px solid #00D4FF',
-                                bgcolor: 'rgba(0, 212, 255, 0.12)',
+                                bgcolor: tom(cores.primaria, 0.12),
                                 pointerEvents: 'none',
                                 zIndex: 9999
                             }} />
@@ -1792,7 +1792,7 @@ const ConfigEtiquetas = () => {
                     sx: {
                         bgcolor: cores.superficie,
                         border: '1px solid rgba(0, 212, 255, 0.3)',
-                        borderRadius: 2
+                        borderRadius: 1.5
                     }
                 }}
             >
@@ -1863,7 +1863,7 @@ const ConfigEtiquetas = () => {
                                 }}>
                                     <CardActionArea onClick={() => aplicarModelo(m)} sx={{ p: 2 }}>
                                         <CardContent sx={{ p: 0 }}>
-                                            <Chip size="small" label={`${m.papel_config.width} × ${m.papel_config.height} mm`} sx={{ bgcolor: 'rgba(0, 212, 255, 0.15)', color: cores.primaria, fontWeight: 700, mb: 1.5 }} />
+                                            <Chip size="small" label={`${m.papel_config.width} × ${m.papel_config.height} mm`} sx={{ bgcolor: tom(cores.primaria, 0.15), color: cores.primaria, fontWeight: 700, mb: 1.5 }} />
                                             <Typography variant="subtitle1" fontWeight={700} color={cores.textoForte} gutterBottom>
                                                 {m.nome}
                                             </Typography>
@@ -1894,7 +1894,7 @@ const ConfigEtiquetas = () => {
                     sx: {
                         bgcolor: cores.superficie,
                         border: '1px solid rgba(0, 255, 136, 0.4)',
-                        borderRadius: 2
+                        borderRadius: 1.5
                     }
                 }}
             >

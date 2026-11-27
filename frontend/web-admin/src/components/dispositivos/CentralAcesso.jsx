@@ -7,7 +7,7 @@ import { ContentCopy as CopyIcon } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import api from '../../services/api';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
-import { botaoSecundario } from '../../styles/tokens';
+import { botaoSecundario, cores } from '../../styles/tokens';
 
 const OPCOES = [
     { valor: 'local', titulo: 'Só este PC', texto: 'A Central abre apenas no próprio PC do evento. Mais seguro.' },
@@ -89,7 +89,7 @@ const CentralAcesso = ({ agente, onClose }) => {
                 {erro && <Alert severity="error">{erro}</Alert>}
                 {status && (
                     <>
-                        <Typography variant="body2" sx={{ color: '#CBD5E1', mb: 1.5 }}>
+                        <Typography variant="body2" sx={{ color: cores.textoSuave, mb: 1.5 }}>
                             Quem pode abrir a Central (vídeo ao vivo direto do PC do evento, sem passar pela internet).
                             Hoje: <b>{OPCOES.find(o => o.valor === status.acesso)?.titulo}</b> ({ORIGEM[status.origem] || status.origem}).
                         </Typography>
@@ -98,7 +98,7 @@ const CentralAcesso = ({ agente, onClose }) => {
                                 <FormControlLabel key={o.valor} value={o.valor} control={<Radio size="small" />} sx={{ alignItems: 'flex-start', mb: 1 }}
                                     label={<Box sx={{ pt: 0.75 }}>
                                         <Typography variant="body2" sx={{ fontWeight: 700 }}>{o.titulo}</Typography>
-                                        <Typography variant="caption" sx={{ color: '#94A3B8' }}>{o.texto}</Typography>
+                                        <Typography variant="caption" sx={{ color: cores.textoSecundario }}>{o.texto}</Typography>
                                     </Box>} />
                             ))}
                         </RadioGroup>
@@ -107,7 +107,7 @@ const CentralAcesso = ({ agente, onClose }) => {
                                 O Tailscale não está conectado neste PC. Pode salvar: a Central passa a atender por ele assim que conectar (o PC confere a cada minuto).
                             </Alert>
                         )}
-                        <Typography variant="caption" sx={{ color: '#94A3B8', display: 'block', mb: 0.5 }}>Endereços para abrir agora:</Typography>
+                        <Typography variant="caption" sx={{ color: cores.textoSecundario, display: 'block', mb: 0.5 }}>Endereços para abrir agora:</Typography>
                         {status.enderecos?.map(e => (
                             <Box key={e} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                 <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>{e}</Typography>
@@ -116,7 +116,7 @@ const CentralAcesso = ({ agente, onClose }) => {
                         ))}
                         <Box sx={{ mt: 2, pt: 1.5, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                             <Typography variant="body2" sx={{ fontWeight: 700 }}>Chave de acesso</Typography>
-                            <Typography variant="caption" sx={{ color: '#94A3B8', display: 'block', mb: 1 }}>
+                            <Typography variant="caption" sx={{ color: cores.textoSecundario, display: 'block', mb: 1 }}>
                                 Fora do próprio PC, a Central pede esta chave (no PC do evento, o abrir-central.bat entra sozinho).
                                 Envie só por canal seguro; a entrada vale 12 horas em cada navegador.
                             </Typography>
@@ -138,7 +138,7 @@ const CentralAcesso = ({ agente, onClose }) => {
                                     </Box>
                                 </>
                             ) : (
-                                <Typography variant="caption" sx={{ color: '#FFB800' }}>
+                                <Typography variant="caption" sx={{ color: cores.alerta }}>
                                     Agente antigo: no PC do evento, rode ligar-ia-facial.bat para ver e trocar a chave por aqui.
                                 </Typography>
                             )}

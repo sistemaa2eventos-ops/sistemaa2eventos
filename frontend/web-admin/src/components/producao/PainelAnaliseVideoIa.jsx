@@ -207,7 +207,7 @@ const PainelAnaliseVideoIa = ({
                             ctx.fillStyle = 'rgba(16, 185, 129, 0.14)';
                             ctx.fill();
                             ctx.lineWidth = Math.max(2.5, 3 * scaleFont);
-                            ctx.strokeStyle = '#10B981';
+                            ctx.strokeStyle = cores.sucesso;
                             ctx.stroke();
 
                             const texto = d.rotulo || `${d.quantidade_no_quadro} ${item.unidade || 'un'}`;
@@ -219,7 +219,7 @@ const PainelAnaliseVideoIa = ({
                             const pillY = Math.max(6, y - pillH - 4);
 
                             desenharRetanguloArredondado(ctx, pillX, pillY, pillW, pillH, 6);
-                            ctx.fillStyle = '#10B981';
+                            ctx.fillStyle = cores.sucesso;
                             ctx.fill();
                             ctx.fillStyle = '#06281E';
                             ctx.textBaseline = 'middle';
@@ -242,7 +242,7 @@ const PainelAnaliseVideoIa = ({
                         ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
                         ctx.fill();
                         ctx.lineWidth = 2.5;
-                        ctx.strokeStyle = '#F59E0B';
+                        ctx.strokeStyle = cores.alerta;
                         ctx.stroke();
                         ctx.restore();
                     });
@@ -259,9 +259,9 @@ const PainelAnaliseVideoIa = ({
             ctx.fill();
             ctx.beginPath();
             ctx.arc(14 + 16 * scaleFont, 14 + badgeH / 2, 4.5 * scaleFont, 0, Math.PI * 2);
-            ctx.fillStyle = '#10B981';
+            ctx.fillStyle = cores.sucesso;
             ctx.fill();
-            ctx.fillStyle = '#F8FAFC';
+            ctx.fillStyle = cores.textoForte;
             ctx.textBaseline = 'middle';
             ctx.fillText(esqTxt, 14 + 28 * scaleFont, 14 + badgeH / 2 + 1);
 
@@ -271,7 +271,7 @@ const PainelAnaliseVideoIa = ({
                 desenharRetanguloArredondado(ctx, cw - dirW - 14, 14, dirW, badgeH, badgeH / 2);
                 ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
                 ctx.fill();
-                ctx.fillStyle = '#F8FAFC';
+                ctx.fillStyle = cores.textoForte;
                 ctx.fillText(dirTxt, cw - dirW - 1, 14 + badgeH / 2 + 1);
             }
             ctx.restore();
@@ -463,7 +463,7 @@ const PainelAnaliseVideoIa = ({
                 <Grid item xs={12} lg={7}>
                     <Box
                         sx={{
-                            borderRadius: 2,
+                            borderRadius: 1.5,
                             overflow: 'hidden',
                             border: `1px solid ${resultadoIa ? funcao.liberado : cores.borda}`,
                             bgcolor: cores.fundo
@@ -506,7 +506,7 @@ const PainelAnaliseVideoIa = ({
                                                 position: 'relative',
                                                 flexShrink: 0,
                                                 width: 96,
-                                                borderRadius: 1.25,
+                                                borderRadius: 1,
                                                 overflow: 'hidden',
                                                 cursor: 'pointer',
                                                 border: `2px solid ${ativo ? cores.primaria : (temDeteccao ? funcao.liberado : cores.borda)}`
@@ -520,7 +520,7 @@ const PainelAnaliseVideoIa = ({
                                             />
                                             <Typography
                                                 sx={{
-                                                    fontSize: '0.68rem',
+                                                    fontSize: '0.75rem',
                                                     textAlign: 'center',
                                                     py: 0.2,
                                                     bgcolor: ativo ? cores.primaria : cores.superficieElevada,
@@ -663,7 +663,7 @@ const PainelAnaliseVideoIa = ({
                         {erroIa && <Alert severity="warning">{erroIa}</Alert>}
 
                         {resultadoIa && (
-                            <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: cores.superficieElevada, border: `1px solid ${cores.borda}` }}>
+                            <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: cores.superficieElevada, border: `1px solid ${cores.borda}` }}>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.25 }}>
                                     <Typography sx={{ fontSize: tamanhos.sm, fontWeight: 700, color: cores.textoForte }}>
                                         Total no vídeo ({resultadoIa.modelo_ia_versao})

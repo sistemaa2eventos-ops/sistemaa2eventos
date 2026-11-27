@@ -12,6 +12,7 @@ import NeonButton from '../common/NeonButton';
 import { carregarConfigEtiqueta, montarHtmlEtiqueta, imprimirHtml, comFotoAssinada } from '../../services/etiquetaService';
 import { elementosHtml, estiloFundoPapel, unidadePx, ESCALA_EDITOR } from '../../services/etiquetaRender';
 import api from '../../services/api';
+import { cores } from '../../styles/tokens';
 
 const ESCALA_PREVIEW = 2.8; // Fator de escala para preview na tela (mm -> px)
 
@@ -118,18 +119,18 @@ export const PreviewEtiquetaDialog = ({
             fullWidth
             PaperProps={{
                 sx: {
-                    bgcolor: '#0A1628',
+                    bgcolor: cores.superficie,
                     border: '1px solid rgba(0, 212, 255, 0.25)',
-                    borderRadius: 2,
+                    borderRadius: 1.5,
                     boxShadow: '0 12px 40px rgba(0,0,0,0.8)'
                 }
             }}
         >
             <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                 <Stack direction="row" spacing={1.5} alignItems="center">
-                    <StyleIcon sx={{ color: '#00D4FF' }} />
+                    <StyleIcon sx={{ color: cores.primaria }} />
                     <Box>
-                        <Typography variant="h6" fontWeight={700} color="#FFFFFF" lineHeight={1.2}>
+                        <Typography variant="h6" fontWeight={700} color={cores.textoForte} lineHeight={1.2}>
                             Pré-visualização da impressão
                         </Typography>
                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
@@ -145,7 +146,7 @@ export const PreviewEtiquetaDialog = ({
             <DialogContent sx={{ py: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', minHeight: 320 }}>
                 {loading ? (
                     <Box sx={{ my: 'auto', textAlign: 'center' }}>
-                        <CircularProgress size={36} sx={{ color: '#00D4FF', mb: 2 }} />
+                        <CircularProgress size={36} sx={{ color: cores.primaria, mb: 2 }} />
                         <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
                             Gerando pré-visualização da credencial...
                         </Typography>
@@ -155,7 +156,7 @@ export const PreviewEtiquetaDialog = ({
                         <Typography variant="body1" color="error" fontWeight={600} gutterBottom>
                             {erro}
                         </Typography>
-                        <Button variant="outlined" size="small" onClick={onClose} sx={{ mt: 1, color: '#FFFFFF', borderColor: 'rgba(255,255,255,0.3)' }}>
+                        <Button variant="outlined" size="small" onClick={onClose} sx={{ mt: 1, color: cores.textoForte, borderColor: 'rgba(255,255,255,0.3)' }}>
                             Fechar
                         </Button>
                     </Box>
@@ -168,7 +169,7 @@ export const PreviewEtiquetaDialog = ({
                                 height: alturaPx,
                                 minWidth: larguraPx,
                                 minHeight: alturaPx,
-                                bgcolor: papel.corFundo || '#FFFFFF',
+                                bgcolor: papel.corFundo || cores.textoForte,
                                 backgroundImage: (!papel.fundo_como_referencia && !papel.modo_referencia && papel.imprimir_fundo !== false && (papel.background_url || papel.bg_url)) ? `url('${papel.background_url || papel.bg_url}')` : 'none',
                                 backgroundSize: 'cover',
                                 backgroundPosition: 'center',
@@ -193,7 +194,7 @@ export const PreviewEtiquetaDialog = ({
                     Fechar sem imprimir
                 </Button>
                 <NeonButton
-                    neonColor="#00FF88"
+                    neonColor={cores.sucesso}
                     startIcon={printing ? <CircularProgress size={18} color="inherit" /> : <PrintIcon />}
                     onClick={() => handleImprimir()}
                     disabled={loading || !!erro || printing}

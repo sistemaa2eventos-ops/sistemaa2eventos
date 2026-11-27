@@ -13,6 +13,7 @@ import { styled } from '@mui/material/styles';
 import { format } from 'date-fns';
 import GlassCard from '../common/GlassCard';
 import NeonButton from '../common/NeonButton';
+import { cores, tom } from '../../styles/tokens';
 
 const EventBadge = styled(Box)(({ status }) => ({
     fontWeight: 700,
@@ -23,17 +24,17 @@ const EventBadge = styled(Box)(({ status }) => ({
     display: 'flex',
     alignItems: 'center',
     background: status === 'ativo' ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255, 184, 0, 0.1)',
-    color: status === 'ativo' ? '#00FF88' : '#FFB800',
+    color: status === 'ativo' ? cores.sucesso : cores.alerta,
     border: `1px solid ${status === 'ativo' ? 'rgba(0, 255, 136, 0.2)' : 'rgba(255, 184, 0, 0.2)'}`,
     letterSpacing: '1px'
 }));
 
 const EventCard = ({ evento, toggleStatus, handleGerenciar, handleOpenDialog, handleDelete }) => {
     return (
-        <GlassCard glowColor="#00D4FF">
+        <GlassCard glowColor={cores.primaria}>
             <Box sx={{ p: 3 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                    <Avatar sx={{ bgcolor: 'rgba(0, 212, 255, 0.1)', color: '#00D4FF', width: 56, height: 56 }}>
+                    <Avatar sx={{ bgcolor: tom(cores.primaria, 0.1), color: cores.primaria, width: 56, height: 56 }}>
                         <EventIcon fontSize="large" />
                     </Avatar>
                     <Stack alignItems="flex-end">
@@ -54,7 +55,7 @@ const EventCard = ({ evento, toggleStatus, handleGerenciar, handleOpenDialog, ha
                     </Stack>
                 </Box>
 
-                <Typography variant="h5" sx={{ fontWeight: 700, color: '#FFFFFF', mb: 1, letterSpacing: '1px' }}>
+                <Typography variant="h5" sx={{ fontWeight: 700, color: cores.textoForte, mb: 1, letterSpacing: '1px' }}>
                     {evento.nome}
                 </Typography>
 
@@ -71,7 +72,7 @@ const EventCard = ({ evento, toggleStatus, handleGerenciar, handleOpenDialog, ha
                             {evento.data_fim && !isNaN(new Date(evento.data_fim).getTime()) ? format(new Date(evento.data_fim), "dd/MM/yy") : '??'}
                         </Typography>
                     </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#00FF88' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: cores.sucesso }}>
                         <ResetIcon sx={{ fontSize: 16 }} />
                         <Typography variant="caption" sx={{ fontWeight: 700 }}>Fechamento do turno: {String(evento.horario_reset || '00:00').slice(0, 5)}</Typography>
                     </Box>
@@ -90,14 +91,14 @@ const EventCard = ({ evento, toggleStatus, handleGerenciar, handleOpenDialog, ha
                 >
                     <Box sx={{ flex: 1, textAlign: 'center' }}>
                         <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Empresas</Typography>
-                        <Typography variant="h6" sx={{ color: '#00D4FF', fontWeight: 700 }}>
+                        <Typography variant="h6" sx={{ color: cores.primaria, fontWeight: 700 }}>
                             {String(evento.total_empresas || 0).padStart(2, '0')}
                         </Typography>
                     </Box>
                     <Box sx={{ width: '1px', background: 'rgba(255,255,255,0.05)' }} />
                     <Box sx={{ flex: 1, textAlign: 'center' }}>
                         <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Pessoas</Typography>
-                        <Typography variant="h6" sx={{ color: '#7B2FBE', fontWeight: 700 }}>
+                        <Typography variant="h6" sx={{ color: cores.secundaria, fontWeight: 700 }}>
                             {evento.total_pessoas > 1000
                                 ? `${(evento.total_pessoas / 1000).toFixed(1)}k`
                                 : evento.total_pessoas || 0}
@@ -120,7 +121,7 @@ const EventCard = ({ evento, toggleStatus, handleGerenciar, handleOpenDialog, ha
                             onClick={() => handleOpenDialog(evento)}
                             sx={{ border: '1px solid rgba(0,212,255,0.1)', borderRadius: 1.5 }}
                         >
-                            <EditIcon fontSize="small" sx={{ color: '#00D4FF' }} />
+                            <EditIcon fontSize="small" sx={{ color: cores.primaria }} />
                         </IconButton>
                     </Tooltip>
                     <Tooltip title="Excluir">
@@ -128,7 +129,7 @@ const EventCard = ({ evento, toggleStatus, handleGerenciar, handleOpenDialog, ha
                             onClick={() => handleDelete(evento.id)}
                             sx={{ border: '1px solid rgba(255, 51, 102, 0.1)', borderRadius: 1.5 }}
                         >
-                            <DeleteIcon fontSize="small" sx={{ color: '#FF3366' }} />
+                            <DeleteIcon fontSize="small" sx={{ color: cores.erro }} />
                         </IconButton>
                     </Tooltip>
                 </Box>

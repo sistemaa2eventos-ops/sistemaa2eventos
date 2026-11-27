@@ -4,7 +4,7 @@ import { useSnackbar } from 'notistack';
 import api from '../../services/api';
 import TituloModal from '../common/TituloModal';
 import NeonButton from '../common/NeonButton';
-import { botaoSecundario, cores } from '../../styles/tokens';
+import { botaoSecundario, cores, tom } from '../../styles/tokens';
 
 /**
  * Copia a configuração de documentos (tipos, obrigatórios por função e para empresas, funções e aviso)
@@ -47,7 +47,7 @@ const CopiarConfiguracaoDialog = ({ open, onClose, eventoAtualId, onCopiado }) =
             <TituloModal titulo="Copiar de outro evento" subtitulo="Traz os tipos, os obrigatórios e as funções do evento escolhido." onFechar={onClose} desabilitarFechar={copiando} />
             <DialogContent sx={{ p: 3 }}>
                 <Stack spacing={2}>
-                    <Alert severity="info" sx={{ bgcolor: 'rgba(0,212,255,0.05)', color: '#E8F4FD', border: '1px solid rgba(0,212,255,0.2)' }}>
+                    <Alert severity="info" sx={{ bgcolor: tom(cores.primaria, 0.05), color: cores.texto, border: '1px solid rgba(0,212,255,0.2)' }}>
                         Tipos com o mesmo nome são reaproveitados. Os obrigatórios deste evento são substituídos pelos do evento escolhido;
                         tipos que só existem aqui continuam. Nada é gravado até clicar em Salvar.
                     </Alert>

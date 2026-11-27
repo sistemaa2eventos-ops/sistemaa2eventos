@@ -1,23 +1,24 @@
 import api from '../../services/api';
+import { cores } from '../../styles/tokens';
 
 /** Status de documento (único lugar para rótulo e cor). 'rejeitado' é o nome legado de 'reprovado'. */
 export const STATUS_DOCUMENTO = {
-    pendente: { label: 'Pendente', color: '#FFB800' },
-    em_analise: { label: 'Em análise', color: '#FFB800' },
-    aprovado: { label: 'Aprovado', color: '#00FF88' },
-    reprovado: { label: 'Reprovado', color: '#FF3366' },
-    rejeitado: { label: 'Reprovado', color: '#FF3366' },
-    reenvio_solicitado: { label: 'Reenvio solicitado', color: '#00D4FF' },
-    vencido: { label: 'Vencido', color: '#FF3366' }
+    pendente: { label: 'Pendente', color: cores.alerta },
+    em_analise: { label: 'Em análise', color: cores.alerta },
+    aprovado: { label: 'Aprovado', color: cores.sucesso },
+    reprovado: { label: 'Reprovado', color: cores.erro },
+    rejeitado: { label: 'Reprovado', color: cores.erro },
+    reenvio_solicitado: { label: 'Reenvio solicitado', color: cores.primaria },
+    vencido: { label: 'Vencido', color: cores.erro }
 };
 
 /** Situação documental da pessoa (status_documentos / avaliação) */
 export const SITUACAO_DOCUMENTAL = {
-    aprovado: { label: 'Documentação OK', color: '#00FF88' },
-    pendente: { label: 'Pendente', color: '#FFB800' },
-    em_analise: { label: 'Em análise', color: '#FFB800' },
-    reenvio_solicitado: { label: 'Reenvio solicitado', color: '#00D4FF' },
-    reprovado: { label: 'Reprovado', color: '#FF3366' }
+    aprovado: { label: 'Documentação OK', color: cores.sucesso },
+    pendente: { label: 'Pendente', color: cores.alerta },
+    em_analise: { label: 'Em análise', color: cores.alerta },
+    reenvio_solicitado: { label: 'Reenvio solicitado', color: cores.primaria },
+    reprovado: { label: 'Reprovado', color: cores.erro }
 };
 
 /** Motivo de cada pendência (documento exigido sem versão válida) */

@@ -6,6 +6,7 @@ import api from '../../services/api';
 import DataTable from '../common/DataTable';
 import ChecklistObrigatorios from './ChecklistObrigatorios';
 import { formatarCpf } from '../../utils/formatadores';
+import { cores } from '../../styles/tokens';
 
 /**
  * Participantes com documentação pendente, do mais antigo cadastro para o mais novo.
@@ -45,7 +46,7 @@ const FilaPessoasPendentes = ({ search = '', recarregarToken = 0, onAnexar }) =>
             minWidth: 240,
             format: (val, row) => (
                 <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF' }}>{val || '—'}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: cores.textoForte }}>{val || '—'}</Typography>
                     <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
                         CPF {row.cpf ? formatarCpf(row.cpf) : '—'} · {row.empresa_nome || 'Sem empresa'}
                     </Typography>
@@ -68,7 +69,7 @@ const FilaPessoasPendentes = ({ search = '', recarregarToken = 0, onAnexar }) =>
                     <Chip
                         size="small"
                         label={row.dias_pendente === null ? 'Sem data' : `Sem enviar há ${row.dias_pendente} dia(s)`}
-                        sx={{ mt: 0.5, fontWeight: 700, bgcolor: 'rgba(255,184,0,0.15)', color: '#FFB800' }}
+                        sx={{ mt: 0.5, fontWeight: 700, bgcolor: 'rgba(255,184,0,0.15)', color: cores.alerta }}
                     />
                 </Box>
             )
@@ -101,7 +102,7 @@ const FilaPessoasPendentes = ({ search = '', recarregarToken = 0, onAnexar }) =>
     return (
         <Stack spacing={1.5}>
             <Box>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: cores.textoForte }}>
                     Pendentes de documentação ({total})
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>

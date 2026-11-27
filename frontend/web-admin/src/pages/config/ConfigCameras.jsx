@@ -24,6 +24,7 @@ import CamerasEventoBarra from '../../components/cameras/CamerasEventoBarra';
 import GravacoesPainel from '../../components/cameras/GravacoesPainel';
 import SeletorModo from '../../components/cameras/SeletorModo';
 import { MODOS_IA, MODOS_GRAVACAO, modoIaDe, camposDoModoIa } from '../../components/cameras/opcoesCamera';
+import { cores } from '../../styles/tokens';
 
 const ABAS = { cameras: 0, gravacoes: 1, ia: 2 };
 
@@ -33,7 +34,7 @@ const ABAS = { cameras: 0, gravacoes: 1, ia: 2 };
  */
 const situacaoCamera = (cam, status, isDesativada, st, iaErro, motorLigado) => {
     if (isDesativada) {
-        return { cor: '#FFB800', titulo: 'Desativada', detalhe: 'Sem vídeo, IA e gravação.', chips: [] };
+        return { cor: cores.alerta, titulo: 'Desativada', detalhe: 'Sem vídeo, IA e gravação.', chips: [] };
     }
     const chips = [];
     const modo = modoIaDe(cam);
@@ -48,12 +49,12 @@ const situacaoCamera = (cam, status, isDesativada, st, iaErro, motorLigado) => {
     if (modo !== 'monitorar' && st) {
         if (st.conectada && st.video_fps) chips.push(`${Math.round(st.video_fps)} quadros/s`);
         return st.conectada
-            ? { cor: '#00FF88', titulo: 'Online', detalhe: 'Recebendo vídeo agora.', chips }
-            : { cor: '#FF3366', titulo: 'Sem sinal', detalhe: 'O PC do evento não está recebendo o vídeo desta câmera.', chips };
+            ? { cor: cores.sucesso, titulo: 'Online', detalhe: 'Recebendo vídeo agora.', chips }
+            : { cor: cores.erro, titulo: 'Sem sinal', detalhe: 'O PC do evento não está recebendo o vídeo desta câmera.', chips };
     }
-    if (status === 'online') return { cor: '#00FF88', titulo: 'Online', detalhe: 'Respondeu ao último teste.', chips };
-    if (status === 'offline') return { cor: '#FF3366', titulo: 'Offline', detalhe: 'Não respondeu ao último teste.', chips };
-    return { cor: '#94A3B8', titulo: 'Não verificada', detalhe: 'Toque em Testar para checar a conexão.', chips };
+    if (status === 'online') return { cor: cores.sucesso, titulo: 'Online', detalhe: 'Respondeu ao último teste.', chips };
+    if (status === 'offline') return { cor: cores.erro, titulo: 'Offline', detalhe: 'Não respondeu ao último teste.', chips };
+    return { cor: cores.textoSecundario, titulo: 'Não verificada', detalhe: 'Toque em Testar para checar a conexão.', chips };
 };
 
 const ConfigCameras = ({ abaInicial = null }) => {
@@ -248,8 +249,8 @@ const ConfigCameras = ({ abaInicial = null }) => {
                         textColor="inherit"
                         sx={{
                             '& .MuiTab-root': { fontWeight: 700, fontSize: '0.875rem' },
-                            '& .Mui-selected': { color: '#00D4FF' },
-                            '& .MuiTabs-indicator': { bgcolor: '#00D4FF', height: 3 }
+                            '& .Mui-selected': { color: cores.primaria },
+                            '& .MuiTabs-indicator': { bgcolor: cores.primaria, height: 3 }
                         }}
                     >
                         <Tab icon={<CameraIcon sx={{ mr: 1 }} />} iconPosition="start" label={`Câmeras (${cameras.length})`} />
@@ -276,7 +277,7 @@ const ConfigCameras = ({ abaInicial = null }) => {
                             size="small"
                             startIcon={<OpenInNewIcon />}
                             onClick={() => navigate(`/monitor?evento_id=${eventoId}`)}
-                            sx={{ borderColor: '#00FF88', color: '#00FF88', fontWeight: 700 }}
+                            sx={{ borderColor: cores.sucesso, color: cores.sucesso, fontWeight: 700 }}
                         >
                             Abrir no monitor CFTV
                         </Button>
@@ -339,7 +340,7 @@ const ConfigCameras = ({ abaInicial = null }) => {
                                                 : status === 'online'
                                                     ? '1px solid rgba(0, 255, 136, 0.3)'
                                                     : '1px solid rgba(255,255,255,0.08)',
-                                            transition: 'all 0.3s ease',
+                                            transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, opacity 0.3s ease, transform 0.3s ease',
                                             '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 8px 30px rgba(0,0,0,0.5)' }
                                         }}>
                                             {/* Situação da câmera (as imagens ficam no Monitoramento) */}
@@ -356,15 +357,15 @@ const ConfigCameras = ({ abaInicial = null }) => {
                                                         </Stack>
                                                         <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" sx={{ mt: 1.25 }}>
                                                             {sit.chips.map((c) => (
-                                                                <Chip key={c} label={c} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.8)', fontWeight: 600, fontSize: '0.72rem' }} />
+                                                                <Chip key={c} label={c} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.8)', fontWeight: 600, fontSize: '0.75rem' }} />
                                                             ))}
-                                                            <Chip label={cam.fabricante || 'RTSP'} size="small" sx={{ bgcolor: 'rgba(0,0,0,0.4)', color: '#00D4FF', fontWeight: 700, fontSize: '0.72rem', border: '1px solid rgba(0,212,255,0.3)' }} />
+                                                            <Chip label={cam.fabricante || 'RTSP'} size="small" sx={{ bgcolor: 'rgba(0,0,0,0.4)', color: cores.primaria, fontWeight: 700, fontSize: '0.75rem', border: '1px solid rgba(0,212,255,0.3)' }} />
                                                             {cam.area?.nome_area && (
                                                                 <Chip
                                                                     icon={<ShieldIcon sx={{ fontSize: 13, color: '#FFFFFF !important' }} />}
                                                                     label={cam.area.nome_area}
                                                                     size="small"
-                                                                    sx={{ bgcolor: 'rgba(0,0,0,0.4)', color: '#FFFFFF', fontWeight: 600, fontSize: '0.72rem' }}
+                                                                    sx={{ bgcolor: 'rgba(0,0,0,0.4)', color: cores.textoForte, fontWeight: 600, fontSize: '0.75rem' }}
                                                                 />
                                                             )}
                                                         </Stack>
@@ -375,7 +376,7 @@ const ConfigCameras = ({ abaInicial = null }) => {
                                             {/* Informações da Câmera */}
                                             <Box sx={{ p: 2.5 }}>
                                                 <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
-                                                    <Typography variant="h6" fontWeight={700} noWrap sx={{ color: '#FFFFFF', flex: 1 }}>
+                                                    <Typography variant="h6" fontWeight={700} noWrap sx={{ color: cores.textoForte, flex: 1 }}>
                                                         {cam.nome}
                                                     </Typography>
                                                 </Stack>

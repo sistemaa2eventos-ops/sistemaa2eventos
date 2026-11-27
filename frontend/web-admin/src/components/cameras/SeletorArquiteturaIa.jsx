@@ -11,13 +11,14 @@ import {
     InfoOutlined as InfoIcon
 } from '@mui/icons-material';
 import GlassCard from '../common/GlassCard';
+import { cores } from '../../styles/tokens';
 
 export const MODOS_ARQUITETURA = [
     {
         id: 'local',
         titulo: 'Servidor no Evento',
         subtitulo: 'Super Operação Local',
-        cor: '#00FF88',
+        cor: cores.sucesso,
         icone: PcIcon,
         badges: ['30-60 FPS Real', '1080p Full HD', '100% Offline'],
         resumo: 'O computador com a placa de vídeo potente vai para o evento. Reconhece instantâneo com latência zero e total independência de internet.',
@@ -43,7 +44,7 @@ export const MODOS_ARQUITETURA = [
         id: 'auto',
         titulo: 'Híbrido Inteligente',
         subtitulo: 'Notebook no Evento + Servidor Central',
-        cor: '#00D4FF',
+        cor: cores.primaria,
         icone: HybridIcon,
         badges: ['4 KB por Rosto', 'Tolerância a Falhas', 'GPU Central'],
         resumo: 'O notebook no evento acha os rostos e o Servidor de IA Central diz quem é. Se a internet oscilar mais que 2,5 s, o notebook assume sozinho por reserva.',
@@ -69,7 +70,7 @@ export const MODOS_ARQUITETURA = [
         id: 'direto_servidor',
         titulo: 'Central Remota / Fibra',
         subtitulo: 'Câmeras Direto para o Servidor',
-        cor: '#A855F7',
+        cor: cores.secundariaClara,
         icone: CloudIcon,
         badges: ['RTSP ➔ Servidor', 'Notebook Leve', 'Processamento na Central'],
         resumo: 'As câmeras IP transmitem os vídeos diretamente pela internet fibra até o Servidor Central de IA, que processa tudo. No evento você só precisa abrir o navegador.',
@@ -108,7 +109,7 @@ const SeletorArquiteturaIa = ({
         <Box sx={{ mb: 2.5 }}>
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
                 <Box>
-                    <Typography variant="caption" sx={{ textTransform: 'uppercase', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.08em', color: 'text.secondary' }}>
+                    <Typography variant="caption" sx={{ textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.08em', color: 'text.secondary' }}>
                         Arquitetura de Operação de IA
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
@@ -131,7 +132,7 @@ const SeletorArquiteturaIa = ({
                                     display: 'flex',
                                     flexDirection: 'column',
                                     justifyContent: 'space-between',
-                                    transition: 'all 0.25s ease-in-out',
+                                    transition: 'background-color 0.25s ease-in-out, border-color 0.25s ease-in-out, color 0.25s ease-in-out, opacity 0.25s ease-in-out, transform 0.25s ease-in-out',
                                     border: ativo ? `1px solid ${modo.cor}` : '1px solid rgba(255,255,255,0.08)',
                                     boxShadow: ativo ? `0 0 16px ${modo.cor}25` : 'none',
                                     background: ativo ? `linear-gradient(180deg, ${modo.cor}0c 0%, rgba(5,11,24,0.6) 100%)` : undefined,
@@ -162,7 +163,7 @@ const SeletorArquiteturaIa = ({
                                                 <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
                                                     {modo.titulo}
                                                 </Typography>
-                                                <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.72rem' }}>
+                                                <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
                                                     {modo.subtitulo}
                                                 </Typography>
                                             </Box>
@@ -174,7 +175,7 @@ const SeletorArquiteturaIa = ({
                                                 label="Ativo"
                                                 sx={{
                                                     height: 22,
-                                                    fontSize: '0.68rem',
+                                                    fontSize: '0.75rem',
                                                     fontWeight: 700,
                                                     bgcolor: `${modo.cor}22`,
                                                     color: modo.cor,
@@ -217,7 +218,7 @@ const SeletorArquiteturaIa = ({
                                             if (onChange && modo.id !== valor) onChange(modo.id);
                                         }}
                                         sx={{
-                                            fontSize: '0.72rem',
+                                            fontSize: '0.75rem',
                                             fontWeight: 700,
                                             py: 0.35,
                                             px: 1.5,
@@ -243,7 +244,7 @@ const SeletorArquiteturaIa = ({
                                             setDialogo(modo);
                                         }}
                                         sx={{
-                                            fontSize: '0.72rem',
+                                            fontSize: '0.75rem',
                                             textTransform: 'none',
                                             color: 'text.secondary',
                                             '&:hover': { color: modo.cor }
@@ -328,7 +329,7 @@ const SeletorArquiteturaIa = ({
 
                             <Divider sx={{ my: 1.5, borderColor: 'rgba(255,255,255,0.08)' }} />
 
-                            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#00D4FF' }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: cores.primaria }}>
                                 🚀 Passo a passo para operar no evento:
                             </Typography>
                             <Box component="ol" sx={{ pl: 2.5, mt: 0, mb: 1, color: 'text.secondary', fontSize: '0.85rem' }}>

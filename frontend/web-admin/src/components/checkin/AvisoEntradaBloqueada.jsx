@@ -1,6 +1,7 @@
 import React from 'react';
 import { Alert, Box, Button, CircularProgress, Typography } from '@mui/material';
 import { LockOpen as LiberarIcon } from '@mui/icons-material';
+import { cores } from '../../styles/tokens';
 
 /**
  * Aviso de entrada bloqueada pelo rosto (sem ficha aberta). Mesma mensagem e mesmo botão
@@ -15,14 +16,14 @@ const AvisoEntradaBloqueada = ({ bloqueio, podeLiberar = false, liberando = fals
             severity="warning"
             variant="outlined"
             onClose={onFechar}
-            sx={{ mb: { xs: 1.5, sm: 2 }, color: '#FFB800', borderColor: 'rgba(255, 184, 0, 0.5)', bgcolor: 'rgba(255, 184, 0, 0.06)', '& .MuiAlert-icon': { color: '#FFB800' }, '& .MuiAlert-action .MuiIconButton-root': { color: '#FFB800' } }}
+            sx={{ mb: { xs: 1.5, sm: 2 }, color: cores.alerta, borderColor: 'rgba(255, 184, 0, 0.5)', bgcolor: 'rgba(255, 184, 0, 0.06)', '& .MuiAlert-icon': { color: cores.alerta }, '& .MuiAlert-action .MuiIconButton-root': { color: cores.alerta } }}
         >
             {nome && (
                 <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.75)', fontWeight: 700 }}>
                     {nome}
                 </Typography>
             )}
-            <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+            <Typography variant="body2" sx={{ fontWeight: 700, color: cores.textoForte }}>
                 {liberavel
                     ? (mensagem || 'Entrada bloqueada nesta área: a reentrada precisa de liberação do controlador.')
                     : 'Pessoa já está dentro'}
@@ -35,7 +36,7 @@ const AvisoEntradaBloqueada = ({ bloqueio, podeLiberar = false, liberando = fals
                     onClick={onLiberar}
                     disabled={liberando}
                     startIcon={liberando ? <CircularProgress size={14} /> : <LiberarIcon sx={{ fontSize: 16 }} />}
-                    sx={{ mt: 1, minHeight: 36, fontSize: '0.8rem', color: '#FFB800', borderColor: 'rgba(255, 184, 0, 0.6)', textTransform: 'none', borderRadius: 1.5 }}
+                    sx={{ mt: 1, minHeight: 36, fontSize: '0.8rem', color: cores.alerta, borderColor: 'rgba(255, 184, 0, 0.6)', textTransform: 'none', borderRadius: 1.5 }}
                 >
                     {liberando ? 'Liberando...' : 'Liberar reentrada'}
                 </Button>
@@ -52,7 +53,7 @@ const AvisoEntradaBloqueada = ({ bloqueio, podeLiberar = false, liberando = fals
             )}
             {erroLiberacao && (
                 <Box sx={{ mt: 1 }}>
-                    <Typography variant="caption" sx={{ display: 'block', color: '#FF3366', fontWeight: 700 }}>
+                    <Typography variant="caption" sx={{ display: 'block', color: cores.erro, fontWeight: 700 }}>
                         {erroLiberacao}
                     </Typography>
                 </Box>

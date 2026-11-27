@@ -21,7 +21,7 @@ import useFotoPessoa from '../../hooks/useFotoPessoa';
 import api from '../../services/api';
 import ChecklistObrigatorios from '../documentos/ChecklistObrigatorios';
 
-import { botaoSecundario } from '../../styles/tokens';
+import { botaoSecundario, cores, tom } from '../../styles/tokens';
 
 const normalizarFuncao = (f) => String(f || '').trim().replace(/\s+/g, ' ').toUpperCase();
 const PessoaFormDialog = ({
@@ -126,13 +126,13 @@ const PessoaFormDialog = ({
             minHeight: 0, 
             height: { xs: 'auto', md: '100%' },
             '&::-webkit-scrollbar': { width: '6px' },
-            '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.3)', borderRadius: '10px' }
+            '&::-webkit-scrollbar-thumb': { background: tom(cores.primaria, 0.3), borderRadius: '8px' }
           }}>
             {activeStep === 0 && (
               !isEmpresa ? (
                 <>
                   <Box sx={{ mb: { xs: 1.5, md: 3 }, textAlign: 'center' }}>
-                    <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: 2 }}>Identificação biométrica</Typography>
+                    <Typography variant="overline" sx={{ color: cores.primaria, fontWeight: 700, letterSpacing: 2 }}>Identificação biométrica</Typography>
                   </Box>
                   <PhotoCapture
                     onPhotoCaptured={(url) => setFormData({ ...formData, foto_url: url })}
@@ -159,7 +159,7 @@ const PessoaFormDialog = ({
                 <Box sx={{ 
                   p: 1.5, 
                   borderRadius: 1.5, 
-                  bgcolor: 'rgba(0, 212, 255, 0.04)', 
+                  bgcolor: tom(cores.primaria, 0.04), 
                   border: '1px solid rgba(0, 212, 255, 0.15)',
                   display: 'flex', 
                   alignItems: 'center', 
@@ -178,10 +178,10 @@ const PessoaFormDialog = ({
                     </Box>
                   )}
                   <Box sx={{ overflow: 'hidden' }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#FFFFFF', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, color: cores.textoForte, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                       {formData.nome_completo || 'Colaborador'}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#00D4FF', display: 'block', fontWeight: 600 }}>
+                    <Typography variant="caption" sx={{ color: cores.primaria, display: 'block', fontWeight: 600 }}>
                       {formData.cpf || 'Sem CPF'}
                     </Typography>
                     <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
@@ -190,7 +190,7 @@ const PessoaFormDialog = ({
                   </Box>
                 </Box>
 
-                <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: '1px' }}>
+                <Typography variant="overline" sx={{ color: cores.primaria, fontWeight: 700, letterSpacing: '1px' }}>
                   Escopo e categoria
                 </Typography>
 
@@ -200,7 +200,7 @@ const PessoaFormDialog = ({
                     value={formData.tipo_pessoa || ''} 
                     label="Categoria" 
                     onChange={(e) => setFormData({ ...formData, tipo_pessoa: e.target.value })} 
-                    MenuProps={{ PaperProps: { sx: { bgcolor: '#0a1628', color: '#FFFFFF', border: '1px solid #00D4FF' } } }}
+                    MenuProps={{ PaperProps: { sx: { bgcolor: cores.superficie, color: cores.textoForte, border: '1px solid #00D4FF' } } }}
                   >
                     <MenuItem value="colaborador">Colaborador (B2B) / staff</MenuItem>
                     <MenuItem value="visitante">Visitante (B2C)</MenuItem>
@@ -219,7 +219,7 @@ const PessoaFormDialog = ({
 
                 {formData.tipo_pessoa === 'visitante' && (
                   <FormControlLabel 
-                    control={<Checkbox size="small" checked={formData.pagamento_validado} onChange={(e) => setFormData({ ...formData, pagamento_validado: e.target.checked })} sx={{ color: 'rgba(0, 255, 136, 0.5)', '&.Mui-checked': { color: '#00FF88' } }} />} 
+                    control={<Checkbox size="small" checked={formData.pagamento_validado} onChange={(e) => setFormData({ ...formData, pagamento_validado: e.target.checked })} sx={{ color: 'rgba(0, 255, 136, 0.5)', '&.Mui-checked': { color: cores.sucesso } }} />} 
                     label={<Typography variant="caption">Pagamento validado</Typography>} 
                   />
                 )}
@@ -231,7 +231,7 @@ const PessoaFormDialog = ({
                       value={formData.parecer_documentos || 'pendente'} 
                       label="Situação dos documentos" 
                       onChange={(e) => setFormData({ ...formData, parecer_documentos: e.target.value })} 
-                      MenuProps={{ PaperProps: { sx: { bgcolor: '#0a1628', color: '#FFFFFF', border: '1px solid #00D4FF' } } }}
+                      MenuProps={{ PaperProps: { sx: { bgcolor: cores.superficie, color: cores.textoForte, border: '1px solid #00D4FF' } } }}
                     >
                       <MenuItem value="pendente">Documentos pendentes</MenuItem>
                       <MenuItem value="completo">Completo e correto (aprovar)</MenuItem>
@@ -241,13 +241,13 @@ const PessoaFormDialog = ({
                 )}
 
                 <Box sx={{ mt: 1, p: 1.5, borderRadius: 1.5, bgcolor: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                  <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, display: 'block', mb: 0.5 }}>
+                  <Typography variant="caption" sx={{ color: cores.primaria, fontWeight: 700, display: 'block', mb: 0.5 }}>
                     Acesso por fase do evento
                   </Typography>
                   <FormGroup>
                     {['montagem', 'evento', 'desmontagem'].map(fase => {
                       const isChecked = Array.isArray(formData?.fases_acesso) && formData.fases_acesso.includes(fase);
-                      const phaseColor = fase === 'montagem' ? '#00D4FF' : (fase === 'evento' ? '#00FF88' : '#FFB800');
+                      const phaseColor = fase === 'montagem' ? cores.primaria : (fase === 'evento' ? cores.sucesso : cores.alerta);
                       return (
                         <FormControlLabel 
                           key={fase}
@@ -273,7 +273,7 @@ const PessoaFormDialog = ({
                 <Box sx={{ 
                   p: 1.5, 
                   borderRadius: 1.5, 
-                  bgcolor: 'rgba(0, 212, 255, 0.04)', 
+                  bgcolor: tom(cores.primaria, 0.04), 
                   border: '1px solid rgba(0, 212, 255, 0.15)',
                   display: 'flex', 
                   alignItems: 'center', 
@@ -284,7 +284,7 @@ const PessoaFormDialog = ({
                   )}
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{formData.nome_completo}</Typography>
-                    <Typography variant="caption" sx={{ color: '#00FF88', fontWeight: 700 }}>{formData.funcao || 'Colaborador'}</Typography>
+                    <Typography variant="caption" sx={{ color: cores.sucesso, fontWeight: 700 }}>{formData.funcao || 'Colaborador'}</Typography>
                   </Box>
                 </Box>
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontStyle: 'italic' }}>
@@ -295,7 +295,7 @@ const PessoaFormDialog = ({
 
           </Grid>
 
-          <Grid item xs={12} md={activeStep === 1 ? 8 : 7} sx={{ p: { xs: 2, sm: 2.5, md: 3 }, pr: { xs: 2, md: 2.5 }, height: { xs: 'auto', md: '100%' }, maxHeight: { xs: 'none', md: '100%' }, overflowY: { xs: 'visible', md: 'auto' }, display: 'flex', flexDirection: 'column', minHeight: 0, '&::-webkit-scrollbar': { width: '6px' }, '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.4)', borderRadius: '10px' }, '&::-webkit-scrollbar-track': { background: 'rgba(255,255,255,0.02)' } }}>
+          <Grid item xs={12} md={activeStep === 1 ? 8 : 7} sx={{ p: { xs: 2, sm: 2.5, md: 3 }, pr: { xs: 2, md: 2.5 }, height: { xs: 'auto', md: '100%' }, maxHeight: { xs: 'none', md: '100%' }, overflowY: { xs: 'visible', md: 'auto' }, display: 'flex', flexDirection: 'column', minHeight: 0, '&::-webkit-scrollbar': { width: '6px' }, '&::-webkit-scrollbar-thumb': { background: tom(cores.primaria, 0.4), borderRadius: '8px' }, '&::-webkit-scrollbar-track': { background: 'rgba(255,255,255,0.02)' } }}>
             <Box sx={{ pr: { xs: 0, md: 0.5 }, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               {!isEmpresa && (
               <Stepper activeStep={activeStep} alternativeLabel sx={{
@@ -305,9 +305,9 @@ const PessoaFormDialog = ({
                   color: 'rgba(255,255,255,0.05)',
                   border: '1px solid rgba(255,255,255,0.1)',
                   borderRadius: '50%',
-                  '&.Mui-active': { color: '#00D4FF', borderColor: '#00D4FF', boxShadow: '0 0 10px rgba(0,212,255,0.2)' },
-                  '&.Mui-completed': { color: '#00FF88', borderColor: '#00FF88' },
-                  '& .MuiStepIcon-text': { fill: '#FFFFFF', fontWeight: 700 }
+                  '&.Mui-active': { color: cores.primaria, borderColor: cores.primaria, boxShadow: '0 0 10px rgba(0,212,255,0.2)' },
+                  '&.Mui-completed': { color: cores.sucesso, borderColor: cores.sucesso },
+                  '& .MuiStepIcon-text': { fill: cores.textoForte, fontWeight: 700 }
                 },
                 '& .MuiStepLabel-label': {
                   color: 'rgba(255,255,255,0.3) !important', fontSize: { xs: '0.7rem', sm: '0.75rem' }, fontWeight: 600, mt: 0.75,
@@ -332,7 +332,7 @@ const PessoaFormDialog = ({
                     <Grid item xs={12} md={4}>
                       <FormControl fullWidth required>
                         <InputLabel>Empresa</InputLabel>
-                        <Select value={formData.empresa_id} label="Empresa" onChange={(e) => setFormData({ ...formData, empresa_id: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: '#0a1628', color: '#FFFFFF', border: '1px solid #00D4FF' } } }}>
+                        <Select value={formData.empresa_id} label="Empresa" onChange={(e) => setFormData({ ...formData, empresa_id: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: cores.superficie, color: cores.textoForte, border: '1px solid #00D4FF' } } }}>
                           {empresas.map(emp => <MenuItem key={emp.id} value={emp.id}>{emp.nome}</MenuItem>)}
                         </Select>
                       </FormControl>
@@ -378,7 +378,7 @@ const PessoaFormDialog = ({
                         <TextField label="Observações internas" fullWidth multiline rows={2} value={formData.observacoes || ''} onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })} />
                       </Grid>
                       <Grid item xs={12}>
-                        <FormControlLabel control={<Checkbox checked={formData.aceite_lgpd || false} onChange={(e) => setFormData({ ...formData, aceite_lgpd: e.target.checked })} sx={{ color: 'rgba(0, 255, 136, 0.5)', '&.Mui-checked': { color: '#00FF88' } }} />} label={<Typography variant="body2" sx={{ color: '#00FF88', fontWeight: 600 }}>Consentimento LGPD para uso da biometria registrado</Typography>} />
+                        <FormControlLabel control={<Checkbox checked={formData.aceite_lgpd || false} onChange={(e) => setFormData({ ...formData, aceite_lgpd: e.target.checked })} sx={{ color: 'rgba(0, 255, 136, 0.5)', '&.Mui-checked': { color: cores.sucesso } }} />} label={<Typography variant="body2" sx={{ color: cores.sucesso, fontWeight: 600 }}>Consentimento LGPD para uso da biometria registrado</Typography>} />
                       </Grid>
                     </>
                   )}
@@ -391,7 +391,7 @@ const PessoaFormDialog = ({
                   {/* Cabeçalho da seção com ações */}
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
                     <Box>
-                      <Typography variant="subtitle2" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: '0.5px' }}>
+                      <Typography variant="subtitle2" sx={{ color: cores.primaria, fontWeight: 700, letterSpacing: '0.5px' }}>
                         Dias permitidos para acesso físico
                       </Typography>
                       <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>
@@ -403,7 +403,7 @@ const PessoaFormDialog = ({
                         size="small" 
                         variant="outlined" 
                         onClick={handleSelectAllDates} 
-                        sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#00FF88', borderColor: 'rgba(0,255,136,0.3)', py: 0.3, px: 1.5, '&:hover': { borderColor: '#00FF88', bgcolor: 'rgba(0,255,136,0.08)' } }}
+                        sx={{ fontSize: '0.75rem', fontWeight: 700, color: cores.sucesso, borderColor: 'rgba(0,255,136,0.3)', py: 0.3, px: 1.5, '&:hover': { borderColor: cores.sucesso, bgcolor: 'rgba(0,255,136,0.08)' } }}
                       >
                         Marcar todos
                       </Button>
@@ -411,7 +411,7 @@ const PessoaFormDialog = ({
                         size="small" 
                         variant="outlined" 
                         onClick={handleClearAllDates} 
-                        sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#FF3366', borderColor: 'rgba(255,51,102,0.3)', py: 0.3, px: 1.5, '&:hover': { borderColor: '#FF3366', bgcolor: 'rgba(255,51,102,0.08)' } }}
+                        sx={{ fontSize: '0.75rem', fontWeight: 700, color: cores.erro, borderColor: 'rgba(255,51,102,0.3)', py: 0.3, px: 1.5, '&:hover': { borderColor: cores.erro, bgcolor: 'rgba(255,51,102,0.08)' } }}
                       >
                         Limpar
                       </Button>
@@ -421,10 +421,10 @@ const PessoaFormDialog = ({
                   {/* Abas Rápidas de Navegação / Filtro por Fase */}
                   <Stack direction="row" spacing={1} sx={{ mb: 1.5, flexWrap: 'wrap', gap: 0.5 }}>
                     {[
-                      { id: 'todas', label: 'Todas as fases', color: '#00D4FF' },
-                      { id: 'montagem', label: 'Montagem', color: '#00D4FF' },
-                      { id: 'evento', label: 'Evento', color: '#00FF88' },
-                      { id: 'desmontagem', label: 'Desmontagem', color: '#FFB800' }
+                      { id: 'todas', label: 'Todas as fases', color: cores.primaria },
+                      { id: 'montagem', label: 'Montagem', color: cores.primaria },
+                      { id: 'evento', label: 'Evento', color: cores.sucesso },
+                      { id: 'desmontagem', label: 'Desmontagem', color: cores.alerta }
                     ].map(tab => (
                       <Button
                         key={tab.id}
@@ -435,7 +435,7 @@ const PessoaFormDialog = ({
                           fontSize: '0.75rem',
                           fontWeight: 700,
                           letterSpacing: '0.5px',
-                          color: activePhaseTab === tab.id ? '#0a1628' : tab.color,
+                          color: activePhaseTab === tab.id ? cores.superficie : tab.color,
                           bgcolor: activePhaseTab === tab.id ? tab.color : 'transparent',
                           borderColor: tab.color,
                           py: 0.3,
@@ -465,14 +465,14 @@ const PessoaFormDialog = ({
                       flexDirection: 'column',
                       gap: 2,
                       '&::-webkit-scrollbar': { width: '6px' }, 
-                      '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.5)', borderRadius: '10px' }, 
+                      '&::-webkit-scrollbar-thumb': { background: tom(cores.primaria, 0.5), borderRadius: '8px' }, 
                       '&::-webkit-scrollbar-track': { background: 'rgba(255,255,255,0.02)' }
                     }}
                   >
                     {[
-                      { id: 'montagem', label: 'Montagem', color: '#00D4FF', bg: 'rgba(0,212,255,0.04)', border: 'rgba(0,212,255,0.2)' },
-                      { id: 'evento', label: 'Evento', color: '#00FF88', bg: 'rgba(0,255,136,0.04)', border: 'rgba(0,255,136,0.2)' },
-                      { id: 'desmontagem', label: 'Desmontagem', color: '#FFB800', bg: 'rgba(255,184,0,0.05)', border: 'rgba(255,184,0,0.25)' }
+                      { id: 'montagem', label: 'Montagem', color: cores.primaria, bg: tom(cores.primaria, 0.04), border: tom(cores.primaria, 0.2) },
+                      { id: 'evento', label: 'Evento', color: cores.sucesso, bg: 'rgba(0,255,136,0.04)', border: 'rgba(0,255,136,0.2)' },
+                      { id: 'desmontagem', label: 'Desmontagem', color: cores.alerta, bg: 'rgba(255,184,0,0.05)', border: 'rgba(255,184,0,0.25)' }
                     ]
                       .filter(phase => activePhaseTab === 'todas' || activePhaseTab === phase.id)
                       .map(phase => {
@@ -511,7 +511,7 @@ const PessoaFormDialog = ({
                                 <Button 
                                   size="small" 
                                   onClick={() => handleClearPhase ? handleClearPhase(phase.id) : null}
-                                  sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', py: 0.2, px: 1, minWidth: 'auto', border: '1px solid rgba(255,255,255,0.1)', '&:hover': { color: '#FF3366', borderColor: '#FF3366' } }}
+                                  sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', py: 0.2, px: 1, minWidth: 'auto', border: '1px solid rgba(255,255,255,0.1)', '&:hover': { color: cores.erro, borderColor: cores.erro } }}
                                 >
                                   Limpar
                                 </Button>
@@ -537,7 +537,7 @@ const PessoaFormDialog = ({
                                       border: `1px solid ${isChecked ? phase.color : 'rgba(255,255,255,0.1)'}`,
                                       bgcolor: isChecked ? `${phase.color}18` : 'rgba(255,255,255,0.02)',
                                       boxShadow: isChecked ? `0 0 10px ${phase.color}30` : 'none',
-                                      transition: 'all 0.15s ease',
+                                      transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.15s ease',
                                       '&:hover': {
                                         borderColor: phase.color,
                                         bgcolor: `${phase.color}10`
@@ -554,9 +554,9 @@ const PessoaFormDialog = ({
                                       bgcolor: isChecked ? phase.color : 'transparent',
                                       border: `1px solid ${isChecked ? phase.color : 'rgba(255,255,255,0.3)'}`
                                     }}>
-                                      {isChecked && <CheckIcon sx={{ fontSize: 13, color: '#0a1628', fontWeight: 700 }} />}
+                                      {isChecked && <CheckIcon sx={{ fontSize: 13, color: cores.superficie, fontWeight: 700 }} />}
                                     </Box>
-                                    <Typography variant="caption" sx={{ color: isChecked ? '#FFFFFF' : 'rgba(255,255,255,0.7)', fontWeight: isChecked ? 700 : 500, fontSize: '0.75rem' }}>
+                                    <Typography variant="caption" sx={{ color: isChecked ? cores.textoForte : 'rgba(255,255,255,0.7)', fontWeight: isChecked ? 700 : 500, fontSize: '0.75rem' }}>
                                       {date ? format(new Date(date + 'T00:00:00'), "dd/MM") : '--/--'}
                                     </Typography>
                                   </Box>
@@ -573,19 +573,19 @@ const PessoaFormDialog = ({
               {activeStep === 2 && (
                 <Box sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                   <Box>
-                    <Typography variant="subtitle2" sx={{ color: '#FF3366', mb: 1, fontWeight: 700 }}>Verificação de risco operacional</Typography>
+                    <Typography variant="subtitle2" sx={{ color: cores.erro, mb: 1, fontWeight: 700 }}>Verificação de risco operacional</Typography>
                     <Divider sx={{ mb: 1.5, borderColor: 'rgba(255,51,102,0.2)' }} />
                     <FormGroup row>
-                      <FormControlLabel control={<Checkbox checked={formData.trabalho_area_tecnica} onChange={(e) => setFormData({ ...formData, trabalho_area_tecnica: e.target.checked })} sx={{ color: 'rgba(255,51,102,0.3)', '&.Mui-checked': { color: '#FF3366' } }} />} label={<Typography variant="body2">Trabalhará em área técnica confinada</Typography>} />
-                      <FormControlLabel control={<Checkbox checked={formData.trabalho_altura} onChange={(e) => setFormData({ ...formData, trabalho_altura: e.target.checked })} sx={{ color: 'rgba(255,184,0,0.3)', '&.Mui-checked': { color: '#FFB800' } }} />} label={<Typography variant="body2">Executará trabalho em altura</Typography>} />
+                      <FormControlLabel control={<Checkbox checked={formData.trabalho_area_tecnica} onChange={(e) => setFormData({ ...formData, trabalho_area_tecnica: e.target.checked })} sx={{ color: 'rgba(255,51,102,0.3)', '&.Mui-checked': { color: cores.erro } }} />} label={<Typography variant="body2">Trabalhará em área técnica confinada</Typography>} />
+                      <FormControlLabel control={<Checkbox checked={formData.trabalho_altura} onChange={(e) => setFormData({ ...formData, trabalho_altura: e.target.checked })} sx={{ color: 'rgba(255,184,0,0.3)', '&.Mui-checked': { color: cores.alerta } }} />} label={<Typography variant="body2">Executará trabalho em altura</Typography>} />
                     </FormGroup>
                   </Box>
 
                   <Box sx={{ mt: 1 }}>
-                    <Typography variant="subtitle2" sx={{ color: '#00D4FF', mb: 1, fontWeight: 700 }}>DOCUMENTAÇÃO PESSOAL ECM (NRs, ASO, seguros)</Typography>
-                    <Divider sx={{ mb: 1.5, borderColor: 'rgba(0,212,255,0.2)' }} />
+                    <Typography variant="subtitle2" sx={{ color: cores.primaria, mb: 1, fontWeight: 700 }}>DOCUMENTAÇÃO PESSOAL ECM (NRs, ASO, seguros)</Typography>
+                    <Divider sx={{ mb: 1.5, borderColor: tom(cores.primaria, 0.2) }} />
                     {obrigatoriosDaPessoa.length > 0 && (
-                      <Box sx={{ mb: 2, p: 1.5, borderRadius: 1.5, border: '1px solid rgba(0,212,255,0.2)', bgcolor: 'rgba(0,212,255,0.04)' }}>
+                      <Box sx={{ mb: 2, p: 1.5, borderRadius: 1.5, border: '1px solid rgba(0,212,255,0.2)', bgcolor: tom(cores.primaria, 0.04) }}>
                         <ChecklistObrigatorios obrigatorios={obrigatoriosDaPessoa} titulo={`Documentos obrigatórios para ${formData.funcao || 'a função'}`} />
                         <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.6)', mt: 1 }}>
                           Anexe todos. Enquanto faltar algum, o participante fica pendente; a auditoria aprova cada documento.
@@ -594,7 +594,7 @@ const PessoaFormDialog = ({
                     )}
                     {!selectedPessoa ? (
                       <Box sx={{ textAlign: 'center', py: 4 }}>
-                        <CircularProgress size={24} sx={{ color: '#00D4FF', mb: 2 }} />
+                        <CircularProgress size={24} sx={{ color: cores.primaria, mb: 2 }} />
                         <Typography color="text.secondary">Preparando ambiente para documentos...</Typography>
                       </Box>
                     ) : (
@@ -606,26 +606,26 @@ const PessoaFormDialog = ({
                             documentos.map(doc => (
                               <Box key={doc.id} sx={{ p: 1.5, bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 1.5, border: '1px solid rgba(0, 212, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
-                                  <FileIcon sx={{ color: '#00D4FF', flexShrink: 0 }} />
+                                  <FileIcon sx={{ color: cores.primaria, flexShrink: 0 }} />
                                   <Box sx={{ textAlign: 'left', minWidth: 0 }}>
                                     <Typography variant="subtitle2" sx={{ fontWeight: 700 }} noWrap>{doc.titulo}</Typography>
                                     <Typography variant="caption" color="text.secondary" noWrap display="block">{doc.tipo_doc} • Upload {new Date(doc.data_inclusao).toLocaleDateString()}</Typography>
                                   </Box>
                                 </Box>
                                 <Box sx={{ flexShrink: 0 }}>
-                                  {doc.status === 'aprovado' && <CheckCircleIcon sx={{ color: '#00FF88' }} titleAccess="Aprovado" />}
-                                  {doc.status === 'rejeitado' && <CancelIcon sx={{ color: '#FF3366' }} titleAccess="Rejeitado" />}
-                                  {doc.status === 'pendente' && <Typography variant="caption" sx={{ color: '#FFB800', border: '1px solid', px: 1, borderRadius: 1 }}>Pendente</Typography>}
+                                  {doc.status === 'aprovado' && <CheckCircleIcon sx={{ color: cores.sucesso }} titleAccess="Aprovado" />}
+                                  {doc.status === 'rejeitado' && <CancelIcon sx={{ color: cores.erro }} titleAccess="Rejeitado" />}
+                                  {doc.status === 'pendente' && <Typography variant="caption" sx={{ color: cores.alerta, border: '1px solid', px: 1, borderRadius: 1 }}>Pendente</Typography>}
                                 </Box>
                               </Box>
                             ))
                           )}
                         </Stack>
                         <Box sx={{ p: 2, border: '1px dashed rgba(0,212,255,0.3)', borderRadius: 1.5, textAlign: 'center' }}>
-                          <Typography variant="body2" sx={{ color: '#00D4FF', mb: 1.5, fontWeight: 700 }}>Inserir novo documento</Typography>
+                          <Typography variant="body2" sx={{ color: cores.primaria, mb: 1.5, fontWeight: 700 }}>Inserir novo documento</Typography>
                           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="center">
-                            <Button variant="outlined" startIcon={<UploadIcon />} onClick={() => { const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*,application/pdf'; input.onchange = (e) => handleUploadECM(selectedPessoa.id, e.target.files[0]); input.click(); }} sx={{ borderColor: 'rgba(0,212,255,0.3)', color: '#00D4FF' }}>Arquivo / scanner</Button>
-                            <Button variant="outlined" startIcon={<CameraIcon />} onClick={() => handleOpenWebcamECM(selectedPessoa.id)} sx={{ borderColor: 'rgba(123,47,190,0.5)', color: '#7B2FBE' }}>Foto webcam</Button>
+                            <Button variant="outlined" startIcon={<UploadIcon />} onClick={() => { const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*,application/pdf'; input.onchange = (e) => handleUploadECM(selectedPessoa.id, e.target.files[0]); input.click(); }} sx={{ borderColor: tom(cores.primaria, 0.3), color: cores.primaria }}>Arquivo / scanner</Button>
+                            <Button variant="outlined" startIcon={<CameraIcon />} onClick={() => handleOpenWebcamECM(selectedPessoa.id)} sx={{ borderColor: 'rgba(123,47,190,0.5)', color: cores.secundaria }}>Foto webcam</Button>
                           </Stack>
                         </Box>
                       </Box>

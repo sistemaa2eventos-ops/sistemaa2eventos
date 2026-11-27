@@ -10,6 +10,7 @@ import {
 } from '@mui/icons-material';
 import api from '../services/api';
 import { useSnackbar } from 'notistack';
+import { cores, tom } from '../styles/tokens';
 
 export default function PessoasAreaSelect({ eventoId, selectedAreas = [], onAreasChange }) {
     const { enqueueSnackbar } = useSnackbar();
@@ -111,15 +112,15 @@ export default function PessoasAreaSelect({ eventoId, selectedAreas = [], onArea
                                     ? '1.5px solid rgba(0,212,255,0.6)'
                                     : '1px solid rgba(255,255,255,0.08)',
                                 bgcolor: isSelected
-                                    ? 'rgba(0,212,255,0.07)'
+                                    ? tom(cores.primaria, 0.07)
                                     : 'rgba(255,255,255,0.02)',
                                 cursor: 'pointer',
-                                transition: 'all 0.2s',
+                                transition: 'background-color 0.2s, border-color 0.2s, color 0.2s, opacity 0.2s, transform 0.2s',
                                 '&:hover': {
                                     bgcolor: isSelected
-                                        ? 'rgba(0,212,255,0.1)'
+                                        ? tom(cores.primaria, 0.1)
                                         : 'rgba(255,255,255,0.04)',
-                                    borderColor: 'rgba(0,212,255,0.3)',
+                                    borderColor: tom(cores.primaria, 0.3),
                                 },
                             }}
                         >
@@ -181,9 +182,9 @@ export default function PessoasAreaSelect({ eventoId, selectedAreas = [], onArea
                                     onDelete={() => remove(area.id)}
                                     size="small"
                                     sx={{
-                                        bgcolor: 'rgba(0,212,255,0.1)',
+                                        bgcolor: tom(cores.primaria, 0.1),
                                         color: 'primary.main',
-                                        borderColor: 'rgba(0,212,255,0.2)',
+                                        borderColor: tom(cores.primaria, 0.2),
                                         '& .MuiChip-deleteIcon': { color: 'primary.main', opacity: 0.6, '&:hover': { opacity: 1 } },
                                     }}
                                     variant="outlined"

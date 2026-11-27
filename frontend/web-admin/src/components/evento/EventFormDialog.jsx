@@ -23,7 +23,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import NeonButton from '../common/NeonButton';
 
-import { botaoSecundario } from '../../styles/tokens';
+import { botaoSecundario, cores, tom } from '../../styles/tokens';
 const EventFormDialog = ({
     open,
     onClose,
@@ -76,7 +76,7 @@ const EventFormDialog = ({
                 minHeight: 0, 
                 flex: '1 1 auto', 
                 '&::-webkit-scrollbar': { width: '8px' }, 
-                '&::-webkit-scrollbar-thumb': { background: 'rgba(0,212,255,0.4)', borderRadius: '10px' }, 
+                '&::-webkit-scrollbar-thumb': { background: tom(cores.primaria, 0.4), borderRadius: '8px' }, 
                 '&::-webkit-scrollbar-track': { background: 'rgba(255,255,255,0.02)' } 
             }}>
                 <Box sx={{ pr: { xs: 0, md: 1 }, pb: 6, flex: 1 }}>
@@ -148,7 +148,7 @@ const EventFormDialog = ({
 
                         <Divider sx={{ my: 1, borderColor: 'rgba(255,255,255,0.05)' }} />
 
-                        <Typography variant="subtitle2" sx={{ color: '#00D4FF', fontWeight: 700, mb: 1 }}>
+                        <Typography variant="subtitle2" sx={{ color: cores.primaria, fontWeight: 700, mb: 1 }}>
                             Configurações de fluxo
                         </Typography>
 
@@ -167,7 +167,7 @@ const EventFormDialog = ({
                                 Ditará se o check-in dispara comando de impressão térmica.
                             </Typography>
 
-                            <Typography variant="caption" sx={{ color: '#FFFFFF', fontWeight: 700, display: 'block', mb: 1, ml: 1 }}>
+                            <Typography variant="caption" sx={{ color: cores.textoForte, fontWeight: 700, display: 'block', mb: 1, ml: 1 }}>
                                 Métodos de check-in permitidos
                             </Typography>
                             <FormGroup row sx={{ ml: 1, mb: 2 }}>
@@ -198,7 +198,7 @@ const EventFormDialog = ({
                                 ))}
                             </FormGroup>
 
-                            <Typography variant="caption" sx={{ color: '#FFFFFF', fontWeight: 700, display: 'block', mb: 1, ml: 1 }}>
+                            <Typography variant="caption" sx={{ color: cores.textoForte, fontWeight: 700, display: 'block', mb: 1, ml: 1 }}>
                                 Métodos de check-out permitidos
                             </Typography>
                             <FormGroup row sx={{ ml: 1 }}>
@@ -232,7 +232,7 @@ const EventFormDialog = ({
 
                         <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.05)' }} />
 
-                        <Typography variant="subtitle2" sx={{ color: '#7B2FBE', fontWeight: 700, mb: 1 }}>
+                        <Typography variant="subtitle2" sx={{ color: cores.secundaria, fontWeight: 700, mb: 1 }}>
                             Identidade visual do evento
                         </Typography>
 
@@ -243,7 +243,7 @@ const EventFormDialog = ({
                                         label="Cor primária"
                                         type="color"
                                         fullWidth
-                                        value={formData.cor_primaria || '#00D4FF'}
+                                        value={formData.cor_primaria || cores.primaria}
                                         onChange={(e) => setFormData({ ...formData, cor_primaria: e.target.value })}
                                         InputLabelProps={{ shrink: true }}
                                         helperText="Cor principal do evento"
@@ -254,7 +254,7 @@ const EventFormDialog = ({
                                         label="Cor secundária"
                                         type="color"
                                         fullWidth
-                                        value={formData.cor_secundaria || '#7B2FBE'}
+                                        value={formData.cor_secundaria || cores.secundaria}
                                         onChange={(e) => setFormData({ ...formData, cor_secundaria: e.target.value })}
                                         InputLabelProps={{ shrink: true }}
                                         helperText="Cor de destaque"
@@ -297,9 +297,9 @@ const EventFormDialog = ({
                         ) : (
                             <Stack spacing={4} sx={{ mb: 4 }}>
                                 {[
-                                    { id: 'montagem', label: 'Montagem', color: '#00D4FF', bg: 'rgba(0,212,255,0.04)', border: 'rgba(0,212,255,0.15)' },
-                                    { id: 'evento', label: 'Evento', color: '#00FF88', bg: 'rgba(0,255,136,0.04)', border: 'rgba(0,255,136,0.15)' },
-                                    { id: 'desmontagem', label: 'Desmontagem', color: '#FFB800', bg: 'rgba(255,184,0,0.05)', border: 'rgba(255,184,0,0.25)' }
+                                    { id: 'montagem', label: 'Montagem', color: cores.primaria, bg: tom(cores.primaria, 0.04), border: tom(cores.primaria, 0.15) },
+                                    { id: 'evento', label: 'Evento', color: cores.sucesso, bg: 'rgba(0,255,136,0.04)', border: 'rgba(0,255,136,0.15)' },
+                                    { id: 'desmontagem', label: 'Desmontagem', color: cores.alerta, bg: 'rgba(255,184,0,0.05)', border: 'rgba(255,184,0,0.25)' }
                                 ].map(phase => {
                                     const selectedCount = (formData[`datas_${phase.id}`] || []).length;
                                     const allDates = generateDateRange();
@@ -357,7 +357,7 @@ const EventFormDialog = ({
                                                             }
                                                             label={
                                                                 <Box sx={{ lineHeight: 1 }}>
-                                                                    <Typography variant="caption" sx={{ fontWeight: isChecked ? 800 : 600, display: 'block', color: isChecked ? '#FFFFFF' : 'rgba(255,255,255,0.7)' }}>
+                                                                    <Typography variant="caption" sx={{ fontWeight: isChecked ? 800 : 600, display: 'block', color: isChecked ? cores.textoForte : 'rgba(255,255,255,0.7)' }}>
                                                                         {format(new Date(date + 'T00:00:00'), "dd/MM")}
                                                                     </Typography>
                                                                     <Typography variant="caption" sx={{ fontSize: '0.75rem', color: isChecked ? phase.color : 'text.secondary' }}>
@@ -372,7 +372,7 @@ const EventFormDialog = ({
                                                                 borderRadius: 1.5,
                                                                 border: `1px solid ${isChecked ? phase.color : 'rgba(255,255,255,0.06)'}`,
                                                                 bgcolor: isChecked ? phase.bg : 'rgba(255,255,255,0.02)',
-                                                                transition: 'all 0.15s ease',
+                                                                transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.15s ease',
                                                                 '&:hover': { background: 'rgba(255,255,255,0.05)' }
                                                             }}
                                                         />

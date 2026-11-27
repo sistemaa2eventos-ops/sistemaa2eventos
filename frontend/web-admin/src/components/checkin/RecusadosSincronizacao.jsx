@@ -3,6 +3,7 @@ import { Box, Button, Stack, Typography } from '@mui/material';
 import { ErrorOutline as RecusaIcon } from '@mui/icons-material';
 
 import localCheckinService from '../../services/LocalCheckinService';
+import { cores } from '../../styles/tokens';
 
 const ROTULO_TIPO = { checkout: 'Saída', checkin: 'Entrada' };
 
@@ -14,7 +15,7 @@ const descreverCodigo = (payload = {}) => (
  * Acessos feitos sem internet que o servidor recusou ao sincronizar (status erro_negocio).
  * Ficam aqui até o operador dispensar: antes, nenhuma tela mostrava essa recusa.
  */
-const RecusadosSincronizacao = ({ cor = '#FF3366' }) => {
+const RecusadosSincronizacao = ({ cor = cores.erro }) => {
     const [itens, setItens] = useState([]);
     const [dispensando, setDispensando] = useState(false);
 
@@ -64,7 +65,7 @@ const RecusadosSincronizacao = ({ cor = '#FF3366' }) => {
                 <Typography variant="body2" fontWeight={700} sx={{ color: '#FFB3C6', display: 'flex', alignItems: 'center', gap: 0.75 }}>
                     <RecusaIcon sx={{ fontSize: 18 }} /> Recusados pelo servidor ({itens.length})
                 </Typography>
-                <Button size="small" onClick={dispensarTodos} disabled={dispensando} sx={{ color: '#FFFFFF', textTransform: 'none', fontWeight: 700 }}>
+                <Button size="small" onClick={dispensarTodos} disabled={dispensando} sx={{ color: cores.textoForte, textTransform: 'none', fontWeight: 700 }}>
                     Dispensar todos
                 </Button>
             </Stack>
@@ -83,7 +84,7 @@ const RecusadosSincronizacao = ({ cor = '#FF3366' }) => {
                                 {item.observacao || 'Recusado pelo servidor'}
                             </Typography>
                         </Box>
-                        <Button size="small" onClick={() => dispensar(item.id)} sx={{ color: '#FFFFFF', textTransform: 'none', flexShrink: 0 }}>
+                        <Button size="small" onClick={() => dispensar(item.id)} sx={{ color: cores.textoForte, textTransform: 'none', flexShrink: 0 }}>
                             Dispensar
                         </Button>
                     </Stack>

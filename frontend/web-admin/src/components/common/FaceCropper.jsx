@@ -16,6 +16,7 @@ import {
     Search as ZoomIcon,
     RestartAlt as ResetIcon
 } from '@mui/icons-material';
+import { cores, tom } from '../../styles/tokens';
 
 const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
     const [scale, setScale] = useState(1);
@@ -79,7 +80,7 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
         if (!ctx) return;
 
         // Fundo branco
-        ctx.fillStyle = '#FFFFFF';
+        ctx.fillStyle = cores.textoForte;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         // Calcular o fator de escala real entre o preview e a imagem original
@@ -144,7 +145,7 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
             </IconButton>
             <DialogTitle sx={{ textAlign: 'center', pt: { xs: 5, sm: 6 }, pb: { xs: 1, sm: 2 } }} component="div">
                 <Typography variant="h4" sx={{
-                    color: '#FFFFFF',
+                    color: cores.textoForte,
                     fontFamily: '"Space Grotesk", sans-serif',
                     fontWeight: 700,
                     letterSpacing: { xs: 2, sm: 4 },
@@ -255,7 +256,7 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
                 </Box>
 
                 <Stack direction="row" spacing={3} alignItems="center" sx={{ width: '80%', mt: 6 }}>
-                    <ZoomIcon sx={{ color: '#00D4FF', fontSize: 24 }} />
+                    <ZoomIcon sx={{ color: cores.primaria, fontSize: 24 }} />
                     <Slider
                         value={scale}
                         min={0.1}
@@ -263,12 +264,12 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
                         step={0.01}
                         onChange={(e, val) => setScale(val)}
                         sx={{
-                            color: '#00D4FF',
+                            color: cores.primaria,
                             '& .MuiSlider-thumb': {
                                 width: 22,
                                 height: 22,
                                 border: '2px solid currentColor',
-                                bgcolor: '#00D4FF',
+                                bgcolor: cores.primaria,
                                 boxShadow: '0 0 15px rgba(0, 212, 255, 0.5)'
                             },
                             '& .MuiSlider-rail': { opacity: 0.2 },
@@ -279,12 +280,12 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
                         onClick={handleReset}
                         startIcon={<ResetIcon />}
                         sx={{
-                            color: '#00D4FF',
+                            color: cores.primaria,
                             fontWeight: 700,
                             fontFamily: 'Inter',
                             textTransform: 'none',
                             fontSize: '0.875rem',
-                            '&:hover': { bgcolor: 'rgba(0,212,255,0.1)' }
+                            '&:hover': { bgcolor: tom(cores.primaria, 0.1) }
                         }}
                     >
                         Resetar
@@ -298,7 +299,7 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
                     onClick={handleConfirm}
                     fullWidth
                     sx={{
-                        bgcolor: '#00D4FF',
+                        bgcolor: cores.primaria,
                         color: '#000000',
                         fontWeight: 700,
                         maxWidth: { xs: '100%', sm: 300 },
@@ -308,7 +309,7 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
                         fontSize: '1.25rem',
                         letterSpacing: 1,
                         boxShadow: '0 4px 15px rgba(0, 212, 255, 0.4)',
-                        '&:hover': { bgcolor: '#00D4FF' }
+                        '&:hover': { bgcolor: cores.primaria }
                     }}
                 >
                     Salvar
@@ -318,8 +319,8 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
                     onClick={onClose}
                     fullWidth
                     sx={{
-                        color: '#FFFFFF',
-                        borderColor: '#00D4FF',
+                        color: cores.textoForte,
+                        borderColor: cores.primaria,
                         maxWidth: { xs: '100%', sm: 300 },
                         py: 2,
                         borderRadius: 1.5,
@@ -330,8 +331,8 @@ const FaceCropper = ({ image, open, onClose, onCropComplete }) => {
                         borderWidth: '2px',
                         '&:hover': {
                             borderWidth: '2px',
-                            bgcolor: 'rgba(0, 212, 255, 0.05)',
-                            borderColor: '#00D4FF'
+                            bgcolor: tom(cores.primaria, 0.05),
+                            borderColor: cores.primaria
                         }
                     }}
                 >

@@ -22,12 +22,13 @@ import api from '../services/api';
 import { useConfirmacao } from '../contexts/ConfirmacaoContext';
 
 import { comoRotulo } from '../utils/formatadores';
+import { cores, tom } from '../styles/tokens';
 const STATUS_COLORS = {
-    confirmado: { bg: 'rgba(0,255,136,0.1)', color: '#00FF88', label: 'Confirmado' },
-    pendente: { bg: 'rgba(255,184,0,0.1)', color: '#FFB800', label: 'Pendente' },
-    rejeitado: { bg: 'rgba(255,51,102,0.1)', color: '#FF3366', label: 'Rejeitado' },
-    cancelado: { bg: 'rgba(255,51,102,0.1)', color: '#FF3366', label: 'Cancelado' },
-    reconciliado: { bg: 'rgba(0,212,255,0.1)', color: '#00D4FF', label: 'Reconciliado' },
+    confirmado: { bg: 'rgba(0,255,136,0.1)', color: cores.sucesso, label: 'Confirmado' },
+    pendente: { bg: 'rgba(255,184,0,0.1)', color: cores.alerta, label: 'Pendente' },
+    rejeitado: { bg: 'rgba(255,51,102,0.1)', color: cores.erro, label: 'Rejeitado' },
+    cancelado: { bg: 'rgba(255,51,102,0.1)', color: cores.erro, label: 'Cancelado' },
+    reconciliado: { bg: tom(cores.primaria, 0.1), color: cores.primaria, label: 'Reconciliado' },
 };
 
 const KpiCard = ({ icon, label, value, color, sub }) => (
@@ -138,16 +139,16 @@ export default function Financeiro() {
             {/* KPI Cards */}
             <Grid container spacing={3} sx={{ mb: 3 }}>
                 <Grid item xs={6} md={3}>
-                    <KpiCard icon={<TrendingUpIcon />} label="Total recebido" value={formatCurrency(kpis.total_recebido)} color="#00FF88" sub={`${kpis.total || 0} transações`} />
+                    <KpiCard icon={<TrendingUpIcon />} label="Total recebido" value={formatCurrency(kpis.total_recebido)} color={cores.sucesso} sub={`${kpis.total || 0} transações`} />
                 </Grid>
                 <Grid item xs={6} md={3}>
-                    <KpiCard icon={<WarningIcon />} label="Pendentes" value={kpis.pendentes || 0} color="#FFB800" sub="Aguardando confirmação" />
+                    <KpiCard icon={<WarningIcon />} label="Pendentes" value={kpis.pendentes || 0} color={cores.alerta} sub="Aguardando confirmação" />
                 </Grid>
                 <Grid item xs={6} md={3}>
-                    <KpiCard icon={<BlockIcon />} label="Rejeitados" value={kpis.rejeitados || 0} color="#FF3366" sub="Falha ou cancelamento" />
+                    <KpiCard icon={<BlockIcon />} label="Rejeitados" value={kpis.rejeitados || 0} color={cores.erro} sub="Falha ou cancelamento" />
                 </Grid>
                 <Grid item xs={6} md={3}>
-                    <KpiCard icon={<CheckIcon />} label="Taxa de sucesso" value={`${kpis.taxa_sucesso || 0}%`} color="#00D4FF" sub="Confirmados / Total" />
+                    <KpiCard icon={<CheckIcon />} label="Taxa de sucesso" value={`${kpis.taxa_sucesso || 0}%`} color={cores.primaria} sub="Confirmados / Total" />
                 </Grid>
             </Grid>
 
@@ -183,7 +184,7 @@ export default function Financeiro() {
                     <Box sx={{ flex: 1 }} />
                     <Tooltip title="Atualizar"><IconButton onClick={() => fetchTransactions(pagination.page)} color="primary"><RefreshIcon /></IconButton></Tooltip>
                     <Button variant="outlined" size="small" startIcon={<DownloadIcon />} onClick={handleExportCSV}
-                        sx={{ color: '#00D4FF', borderColor: 'rgba(0,212,255,0.3)', fontWeight: 700, fontSize: '0.75rem' }}>
+                        sx={{ color: cores.primaria, borderColor: tom(cores.primaria, 0.3), fontWeight: 700, fontSize: '0.75rem' }}>
                         CSV
                     </Button>
                 </Box>
@@ -222,12 +223,12 @@ export default function Financeiro() {
                                                 <TableCell sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
                                                     {tx.webhook_received_at ? new Date(tx.webhook_received_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
                                                 </TableCell>
-                                                <TableCell sx={{ fontWeight: 600, color: '#FFFFFF', fontSize: '0.8125rem' }}>{tx.pessoas?.nome || '-'}</TableCell>
+                                                <TableCell sx={{ fontWeight: 600, color: cores.textoForte, fontSize: '0.8125rem' }}>{tx.pessoas?.nome || '-'}</TableCell>
                                                 <TableCell sx={{ fontSize: '0.75rem', color: 'text.secondary', fontFamily: '"Inter", sans-serif' }}>{tx.pessoas?.cpf || '-'}</TableCell>
-                                                <TableCell align="right" sx={{ fontWeight: 700, color: '#00FF88', fontSize: '0.875rem' }}>{formatCurrency(tx.valor)}</TableCell>
+                                                <TableCell align="right" sx={{ fontWeight: 700, color: cores.sucesso, fontSize: '0.875rem' }}>{formatCurrency(tx.valor)}</TableCell>
                                                 <TableCell>
                                                     <Chip label={comoRotulo(tx.provider || '-')} size="small"
-                                                        sx={{ fontWeight: 700, fontSize: '0.75rem', height: 22, bgcolor: tx.provider === 'stripe' ? 'rgba(123,47,190,0.1)' : 'rgba(0,212,255,0.1)', color: tx.provider === 'stripe' ? '#7B2FBE' : '#00D4FF' }} />
+                                                        sx={{ fontWeight: 700, fontSize: '0.75rem', height: 22, bgcolor: tx.provider === 'stripe' ? 'rgba(123,47,190,0.1)' : tom(cores.primaria, 0.1), color: tx.provider === 'stripe' ? cores.secundaria : cores.primaria }} />
                                                 </TableCell>
                                                 <TableCell>
                                                     <Chip label={st.label} size="small"
@@ -239,7 +240,7 @@ export default function Financeiro() {
                                                 <TableCell align="center">
                                                     {tx.status === 'pendente' && (
                                                         <Tooltip title="Reconciliar manualmente">
-                                                            <IconButton size="small" onClick={() => handleReconcile(tx.id)} sx={{ color: '#00D4FF' }}>
+                                                            <IconButton size="small" onClick={() => handleReconcile(tx.id)} sx={{ color: cores.primaria }}>
                                                                 <ReconcileIcon fontSize="small" />
                                                             </IconButton>
                                                         </Tooltip>

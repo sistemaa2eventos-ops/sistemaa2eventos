@@ -119,7 +119,7 @@ const PainelContagemFotoPilha = ({
                     ctx.fillStyle = 'rgba(16, 185, 129, 0.12)';
                     ctx.fill();
                     ctx.lineWidth = Math.max(2.5, 3.2 * scaleFont);
-                    ctx.strokeStyle = '#10B981';
+                    ctx.strokeStyle = cores.sucesso;
                     ctx.stroke();
 
                     // Etiqueta pill verde acima da caixa
@@ -132,7 +132,7 @@ const PainelContagemFotoPilha = ({
                     const pillY = Math.max(6, y - pillH - 4);
 
                     desenharRetanguloArredondado(ctx, pillX, pillY, pillW, pillH, 7);
-                    ctx.fillStyle = '#10B981';
+                    ctx.fillStyle = cores.sucesso;
                     ctx.fill();
                     ctx.fillStyle = '#06281E';
                     ctx.textBaseline = 'middle';
@@ -156,7 +156,7 @@ const PainelContagemFotoPilha = ({
                 ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
                 ctx.fill();
                 ctx.lineWidth = Math.max(2, 2.5 * scaleFont);
-                ctx.strokeStyle = '#F59E0B';
+                ctx.strokeStyle = cores.alerta;
                 ctx.stroke();
 
                 const texto = `${nr.quantidade}x ${nr.descricao}`;
@@ -168,7 +168,7 @@ const PainelContagemFotoPilha = ({
                 const pillY = Math.max(6, y - pillH - 4);
 
                 desenharRetanguloArredondado(ctx, pillX, pillY, pillW, pillH, 6);
-                ctx.fillStyle = '#F59E0B';
+                ctx.fillStyle = cores.alerta;
                 ctx.fill();
                 ctx.fillStyle = '#1C1917';
                 ctx.textBaseline = 'middle';
@@ -187,9 +187,9 @@ const PainelContagemFotoPilha = ({
             ctx.fill();
             ctx.beginPath();
             ctx.arc(16 + 18 * scaleFont, 16 + badgeH / 2, 5 * scaleFont, 0, Math.PI * 2);
-            ctx.fillStyle = '#10B981';
+            ctx.fillStyle = cores.sucesso;
             ctx.fill();
-            ctx.fillStyle = '#F8FAFC';
+            ctx.fillStyle = cores.textoForte;
             ctx.textBaseline = 'middle';
             ctx.fillText(localTxt, 16 + 30 * scaleFont, 16 + badgeH / 2 + 1);
 
@@ -199,7 +199,7 @@ const PainelContagemFotoPilha = ({
             desenharRetanguloArredondado(ctx, cw - totalW - 16, 16, totalW, badgeH, badgeH / 2);
             ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
             ctx.fill();
-            ctx.fillStyle = '#F8FAFC';
+            ctx.fillStyle = cores.textoForte;
             ctx.fillText(totalTxt, cw - totalW - 2, 16 + badgeH / 2 + 1);
             ctx.restore();
         };
@@ -367,7 +367,7 @@ const PainelContagemFotoPilha = ({
                 <Grid item xs={12} lg={7}>
                     <Box
                         sx={{
-                            borderRadius: 2,
+                            borderRadius: 1.5,
                             overflow: 'hidden',
                             border: `1px solid ${resultadoIa ? funcao.liberado : cores.borda}`,
                             bgcolor: cores.fundo
@@ -490,7 +490,7 @@ const PainelContagemFotoPilha = ({
                         )}
 
                         {resultadoIa && (
-                            <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: cores.superficieElevada, border: `1px solid ${cores.borda}` }}>
+                            <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: cores.superficieElevada, border: `1px solid ${cores.borda}` }}>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.25 }}>
                                     <Typography sx={{ fontSize: tamanhos.sm, fontWeight: 700, color: cores.textoForte }}>
                                         Resultado identificado ({resultadoIa.modelo_ia_versao})

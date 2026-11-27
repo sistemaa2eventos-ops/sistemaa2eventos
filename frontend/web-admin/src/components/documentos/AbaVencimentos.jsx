@@ -6,6 +6,7 @@ import { useSnackbar } from 'notistack';
 import api from '../../services/api';
 import ListaDocumentos from './ListaDocumentos';
 import { chipSx } from './documentosUtils';
+import { cores } from '../../styles/tokens';
 
 /**
  * Documentos vencidos e a vencer (janela padrão = configuração do evento).
@@ -48,7 +49,7 @@ const AbaVencimentos = ({ onAuditar, recarregarToken }) => {
         <Box>
             <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
                 <TextField select size="small" label="Janela" value={dias} onChange={(e) => setDias(e.target.value)}
-                    sx={{ minWidth: 220, '& .MuiOutlinedInput-root': { color: '#FFFFFF' } }}>
+                    sx={{ minWidth: 220, '& .MuiOutlinedInput-root': { color: cores.textoForte } }}>
                     <MenuItem value="">Padrão do evento{dados.janela_dias ? ` (${dados.janela_dias} dias)` : ''}</MenuItem>
                     {[7, 15, 30, 60, 90].map(n => <MenuItem key={n} value={n}>Próximos {n} dias</MenuItem>)}
                 </TextField>
@@ -58,15 +59,15 @@ const AbaVencimentos = ({ onAuditar, recarregarToken }) => {
             </Stack>
 
             {carregando ? (
-                <Box sx={{ textAlign: 'center', py: 4 }}><CircularProgress sx={{ color: '#00D4FF' }} /></Box>
+                <Box sx={{ textAlign: 'center', py: 4 }}><CircularProgress sx={{ color: cores.primaria }} /></Box>
             ) : dados.data.length === 0 ? (
-                <Typography sx={{ color: '#00FF88', textAlign: 'center', py: 6, fontWeight: 700 }}>
+                <Typography sx={{ color: cores.sucesso, textAlign: 'center', py: 6, fontWeight: 700 }}>
                     Nenhum documento vencido ou a vencer na janela selecionada.
                 </Typography>
             ) : (
                 <>
-                    <Grupo titulo="Vencidos" cor="#FF3366" itens={vencidos} />
-                    <Grupo titulo="A vencer" cor="#FFB800" itens={aVencer} />
+                    <Grupo titulo="Vencidos" cor={cores.erro} itens={vencidos} />
+                    <Grupo titulo="A vencer" cor={cores.alerta} itens={aVencer} />
                 </>
             )}
         </Box>

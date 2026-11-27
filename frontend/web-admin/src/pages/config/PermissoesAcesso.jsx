@@ -381,9 +381,9 @@ const PermissoesAcesso = () => {
                         textTransform: 'none',
                         minHeight: 48,
                         gap: 1,
-                        '&.Mui-selected': { color: '#00D4FF', fontWeight: 700 }
+                        '&.Mui-selected': { color: cores.primaria, fontWeight: 700 }
                     },
-                    '& .MuiTabs-indicator': { bgcolor: '#00D4FF' }
+                    '& .MuiTabs-indicator': { bgcolor: cores.primaria }
                 }}
             >
                 <Tab icon={<PeopleIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Operadores do Sistema Web" />
@@ -411,7 +411,7 @@ const PermissoesAcesso = () => {
                                 title="Modelo Padrão Ativo"
                                 value={metricas.nomePadrao}
                                 icon={<StarIcon />}
-                                color="#FFB800"
+                                color={cores.alerta}
                                 caption="Herdado em novos operadores"
                             />
                         </Grid>
@@ -429,7 +429,7 @@ const PermissoesAcesso = () => {
                                 title="Perfis com Restrições"
                                 value={metricas.comRestricoes}
                                 icon={<SecurityIcon />}
-                                color="#A855F7"
+                                color={cores.secundariaClara}
                                 caption="Travas granulares ou horários"
                             />
                         </Grid>
@@ -461,7 +461,7 @@ const PermissoesAcesso = () => {
                                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5, gap: 1 }}>
                                                 <Box sx={{ minWidth: 0, flex: 1 }}>
                                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.5 }}>
-                                                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF', fontSize: '1.0625rem' }}>
+                                                        <Typography variant="h6" sx={{ fontWeight: 700, color: cores.textoForte, fontSize: '1.0625rem' }}>
                                                             {modelo.nome}
                                                         </Typography>
                                                         {modelo.padrao && (
@@ -471,7 +471,7 @@ const PermissoesAcesso = () => {
                                                                 size="small"
                                                                 sx={{
                                                                     bgcolor: 'rgba(255, 184, 0, 0.12)',
-                                                                    color: '#FFB800',
+                                                                    color: cores.alerta,
                                                                     border: '1px solid rgba(255, 184, 0, 0.4)',
                                                                     fontWeight: 700,
                                                                     fontSize: '0.6875rem'
@@ -489,7 +489,7 @@ const PermissoesAcesso = () => {
                                                         <IconButton
                                                             size="small"
                                                             onClick={() => abrirEditarModelo(modelo)}
-                                                            sx={{ color: '#00D4FF', '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.1)' } }}
+                                                            sx={{ color: cores.primaria, '&:hover': { bgcolor: tom(cores.primaria, 0.1) } }}
                                                         >
                                                             <EditIcon sx={{ fontSize: 18 }} />
                                                         </IconButton>
@@ -508,7 +508,7 @@ const PermissoesAcesso = () => {
                                                             <IconButton
                                                                 size="small"
                                                                 onClick={() => setModeloParaExcluir(modelo)}
-                                                                sx={{ color: '#EF4444', '&:hover': { bgcolor: 'rgba(239, 68, 68, 0.1)' } }}
+                                                                sx={{ color: cores.erro, '&:hover': { bgcolor: 'rgba(239, 68, 68, 0.1)' } }}
                                                             >
                                                                 <DeleteIcon sx={{ fontSize: 18 }} />
                                                             </IconButton>
@@ -530,9 +530,9 @@ const PermissoesAcesso = () => {
                                                     }
                                                     size="small"
                                                     sx={{
-                                                        bgcolor: modelo.modo_tela === 'quiosque' ? 'rgba(239, 68, 68, 0.12)' : 'rgba(0, 212, 255, 0.08)',
-                                                        color: modelo.modo_tela === 'quiosque' ? '#F87171' : '#00D4FF',
-                                                        border: `1px solid ${modelo.modo_tela === 'quiosque' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(0, 212, 255, 0.25)'}`,
+                                                        bgcolor: modelo.modo_tela === 'quiosque' ? 'rgba(239, 68, 68, 0.12)' : tom(cores.primaria, 0.08),
+                                                        color: modelo.modo_tela === 'quiosque' ? '#F87171' : cores.primaria,
+                                                        border: `1px solid ${modelo.modo_tela === 'quiosque' ? 'rgba(239, 68, 68, 0.3)' : tom(cores.primaria, 0.25)}`,
                                                         fontSize: '0.75rem',
                                                         fontWeight: 600
                                                     }}
@@ -542,7 +542,7 @@ const PermissoesAcesso = () => {
                                                     size="small"
                                                     sx={{
                                                         bgcolor: 'rgba(255,255,255,0.05)',
-                                                        color: '#FFFFFF',
+                                                        color: cores.textoForte,
                                                         border: '1px solid rgba(255,255,255,0.12)',
                                                         fontSize: '0.75rem'
                                                     }}
@@ -552,7 +552,7 @@ const PermissoesAcesso = () => {
                                                     size="small"
                                                     sx={{
                                                         bgcolor: qtdModulosAtivos > 0 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255,255,255,0.05)',
-                                                        color: qtdModulosAtivos > 0 ? '#10B981' : 'rgba(255,255,255,0.5)',
+                                                        color: qtdModulosAtivos > 0 ? cores.sucesso : 'rgba(255,255,255,0.5)',
                                                         border: `1px solid ${qtdModulosAtivos > 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255,255,255,0.1)'}`,
                                                         fontSize: '0.75rem'
                                                     }}
@@ -577,7 +577,7 @@ const PermissoesAcesso = () => {
                                                         size="small"
                                                         sx={{
                                                             bgcolor: 'rgba(245, 158, 11, 0.12)',
-                                                            color: '#FBBF24',
+                                                            color: cores.alerta,
                                                             border: '1px solid rgba(245, 158, 11, 0.3)',
                                                             fontSize: '0.75rem'
                                                         }}
@@ -599,7 +599,7 @@ const PermissoesAcesso = () => {
                                                             sx={{
                                                                 height: 20,
                                                                 fontSize: '0.6875rem',
-                                                                bgcolor: 'rgba(0, 212, 255, 0.06)',
+                                                                bgcolor: tom(cores.primaria, 0.06),
                                                                 color: 'rgba(255,255,255,0.85)',
                                                                 border: '1px solid rgba(0, 212, 255, 0.15)'
                                                             }}
@@ -627,7 +627,7 @@ const PermissoesAcesso = () => {
                                                             size="small"
                                                             variant="text"
                                                             onClick={() => handleDefinirPadrao(modelo)}
-                                                            sx={{ fontSize: '0.75rem', color: '#FFB800', textTransform: 'none' }}
+                                                            sx={{ fontSize: '0.75rem', color: cores.alerta, textTransform: 'none' }}
                                                         >
                                                             Definir como Padrão
                                                         </Button>
@@ -639,10 +639,10 @@ const PermissoesAcesso = () => {
                                                         onClick={() => setModeloParaAplicar(modelo)}
                                                         sx={{
                                                             fontSize: '0.75rem',
-                                                            color: '#00D4FF',
-                                                            borderColor: 'rgba(0, 212, 255, 0.3)',
+                                                            color: cores.primaria,
+                                                            borderColor: tom(cores.primaria, 0.3),
                                                             textTransform: 'none',
-                                                            '&:hover': { borderColor: '#00D4FF', bgcolor: 'rgba(0, 212, 255, 0.08)' }
+                                                            '&:hover': { borderColor: cores.primaria, bgcolor: tom(cores.primaria, 0.08) }
                                                         }}
                                                     >
                                                         Aplicar aos Operadores
@@ -661,7 +661,7 @@ const PermissoesAcesso = () => {
             {/* ABA 1: EQUIPE DE PRODUÇÃO (PORTAL DO PRODUTOR) */}
             {abaPrincipal === 1 && (
                 <Stack spacing={3}>
-                    <Alert severity="info" sx={{ bgcolor: 'rgba(0, 212, 255, 0.08)', color: '#FFFFFF', border: '1px solid rgba(0, 212, 255, 0.2)' }}>
+                    <Alert severity="info" sx={{ bgcolor: tom(cores.primaria, 0.08), color: cores.textoForte, border: '1px solid rgba(0, 212, 255, 0.2)' }}>
                         <b>Isolamento de Segurança por Evento:</b> Os produtores possuem credenciais isoladas cadastradas diretamente na aba de <b>Produção</b> de cada evento. Eles acessam o <b>Portal do Produtor</b> (mobile-first) e não possuem acesso às telas administrativas nem a dados globais do sistema.
                     </Alert>
 
@@ -669,44 +669,44 @@ const PermissoesAcesso = () => {
                         {/* Matriz dos 4 Papéis de Produção */}
                         <Grid item xs={12} md={7}>
                             <GlassCard sx={{ p: 3, height: '100%' }}>
-                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#00D4FF', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography variant="h6" sx={{ fontWeight: 700, color: cores.primaria, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
                                     <EngineeringIcon /> Papéis da Produção & Matriz de Acesso
                                 </Typography>
                                 <Stack spacing={2}>
-                                    <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                    <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#00D4FF' }}>Produtor Geral</Typography>
-                                            <Chip label="Acesso Amplo de Campo" size="small" sx={{ bgcolor: 'rgba(0, 212, 255, 0.1)', color: '#00D4FF', fontSize: '0.7rem' }} />
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: cores.primaria }}>Produtor Geral</Typography>
+                                            <Chip label="Acesso Amplo de Campo" size="small" sx={{ bgcolor: tom(cores.primaria, 0.1), color: cores.primaria, fontSize: '0.75rem' }} />
                                         </Box>
                                         <Typography variant="body2" sx={{ color: cores.textoSecundario, fontSize: '0.8125rem' }}>
                                             Visualiza todas as áreas do evento, orçamentos, aprovação de presenças da equipe e edição de plantas colaborativas.
                                         </Typography>
                                     </Box>
 
-                                    <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                    <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#10B981' }}>Produtor de Área</Typography>
-                                            <Chip label="Escopo Delimitado" size="small" sx={{ bgcolor: 'rgba(16, 185, 129, 0.1)', color: '#10B981', fontSize: '0.7rem' }} />
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: cores.sucesso }}>Produtor de Área</Typography>
+                                            <Chip label="Escopo Delimitado" size="small" sx={{ bgcolor: 'rgba(16, 185, 129, 0.1)', color: cores.sucesso, fontSize: '0.75rem' }} />
                                         </Box>
                                         <Typography variant="body2" sx={{ color: cores.textoSecundario, fontSize: '0.8125rem' }}>
                                             Restrito exclusivamente à sua área física designada (Palco, Camarote, Portaria, Pista), checklists de montagem e tarefas locais.
                                         </Typography>
                                     </Box>
 
-                                    <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                    <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#FBBF24' }}>Técnico / Operacional</Typography>
-                                            <Chip label="Execução de Tarefas" size="small" sx={{ bgcolor: 'rgba(245, 158, 11, 0.1)', color: '#FBBF24', fontSize: '0.7rem' }} />
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: cores.alerta }}>Técnico / Operacional</Typography>
+                                            <Chip label="Execução de Tarefas" size="small" sx={{ bgcolor: 'rgba(245, 158, 11, 0.1)', color: cores.alerta, fontSize: '0.75rem' }} />
                                         </Box>
                                         <Typography variant="body2" sx={{ color: cores.textoSecundario, fontSize: '0.8125rem' }}>
                                             Acesso direto aos checklists e cronogramas operacionais de montagem e ponto de presença. Sem acesso a cachês ou orçamentos.
                                         </Typography>
                                     </Box>
 
-                                    <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                    <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#A855F7' }}>Financeiro de Produção</Typography>
-                                            <Chip label="Conferência de Custos" size="small" sx={{ bgcolor: 'rgba(168, 85, 247, 0.1)', color: '#A855F7', fontSize: '0.7rem' }} />
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: cores.secundariaClara }}>Financeiro de Produção</Typography>
+                                            <Chip label="Conferência de Custos" size="small" sx={{ bgcolor: 'rgba(168, 85, 247, 0.1)', color: cores.secundariaClara, fontSize: '0.75rem' }} />
                                         </Box>
                                         <Typography variant="body2" sx={{ color: cores.textoSecundario, fontSize: '0.8125rem' }}>
                                             Visualização de diárias, valores de cachê acordados, chaves Pix e relatórios de despesas sem alterar plantas ou projetos técnicos.
@@ -719,8 +719,8 @@ const PermissoesAcesso = () => {
                         {/* Políticas e Diretrizes do Portal */}
                         <Grid item xs={12} md={5}>
                             <GlassCard sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
-                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <ShieldIcon sx={{ color: '#00D4FF' }} /> Diretrizes do Portal do Produtor
+                                <Typography variant="h6" sx={{ fontWeight: 700, color: cores.textoForte, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <ShieldIcon sx={{ color: cores.primaria }} /> Diretrizes do Portal do Produtor
                                 </Typography>
                                 <Stack spacing={2.5} sx={{ flex: 1 }}>
                                     <FormControlLabel
@@ -735,7 +735,7 @@ const PermissoesAcesso = () => {
                                         }
                                         label={
                                             <Box>
-                                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }}>Exigir Termo LGPD no Primeiro Acesso</Typography>
+                                                <Typography variant="body2" sx={{ fontWeight: 600, color: cores.textoForte }}>Exigir Termo LGPD no Primeiro Acesso</Typography>
                                                 <Typography variant="caption" sx={{ color: cores.textoSecundario }}>Obriga a leitura e aceite do termo antes de liberar a visualização de tarefas.</Typography>
                                             </Box>
                                         }
@@ -753,7 +753,7 @@ const PermissoesAcesso = () => {
                                         }
                                         label={
                                             <Box>
-                                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }}>Ocultar Valores de Cachê para Técnicos</Typography>
+                                                <Typography variant="body2" sx={{ fontWeight: 600, color: cores.textoForte }}>Ocultar Valores de Cachê para Técnicos</Typography>
                                                 <Typography variant="caption" sx={{ color: cores.textoSecundario }}>Trava o acesso a valores pagos a terceiros em dispositivos de campo.</Typography>
                                             </Box>
                                         }
@@ -771,7 +771,7 @@ const PermissoesAcesso = () => {
                                         }
                                         label={
                                             <Box>
-                                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }}>Registro de Presença Mobile</Typography>
+                                                <Typography variant="body2" sx={{ fontWeight: 600, color: cores.textoForte }}>Registro de Presença Mobile</Typography>
                                                 <Typography variant="caption" sx={{ color: cores.textoSecundario }}>Permite que a equipe registre entrada de turno pelo smartphone com validação.</Typography>
                                             </Box>
                                         }
@@ -805,7 +805,7 @@ const PermissoesAcesso = () => {
             {/* ABA 2: CENTRAL DE MONITORAMENTO (CFTV LOCAL) */}
             {abaPrincipal === 2 && (
                 <Stack spacing={3}>
-                    <Alert severity="info" sx={{ bgcolor: 'rgba(0, 212, 255, 0.08)', color: '#FFFFFF', border: '1px solid rgba(0, 212, 255, 0.2)' }}>
+                    <Alert severity="info" sx={{ bgcolor: tom(cores.primaria, 0.08), color: cores.textoForte, border: '1px solid rgba(0, 212, 255, 0.2)' }}>
                         <b>Posto Físico Local & Operação Offline:</b> Os operadores da Central de Monitoramento acessam o software instalado diretamente no computador físico do evento. Eles não possuem conta no painel web. Cada ação realizada no CFTV (assistir, movimentar joystick PTZ, ouvir ou falar) é registrada individualmente para conformidade LGPD e segurança do evento.
                     </Alert>
 
@@ -813,26 +813,26 @@ const PermissoesAcesso = () => {
                         {/* Perfis Operacionais de CFTV */}
                         <Grid item xs={12} md={6}>
                             <GlassCard sx={{ p: 3, height: '100%' }}>
-                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#00D4FF', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography variant="h6" sx={{ fontWeight: 700, color: cores.primaria, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
                                     <VideocamIcon /> Perfis de Câmeras & Joystick
                                 </Typography>
                                 <Stack spacing={2}>
-                                    <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#00D4FF', mb: 0.5 }}>Visualizador de Mural</Typography>
+                                    <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: cores.primaria, mb: 0.5 }}>Visualizador de Mural</Typography>
                                         <Typography variant="body2" sx={{ color: cores.textoSecundario, fontSize: '0.8125rem' }}>
                                             Acesso às grades de câmeras ao vivo, mosaicos e mural CFTV. Sem controle de rotação motorizada (PTZ) nem transmissão de áudio.
                                         </Typography>
                                     </Box>
 
-                                    <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#FBBF24', mb: 0.5 }}>Operador Avançado PTZ & Áudio</Typography>
+                                    <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: cores.alerta, mb: 0.5 }}>Operador Avançado PTZ & Áudio</Typography>
                                         <Typography variant="body2" sx={{ color: cores.textoSecundario, fontSize: '0.8125rem' }}>
                                             Controle manual por joystick, movimento 360°, posições gravadas (presets), zoom óptico e canal de áudio bidirecional (alto-falante).
                                         </Typography>
                                     </Box>
 
-                                    <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#10B981', mb: 0.5 }}>Auditoria Contínua (LGPD & LAI)</Typography>
+                                    <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: cores.sucesso, mb: 0.5 }}>Auditoria Contínua (LGPD & LAI)</Typography>
                                         <Typography variant="body2" sx={{ color: cores.textoSecundario, fontSize: '0.8125rem' }}>
                                             Todo login, troca de câmera ou gravação gera uma trilha imutável vinculada ao login do operador da central.
                                         </Typography>
@@ -844,8 +844,8 @@ const PermissoesAcesso = () => {
                         {/* Políticas da Central Local */}
                         <Grid item xs={12} md={6}>
                             <GlassCard sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
-                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <SecurityIcon sx={{ color: '#00D4FF' }} /> Políticas de Segurança da Central
+                                <Typography variant="h6" sx={{ fontWeight: 700, color: cores.textoForte, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <SecurityIcon sx={{ color: cores.primaria }} /> Políticas de Segurança da Central
                                 </Typography>
                                 <Stack spacing={2.5} sx={{ flex: 1 }}>
                                     <FormControl fullWidth size="small">
@@ -877,7 +877,7 @@ const PermissoesAcesso = () => {
                                         }
                                         label={
                                             <Box>
-                                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }}>Confirmação para Assumir PTZ</Typography>
+                                                <Typography variant="body2" sx={{ fontWeight: 600, color: cores.textoForte }}>Confirmação para Assumir PTZ</Typography>
                                                 <Typography variant="caption" sx={{ color: cores.textoSecundario }}>Evita que dois operadores movimentem a mesma câmera ao mesmo tempo.</Typography>
                                             </Box>
                                         }
@@ -895,7 +895,7 @@ const PermissoesAcesso = () => {
                                         }
                                         label={
                                             <Box>
-                                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }}>Habilitar Áudio Bidirecional (Alto-Falante)</Typography>
+                                                <Typography variant="body2" sx={{ fontWeight: 600, color: cores.textoForte }}>Habilitar Áudio Bidirecional (Alto-Falante)</Typography>
                                                 <Typography variant="caption" sx={{ color: cores.textoSecundario }}>Permite falar pelos alto-falantes das câmeras compatíveis da portaria.</Typography>
                                             </Box>
                                         }
@@ -929,7 +929,7 @@ const PermissoesAcesso = () => {
             {/* ABA 3: PORTAL DE EMPRESAS & PRESTADORES */}
             {abaPrincipal === 3 && (
                 <Stack spacing={3}>
-                    <Alert severity="info" sx={{ bgcolor: 'rgba(0, 212, 255, 0.08)', color: '#FFFFFF', border: '1px solid rgba(0, 212, 255, 0.2)' }}>
+                    <Alert severity="info" sx={{ bgcolor: tom(cores.primaria, 0.08), color: cores.textoForte, border: '1px solid rgba(0, 212, 255, 0.2)' }}>
                         <b>Portal das Empresas (empresa.nzt.app.br):</b> Os responsáveis das empresas contratadas acessam um portal exclusivo via e-mail e chave de acesso cifrada (AES-256-GCM / scrypt). As solicitações de alteração de equipe passam por aprovação de operadores autorizados no painel.
                     </Alert>
 
@@ -937,34 +937,34 @@ const PermissoesAcesso = () => {
                         {/* Fluxo de Solicitações */}
                         <Grid item xs={12} md={6}>
                             <GlassCard sx={{ p: 3, height: '100%' }}>
-                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#00D4FF', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography variant="h6" sx={{ fontWeight: 700, color: cores.primaria, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
                                     <BusinessIcon /> Fluxo de Solicitações das Empresas
                                 </Typography>
                                 <Stack spacing={2}>
-                                    <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                    <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                                            <KeyIcon sx={{ fontSize: 16, color: '#FFB800' }} />
-                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#FFFFFF' }}>Autenticação por Chave Cifrada</Typography>
+                                            <KeyIcon sx={{ fontSize: 16, color: cores.alerta }} />
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: cores.textoForte }}>Autenticação por Chave Cifrada</Typography>
                                         </Box>
                                         <Typography variant="body2" sx={{ color: cores.textoSecundario, fontSize: '0.8125rem' }}>
                                             A chave é gerada pelo painel administrativo e conferida via hash seguro. Gerar nova chave revoga sessões anteriores instantaneamente.
                                         </Typography>
                                     </Box>
 
-                                    <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                    <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                                            <ChecklistIcon sx={{ fontSize: 16, color: '#10B981' }} />
-                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#FFFFFF' }}>Controle de Cotas de Credenciamento</Typography>
+                                            <ChecklistIcon sx={{ fontSize: 16, color: cores.sucesso }} />
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: cores.textoForte }}>Controle de Cotas de Credenciamento</Typography>
                                         </Box>
                                         <Typography variant="body2" sx={{ color: cores.textoSecundario, fontSize: '0.8125rem' }}>
                                             A empresa credencia sua equipe dentro da cota autorizada para o evento, com envio de foto e documentos obrigatórios.
                                         </Typography>
                                     </Box>
 
-                                    <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                    <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                                            <LockIcon sx={{ fontSize: 16, color: '#A855F7' }} />
-                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#FFFFFF' }}>Aprovação Obrigatória para Mudanças Críticas</Typography>
+                                            <LockIcon sx={{ fontSize: 16, color: cores.secundariaClara }} />
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: cores.textoForte }}>Aprovação Obrigatória para Mudanças Críticas</Typography>
                                         </Box>
                                         <Typography variant="body2" sx={{ color: cores.textoSecundario, fontSize: '0.8125rem' }}>
                                             Substituições de equipe, exclusões e trocas de dados cadastrais geram solicitações pendentes na fila do operador.
@@ -977,8 +977,8 @@ const PermissoesAcesso = () => {
                         {/* Travas do Portal de Empresas */}
                         <Grid item xs={12} md={6}>
                             <GlassCard sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
-                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <ShieldIcon sx={{ color: '#00D4FF' }} /> Travas & Regras do Portal de Empresas
+                                <Typography variant="h6" sx={{ fontWeight: 700, color: cores.textoForte, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <ShieldIcon sx={{ color: cores.primaria }} /> Travas & Regras do Portal de Empresas
                                 </Typography>
                                 <Stack spacing={2.5} sx={{ flex: 1 }}>
                                     <FormControlLabel
@@ -993,7 +993,7 @@ const PermissoesAcesso = () => {
                                         }
                                         label={
                                             <Box>
-                                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }}>Aprovação para Editar Participante</Typography>
+                                                <Typography variant="body2" sx={{ fontWeight: 600, color: cores.textoForte }}>Aprovação para Editar Participante</Typography>
                                                 <Typography variant="caption" sx={{ color: cores.textoSecundario }}>Mudança de dados cadastrais após envio entra como solicitação pendente.</Typography>
                                             </Box>
                                         }
@@ -1011,7 +1011,7 @@ const PermissoesAcesso = () => {
                                         }
                                         label={
                                             <Box>
-                                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }}>Aprovação para Cancelar / Excluir</Typography>
+                                                <Typography variant="body2" sx={{ fontWeight: 600, color: cores.textoForte }}>Aprovação para Cancelar / Excluir</Typography>
                                                 <Typography variant="caption" sx={{ color: cores.textoSecundario }}>Evita descredenciamento indevido no dia do evento sem validação da portaria.</Typography>
                                             </Box>
                                         }
@@ -1029,7 +1029,7 @@ const PermissoesAcesso = () => {
                                         }
                                         label={
                                             <Box>
-                                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }}>Aprovação para Trocar Documento</Typography>
+                                                <Typography variant="body2" sx={{ fontWeight: 600, color: cores.textoForte }}>Aprovação para Trocar Documento</Typography>
                                                 <Typography variant="caption" sx={{ color: cores.textoSecundario }}>Substituição de ASO, NR ou documento de segurança passa por auditoria.</Typography>
                                             </Box>
                                         }
@@ -1084,10 +1084,10 @@ const PermissoesAcesso = () => {
                 fullWidth
                 PaperProps={{
                     sx: {
-                        bgcolor: '#0B132B',
+                        bgcolor: cores.superficie,
                         border: '1px solid rgba(0, 212, 255, 0.3)',
                         borderRadius: 3,
-                        color: '#FFFFFF'
+                        color: cores.textoForte
                     }
                 }}
             >
@@ -1111,9 +1111,9 @@ const PermissoesAcesso = () => {
                                 fontSize: '0.8125rem',
                                 textTransform: 'none',
                                 minHeight: 44,
-                                '&.Mui-selected': { color: '#00D4FF', fontWeight: 700 }
+                                '&.Mui-selected': { color: cores.primaria, fontWeight: 700 }
                             },
-                            '& .MuiTabs-indicator': { bgcolor: '#00D4FF' }
+                            '& .MuiTabs-indicator': { bgcolor: cores.primaria }
                         }}
                     >
                         <Tab icon={<VerifiedUserIcon sx={{ fontSize: 16 }} />} iconPosition="start" label="1. Identificação" />
@@ -1149,12 +1149,12 @@ const PermissoesAcesso = () => {
                                     <Switch
                                         checked={formModelo.padrao}
                                         onChange={(e) => setFormModelo({ ...formModelo, padrao: e.target.checked })}
-                                        sx={{ '& .Mui-checked': { color: '#FFB800' } }}
+                                        sx={{ '& .Mui-checked': { color: cores.alerta } }}
                                     />
                                 }
                                 label={
                                     <Box>
-                                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }}>
+                                        <Typography variant="body2" sx={{ fontWeight: 600, color: cores.textoForte }}>
                                             Definir como Modelo Padrão do Sistema
                                         </Typography>
                                         <Typography variant="caption" sx={{ color: cores.textoSecundario }}>
@@ -1169,8 +1169,8 @@ const PermissoesAcesso = () => {
                     {/* ABA FORM 1: MÓDULOS AUTORIZADOS */}
                     {abaForm === 1 && (
                         <Box>
-                            <Box sx={{ mb: 2.5, p: 1.5, borderRadius: 2, bgcolor: 'rgba(0, 212, 255, 0.04)', border: '1px solid rgba(0, 212, 255, 0.15)' }}>
-                                <Typography variant="caption" sx={{ color: '#00D4FF', fontWeight: 700, display: 'block', mb: 1 }}>
+                            <Box sx={{ mb: 2.5, p: 1.5, borderRadius: 1.5, bgcolor: tom(cores.primaria, 0.04), border: '1px solid rgba(0, 212, 255, 0.15)' }}>
+                                <Typography variant="caption" sx={{ color: cores.primaria, fontWeight: 700, display: 'block', mb: 1 }}>
                                     PRESETS RÁPIDOS (1 CLIQUE):
                                 </Typography>
                                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -1179,40 +1179,40 @@ const PermissoesAcesso = () => {
                                         label="Portaria / Check-in"
                                         size="small"
                                         onClick={() => aplicarPreset(['checkin', 'checkout', 'pessoas'])}
-                                        sx={{ cursor: 'pointer', bgcolor: 'rgba(0, 212, 255, 0.12)', color: '#00D4FF' }}
+                                        sx={{ cursor: 'pointer', bgcolor: tom(cores.primaria, 0.12), color: cores.primaria }}
                                     />
                                     <Chip
                                         icon={<PresetIcon sx={{ fontSize: 14 }} />}
                                         label="Fiscalização de Áreas"
                                         size="small"
                                         onClick={() => aplicarPreset(['fiscalizacao', 'monitoramento', 'pessoas'])}
-                                        sx={{ cursor: 'pointer', bgcolor: 'rgba(0, 212, 255, 0.12)', color: '#00D4FF' }}
+                                        sx={{ cursor: 'pointer', bgcolor: tom(cores.primaria, 0.12), color: cores.primaria }}
                                     />
                                     <Chip
                                         icon={<PresetIcon sx={{ fontSize: 14 }} />}
                                         label="Coordenação"
                                         size="small"
                                         onClick={() => aplicarPreset(['dashboard', 'checkin', 'checkout', 'fiscalizacao', 'monitoramento', 'pessoas', 'empresas', 'relatorios', 'veiculos', 'auditoria_documentos'])}
-                                        sx={{ cursor: 'pointer', bgcolor: 'rgba(0, 212, 255, 0.12)', color: '#00D4FF' }}
+                                        sx={{ cursor: 'pointer', bgcolor: tom(cores.primaria, 0.12), color: cores.primaria }}
                                     />
                                     <Chip
                                         icon={<PresetIcon sx={{ fontSize: 14 }} />}
                                         label="Produção de Palco"
                                         size="small"
                                         onClick={() => aplicarPreset(['producao'])}
-                                        sx={{ cursor: 'pointer', bgcolor: 'rgba(0, 212, 255, 0.12)', color: '#00D4FF' }}
+                                        sx={{ cursor: 'pointer', bgcolor: tom(cores.primaria, 0.12), color: cores.primaria }}
                                     />
                                     <Chip
                                         label="Marcar Todos"
                                         size="small"
                                         onClick={() => aplicarPreset(MODULOS.map(m => m.key))}
-                                        sx={{ cursor: 'pointer', bgcolor: 'rgba(16, 185, 129, 0.15)', color: '#10B981' }}
+                                        sx={{ cursor: 'pointer', bgcolor: 'rgba(16, 185, 129, 0.15)', color: cores.sucesso }}
                                     />
                                     <Chip
                                         label="Limpar Todos"
                                         size="small"
                                         onClick={() => aplicarPreset([])}
-                                        sx={{ cursor: 'pointer', bgcolor: 'rgba(239, 68, 68, 0.15)', color: '#EF4444' }}
+                                        sx={{ cursor: 'pointer', bgcolor: 'rgba(239, 68, 68, 0.15)', color: cores.erro }}
                                     />
                                 </Stack>
                             </Box>
@@ -1224,15 +1224,15 @@ const PermissoesAcesso = () => {
                                         <Grid item xs={12} sm={6} key={mod.key}>
                                             <Box sx={{
                                                 p: 1.5,
-                                                borderRadius: 2,
-                                                bgcolor: ativo ? 'rgba(0, 212, 255, 0.06)' : 'rgba(255, 255, 255, 0.02)',
-                                                border: `1px solid ${ativo ? 'rgba(0, 212, 255, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
+                                                borderRadius: 1.5,
+                                                bgcolor: ativo ? tom(cores.primaria, 0.06) : 'rgba(255, 255, 255, 0.02)',
+                                                border: `1px solid ${ativo ? tom(cores.primaria, 0.3) : 'rgba(255, 255, 255, 0.08)'}`,
                                                 display: 'flex',
                                                 justifyContent: 'space-between',
                                                 alignItems: 'center'
                                             }}>
                                                 <Box sx={{ pr: 1 }}>
-                                                    <Typography variant="body2" sx={{ fontWeight: 600, color: ativo ? '#00D4FF' : '#FFFFFF' }}>
+                                                    <Typography variant="body2" sx={{ fontWeight: 600, color: ativo ? cores.primaria : cores.textoForte }}>
                                                         {mod.label}
                                                     </Typography>
                                                     <Typography variant="caption" sx={{ color: cores.textoSecundario, display: 'block' }}>
@@ -1288,7 +1288,7 @@ const PermissoesAcesso = () => {
                                 </Select>
                             </FormControl>
 
-                            <Alert severity="info" sx={{ bgcolor: 'rgba(0, 212, 255, 0.08)', color: '#FFFFFF', border: '1px solid rgba(0, 212, 255, 0.2)' }}>
+                            <Alert severity="info" sx={{ bgcolor: tom(cores.primaria, 0.08), color: cores.textoForte, border: '1px solid rgba(0, 212, 255, 0.2)' }}>
                                 No modo <b>Quiosque travado</b>, o operador não consegue navegar livremente fora do posto de trabalho e o botão de logout/encerramento fica protegido por confirmação.
                             </Alert>
                         </Stack>
@@ -1301,7 +1301,7 @@ const PermissoesAcesso = () => {
                                 Restrinja ações críticas dentro das telas operacionais para garantir a conformidade e integridade dos dados:
                             </Typography>
 
-                            <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                            <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
                                 <FormControlLabel
                                     control={
                                         <Switch
@@ -1314,7 +1314,7 @@ const PermissoesAcesso = () => {
                                     }
                                     label={
                                         <Box>
-                                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }}>
+                                            <Typography variant="body2" sx={{ fontWeight: 600, color: cores.textoForte }}>
                                                 Participantes em Modo Somente Leitura
                                             </Typography>
                                             <Typography variant="caption" sx={{ color: cores.textoSecundario }}>
@@ -1325,7 +1325,7 @@ const PermissoesAcesso = () => {
                                 />
                             </Box>
 
-                            <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                            <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
                                 <FormControlLabel
                                     control={
                                         <Switch
@@ -1338,7 +1338,7 @@ const PermissoesAcesso = () => {
                                     }
                                     label={
                                         <Box>
-                                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }}>
+                                            <Typography variant="body2" sx={{ fontWeight: 600, color: cores.textoForte }}>
                                                 Permitir Liberação de Check-in com Pendência Documental
                                             </Typography>
                                             <Typography variant="caption" sx={{ color: cores.textoSecundario }}>
@@ -1349,7 +1349,7 @@ const PermissoesAcesso = () => {
                                 />
                             </Box>
 
-                            <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                            <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
                                 <FormControlLabel
                                     control={
                                         <Switch
@@ -1362,7 +1362,7 @@ const PermissoesAcesso = () => {
                                     }
                                     label={
                                         <Box>
-                                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }}>
+                                            <Typography variant="body2" sx={{ fontWeight: 600, color: cores.textoForte }}>
                                                 Empresas & Prestadores em Modo Somente Consulta
                                             </Typography>
                                             <Typography variant="caption" sx={{ color: cores.textoSecundario }}>
@@ -1373,7 +1373,7 @@ const PermissoesAcesso = () => {
                                 />
                             </Box>
 
-                            <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                            <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
                                 <FormControlLabel
                                     control={
                                         <Switch
@@ -1386,7 +1386,7 @@ const PermissoesAcesso = () => {
                                     }
                                     label={
                                         <Box>
-                                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }}>
+                                            <Typography variant="body2" sx={{ fontWeight: 600, color: cores.textoForte }}>
                                                 Bloqueio Completo de Edição de Dados no Campo
                                             </Typography>
                                             <Typography variant="caption" sx={{ color: cores.textoSecundario }}>
@@ -1414,7 +1414,7 @@ const PermissoesAcesso = () => {
                                 }
                                 label={
                                     <Box>
-                                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }}>
+                                        <Typography variant="body2" sx={{ fontWeight: 600, color: cores.textoForte }}>
                                             Ativar Restrição de Horário de Acesso (Janela de Turno)
                                         </Typography>
                                         <Typography variant="caption" sx={{ color: cores.textoSecundario }}>
@@ -1488,9 +1488,9 @@ const PermissoesAcesso = () => {
                                                         onClick={() => alternarDiaSemana(d.valor)}
                                                         sx={{
                                                             cursor: 'pointer',
-                                                            bgcolor: selecionado ? 'rgba(0, 212, 255, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                                                            color: selecionado ? '#00D4FF' : 'rgba(255, 255, 255, 0.5)',
-                                                            border: `1px solid ${selecionado ? '#00D4FF' : 'rgba(255, 255, 255, 0.1)'}`,
+                                                            bgcolor: selecionado ? tom(cores.primaria, 0.2) : 'rgba(255, 255, 255, 0.05)',
+                                                            color: selecionado ? cores.primaria : 'rgba(255, 255, 255, 0.5)',
+                                                            border: `1px solid ${selecionado ? cores.primaria : 'rgba(255, 255, 255, 0.1)'}`,
                                                             fontWeight: selecionado ? 700 : 500
                                                         }}
                                                     />
@@ -1526,10 +1526,10 @@ const PermissoesAcesso = () => {
                 fullWidth
                 PaperProps={{
                     sx: {
-                        bgcolor: '#0B132B',
+                        bgcolor: cores.superficie,
                         border: '1px solid rgba(0, 212, 255, 0.3)',
                         borderRadius: 3,
-                        color: '#FFFFFF'
+                        color: cores.textoForte
                     }
                 }}
             >
@@ -1550,7 +1550,7 @@ const PermissoesAcesso = () => {
                             }
                             label={
                                 <Box>
-                                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 600, color: cores.textoForte }}>
                                         Atualizar permissões por evento específico
                                     </Typography>
                                     <Typography variant="caption" sx={{ color: cores.textoSecundario }}>
@@ -1569,7 +1569,7 @@ const PermissoesAcesso = () => {
                             }
                             label={
                                 <Box>
-                                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 600, color: cores.textoForte }}>
                                         Sincronizar página inicial e modo quiosque
                                     </Typography>
                                     <Typography variant="caption" sx={{ color: cores.textoSecundario }}>
@@ -1588,7 +1588,7 @@ const PermissoesAcesso = () => {
                             }
                             label={
                                 <Box>
-                                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 600, color: cores.textoForte }}>
                                         Sincronizar travas granulares
                                     </Typography>
                                     <Typography variant="caption" sx={{ color: cores.textoSecundario }}>
@@ -1607,7 +1607,7 @@ const PermissoesAcesso = () => {
                             }
                             label={
                                 <Box>
-                                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#FFFFFF' }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 600, color: cores.textoForte }}>
                                         Sincronizar restrições de horário e turno
                                     </Typography>
                                     <Typography variant="caption" sx={{ color: cores.textoSecundario }}>
@@ -1641,10 +1641,10 @@ const PermissoesAcesso = () => {
                 fullWidth
                 PaperProps={{
                     sx: {
-                        bgcolor: '#0B132B',
+                        bgcolor: cores.superficie,
                         border: '1px solid rgba(239, 68, 68, 0.4)',
                         borderRadius: 3,
-                        color: '#FFFFFF'
+                        color: cores.textoForte
                     }
                 }}
             >
@@ -1667,7 +1667,7 @@ const PermissoesAcesso = () => {
                         color="error"
                         onClick={confirmarExclusao}
                         disabled={excluindo}
-                        sx={{ bgcolor: '#EF4444' }}
+                        sx={{ bgcolor: cores.erro }}
                     >
                         {excluindo ? 'Excluindo...' : 'Sim, Excluir'}
                     </Button>

@@ -3,8 +3,9 @@ import {
     Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography, Button, Alert, CircularProgress
 } from '@mui/material';
 import api from '../../services/api';
+import { cores } from '../../styles/tokens';
 
-const COR = { ok: '#00FF88', alerta: '#FFB800', erro: '#FF3366', nao_testado: '#64748B' };
+const COR = { ok: cores.sucesso, alerta: cores.alerta, erro: cores.erro, nao_testado: cores.textoFraco };
 
 /**
  * "Diagnosticar" de uma câmera: cadastro, PC do evento, rede (ping/porta), imagem, miniatura, IA e
@@ -43,7 +44,7 @@ const DiagnosticoCamera = ({ camera, onClose, onEditar, onResultado }) => {
                 {carregando && (
                     <Box sx={{ py: 3, textAlign: 'center' }}>
                         <CircularProgress size={28} />
-                        <Typography variant="body2" sx={{ mt: 1, color: '#94A3B8' }}>Testando a câmera pela rede do evento (até 40 s)...</Typography>
+                        <Typography variant="body2" sx={{ mt: 1, color: cores.textoSecundario }}>Testando a câmera pela rede do evento (até 40 s)...</Typography>
                     </Box>
                 )}
                 {erro && <Alert severity="error">Não deu para diagnosticar: {erro}</Alert>}
@@ -51,18 +52,18 @@ const DiagnosticoCamera = ({ camera, onClose, onEditar, onResultado }) => {
                     <>
                         <Alert severity={gravidade} sx={{ mb: 1.5 }}>{dados.resumo}</Alert>
                         {dados.itens.map((i) => {
-                            const cor = COR[i.estado] || '#94A3B8';
+                            const cor = COR[i.estado] || cores.textoSecundario;
                             return (
                                 <Box key={i.chave} sx={{ display: 'flex', gap: 1.5, py: 1, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                                     <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: cor, mt: 0.75, flexShrink: 0 }} aria-label={i.estado} />
                                     <Box sx={{ flex: 1, minWidth: 0 }}>
                                         <Typography variant="body2" sx={{ fontWeight: 600 }}>{i.titulo}</Typography>
-                                        <Typography variant="body2" sx={{ color: '#CBD5E1', wordBreak: 'break-word' }}>{i.detalhe}</Typography>
+                                        <Typography variant="body2" sx={{ color: cores.textoSuave, wordBreak: 'break-word' }}>{i.detalhe}</Typography>
                                         {i.como_corrigir && <Typography variant="caption" sx={{ color: cor, display: 'block', mt: 0.25 }}>{i.como_corrigir}</Typography>}
                                     </Box>
                                     {i.acao === 'editar' && onEditar && (
                                         <Button size="small" variant="outlined" onClick={() => { onClose(); onEditar(camera); }}
-                                            sx={{ alignSelf: 'center', flexShrink: 0, fontSize: '0.72rem' }}>
+                                            sx={{ alignSelf: 'center', flexShrink: 0, fontSize: '0.75rem' }}>
                                             Editar câmera
                                         </Button>
                                     )}

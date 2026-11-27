@@ -16,6 +16,7 @@ import { useSnackbar } from 'notistack';
 import api from '../../services/api';
 import { useConfirmacao } from '../../contexts/ConfirmacaoContext';
 import SeletorArquiteturaIa from './SeletorArquiteturaIa';
+import { cores } from '../../styles/tokens';
 
 const gb = (bytes) => (bytes == null ? '—' : `${(bytes / 1024 ** 3).toFixed(bytes > 10 * 1024 ** 3 ? 0 : 1)} GB`);
 
@@ -187,7 +188,7 @@ const CamerasEventoBarra = ({ podeEditar = true }) => {
                 {cfg.motor_ia_ativo && cfg.ia_onde === 'direto_servidor' && (
                     <Tooltip title="As câmeras transmitem os vídeos diretamente via internet fibra até o Servidor de IA Central na sede.">
                         <Chip size="small" variant="outlined" icon={<CloudIcon sx={{ fontSize: 14 }} />}
-                            sx={{ fontWeight: 700, borderColor: '#A855F7', color: '#C084FC' }}
+                            sx={{ fontWeight: 700, borderColor: cores.secundariaClara, color: '#C084FC' }}
                             label="Modo Fibra: Câmeras conectadas ao Servidor Central" />
                     </Tooltip>
                 )}

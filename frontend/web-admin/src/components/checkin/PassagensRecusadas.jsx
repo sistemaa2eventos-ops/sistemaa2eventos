@@ -4,6 +4,7 @@ import { ErrorOutline as RecusaIcon } from '@mui/icons-material';
 
 import api from '../../services/api';
 import { parseLocalDate } from '../../utils/dateUtils';
+import { cores } from '../../styles/tokens';
 
 const INTERVALO_ATUALIZACAO_MS = 30000;
 // Códigos de recusa que o backend já usa; o resto aparece legível (ou como veio)
@@ -34,7 +35,7 @@ const horaDe = (valor) => {
  * É outra fonte que RecusadosSincronizacao (fila do aparelho): não misture as duas.
  * Sem a rota (404/503) ou sem conexão, o bloco fica escondido e a tela segue normal.
  */
-const PassagensRecusadas = ({ eventoId, cor = '#FF3366' }) => {
+const PassagensRecusadas = ({ eventoId, cor = cores.erro }) => {
     const [itens, setItens] = useState([]);
     const [resolvendoId, setResolvendoId] = useState(null);
     const [erro, setErro] = useState('');
@@ -98,7 +99,7 @@ const PassagensRecusadas = ({ eventoId, cor = '#FF3366' }) => {
                 O servidor não aceitou estas passagens. Confira com a pessoa e resolva.
             </Typography>
             {erro && (
-                <Typography variant="caption" sx={{ display: 'block', color: '#FF3366', fontWeight: 700, mb: 0.5 }}>
+                <Typography variant="caption" sx={{ display: 'block', color: cores.erro, fontWeight: 700, mb: 0.5 }}>
                     {erro}
                 </Typography>
             )}
@@ -124,7 +125,7 @@ const PassagensRecusadas = ({ eventoId, cor = '#FF3366' }) => {
                             size="small"
                             onClick={() => resolver(item.id)}
                             disabled={resolvendoId === item.id}
-                            sx={{ color: '#FFFFFF', textTransform: 'none', flexShrink: 0 }}
+                            sx={{ color: cores.textoForte, textTransform: 'none', flexShrink: 0 }}
                         >
                             Resolver
                         </Button>

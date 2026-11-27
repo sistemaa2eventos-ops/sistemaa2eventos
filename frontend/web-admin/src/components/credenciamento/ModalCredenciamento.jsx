@@ -29,6 +29,7 @@ import ListaDocumentos from '../documentos/ListaDocumentos';
 import { SITUACAO_DOCUMENTAL, MOTIVO_PENDENCIA } from '../documentos/documentosUtils';
 
 import { comoRotulo } from '../../utils/formatadores';
+import { cores, tom } from '../../styles/tokens';
 export const ModalCredenciamento = ({
     open,
     pessoa,
@@ -369,7 +370,7 @@ export const ModalCredenciamento = ({
                     maxHeight: '92dvh',
                     overflowY: 'auto',
                     '&::-webkit-scrollbar': { width: '6px' },
-                    '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0, 212, 255, 0.25)', borderRadius: '10px' }
+                    '&::-webkit-scrollbar-thumb': { bgcolor: tom(cores.primaria, 0.25), borderRadius: '8px' }
                 }
             }}
         >
@@ -385,12 +386,12 @@ export const ModalCredenciamento = ({
                     {/* Top bar do modal */}
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: { xs: 1.75, sm: 3 } }}>
                         <Stack direction="row" spacing={1.5} alignItems="center">
-                            <Typography variant="overline" sx={{ color: '#00D4FF', fontWeight: 700, letterSpacing: { xs: '1px', sm: '2px' }, fontSize: { xs: '0.75rem', sm: '0.8125rem' } }}>
+                            <Typography variant="overline" sx={{ color: cores.primaria, fontWeight: 700, letterSpacing: { xs: '1px', sm: '2px' }, fontSize: { xs: '0.75rem', sm: '0.8125rem' } }}>
                                 Estação de credenciamento e acesso
                             </Typography>
                         </Stack>
 
-                        <IconButton onClick={onClose} disabled={loading} sx={{ color: 'rgba(255, 255, 255, 0.6)', '&:hover': { color: '#FF3366' } }}>
+                        <IconButton onClick={onClose} disabled={loading} sx={{ color: 'rgba(255, 255, 255, 0.6)', '&:hover': { color: cores.erro } }}>
                             <CloseIcon />
                         </IconButton>
                     </Box>
@@ -400,9 +401,9 @@ export const ModalCredenciamento = ({
                         <Alert
                             severity="warning"
                             variant="outlined"
-                            sx={{ mb: { xs: 2, sm: 3 }, color: '#FFB800', borderColor: 'rgba(255, 184, 0, 0.5)', bgcolor: 'rgba(255, 184, 0, 0.06)', '& .MuiAlert-icon': { color: '#FFB800' } }}
+                            sx={{ mb: { xs: 2, sm: 3 }, color: cores.alerta, borderColor: 'rgba(255, 184, 0, 0.5)', bgcolor: 'rgba(255, 184, 0, 0.06)', '& .MuiAlert-icon': { color: cores.alerta } }}
                         >
-                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: cores.textoForte }}>
                                 {bloqueioEntrada.liberavel
                                     ? (bloqueioEntrada.mensagem || 'Entrada bloqueada nesta área: a reentrada precisa de liberação do controlador.')
                                     : 'Pessoa já está dentro'}
@@ -414,13 +415,13 @@ export const ModalCredenciamento = ({
                                     onClick={onLiberarReentrada}
                                     disabled={liberandoReentrada}
                                     startIcon={liberandoReentrada ? <CircularProgress size={14} /> : <LiberarIcon sx={{ fontSize: 16 }} />}
-                                    sx={{ mt: 1, minHeight: 36, fontSize: '0.8rem', color: '#FFB800', borderColor: 'rgba(255, 184, 0, 0.6)', textTransform: 'none', borderRadius: 1.5 }}
+                                    sx={{ mt: 1, minHeight: 36, fontSize: '0.8rem', color: cores.alerta, borderColor: 'rgba(255, 184, 0, 0.6)', textTransform: 'none', borderRadius: 1.5 }}
                                 >
                                     {liberandoReentrada ? 'Liberando...' : 'Liberar reentrada'}
                                 </Button>
                             )}
                             {bloqueioEntrada.erroLiberacao && (
-                                <Typography variant="caption" sx={{ display: 'block', mt: 1, color: '#FF3366', fontWeight: 700 }}>
+                                <Typography variant="caption" sx={{ display: 'block', mt: 1, color: cores.erro, fontWeight: 700 }}>
                                     {bloqueioEntrada.erroLiberacao}
                                 </Typography>
                             )}
@@ -432,7 +433,7 @@ export const ModalCredenciamento = ({
                                         onClick={handleRegistrarSaida}
                                         disabled={registrandoSaida || loading}
                                         startIcon={registrandoSaida ? <CircularProgress size={14} /> : <SaidaIcon sx={{ fontSize: 16 }} />}
-                                        sx={{ mt: 1, minHeight: 36, fontSize: '0.8rem', color: '#FFB800', borderColor: 'rgba(255, 184, 0, 0.6)', textTransform: 'none', borderRadius: 1.5 }}
+                                        sx={{ mt: 1, minHeight: 36, fontSize: '0.8rem', color: cores.alerta, borderColor: 'rgba(255, 184, 0, 0.6)', textTransform: 'none', borderRadius: 1.5 }}
                                     >
                                         {registrandoSaida ? 'Registrando saída...' : 'Registrar saída'}
                                     </Button>
@@ -443,7 +444,7 @@ export const ModalCredenciamento = ({
                                 )
                             )}
                             {erroSaida && (
-                                <Typography variant="caption" sx={{ display: 'block', mt: 1, color: '#FF3366', fontWeight: 700 }}>
+                                <Typography variant="caption" sx={{ display: 'block', mt: 1, color: cores.erro, fontWeight: 700 }}>
                                     {erroSaida}
                                 </Typography>
                             )}
@@ -454,9 +455,9 @@ export const ModalCredenciamento = ({
                         <Alert
                             severity="success"
                             variant="outlined"
-                            sx={{ mb: { xs: 2, sm: 3 }, color: '#00FF88', borderColor: 'rgba(0, 255, 136, 0.5)', bgcolor: 'rgba(0, 255, 136, 0.06)', '& .MuiAlert-icon': { color: '#00FF88' } }}
+                            sx={{ mb: { xs: 2, sm: 3 }, color: cores.sucesso, borderColor: 'rgba(0, 255, 136, 0.5)', bgcolor: 'rgba(0, 255, 136, 0.06)', '& .MuiAlert-icon': { color: cores.sucesso } }}
                         >
-                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: cores.textoForte }}>
                                 {saidaRegistrada.offline
                                     ? 'Saída guardada neste aparelho: será enviada quando a conexão voltar.'
                                     : 'Saída registrada.'}{' '}
@@ -470,9 +471,9 @@ export const ModalCredenciamento = ({
                         <Alert
                             severity="error"
                             variant="outlined"
-                            sx={{ mb: { xs: 2, sm: 3 }, color: '#FF3366', borderColor: 'rgba(255, 51, 102, 0.6)', bgcolor: 'rgba(255, 51, 102, 0.1)', '& .MuiAlert-icon': { color: '#FF3366' }, '& .MuiAlert-message': { width: '100%' } }}
+                            sx={{ mb: { xs: 2, sm: 3 }, color: cores.erro, borderColor: 'rgba(255, 51, 102, 0.6)', bgcolor: 'rgba(255, 51, 102, 0.1)', '& .MuiAlert-icon': { color: cores.erro }, '& .MuiAlert-message': { width: '100%' } }}
                         >
-                            <Typography variant="body1" sx={{ fontWeight: 800, color: '#FFFFFF', mb: 0.5 }}>
+                            <Typography variant="body1" sx={{ fontWeight: 800, color: cores.textoForte, mb: 0.5 }}>
                                 DOCUMENTAÇÃO PENDENTE: ENTRADA NÃO PERMITIDA
                             </Typography>
                             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)' }}>
@@ -491,14 +492,14 @@ export const ModalCredenciamento = ({
                                     value={motivoLiberarHoje}
                                     onChange={(e) => setMotivoLiberarHoje(e.target.value)}
                                     disabled={liberandoHoje}
-                                    sx={{ '& .MuiOutlinedInput-root': { color: '#FFFFFF', bgcolor: 'rgba(0,0,0,0.25)', '& fieldset': { borderColor: 'rgba(255,51,102,0.4)' } } }}
+                                    sx={{ '& .MuiOutlinedInput-root': { color: cores.textoForte, bgcolor: 'rgba(0,0,0,0.25)', '& fieldset': { borderColor: 'rgba(255,51,102,0.4)' } } }}
                                 />
                                 <Button
                                     variant="outlined"
                                     onClick={handleLiberarHoje}
                                     disabled={liberandoHoje || motivoLiberarHoje.trim().length < 3}
                                     startIcon={liberandoHoje ? <CircularProgress size={14} /> : <LiberarIcon sx={{ fontSize: 16 }} />}
-                                    sx={{ flexShrink: 0, minHeight: 40, color: '#FF3366', borderColor: 'rgba(255, 51, 102, 0.6)', textTransform: 'none', fontWeight: 700, borderRadius: 1.5 }}
+                                    sx={{ flexShrink: 0, minHeight: 40, color: cores.erro, borderColor: 'rgba(255, 51, 102, 0.6)', textTransform: 'none', fontWeight: 700, borderRadius: 1.5 }}
                                 >
                                     {liberandoHoje ? 'Liberando...' : 'Liberar hoje'}
                                 </Button>
@@ -511,9 +512,9 @@ export const ModalCredenciamento = ({
                         <Alert
                             severity="info"
                             variant="outlined"
-                            sx={{ mb: { xs: 2, sm: 3 }, color: '#00D4FF', borderColor: 'rgba(0, 212, 255, 0.5)', bgcolor: 'rgba(0, 212, 255, 0.06)', '& .MuiAlert-icon': { color: '#00D4FF' } }}
+                            sx={{ mb: { xs: 2, sm: 3 }, color: cores.primaria, borderColor: tom(cores.primaria, 0.5), bgcolor: tom(cores.primaria, 0.06), '& .MuiAlert-icon': { color: cores.primaria } }}
                         >
-                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: cores.textoForte }}>
                                 Documentação pendente, entrada liberada hoje
                             </Typography>
                             <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.75)', display: 'block' }}>
@@ -533,7 +534,7 @@ export const ModalCredenciamento = ({
                                     nome={pessoa.nome_completo || pessoa.nome}
                                     width={130}
                                     borderRadius="16px"
-                                    accentColor="#00D4FF"
+                                    accentColor={cores.primaria}
                                     borderWidth="3px"
                                 />
                             </Box>
@@ -556,7 +557,7 @@ export const ModalCredenciamento = ({
                                 />
 
                                 {situacao?.pendencias?.length > 0 && (
-                                    <Typography variant="caption" sx={{ color: '#FFB800', display: 'block', maxWidth: 220 }}>
+                                    <Typography variant="caption" sx={{ color: cores.alerta, display: 'block', maxWidth: 220 }}>
                                         Pendente: {situacao.pendencias.map(p => `${p.nome} (${MOTIVO_PENDENCIA[p.motivo] || p.motivo})`).join(', ')}
                                     </Typography>
                                 )}
@@ -566,7 +567,7 @@ export const ModalCredenciamento = ({
                                         icon={<LiberarIcon sx={{ fontSize: '16px !important' }} />}
                                         label={`LIBERADO ATÉ ${liberadoAte.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
                                         size="small"
-                                        sx={{ bgcolor: 'rgba(178,102,255,0.15)', color: '#A855F7', fontWeight: 700, fontSize: '0.75rem' }}
+                                        sx={{ bgcolor: 'rgba(178,102,255,0.15)', color: cores.secundariaClara, fontWeight: 700, fontSize: '0.75rem' }}
                                     />
                                 ) : situacao && statusDocs !== 'aprovado' && pessoa.status_acesso !== 'bloqueado' && !statusDocumentalComLiberacao?.exige_liberacao && (
                                     <Tooltip title="Permite entrada no leitor facial até o checkout ou o horário de reset do evento">
@@ -576,7 +577,7 @@ export const ModalCredenciamento = ({
                                             startIcon={liberando ? <CircularProgress size={14} /> : <LiberarIcon fontSize="small" />}
                                             onClick={handleLiberarTurno}
                                             disabled={liberando}
-                                            sx={{ fontSize: '0.75rem', color: '#A855F7', borderColor: 'rgba(178,102,255,0.5)', borderRadius: 1.5, textTransform: 'none' }}
+                                            sx={{ fontSize: '0.75rem', color: cores.secundariaClara, borderColor: 'rgba(178,102,255,0.5)', borderRadius: 1.5, textTransform: 'none' }}
                                         >
                                             Liberar neste turno
                                         </Button>
@@ -592,13 +593,13 @@ export const ModalCredenciamento = ({
                                         sx={{
                                             mt: 0.5,
                                             fontSize: '0.75rem',
-                                            color: '#00D4FF',
-                                            borderColor: 'rgba(0, 212, 255, 0.4)',
+                                            color: cores.primaria,
+                                            borderColor: tom(cores.primaria, 0.4),
                                             borderRadius: 1.5,
                                             textTransform: 'none',
                                             '&:hover': {
-                                                borderColor: '#00D4FF',
-                                                bgcolor: 'rgba(0, 212, 255, 0.08)'
+                                                borderColor: cores.primaria,
+                                                bgcolor: tom(cores.primaria, 0.08)
                                             }
                                         }}
                                     >
@@ -611,21 +612,21 @@ export const ModalCredenciamento = ({
                         {/* Coluna dos Dados e Input Universal de Pulseira */}
                         <Grid item xs={12} sm={8}>
                             <Box mb={2}>
-                                <Typography fontWeight={700} color="#FFFFFF" sx={{ fontSize: { xs: '1.2rem', sm: '1.65rem' }, letterSpacing: '0.3px', lineHeight: 1.2, textAlign: { xs: 'center', sm: 'left' } }}>
+                                <Typography fontWeight={700} color={cores.textoForte} sx={{ fontSize: { xs: '1.2rem', sm: '1.65rem' }, letterSpacing: '0.3px', lineHeight: 1.2, textAlign: { xs: 'center', sm: 'left' } }}>
                                     {pessoa.nome_completo || pessoa.nome}
                                 </Typography>
 
                                 <Stack spacing={0.85} mt={1.25}>
-                                    <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.85, color: '#FFFFFF' }}>
-                                        <BadgeIcon sx={{ color: '#00D4FF', fontSize: 18 }} /> 
+                                    <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.85, color: cores.textoForte }}>
+                                        <BadgeIcon sx={{ color: cores.primaria, fontSize: 18 }} /> 
                                         <strong>CPF:</strong> {pessoa.cpf || 'Não cadastrado'}
                                     </Typography>
-                                    <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.85, color: '#FFFFFF' }}>
-                                        <CompanyIcon sx={{ color: '#00D4FF', fontSize: 18 }} /> 
+                                    <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.85, color: cores.textoForte }}>
+                                        <CompanyIcon sx={{ color: cores.primaria, fontSize: 18 }} /> 
                                         <strong>Empresa:</strong> {pessoa.empresas?.nome || pessoa.empresa_nome || 'Pessoa Física / Avulso'}
                                     </Typography>
-                                    <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.85, color: '#FFFFFF' }}>
-                                        <BadgeIcon sx={{ color: '#00D4FF', fontSize: 18 }} /> 
+                                    <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.85, color: cores.textoForte }}>
+                                        <BadgeIcon sx={{ color: cores.primaria, fontSize: 18 }} /> 
                                         <strong>Função:</strong> {pessoa.funcao || pessoa.cargo || 'Colaborador'}
                                     </Typography>
                                 </Stack>
@@ -637,7 +638,7 @@ export const ModalCredenciamento = ({
                                     Áreas autorizadas:
                                 </Typography>
                                 <Box mt={0.5}>
-                                    <AuthorizedAreasChips pessoa={pessoa} accentColor="#00D4FF" />
+                                    <AuthorizedAreasChips pessoa={pessoa} accentColor={cores.primaria} />
                                 </Box>
                             </Box>
 
@@ -667,10 +668,10 @@ export const ModalCredenciamento = ({
                                                 }}
                                                 sx={{
                                                     bgcolor: 'rgba(0,0,0,0.3)',
-                                                    color: '#FFFFFF',
+                                                    color: cores.textoForte,
                                                     borderRadius: 1.5,
                                                     fontSize: '0.82rem',
-                                                    '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 212, 255, 0.3)' }
+                                                    '.MuiOutlinedInput-notchedOutline': { borderColor: tom(cores.primaria, 0.3) }
                                                 }}
                                             >
                                                 <MenuItem value="todas">Todas as Fases</MenuItem>
@@ -694,10 +695,10 @@ export const ModalCredenciamento = ({
                                                 onChange={(e) => setSelectedTipoPulseira(e.target.value)}
                                                 sx={{
                                                     bgcolor: 'rgba(0,0,0,0.3)',
-                                                    color: '#FFFFFF',
+                                                    color: cores.textoForte,
                                                     borderRadius: 1.5,
                                                     fontSize: '0.82rem',
-                                                    '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 212, 255, 0.3)' }
+                                                    '.MuiOutlinedInput-notchedOutline': { borderColor: tom(cores.primaria, 0.3) }
                                                 }}
                                             >
                                                 {tiposPulseiraFiltrados.map(t => (
@@ -731,7 +732,7 @@ export const ModalCredenciamento = ({
 
                                 {/* Pulseira em uso (TODAY) */}
                                 {statusPulseira?.emUso && devolvidaId !== pessoa.id && desfeitaInfo?.id !== pessoa.id && (
-                                    <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: 'rgba(0, 212, 255, 0.05)', p: 1, borderRadius: 1.5, border: '1px solid rgba(0, 212, 255, 0.15)' }}>
+                                    <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: tom(cores.primaria, 0.05), p: 1, borderRadius: 1.5, border: '1px solid rgba(0, 212, 255, 0.15)' }}>
                                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>
                                             Pulseira em uso: <strong>{statusPulseira.emUso}</strong>
                                         </Typography>
@@ -742,9 +743,9 @@ export const ModalCredenciamento = ({
                                             onClick={handleDevolverPulseira}
                                             disabled={devolvendo}
                                             sx={{
-                                                fontSize: '0.7rem',
-                                                color: '#00D4FF',
-                                                borderColor: 'rgba(0, 212, 255, 0.4)',
+                                                fontSize: '0.75rem',
+                                                color: cores.primaria,
+                                                borderColor: tom(cores.primaria, 0.4),
                                                 textTransform: 'none',
                                                 py: 0.2,
                                                 px: 1
@@ -759,7 +760,7 @@ export const ModalCredenciamento = ({
                                                     variant="outlined"
                                                     onClick={handleDesfazerLancamento}
                                                     disabled={desfazendo}
-                                                    sx={{ fontSize: '0.7rem', color: '#FFB020', borderColor: 'rgba(255, 176, 32, 0.4)', textTransform: 'none', py: 0.2, px: 1, ml: 0.5 }}
+                                                    sx={{ fontSize: '0.75rem', color: '#FFB020', borderColor: 'rgba(255, 176, 32, 0.4)', textTransform: 'none', py: 0.2, px: 1, ml: 0.5 }}
                                                 >
                                                     {desfazendo ? 'Desfazendo...' : 'Lançamento errado'}
                                                 </Button>
@@ -773,9 +774,9 @@ export const ModalCredenciamento = ({
                                     <Alert
                                         severity="warning"
                                         variant="outlined"
-                                        sx={{ mt: 1, color: '#FFB800', borderColor: 'rgba(255, 184, 0, 0.5)', bgcolor: 'rgba(255, 184, 0, 0.06)', '& .MuiAlert-icon': { color: '#FFB800' } }}
+                                        sx={{ mt: 1, color: cores.alerta, borderColor: 'rgba(255, 184, 0, 0.5)', bgcolor: 'rgba(255, 184, 0, 0.06)', '& .MuiAlert-icon': { color: cores.alerta } }}
                                     >
-                                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFFFFF', mb: 1 }}>
+                                        <Typography variant="body2" sx={{ fontWeight: 700, color: cores.textoForte, mb: 1 }}>
                                             ⚠️ PULSEIRA {statusPulseira.pendencia.numero} PENDENTE DESDE {new Date(statusPulseira.pendencia.dataCheckin).toLocaleDateString('pt-BR')}
                                         </Typography>
                                         <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.9)', mb: 1 }}>
@@ -798,14 +799,14 @@ export const ModalCredenciamento = ({
                                                     onChange={(e) => setMotivoDevolucao(e.target.value)}
                                                     placeholder="ex: Esqueceu de devolver, perdeu a pulseira, etc"
                                                     fullWidth
-                                                    sx={{ mt: 1, mb: 1, '& .MuiOutlinedInput-root': { color: '#FFFFFF' }, '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' } }}
+                                                    sx={{ mt: 1, mb: 1, '& .MuiOutlinedInput-root': { color: cores.textoForte }, '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' } }}
                                                 />
                                                 <Button
                                                     size="small"
                                                     variant="outlined"
                                                     onClick={handleRegistrarMotivoPendencia}
                                                     disabled={registrandoMotivo || !motivoDevolucao.trim()}
-                                                    sx={{ fontSize: '0.75rem', color: '#FFB800', borderColor: 'rgba(255, 184, 0, 0.6)', textTransform: 'none' }}
+                                                    sx={{ fontSize: '0.75rem', color: cores.alerta, borderColor: 'rgba(255, 184, 0, 0.6)', textTransform: 'none' }}
                                                 >
                                                     {registrandoMotivo ? 'Registrando...' : 'Registrar Motivo'}
                                                 </Button>
@@ -815,7 +816,7 @@ export const ModalCredenciamento = ({
                                 )}
 
                                 {desfeitaInfo?.id === pessoa.id && (
-                                    <Typography variant="caption" sx={{ display: 'block', mt: 1, color: '#00D4FF', fontWeight: 700 }}>
+                                    <Typography variant="caption" sx={{ display: 'block', mt: 1, color: cores.primaria, fontWeight: 700 }}>
                                         Lançamento desfeito.{desfeitaInfo.restaurado
                                             ? ` Pulseira ${desfeitaInfo.restaurado} voltou para a pessoa.`
                                             : ' A pessoa ficou sem pulseira em uso.'}
@@ -823,7 +824,7 @@ export const ModalCredenciamento = ({
                                 )}
 
                                 {erroValidacao && (
-                                    <Typography variant="caption" sx={{ color: '#FF3366', fontWeight: 700, mt: 1, display: 'block' }}>
+                                    <Typography variant="caption" sx={{ color: cores.erro, fontWeight: 700, mt: 1, display: 'block' }}>
                                         {erroValidacao}
                                     </Typography>
                                 )}
@@ -837,7 +838,7 @@ export const ModalCredenciamento = ({
                             <Grid item xs={12} sm={7}>
                                 <NeonButton
                                     fullWidth
-                                    neonColor="#00FF88"
+                                    neonColor={cores.sucesso}
                                     onClick={() => handleConfirmar()}
                                     disabled={loading}
                                     sx={{ height: { xs: 48, sm: 56 }, fontSize: { xs: '0.875rem', sm: '1rem' }, fontWeight: 700, borderRadius: 1.5 }}
@@ -902,7 +903,7 @@ export const ModalCredenciamento = ({
                 <DialogContent sx={{ pt: 2, overflowY: 'auto' }}>
                     {loadingDocs ? (
                         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                            <CircularProgress size={32} sx={{ color: '#00D4FF' }} />
+                            <CircularProgress size={32} sx={{ color: cores.primaria }} />
                         </Box>
                     ) : (
                         <ListaDocumentos documentos={pessoaDocs} />

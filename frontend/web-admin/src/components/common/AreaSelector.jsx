@@ -1,12 +1,12 @@
 import { Box, Typography, FormControl, Select, MenuItem, Chip } from '@mui/material';
-import { tom } from '../../styles/tokens';
+import { tom, cores } from '../../styles/tokens';
 
 /**
  * Seletor de área/portaria usado em check-in e checkout.
- * accentColor: cor hex usada no tema do select e do chip (ex: '#00D4FF' ou '#FF3366').
+ * accentColor: cor hex usada no tema do select e do chip (ex: cores.primaria ou cores.erro).
  * compacto: versão de cabeçalho (sem rótulo à parte e sem margem).
  */
-const AreaSelector = ({ areas, value, onChange, accentColor = '#00D4FF', compacto = false }) => {
+const AreaSelector = ({ areas, value, onChange, accentColor = cores.primaria, compacto = false }) => {
   if (!areas?.length) return null;
 
   const selectedName = areas.find(a => a.id === value)?.nome_area;

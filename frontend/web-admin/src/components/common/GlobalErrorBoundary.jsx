@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Typography, Button, Container } from '@mui/material';
 import { ErrorOutline as ErrorIcon } from '@mui/icons-material';
 import { ehErroDeVersao, recarregarUmaVez } from '../../utils/atualizacaoApp';
+import { cores } from '../../styles/tokens';
 
 class GlobalErrorBoundary extends React.Component {
     constructor(props) {
@@ -33,14 +34,14 @@ class GlobalErrorBoundary extends React.Component {
                         alignItems: 'center',
                         justifyContent: 'center',
                         minHeight: '100dvh',
-                        bgcolor: '#050B18',
-                        color: '#FFFFFF',
+                        bgcolor: cores.fundo,
+                        color: cores.textoForte,
                         textAlign: 'center',
                         p: 3
                     }}
                 >
                     <Container maxWidth="sm">
-                        <ErrorIcon sx={{ fontSize: 80, color: '#FF3366', mb: 2 }} />
+                        <ErrorIcon sx={{ fontSize: 80, color: cores.erro, mb: 2 }} />
                         <Typography variant="h4" sx={{ fontWeight: 700, mb: 2, fontFamily: '"Space Grotesk", sans-serif' }}>
                             Sistema interceptado
                         </Typography>
@@ -52,10 +53,10 @@ class GlobalErrorBoundary extends React.Component {
                             variant="contained"
                             onClick={this.handleReload}
                             sx={{
-                                bgcolor: '#00D4FF',
+                                bgcolor: cores.primaria,
                                 color: '#000000',
                                 fontWeight: 700,
-                                '&:hover': { bgcolor: '#00FF88' }
+                                '&:hover': { bgcolor: cores.sucesso }
                             }}
                         >
                             Reinicializar interface
@@ -63,7 +64,7 @@ class GlobalErrorBoundary extends React.Component {
 
                         {true && (
                             <Box sx={{ mt: 4, textAlign: 'left', p: 2, bgcolor: 'rgba(255,51,102,0.1)', borderRadius: 1.5 }}>
-                                <Typography variant="caption" sx={{ color: '#FF3366', fontFamily: '"Inter", sans-serif' }}>
+                                <Typography variant="caption" sx={{ color: cores.erro, fontFamily: '"Inter", sans-serif' }}>
                                     {this.state.error?.toString()}
                                 </Typography>
                             </Box>

@@ -75,7 +75,7 @@ const KpiCard = ({ titulo, valor, icone, cor = cores.primaria, rodape, progresso
             <LinearProgress
                 variant="determinate"
                 value={Math.max(0, Math.min(100, progresso))}
-                sx={{ mt: 1, height: 4, borderRadius: 2, bgcolor: 'rgba(148,163,184,0.12)', '& .MuiLinearProgress-bar': { bgcolor: cor } }}
+                sx={{ mt: 1, height: 4, borderRadius: 1.5, bgcolor: 'rgba(148,163,184,0.12)', '& .MuiLinearProgress-bar': { bgcolor: cor } }}
             />
         )}
         {rodape && (

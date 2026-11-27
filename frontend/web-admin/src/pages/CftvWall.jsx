@@ -28,6 +28,7 @@ import { tocarAlerta, useSomAlertas, criarFiltroAlertas } from '../utils/alertSo
 import { comoRotulo } from '../utils/formatadores';
 import TituloModal from '../components/common/TituloModal';
 import { entrarTelaCheia, sairTelaCheia, estaEmTelaCheia, ouvirTelaCheia, suportaTelaCheia } from '../utils/telaCheia';
+import { cores, tom } from '../styles/tokens';
 
 /** Relógio isolado: antes o relógio re-renderizava a parede inteira a cada segundo */
 const Relogio = () => {
@@ -255,8 +256,8 @@ const CftvWall = () => {
         <Box sx={{
             width: '100%',
             height: '100dvh',
-            bgcolor: '#050B18',
-            color: '#FFFFFF',
+            bgcolor: cores.fundo,
+            color: cores.textoForte,
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
@@ -267,7 +268,7 @@ const CftvWall = () => {
                 minHeight: { xs: 48, md: 52 },
                 py: { xs: 0.75, md: 0 },
                 px: { xs: 1.25, md: 2 },
-                bgcolor: '#0A1628',
+                bgcolor: cores.superficie,
                 borderBottom: '1px solid rgba(0, 212, 255, 0.2)',
                 display: 'flex',
                 flexWrap: 'wrap',
@@ -284,17 +285,17 @@ const CftvWall = () => {
                         startIcon={<ArrowBackIcon sx={{ fontSize: 16 }} />}
                         onClick={handleExitCftv}
                         sx={{
-                            color: '#00D4FF',
-                            borderColor: 'rgba(0, 212, 255, 0.4)',
+                            color: cores.primaria,
+                            borderColor: tom(cores.primaria, 0.4),
                             fontWeight: 700,
                             fontSize: { xs: '0.72rem', sm: '0.78rem' },
                             height: 28,
                             px: 1.25,
                             textTransform: 'none',
-                            bgcolor: 'rgba(0, 212, 255, 0.08)',
+                            bgcolor: tom(cores.primaria, 0.08),
                             borderRadius: 1.5,
                             whiteSpace: 'nowrap',
-                            '&:hover': { bgcolor: 'rgba(0, 212, 255, 0.2)', borderColor: '#00D4FF' }
+                            '&:hover': { bgcolor: tom(cores.primaria, 0.2), borderColor: cores.primaria }
                         }}
                     >
                         Voltar
@@ -302,11 +303,11 @@ const CftvWall = () => {
 
                     <Stack direction="row" spacing={1} alignItems="center">
                         <Box sx={{
-                            width: 9, height: 9, borderRadius: '50%', bgcolor: '#00FF88', flexShrink: 0,
+                            width: 9, height: 9, borderRadius: '50%', bgcolor: cores.sucesso, flexShrink: 0,
                             boxShadow: '0 0 10px #00FF88', animation: 'cftvPulse 1.5s infinite alternate',
                             '@keyframes cftvPulse': { '0%': { opacity: 0.4 }, '100%': { opacity: 1 } }
                         }} />
-                        <Typography variant="subtitle2" fontWeight={700} noWrap letterSpacing={0.5} sx={{ color: '#00D4FF', fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
+                        <Typography variant="subtitle2" fontWeight={700} noWrap letterSpacing={0.5} sx={{ color: cores.primaria, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
                             A2 CFTV Wall
                         </Typography>
                     </Stack>
@@ -314,7 +315,7 @@ const CftvWall = () => {
                     <Chip
                         label={`${displayedCameras.length} câmeras`}
                         size="small"
-                        sx={{ bgcolor: 'rgba(0, 212, 255, 0.1)', color: '#00D4FF', fontWeight: 700, fontSize: '0.7rem', height: 22 }}
+                        sx={{ bgcolor: tom(cores.primaria, 0.1), color: cores.primaria, fontWeight: 700, fontSize: '0.75rem', height: 22 }}
                     />
 
                     {focusedCamId && (
@@ -323,7 +324,7 @@ const CftvWall = () => {
                             size="small"
                             onDelete={() => setFocusedCamId(null)}
                             color="warning"
-                            sx={{ fontWeight: 700, fontSize: '0.7rem', height: 22 }}
+                            sx={{ fontWeight: 700, fontSize: '0.75rem', height: 22 }}
                         />
                     )}
                 </Stack>
@@ -333,7 +334,7 @@ const CftvWall = () => {
                     display: { xs: 'none', md: 'block' },
                     px: 2, py: 0.4, borderRadius: 1.5,
                     bgcolor: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.1)',
-                    fontFamily: '"Inter", sans-serif', fontWeight: 700, fontSize: '1rem', color: '#00FF88', letterSpacing: 2
+                    fontFamily: '"Inter", sans-serif', fontWeight: 700, fontSize: '1rem', color: cores.sucesso, letterSpacing: 2
                 }}>
                     <Relogio />
                 </Box>
@@ -345,7 +346,7 @@ const CftvWall = () => {
                         <IconButton
                             size="small"
                             onClick={() => { setFocusedCamId(null); handleLayoutChange('1x1'); }}
-                            sx={{ color: layout === '1x1' ? '#00D4FF' : 'rgba(255,255,255,0.6)', bgcolor: layout === '1x1' ? 'rgba(0,212,255,0.15)' : 'transparent' }}
+                            sx={{ color: layout === '1x1' ? cores.primaria : 'rgba(255,255,255,0.6)', bgcolor: layout === '1x1' ? tom(cores.primaria, 0.15) : 'transparent' }}
                         >
                             <Grid1x1Icon fontSize="small" />
                         </IconButton>
@@ -355,7 +356,7 @@ const CftvWall = () => {
                         <IconButton
                             size="small"
                             onClick={() => { setFocusedCamId(null); handleLayoutChange('2x2'); }}
-                            sx={{ color: layout === '2x2' ? '#00D4FF' : 'rgba(255,255,255,0.6)', bgcolor: layout === '2x2' ? 'rgba(0,212,255,0.15)' : 'transparent' }}
+                            sx={{ color: layout === '2x2' ? cores.primaria : 'rgba(255,255,255,0.6)', bgcolor: layout === '2x2' ? tom(cores.primaria, 0.15) : 'transparent' }}
                         >
                             <Grid2x2Icon fontSize="small" />
                         </IconButton>
@@ -365,7 +366,7 @@ const CftvWall = () => {
                         <IconButton
                             size="small"
                             onClick={() => { setFocusedCamId(null); handleLayoutChange('3x3'); }}
-                            sx={{ display: { xs: 'none', sm: 'inline-flex' }, color: layout === '3x3' ? '#00D4FF' : 'rgba(255,255,255,0.6)', bgcolor: layout === '3x3' ? 'rgba(0,212,255,0.15)' : 'transparent' }}
+                            sx={{ display: { xs: 'none', sm: 'inline-flex' }, color: layout === '3x3' ? cores.primaria : 'rgba(255,255,255,0.6)', bgcolor: layout === '3x3' ? tom(cores.primaria, 0.15) : 'transparent' }}
                         >
                             <Grid3x3Icon fontSize="small" />
                         </IconButton>
@@ -375,7 +376,7 @@ const CftvWall = () => {
                         <IconButton
                             size="small"
                             onClick={() => { setFocusedCamId(null); handleLayoutChange('4x4'); }}
-                            sx={{ display: { xs: 'none', sm: 'inline-flex' }, color: layout === '4x4' ? '#00D4FF' : 'rgba(255,255,255,0.6)', bgcolor: layout === '4x4' ? 'rgba(0,212,255,0.15)' : 'transparent' }}
+                            sx={{ display: { xs: 'none', sm: 'inline-flex' }, color: layout === '4x4' ? cores.primaria : 'rgba(255,255,255,0.6)', bgcolor: layout === '4x4' ? tom(cores.primaria, 0.15) : 'transparent' }}
                         >
                             <Grid4x4Icon fontSize="small" />
                         </IconButton>
@@ -387,7 +388,7 @@ const CftvWall = () => {
                         size="small"
                         startIcon={<TuneIcon sx={{ fontSize: 16 }} />}
                         onClick={() => setOpenSelectModal(true)}
-                        sx={{ borderColor: 'rgba(255,255,255,0.2)', color: '#FFFFFF', fontSize: '0.72rem', fontWeight: 700, px: 1, height: 28, minHeight: 28 }}
+                        sx={{ borderColor: 'rgba(255,255,255,0.2)', color: cores.textoForte, fontSize: '0.75rem', fontWeight: 700, px: 1, height: 28, minHeight: 28 }}
                     >
                         <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Selecionar </Box>Câmeras
                     </Button>
@@ -397,7 +398,7 @@ const CftvWall = () => {
                         <IconButton
                             size="small"
                             onClick={() => setSoundEnabled(!soundEnabled)}
-                            sx={{ color: soundEnabled ? '#00FF88' : '#FF3366' }}
+                            sx={{ color: soundEnabled ? cores.sucesso : cores.erro }}
                         >
                             {soundEnabled ? <SoundIcon fontSize="small" /> : <MuteIcon fontSize="small" />}
                         </IconButton>
@@ -410,7 +411,7 @@ const CftvWall = () => {
                                 size="small"
                                 onClick={toggleFullscreen}
                                 aria-label={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
-                                sx={{ color: '#00D4FF' }}
+                                sx={{ color: cores.primaria }}
                             >
                                 {isFullscreen ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
                             </IconButton>
@@ -437,7 +438,7 @@ const CftvWall = () => {
                             variant="contained"
                             startIcon={<TuneIcon />}
                             onClick={() => setOpenSelectModal(true)}
-                            sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700 }}
+                            sx={{ bgcolor: cores.primaria, color: '#000000', fontWeight: 700 }}
                         >
                             Selecionar câmeras agora
                         </Button>
@@ -463,12 +464,12 @@ const CftvWall = () => {
                                             width: '100%',
                                             aspectRatio: { xs: '16/9', md: 'unset' },
                                             height: { xs: 'auto', md: gridConfig.height },
-                                            bgcolor: '#050B18',
+                                            bgcolor: cores.fundo,
                                             borderRadius: 1.5,
                                             overflow: 'hidden',
                                             border: isAlarming ? '3px solid #FF3366' : '1px solid rgba(255,255,255,0.08)',
                                             boxShadow: isAlarming ? '0 0 25px rgba(255, 0, 85, 0.8)' : 'none',
-                                            transition: 'all 0.2s ease',
+                                            transition: 'background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease',
                                             '&:hover .cftv-overlay-controls': { opacity: 1 }
                                         }}
                                     >
@@ -494,14 +495,14 @@ const CftvWall = () => {
                                                     bgcolor: 'rgba(0,0,0,0.7)', px: 0.6, py: 0.2, borderRadius: 1,
                                                     border: '1px solid rgba(255,255,255,0.1)'
                                                 }}>
-                                                    <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#FF3366' }} />
-                                                    <Typography variant="caption" fontWeight={700} sx={{ fontSize: '0.68rem', color: '#FF3366' }}>
+                                                    <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: cores.erro }} />
+                                                    <Typography variant="caption" fontWeight={700} sx={{ fontSize: '0.75rem', color: cores.erro }}>
                                                         REC
                                                     </Typography>
                                                 </Box>
 
                                                 <Typography variant="body2" fontWeight={700} noWrap sx={{
-                                                    color: '#FFFFFF', fontSize: { xs: '0.72rem', sm: '0.8125rem' }, textShadow: '0 1px 3px rgba(0,0,0,0.9)'
+                                                    color: cores.textoForte, fontSize: { xs: '0.72rem', sm: '0.8125rem' }, textShadow: '0 1px 3px rgba(0,0,0,0.9)'
                                                 }}>
                                                     {cam.nome}
                                                 </Typography>
@@ -513,7 +514,7 @@ const CftvWall = () => {
                                                         icon={<ShieldIcon sx={{ fontSize: 10, color: '#FFFFFF !important' }} />}
                                                         label={cam.area.nome_area}
                                                         size="small"
-                                                        sx={{ display: { xs: 'none', sm: 'inline-flex' }, bgcolor: 'rgba(0, 212, 255, 0.25)', color: '#FFFFFF', fontWeight: 700, fontSize: '0.7rem', height: 20 }}
+                                                        sx={{ display: { xs: 'none', sm: 'inline-flex' }, bgcolor: tom(cores.primaria, 0.25), color: cores.textoForte, fontWeight: 700, fontSize: '0.75rem', height: 20 }}
                                                     />
                                                 )}
                                                 {isAlarming && (
@@ -521,7 +522,7 @@ const CftvWall = () => {
                                                         label="Alvo!"
                                                         size="small"
                                                         color="error"
-                                                        sx={{ fontWeight: 700, fontSize: '0.7rem', height: 20, animation: 'blink 0.8s infinite' }}
+                                                        sx={{ fontWeight: 700, fontSize: '0.75rem', height: 20, animation: 'blink 0.8s infinite' }}
                                                     />
                                                 )}
                                             </Stack>
@@ -540,7 +541,7 @@ const CftvWall = () => {
                                             </Typography>
 
                                             <Typography variant="caption" noWrap sx={{
-                                                fontFamily: '"Inter", sans-serif', fontSize: { xs: '0.65rem', sm: '0.75rem' }, color: '#00FF88', fontWeight: 700, flexShrink: 0
+                                                fontFamily: '"Inter", sans-serif', fontSize: { xs: '0.65rem', sm: '0.75rem' }, color: cores.sucesso, fontWeight: 700, flexShrink: 0
                                             }}>
                                                 {stCam?.conectada ? `${Math.round(stCam.video_fps)} fps` : (aoVivo ? 'AO VIVO' : 'SNAP')}
                                                 {stCam?.rostos ? ` • ${stCam.rostos}` : ''}
@@ -557,7 +558,7 @@ const CftvWall = () => {
                                                 <IconButton
                                                     size="small"
                                                     onClick={(e) => { e.stopPropagation(); setFocusedCamId(focusedCamId === cam.id ? null : cam.id); }}
-                                                    sx={{ color: '#00D4FF', bgcolor: 'rgba(0,212,255,0.2)' }}
+                                                    sx={{ color: cores.primaria, bgcolor: tom(cores.primaria, 0.2) }}
                                                 >
                                                     <Grid1x1Icon />
                                                 </IconButton>
@@ -573,7 +574,7 @@ const CftvWall = () => {
                                                             .then((url) => { if (aba) aba.location.href = url; })
                                                             .catch(() => { if (aba) aba.close(); });
                                                     }}
-                                                    sx={{ color: '#FFFFFF', bgcolor: 'rgba(255,255,255,0.2)' }}
+                                                    sx={{ color: cores.textoForte, bgcolor: 'rgba(255,255,255,0.2)' }}
                                                 >
                                                     <SnapshotIcon />
                                                 </IconButton>
@@ -617,7 +618,7 @@ const CftvWall = () => {
                                     <Checkbox
                                         checked={selectedCameraIds.includes(c.id)}
                                         onChange={() => toggleCameraSelection(c.id)}
-                                        sx={{ color: '#00D4FF', '&.Mui-checked': { color: '#00D4FF' } }}
+                                        sx={{ color: cores.primaria, '&.Mui-checked': { color: cores.primaria } }}
                                     />
                                 }
                                 label={
@@ -635,7 +636,7 @@ const CftvWall = () => {
                     </FormGroup>
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={() => setOpenSelectModal(false)} variant="contained" fullWidth sx={{ bgcolor: '#00D4FF', color: '#000000', fontWeight: 700 }}>
+                    <Button onClick={() => setOpenSelectModal(false)} variant="contained" fullWidth sx={{ bgcolor: cores.primaria, color: '#000000', fontWeight: 700 }}>
                         Aplicar ao mosaico
                     </Button>
                 </DialogActions>
@@ -653,20 +654,20 @@ const CftvWall = () => {
                         overflowY: 'auto',
                         zIndex: 999999,
                         background: 'linear-gradient(135deg, rgba(220, 20, 60, 0.98) 0%, rgba(139, 0, 0, 0.98) 100%)',
-                        color: '#FFFFFF', borderRadius: 1.5, p: { xs: 2, sm: 3 },
+                        color: cores.textoForte, borderRadius: 1.5, p: { xs: 2, sm: 3 },
                         boxShadow: '0 0 60px rgba(255, 30, 86, 0.9), 0 25px 50px rgba(0,0,0,0.9)',
                         border: '2px solid #FF3366',
                         animation: 'cftvAlertPulse 1.2s infinite alternate',
                         '@keyframes cftvAlertPulse': {
-                            '0%': { borderColor: '#FFFFFF', boxShadow: '0 0 30px rgba(255, 51, 102, 0.8)' },
-                            '100%': { borderColor: '#FF3366', boxShadow: '0 0 70px rgba(255, 0, 80, 1)' }
+                            '0%': { borderColor: cores.textoForte, boxShadow: '0 0 30px rgba(255, 51, 102, 0.8)' },
+                            '100%': { borderColor: cores.erro, boxShadow: '0 0 70px rgba(255, 0, 80, 1)' }
                         }
                     }}>
                         <Stack direction="row" spacing={1.5} justifyContent="space-between" alignItems="center">
                             <Stack direction="row" spacing={1.2} alignItems="center" sx={{ minWidth: 0 }}>
-                                <AlarmIcon sx={{ fontSize: { xs: 28, sm: 36 }, color: '#FFFFFF', flexShrink: 0 }} />
+                                <AlarmIcon sx={{ fontSize: { xs: 28, sm: 36 }, color: cores.textoForte, flexShrink: 0 }} />
                                 <Box sx={{ minWidth: 0 }}>
-                                    <Typography variant="h6" fontWeight={700} letterSpacing={0.5} sx={{ color: '#FFFFFF', fontSize: { xs: '1rem', sm: '1.25rem' } }}>
+                                    <Typography variant="h6" fontWeight={700} letterSpacing={0.5} sx={{ color: cores.textoForte, fontSize: { xs: '1rem', sm: '1.25rem' } }}>
                                         Alvo identificado na watchlist!
                                     </Typography>
                                     <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.9)', fontWeight: 700 }}>
@@ -674,14 +675,14 @@ const CftvWall = () => {
                                     </Typography>
                                 </Box>
                             </Stack>
-                            <IconButton onClick={() => setActiveAlert(null)} size="small" sx={{ color: '#FFFFFF', bgcolor: 'rgba(0,0,0,0.3)' }}>
+                            <IconButton onClick={() => setActiveAlert(null)} size="small" sx={{ color: cores.textoForte, bgcolor: 'rgba(0,0,0,0.3)' }}>
                                 <CloseIcon />
                             </IconButton>
                         </Stack>
 
                         {/* COMPARATIVO VISUAL: FOTO CADASTRADA VS FOTO CAPTURADA PELA CÂMERA */}
                         <Box sx={{ mt: 2, p: 1.5, borderRadius: 1.5, bgcolor: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.15)' }}>
-                            <Typography variant="caption" fontWeight={700} sx={{ color: '#00D4FF', letterSpacing: 1, display: 'block', mb: 1 }}>
+                            <Typography variant="caption" fontWeight={700} sx={{ color: cores.primaria, letterSpacing: 1, display: 'block', mb: 1 }}>
                                 Comparativo biométrico facial
                             </Typography>
                             <Grid container spacing={1.5} alignItems="center">
@@ -697,7 +698,7 @@ const CftvWall = () => {
                                             nome={activeAlert?.pessoa?.nome}
                                             width={96}
                                             borderRadius="10px"
-                                            accentColor="#00D4FF"
+                                            accentColor={cores.primaria}
                                             borderWidth="2px"
                                         />
                                     </Box>
@@ -705,11 +706,11 @@ const CftvWall = () => {
 
                                 {/* Foto Capturada no Local */}
                                 <Grid item xs={6} sx={{ textAlign: 'center' }}>
-                                    <Typography variant="caption" sx={{ display: 'block', mb: 0.5, fontWeight: 700, color: '#FF3366' }}>
+                                    <Typography variant="caption" sx={{ display: 'block', mb: 0.5, fontWeight: 700, color: cores.erro }}>
                                         Foto capturada
                                     </Typography>
                                     <Box sx={{
-                                        width: 96, height: 96, mx: 'auto', borderRadius: '10px',
+                                        width: 96, height: 96, mx: 'auto', borderRadius: '8px',
                                         overflow: 'hidden', bgcolor: '#000000', border: '2px solid #FF3366',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center'
                                     }}>
@@ -729,7 +730,7 @@ const CftvWall = () => {
 
                         {/* DADOS DA PESSOA */}
                         <Box sx={{ mt: 1.5 }}>
-                            <Typography variant="h6" fontWeight={700} sx={{ color: '#FFFFFF', fontSize: { xs: '1.1rem', sm: '1.35rem' } }}>
+                            <Typography variant="h6" fontWeight={700} sx={{ color: cores.textoForte, fontSize: { xs: '1.1rem', sm: '1.35rem' } }}>
                                 {activeAlert?.target_name || activeAlert?.pessoa?.nome}
                             </Typography>
                             <Typography variant="body2" sx={{ fontFamily: '"Inter", sans-serif', fontWeight: 700 }}>
@@ -738,7 +739,7 @@ const CftvWall = () => {
                             <Chip
                                 label={comoRotulo(activeAlert?.watchlist?.nivel_alerta) || 'Crítico / alto risco'}
                                 size="small"
-                                sx={{ mt: 0.75, bgcolor: '#FFFFFF', color: '#FF3366', fontWeight: 700, fontSize: '0.75rem' }}
+                                sx={{ mt: 0.75, bgcolor: cores.textoForte, color: cores.erro, fontWeight: 700, fontSize: '0.75rem' }}
                             />
                         </Box>
 
@@ -768,14 +769,14 @@ const CftvWall = () => {
                                 startIcon={<CheckCircleIcon />}
                                 onClick={() => handleConcluirRastreamento(activeAlert?.pessoa?.cpf)}
                                 sx={{
-                                    bgcolor: '#00FF88',
+                                    bgcolor: cores.sucesso,
                                     color: '#000000',
                                     fontWeight: 700,
                                     fontSize: '0.82rem',
                                     letterSpacing: '0.5px',
                                     py: 1.1,
                                     boxShadow: '0 4px 20px rgba(0, 230, 118, 0.5)',
-                                    '&:hover': { bgcolor: '#00FF88', color: '#000000' }
+                                    '&:hover': { bgcolor: cores.sucesso, color: '#000000' }
                                 }}
                             >
                                 Alvo localizado (concluir)
@@ -789,7 +790,7 @@ const CftvWall = () => {
                                 fullWidth
                                 startIcon={<SoundIcon />}
                                 onClick={() => tocarAlerta('sirene', true)}
-                                sx={{ bgcolor: '#FFFFFF', color: '#FF3366', fontWeight: 700, fontSize: '0.75rem' }}
+                                sx={{ bgcolor: cores.textoForte, color: cores.erro, fontWeight: 700, fontSize: '0.75rem' }}
                             >
                                 Sirene
                             </Button>
@@ -798,7 +799,7 @@ const CftvWall = () => {
                                 size="small"
                                 fullWidth
                                 onClick={() => setActiveAlert(null)}
-                                sx={{ bgcolor: 'rgba(0,0,0,0.6)', color: '#FFFFFF', fontWeight: 700, fontSize: '0.75rem' }}
+                                sx={{ bgcolor: 'rgba(0,0,0,0.6)', color: cores.textoForte, fontWeight: 700, fontSize: '0.75rem' }}
                             >
                                 Minimizar
                             </Button>

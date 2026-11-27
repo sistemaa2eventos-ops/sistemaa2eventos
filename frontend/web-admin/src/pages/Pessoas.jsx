@@ -20,7 +20,7 @@ import ConfirmDialog from '../components/common/ConfirmDialog';
 import AnexarDocumentoDialog from '../components/documentos/AnexarDocumentoDialog';
 import api from '../services/api';
 import { useSnackbar } from 'notistack';
-import { botaoSecundario } from '../styles/tokens';
+import { botaoSecundario, cores, tom } from '../styles/tokens';
 
 
 const Pessoas = () => {
@@ -155,7 +155,7 @@ const Pessoas = () => {
         </Box>
       </Box>
 
-      <GlassCard glowColor="#7B2FBE" sx={{ p: { xs: 2, sm: 2.5, md: 3 }, mb: 3 }}>
+      <GlassCard glowColor={cores.secundaria} sx={{ p: { xs: 2, sm: 2.5, md: 3 }, mb: 3 }}>
         <Tabs
           value={statusFilter}
           onChange={(e, val) => setStatusFilter(val)}
@@ -167,7 +167,7 @@ const Pessoas = () => {
             minHeight: 40,
             '& .MuiTab-root': { color: 'rgba(255,255,255,0.5)', fontWeight: 700, minHeight: 40, py: 0.5, fontSize: '0.8125rem' }, 
             '& .Mui-selected': { color: '#00D4FF !important' }, 
-            '& .MuiTabs-indicator': { backgroundColor: '#00D4FF' } 
+            '& .MuiTabs-indicator': { backgroundColor: cores.primaria } 
           }}
         >
           <Tab value="TODOS" label="Todos" />
@@ -188,7 +188,7 @@ const Pessoas = () => {
               height: 38,
               bgcolor: 'rgba(0,0,0,0.25)', 
               borderRadius: 1.5, 
-              color: '#FFFFFF', 
+              color: cores.textoForte, 
               fontSize: '0.875rem' 
             }
           }}
@@ -283,7 +283,7 @@ const Pessoas = () => {
                     }
         }}
       >
-        <DialogTitle sx={{ fontWeight: 700, color: isBlocking ? '#FF3366' : '#00FF88' }}>
+        <DialogTitle sx={{ fontWeight: 700, color: isBlocking ? cores.erro : cores.sucesso }}>
           {isBlocking ? 'Bloquear participante' : 'Desbloquear participante'}
         </DialogTitle>
         <DialogContent sx={{ overflowY: 'auto' }}>
@@ -299,7 +299,7 @@ const Pessoas = () => {
             value={blockJustification}
             onChange={(e) => setBlockJustification(e.target.value)}
             InputProps={{
-              sx: { height: 38, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 1.5, color: '#FFFFFF', fontSize: '0.875rem' }
+              sx: { height: 38, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 1.5, color: cores.textoForte, fontSize: '0.875rem' }
             }}
           />
         </DialogContent>
@@ -308,7 +308,7 @@ const Pessoas = () => {
           <NeonButton
             onClick={handleConfirmBlock}
             loading={blockLoading}
-            sx={{ height: 38, minHeight: 38, bgcolor: isBlocking ? '#FF3366' : '#00FF88' }}
+            sx={{ height: 38, minHeight: 38, bgcolor: isBlocking ? cores.erro : cores.sucesso }}
           >
             CONFIRMAR {isBlocking ? 'Bloqueio' : 'Desbloqueio'}
           </NeonButton>
@@ -336,7 +336,7 @@ const Pessoas = () => {
       >
         <DialogTitle sx={{ textAlign: 'center', fontWeight: 700 }}>ACRESCITAR CREDENCIAL: {qrPessoa?.nome}</DialogTitle>
         <DialogContent sx={{ textAlign: 'center', py: 4, overflowY: 'auto' }}>
-          {qrLoading ? <CircularProgress sx={{ color: '#00FF88' }} /> : (
+          {qrLoading ? <CircularProgress sx={{ color: cores.sucesso }} /> : (
             <Box>
               <img src={qrImage} alt="QR Code" style={{ maxWidth: '100%', maxHeight: '45dvh', width: '250px', border: '8px solid #FFFFFF', borderRadius: '8px', objectFit: 'contain' }} />
               <Typography variant="caption" sx={{ display: 'block', mt: 2, color: 'text.secondary' }}>TOKEN SEGURO: {qrPessoa?.qr_code || 'Gerado via sistema'}</Typography>
@@ -351,14 +351,14 @@ const Pessoas = () => {
                 variant="outlined"
                 onClick={handleReenviarEmailQR}
                 disabled={enviandoEmailQR}
-                sx={{ borderColor: 'rgba(0, 212, 255, 0.4)', color: '#00D4FF', fontWeight: 600, height: 38 }}
+                sx={{ borderColor: tom(cores.primaria, 0.4), color: cores.primaria, fontWeight: 600, height: 38 }}
               >
                 {enviandoEmailQR ? 'Enviando...' : 'Enviar por E-mail'}
               </Button>
               <Button
                 variant="contained"
                 onClick={() => { const link = document.createElement('a'); link.href = qrImage; link.download = `QR_${qrPessoa?.nome}.png`; link.click(); }}
-                sx={{ bgcolor: '#00FF88', color: '#000000', fontWeight: 700, height: 38 }}
+                sx={{ bgcolor: cores.sucesso, color: '#000000', fontWeight: 700, height: 38 }}
               >
                 Baixar png
               </Button>

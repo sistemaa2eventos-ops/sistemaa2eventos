@@ -19,6 +19,7 @@ import NeonButton from '../../components/common/NeonButton';
 import { carregarIaConfig, definirIaConfig, useIaConfig, useIaStatus, statusDaCamera, NOMES_PERFIL } from '../../hooks/useIaConfig';
 import { MODOS_IA, modoIaDe, camposDoModoIa } from '../../components/cameras/opcoesCamera';
 import ServidoresIaPainel from '../../components/cameras/ServidoresIaPainel';
+import { cores, tom } from '../../styles/tokens';
 
 // Mesma tabela do motor (backend/microservice-face-python/src/main.py → PERFIS e COMUNS)
 const PERFIS_IA = {
@@ -766,7 +767,7 @@ const ConfigIAFacial = ({ embutido = false }) => {
                                                     </TableCell>
                                                     <TableCell>
                                                         {isDesativada ? (
-                                                            <Chip label="Desativada" size="small" color="warning" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700 }} />
+                                                            <Chip label="Desativada" size="small" color="warning" sx={{ height: 20, fontSize: '0.75rem', fontWeight: 700 }} />
                                                         ) : st ? (
                                                             <Typography variant="caption">
                                                                 {st.conectada ? `${Math.round(st.video_fps)} fps` : 'sem vídeo'}
@@ -853,7 +854,7 @@ const ConfigIAFacial = ({ embutido = false }) => {
                                 <Grid container spacing={1.5}>
                                     {diagnostico.checks.map(ch => {
                                         const Icone = ch.status === 'ok' ? CheckIcon : (ch.status === 'error' ? ErrorIcon : WarnIcon);
-                                        const cor = ch.status === 'ok' ? '#00FF88' : (ch.status === 'error' ? '#FF3366' : '#FFB800');
+                                        const cor = ch.status === 'ok' ? cores.sucesso : (ch.status === 'error' ? cores.erro : cores.alerta);
                                         return (
                                             <Grid item xs={12} md={6} key={ch.id}>
                                                 <Box sx={{
@@ -887,14 +888,14 @@ const ConfigIAFacial = ({ embutido = false }) => {
                             {/* 2. RECOMENDAÇÕES DE CONFIGURAÇÃO ANTES DE LIGAR */}
                             <Box sx={{
                                 p: 2,
-                                borderRadius: 2,
-                                bgcolor: 'rgba(0, 212, 255, 0.05)',
+                                borderRadius: 1.5,
+                                bgcolor: tom(cores.primaria, 0.05),
                                 border: '1px solid rgba(0, 212, 255, 0.25)'
                             }}>
                                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={1} sx={{ mb: 1 }}>
                                     <Stack direction="row" spacing={1} alignItems="center">
-                                        <RecommendIcon sx={{ color: '#00D4FF' }} />
-                                        <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#00D4FF' }}>
+                                        <RecommendIcon sx={{ color: cores.primaria }} />
+                                        <Typography variant="subtitle2" fontWeight={700} sx={{ color: cores.primaria }}>
                                             2. Recomendações de Configuração para este PC
                                         </Typography>
                                     </Stack>

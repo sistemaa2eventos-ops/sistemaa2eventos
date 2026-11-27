@@ -6,6 +6,7 @@ import api from '../../services/api';
 import PageHeader from '../../components/common/PageHeader';
 import GlassCard from '../../components/common/GlassCard';
 import NeonButton from '../../components/common/NeonButton';
+import { cores } from '../../styles/tokens';
 
 const ConfigVeiculos = () => {
     const { enqueueSnackbar } = useSnackbar();
@@ -74,15 +75,15 @@ const ConfigVeiculos = () => {
                 <Grid item xs={12} md={6}>
                     <GlassCard sx={{ p: { xs: 2.5, md: 3 }, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
-                            <CarIcon sx={{ color: '#00D4FF', fontSize: 28 }} />
-                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                            <CarIcon sx={{ color: cores.primaria, fontSize: 28 }} />
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: cores.textoForte }}>
                                 MOTOR ANPR / LPR (Leitura de Placas)
                             </Typography>
                         </Box>
 
                         <FormControlLabel
                             control={<Switch checked={anprEnabled} onChange={(e) => setAnprEnabled(e.target.checked)} color="primary" />}
-                            label={<Typography sx={{ fontWeight: 600, color: '#FFFFFF' }}>Habilitar módulo de estacionamento</Typography>}
+                            label={<Typography sx={{ fontWeight: 600, color: cores.textoForte }}>Habilitar módulo de estacionamento</Typography>}
                             sx={{ mb: 3 }}
                         />
 

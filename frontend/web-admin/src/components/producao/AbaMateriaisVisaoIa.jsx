@@ -84,7 +84,7 @@ const ESTADO_INICIAL_MATERIAL = (areaPadrao = '') => ({
     fotos_referencia: [],
     caracteristicas: {
         cor_predominante: 'Alumínio / Prata',
-        cor_hex_referencia: '#CBD5E1',
+        cor_hex_referencia: cores.textoSuave,
         formato_geometria: 'estrutura_vazada',
         material_composicao: '',
         unidade_medida: 'un',
@@ -587,7 +587,7 @@ const AbaMateriaisVisaoIa = ({ resumo, headersExtra, aoAtualizar, apiClient }) =
             fotos_referencia: fotosAtuais,
             caracteristicas: {
                 cor_predominante: car.cor_predominante || 'Alumínio / Prata',
-                cor_hex_referencia: car.cor_hex_referencia || '#CBD5E1',
+                cor_hex_referencia: car.cor_hex_referencia || cores.textoSuave,
                 formato_geometria: car.formato_geometria || 'estrutura_vazada',
                 material_composicao: car.material_composicao || '',
                 unidade_medida: car.unidade_medida || 'un',
@@ -916,7 +916,7 @@ const AbaMateriaisVisaoIa = ({ resumo, headersExtra, aoAtualizar, apiClient }) =
                 <Grid container spacing={2.5} alignItems="flex-start">
                     <Grid item xs={12} lg={7}>
                         <Stack spacing={1.5}>
-                            <Box sx={{ borderRadius: 2, overflow: 'hidden', border: `1px solid ${iaRodando ? cores.primaria : cores.borda}`, bgcolor: cores.fundo }}>
+                            <Box sx={{ borderRadius: 1.5, overflow: 'hidden', border: `1px solid ${iaRodando ? cores.primaria : cores.borda}`, bgcolor: cores.fundo }}>
                                 <video
                                     ref={videoIaRef}
                                     src={fonteMidia === 'video' ? videoUrl : undefined}
@@ -986,7 +986,7 @@ const AbaMateriaisVisaoIa = ({ resumo, headersExtra, aoAtualizar, apiClient }) =
                             </FormControl>
 
                             {materialFocoCard && (
-                                <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: cores.superficieElevada, border: `1px solid ${cores.borda}`, display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                                <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: cores.superficieElevada, border: `1px solid ${cores.borda}`, display: 'flex', gap: 1.5, alignItems: 'center' }}>
                                     {materialFocoCard.foto_referencia_url ? (
                                         <Box
                                             component="img"
@@ -1020,7 +1020,7 @@ const AbaMateriaisVisaoIa = ({ resumo, headersExtra, aoAtualizar, apiClient }) =
                                 </Box>
                             )}
 
-                            <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: cores.superficieElevada, border: `1px solid ${cores.borda}` }}>
+                            <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: cores.superficieElevada, border: `1px solid ${cores.borda}` }}>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                                     <Typography sx={{ fontSize: tamanhos.sm, color: cores.textoSecundario }}>
                                         Total rastreado nesta análise:
@@ -1078,7 +1078,7 @@ const AbaMateriaisVisaoIa = ({ resumo, headersExtra, aoAtualizar, apiClient }) =
                             </NeonButton>
 
                             {eventosAcao.length > 0 && (
-                                <Box sx={{ maxHeight: 160, overflowY: 'auto', p: 1.25, borderRadius: 2, bgcolor: cores.fundo, border: `1px solid ${cores.borda}` }}>
+                                <Box sx={{ maxHeight: 160, overflowY: 'auto', p: 1.25, borderRadius: 1.5, bgcolor: cores.fundo, border: `1px solid ${cores.borda}` }}>
                                     <Typography sx={{ fontSize: tamanhos.xs, fontWeight: 700, color: cores.textoSecundario, mb: 0.75 }}>
                                         Ações executadas pelo monitoramento ({eventosAcao.length})
                                     </Typography>
@@ -1166,7 +1166,7 @@ const AbaMateriaisVisaoIa = ({ resumo, headersExtra, aoAtualizar, apiClient }) =
                     {sessoes.map((sessao) => {
                         const rec = recebimentos.find((r) => r.id === sessao.recebimento_id);
                         return (
-                            <Box key={sessao.id} sx={{ p: 2, borderRadius: 2, border: `1px solid ${cores.borda}`, bgcolor: cores.superficieElevada }}>
+                            <Box key={sessao.id} sx={{ p: 2, borderRadius: 1.5, border: `1px solid ${cores.borda}`, bgcolor: cores.superficieElevada }}>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
                                     <Box>
                                         <Typography sx={{ fontWeight: 700, color: cores.textoForte }}>
@@ -1632,13 +1632,13 @@ const AbaMateriaisVisaoIa = ({ resumo, headersExtra, aoAtualizar, apiClient }) =
                                 <Grid container spacing={1.5} sx={{ mb: 1.5 }}>
                                     {formMaterial.fotos_referencia.map((foto) => (
                                         <Grid item xs={12} sm={6} md={4} key={foto.id}>
-                                            <Box sx={{ p: 1, borderRadius: 2, bgcolor: cores.superficieElevada, border: `1px solid ${foto.principal ? cores.primaria : cores.borda}` }}>
+                                            <Box sx={{ p: 1, borderRadius: 1.5, bgcolor: cores.superficieElevada, border: `1px solid ${foto.principal ? cores.primaria : cores.borda}` }}>
                                                 <Box sx={{ position: 'relative', mb: 1 }}>
                                                     <Box
                                                         component="img"
                                                         src={foto.url}
                                                         alt={foto.legenda || 'Referência'}
-                                                        sx={{ width: '100%', height: 112, objectFit: 'cover', borderRadius: 1.25, display: 'block' }}
+                                                        sx={{ width: '100%', height: 112, objectFit: 'cover', borderRadius: 1, display: 'block' }}
                                                     />
                                                     <Chip
                                                         size="small"
@@ -1998,7 +1998,7 @@ const AbaMateriaisVisaoIa = ({ resumo, headersExtra, aoAtualizar, apiClient }) =
                 <TituloModal titulo="Foto de referência / evidência capturada" onFechar={() => setEvidenciaModalUrl('')} />
                 <DialogContent dividers>
                     {evidenciaModalUrl && (
-                        <Box component="img" src={evidenciaModalUrl} alt="Visualização ampliada" sx={{ width: '100%', borderRadius: 2, display: 'block' }} />
+                        <Box component="img" src={evidenciaModalUrl} alt="Visualização ampliada" sx={{ width: '100%', borderRadius: 1.5, display: 'block' }} />
                     )}
                 </DialogContent>
                 <DialogActions sx={{ px: 3, py: 1.5 }}>

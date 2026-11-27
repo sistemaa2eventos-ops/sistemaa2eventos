@@ -6,17 +6,18 @@ import { Refresh as RefreshIcon } from '@mui/icons-material';
 import GlassCard from '../common/GlassCard';
 
 import { comoRotulo } from '../../utils/formatadores';
-const COR_STATUS = { online: '#00FF88', local: '#FFB800', offline: '#FF3366', migrado: 'rgba(255,255,255,0.4)', desativado: 'rgba(255,255,255,0.4)' };
+import { cores } from '../../styles/tokens';
+const COR_STATUS = { online: cores.sucesso, local: cores.alerta, offline: cores.erro, migrado: 'rgba(255,255,255,0.4)', desativado: 'rgba(255,255,255,0.4)' };
 const ROTULO_SERVICO = { supabase: 'Banco (Supabase)', postgresql_edge: 'Banco local (Edge)', redis: 'Redis (filas/tempo real)', tempo_real: 'Tempo real (WebSocket)' };
-const COR_NIVEL = { error: '#FF3366', warn: '#FFB800', info: 'rgba(255,255,255,0.75)', debug: 'rgba(255,255,255,0.45)' };
+const COR_NIVEL = { error: cores.erro, warn: cores.alerta, info: 'rgba(255,255,255,0.75)', debug: 'rgba(255,255,255,0.45)' };
 
 const Titulo = ({ children }) => (
-    <Typography variant="subtitle2" sx={{ color: '#00D4FF', fontWeight: 700, mb: 1.5, letterSpacing: 1 }}>{children}</Typography>
+    <Typography variant="subtitle2" sx={{ color: cores.primaria, fontWeight: 700, mb: 1.5, letterSpacing: 1 }}>{children}</Typography>
 );
 const Linha = ({ rotulo, valor, cor }) => (
     <Stack direction="row" justifyContent="space-between" sx={{ py: 0.5 }}>
         <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.65)' }}>{rotulo}</Typography>
-        <Typography variant="body2" sx={{ color: cor || '#FFFFFF', fontWeight: 700 }}>{valor}</Typography>
+        <Typography variant="body2" sx={{ color: cor || cores.textoForte, fontWeight: 700 }}>{valor}</Typography>
     </Stack>
 );
 
@@ -35,9 +36,9 @@ const AbaSaude = ({ sysStatus, sysPerf, sysLogs = [], sysError, terminais = [], 
     const saudeVideo = sysStatus?.saude_video || [];
     // Câmera sem sinal, ou abaixo de 10 fps (vídeo travado), aparece em destaque
     const estadoCamera = (c) => {
-        if (!c.conectada) return { rotulo: 'sem sinal', cor: '#FF3366' };
-        if (c.fps < 10) return { rotulo: 'lento', cor: '#FFB800' };
-        return { rotulo: 'ok', cor: '#00FF88' };
+        if (!c.conectada) return { rotulo: 'sem sinal', cor: cores.erro };
+        if (c.fps < 10) return { rotulo: 'lento', cor: cores.alerta };
+        return { rotulo: 'ok', cor: cores.sucesso };
     };
 
     const logsFiltrados = useMemo(() => {
@@ -51,11 +52,11 @@ const AbaSaude = ({ sysStatus, sysPerf, sysLogs = [], sysError, terminais = [], 
     return (
         <Box>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                <Typography variant="caption" sx={{ color: sysError ? '#FFB800' : 'rgba(255,255,255,0.5)' }}>
+                <Typography variant="caption" sx={{ color: sysError ? cores.alerta : 'rgba(255,255,255,0.5)' }}>
                     {sysError ? 'Algumas informações não puderam ser carregadas. ' : ''}
                     Atualiza a cada 15 s{atualizadoEm ? ` · última às ${atualizadoEm.toLocaleTimeString('pt-BR')}` : ''}
                 </Typography>
-                <Button size="small" startIcon={<RefreshIcon />} onClick={onAtualizar} sx={{ color: '#00D4FF' }}>Atualizar</Button>
+                <Button size="small" startIcon={<RefreshIcon />} onClick={onAtualizar} sx={{ color: cores.primaria }}>Atualizar</Button>
             </Stack>
 
             <Grid container spacing={2.5}>
@@ -67,7 +68,7 @@ const AbaSaude = ({ sysStatus, sysPerf, sysLogs = [], sysError, terminais = [], 
                             <Stack key={k} direction="row" justifyContent="space-between" alignItems="center" sx={{ py: 0.5 }}>
                                 <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.75)' }}>{ROTULO_SERVICO[k] || k}</Typography>
                                 <Chip size="small" label={comoRotulo(v)}
-                                    sx={{ fontWeight: 700, bgcolor: `${COR_STATUS[v] || '#94A3B8'}22`, color: COR_STATUS[v] || '#94A3B8' }} />
+                                    sx={{ fontWeight: 700, bgcolor: `${COR_STATUS[v] || cores.textoSecundario}22`, color: COR_STATUS[v] || cores.textoSecundario }} />
                             </Stack>
                         ))}
                         <Linha rotulo="Painéis conectados" valor={sysStatus?.tempo_real?.clientes_conectados ?? '—'} />
@@ -78,15 +79,15 @@ const AbaSaude = ({ sysStatus, sysPerf, sysLogs = [], sysError, terminais = [], 
                     <GlassCard sx={{ p: 2.5, height: '100%' }}>
                         <Titulo>Leitores e agentes</Titulo>
                         <Linha rotulo="Leitores online" valor={`${leitoresOnline} / ${leitores.length}`}
-                            cor={leitores.length && leitoresOnline < leitores.length ? '#FFB800' : '#00FF88'} />
+                            cor={leitores.length && leitoresOnline < leitores.length ? cores.alerta : cores.sucesso} />
                         {leitores.filter(t => t.status !== 'online').map(t => (
-                            <Typography key={t.id} variant="caption" sx={{ color: '#FF3366', display: 'block' }}>● {t.nome} offline</Typography>
+                            <Typography key={t.id} variant="caption" sx={{ color: cores.erro, display: 'block' }}>● {t.nome} offline</Typography>
                         ))}
-                        <Linha rotulo="Faces aguardando envio" valor={fila.pendente} cor={fila.pendente ? '#FFB800' : undefined} />
-                        <Linha rotulo="Envios com erro" valor={fila.erro} cor={fila.erro ? '#FF3366' : undefined} />
+                        <Linha rotulo="Faces aguardando envio" valor={fila.pendente} cor={fila.pendente ? cores.alerta : undefined} />
+                        <Linha rotulo="Envios com erro" valor={fila.erro} cor={fila.erro ? cores.erro : undefined} />
                         <Linha rotulo="Agentes locais conectados" valor={agentes.length} />
                         {agentes.map(a => (
-                            <Typography key={a} variant="caption" sx={{ color: '#00FF88', display: 'block' }}>● {a}</Typography>
+                            <Typography key={a} variant="caption" sx={{ color: cores.sucesso, display: 'block' }}>● {a}</Typography>
                         ))}
                     </GlassCard>
                 </Grid>
@@ -95,17 +96,17 @@ const AbaSaude = ({ sysStatus, sysPerf, sysLogs = [], sysError, terminais = [], 
                     <GlassCard sx={{ p: 2.5 }}>
                         <Titulo>Saúde do vídeo (PC do evento)</Titulo>
                         {saudeVideo.length === 0 && (
-                            <Typography variant="body2" sx={{ color: '#FFB800' }}>Nenhum PC do evento enviando dados de vídeo.</Typography>
+                            <Typography variant="body2" sx={{ color: cores.alerta }}>Nenhum PC do evento enviando dados de vídeo.</Typography>
                         )}
                         {saudeVideo.map(a => (
                             <Box key={a.agente_id} sx={{ mb: 2 }}>
                                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                                    <Typography variant="body2" sx={{ color: '#FFFFFF', fontWeight: 700 }}>{a.agente}</Typography>
+                                    <Typography variant="body2" sx={{ color: cores.textoForte, fontWeight: 700 }}>{a.agente}</Typography>
                                     <Chip size="small" label={a.ok ? `ao vivo · há ${a.idade_s}s` : `sem dados há ${a.idade_s}s`}
-                                        sx={{ fontWeight: 700, bgcolor: a.ok ? '#00FF8822' : '#FF336622', color: a.ok ? '#00FF88' : '#FF3366' }} />
+                                        sx={{ fontWeight: 700, bgcolor: a.ok ? '#00FF8822' : '#FF336622', color: a.ok ? cores.sucesso : cores.erro }} />
                                 </Stack>
-                                <Linha rotulo="Motor de IA" valor={a.motor ? 'ligado' : 'desligado'} cor={a.motor ? undefined : '#FF3366'} />
-                                <Linha rotulo="Retransmissor de vídeo" valor={a.retransmissor ? 'ativo' : 'indisponível'} cor={a.retransmissor ? undefined : '#FFB800'} />
+                                <Linha rotulo="Motor de IA" valor={a.motor ? 'ligado' : 'desligado'} cor={a.motor ? undefined : cores.erro} />
+                                <Linha rotulo="Retransmissor de vídeo" valor={a.retransmissor ? 'ativo' : 'indisponível'} cor={a.retransmissor ? undefined : cores.alerta} />
                                 {a.cameras.map(c => {
                                     const est = estadoCamera(c);
                                     return (
@@ -129,10 +130,10 @@ const AbaSaude = ({ sysStatus, sysPerf, sysLogs = [], sysError, terminais = [], 
                         <Linha rotulo="No ar há" valor={sysPerf?.node?.uptime_formatado || '—'} />
                         <Linha rotulo="Memória do processo" valor={sysPerf?.node?.memoria ? `${sysPerf.node.memoria.heap_usado_mb} MB (RSS ${sysPerf.node.memoria.rss_mb} MB)` : '—'} />
                         <Linha rotulo="Memória da máquina" valor={memoriaPct !== undefined ? `${memoriaPct}%` : '—'}
-                            cor={memoriaPct >= 90 ? '#FF3366' : memoriaPct >= 75 ? '#FFB800' : undefined} />
+                            cor={memoriaPct >= 90 ? cores.erro : memoriaPct >= 75 ? cores.alerta : undefined} />
                         <Linha rotulo="Última sincronização" valor={sysStatus?.sync?.lastSync ? new Date(sysStatus.sync.lastSync).toLocaleTimeString('pt-BR') : '—'} />
                         <Linha rotulo="Sincronizações pendentes / falhas" valor={`${sysStatus?.sync?.pending ?? 0} / ${sysStatus?.sync?.failed ?? 0}`}
-                            cor={sysStatus?.sync?.failed ? '#FF3366' : undefined} />
+                            cor={sysStatus?.sync?.failed ? cores.erro : undefined} />
                     </GlassCard>
                 </Grid>
 
