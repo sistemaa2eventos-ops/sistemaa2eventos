@@ -58,12 +58,15 @@ router.post('/generate-upload-url/:token', tokenDeEmpresa, uploadLimiter, public
 // Cadastro de colaborador via link externo
 router.post('/register/:token', tokenDeEmpresa, registerLimiter, publicController.registerEmployee);
 
-// Pré-cadastro da planilha da empresa: o participante digita o CPF e recebe os dados para conferir.
-// Limite próprio por IP: dificulta varrer CPFs com o link (a resposta só traz pré-cadastro desta empresa)
+// Pré-cadastro da planilha da empresa: o participante digita o CPF e recebe nome e função para conferir.
+// Limite por IP que conta só as consultas SEM resultado (quem acha seu CPF não gasta o limite).
+// Varredura de CPFs com o link esbarra aqui; uso normal com a planilha não.
 const preCadastroLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 120,
-    message: { error: 'Muitas consultas seguidas desta rede. Aguarde alguns minutos e tente de novo.' },
+    max: 30,
+    skipSuccessfulRequests: true,
+    requestWasSuccessful: (req, res) => res.locals.preCadastroEncontrado === true,
+    message: { error: 'Muitas consultas sem resultado desta rede. Aguarde alguns minutos e tente de novo.' },
     standardHeaders: true,
     legacyHeaders: false,
 });

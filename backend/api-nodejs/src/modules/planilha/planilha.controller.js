@@ -109,10 +109,17 @@ class PlanilhaController {
             if (evento?.status === 'encerrado') {
                 return res.status(403).json({ error: 'Este evento já foi encerrado. Não é possível fazer novos cadastros.' });
             }
-            const dados = await planilhaService.buscarPreCadastro({
+            const resultado = await planilhaService.buscarPreCadastro({
                 eventoId: empresa.evento_id, empresaId: empresa.id, cpf: req.body?.cpf
             });
-            res.json({ success: true, encontrado: !!dados, dados: dados || null });
+            // Só consulta que achou pré-cadastro conta como "sucesso" no limite (ver public.routes.js)
+            res.locals.preCadastroEncontrado = resultado.status === 'encontrado';
+            res.json({
+                success: true,
+                status: resultado.status,
+                encontrado: resultado.status === 'encontrado',
+                dados: resultado.dados || null
+            });
         } catch (error) {
             responderErro(res, error, 'Erro ao consultar o pré-cadastro.');
         }

@@ -176,19 +176,23 @@ class PlanilhaService {
      */
     async buscarPreCadastro({ eventoId, empresaId, cpf }) {
         const digitos = String(cpf || '').replace(/\D/g, '');
-        if (digitos.length !== 11) return null;
+        if (digitos.length !== 11) return { status: 'nao_encontrado' };
         const { data, error } = await supabase.from('pessoas')
             .select(`id, empresa_id, origem_cadastro, aceite_lgpd, created_by, ${CAMPOS_PESSOA.join(', ')}`)
             .eq('evento_id', eventoId).eq('cpf', digitos).maybeSingle();
         if (error) throw error;
-        if (!ehPreCadastroPendente(data, empresaId)) return null;
 
-        const { modelo } = await this.obterModelo(eventoId);
-        const dados = {};
-        for (const { campo } of modelo.colunas) {
-            if (campo !== 'cpf' && data[campo]) dados[campo] = data[campo];
+        if (data && ehPreCadastroPendente(data, empresaId)) {
+            // Só nome e função: são os dados que a planilha traz e que podem ser mostrados ao participante (LGPD).
+            // E-mail, telefone, nome da mãe e data de nascimento nunca saem daqui: a pessoa preenche.
+            return {
+                status: 'encontrado',
+                dados: { nome_completo: data.nome_completo || null, funcao: data.funcao || null }
+            };
         }
-        return dados;
+        // Já concluído pela mesma empresa: avisa sem devolver dados. De outra empresa: não revela nada.
+        if (data && data.empresa_id === empresaId) return { status: 'ja_cadastrado' };
+        return { status: 'nao_encontrado' };
     }
 }
 

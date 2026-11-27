@@ -1,4 +1,4 @@
--- NÃO APLICADA: aplicar manualmente no Supabase após rodar docs/auditoria/consultas_verificacao_evento.sql (S6 e S7)
+-- APLICADA em 27/11/2026 via Supabase MCP após validação das consultas S6 e S7.
 --
 -- Correção P1: pessoas.cpf com pontuação (registros legados) quebra a deduplicação e as buscas por CPF.
 -- Este script grava só os dígitos. Antes de alterar, confere se isso criaria duplicidade em (evento_id, cpf):

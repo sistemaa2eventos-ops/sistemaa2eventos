@@ -153,6 +153,13 @@ export default function RegistrationForm({ token, company, branding, requiredFie
     // Achado o pré-cadastro, o CPF fica travado; o resto pode ser corrigido antes de enviar.
     const [preCadastro, setPreCadastro] = useState<'nenhum' | 'buscando' | 'encontrado'>('nenhum');
     const cpfConsultadoRef = useRef('');
+
+    // Entrada pelo link da empresa: instruções → janela do CPF (consulta) → formulário
+    const [etapaInicio, setEtapaInicio] = useState<'instrucoes' | 'formulario'>(preFilledData ? 'formulario' : 'instrucoes');
+    const [cpfJanelaAberta, setCpfJanelaAberta] = useState(false);
+    const [cpfJanela, setCpfJanela] = useState('');
+    const [cpfJanelaErro, setCpfJanelaErro] = useState('');
+    const [cpfJanelaBuscando, setCpfJanelaBuscando] = useState(false);
     const regrasDocs = company.documentos;
     const funcoesDoEvento = regrasDocs?.funcoes || [];
     const docsMinimos = regrasDocs?.minimo || [];
@@ -172,32 +179,46 @@ export default function RegistrationForm({ token, company, branding, requiredFie
     };
 
 
-    const consultarPreCadastro = async (cpfDigitos: string) => {
-        if (preFilledData || cpfConsultadoRef.current === cpfDigitos) return;
-        cpfConsultadoRef.current = cpfDigitos;
-        setPreCadastro('buscando');
+    // Janela do CPF: consulta a planilha uma vez. Achou → preenche nome e função; não achou → formulário do zero;
+    // já cadastrado pela empresa → avisa e não abre o formulário.
+    const consultarCpfNaJanela = async () => {
+        const digitos = cpfJanela.replace(/\D/g, '');
+        if (!isValidCPF(digitos)) { setCpfJanelaErro('Digite um CPF válido.'); return; }
+        setCpfJanelaBuscando(true);
+        setCpfJanelaErro('');
         try {
-            const { data } = await api.post(`/public/company/${token.trim()}/pre-cadastro`, { cpf: cpfDigitos });
+            const { data } = await api.post(`/public/company/${token.trim()}/pre-cadastro`, { cpf: digitos });
+            if (data?.status === 'ja_cadastrado') {
+                setCpfJanelaErro(`Este CPF já tem cadastro neste evento. Fale com a ${company.nome}.`);
+                return;
+            }
+            cpfConsultadoRef.current = digitos;
             const dados = data?.encontrado ? data.dados || {} : null;
-            if (!dados) { setPreCadastro('nenhum'); return; }
-            // Só o que a empresa preencheu na planilha; o que veio vazio fica como está
-            setFormData(prev => ({
-                ...prev,
-                nome: dados.nome_completo || prev.nome,
-                email: dados.email || prev.email,
-                nome_mae: dados.nome_mae || prev.nome_mae,
-                data_nascimento: dados.data_nascimento || prev.data_nascimento,
-                funcao: dados.funcao || prev.funcao
-            }));
-            if (dados.funcao && funcoesDoEvento.length > 0 && !funcoesDoEvento.includes(dados.funcao)) setFuncaoOutra(true);
-            setPreCadastro('encontrado');
-        } catch {
-            // Sem resposta: o cadastro segue normal, digitado
-            setPreCadastro('nenhum');
+            if (dados) {
+                // Só nome e função (o que a planilha traz); o restante a pessoa preenche
+                setFormData(prev => ({
+                    ...prev,
+                    cpf: maskCPF(digitos),
+                    nome: dados.nome_completo || prev.nome,
+                    funcao: dados.funcao || prev.funcao
+                }));
+                if (dados.funcao && funcoesDoEvento.length > 0 && !funcoesDoEvento.includes(dados.funcao)) setFuncaoOutra(true);
+                setPreCadastro('encontrado');
+            } else {
+                setFormData(prev => ({ ...prev, cpf: maskCPF(digitos) }));
+                setPreCadastro('nenhum');
+            }
+            setCpfJanelaAberta(false);
+            setEtapaInicio('formulario');
+        } catch (err) {
+            const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+            setCpfJanelaErro(msg || 'Não foi possível consultar agora. Tente de novo.');
+        } finally {
+            setCpfJanelaBuscando(false);
         }
     };
 
-    // "Não é o meu CPF": destrava e limpa o que veio da planilha
+    // Limpa o que veio da planilha e volta para a janela do CPF
     const descartarPreCadastro = () => {
         cpfConsultadoRef.current = '';
         setPreCadastro('nenhum');
@@ -205,17 +226,19 @@ export default function RegistrationForm({ token, company, branding, requiredFie
         setFormData(prev => ({ ...prev, cpf: '', nome: '', email: '', nome_mae: '', data_nascimento: '', funcao: '' }));
     };
 
+    const corrigirCpf = () => {
+        descartarPreCadastro();
+        setCpfJanela('');
+        setCpfJanelaErro('');
+        setEtapaInicio('instrucoes');
+        setCpfJanelaAberta(true);
+    };
+
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value: rawValue } = e.target;
-        if (name === 'cpf' && preCadastro === 'encontrado') return; // CPF do pré-cadastro não muda
-        const value = name === 'cpf' ? maskCPF(rawValue) : rawValue;
+        if (name === 'cpf') return; // CPF é informado na janela inicial e não muda aqui
 
-        setFormData(prev => ({ ...prev, [name]: value }));
-
-        if (name === 'cpf') {
-            const digitos = value.replace(/\D/g, '');
-            if (digitos.length === 11 && isValidCPF(digitos)) consultarPreCadastro(digitos);
-        }
+        setFormData(prev => ({ ...prev, [name]: rawValue }));
     };
 
     const toggleDate = (date: string) => {
@@ -455,6 +478,66 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                 </div>
             </div>
 
+            {etapaInicio === 'instrucoes' && (
+                <div className="p-8 space-y-6 relative z-10">
+                    <div className="space-y-3">
+                        <h2 className="text-lg font-bold text-texto-forte">Antes de começar</h2>
+                        <ol className="list-decimal pl-5 space-y-2 text-sm text-texto-secundario">
+                            <li>Clique em <strong className="text-texto-forte">Iniciar pré-cadastro</strong> e digite o seu CPF.</li>
+                            <li>Se a {company.nome} já enviou os seus dados, o seu nome e a sua função aparecem preenchidos.</li>
+                            <li>Preencha o restante das informações e anexe os documentos pedidos.</li>
+                            <li>Confirme a inscrição. Ela fica aguardando a validação da organização do evento.</li>
+                        </ol>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setCpfJanelaAberta(true)}
+                        className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-texto-forte font-bold py-4 rounded-xl hover:from-cyan-400 hover:to-blue-500 transition-all text-base tracking-wide"
+                    >
+                        INICIAR PRÉ-CADASTRO
+                    </button>
+                </div>
+            )}
+
+            {cpfJanelaAberta && (
+                <div role="dialog" aria-modal="true" aria-labelledby="cpf-janela-titulo" className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+                    <div className="w-full max-w-md bg-superficie border border-borda rounded-2xl p-6 space-y-4 shadow-2xl">
+                        <h2 id="cpf-janela-titulo" className="text-lg font-bold text-texto-forte">Digite o seu CPF</h2>
+                        <input
+                            autoFocus
+                            inputMode="numeric"
+                            value={cpfJanela}
+                            onChange={(e) => { setCpfJanela(maskCPF(e.target.value)); setCpfJanelaErro(''); }}
+                            onKeyDown={(e) => { if (e.key === 'Enter' && cpfJanela.replace(/\D/g, '').length === 11 && !cpfJanelaBuscando) consultarCpfNaJanela(); }}
+                            placeholder="000.000.000-00"
+                            aria-describedby="cpf-janela-ajuda"
+                            className="w-full p-3.5 bg-superficie/50 border border-borda rounded-xl text-texto-forte placeholder-texto-fraco focus:ring-2 focus:ring-primaria focus:border-primaria"
+                        />
+                        <p id="cpf-janela-ajuda" className="text-xs text-texto-fraco">Use o CPF do seu documento. Não precisa de pontos nem traço.</p>
+                        {cpfJanelaErro && <p role="alert" className="text-sm text-red-300">{cpfJanelaErro}</p>}
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setCpfJanelaAberta(false)}
+                                disabled={cpfJanelaBuscando}
+                                className="flex-shrink-0 px-5 py-3 bg-superficie-elevada/80 text-texto-secundario font-semibold rounded-xl border border-borda text-sm disabled:opacity-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={consultarCpfNaJanela}
+                                disabled={cpfJanelaBuscando || cpfJanela.replace(/\D/g, '').length !== 11}
+                                className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 text-texto-forte font-bold py-3 rounded-xl disabled:opacity-40 text-sm"
+                            >
+                                {cpfJanelaBuscando ? 'Procurando...' : 'Continuar'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {etapaInicio === 'formulario' && (
             <form onSubmit={handleSubmit} className="p-8 space-y-8 relative z-10">
                 {error && (
                     <div ref={erroRef} role="alert" className="p-4 bg-red-900/30 border border-erro/50 text-erro rounded-xl flex items-center gap-3 backdrop-blur-sm">
@@ -511,24 +594,29 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                                     inputMode="numeric"
                                     value={formData.cpf}
                                     onChange={handleInputChange}
-                                    readOnly={!!preFilledData?.cpf || preCadastro === 'encontrado'}
+                                    readOnly
                                     aria-describedby="cpf-ajuda"
-                                    className={`w-full p-3.5 bg-superficie/50 border border-borda rounded-xl text-texto-forte placeholder-texto-fraco focus:ring-2 focus:ring-primaria focus:border-primaria transition-all shadow-inner ${(preFilledData?.cpf || preCadastro === 'encontrado') ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                    className="w-full p-3.5 bg-superficie/50 border border-borda rounded-xl text-texto-forte placeholder-texto-fraco transition-all shadow-inner opacity-70 cursor-not-allowed"
                                     placeholder="000.000.000-00"
                                 />
                                 <p id="cpf-ajuda" className="text-xs text-texto-fraco">
-                                    {preCadastro === 'buscando'
-                                        ? 'Procurando o seu pré-cadastro...'
-                                        : 'Comece pelo CPF: se a sua empresa já enviou os seus dados, eles aparecem preenchidos.'}
+                                    CPF informado na etapa inicial.
                                 </p>
                                 {preCadastro === 'encontrado' && (
                                     <div role="status" className="mt-2 p-3 rounded-xl border border-sucesso/40 bg-sucesso/10 text-sm text-green-300 flex flex-wrap items-center justify-between gap-2">
                                         <span className="flex items-center gap-2">
                                             <CheckCircle className="w-4 h-4 flex-shrink-0" />
-                                            Encontramos os dados enviados pela {company.nome}. Confira e corrija o que estiver errado.
+                                            Encontramos o seu nome e a sua função enviados pela {company.nome}. Preencha o restante.
                                         </span>
-                                        <button type="button" onClick={descartarPreCadastro} className="text-xs font-semibold underline underline-offset-4 text-green-200 hover:text-texto-forte">
+                                        <button type="button" onClick={corrigirCpf} className="text-xs font-semibold underline underline-offset-4 text-green-200 hover:text-texto-forte">
                                             Não é o meu CPF
+                                        </button>
+                                    </div>
+                                )}
+                                {preCadastro === 'nenhum' && !preFilledData && (
+                                    <div className="mt-2 text-xs text-texto-fraco">
+                                        <button type="button" onClick={corrigirCpf} className="underline underline-offset-4 hover:text-texto-forte">
+                                            Errei o CPF
                                         </button>
                                     </div>
                                 )}
@@ -895,6 +983,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                     </div>
                 )}
             </form>
+            )}
 
             {/* LGPD Modal */}
             {showLGPDModal && (

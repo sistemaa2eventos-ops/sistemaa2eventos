@@ -4,6 +4,7 @@ const logger = require('../../../services/logger');
 const cacheService = require('../../../services/cacheService');
 const { getHojeLocal, getInicioHojeLocal, ultimaOcorrenciaHorario, TIMEZONE } = require('../../../utils/dateUtils');
 const { inicioDiaOperacao } = require('../../../utils/diaOperacao');
+const { ultimoMovimentoDoTurno, conjuntoPresentes } = require('../../../utils/presenca');
 const { bloqueioDeEntrada } = require('./entradaEtapa');
 
 // Evento com o mesmo cache de 15 s do requireEvent (antes: 2 consultas a `eventos` por acesso)
@@ -114,7 +115,7 @@ class ValidationService {
         };
 
         const [
-            { count: countPresentes },
+            ultimoMovimento,
             { data: evento },
             { count: countCheckinsHoje },
             { count: countCheckoutsHoje },
@@ -124,10 +125,8 @@ class ValidationService {
             { data: presentesNtoN },
             { data: quotasHoje }
         ] = await Promise.all([
-            // Presentes = quem está com entrada registrada (mesmo estado usado pelo anti-passback;
-            // o fechamento de turno zera no horario_reset)
-            supabase.from('pessoas').select('id', { count: 'exact', head: true })
-                .eq('evento_id', evento_id).eq('status_acesso', 'checkin_feito'),
+            // Presentes = último movimento do turno é check-in (mesmo critério do Monitor e da fiscalização)
+            ultimoMovimentoDoTurno(evento_id, startOfDay),
             supabase.from('eventos').select('capacidade_total').eq('id', evento_id).single(),
             contarLogs(q => q.eq('tipo', 'checkin')),
             contarLogs(q => q.eq('tipo', 'checkout')),
@@ -136,10 +135,9 @@ class ValidationService {
             supabase.from('evento_areas').select('id, nome_area').eq('evento_id', evento_id),
             buscarTodos(supabase
                 .from('pessoa_evento_empresa')
-                .select('id, empresa_id, empresas(nome), pessoas!inner(status_acesso)')
+                .select('id, pessoa_id, empresa_id, empresas(nome)')
                 .eq('evento_id', evento_id)
-                .eq('status_aprovacao', 'aprovado')
-                .eq('pessoas.status_acesso', 'checkin_feito')),
+                .eq('status_aprovacao', 'aprovado')),
             supabase.from('quotas_diarias').select('empresa_id, quota').eq('evento_id', evento_id).eq('data', hoje)
         ]);
 
@@ -161,9 +159,11 @@ class ValidationService {
             }));
         }
 
-        // Ocupação por empresa N:N
+        // Presentes agora (mesmo critério do Monitor) e ocupação por empresa N:N
+        const presentesSet = conjuntoPresentes(ultimoMovimento || new Map());
+        const countPresentes = presentesSet.size;
         const ocupacaoPorEmpresa = {};
-        (presentesNtoN || []).forEach(vinculo => {
+        (presentesNtoN || []).filter(vinculo => presentesSet.has(vinculo.pessoa_id)).forEach(vinculo => {
             const eid = vinculo.empresa_id;
             if (!ocupacaoPorEmpresa[eid]) {
                 ocupacaoPorEmpresa[eid] = { id: eid, nome: vinculo.empresas?.nome || 'Desconhecida', total: 0, quota: 0 };
