@@ -73,6 +73,10 @@ export const ConferenciaSaidaDialog = ({
             // A janela de horário do dia anterior abre por cima; esta fica para o operador ver o motivo
             return { success: false, error: 'Entrou num dia anterior sem saída: confirme o horário na janela que abriu.' };
         }
+        if (resultado?.motivoPulseira) {
+            // O campo de motivo abre por cima; a conferência só mostra que a saída depende dele
+            return { success: false, error: 'Pulseira fora do horário: informe o motivo na janela que abriu.' };
+        }
         if (resultado?.success) setSucesso(true);
         return resultado;
     };

@@ -61,7 +61,7 @@ const ConfigEvento = () => {
     };
 
     const handleResetManual = async () => {
-        if (!(await confirmar({ titulo: 'Fechar turno agora', mensagem: 'Todas as entradas ativas serão encerradas. Continuar?', textoConfirmar: 'Fechar turno' }))) return;
+        if (!(await confirmar({ titulo: 'Fechar turno agora', mensagem: 'Zera o turno. Quem estiver dentro recebe saída automática marcada como \'a conferir\'. As pulseiras continuam com a pessoa até a devolução ou o descredenciamento.', textoConfirmar: 'Fechar turno' }))) return;
         try {
             const eid = localStorage.getItem('active_evento_id');
             await api.post(`/eventos/${eid}/reset-manual`);

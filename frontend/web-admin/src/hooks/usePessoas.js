@@ -21,6 +21,11 @@ export const usePessoas = () => {
     const eventoIdParam = searchParams.get('evento_id') || localStorage.getItem('active_evento_id');
     const isAdmin = user?.nivel_acesso === 'admin_master' || user?.nivel_acesso === 'admin' || user?.nivel_acesso === 'master' || user?.nivel_acesso === 'supervisor';
     const isEmpresa = user?.nivel_acesso === 'empresa';
+    const regrasUsuario = user?.permissions?.regras || user?.permissions || {};
+    const somenteLeituraPessoas = !isAdmin && Boolean(
+        regrasUsuario.participantes_somente_leitura ||
+        regrasUsuario.bloquear_edicao_dados
+    );
 
     // States
     const [pessoas, setPessoas] = useState([]);
@@ -261,6 +266,10 @@ export const usePessoas = () => {
     const handleCloseDialog = () => { setOpenDialog(false); setSelectedPessoa(null); };
 
     const handleSave = async () => {
+      if (somenteLeituraPessoas) {
+        enqueueSnackbar('Perfil configurado como somente leitura. Alterações não são permitidas.', { variant: 'warning' });
+        return;
+      }
       if (!formData.nome_completo || !formData.empresa_id) { enqueueSnackbar('Nome Completo e Empresa são obrigatórios.', {variant: 'error'}); return; }
       try {
         setSaving(true);
@@ -437,6 +446,10 @@ export const usePessoas = () => {
     const handleDelete = (id) => { setPessoaToDelete(id); setOpenDeleteConfirm(true); };
 
     const confirmDelete = async () => {
+      if (somenteLeituraPessoas) {
+        enqueueSnackbar('Perfil configurado como somente leitura. Exclusão não é permitida.', { variant: 'warning' });
+        return;
+      }
       try {
         setDeleteLoading(true);
         await api.delete(`/pessoas/${pessoaToDelete}`);
@@ -596,6 +609,7 @@ export const usePessoas = () => {
         eventoIdParam,
         isAdmin,
         isEmpresa,
+        somenteLeituraPessoas,
 
         // Handlers
         handleOpenDialog,

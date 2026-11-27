@@ -93,12 +93,21 @@ class PlanilhaController {
     async preCadastroPublico(req, res) {
         try {
             const { data: empresa, error } = await supabase.from('empresas')
-                .select('id, evento_id, registration_token_expires_at')
+                .select('id, evento_id, ativo, registration_token_expires_at')
                 .eq('registration_token', req.params.token).maybeSingle();
             if (error) throw error;
             if (!empresa) return res.status(404).json({ error: 'Link de cadastro inválido ou inexistente.' });
             if (empresa.registration_token_expires_at && new Date(empresa.registration_token_expires_at) < new Date()) {
                 return res.status(403).json({ error: 'Este link de cadastro expirou.' });
+            }
+            if (empresa.ativo === false) {
+                return res.status(403).json({ error: 'Esta empresa está inativa neste evento. Procure a administração do evento.' });
+            }
+            const { data: evento, error: evErr } = await supabase.from('eventos')
+                .select('status').eq('id', empresa.evento_id).maybeSingle();
+            if (evErr) throw evErr;
+            if (evento?.status === 'encerrado') {
+                return res.status(403).json({ error: 'Este evento já foi encerrado. Não é possível fazer novos cadastros.' });
             }
             const dados = await planilhaService.buscarPreCadastro({
                 eventoId: empresa.evento_id, empresaId: empresa.id, cpf: req.body?.cpf

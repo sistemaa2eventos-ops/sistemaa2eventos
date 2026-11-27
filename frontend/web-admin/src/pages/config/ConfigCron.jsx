@@ -69,10 +69,15 @@ const ConfigCron = () => {
     };
 
     const handleManualReset = async () => {
-        if (!(await confirmar({ titulo: 'Fechar turno agora', mensagem: 'Quem estiver com entrada registrada recebe saída automática. Continuar?', textoConfirmar: 'Fechar turno' }))) return;
+        const eid = localStorage.getItem('active_evento_id');
+        if (!eid) {
+            enqueueSnackbar('Selecione um evento ativo no Dashboard antes de fechar o turno.', { variant: 'warning' });
+            return;
+        }
+        if (!(await confirmar({ titulo: 'Fechar turno agora', mensagem: 'Zera o turno. Quem estiver dentro recebe saída automática marcada como \'a conferir\'. As pulseiras continuam com a pessoa até a devolução ou o descredenciamento.', textoConfirmar: 'Fechar turno' }))) return;
         try {
             setRunningReset(true);
-            await api.post('/eventos/reset/manual');
+            await api.post(`/eventos/${eid}/reset-manual`);
             enqueueSnackbar('Reset de turnos executado com sucesso!', { variant: 'success' });
         } catch (err) {
             enqueueSnackbar(err.response?.data?.error || 'Erro ao executar reset.', { variant: 'error' });

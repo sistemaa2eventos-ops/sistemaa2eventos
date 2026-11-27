@@ -9,7 +9,7 @@
 // Pulseira descredenciada (devolvida, perdida ou saída real) não aparece.
 
 const pulseiraService = require('../pulseiras/pulseira.service');
-const { getHojeLocal, getLimitesDiaLocalUTC } = require('../../utils/dateUtils');
+const { inicioDiaOperacao } = require('../../utils/diaOperacao');
 
 // Situações que não credenciam (pendente, recusada, em verificação ou bloqueada)
 const SITUACOES_NAO_CREDENCIADAS = ['pendente', 'recusado', 'verificacao', 'bloqueado'];
@@ -113,15 +113,14 @@ async function situacaoFiscal(client, eventoId, pessoa) {
     else if (SITUACOES_NAO_CREDENCIADAS.includes(pessoa.status_acesso)) motivoNaoCredenciado = `Situação: ${pessoa.status_acesso}`;
     else if (pessoa.bloqueado) motivoNaoCredenciado = 'Bloqueada';
 
-    // 2. Movimentos de hoje (dia civil de Brasília)
-    const { start, end } = getLimitesDiaLocalUTC(getHojeLocal());
+    // 2. Movimentos do dia de operação (desde o horario_reset do evento; 00:00 por padrão)
+    const inicioDia = await inicioDiaOperacao(eventoId);
     const { data: movimentos, error } = await client.from('logs_acesso')
         .select('tipo, created_at, numero_pulseira, metodo, observacao, created_by, evento_areas(nome_area)')
         .eq('evento_id', eventoId)
         .eq('pessoa_id', pessoa.id)
         .in('tipo', ['checkin', 'checkout'])
-        .gte('created_at', start)
-        .lte('created_at', end)
+        .gte('created_at', inicioDia)
         .order('created_at', { ascending: true });
     if (error) throw error;
     const hoje = movimentos || [];

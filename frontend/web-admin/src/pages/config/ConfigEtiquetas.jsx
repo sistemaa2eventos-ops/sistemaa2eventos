@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
     Box, Typography, Grid, TextField, IconButton, Paper, Stack,
     Button, Tooltip, MenuItem, FormControl, InputLabel, Select,
-    Divider, Slider, Switch, FormControlLabel, Tabs, Tab, Chip, Alert,
+    Divider, Switch, Tabs, Tab, Chip,
     Dialog, DialogTitle, DialogContent, DialogActions, Card, CardActionArea, CardContent
 } from '@mui/material';
 import {
@@ -128,7 +128,7 @@ const CORES_PALETA = [
     { label: 'Cinza', hex: '#666666' }
 ];
 
-const CORES_GRADE = [
+const _CORES_GRADE = [
     { label: 'Azul', hex: '#0080FF' },
     { label: 'Magenta', hex: '#FF0077' },
     { label: 'Branca', hex: cores.textoForte },
@@ -307,9 +307,9 @@ const ConfigEtiquetas = () => {
     // Preferências gráficas
     const prefs = useMemo(lerPrefs, []);
     const [showGrid, setShowGrid] = useState(prefs.showGrid ?? true);
-    const [gridSize, setGridSize] = useState(prefs.gridSize ?? 10);
-    const [gridColor, setGridColor] = useState(prefs.gridColor ?? '#0080FF');
-    const [gridIntensity, setGridIntensity] = useState(prefs.gridIntensity ?? 0.6);
+    const [gridSize, _setGridSize] = useState(prefs.gridSize ?? 10);
+    const [gridColor, _setGridColor] = useState(prefs.gridColor ?? '#0080FF');
+    const [gridIntensity, _setGridIntensity] = useState(prefs.gridIntensity ?? 0.6);
     const [snapToGrid, setSnapToGrid] = useState(prefs.snapToGrid ?? false);
     const [showRulers, setShowRulers] = useState(prefs.showRulers ?? true);
     const [showGuides, setShowGuides] = useState(prefs.showGuides ?? true);
@@ -827,7 +827,7 @@ const ConfigEtiquetas = () => {
         }
     };
 
-    const handleDragStop = (_e, d, el) => {
+    const handleDragStop = (_e, d, _el) => {
         setSmartGuides({ vertical: null, horizontal: null });
         const drag = dragRef.current;
         dragRef.current = null;
@@ -1664,6 +1664,7 @@ const ConfigEtiquetas = () => {
                                                         resizeHandleStyles={podeRedimensionar ? ALCAS_SIMPLES : undefined}
                                                         bounds="parent"
                                                         onDragStart={(e, d) => handleDragStart(e, d, el)}
+                                                        onDrag={(e, d) => handleDrag(e, d, el)}
                                                         onDragStop={(e, d) => handleDragStop(e, d, el)}
                                                         onResizeStop={(_e, _dir, ref, _delta, position) => {
                                                             updateElement(el.id, {

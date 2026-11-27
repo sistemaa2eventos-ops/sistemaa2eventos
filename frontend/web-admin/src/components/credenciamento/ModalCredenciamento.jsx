@@ -136,7 +136,7 @@ export const ModalCredenciamento = ({
                 setSaidaRegistrada({ pessoaId: pessoa.id, offline: !!r.offline });
                 setUltimoCodigoCamera(''); // a leitura da saída não pode aparecer na próxima ficha
             }
-            else if (!r?.turnoAnterior) setErroSaida(r?.error || 'Não foi possível registrar a saída.');
+            else if (!r?.turnoAnterior && !r?.motivoPulseira) setErroSaida(r?.error || 'Não foi possível registrar a saída.');
         } finally {
             setRegistrandoSaida(false);
         }

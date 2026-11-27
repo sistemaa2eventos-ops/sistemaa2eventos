@@ -72,6 +72,6 @@ router.post('/company/:token/pre-cadastro', tokenDeEmpresa, preCadastroLimiter,
 
 // --- Rotas B2B Auto-Cadastro Portal ---
 router.get('/portal/invite/:token', publicController.validateInvite);
-router.post('/portal/cadastro', publicController.submitCadastro);
+router.post('/portal/cadastro', registerLimiter, publicController.submitCadastro);
 
 module.exports = router;

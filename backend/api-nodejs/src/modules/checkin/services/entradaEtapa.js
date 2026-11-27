@@ -28,6 +28,7 @@ const logger = require('../../../services/logger');
 const { emLotes } = require('../../../utils/lotes');
 
 const INDICE_ENTRADA = 'uq_logs_entrada_etapa_dia';          // removido pela 20261118b (índice antigo)
+const SAIDA_FORCADA_CRON = 'CHECKOUT_FORCADO_CRON';          // saída do fechamento de turno (cron.controller)
 const AREA_GERAL = '00000000-0000-0000-0000-000000000000';
 const CODIGO_ENTRADA_ABERTA = 'P0409';                         // RAISE EXCEPTION ... ERRCODE 'P0409' da função
 /** codigo do 409 de bloqueio de entrada (o painel usa com o campo liberavel para mostrar o botão de liberação) */
@@ -147,7 +148,7 @@ function ehViolacaoEntrada(erro) {
  */
 async function buscarUltimoRegistroNaEtapa(client, { evento_id, pessoa_id, etapa, dia, area_id }) {
     let q = (client || supabase).from('logs_acesso')
-        .select('id, tipo, created_at')
+        .select('id, tipo, created_at, observacao')
         .eq('evento_id', evento_id)
         .eq('pessoa_id', pessoa_id)
         .eq('etapa', etapa)
@@ -242,7 +243,8 @@ async function bloqueioDeEntrada(client, { evento_id, pessoa_id, etapa, dia, are
     if (await areaControlaEntrada(client, area_id, cache)) {
         if (estaDentro(ultimo)) {
             erro = erroEntradaAberta(ultimo.created_at);
-        } else if (ultimo.tipo === 'checkout') {
+        } else if (ultimo.tipo === 'checkout' && ultimo.observacao !== SAIDA_FORCADA_CRON) {
+            // Saída forçada do fechamento de turno não exige liberação de reentrada
             const liberada = await existeLiberacaoDepois(client, {
                 evento_id, pessoa_id, etapa, dia, area_id, depois: parseUtcSemFuso(ultimo.created_at)
             });

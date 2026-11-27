@@ -10,7 +10,7 @@ import {
 } from '@mui/icons-material';
 import NeonButton from '../common/NeonButton';
 import { carregarConfigEtiqueta, montarHtmlEtiqueta, imprimirHtml, comFotoAssinada } from '../../services/etiquetaService';
-import { elementosHtml, estiloFundoPapel, unidadePx, ESCALA_EDITOR } from '../../services/etiquetaRender';
+import { elementosHtml, unidadePx, ESCALA_EDITOR } from '../../services/etiquetaRender';
 import api from '../../services/api';
 import { cores } from '../../styles/tokens';
 

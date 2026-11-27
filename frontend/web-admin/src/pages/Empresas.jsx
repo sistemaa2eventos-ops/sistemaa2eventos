@@ -53,6 +53,7 @@ import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { useSnackbar } from 'notistack';
 import { useEmpresas } from '../hooks/useEmpresas';
+import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import { useConfirmacao } from '../contexts/ConfirmacaoContext';
 import TituloModal from '../components/common/TituloModal';
@@ -186,6 +187,14 @@ const Empresas = () => {
       handleSelectAllDatesEmpresa, handleClearAllDatesEmpresa,
       handleSelectAllPhaseEmpresa, handleClearPhaseEmpresa, loadDocumentos, loadEmpresas
   } = useEmpresas(eventoIdParam);
+
+  const { user } = useAuth();
+  const isAdmin = user?.nivel_acesso === 'admin_master' || user?.nivel_acesso === 'admin' || user?.nivel_acesso === 'master' || user?.nivel_acesso === 'supervisor';
+  const regrasUsuario = user?.permissions?.regras || user?.permissions || {};
+  const somenteLeituraEmpresas = !isAdmin && Boolean(
+    regrasUsuario.empresas_somente_leitura ||
+    regrasUsuario.bloquear_edicao_dados
+  );
 
   // Ao criar nova empresa não exige documentação (2 etapas); ao editar empresa exibe as 3 etapas
   const steps = selectedEmpresa
@@ -408,25 +417,29 @@ const Empresas = () => {
           >
             <QuotaIcon fontSize="small" />
           </IconButton>
-          <IconButton
-            size="small"
-            onClick={() => handleOpenEdit(row)}
-            sx={acaoTabela}
-            title="Editar"
-          >
-            <EditIcon fontSize="small" />
-          </IconButton>
-          <IconButton
-            size="small"
-            onClick={() => {
-                setEmpresaToDelete(row.id);
-                setOpenDeleteConfirm(true);
-            }}
-            sx={acaoTabelaPerigo}
-            title="Excluir"
-          >
-            <DeleteIcon fontSize="small" />
-          </IconButton>
+          {!somenteLeituraEmpresas && (
+            <>
+              <IconButton
+                size="small"
+                onClick={() => handleOpenEdit(row)}
+                sx={acaoTabela}
+                title="Editar"
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
+              <IconButton
+                size="small"
+                onClick={() => {
+                    setEmpresaToDelete(row.id);
+                    setOpenDeleteConfirm(true);
+                }}
+                sx={acaoTabelaPerigo}
+                title="Excluir"
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </>
+          )}
         </Stack>
       ),
     },
@@ -607,9 +620,11 @@ const Empresas = () => {
           <Button variant="outlined" startIcon={<RegrasIcon />} onClick={() => setOpenRegras(true)} sx={botaoSecundario}>
             Regras de remuneração
           </Button>
-          <NeonButton startIcon={<AddIcon />} onClick={handleNew}>
-            Nova empresa
-          </NeonButton>
+          {!somenteLeituraEmpresas && (
+            <NeonButton startIcon={<AddIcon />} onClick={handleNew}>
+              Nova empresa
+            </NeonButton>
+          )}
         </Stack>
       </Box>
 
@@ -958,6 +973,11 @@ const Empresas = () => {
         title="Remover empresa?"
         description="Esta ação desvinculará a empresa do ecossistema. Colaboradores vinculados serão mantidos, mas podem perder acesso a certas áreas."
         onConfirm={async () => {
+            if (somenteLeituraEmpresas) {
+                enqueueSnackbar('Perfil configurado como somente leitura. Exclusão não permitida.', { variant: 'warning' });
+                setOpenDeleteConfirm(false);
+                return;
+            }
             await handleDelete(empresaToDelete);
             setOpenDeleteConfirm(false);
         }}

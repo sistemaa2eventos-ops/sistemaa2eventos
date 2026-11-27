@@ -18,9 +18,7 @@ import {
     Tune as TuneIcon,
     Security as SecurityIcon,
     Devices as DevicesIcon,
-    CheckCircle as CheckCircleIcon,
     People as PeopleIcon,
-    AdminPanelSettings as AdminIcon,
     Bolt as PresetIcon,
     OpenInNew as OpenIcon,
     Engineering as EngineeringIcon,
@@ -40,7 +38,7 @@ import NeonButton from '../../components/common/NeonButton';
 import PageHeader from '../../components/common/PageHeader';
 import TituloModal from '../../components/common/TituloModal';
 import { MODULOS } from '../../hooks/useUsuarios';
-import { botaoSecundario, cores, funcao, tamanhos, tom } from '../../styles/tokens';
+import { botaoSecundario, cores, funcao, tom } from '../../styles/tokens';
 
 const DIAS_SEMANA_OPCOES = [
     { valor: 0, rotulo: 'Dom' },

@@ -46,6 +46,72 @@ const recusarSeDocumentacaoPendente = async (res, eventoId, pessoa, tipo) => {
 
 const { outraPessoaNoLote } = require('./pulseiraLote');
 
+// Número de pulseira: ponto único de normalização (sem espaços, só dígitos, sem zeros à esquerda).
+// pessoas.numero_pulseira é VARCHAR; lotes são faixas numéricas. Número não numérico → null (400 na rota).
+const normalizarNumeroPulseira = (valor) => {
+    const texto = String(valor ?? '').trim();
+    if (!/^\d+$/.test(texto)) return null;
+    const numero = parseInt(texto, 10);
+    return numero > 0 ? String(numero) : null;
+};
+
+// Desfaz a pulseira gravada na pessoa quando o acesso que a usava não foi registrado (o número não fica preso)
+const reverterPulseiraPessoa = async (cliente, eventoId, pessoaId, anterior) => {
+    const { error } = await cliente.from('pessoas')
+        .update({ numero_pulseira: anterior.numero_pulseira, tipo_pulseira_id: anterior.tipo_pulseira_id, updated_at: new Date() })
+        .eq('id', pessoaId)
+        .eq('evento_id', eventoId);
+    if (error) logger.error({ err: error, pessoa_id: pessoaId }, 'Falha ao reverter pulseira após acesso não registrado');
+};
+
+// Lote da pulseira lida na ENTRADA precisa valer agora (fase, data e horário). Saída nunca passa por aqui.
+// Número fora de qualquer lote (dados antigos) não é barrado. true = resposta 403 já enviada.
+const recusarSeLoteForaDaJanela = async (res, cliente, eventoId, numero) => {
+    const numeroNormalizado = normalizarNumeroPulseira(numero);
+    if (!numeroNormalizado) return false;
+    const candidatos = await buscarLotesDaFaixa(cliente, eventoId, parseInt(numeroNormalizado, 10));
+    const escolha = await escolherLote(candidatos, eventoId);
+    if (!escolha.bloqueado) return false;
+    ApiResponse.error(res, escolha.motivo, 403, { codigo: 'PULSEIRA_FORA_DO_LOTE' });
+    return true;
+};
+
+// Saída REAL com pulseira de dia de operação anterior ainda não devolvida (pendência).
+// Sem motivo: 400 MOTIVO_PULSEIRA_FORA_HORARIO e nada é gravado. Com motivo: grava antes da saída.
+// Pessoa sem pendência segue normalmente. true = resposta já enviada (saída não registrada).
+const tratarPendenciaNaSaida = async (res, eventoId, pessoaId, motivoBruto, usuarioId) => {
+    const { pendencia } = await pulseiraService.buscarStatusPulseira(eventoId, pessoaId);
+    if (!pendencia) return false;
+    const motivo = String(motivoBruto ?? '').trim();
+    if (!motivo) {
+        res.status(400).json({
+            success: false,
+            code: 'MOTIVO_PULSEIRA_FORA_HORARIO',
+            error: 'Pulseira entregue fora do horário: informe o motivo.',
+            pendencia: { numero: pendencia.numero, dataCheckin: pendencia.dataCheckin }
+        });
+        return true;
+    }
+    await pulseiraService.registrarMotivoPendencia(eventoId, pessoaId, {
+        numero: pendencia.numero, dataCheckin: pendencia.dataCheckin, motivo
+    }, usuarioId);
+    return false;
+};
+
+// Saída REAL libera a pulseira em uso. Só chamada depois de a saída estar gravada.
+// Falha ao liberar não desfaz a saída (ela já aconteceu): fica no log para o operador conferir.
+const liberarPulseiraNaSaida = async (eventoId, resultado, pessoaId, body, usuarioId) => {
+    if (resultado?.tipo !== 'checkout') return null;
+    const instante = Date.parse(body?.offline_timestamp);
+    const ocorridaEm = Number.isNaN(instante) ? new Date() : new Date(instante);
+    try {
+        return await pulseiraService.liberarNaSaida(eventoId, pessoaId, { ocorridaEm, usuarioId });
+    } catch (error) {
+        logger.error({ err: error, pessoa_id: pessoaId }, 'Saída registrada, mas a pulseira não foi liberada');
+        return { liberada: false, numero_pulseira: null, erro: true };
+    }
+};
+
 /**
  * Origem INFORMATIVA do credenciamento (campo observacao do registro). Nenhuma regra lê este texto:
  * entrada única, reentrada, portão, contagens, toggle, anti-passback e turno decidem pelo tipo, etapa e área.
@@ -427,15 +493,17 @@ class AccessController {
         let eventoId;
         try {
             const { pessoa_id } = req.body;
-            numero_pulseira = req.body.numero_pulseira;
+            const numeroBruto = req.body.numero_pulseira;
             eventoId = req.event?.id;
             const area_id = req.body.area_id || null;
             const supabaseClient = req.supabase || supabase;
             if (await recusarSeSoMonitoramento(res, area_id)) return;
 
-            if (!pessoa_id || !numero_pulseira) {
+            if (!pessoa_id || !String(numeroBruto ?? '').trim()) {
                 return ApiResponse.error(res, 'pessoa_id e numero_pulseira são obrigatórios', 400);
             }
+            numero_pulseira = normalizarNumeroPulseira(numeroBruto);
+            if (!numero_pulseira) return ApiResponse.error(res, 'numero_pulseira deve conter só números', 400);
 
             // Buscar pessoa
             const { data: pessoa, error: pessoaErr } = await supabaseClient
@@ -462,6 +530,7 @@ class AccessController {
             if (outraNoLote) return ApiResponse.error(res, 'Pulseira já vinculada a outra pessoa neste lote', 409);
 
             // Salvar numero_pulseira e tipo_pulseira_id na pessoa
+            const anterior = { numero_pulseira: pessoa.numero_pulseira ?? null, tipo_pulseira_id: pessoa.tipo_pulseira_id ?? null };
             const updateData = { numero_pulseira, updated_at: new Date() };
             if (tipoPulseira?.id) updateData.tipo_pulseira_id = tipoPulseira.id;
             await supabaseClient.from('pessoas').update(updateData).eq('id', pessoa_id);
@@ -469,19 +538,29 @@ class AccessController {
 
             // Delegar ao fluxo centralizado (inclui validações, watchlist, anti-passback, websocket)
             // A pessoa lida antes do update ainda tinha a pulseira antiga: o log gravava o número errado
-            const result = await checkinService.registrarAcesso(supabaseClient, {
-                pessoa_id,
-                pessoa: { ...pessoa, numero_pulseira },
-                evento_id: eventoId,
-                tipo: req.body.tipo || null, // null = Smart Access decide
-                etapa: etapaDoLote(tipoPulseira), // fase do lote lido agora (entrada única por etapa)
-                metodo: 'pulseira',
-                dispositivo_id: 'web-dashboard',
-                created_by: req.user?.id,
-                area_id
-            });
+            let result;
+            try {
+                result = await checkinService.registrarAcesso(supabaseClient, {
+                    pessoa_id,
+                    pessoa: { ...pessoa, numero_pulseira },
+                    evento_id: eventoId,
+                    tipo: req.body.tipo || null, // null = Smart Access decide
+                    etapa: etapaDoLote(tipoPulseira), // fase do lote lido agora (entrada única por etapa)
+                    metodo: 'pulseira',
+                    dispositivo_id: 'web-dashboard',
+                    created_by: req.user?.id,
+                    area_id
+                });
+            } catch (errAcesso) {
+                await reverterPulseiraPessoa(supabaseClient, eventoId, pessoa_id, anterior);
+                throw errAcesso;
+            }
 
-            if (result.error) return ApiResponse.error(res, result.error, result.status || 400, result.detalhes || null);
+            if (result.error) {
+                // Entrada não registrada: o número gravado acima não pode ficar com a pessoa
+                await reverterPulseiraPessoa(supabaseClient, eventoId, pessoa_id, anterior);
+                return ApiResponse.error(res, result.error, result.status || 400, result.detalhes || null);
+            }
 
             // Montar info da pulseira para resposta
             const pulseiraInfo = tipoPulseira ? {
@@ -594,6 +673,9 @@ class AccessController {
                 return ApiResponse.error(res, 'Participante / Pulseira não encontrada para baixa', 404);
             }
 
+            // Saída real: pulseira de dia de operação anterior não devolvida exige o motivo (400, nada gravado)
+            if (await tratarPendenciaNaSaida(res, eventoId, pessoa.id, req.body.motivo, req.user?.id)) return;
+
             // Delegar ao fluxo centralizado com tipo forçado 'checkout'
             const result = await checkinService.registrarAcesso(supabaseClient, {
                 pessoa_id: pessoa.id,
@@ -609,6 +691,9 @@ class AccessController {
             });
 
             if (result.error) return ApiResponse.error(res, result.error, result.status || 400, result.detalhes || null);
+
+            // Saída real devolve a pulseira em uso (zera o número e encerra o vínculo)
+            await liberarPulseiraNaSaida(eventoId, result, pessoa.id, req.body, req.user?.id);
 
             // Dispatch webhook
             webhookDispatcher.dispatchCheckout(eventoId, pessoa);
@@ -655,11 +740,22 @@ class AccessController {
             // 3. Registrar o acesso (checkin ou checkout) SEM exigir pulseira!
             const tipoPedido = (tipo === 'checkout' || tipo === 'checkin') ? tipo : null;
             if (await recusarSeDocumentacaoPendente(res, eventoId, pessoa, tipoPedido)) return;
+
+            // Tipo efetivo = o que o sistema vai registrar (toggle decidido agora, a mesma regra do registrarAcesso)
+            const tipoEfetivo = tipoPedido || await validationService.determineSmartAccessType(pessoa.id, eventoId, null, area_id || null, {});
+            if (tipoEfetivo === 'checkout') {
+                // Saída real: pulseira de dia anterior não devolvida exige motivo
+                if (await tratarPendenciaNaSaida(res, eventoId, pessoa.id, req.body.motivo, req.user?.id)) return;
+            } else if (pessoa.numero_pulseira && await recusarSeLoteForaDaJanela(res, supabaseClient, eventoId, pessoa.numero_pulseira)) {
+                // Entrada com pulseira de lote fora da fase/data/horário: 403 (a saída segue liberada)
+                return;
+            }
+
             const result = await checkinService.registrarAcesso(supabaseClient, {
                 pessoa_id: pessoa.id,
                 pessoa,
                 evento_id: eventoId,
-                tipo: tipoPedido,
+                tipo: tipoPedido, // null = o registrarAcesso decide (contrato do leitor)
                 metodo: metodo || 'barcode',
                 dispositivo_id: 'web-dashboard',
                 created_by: req.user?.id,
@@ -668,6 +764,7 @@ class AccessController {
             });
 
             if (result.error) return ApiResponse.error(res, result.error, result.status || 400, result.detalhes || null);
+            await liberarPulseiraNaSaida(eventoId, result, pessoa.id, req.body, req.user?.id);
 
             // Disparar Webhook (tipo efetivo: o que o sistema registrou)
             if (result.tipo === 'checkout') {
@@ -702,7 +799,7 @@ class AccessController {
     // ============================================
     async credenciarPulseira(req, res) {
         try {
-            const { pessoa_id, numero_pulseira, area_id, sync_id, offline_timestamp } = req.body;
+            let { pessoa_id, numero_pulseira, area_id, sync_id, offline_timestamp } = req.body;
             if (await recusarSeSoMonitoramento(res, area_id)) return;
             const eventoId = req.event?.id;
             const supabaseClient = req.supabase || supabase;
@@ -729,6 +826,12 @@ class AccessController {
             // Status de acesso pendente/recusado: credenciar pelo operador vale como liberação do turno
             // (registra quem liberou; expira no checkout ou no horário de reset do evento)
             if (['pendente', 'recusado'].includes(pessoa.status_acesso)) {
+                const userRole = req.user?.nivel_acesso || req.user?.role;
+                const regras = req.user?.permissions?.regras || req.user?.permissions || {};
+                const podeLiberarPendente = userRole === 'admin_master' || userRole === 'admin' || regras.checkin_liberar_pendente !== false;
+                if (!podeLiberarPendente) {
+                    return ApiResponse.error(res, 'Acesso negado: Perfil de operador não autorizado a liberar participantes com status pendente ou recusado.', 403);
+                }
                 try {
                     const liberacao = await require('../entities/liberacaoManual.service').liberar({
                         pessoaId: pessoa_id,
@@ -773,31 +876,27 @@ class AccessController {
                 });
             }
 
-            // 2. Buscar tipo de pulseira (por ID explícito ou por faixa numérica)
+            // 2. Número normalizado (um único ponto) e lote: faixa do lote + fase, data e horário que valem AGORA
+            const numeroNormalizado = normalizarNumeroPulseira(numero_pulseira);
+            if (!numeroNormalizado) return ApiResponse.error(res, 'Número de pulseira inválido: use somente dígitos.', 400);
+            numero_pulseira = numeroNormalizado;
+            const candidatos = await buscarLotesDaFaixa(supabaseClient, eventoId, parseInt(numero_pulseira, 10));
+
             let tipoPulseira = null;
             if (req.body.tipo_pulseira_id) {
-                const { data: tp } = await supabaseClient
-                    .from('evento_tipos_pulseira')
-                    .select(`
-                        id, nome_tipo, cor_hex, alerta_duplicidade, fase,
-                        pulseira_areas_permitidas (
-                            area_id,
-                            evento_areas (id, nome_area)
-                        )
-                    `)
-                    .eq('id', req.body.tipo_pulseira_id)
-                    .single();
-                if (tp) tipoPulseira = tp;
-            }
-
-            if (!tipoPulseira && numero_pulseira) {
-                const numeroPulseiraInt = parseInt(numero_pulseira, 10);
-                if (!isNaN(numeroPulseiraInt)) {
-                    const candidatos = await buscarLotesDaFaixa(supabaseClient, eventoId, numeroPulseiraInt);
-                    const escolha = await escolherLote(candidatos, eventoId);
-                    if (escolha.bloqueado) return ApiResponse.error(res, escolha.motivo, 403);
-                    if (escolha.lote) tipoPulseira = escolha.lote;
+                // Lote informado pelo cliente: só vale se a faixa cobrir o número E o lote estiver ativo agora
+                const idInformado = String(req.body.tipo_pulseira_id).toLowerCase();
+                const doLoteInformado = candidatos.filter(c => String(c.id).toLowerCase() === idInformado);
+                if (doLoteInformado.length === 0) {
+                    return ApiResponse.error(res, `O número ${numero_pulseira} não está na faixa deste lote de pulseira.`, 403);
                 }
+                const escolhaInformada = await escolherLote(doLoteInformado, eventoId);
+                if (escolhaInformada.bloqueado) return ApiResponse.error(res, escolhaInformada.motivo, 403);
+                tipoPulseira = doLoteInformado[0]; // único candidato com esse id: o lote informado, válido agora
+            } else {
+                const escolha = await escolherLote(candidatos, eventoId);
+                if (escolha.bloqueado) return ApiResponse.error(res, escolha.motivo, 403);
+                if (escolha.lote) tipoPulseira = escolha.lote;
             }
 
             // 3. Pulseira não pode estar em outra pessoa do evento DENTRO DO MESMO LOTE (sempre, antes de gravar)
@@ -852,6 +951,7 @@ class AccessController {
             }
 
             // 5. Salvar pulseira (e o cache areas_autorizadas) na pessoa — uma gravação
+            const anterior = { numero_pulseira: pessoa.numero_pulseira ?? null, tipo_pulseira_id: pessoa.tipo_pulseira_id ?? null };
             const updateData = { numero_pulseira, updated_at: new Date() };
             if (areasVinculadas.length > 0) updateData.areas_autorizadas = areasVinculadas.map(a => a.area_id);
             if (tipoPulseira?.id) updateData.tipo_pulseira_id = tipoPulseira.id;
@@ -866,7 +966,10 @@ class AccessController {
                     p_evento_id: eventoId, p_pessoa_id: pessoa_id,
                     p_tipo_saiu: tipoAntes, p_tipo_entrou: tipoPulseira.id
                 });
-                if (areasErr) throw areasErr;
+                if (areasErr) {
+                    await reverterPulseiraPessoa(supabaseClient, eventoId, pessoa_id, anterior);
+                    throw areasErr;
+                }
             }
             pulseiraService.registrarEntrega(pessoa_id, req.user?.id);
             if (req.body.atendimento_inicio) {
@@ -877,21 +980,31 @@ class AccessController {
             }
 
             // 6. Auto CHECK-IN via fluxo centralizado
-            const result = await checkinService.registrarAcesso(supabaseClient, {
-                pessoa_id,
-                pessoa: { ...pessoa, numero_pulseira },
-                evento_id: eventoId,
-                tipo: 'checkin',
-                metodo: 'pulseira',
-                dispositivo_id: 'web-dashboard',
-                created_by: req.user?.id,
-                area_id: area_id || null,
-                sync_id, offline_timestamp,
-                etapa: etapaDoLote(tipoPulseira),
-                observacao: OBSERVACAO_CREDENCIAMENTO
-            });
+            let result;
+            try {
+                result = await checkinService.registrarAcesso(supabaseClient, {
+                    pessoa_id,
+                    pessoa: { ...pessoa, numero_pulseira },
+                    evento_id: eventoId,
+                    tipo: 'checkin',
+                    metodo: 'pulseira',
+                    dispositivo_id: 'web-dashboard',
+                    created_by: req.user?.id,
+                    area_id: area_id || null,
+                    sync_id, offline_timestamp,
+                    etapa: etapaDoLote(tipoPulseira),
+                    observacao: OBSERVACAO_CREDENCIAMENTO
+                });
+            } catch (errAcesso) {
+                // Entrada não registrada: o número gravado no passo 5 não pode ficar com a pessoa
+                await reverterPulseiraPessoa(supabaseClient, eventoId, pessoa_id, anterior);
+                throw errAcesso;
+            }
 
-            if (result.error) return ApiResponse.error(res, result.error, result.status || 400, result.detalhes || null);
+            if (result.error) {
+                await reverterPulseiraPessoa(supabaseClient, eventoId, pessoa_id, anterior);
+                return ApiResponse.error(res, result.error, result.status || 400, result.detalhes || null);
+            }
 
             // 7. Montar resposta enriquecida
             const pulseiraInfo = tipoPulseira ? {

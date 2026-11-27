@@ -1,13 +1,11 @@
 import React, { memo } from 'react';
 import { Box, Typography } from '@mui/material';
 import {
-    ESCALA_EDITOR,
     gerarBarcodeSvg,
     gerarQrExemploSvg,
     svgForma,
     tamanhoDaFonte,
     preencher,
-    escapar,
     rotacaoDe,
     ICONES
 } from '../../../services/etiquetaRender';
@@ -30,7 +28,7 @@ const pesoDe = (fw) => {
  * Cada elemento tem suas props memoizadas, evitando reconciliação desnecessária
  * durante o arrasto do mouse.
  */
-export const ElementoVisual = memo(({ el, dados }) => {
+const ElementoVisualComponent = memo(({ el, dados }) => {
     const rot = rotacaoDe(el);
     const troca = rot === 90 || rot === 270;
     const w = troca ? el.height : el.width;
@@ -211,3 +209,6 @@ export const ElementoVisual = memo(({ el, dados }) => {
 });
 
 export default ElementoVisual;
+
+ElementoVisualComponent.displayName = 'ElementoVisual';
+export const ElementoVisual = ElementoVisualComponent;

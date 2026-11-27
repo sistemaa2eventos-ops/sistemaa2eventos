@@ -146,6 +146,38 @@ const respostaDocumentosFalharam = (res, falharam) => res.status(502).json({
     documentos_nao_enviados: falharam
 });
 
+/** Motivo para recusar cadastro público (empresa inativa ou evento encerrado). null = pode cadastrar. */
+const motivoBloqueioCadastro = async (empresaId, eventoId) => {
+    if (empresaId) {
+        const { data: emp, error: empErr } = await supabase.from('empresas').select('ativo').eq('id', empresaId).maybeSingle();
+        if (empErr) throw empErr;
+        if (emp && emp.ativo === false) return 'Esta empresa está inativa neste evento. Procure a administração do evento.';
+    }
+    if (eventoId) {
+        const { data: ev, error: evErr } = await supabase.from('eventos').select('status').eq('id', eventoId).maybeSingle();
+        if (evErr) throw evErr;
+        if (ev?.status === 'encerrado') return 'Este evento já foi encerrado. Não é possível fazer novos cadastros.';
+    }
+    return null;
+};
+
+/** Campos que o cadastro público de portal aceita (os que o formulário envia). O resto é descartado com aviso. */
+const CAMPOS_CADASTRO_PORTAL = [
+    'nome', 'cpf', 'data_nascimento', 'nome_mae', 'telefone', 'email', 'funcao', 'dias_trabalho',
+    'aceite_lgpd', 'foto_base64', 'foto_url', 'documento_foto', 'documentos',
+    'trabalho_area_tecnica', 'trabalho_altura'
+];
+const filtrarCamposCadastroPortal = (corpo) => {
+    const limpo = {};
+    const descartados = [];
+    for (const [campo, valor] of Object.entries(corpo || {})) {
+        if (CAMPOS_CADASTRO_PORTAL.includes(campo)) limpo[campo] = valor;
+        else descartados.push(campo);
+    }
+    if (descartados.length) logger.warn(`[PortalPublico] Campos descartados do cadastro público: ${descartados.join(', ')}`);
+    return limpo;
+};
+
 class PublicController {
     /**
      * Identidade pública do sistema (nome, logo, emblema e ícones PWA definidos em Configurações → Geral).
@@ -282,6 +314,9 @@ class PublicController {
             if (empresa.registration_token_expires_at && new Date(empresa.registration_token_expires_at) < new Date()) {
                 return res.status(403).json({ error: 'Este link de registro expirou. Solicite um novo convite ao administrador do evento.' });
             }
+
+            const motivoBloqueio = await motivoBloqueioCadastro(empresa.id, empresa.evento_id);
+            if (motivoBloqueio) return res.status(403).json({ error: motivoBloqueio });
 
             // --- ⚡ PERFORMANCE: Otimização de Contagem (Inscritos) ---
             const { count: totalPessoas } = await supabase
@@ -586,6 +621,9 @@ class PublicController {
             const eventoId = activeContext.evento_id;
             const empresaId = context === 'PESSOA' ? activeContext.empresa_id : activeContext.id;
 
+            const motivoBloqueio = await motivoBloqueioCadastro(empresaId, eventoId);
+            if (motivoBloqueio) return res.status(403).json({ error: motivoBloqueio });
+
             // 2. Validar CPF e Duplicidade (Apenas se for novo registro)
             const cpfLimpo = cpf.replace(/[^\d]/g, '');
             // Pré-cadastro da planilha desta empresa ainda não concluído: o envio completa esse registro
@@ -683,8 +721,8 @@ class PublicController {
                 fases_acesso: fases_acesso || [],
                 dias_acesso: dias_trabalho || [],
                 dias_trabalho: dias_trabalho || [],
-                trabalha_area_tecnica: trabalho_area_tecnica || false,
-                trabalha_altura: trabalho_altura || false,
+                trabalho_area_tecnica: trabalho_area_tecnica || false,
+                trabalho_altura: trabalho_altura || false,
                 aceite_lgpd: true,
                 data_aceite_lgpd: new Date(),
                 registration_token: null,
@@ -702,7 +740,7 @@ class PublicController {
                 }
             }
             if (ignoredFields.length > 0) {
-                logger.info(`[Schema] Campos ignorados (não existem na tabela): ${ignoredFields.join(', ')}`);
+                logger.warn(`[Schema] Campos descartados do cadastro (não existem na tabela pessoas): ${ignoredFields.join(', ')}`);
             }
 
             let finalPessoaId = null;
@@ -860,6 +898,9 @@ class PublicController {
                 return res.status(403).json({ error: 'Link inválido ou expirado.' });
             }
 
+            const motivoBloqueio = await motivoBloqueioCadastro(empresa.id, empresa.evento_id);
+            if (motivoBloqueio) return res.status(403).json({ error: motivoBloqueio });
+
             // Documento mínimo do evento (ex.: RG/CNH frente e verso) antes de subir qualquer arquivo
             const regrasDocs = await regrasDocumentosPortal(empresa.evento_id);
             const faltando = minimoFaltando(pessoa?.documentos, regrasDocs);
@@ -881,7 +922,8 @@ class PublicController {
                 }
             }
 
-            const cleanPessoa = { ...pessoa };
+            // Só campos de cadastro: bloqueado, ativo, status, id, evento_id etc. nunca vêm do cliente
+            const cleanPessoa = filtrarCamposCadastroPortal(pessoa);
             delete cleanPessoa.foto_base64; // Remove huge payload part
             if (finalFotoUrl) cleanPessoa.foto_url = finalFotoUrl;
             // foto_url e documento_foto enviados pelo cliente: só data URI ou arquivo do nosso storage.

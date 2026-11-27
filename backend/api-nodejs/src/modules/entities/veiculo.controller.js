@@ -399,13 +399,25 @@ const veiculoController = {
     historico: async (req, res) => {
         try {
             const { id } = req.params;
-            const { page = 1, limit = 20 } = req.query;
+            const evento_id = req.tenantId || req.event?.id || req.query.evento_id;
+            if (!evento_id) return res.status(400).json({ error: 'Evento não informado.' });
+
+            // Mesma checagem de getById: o veículo precisa pertencer ao evento
+            try {
+                await veiculoService.getById(supabase, id, evento_id);
+            } catch (checkErr) {
+                return res.status(404).json({ error: checkErr.message });
+            }
+
+            const page = parseInt(req.query.page, 10) || 1;
+            const limit = parseInt(req.query.limit, 10) || 20;
             const from = (page - 1) * limit;
 
             const { data, error, count } = await supabase
                 .from('logs_veiculos')
                 .select('*, usuarios:operador_id(nome_completo)', { count: 'exact' })
                 .eq('veiculo_id', id)
+                .eq('evento_id', evento_id)
                 .order('created_at', { ascending: false })
                 .range(from, from + limit - 1);
 

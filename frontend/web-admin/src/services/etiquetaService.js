@@ -1,7 +1,6 @@
 import api from './api';
 import { obterUrlFoto } from './fotosPessoa';
 import {
-    ESCALA_EDITOR,
     unidadeMm,
     elementosHtml,
     estiloFundoPapel,

@@ -37,12 +37,12 @@ jest.mock('../src/config/supabase', () => ({ supabase: { from: (t) => mockConstr
 jest.mock('../src/modules/checkin/checkin.service', () => ({
     registrarAcesso: jest.fn(async (_c, dados) => { mockDb.registros.push(dados); return { success: true, tipo: dados.tipo }; })
 }));
-jest.mock('../src/modules/checkin/services/validation.service', () => ({}));
+jest.mock('../src/modules/checkin/services/validation.service', () => ({ determineSmartAccessType: jest.fn(async (p, e, req) => req || 'checkin') }));
 jest.mock('../src/services/webhookDispatcher', () => ({ dispatchCheckin: jest.fn(), dispatchCheckout: jest.fn() }));
 jest.mock('../src/services/websocketService', () => ({ emit: jest.fn() }));
 jest.mock('../src/modules/checkin/services/database.service', () => ({}));
 jest.mock('../src/modules/system/watchlist.service', () => ({ verificarCPF: jest.fn(async () => null), registrarAlerta: jest.fn(async () => {}) }));
-jest.mock('../src/modules/pulseiras/pulseira.service', () => ({}));
+jest.mock('../src/modules/pulseiras/pulseira.service', () => ({ buscarStatusPulseira: jest.fn(async () => ({ emUso: null, pendencia: null })), liberarNaSaida: jest.fn(async () => ({ liberada: false, numero_pulseira: null })) }));
 jest.mock('../src/modules/pulseiras/loteSelecao', () => ({
     buscarLotesDaFaixa: jest.fn(async () => []),
     escolherLote: jest.fn(async () => ({ lote: null, bloqueado: false, motivo: null }))

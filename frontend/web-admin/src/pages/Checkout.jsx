@@ -18,6 +18,7 @@ import RecentAccessList from '../components/credenciamento/RecentAccessList';
 import CabecalhoOperacao, { BotaoJanelaRegistros } from '../components/credenciamento/CabecalhoOperacao';
 import { useCheckin } from '../hooks/useCheckin';
 import CorrigirTurnoDialog from '../components/checkin/CorrigirTurnoDialog';
+import MotivoPulseiraDialog from '../components/checkin/MotivoPulseiraDialog';
 import ConferenciaSaidaDialog, { identificarLeitura } from '../components/checkin/ConferenciaSaidaDialog';
 import PassagensRecusadas from '../components/checkin/PassagensRecusadas';
 import RecusadosSincronizacao from '../components/checkin/RecusadosSincronizacao';
@@ -112,6 +113,7 @@ const Checkout = () => {
     desvincularLeitor,
     carregarDispositivosDisponiveis,
     turnoAnterior, confirmarTurnoAnterior, cancelarTurnoAnterior,
+    motivoPulseira, confirmarMotivoPulseira, cancelarMotivoPulseira,
     eventoId,
   } = useCheckin('checkout', { logsTipo: 'checkout' });
 
@@ -337,6 +339,9 @@ const Checkout = () => {
 
       {/* Saída de um dia anterior: confirmar o horário */}
       <CorrigirTurnoDialog turno={turnoAnterior} onConfirmar={confirmarTurnoAnterior} onCancelar={cancelarTurnoAnterior} />
+
+      {/* Saída de pulseira entregue fora do horário: o motivo é obrigatório */}
+      <MotivoPulseiraDialog motivo={motivoPulseira} onConfirmar={confirmarMotivoPulseira} onCancelar={cancelarMotivoPulseira} />
 
       {/* FEEDBACK OVERLAY */}
       {checkinResult && (

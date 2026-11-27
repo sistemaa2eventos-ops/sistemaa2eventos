@@ -8,7 +8,6 @@ import {
     Search as SearchIcon,
     Print as PrintIcon,
     MenuBook as ManualIcon,
-    Devices as DevicesIcon,
     Videocam as CameraIcon,
     Face as FaceIcon,
     Clear as ClearIcon,

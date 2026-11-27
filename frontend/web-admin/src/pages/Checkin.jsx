@@ -23,6 +23,7 @@ import { useCheckin } from '../hooks/useCheckin';
 import { useAuth } from '../contexts/AuthContext';
 import { carregarConfigEtiqueta } from '../services/etiquetaService';
 import CorrigirTurnoDialog from '../components/checkin/CorrigirTurnoDialog';
+import MotivoPulseiraDialog from '../components/checkin/MotivoPulseiraDialog';
 import AvisoEntradaBloqueada from '../components/checkin/AvisoEntradaBloqueada';
 import AcoesPulseiraCheckin from '../components/checkin/AcoesPulseiraCheckin';
 import RecusadosSincronizacao from '../components/checkin/RecusadosSincronizacao';
@@ -75,6 +76,7 @@ const Checkin = () => {
     desvincularLeitor,
     carregarDispositivosDisponiveis,
     turnoAnterior, confirmarTurnoAnterior, cancelarTurnoAnterior,
+    motivoPulseira, confirmarMotivoPulseira, cancelarMotivoPulseira,
     // Entrada bloqueada numa área que controla entrada (409 ENTRADA_BLOQUEADA)
     bloqueioEntrada, liberarReentrada, liberandoReentrada, registrarSaidaFicha, cancelarBloqueioEntrada,
   } = useCheckin(undefined, { logsTipo: 'checkin' });
@@ -358,6 +360,9 @@ const Checkin = () => {
 
       {/* Saída de um dia anterior: confirmar o horário */}
       <CorrigirTurnoDialog turno={turnoAnterior} onConfirmar={confirmarTurnoAnterior} onCancelar={cancelarTurnoAnterior} />
+
+      {/* Saída de pulseira entregue fora do horário: o motivo é obrigatório */}
+      <MotivoPulseiraDialog motivo={motivoPulseira} onConfirmar={confirmarMotivoPulseira} onCancelar={cancelarMotivoPulseira} />
 
       {/* FEEDBACK OVERLAY GLOBAL */}
       {checkinResult && (

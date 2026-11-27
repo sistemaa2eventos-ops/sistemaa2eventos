@@ -121,7 +121,7 @@ const ConfigCameras = ({ abaInicial = null }) => {
                 setMotorLigado(null);
                 enqueueSnackbar('Não foi possível verificar se o motor de IA do evento está ligado.', { variant: 'warning' });
             });
-    }, [activeTab]);
+    }, [activeTab, enqueueSnackbar]);
 
     // Abrir Modal de Câmera
     const handleOpenModal = (camera = null) => {
@@ -362,7 +362,7 @@ const ConfigCameras = ({ abaInicial = null }) => {
                                                             <Chip label={cam.fabricante || 'RTSP'} size="small" sx={{ bgcolor: 'rgba(0,0,0,0.4)', color: cores.primaria, fontWeight: 700, fontSize: '0.75rem', border: '1px solid rgba(0,212,255,0.3)' }} />
                                                             {cam.area?.nome_area && (
                                                                 <Chip
-                                                                    icon={<ShieldIcon sx={{ fontSize: 13, color: '#FFFFFF !important' }} />}
+                                                                    icon={<ShieldIcon sx={{ fontSize: 13, color: `${cores.textoForte} !important` }} />}
                                                                     label={cam.area.nome_area}
                                                                     size="small"
                                                                     sx={{ bgcolor: 'rgba(0,0,0,0.4)', color: cores.textoForte, fontWeight: 600, fontSize: '0.75rem' }}

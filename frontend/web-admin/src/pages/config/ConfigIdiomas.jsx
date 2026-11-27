@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
-    Box, Typography, List, ListItem, ListItemIcon, ListItemText,
-    ListItemSecondaryAction, MenuItem, Select, CircularProgress,
-    Grid, Card, CardActionArea, CardContent, Chip, Button, Stack
+    Box, Typography, MenuItem, Select, CircularProgress,
+    Grid, Card, CardActionArea, Chip, Button, Stack
 } from '@mui/material';
 import { useSnackbar } from 'notistack';
 import {
@@ -61,7 +60,7 @@ const IDIOMAS_DISPONIVEIS = [
 
 const ConfigIdiomas = () => {
     const { t, i18n } = useTranslation();
-    const [settings, setSettings] = useState(null);
+    const [, setSettings] = useState(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const { enqueueSnackbar } = useSnackbar();

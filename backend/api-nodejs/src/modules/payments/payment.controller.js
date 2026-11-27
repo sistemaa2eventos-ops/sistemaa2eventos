@@ -75,17 +75,20 @@ class PaymentController {
      */
     async listTransactions(req, res) {
         try {
-            const { evento_id, status, provider, date_from, date_to, page = 1, limit = 25 } = req.query;
+            // Evento SEMPRE o de req.event (requireEvent); evento_id vindo da query é ignorado
+            const eventoId = req.event?.id;
+            if (!eventoId) return res.status(400).json({ error: 'Evento não informado.' });
+            const { status, provider, date_from, date_to, page = 1, limit = 25 } = req.query;
             const offset = (parseInt(page) - 1) * parseInt(limit);
 
             let query = supabase
                 .from('transacoes_financeiras')
                 .select('*, pessoas(nome, cpf)', { count: 'exact' })
+                .eq('evento_id', eventoId)
                 .order('webhook_received_at', { ascending: false })
                 .range(offset, offset + parseInt(limit) - 1);
 
             // Filtros
-            if (evento_id) query = query.eq('evento_id', evento_id);
             if (status) query = query.eq('status', status);
             if (provider) query = query.eq('provider', provider);
             if (date_from) query = query.gte('webhook_received_at', date_from);
@@ -96,8 +99,7 @@ class PaymentController {
             if (error) throw error;
 
             // KPIs filtrados por evento ativo
-            let kpiQuery = supabase.from('transacoes_financeiras').select('status, valor');
-            if (evento_id) kpiQuery = kpiQuery.eq('evento_id', evento_id);
+            const kpiQuery = supabase.from('transacoes_financeiras').select('status, valor').eq('evento_id', eventoId);
 
             const { data: allTx } = await kpiQuery;
 
@@ -137,6 +139,18 @@ class PaymentController {
         try {
             const { id } = req.params;
             const userId = req.user?.id;
+            const eventoId = req.event?.id;
+            if (!eventoId) return res.status(400).json({ error: 'Evento não informado.' });
+
+            // Transação precisa ser do evento da requisição antes de qualquer alteração
+            const { data: transacao, error: buscaErr } = await supabase
+                .from('transacoes_financeiras')
+                .select('id')
+                .eq('id', id)
+                .eq('evento_id', eventoId)
+                .maybeSingle();
+            if (buscaErr) throw buscaErr;
+            if (!transacao) return res.status(404).json({ error: 'Transação não encontrada neste evento.' });
 
             // --- ⚛️ ATOMICIDADE ACID (Postgres RPC) ---
             // Resolve o problema de estado inconsistente (Pagamento OK, Acesso Pendente)
@@ -150,12 +164,13 @@ class PaymentController {
             // Logar quem fez a reconciliação manual na tabela de transações (audit trail)
             await supabase
                 .from('transacoes_financeiras')
-                .update({ 
+                .update({
                     reconciliado_por: userId,
                     reconciliado_em: new Date(),
                     observacao: 'Reconciliação manual via Admin'
                 })
-                .eq('id', id);
+                .eq('id', id)
+                .eq('evento_id', eventoId);
 
             logger.info(`✅ Transação ${id} reconciliada ATOMICAMENTE por ${userId}`);
             res.json({ success: true, transaction: data });

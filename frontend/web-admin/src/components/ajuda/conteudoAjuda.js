@@ -14,7 +14,7 @@ const AJUDAS = {
             'Acompanhe "Presentes agora", o fluxo por hora e a lotação por área durante a operação.'
         ],
         atencao: [
-            '"Reset diário" fecha o dia: quem não está no evento passa a ausente e começa um novo dia de operação. Use só no fim do expediente.',
+            '"Reset diário" zera o turno: quem estiver dentro recebe saída automática marcada como "a conferir", e a falta de saída aparece no relatório do dia de origem. As pulseiras continuam com a pessoa até a devolução ou o descredenciamento. Use só no fim do expediente.',
             'O percentual de lotação só aparece se a "Capacidade" estiver preenchida no evento.'
         ],
         dicas: ['Os números se atualizam sozinhos a cada minuto; o ícone "Atualizar dados" força na hora.']
@@ -292,7 +292,7 @@ const AJUDAS = {
         titulo: 'Pulseiras',
         objetivo: 'Lotes de pulseiras: cor, faixa de números, áreas liberadas e fase do evento (Montagem, Evento, Desmontagem).',
         passos: ['"Provisionar lote": nome, cor, etapa/fase de validade, data específica (opcional), início e fim de uso (opcional), número inicial e final, método de leitura e "Zonas de acesso permitidas".', '"Criar lote".'],
-        atencao: ['Crie as áreas antes: lote sem zona fica "Sem acesso".', 'Lotes de fases diferentes podem repetir números e cores; ao rodar o reset de turnos as pulseiras anteriores são liberadas automaticamente.', 'Excluir um lote é irreversível.', 'Fora da fase, data ou horário de uso do lote, a pulseira é recusada no credenciamento e no check-in.'],
+        atencao: ['Crie as áreas antes: lote sem zona fica "Sem acesso".', 'Lotes de fases diferentes podem repetir números e cores; o reset de turnos não tira a pulseira de ninguém: ela só volta ao estoque na devolução ou no descredenciamento.', 'Excluir um lote é irreversível.', 'Fora da fase, data ou horário de uso do lote, a pulseira é recusada no credenciamento e no check-in.'],
         tituloConferir: 'Conferir antes do evento',
         passosConferir: [
             'Janela de horário: crie um lote com "Início uso" 16:00 e "Fim uso" 02:00. Tente vincular uma pulseira desse lote fora desse horário: o sistema deve recusar com aviso.',
@@ -440,8 +440,8 @@ const AJUDAS = {
         objetivo: 'Horários do fechamento do dia, do relatório diário e da limpeza de registros.',
         passos: ['Ajuste os horários e clique "Salvar Alterações".'],
         atencao: [
-            'O relatório diário precisa rodar depois do reset de turno.',
-            '"Reset de Turno Agora" fecha o dia na hora: use só no fim do expediente.'
+            'O relatório do turno é arquivado no fechamento automático (horário de reset do evento). O fechamento manual só zera o turno e não arquiva.',
+            '"Reset de Turno Agora" zera o turno na hora: quem está dentro recebe saída marcada como "a conferir". Use só no fim do expediente.'
         ]
     },
     '/config/idiomas': {

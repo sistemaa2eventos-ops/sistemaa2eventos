@@ -118,6 +118,7 @@ export default function PhotoCapture({ onPhotoCaptured, initialPhoto = null }: P
 
     // Sync imgSrc with prop when it changes (e.g. if cleared by parent)
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setImgSrc(initialPhoto);
     }, [initialPhoto]);
 

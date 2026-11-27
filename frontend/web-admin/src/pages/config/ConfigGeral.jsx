@@ -15,15 +15,12 @@ import {
     VerifiedUser as PerfisIcon,
     Schedule as CronIcon,
     Storage as BancoIcon,
-    FactCheck as RegrasIcon,
-    Extension as ComunicacaoIcon,
     OpenInNew as OpenIcon,
     Devices as DevicesIcon,
     VolumeUp as VolumeIcon,
     Speed as SpeedIcon,
     OfflinePin as OfflineIcon,
     Smartphone as PhoneIcon,
-    Videocam as VideoIcon,
     InfoOutlined as InfoIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
@@ -37,7 +34,7 @@ import { botaoSecundario, cores, fontes, tamanhos, tom, raios } from '../../styl
 import nztLogoClean from '../../assets/images/nzt-logo-clean.png';
 import nztEmblem from '../../assets/images/nzt-emblem.png';
 
-const IDIOMAS_ROTULO = {
+const _IDIOMAS_ROTULO = {
     'pt-BR': 'Português (BR)',
     pt: 'Português (BR)',
     en: 'English',
@@ -141,8 +138,6 @@ const ConfigGeral = () => {
 
     const limiarLotacao = Number(settings.alert_peak_threshold) || 90;
     const alertaLotacaoAtivo = settings.alert_event_peak !== false;
-    const idiomaAtivo = IDIOMAS_ROTULO[settings.language] || settings.language || 'Português (BR)';
-    const duracaoSessao = Number(settings.jwt_expiration_hours) || 8;
 
     // Contadores para os KPIs
     const customAssets = [

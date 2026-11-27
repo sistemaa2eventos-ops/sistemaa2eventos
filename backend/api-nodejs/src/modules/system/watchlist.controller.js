@@ -122,12 +122,17 @@ class WatchlistController {
                 return res.status(400).json({ error: 'Justificativa / Motivo do desbloqueio é obrigatório para registrar auditoria de segurança.' });
             }
 
-            // 1. Obter registro do alvo
+            // Só age sobre o evento da requisição (requireEvent)
+            const eventoId = req.event?.id;
+            if (!eventoId) return res.status(400).json({ error: 'Evento não informado.' });
+
+            // 1. Obter registro do alvo (neste evento)
             let watchlistId = id;
             let { data: item } = await supabase
                 .from('watchlist')
                 .select('*')
                 .eq('id', id)
+                .eq('evento_id', eventoId)
                 .maybeSingle();
 
             if (!item) {
@@ -136,6 +141,7 @@ class WatchlistController {
                     .from('pessoas')
                     .select('cpf')
                     .eq('id', id)
+                    .eq('evento_id', eventoId)
                     .maybeSingle();
 
                 if (pessoa && pessoa.cpf) {
@@ -144,6 +150,7 @@ class WatchlistController {
                         .from('watchlist')
                         .select('*')
                         .eq('cpf', cpfLimpo)
+                        .eq('evento_id', eventoId)
                         .maybeSingle();
                     if (wByCpf) {
                         watchlistId = wByCpf.id;
@@ -164,31 +171,40 @@ class WatchlistController {
             // 2. Desativar registro na Watchlist (sem updated_at)
             await supabase
                 .from('watchlist')
-                .update({ 
+                .update({
                     ativo: false
                 })
-                .eq('id', watchlistId);
+                .eq('id', watchlistId)
+                .eq('evento_id', eventoId);
 
             if (cpfLimpo) {
                 await supabase
                     .from('watchlist')
                     .update({ ativo: false })
-                    .eq('cpf', cpfLimpo);
+                    .eq('cpf', cpfLimpo)
+                    .eq('evento_id', eventoId);
             }
 
-            // 3. LIBERAÇÃO IMEDIATA: Atualizar todas as ocorrências deste CPF na tabela pessoas em todos os eventos
+            // 3. LIBERAÇÃO: só as ocorrências deste CPF neste evento. Não força 'autorizado':
+            // tira o bloqueio e reavalia a documentação (pendente se faltar documento)
             if (cpfLimpo) {
                 const { data: ocorrencias } = await supabase
                     .from('pessoas')
                     .update({
                         bloqueado: false,
-                        status_acesso: 'autorizado',
                         motivo_bloqueio: null,
                         updated_at: new Date()
                     })
                     .eq('cpf', cpfLimpo)
+                    .eq('evento_id', eventoId)
                     .select('id');
-                // Desbloquear não dispensa documentação: reavalia cada ocorrência (pendente se faltar documento)
+                // Sai do bloqueio para a reavaliação; sincronizarStatusPessoa define autorizado/pendente pela documentação
+                await supabase
+                    .from('pessoas')
+                    .update({ status_acesso: 'pendente' })
+                    .eq('cpf', cpfLimpo)
+                    .eq('evento_id', eventoId)
+                    .eq('status_acesso', 'bloqueado');
                 for (const p of ocorrencias || []) await documentoService.sincronizarStatusPessoa(null, p.id);
             }
 

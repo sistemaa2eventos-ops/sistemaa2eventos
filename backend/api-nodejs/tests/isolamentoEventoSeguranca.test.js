@@ -186,7 +186,7 @@ describe('Fechamento manual de turno', () => {
         const res = resposta();
         await cronController.manualTrigger({ params: { id }, body: {} }, res);
         expect(res.statusCode).toBe(200);
-        expect(espiao).toHaveBeenCalledWith(id);
+        expect(espiao).toHaveBeenCalledWith(id, { arquivar: false });
     });
 });
 

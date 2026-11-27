@@ -43,7 +43,7 @@ import { useTranslation } from 'react-i18next';
  * 5. Base: Últimos participantes cadastrados.
  */
 const Dashboard = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const [, forceUpdate] = React.useState({});
 
     React.useEffect(() => {

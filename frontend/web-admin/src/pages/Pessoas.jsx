@@ -65,6 +65,7 @@ const Pessoas = () => {
     eventoIdParam,
     isAdmin,
     isEmpresa,
+    somenteLeituraPessoas,
 
     // Handlers
     handleOpenDialog,
@@ -144,14 +145,16 @@ const Pessoas = () => {
           gap: 1.5, 
           width: { xs: '100%', md: 'auto' } 
         }}>
-          <NeonButton 
-            startIcon={<AddIcon sx={{ fontSize: 18 }} />} 
-            loading={saving} 
-            onClick={() => handleOpenDialog()}
-            sx={{ whiteSpace: 'nowrap' }}
-          >
-            {isEmpresa ? 'Novo vínculo' : 'Novo participante'}
-          </NeonButton>
+          {!somenteLeituraPessoas && (
+            <NeonButton 
+              startIcon={<AddIcon sx={{ fontSize: 18 }} />} 
+              loading={saving} 
+              onClick={() => handleOpenDialog()}
+              sx={{ whiteSpace: 'nowrap' }}
+            >
+              {isEmpresa ? 'Novo vínculo' : 'Novo participante'}
+            </NeonButton>
+          )}
         </Box>
       </Box>
 
@@ -198,10 +201,10 @@ const Pessoas = () => {
         <PessoasTable
           pessoas={pessoas}
           loading={loading}
-          onEdit={handleOpenDialog}
-          onDelete={handleDelete}
-          onBlock={handleOpenBlock}
-          onExpulsar={handleExpulsar}
+          onEdit={somenteLeituraPessoas ? null : handleOpenDialog}
+          onDelete={somenteLeituraPessoas ? null : handleDelete}
+          onBlock={somenteLeituraPessoas ? null : handleOpenBlock}
+          onExpulsar={somenteLeituraPessoas ? null : handleExpulsar}
           onOpenDocs={handleOpenDocs}
           onViewQR={handleViewQR}
           isAdmin={isAdmin}

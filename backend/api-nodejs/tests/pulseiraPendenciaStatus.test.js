@@ -28,6 +28,8 @@ jest.mock('../src/utils/dateUtils', () => ({
     getLimitesDiaLocalUTC: () => ({ start: '2026-11-24T03:00:00.000Z', end: '2026-11-25T02:59:59.999Z' }),
 }));
 
+jest.mock('../src/utils/diaOperacao', () => ({ inicioDiaOperacao: jest.fn(async () => '2026-11-24T03:00:00.000Z') }));
+
 const pulseiraService = require('../src/modules/pulseiras/pulseira.service');
 
 beforeEach(() => Object.assign(mockDados, { entradas: [], saidas: [], marcadas: [], motivos: [] }));

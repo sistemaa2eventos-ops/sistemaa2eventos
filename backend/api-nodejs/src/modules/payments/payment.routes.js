@@ -14,7 +14,8 @@ router.use((req, res, next) => {
     next();
 });
 const paymentController = require('./payment.controller');
-const { authenticate } = require('../../middleware/auth');
+const { authenticate, authorize } = require('../../middleware/auth');
+const { requireEvent } = require('../../middleware/eventMiddleware');
 
 const { verifyWebhookSignature } = require('../../middleware/webhook.middleware');
 
@@ -30,14 +31,14 @@ router.post('/webhook/:provider', verifyWebhookSignature, paymentController.hand
  * @desc Lista transações financeiras com filtros e KPIs
  * @access Private (Admin/Master)
  */
-router.get('/transactions', authenticate, paymentController.listTransactions);
+router.get('/transactions', authenticate, requireEvent, authorize('master', 'admin', 'supervisor'), paymentController.listTransactions);
 
 /**
  * @route PUT /api/payments/transactions/:id/reconcile
  * @desc Marca uma transação como reconciliada manualmente
  * @access Private (Admin/Master)
  */
-router.put('/transactions/:id/reconcile', authenticate, paymentController.reconcileTransaction);
+router.put('/transactions/:id/reconcile', authenticate, requireEvent, authorize('master', 'admin', 'supervisor'), paymentController.reconcileTransaction);
 
 module.exports = router;
 

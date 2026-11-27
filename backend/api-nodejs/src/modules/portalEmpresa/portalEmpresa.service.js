@@ -63,7 +63,7 @@ class PortalEmpresaService {
         // ilike sem curingas: % e _ do texto digitado são escapados
         const padrao = emailLimpo.replace(/[%_\\]/g, (c) => `\\${c}`);
         const { data: candidatas, error } = await supabase.from('empresas')
-            .select('id, evento_id, nome, ativo, portal_chave_hash, portal_chave_gerada_em, eventos(nome)')
+            .select('id, evento_id, nome, ativo, portal_chave_hash, portal_chave_gerada_em, eventos(nome, status)')
             .ilike('email', padrao)
             .not('portal_chave_hash', 'is', null);
         if (error) throw error;
@@ -71,6 +71,7 @@ class PortalEmpresaService {
         const empresa = (candidatas || []).find(e => auth.conferirChave(chave, e.portal_chave_hash));
         if (!empresa) throw erroHttp('E-mail ou chave de acesso incorretos.', 401);
         if (empresa.ativo === false) throw erroHttp('Empresa desativada neste evento. Fale com a organização.', 403);
+        // Evento encerrado: o login continua permitido (consulta); a escrita é bloqueada no middleware
 
         await supabase.from('empresas').update({ portal_ultimo_acesso: new Date().toISOString() }).eq('id', empresa.id);
         logger.info(`[PortalEmpresa] Login: ${empresa.nome} (evento ${empresa.evento_id})`);

@@ -24,9 +24,11 @@ class HealthService {
     start() {
         logger.info('🏥 HealthMonitor iniciado - Alertas proativos ativos');
         this.timer = setInterval(() => this.runDiagnostics(), this.checkInterval);
+        if (this.timer && typeof this.timer.unref === 'function') this.timer.unref();
         
         // Diagnóstico imediato
-        setTimeout(() => this.runDiagnostics(), 5000);
+        const immediateTimer = setTimeout(() => this.runDiagnostics(), 5000);
+        if (immediateTimer && typeof immediateTimer.unref === 'function') immediateTimer.unref();
     }
 
     stop() {

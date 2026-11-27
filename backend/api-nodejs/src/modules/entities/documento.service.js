@@ -195,7 +195,7 @@ class DocumentoService {
         try {
             const { data: pessoa } = await supabase
                 .from('pessoas')
-                .select('id, evento_id, funcao, status_acesso, status_documentos, origem_cadastro')
+                .select('id, evento_id, funcao, status_acesso, status_documentos, origem_cadastro, bloqueado')
                 .eq('id', pessoaId)
                 .single();
             if (!pessoa) return null;
@@ -203,9 +203,9 @@ class DocumentoService {
             const avaliacao = await requisitos.avaliarPessoa(pessoa);
             const novoStatusDocs = avaliacao.status_documentos;
 
-            // Status de acesso (preserva quem está dentro do evento e bloqueios manuais)
+            // Status de acesso (preserva quem está dentro do evento e bloqueios manuais: bloqueado, expulso)
             let novoStatusAcesso = pessoa.status_acesso || 'pendente';
-            const intocavel = ['checkin_feito', 'bloqueado'].includes(pessoa.status_acesso);
+            const intocavel = ['checkin_feito', 'bloqueado', 'expulso'].includes(pessoa.status_acesso) || pessoa.bloqueado === true;
             if (!intocavel) {
                 // Autorizado só com documentação aprovada; qualquer outra situação é pendente
                 if (novoStatusDocs === 'aprovado') novoStatusAcesso = 'autorizado';

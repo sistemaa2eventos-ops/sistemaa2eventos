@@ -150,7 +150,7 @@ router.get('/qrcode/validar/:pessoa_id', sessionMiddleware, async (req, res) => 
             .single();
 
         if (error || !pessoa) return res.status(404).json({ error: 'Pessoa não encontrada ou não autorizada neste evento.' });
-        if (pessoa.status_acesso === 'bloqueado') return res.status(403).json({ error: 'Pessoa bloqueada neste evento.' });
+        if (['bloqueado', 'expulso'].includes(pessoa.status_acesso)) return res.status(403).json({ error: 'Pessoa bloqueada neste evento.' });
 
         return res.json({
             data: {

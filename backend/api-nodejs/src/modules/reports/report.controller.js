@@ -1670,21 +1670,34 @@ class ReportController {
 
             let saved = null;
             try {
-                const { data: inserted, error: insertErr } = await supabase
+                const payloadFechamento = {
+                    evento_id,
+                    data_referencia: dataRef,
+                    hora_fechamento: new Date().toISOString(),
+                    tipo_reset,
+                    executado_por,
+                    total_colaboradores: totais.total_colaboradores || registros.length,
+                    total_checkins: totais.total_checkins || 0,
+                    total_checkouts: totais.total_finalizados || 0,
+                    dados_relatorio: registros
+                };
+                // Não há índice único em (evento_id, data_referencia, tipo_reset): se já existe a linha
+                // desse dia e tipo, atualiza em vez de duplicar (recomendado: constraint única no banco).
+                const { data: existente, error: buscaErr } = await supabase
                     .from('relatorios_diarios_fechados')
-                    .insert({
-                        evento_id,
-                        data_referencia: dataRef,
-                        hora_fechamento: new Date().toISOString(),
-                        tipo_reset,
-                        executado_por,
-                        total_colaboradores: totais.total_colaboradores || registros.length,
-                        total_checkins: totais.total_checkins || 0,
-                        total_checkouts: totais.total_finalizados || 0,
-                        dados_relatorio: registros
-                    })
-                    .select()
-                    .single();
+                    .select('id')
+                    .eq('evento_id', evento_id)
+                    .eq('data_referencia', dataRef)
+                    .eq('tipo_reset', tipo_reset)
+                    .order('hora_fechamento', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+                if (buscaErr) throw buscaErr;
+
+                const gravacao = existente
+                    ? supabase.from('relatorios_diarios_fechados').update(payloadFechamento).eq('id', existente.id)
+                    : supabase.from('relatorios_diarios_fechados').insert(payloadFechamento);
+                const { data: inserted, error: insertErr } = await gravacao.select().single();
 
                 if (insertErr) {
                     logger.warn(`[Reset Diário] Erro ao gravar snapshot em relatorios_diarios_fechados: ${insertErr.message}`);

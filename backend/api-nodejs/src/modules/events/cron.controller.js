@@ -3,7 +3,8 @@ const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const reportController = require('../reports/report.controller');
 const emailService = require('../../services/emailService');
-const { getHojeLocal, getNowLocal } = require('../../utils/dateUtils');
+const { getHojeLocal } = require('../../utils/dateUtils');
+const { inicioDiaOperacao, diaDoTurnoEncerrando } = require('../../utils/diaOperacao');
 const { buscarTodos } = require('../../utils/buscarTodos');
 const { emLotes, emParalelo } = require('../../utils/lotes');
 const { etapasDasPessoas, diaDoAcesso, colunaInexistente } = require('../checkin/services/entradaEtapa');
@@ -24,11 +25,12 @@ class CronController {
     constructor() {
         this._resetTask     = null;
         this._relatorioTask = null;
-        this._ultimoResetPorEvento = {}; // evento_id → 'YYYY-MM-DD' (evita reset duplicado no mesmo dia)
+        // evento_id → dia do turno que ENCERROU no último fechamento automático (YYYY-MM-DD).
+        // Marcado só depois do sucesso. Não é gravado no banco: após reinício, o turno em andamento é tomado como já fechado.
+        this._ultimoResetPorEvento = {};
     }
 
-    // Converte "HH:mm" para expressão cron "mm HH * * *"
-    /** Ontem no fuso local (YYYY-MM-DD) */
+    /** Ontem no fuso local (YYYY-MM-DD). Usado no e-mail do relatório diário (enviarRelatoriosGlobais). */
     _ontemLocal() {
         const d = new Date(`${getHojeLocal()}T12:00:00Z`);
         d.setUTCDate(d.getUTCDate() - 1);
@@ -121,18 +123,33 @@ class CronController {
         const liberacaoManual = require('../entities/liberacaoManual.service');
         await liberacaoManual.expirarVencidas();
 
-        const horaAtual = getNowLocal().slice(11, 16); // HH:MM local
-        const hoje = getHojeLocal();
+        const agora = new Date();
         const { data: eventos, error } = await supabase.from('eventos').select('id, nome, horario_reset').eq('status', 'ativo');
         if (error) return;
 
         for (const ev of eventos || []) {
-            const horaReset = String(ev.horario_reset || '').slice(0, 5);
-            if (!horaReset || horaReset !== horaAtual) continue;
-            if (this._ultimoResetPorEvento[ev.id] === hoje) continue;
-            this._ultimoResetPorEvento[ev.id] = hoje;
-            logger.info(`🔄 [CRON] Fechamento de turno do evento ${ev.nome} (${horaReset})...`);
-            await this.resetTurnos(ev.id).catch(e => logger.error(`[CRON] resetTurnos(${ev.id}) falhou:`, e));
+            // evento sem horario_reset não tem fechamento automático (o helper assumiria 00:00)
+            if (!String(ev.horario_reset || '').slice(0, 5)) continue;
+            try {
+                // Início do turno em andamento (última ocorrência do horario_reset) e o dia do turno que ele encerra
+                const inicio = new Date(await inicioDiaOperacao(ev.id, agora));
+                const chave = await diaDoTurnoEncerrando(ev.id, inicio);
+
+                if (!(ev.id in this._ultimoResetPorEvento)) {
+                    // Primeira leitura desde que o processo subiu: o turno em andamento NÃO é zerado
+                    // (um reinício no meio do turno não pode zerar o evento)
+                    this._ultimoResetPorEvento[ev.id] = chave;
+                    continue;
+                }
+                if (this._ultimoResetPorEvento[ev.id] === chave) continue;
+
+                logger.info(`🔄 [CRON] Fechamento de turno do evento ${ev.nome} (turno de ${chave} encerrado às ${String(ev.horario_reset).slice(0, 5)})...`);
+                // Marca só depois do sucesso: se falhar, tenta de novo no próximo minuto
+                await this.resetTurnos(ev.id, { instante: inicio });
+                this._ultimoResetPorEvento[ev.id] = chave;
+            } catch (e) {
+                logger.error(`[CRON] resetTurnos(${ev.id}) falhou:`, e);
+            }
         }
     }
 
@@ -279,26 +296,31 @@ class CronController {
     }
 
     /**
-     * Fechamento de turno de um evento: saída forçada para quem ficou dentro, status volta para o
-     * próximo turno e o relatório do dia é arquivado (sempre, mesmo sem ninguém dentro).
+     * Fechamento de turno de um evento: zera o turno. Quem ficou dentro recebe saída forçada
+     * (CHECKOUT_FORCADO_CRON) com dia_civil do turno que ENCERROU, e o status volta a "autorizado".
+     * Não mexe em pulseira (o número continua com a pessoa até a devolução ou o descredenciamento)
+     * nem em pulseira_vinculos. Arquiva o relatório do turno encerrado só se `arquivar` for true
+     * (automático). O fechamento manual passa arquivar: false.
      * Sem evento: roda para todos os eventos ativos.
-     * @param {{ arquivar?: boolean, dataFechamento?: string }} opcoes
+     * @param {{ arquivar?: boolean, dataFechamento?: string, instante?: Date }} opcoes
+     *   instante: momento do fechamento (no automático, o início do turno, ou seja o horario_reset).
      */
-    async resetTurnos(eventoId = null, { arquivar = true, dataFechamento = null } = {}) {
+    async resetTurnos(eventoId = null, { arquivar = true, dataFechamento = null, instante = new Date() } = {}) {
         if (!eventoId) {
             const { data: eventos } = await supabase.from('eventos').select('id').eq('status', 'ativo');
             for (const ev of eventos || []) await this.resetTurnos(ev.id, { arquivar, dataFechamento });
             return;
         }
         try {
+            // Dia do turno que está sendo encerrado (o que começou no último horario_reset antes de `instante`)
+            const diaEncerrado = await diaDoTurnoEncerrando(eventoId, instante);
             const { dentro, statusParaZerar } = await this._pessoasDentro(eventoId);
-            logger.info(`🔄 [CRON] Fechamento de turno do evento ${eventoId}: ${dentro.length} pessoa(s) ainda dentro.`);
+            logger.info(`🔄 [CRON] Fechamento de turno do evento ${eventoId} (turno de ${diaEncerrado}): ${dentro.length} pessoa(s) ainda dentro.`);
 
             // 1. Saída forçada para quem ainda estava dentro (erro aqui interrompe: sem saída, o relatório mentiria)
+            //    dia_civil = dia do turno encerrado: a falta de saída aparece no relatório de origem como "a conferir"
             if (dentro.length > 0) {
-                const instante = new Date();
-                const agora = instante.toISOString();
-                const dia = diaDoAcesso(instante);
+                const agora = new Date().toISOString();
                 for (const lote of emLotes(dentro, 500)) {
                     const etapas = await etapasDasPessoas(supabase, lote);
                     const { error: logsErr } = await inserirSaidas(lote.map(pessoa_id => ({
@@ -309,24 +331,22 @@ class CronController {
                         observacao: 'CHECKOUT_FORCADO_CRON',
                         created_at: agora,
                         etapa: etapas.get(pessoa_id),
-                        dia_civil: dia
+                        dia_civil: diaEncerrado
                     })));
                     if (logsErr) throw logsErr;
                 }
             }
 
-            // 2. Status de entrada/saída volta a "autorizado" para o novo dia
-            //    E desvincula o número da pulseira das pessoas para que a numeração possa ser
-            //    reutilizada no novo turno/fase (o histórico fica salvo em pulseira_vinculos)
+            // 2. Status de entrada/saída volta a "autorizado" para o novo turno.
+            //    Pulseira NÃO é desvinculada (decisão da operação): o número segue com a pessoa.
             const pessoasIds = [...new Set([...statusParaZerar, ...dentro])];
             // em lotes: milhares de ids num .in() estouram o tamanho da URL
             for (const lote of emLotes(statusParaZerar, 200)) {
                 const { error: updateErr } = await supabase
                     .from('pessoas')
-                    .update({ 
-                        status_acesso: 'autorizado', 
-                        numero_pulseira: null,
-                        updated_at: new Date().toISOString() 
+                    .update({
+                        status_acesso: 'autorizado',
+                        updated_at: new Date().toISOString()
                     })
                     .in('id', lote);
                 if (updateErr) throw updateErr;
@@ -351,9 +371,9 @@ class CronController {
                 await documentoService.sincronizarStatusPessoa(null, id);
             });
 
-            // 3. Arquivar o fechamento do dia (o e-mail com a planilha sai no horário do relatório)
+            // 3. Arquivar o turno encerrado (só no automático; o e-mail com a planilha sai no horário do relatório)
             if (arquivar) {
-                await reportController.salvarFechamentoDiario(eventoId, dataFechamento || this._ontemLocal(), null, 'automatico');
+                await reportController.salvarFechamentoDiario(eventoId, dataFechamento || diaEncerrado, null, 'automatico');
             }
 
             logger.info(`✅ [CRON] Fechamento de turno do evento ${eventoId} concluído.`);
@@ -396,7 +416,8 @@ class CronController {
             if (evErr) throw evErr;
             if (!evento) return res.status(404).json({ error: 'Evento não encontrado.' });
 
-            await this.resetTurnos(evento.id);
+            // Manual só zera o turno: não arquiva o relatório (o automático do horario_reset arquiva)
+            await this.resetTurnos(evento.id, { arquivar: false });
             res.json({ success: true, message: 'Reset de turnos disparado com sucesso' });
         } catch (error) {
             res.status(500).json({ error: error.message });

@@ -53,7 +53,7 @@ jest.mock('../src/services/webhookDispatcher', () => ({ dispatchCheckin: jest.fn
 jest.mock('../src/modules/system/watchlist.service', () => ({ verificarCPF: jest.fn(async () => null), registrarAlerta: jest.fn(async () => {}) }));
 jest.mock('../src/modules/pulseiras/pulseira.service', () => ({ numeroBloqueado: jest.fn(async () => null), registrarEntrega: jest.fn() }));
 jest.mock('../src/modules/pulseiras/loteSelecao', () => ({
-    buscarLotesDaFaixa: jest.fn(async () => []),
+    buscarLotesDaFaixa: jest.fn(async () => [{ id: 'tp1', nome_tipo: 'Montagem' }, { id: 'tp2', nome_tipo: 'Evento' }]),
     escolherLote: jest.fn(async () => mockEscolha)
 }));
 jest.mock('../src/modules/checkin/checkin.service', () => ({

@@ -2,6 +2,7 @@ const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
 const { normalizarFuncao } = require('./documentoRequisitos.service');
 const empresaResumo = require('./empresaResumo.service');
+const { buscarTodos } = require('../../utils/buscarTodos');
 
 /**
  * Regra de remuneração padrão e regras por função ({ "FUNÇÃO": regra_id }), normalizadas.
@@ -218,12 +219,32 @@ class EmpresaController {
         }
     }
 
-    // Deletar empresa
+    // Deletar empresa (recusa se houver participante vinculado)
     async delete(req, res) {
         try {
             const { id } = req.params;
             const eventoId = eventoDaRequisicao(req, res);
             if (!eventoId) return;
+
+            // Participantes pelo vínculo direto (pessoas.empresa_id) e pelo vínculo do evento (pivô).
+            // Erro na contagem vira 500: sem saber quantos há, não exclui.
+            const [porEmpresa, porPivo] = await Promise.all([
+                buscarTodos(supabase.from('pessoas').select('id').eq('empresa_id', id)),
+                buscarTodos(supabase.from('pessoa_evento_empresa').select('pessoa_id').eq('empresa_id', id))
+            ]);
+            if (porEmpresa.error) throw porEmpresa.error;
+            if (porPivo.error) throw porPivo.error;
+            const participantes = new Set([
+                ...(porEmpresa.data || []).map(p => p.id),
+                ...(porPivo.data || []).map(v => v.pessoa_id)
+            ].filter(Boolean));
+            if (participantes.size > 0) {
+                const n = participantes.size;
+                return res.status(409).json({
+                    error: `Esta empresa tem ${n} participante(s) vinculado(s). Remova ou transfira os participantes antes de excluir.`
+                });
+            }
+
             const { data, error } = await supabase
                 .from('empresas')
                 .delete()
@@ -284,7 +305,8 @@ class EmpresaController {
                 return res.status(404).json({ error: 'Empresa não encontrada.' });
             }
 
-            const emailDestino = (req.body?.email || empresa.email || '').trim();
+            // Destino sempre o e-mail cadastrado da empresa (req.body.email é ignorado)
+            const emailDestino = (empresa.email || '').trim();
             if (!emailDestino) {
                 return res.status(400).json({ error: 'Esta empresa não possui e-mail cadastrado. Informe um e-mail no cadastro da empresa.' });
             }

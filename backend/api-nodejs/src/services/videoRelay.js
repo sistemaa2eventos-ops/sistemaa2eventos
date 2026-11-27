@@ -47,6 +47,7 @@ class VideoRelay {
                     throw err;
                 }
                 st.renovar = setInterval(() => comando().catch(err => logger.debug(`[Vídeo] renovação ${streamId}: ${err.message}`)), RENOVAR_MS);
+                if (st.renovar && typeof st.renovar.unref === 'function') st.renovar.unref();
                 logger.info(`🎥 [Vídeo] ${streamId} ao vivo pelo agente (${params.fps} fps, ${params.max_width}px)`);
             } else {
                 await st.pronto;

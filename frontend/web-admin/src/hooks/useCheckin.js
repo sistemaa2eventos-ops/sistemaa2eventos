@@ -20,6 +20,9 @@ const ehPulseiraDeOutra = (error) => {
         && (dados?.codigo === CODIGO_PULSEIRA_OUTRA || dados?.details?.codigo === CODIGO_PULSEIRA_OUTRA);
 };
 
+// Saída com pulseira de dia de operação anterior não devolvida: o servidor exige o motivo (400, nada gravado)
+const CODIGO_MOTIVO_PULSEIRA = 'MOTIVO_PULSEIRA_FORA_HORARIO';
+
 /**
  * useCheckin: Hook de controle para a operação de recepção (NZT).
  * Modificado para focar em Checkout Manual, QR Code e Pulseiras (Barcode).
@@ -34,6 +37,8 @@ export const useCheckin = (defaultMode, options = {}) => {
     const [checkinResult, setCheckinResult] = useState(null); // 'sucesso' | 'negado' | null
     // Saída de quem entrou num dia anterior: o servidor pede confirmação e o horário real
     const [turnoAnterior, setTurnoAnterior] = useState(null);
+    // Saída pedindo o motivo da pulseira fora do horário: { pendencia, repetir(motivo) }
+    const [motivoPulseira, setMotivoPulseira] = useState(null);
     // Entrada bloqueada (409 ENTRADA_BLOQUEADA): { pessoaId, nome, mensagem, liberavel, etapa, repetir, erroLiberacao, token }
     const [bloqueioEntrada, setBloqueioEntrada] = useState(null);
     const [liberandoReentrada, setLiberandoReentrada] = useState(false);
@@ -224,6 +229,23 @@ export const useCheckin = (defaultMode, options = {}) => {
             console.error('Erro ao carregar dados de check-in:', error);
         }
     }, [eventoId, defaultMode, logsTipo, carregarSessaoAtiva, carregarDispositivosDisponiveis]);
+
+    // 400 MOTIVO_PULSEIRA_FORA_HORARIO: abre o campo de motivo; a mesma saída é reenviada com o texto informado
+    const pedeMotivoPulseira = (error, repetir) => {
+        const dados = error?.response?.status === 400 ? error.response.data : null;
+        if (dados?.code !== CODIGO_MOTIVO_PULSEIRA) return false;
+        setMotivoPulseira({ pendencia: dados.pendencia || null, repetir });
+        return true;
+    };
+
+    const confirmarMotivoPulseira = async (motivo) => {
+        const pendente = motivoPulseira;
+        if (!pendente) return null;
+        setMotivoPulseira(null);
+        return pendente.repetir(motivo);
+    };
+
+    const cancelarMotivoPulseira = () => setMotivoPulseira(null);
 
     const pedeTurnoAnterior = (error) => {
         const det = error?.response?.status === 409 ? error.response.data?.details : null;
@@ -519,7 +541,7 @@ export const useCheckin = (defaultMode, options = {}) => {
     };
 
     // Leitura rápida direta (sem ficha): saída pelo rosto e entrada pelo rosto. Só o rosto passa pessoa.id.
-    const executarLeituraRapida = async (codigo, tipoForcado = null, metodoForcado = 'barcode', nomePessoa = null) => {
+    const executarLeituraRapida = async (codigo, tipoForcado = null, metodoForcado = 'barcode', nomePessoa = null, motivoSaida = null) => {
         if (!codigo || !eventoId) return { success: false, error: 'Código ou evento ausente' };
         const tipoFinal = tipoForcado || (defaultMode === 'checkout' ? 'checkout' : 'checkin');
         try {
@@ -529,7 +551,8 @@ export const useCheckin = (defaultMode, options = {}) => {
                 codigo,
                 tipo: tipoFinal,
                 area_id: areaId,
-                metodo: metodoForcado
+                metodo: metodoForcado,
+                ...(motivoSaida ? { motivo: motivoSaida } : {})
             }, 'leitor-rapido');
 
             if (res.status === 'local') {
@@ -580,6 +603,9 @@ export const useCheckin = (defaultMode, options = {}) => {
             }
         } catch (error) {
             if (pedeTurnoAnterior(error)) return { success: false, turnoAnterior: true };
+            if (tipoFinal === 'checkout' && pedeMotivoPulseira(error, (m) => executarLeituraRapida(codigo, tipoForcado, metodoForcado, nomePessoa, m))) {
+                return { success: false, motivoPulseira: true };
+            }
             // Entrada pelo rosto em área que controla entrada: aviso na tela (sem ficha), com liberação se couber
             if (tipoFinal === 'checkin' && pedeEntradaBloqueada(error, {
                 pessoaId: codigo,
@@ -602,7 +628,7 @@ export const useCheckin = (defaultMode, options = {}) => {
         }
     };
 
-    const performCheckin = async (metodo, extraValue = null, forcedPessoaId = null) => {
+    const performCheckin = async (metodo, extraValue = null, forcedPessoaId = null, motivoSaida = null) => {
         let targetPessoa = forcedPessoaId ? { id: forcedPessoaId } : selectedPessoa;
         const isCheckout = defaultMode === 'checkout' || operationMode === 'checkout';
 
@@ -628,7 +654,8 @@ export const useCheckin = (defaultMode, options = {}) => {
                 res = await localCheckinService.enviar('/access/pulseira/checkout', {
                     pessoa_id: targetPessoa.id,
                     numero_pulseira: extraValue,
-                    area_id: areaId
+                    area_id: areaId,
+                    ...(motivoSaida ? { motivo: motivoSaida } : {})
                 }, 'pulseira-checkout');
             } else if (metodo === 'pulseira') {
                 // CREDENCIAMENTO via BARCODE/PULSEIRA: endpoint que vincula áreas + auto check-in
@@ -701,6 +728,9 @@ export const useCheckin = (defaultMode, options = {}) => {
             return resultadoAcao;
         } catch (error) {
             if (pedeTurnoAnterior(error)) return { success: false, turnoAnterior: true };
+            if (isCheckout && pedeMotivoPulseira(error, (m) => performCheckin(metodo, extraValue, forcedPessoaId, m))) {
+                return { success: false, motivoPulseira: true };
+            }
             if (pedeEntradaBloqueada(error, { pessoaId: targetPessoa?.id, repetir: () => performCheckin(metodo, extraValue, forcedPessoaId) })) {
                 return { success: false, bloqueada: true };
             }
@@ -772,14 +802,15 @@ export const useCheckin = (defaultMode, options = {}) => {
 
     // Saída de quem está dentro (ficha, depois de ENTRADA_BLOQUEADA sem liberação). Usa a mesma chamada de
     // saída pela pulseira do Check-out, mas não fecha a ficha: o operador vê a confirmação e pode tentar a entrada de novo.
-    const registrarSaidaFicha = async (pessoaId, numeroPulseira) => {
+    const registrarSaidaFicha = async (pessoaId, numeroPulseira, motivoSaida = null) => {
         if (!pessoaId || !numeroPulseira) return { success: false, error: 'Pessoa sem pulseira em uso' };
         try {
             setManualSaving(true);
             const res = await localCheckinService.enviar('/access/pulseira/checkout', {
                 pessoa_id: pessoaId,
                 numero_pulseira: numeroPulseira,
-                area_id: areaId
+                area_id: areaId,
+                ...(motivoSaida ? { motivo: motivoSaida } : {})
             }, 'pulseira-checkout');
 
             if (res.status === 'invalido') return { success: false, error: res.message };
@@ -795,6 +826,7 @@ export const useCheckin = (defaultMode, options = {}) => {
             return { success: true, data: res.data?.data || res.data || null };
         } catch (error) {
             if (pedeTurnoAnterior(error)) return { success: false, turnoAnterior: true };
+            if (pedeMotivoPulseira(error, (m) => registrarSaidaFicha(pessoaId, numeroPulseira, m))) return { success: false, motivoPulseira: true };
             return { success: false, error: ehPulseiraDeOutra(error) ? MSG_PULSEIRA_OUTRA : (error.response?.data?.error || 'Não foi possível registrar a saída.') };
         } finally {
             setManualSaving(false);
@@ -837,6 +869,8 @@ export const useCheckin = (defaultMode, options = {}) => {
         selectedPessoa, setSelectedPessoa: handleSelectPessoa,
         // Saída de um dia anterior (CorrigirTurnoDialog): as telas já esperam estes campos
         turnoAnterior, confirmarTurnoAnterior, cancelarTurnoAnterior: () => setTurnoAnterior(null),
+        // Saída de pulseira fora do horário: pede o motivo e reenvia a mesma saída
+        motivoPulseira, confirmarMotivoPulseira, cancelarMotivoPulseira,
         checkinResult, setCheckinResult,
         // Entrada bloqueada (409): aviso na ficha e liberação da reentrada pelo controlador
         bloqueioEntrada, liberarReentrada, liberandoReentrada, cancelarBloqueioEntrada,

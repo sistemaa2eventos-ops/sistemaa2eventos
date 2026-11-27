@@ -17,6 +17,9 @@ jest.mock('../src/utils/dateUtils', () => ({
     getHojeLocal: () => '2026-11-24',
     getLimitesDiaLocalUTC: () => ({ start: '2026-11-24T03:00:00.000Z', end: '2026-11-25T02:59:59.999Z' }),
 }));
+jest.mock('../src/utils/diaOperacao', () => ({
+    inicioDiaOperacao: async () => '2026-11-24T03:00:00.000Z', // horario_reset 00:00 (dia civil)
+}));
 jest.mock('../src/modules/pulseiras/pulseira.service', () => ({
     buscarStatusPulseira: jest.fn(async () => mockStatusPulseira.valor),
 }));

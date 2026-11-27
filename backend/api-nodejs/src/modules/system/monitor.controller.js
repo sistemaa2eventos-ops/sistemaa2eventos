@@ -9,10 +9,7 @@ const os = require('os');
 const fsSync = require('fs');
 const fs = fsSync.promises;
 const path = require('path');
-const { getLimitesDiaLocalUTC, getHojeLocal } = require('../../utils/dateUtils');
-
-// Início do dia LOCAL em UTC (logs_acesso.created_at é gravado em UTC)
-const getInicioHojeLocal = () => getLimitesDiaLocalUTC().start;
+const { inicioDiaOperacao } = require('../../utils/diaOperacao');
 
 /** Arquivo de log combinado mais recente (o winston rotaciona para combined1.log, combined2.log...) */
 const arquivoLogAtual = () => {
@@ -47,6 +44,9 @@ class MonitorController {
             const emCache = cacheService.get(chaveCache);
             if (emCache) return res.json(emCache);
 
+            // Início do dia de operação do evento (horario_reset; 00:00 por padrão). logs_acesso.created_at é UTC.
+            const inicioDia = await inicioDiaOperacao(evento_id);
+
             // Buscar estatísticas em paralelo (os dois lotes rodam ao mesmo tempo)
             const lote1 = Promise.all([
                 // Total de empresas
@@ -65,7 +65,7 @@ class MonitorController {
                     .select('*', { count: 'exact', head: true })
                     .eq('evento_id', evento_id)
                     .eq('tipo', 'checkin')
-                    .gte('created_at', getInicioHojeLocal()),
+                    .gte('created_at', inicioDia),
 
                 // Dispositivos online
                 supabase.from('dispositivos_acesso')
@@ -111,7 +111,7 @@ class MonitorController {
                 supabase.from('pessoas').select('*', { count: 'exact', head: true }).eq('evento_id', evento_id).eq('status_acesso', 'pendente'),
                 supabase.from('pessoas').select('*', { count: 'exact', head: true }).eq('evento_id', evento_id).eq('status_acesso', 'checkin_feito'),
                 supabase.from('pessoas').select('*', { count: 'exact', head: true }).eq('evento_id', evento_id).eq('status_acesso', 'checkout_feito'),
-                supabase.from('logs_acesso').select('*', { count: 'exact', head: true }).eq('evento_id', evento_id).eq('tipo', 'checkout').gte('created_at', getInicioHojeLocal()),
+                supabase.from('logs_acesso').select('*', { count: 'exact', head: true }).eq('evento_id', evento_id).eq('tipo', 'checkout').gte('created_at', inicioDia),
 
                 // Lista de empresas do evento
                 supabase.from('empresas')
@@ -129,7 +129,7 @@ class MonitorController {
                     .select('id, pessoa_id, tipo, created_at')
                     .eq('evento_id', evento_id)
                     .in('tipo', ['checkin', 'checkout'])
-                    .gte('created_at', getInicioHojeLocal())
+                    .gte('created_at', inicioDia)
                     .order('created_at', { ascending: false })),
 
                 // Dispositivos e terminais de acesso
@@ -206,7 +206,15 @@ class MonitorController {
                 }
             });
 
-            // Contar presentes no evento HOJE (quem tem último movimento de HOJE como check-in)
+            // Presentes: último movimento do dia de operação é check-in (mesmo critério da fiscalização).
+            // Conta todas as pessoas do evento, com ou sem empresa.
+            const idsPessoasEvento = new Set(pessoasList.map(p => p.id));
+            let totalPresentesHoje = 0;
+            for (const [pessoaId, tipoUltimo] of ultimoMovimentoPorPessoa) {
+                if (tipoUltimo === 'checkin' && idsPessoasEvento.has(pessoaId)) totalPresentesHoje += 1;
+            }
+
+            // Contagem por empresa (mesmo critério)
             pessoasList.forEach(p => {
                 if (p.empresa_id) {
                     const empData = empresaContagem.get(p.empresa_id);
@@ -222,7 +230,6 @@ class MonitorController {
             });
 
             const empresasMetricas = Array.from(empresaContagem.values()).sort((a, b) => b.cadastros - a.cadastros);
-            const totalPresentesHoje = empresasMetricas.reduce((acc, curr) => acc + (curr.presentes || 0), 0);
 
             // Montar lista de terminais unificada
             let terminaisFormatados = [];
@@ -748,37 +755,27 @@ class MonitorController {
                 return res.status(400).json({ error: 'Falta vincular evento ativo para reset diário.' });
             }
 
-            // Só o evento ativo (antes zerava todos os eventos do sistema). O arquivamento é o de
-            // hoje, logo abaixo — não o de ontem, que o fechamento automático já cuida.
+            // Só o evento ativo (antes zerava todos os eventos do sistema). Manual só zera o turno:
+            // não arquiva o relatório (o automático do horario_reset arquiva o turno encerrado).
             const cronController = require('../events/cron.controller');
             await cronController.resetTurnos(evento_id, { arquivar: false });
             cacheService.delete(`dashboard_${evento_id}`); // o painel já mostra os números zerados
 
-            // Gerar e salvar snapshot do relatório diário imediatamente ao clicar no reset diário
-            let fechamentoResultado = null;
-            try {
-                const reportController = require('../reports/report.controller');
-                const hojeLocal = getHojeLocal(); // fuso do evento (toISOString já virava o dia às 21h)
-                fechamentoResultado = await reportController.salvarFechamentoDiario(evento_id, hojeLocal, req.user?.id, 'manual');
-            } catch (repErr) {
-                logger.error('[Reset Diário] Erro ao consolidar relatório diário no reset manual:', repErr);
-            }
-
-            logger.info(`🔄 Reset diário executado no evento ${evento_id} pelo usuário ${req.user?.id || 'Admin'}`);
+            logger.info(`🔄 Reset diário (só zera o turno) executado no evento ${evento_id} pelo usuário ${req.user?.id || 'Admin'}`);
 
             const websocketService = require('../../services/websocketService');
             websocketService.emit('reset_diario_executado', {
                 evento_id,
                 hora: new Date().toISOString(),
-                fechamento_id: fechamentoResultado?.saved?.id || null,
-                totais: fechamentoResultado?.totais || null
+                fechamento_id: null,
+                totais: null
             }, evento_id);
 
-            res.json({ 
-                success: true, 
-                message: 'Reset diário concluído com sucesso. Relatório diário emitido e arquivado.',
-                totais: fechamentoResultado?.totais || null,
-                snapshot_id: fechamentoResultado?.saved?.id || null
+            res.json({
+                success: true,
+                message: 'Turno zerado. Quem estava dentro recebeu saída automática marcada como "a conferir". As pulseiras continuam com as pessoas até a devolução ou o descredenciamento.',
+                totais: null,
+                snapshot_id: null
             });
         } catch (error) {
             logger.error('Erro no reset diário:', error);

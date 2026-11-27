@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const empresaController = require('./empresa.controller');
-const { authenticate, authorize } = require('../../middleware/auth');
+const { authenticate, authorize, checkPermission } = require('../../middleware/auth');
 const { requireEvent } = require('../../middleware/eventMiddleware');
 const { bloquearSeModuloDesligado } = require('../../middleware/moduloDesligado');
 
@@ -28,14 +28,14 @@ router.post('/:id/portal-acesso/chave', authorize('master', 'admin', 'supervisor
 
 router.get('/:id', empresaController.getById);
 router.get('/:id/participantes-resumo', empresaController.participantesResumo);
-router.post('/', authorize('master', 'admin', 'supervisor', 'operador'), moduloEmpresas, empresaController.create);
-router.put('/:id', authorize('master', 'admin', 'supervisor', 'operador'), moduloEmpresas, empresaController.update);
-router.delete('/:id', authorize('master', 'admin'), empresaController.delete);
+router.post('/', authorize('master', 'admin', 'supervisor', 'operador'), moduloEmpresas, checkPermission('empresas', 'escrita'), empresaController.create);
+router.put('/:id', authorize('master', 'admin', 'supervisor', 'operador'), moduloEmpresas, checkPermission('empresas', 'escrita'), empresaController.update);
+router.delete('/:id', authorize('master', 'admin'), checkPermission('empresas', 'escrita'), empresaController.delete);
 
 // Gerar novo token de cadastro (Admin/Supervisor)
 router.post('/:id/refresh-token', authorize('master', 'admin', 'supervisor'), moduloEmpresas, empresaController.refreshToken);
 
 // Enviar convite por e-mail para o responsável da empresa (link de colaboradores + link de documentação da empresa)
-router.post('/:id/send-invite', authorize('master', 'admin', 'supervisor', 'operador'), moduloEmpresas, empresaController.sendInviteEmail);
+router.post('/:id/send-invite', authorize('master', 'admin', 'supervisor'), moduloEmpresas, empresaController.sendInviteEmail);
 
 module.exports = router;

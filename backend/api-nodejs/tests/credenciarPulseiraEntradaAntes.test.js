@@ -52,7 +52,7 @@ jest.mock('../src/modules/pulseiras/pulseira.service', () => ({
     registrarEntrega: jest.fn()
 }));
 jest.mock('../src/modules/pulseiras/loteSelecao', () => ({
-    buscarLotesDaFaixa: jest.fn(async () => []),
+    buscarLotesDaFaixa: jest.fn(async () => [{ id: 'tp1', nome_tipo: 'Montagem', fase: 'montagem', pulseira_areas_permitidas: [{ area_id: 'a1', evento_areas: { nome_area: 'Palco' } }] }]),
     escolherLote: jest.fn(async () => ({ lote: null }))
 }));
 jest.mock('../src/modules/checkin/codigoLeitor', () => ({ buscarPessoaPorCodigo: jest.fn() }));

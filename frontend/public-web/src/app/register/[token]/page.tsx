@@ -9,16 +9,12 @@ import api from '@/lib/api';
  * Interceptador de Registro Público: Valida o token do convite antes de exibir o formulário.
  */
 function RegisterPage({ token }: { token: string }) {
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState<boolean>(Boolean(token));
+    const [error, setError] = useState<string | null>(!token ? 'Identificador de convite ausente.' : null);
     const [data, setData] = useState<any>(null);
 
     useEffect(() => {
-        if (!token) {
-            setError('Identificador de convite ausente.');
-            setLoading(false);
-            return;
-        }
+        if (!token) return;
 
         const fetchData = async () => {
             try {

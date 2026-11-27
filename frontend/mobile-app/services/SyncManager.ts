@@ -150,12 +150,29 @@ export const SyncManager = {
             body: JSON.stringify(body)
         });
 
-        // 200 = sucesso, 400/403 = "já feito" ou "bloqueado" — não vale retry
-        if (response.ok || response.status === 400 || response.status === 403) {
+        // 200/201 = sucesso absoluto
+        if (response.ok) {
             return { success: true };
         }
 
         const text = await response.text();
-        return { success: false, error: `HTTP ${response.status}: ${text}` };
+        let jsonRes: any = null;
+        try { jsonRes = JSON.parse(text); } catch {}
+
+        // Idempotência: só remove da fila se o servidor expressamente confirmar que já foi registrado
+        const isDuplicate = response.status === 409 || 
+            (response.status === 400 && (
+                jsonRes?.code === 'ALREADY_CHECKED_IN' || 
+                jsonRes?.error?.toLowerCase().includes('já realizado') || 
+                jsonRes?.error?.toLowerCase().includes('já está dentro') ||
+                jsonRes?.error?.toLowerCase().includes('já fez check-in')
+            ));
+
+        if (isDuplicate) {
+            console.log(`ℹ️ Ação ${action.sync_id} já registrada no servidor (${response.status}).`);
+            return { success: true };
+        }
+
+        return { success: false, error: `HTTP ${response.status}: ${jsonRes?.error || text}` };
     }
 };

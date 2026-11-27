@@ -1,7 +1,7 @@
 import { cores, tom } from '../../styles/tokens';
 import React, { useState, useEffect } from 'react';
-import { Box, AppBar, Toolbar, IconButton, useTheme, useMediaQuery, Avatar, Typography, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
-import { Menu as MenuIcon, Event as EventIcon, LockOpen as LockOpenIcon, Logout as LogoutIcon, Fullscreen as FullscreenIcon } from '@mui/icons-material';
+import { Box, AppBar, Toolbar, IconButton, useTheme, useMediaQuery, Avatar, Typography, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Alert, CircularProgress, Stack } from '@mui/material';
+import { Menu as MenuIcon, Event as EventIcon, LockOpen as LockOpenIcon, Logout as LogoutIcon, Lock as LockIcon } from '@mui/icons-material';
 import Sidebar, { LARGURA_MENU, LARGURA_MENU_RECOLHIDO } from './Sidebar';
 import UsuarioChip from './UsuarioChip';
 import NotificationBell from './NotificationBell';
@@ -9,6 +9,7 @@ import AjudaContextual from '../ajuda/AjudaContextual';
 import nztEmblem from '../../assets/images/nzt-emblem.png';
 import { useSystemBranding } from '../../hooks/useSystemBranding';
 import { useAuth } from '../../contexts/AuthContext';
+import api from '../../services/api';
 
 const MainLayout = ({ children }) => {
     const { user, logout } = useAuth();
@@ -31,8 +32,14 @@ const MainLayout = ({ children }) => {
     const isOperador = user?.nivel_acesso === 'operador';
     const modoTela = isOperador ? (user?.permissions?.modo_tela || 'normal') : 'normal';
     const modoKioskAtivo = isOperador && (modoTela === 'quiosque' || modoTela === 'tela_cheia');
-    const [kioskLiberadoTemp, setKioskLiberadoTemp] = useState(false);
+    const [kioskLiberadoTemp, setKioskLiberadoTemp] = useState(() => {
+        try { return sessionStorage.getItem('quiosque_liberado') === '1'; } catch { return false; }
+    });
     const [modalSairKiosk, setModalSairKiosk] = useState(false);
+    const [solicitandoAuthSupervisor, setSolicitandoAuthSupervisor] = useState(false);
+    const [credSupervisor, setCredSupervisor] = useState({ email: '', senha: '' });
+    const [erroSupervisor, setErroSupervisor] = useState('');
+    const [enviandoSupervisor, setEnviandoSupervisor] = useState(false);
 
     useEffect(() => {
         const deveAplicarQuiosque = modoKioskAtivo && !kioskLiberadoTemp;
@@ -45,6 +52,27 @@ const MainLayout = ({ children }) => {
             document.body.classList.remove('modo-quiosque');
         };
     }, [modoKioskAtivo, kioskLiberadoTemp]);
+
+    const handleDesbloquearSupervisor = async (e) => {
+        e?.preventDefault();
+        setEnviandoSupervisor(true);
+        setErroSupervisor('');
+        try {
+            await api.post('/auth/quiosque/desbloquear', {
+                email: credSupervisor.email,
+                senha: credSupervisor.senha
+            }, { hideDefaultError: true, timeout: 15000 });
+            try { sessionStorage.setItem('quiosque_liberado', '1'); } catch {}
+            setKioskLiberadoTemp(true);
+            setModalSairKiosk(false);
+            setSolicitandoAuthSupervisor(false);
+            setCredSupervisor({ email: '', senha: '' });
+        } catch (err) {
+            setErroSupervisor(err.response?.data?.error || 'Credenciais inválidas de administrador ou supervisor.');
+        } finally {
+            setEnviandoSupervisor(false);
+        }
+    };
 
     useEffect(() => {
         const syncEvento = () => {
@@ -214,7 +242,11 @@ const MainLayout = ({ children }) => {
                 {/* Diálogo de controle de saída do Quiosque */}
                 <Dialog 
                     open={modalSairKiosk} 
-                    onClose={() => setModalSairKiosk(false)}
+                    onClose={() => {
+                        setModalSairKiosk(false);
+                        setSolicitandoAuthSupervisor(false);
+                        setErroSupervisor('');
+                    }}
                     PaperProps={{
                         sx: {
                             bgcolor: cores.superficie,
@@ -222,50 +254,109 @@ const MainLayout = ({ children }) => {
                             borderRadius: 3,
                             color: cores.textoForte,
                             p: 1,
-                            maxWidth: 380
+                            maxWidth: 400
                         }
                     }}
                 >
                     <DialogTitle sx={{ color: cores.primaria, fontWeight: 700, fontSize: '1rem', pb: 1 }}>
-                        Modo {modoTela === 'quiosque' ? 'Quiosque' : 'Tela Cheia'}
+                        Modo {modoTela === 'quiosque' ? 'Quiosque (Protegido)' : 'Tela Cheia'}
                     </DialogTitle>
                     <DialogContent sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem' }}>
-                        Deseja liberar temporariamente o menu de navegação ou encerrar a sessão deste posto?
+                        {modoTela === 'quiosque' && solicitandoAuthSupervisor ? (
+                            <Box component="form" onSubmit={handleDesbloquearSupervisor} sx={{ mt: 1 }}>
+                                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', mb: 2 }}>
+                                    Informe a conta de um Administrador ou Supervisor para liberar a navegação:
+                                </Typography>
+                                <Stack spacing={1.5}>
+                                    {erroSupervisor && <Alert severity="error">{erroSupervisor}</Alert>}
+                                    <TextField
+                                        label="E-mail"
+                                        type="email"
+                                        size="small"
+                                        fullWidth
+                                        required
+                                        autoFocus
+                                        value={credSupervisor.email}
+                                        onChange={(e) => setCredSupervisor(c => ({ ...c, email: e.target.value }))}
+                                        sx={{ input: { color: cores.textoForte } }}
+                                    />
+                                    <TextField
+                                        label="Senha"
+                                        type="password"
+                                        size="small"
+                                        fullWidth
+                                        required
+                                        value={credSupervisor.senha}
+                                        onChange={(e) => setCredSupervisor(c => ({ ...c, senha: e.target.value }))}
+                                        sx={{ input: { color: cores.textoForte } }}
+                                    />
+                                    <Button
+                                        type="submit"
+                                        fullWidth
+                                        variant="contained"
+                                        disabled={enviandoSupervisor}
+                                        sx={{ bgcolor: cores.primaria, color: '#000', fontWeight: 700, mt: 1 }}
+                                    >
+                                        {enviandoSupervisor ? <CircularProgress size={20} color="inherit" /> : 'Confirmar e Liberar'}
+                                    </Button>
+                                    <Button
+                                        fullWidth
+                                        variant="text"
+                                        onClick={() => setSolicitandoAuthSupervisor(false)}
+                                        sx={{ color: 'rgba(255,255,255,0.6)', textTransform: 'none' }}
+                                    >
+                                        Voltar às opções
+                                    </Button>
+                                </Stack>
+                            </Box>
+                        ) : (
+                            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem' }}>
+                                {modoTela === 'quiosque'
+                                    ? 'Este terminal está bloqueado em modo quiosque. Liberar o menu requer autorização de supervisor.'
+                                    : 'Deseja exibir temporariamente o menu de navegação ou encerrar a sessão deste posto?'}
+                            </Typography>
+                        )}
                     </DialogContent>
-                    <DialogActions sx={{ px: 3, pb: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                        <Button
-                            fullWidth
-                            variant="outlined"
-                            startIcon={<MenuIcon />}
-                            onClick={() => {
-                                setKioskLiberadoTemp(true);
-                                setModalSairKiosk(false);
-                            }}
-                            sx={{ borderColor: tom(cores.primaria, 0.4), color: cores.primaria }}
-                        >
-                            Exibir Menu Temporariamente
-                        </Button>
-                        <Button
-                            fullWidth
-                            variant="contained"
-                            color="error"
-                            startIcon={<LogoutIcon />}
-                            onClick={() => {
-                                setModalSairKiosk(false);
-                                logout();
-                            }}
-                            sx={{ bgcolor: cores.erro }}
-                        >
-                            Encerrar Sessão (Logout)
-                        </Button>
-                        <Button
-                            fullWidth
-                            onClick={() => setModalSairKiosk(false)}
-                            sx={{ color: 'rgba(255,255,255,0.5)', textTransform: 'none' }}
-                        >
-                            Continuar no Modo Quiosque
-                        </Button>
-                    </DialogActions>
+                    {!solicitandoAuthSupervisor && (
+                        <DialogActions sx={{ px: 3, pb: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            <Button
+                                fullWidth
+                                variant="outlined"
+                                startIcon={modoTela === 'quiosque' ? <LockIcon /> : <MenuIcon />}
+                                onClick={() => {
+                                    if (modoTela === 'quiosque') {
+                                        setSolicitandoAuthSupervisor(true);
+                                    } else {
+                                        setKioskLiberadoTemp(true);
+                                        setModalSairKiosk(false);
+                                    }
+                                }}
+                                sx={{ borderColor: tom(cores.primaria, 0.4), color: cores.primaria }}
+                            >
+                                {modoTela === 'quiosque' ? 'Autenticar e Liberar Menu' : 'Exibir Menu Temporariamente'}
+                            </Button>
+                            <Button
+                                fullWidth
+                                variant="contained"
+                                color="error"
+                                startIcon={<LogoutIcon />}
+                                onClick={() => {
+                                    setModalSairKiosk(false);
+                                    logout();
+                                }}
+                                sx={{ bgcolor: cores.erro }}
+                            >
+                                Encerrar Sessão (Logout)
+                            </Button>
+                            <Button
+                                fullWidth
+                                onClick={() => setModalSairKiosk(false)}
+                                sx={{ color: 'rgba(255,255,255,0.5)', textTransform: 'none' }}
+                            >
+                                Continuar no Modo Quiosque
+                            </Button>
+                        </DialogActions>
+                    )}
                 </Dialog>
             </Box>
         </Box>

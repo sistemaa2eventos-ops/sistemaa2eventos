@@ -12,6 +12,7 @@ const { gerarHashSenha, verificarSenha } = require('../producao/producaoPortalAu
  */
 
 const ESCOPO = 'portal_empresa';
+const METODOS_DE_ESCRITA = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const VALIDADE_TOKEN = '12h';
 // Sem letras/números que se confundem (O/0, I/1/L)
 const ALFABETO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -107,7 +108,7 @@ async function autenticarEmpresa(req, res, next) {
 
     try {
         const { data: empresa, error } = await supabase.from('empresas')
-            .select('id, evento_id, nome, ativo, portal_chave_gerada_em')
+            .select('id, evento_id, nome, ativo, portal_chave_gerada_em, eventos(status)')
             .eq('id', dados.empresa_id).maybeSingle();
         if (error) throw error;
         const chaveTrocada = !empresa?.portal_chave_gerada_em
@@ -117,6 +118,10 @@ async function autenticarEmpresa(req, res, next) {
         }
         if (empresa.ativo === false) {
             return res.status(403).json({ error: 'Empresa desativada neste evento. Fale com a organização.' });
+        }
+        // Evento encerrado: o portal só consulta (escrita bloqueada; GET segue)
+        if (empresa.eventos?.status === 'encerrado' && METODOS_DE_ESCRITA.has(req.method)) {
+            return res.status(403).json({ error: 'Evento encerrado: o portal está somente para consulta.' });
         }
         req.empresaPortal = { id: empresa.id, evento_id: empresa.evento_id, nome: empresa.nome };
         return next();

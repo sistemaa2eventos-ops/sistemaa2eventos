@@ -132,24 +132,44 @@ class ExcelController {
                         companyCache.set(cacheKey, empresaId);
                     }
 
-                    // 4. Inserir Colaborador (Status PENDENTE para análise)
-                    const { code } = await qrGenerator.generate(cpf);
+                    // 4. CPF já existe no evento: atualiza só os dados cadastrais. Status, bloqueio, QR, pulseira
+                    //    e liberações ficam como estão. CPF novo entra como PENDENTE para análise.
+                    const { data: existente, error: findPessoaError } = await supabase
+                        .from('pessoas').select('id').eq('evento_id', eventoId).eq('cpf', cpf).maybeSingle();
+                    if (findPessoaError) throw findPessoaError;
 
-                    const { error: funcError } = await supabase.from('pessoas').upsert({
-                        nome,
-                        cpf,
-                        nome_mae: nome_mae || 'Pendente Análise',
-                        data_nascimento: data_nasc_raw ? new Date(data_nasc_raw).toISOString().split('T')[0] : null,
-                        funcao: funcao || 'OPERACIONAL',
-                        empresa_id: empresaId,
-                        evento_id: eventoId,
-                        status_acesso: 'pendente', // Manda para análise manual
-                        origem_cadastro: 'importacao',
-                        qr_code: code
-                    }, { onConflict: 'cpf, evento_id' });
+                    if (existente) {
+                        const mudancas = {
+                            nome_completo: nome,
+                            empresa_id: empresaId,
+                            updated_at: new Date().toISOString()
+                        };
+                        if (nome_mae) mudancas.nome_mae = nome_mae;
+                        if (data_nasc_raw) mudancas.data_nascimento = new Date(data_nasc_raw).toISOString().split('T')[0];
+                        if (funcao) mudancas.funcao = funcao;
 
-                    if (funcError) throw funcError;
-                    importedCount++;
+                        const { error: updError } = await supabase.from('pessoas').update(mudancas).eq('id', existente.id);
+                        if (updError) throw updError;
+                        importedCount++;
+                    } else {
+                        const { code } = await qrGenerator.generate(cpf);
+
+                        const { error: insError } = await supabase.from('pessoas').insert([{
+                            nome_completo: nome,
+                            cpf,
+                            nome_mae: nome_mae || 'Pendente Análise',
+                            data_nascimento: data_nasc_raw ? new Date(data_nasc_raw).toISOString().split('T')[0] : null,
+                            funcao: funcao || 'OPERACIONAL',
+                            empresa_id: empresaId,
+                            evento_id: eventoId,
+                            status_acesso: 'pendente', // Manda para análise manual
+                            origem_cadastro: 'importacao',
+                            qr_code: code
+                        }]);
+
+                        if (insError) throw insError;
+                        importedCount++;
+                    }
 
                 } catch (e) {
                     errors.push(`Linha ${rowNumber}: Erro inesperado - ${e.message}`);

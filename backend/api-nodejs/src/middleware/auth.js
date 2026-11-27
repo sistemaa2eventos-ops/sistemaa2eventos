@@ -264,6 +264,24 @@ function checkPermission(recurso, acao) {
             return next();
         }
 
+        // --- ENFORCEMENT DE TRAVAS GRANULARES DE PERFIS ---
+        if (acao === 'escrita') {
+            const perms = req.user?.permissions || {};
+            const regras = perms.regras || perms;
+            if (regras.bloquear_edicao_dados === true) {
+                logger.warn(`Acesso bloqueado: Operador '${req.user.id}' com trava 'bloquear_edicao_dados' ativa.`);
+                return res.status(403).json({ error: 'Acesso negado: Perfil configurado com bloqueio de edição de dados.' });
+            }
+            if ((recurso === 'pessoas' || recurso === 'participantes') && regras.participantes_somente_leitura === true) {
+                logger.warn(`Acesso bloqueado: Operador '${req.user.id}' com trava 'participantes_somente_leitura' ativa.`);
+                return res.status(403).json({ error: 'Acesso negado: Perfil configurado como somente leitura para participantes.' });
+            }
+            if (recurso === 'empresas' && regras.empresas_somente_leitura === true) {
+                logger.warn(`Acesso bloqueado: Operador '${req.user.id}' com trava 'empresas_somente_leitura' ativa.`);
+                return res.status(403).json({ error: 'Acesso negado: Perfil configurado como somente leitura para empresas.' });
+            }
+        }
+
         const _safe = (v) => (v && v !== 'undefined' && v !== 'null') ? v : null;
         const requestedEventId = _safe(req.headers['x-evento-id']) || _safe(req.query.evento_id) || _safe(req.body?.evento_id);
         const tenantId = requestedEventId || _safe(req.user.evento_id) || _safe(req.tenantId);

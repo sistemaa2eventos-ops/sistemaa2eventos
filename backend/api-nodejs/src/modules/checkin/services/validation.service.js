@@ -2,7 +2,8 @@ const { supabase } = require('../../../config/supabase');
 const { buscarTodos } = require('../../../utils/buscarTodos');
 const logger = require('../../../services/logger');
 const cacheService = require('../../../services/cacheService');
-const { getHojeLocal, getInicioHojeLocal, getLimitesDiaLocalUTC, ultimaOcorrenciaHorario, TIMEZONE } = require('../../../utils/dateUtils');
+const { getHojeLocal, getInicioHojeLocal, ultimaOcorrenciaHorario, TIMEZONE } = require('../../../utils/dateUtils');
+const { inicioDiaOperacao } = require('../../../utils/diaOperacao');
 const { bloqueioDeEntrada } = require('./entradaEtapa');
 
 // Evento com o mesmo cache de 15 s do requireEvent (antes: 2 consultas a `eventos` por acesso)
@@ -98,16 +99,17 @@ class ValidationService {
     }
 
     async getRealtimeStatsInternal(evento_id) {
+        // Quota é cadastrada por data civil (quotas_diarias.data): mantém o dia local
         const hoje = getHojeLocal();
-        // created_at é gravado em UTC: o dia local (America/Sao_Paulo) vai de 03:00Z a 02:59:59Z
-        const { start: startOfDay, end: endOfDay } = getLimitesDiaLocalUTC(hoje);
+        // Dia de operação do evento: desde o horario_reset (00:00 por padrão). created_at é UTC.
+        const startOfDay = await inicioDiaOperacao(evento_id);
 
         // Contagens exatas feitas no banco (head: true), todas em paralelo.
         // Antes: 6 consultas em sequência e os logs do dia trazidos para a memória —
         // e o PostgREST corta em 1000 linhas, o que zerava/errava os números em dias grandes.
         const contarLogs = (filtro) => {
             let q = supabase.from('logs_acesso').select('id', { count: 'exact', head: true })
-                .eq('evento_id', evento_id).gte('created_at', startOfDay).lte('created_at', endOfDay);
+                .eq('evento_id', evento_id).gte('created_at', startOfDay);
             return filtro(q);
         };
 
@@ -285,7 +287,8 @@ class ValidationService {
         if (pessoa.status_acesso === 'pendente' && !isHumanOperator && !liberadaManualmente) {
             throw this._buildError('Cadastro Incompleto (Pendente)');
         }
-        if (pessoa.status_acesso === 'bloqueado' && !isHumanOperator) {
+        // Expulso é bloqueio (mesmo tratamento de bloqueado): só o operador (decisão humana) pode passar
+        if ((pessoa.status_acesso === 'bloqueado' || pessoa.status_acesso === 'expulso') && !isHumanOperator) {
             throw this._buildError('Pessoa Bloqueada');
         }
         if (pessoa.status_acesso === 'recusado' && !isHumanOperator && !liberadaManualmente) {

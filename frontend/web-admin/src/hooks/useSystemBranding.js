@@ -109,10 +109,13 @@ export function useSystemBranding() {
     const [branding, setBranding] = useState(lerCacheLocal);
 
     useEffect(() => {
-        let montado = true;
         aplicarTituloDocumento(branding.system_name);
         if (branding.emblem_url) aplicarFavicon(branding.emblem_url);
         aplicarModoPerformance(branding.performance_mode_enabled);
+    }, [branding.system_name, branding.emblem_url, branding.performance_mode_enabled]);
+
+    useEffect(() => {
+        let montado = true;
 
         const aoAtualizar = (ev) => {
             if (!montado) return;

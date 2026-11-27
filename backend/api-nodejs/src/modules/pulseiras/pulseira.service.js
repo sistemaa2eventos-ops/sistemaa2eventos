@@ -1,7 +1,8 @@
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
-const { limiteFiltro, getHojeLocal, getLimitesDiaLocalUTC } = require('../../utils/dateUtils');
+const { limiteFiltro } = require('../../utils/dateUtils');
 const { buscarTodos, buscarPorIdsEmLotes } = require('../../utils/buscarTodos');
+const { inicioDiaOperacao } = require('../../utils/diaOperacao');
 const { buscarLotesDaFaixa, escolherLote } = require('./loteSelecao');
 
 // logs_acesso.created_at é UTC gravado sem fuso
@@ -324,6 +325,55 @@ class PulseiraService {
     }
 
     /**
+     * Saída real (check-out): devolve a pulseira em uso. Não exige vínculo aberto (dados antigos): se a
+     * pessoa tem número gravado, zera o número e encerra o vínculo aberto como devolvida.
+     * Saída com instante ANTERIOR à entrega atual (reenvio offline de uma saída antiga) não libera:
+     * a pulseira atual é de outra passagem. Fecha o vínculo antes de limpar a pessoa (o trigger não grava "desvinculada").
+     * @returns {{ liberada: boolean, numero_pulseira: string|null, motivo?: string }}
+     */
+    async liberarNaSaida(eventoId, pessoaId, { ocorridaEm = new Date(), usuarioId = null } = {}) {
+        const { data: pessoa, error: pErr } = await supabase.from('pessoas')
+            .select('id, numero_pulseira')
+            .eq('id', pessoaId)
+            .eq('evento_id', eventoId)
+            .maybeSingle();
+        if (pErr) throw pErr;
+        const numero = String(pessoa?.numero_pulseira ?? '').trim();
+        if (!numero) return { liberada: false, numero_pulseira: null };
+
+        const { data: aberto, error: aErr } = await supabase.from('pulseira_vinculos')
+            .select('id, entregue_em')
+            .eq('evento_id', eventoId)
+            .eq('pessoa_id', pessoaId)
+            .is('encerrado_em', null)
+            .order('entregue_em', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        if (aErr && !tabelaAusente(aErr)) throw aErr;
+
+        // 60 s tolerados entre o relógio do banco (entregue_em) e o do servidor (ocorridaEm)
+        if (aberto && Date.parse(aberto.entregue_em) > new Date(ocorridaEm).getTime() + 60000) {
+            return { liberada: false, numero_pulseira: null, motivo: 'saida_anterior_a_entrega' };
+        }
+
+        const agora = new Date().toISOString();
+        if (aberto) {
+            const { error: vErr } = await supabase.from('pulseira_vinculos')
+                .update({ encerrado_em: agora, motivo_encerramento: 'devolvida', encerrado_por: usuarioId })
+                .eq('id', aberto.id);
+            if (vErr) throw vErr;
+        }
+
+        const { error: upErr } = await supabase.from('pessoas')
+            .update({ numero_pulseira: null, updated_at: agora })
+            .eq('id', pessoaId)
+            .eq('evento_id', eventoId)
+            .eq('numero_pulseira', pessoa.numero_pulseira);
+        if (upErr) throw upErr;
+        return { liberada: true, numero_pulseira: numero };
+    }
+
+    /**
      * Número trocado ou perdido no mesmo lote (tipo de pulseira) do evento. Usa o cliente de serviço:
      * a tabela não tem política de RLS para o cliente do operador.
      * @returns {{ motivo: string }|null} o motivo do bloqueio, ou null se o número está livre
@@ -438,6 +488,21 @@ class PulseiraService {
         const numero = String(ultima.numero_pulseira).trim();
         const entradaIso = new Date(instante(ultima.created_at)).toISOString();
 
+        // Só vale o número que a pessoa tem em vínculo ABERTO: anulação e correção fecham o número antigo,
+        // e o log da entrada ainda mostra o número errado. Pessoa sem nenhum vínculo (dados antigos,
+        // sem a migration) mantém o comportamento anterior.
+        const { data: vinculosPessoa, error: vErr } = await supabase.from('pulseira_vinculos')
+            .select('numero_pulseira, encerrado_em')
+            .eq('pessoa_id', pessoaId)
+            .eq('evento_id', eventoId)
+            .order('entregue_em', { ascending: false })
+            .limit(200);
+        if (vErr && !tabelaAusente(vErr)) throw vErr;
+        if (!vErr && (vinculosPessoa || []).length > 0) {
+            const abertoComNumero = vinculosPessoa.some(v => !v.encerrado_em && String(v.numero_pulseira).trim() === numero);
+            if (!abertoComNumero) return { emUso: null, pendencia: null };
+        }
+
         const [saidas, marcadas] = await Promise.all([
             supabase.from('logs_acesso')
                 .select('observacao')
@@ -460,7 +525,9 @@ class PulseiraService {
         const saiuDeVerdade = (saidas.data || []).some(l => !SAIDAS_AUTOMATICAS.includes(l.observacao));
         if (saiuDeVerdade || (marcadas.data || []).length > 0) return { emUso: null, pendencia: null };
 
-        if (entradaIso >= getLimitesDiaLocalUTC(getHojeLocal()).start) return { emUso: numero, pendencia: null };
+        // "Hoje" é o dia de operação do evento (vira no horario_reset), o mesmo do fechamento de turno
+        const inicioHoje = await inicioDiaOperacao(eventoId);
+        if (entradaIso >= inicioHoje) return { emUso: numero, pendencia: null };
 
         const { data: motivos } = await supabase.from('pulseiras_pendencia')
             .select('motivo_nao_devolucao')
