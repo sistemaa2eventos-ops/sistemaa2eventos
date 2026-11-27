@@ -745,6 +745,13 @@ docker system prune -af
 **Registre cada deploy aqui:**
 
 ```
+2026-11-26 - Deploy 4a63c8f (uma linha de Cache-Control nas páginas dos front-ends)
+├─ Mudanças: "expires -1" saiu do nginx do painel, do portal do produtor e do portal da empresa (gerava um
+│            segundo "Cache-Control: no-cache" ao lado do no-store); comportamento de cache igual (no-store)
+├─ Status: ✅ OK (GitHub Actions run 45926181556); painel, config.js, produtor, empresa e domínio raiz 200 com
+│          um único Cache-Control; /api/ready ok
+└─ Rollback: tag antes-deploy-20261127-cache-header (ba813ce)
+
 2026-11-26 - Deploy 8fd2d6a (imagens em Node 24)
 ├─ Mudanças: API, site público (Next.js 16) e build do painel e dos portais em node:24-alpine (Node 20 sem suporte
 │            desde 30/04/2026); produção passa a usar a mesma versão dos testes do CI
