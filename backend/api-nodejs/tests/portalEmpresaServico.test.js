@@ -1,6 +1,6 @@
 // Portal da empresa: login pela chave certa, isolamento por empresa nas solicitações e aprovação
 // que só executa depois de decidida por um operador.
-process.env.JWT_SECRET = 'segredo-de-teste-portal';
+process.env.PORTAL_EMPRESA_SEGREDO = 'segredo-de-teste-portal-com-mais-de-32-caracteres';
 
 const mockTabelas = {};
 const mockGravacoes = [];

@@ -16,9 +16,15 @@ const VALIDADE_TOKEN = '12h';
 // Sem letras/números que se confundem (O/0, I/1/L)
 const ALFABETO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
+/**
+ * Segredo próprio do portal. Não há fallback para JWT_SECRET nem para o segredo do Supabase: um vazamento
+ * do portal não expõe o painel, e o contrário também não.
+ */
 function segredoBase() {
-    const base = process.env.PORTAL_EMPRESA_SEGREDO || process.env.JWT_SECRET || process.env.SUPABASE_JWT_SECRET;
-    if (!base) throw new Error('Segredo do portal da empresa não configurado (PORTAL_EMPRESA_SEGREDO ou JWT_SECRET).');
+    const base = process.env.PORTAL_EMPRESA_SEGREDO;
+    if (!base || base.length < 32) {
+        throw new Error('PORTAL_EMPRESA_SEGREDO ausente ou curto no .env (mínimo 32 caracteres) — o portal da empresa fica indisponível.');
+    }
     return base;
 }
 

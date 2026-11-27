@@ -1,6 +1,7 @@
 // Portal da empresa: chave de acesso, cifra para o painel e token de escopo próprio.
-process.env.JWT_SECRET = 'segredo-de-teste-portal';
-process.env.SUPABASE_JWT_SECRET = 'segredo-do-painel';
+process.env.PORTAL_EMPRESA_SEGREDO = 'segredo-de-teste-portal-com-mais-de-32-caracteres';
+process.env.JWT_SECRET = 'segredo-do-painel-nao-usado-pelo-portal';
+process.env.SUPABASE_JWT_SECRET = 'segredo-do-supabase-nao-usado-pelo-portal';
 
 jest.mock('../src/config/supabase', () => ({ supabase: { from: jest.fn() } }));
 
@@ -50,5 +51,17 @@ describe('token do portal', () => {
         expect(auth.verificarToken(outro)).toBeNull();
         const t = auth.assinarToken(empresa);
         expect(auth.verificarToken(`${t.slice(0, -2)}xx`)).toBeNull();
+    });
+
+    test('sem PORTAL_EMPRESA_SEGREDO o portal não usa o JWT do painel nem do Supabase', () => {
+        const guardado = process.env.PORTAL_EMPRESA_SEGREDO;
+        try {
+            delete process.env.PORTAL_EMPRESA_SEGREDO;
+            expect(() => auth.assinarToken(empresa)).toThrow(/PORTAL_EMPRESA_SEGREDO/);
+            process.env.PORTAL_EMPRESA_SEGREDO = 'curto';
+            expect(() => auth.assinarToken(empresa)).toThrow(/PORTAL_EMPRESA_SEGREDO/);
+        } finally {
+            process.env.PORTAL_EMPRESA_SEGREDO = guardado;
+        }
     });
 });

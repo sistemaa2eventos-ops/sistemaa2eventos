@@ -68,6 +68,14 @@ jobs:
                 swapon /swapfile || true
             fi
             
+            # Segredo próprio do portal da empresa: grava no .env da VPS só se ainda não existir
+            # (não sobrescreve um valor já configurado no servidor)
+            if ! grep -q "^PORTAL_EMPRESA_SEGREDO=" .env; then
+                [ -n "$(tail -c1 .env)" ] && echo "" >> .env
+                echo "PORTAL_EMPRESA_SEGREDO=${{ secrets.PORTAL_EMPRESA_SEGREDO }}" >> .env
+                echo "PORTAL_EMPRESA_SEGREDO gravado no .env"
+            fi
+
             # Garante que o script tem permissão de execução
             chmod +x deploy.sh
             
