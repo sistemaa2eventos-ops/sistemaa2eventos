@@ -51,10 +51,50 @@ export const situacaoMovimento = (p) => {
     return { rotulo: 'Não entrou hoje', cor: cores.textoSecundario };
 };
 
+/** Situações de documento que dependem da empresa (enviar, reenviar, trocar). */
+const DOC_PEDE_ACAO = ['falta_anexar', 'reprovado', 'reenvio_solicitado', 'vencido'];
+const ROTULO_PENDENCIA_GERAL = {
+    pendente: 'Documentos não enviados',
+    reprovado: 'Documento recusado',
+    reenvio_solicitado: 'Enviar documento de novo',
+    vencido: 'Documento vencido'
+};
+
+/**
+ * Prontidão do participante para entrar no evento:
+ * liberado (tudo certo), analise (depende da organização) ou acao (depende da empresa).
+ */
+export const prontidao = (p) => {
+    if (p.expulso || p.bloqueado || p.cadastro_concluido === false) return 'acao';
+    if (!p.pendente) return 'liberado';
+    if ((p.obrigatorios || []).some(o => DOC_PEDE_ACAO.includes(o.situacao))) return 'acao';
+    return p.situacao_documental === 'em_analise' ? 'analise' : 'acao';
+};
+
+/** O que a empresa precisa resolver para o participante ser liberado (frases curtas). */
+export const motivosAcao = (p) => {
+    if (p.expulso) return ['Expulso do evento. Fale com a organização.'];
+    if (p.bloqueado) return ['Bloqueado pela organização. Fale com a organização.'];
+    const motivos = p.cadastro_concluido === false ? ['Ainda não concluiu o cadastro pelo link'] : [];
+    const docs = (p.obrigatorios || []).filter(o => DOC_PEDE_ACAO.includes(o.situacao))
+        .map(o => `${o.nome}: ${(SITUACAO_OBRIGATORIO[o.situacao] || SITUACAO_OBRIGATORIO.falta_anexar).rotulo.toLowerCase()}`);
+    if (docs.length) return [...motivos, ...docs];
+    if (!p.pendente) return motivos;
+    return [...motivos, ROTULO_PENDENCIA_GERAL[p.situacao_documental] || 'Documentação pendente'];
+};
+
+export const PRONTIDAO = {
+    liberado: { rotulo: 'Liberados', descricao: 'cadastro e documentos aprovados', cor: cores.sucesso },
+    analise: { rotulo: 'Em análise', descricao: 'aguardando a organização conferir', cor: cores.alerta },
+    acao: { rotulo: 'Precisam de ação', descricao: 'dependem da sua empresa', cor: cores.erro }
+};
+
 /** Indicadores da equipe: cada um também é um filtro da lista. */
 export const METRICAS = [
     { key: 'todos', rotulo: 'Cadastrados', cor: cores.textoForte, filtro: () => true },
-    { key: 'pendentes', rotulo: 'Documento pendente', cor: cores.alerta, filtro: (p) => p.pendente },
+    { key: 'liberados', rotulo: 'Liberados', cor: cores.sucesso, filtro: (p) => prontidao(p) === 'liberado' },
+    { key: 'analise', rotulo: 'Em análise', cor: cores.alerta, filtro: (p) => prontidao(p) === 'analise' },
+    { key: 'acao', rotulo: 'Precisam de ação', cor: cores.erro, filtro: (p) => prontidao(p) === 'acao' },
     { key: 'checkin', rotulo: 'Check-in hoje', cor: cores.primaria, filtro: (p) => p.checkins_hoje > 0 },
     { key: 'dentro', rotulo: 'Dentro agora (sem check-out)', cor: cores.sucesso, filtro: (p) => p.dentro },
     { key: 'checkout', rotulo: 'Check-out hoje', cor: cores.saida, filtro: (p) => p.checkouts_hoje > 0 },

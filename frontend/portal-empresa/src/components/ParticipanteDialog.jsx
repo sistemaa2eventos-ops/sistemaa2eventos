@@ -13,6 +13,12 @@ import PedidoDialog from './PedidoDialog';
 import { ROTULO_CAMPO, chipSx, dataBr, dataHora, formatarCpf } from '../util';
 import { botaoSecundario, cores, funcao } from '../styles/tokens';
 
+const iniciais = (nome) => {
+    const partes = String(nome || '').trim().split(/\s+/).filter(Boolean);
+    if (!partes.length) return '?';
+    return (partes[0][0] + (partes.length > 1 ? partes[partes.length - 1][0] : '')).toUpperCase();
+};
+
 const CAMPOS = ['nome_completo', 'cpf', 'funcao', 'email', 'telefone', 'data_nascimento', 'nome_mae', 'nome_credencial', 'passaporte'];
 const TIPO_MOVIMENTO = { checkin: { rotulo: 'Entrada', cor: cores.primaria }, checkout: { rotulo: 'Saída', cor: cores.saida }, expulsao: { rotulo: 'Expulsão', cor: cores.erro } };
 
@@ -75,8 +81,26 @@ const ParticipanteDialog = ({ pessoaId, onClose, onAlterado }) => {
                         )}
 
                         <Box>
-                            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
-                                <Typography variant="subtitle1" sx={{ color: cores.textoForte, fontWeight: 700 }}>Dados</Typography>
+                            <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+                                <Box sx={{
+                                    width: 64, height: 64, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+                                    border: `2px solid ${cores.bordaDestaque}`, bgcolor: cores.superficieElevada,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                }}>
+                                    {p.foto_url ? (
+                                        <Box component="img" src={p.foto_url} alt={p.nome_completo} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    ) : (
+                                        <Typography sx={{ fontWeight: 700, fontSize: '1.25rem', color: cores.textoSecundario }}>
+                                            {iniciais(p.nome_completo)}
+                                        </Typography>
+                                    )}
+                                </Box>
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <Typography variant="subtitle1" sx={{ color: cores.textoForte, fontWeight: 700 }}>{p.nome_completo}</Typography>
+                                    <Typography variant="caption" sx={{ color: cores.textoSecundario, display: 'block' }}>
+                                        {p.funcao || 'Sem função'} · {p.foto_url ? 'Foto biométrica cadastrada' : 'Sem foto biométrica'}
+                                    </Typography>
+                                </Box>
                                 {!editando && <Button onClick={comecarEdicao} sx={{ textTransform: 'none' }}>Pedir alteração</Button>}
                             </Stack>
                             <Grid container spacing={1.5}>

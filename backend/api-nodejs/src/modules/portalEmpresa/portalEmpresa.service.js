@@ -2,7 +2,7 @@
 
 const { supabase } = require('../../config/supabase');
 const logger = require('../../services/logger');
-const { assinarLinhas } = require('../../services/storageSeguro');
+const { assinarLinhas, assinarFotos } = require('../../services/storageSeguro');
 const requisitos = require('../entities/documentoRequisitos.service');
 const documentoService = require('../entities/documento.service');
 const empresaResumo = require('../entities/empresaResumo.service');
@@ -132,7 +132,7 @@ class PortalEmpresaService {
 
     /** Ficha do participante: dados, documentos (com link temporário) e movimentos recentes. */
     async participante(empresa, pessoaId) {
-        const colunas = [...Object.keys(CAMPOS), 'id', 'numero_pulseira', 'status_acesso', 'bloqueado', 'aceite_lgpd', 'origem_cadastro', 'created_at'];
+        const colunas = [...Object.keys(CAMPOS), 'id', 'numero_pulseira', 'status_acesso', 'bloqueado', 'aceite_lgpd', 'origem_cadastro', 'foto_url', 'created_at'];
         const pessoa = await this._pessoaDaEmpresa(empresa, pessoaId, [...new Set(colunas)].join(', '));
         const [situacao, movimentos] = await Promise.all([
             documentoService.situacaoEntidade(empresa.evento_id, 'pessoa', pessoaId),
@@ -142,6 +142,10 @@ class PortalEmpresaService {
                 .order('created_at', { ascending: false }).limit(30)
         ]);
         await assinarLinhas(situacao.documentos);
+        if (pessoa.foto_url) {
+            const assinados = await assinarFotos([{ id: pessoa.id, foto_url: pessoa.foto_url }]);
+            if (assinados.has(pessoa.id)) pessoa.foto_url = assinados.get(pessoa.id);
+        }
         const { aceite_lgpd: aceite, origem_cadastro: origem, ...dados } = pessoa;
         return {
             pessoa: { ...dados, cadastro_concluido: aceite === true || origem !== 'externo' },

@@ -117,7 +117,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
     const [showLGPDModal, setShowLGPDModal] = useState(false);
     const { t } = useTranslation('common');
 
-    const LGPD_TEXT = `O Tratamento de Dados Pessoais Sensíveis (Biometria Facial) é realizado com a finalidade exclusiva de segurança, prevenção à fraude e controle de acesso em tempo real. Os dados são armazenados em ambiente criptografado e não são compartilhados com terceiros para fins comerciais. Ao prosseguir, você autoriza o processamento desses dados conforme a Lei 13.709/2018.`;
+    const LGPD_TEXT = `O tratamento de dados pessoais e biometria facial é realizado com a finalidade exclusiva de segurança, identificação em pontos de acesso, prevenção a fraudes e gestão da equipe no evento. Os dados cadastrais e a foto poderão ser visualizados pela empresa contratante responsável pelo seu credenciamento e pela organização do evento, sendo armazenados em ambiente seguro e sem compartilhamento com terceiros para fins comerciais, nos termos da Lei 13.709/2018 (LGPD).`;
 
     // Helper: campo é obrigatório? nome e cpf = SEMPRE obrigatórios
     const isRequired = (field: keyof RequiredFieldsConfig): boolean => {
@@ -998,7 +998,7 @@ export default function RegistrationForm({ token, company, branding, requiredFie
                         </div>
                         <div className="p-8 max-h-[60vh] overflow-y-auto text-texto-secundario space-y-4 text-justify leading-relaxed">
                             <p>{LGPD_TEXT}</p>
-                            <p>Ao realizar o credenciamento, você concorda que sua imagem será coletada para fins de identificação segura em nossos pontos de acesso.</p>
+                            <p>Ao realizar o credenciamento, você concorda que sua imagem será coletada para fins de identificação segura em nossos pontos de acesso e acompanhamento da sua empresa no evento.</p>
                             {branding?.politica_url && (
                                 <div className="pt-4 mt-4 border-t border-borda">
                                     <p className="text-sm mb-2">Para termos específicos do evento, consulte o canal oficial:</p>

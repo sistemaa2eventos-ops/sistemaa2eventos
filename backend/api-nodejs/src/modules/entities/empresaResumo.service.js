@@ -1,6 +1,7 @@
 const { supabase } = require('../../config/supabase');
 const { buscarTodos } = require('../../utils/buscarTodos');
 const { getLimitesDiaLocalUTC } = require('../../utils/dateUtils');
+const { assinarLinhas, BUCKETS_FOTO } = require('../../services/storageSeguro');
 const requisitos = require('./documentoRequisitos.service');
 const documentoService = require('./documento.service');
 
@@ -14,7 +15,7 @@ class EmpresaResumoService {
     async resumoParticipantes(eventoId, empresaId) {
         const pessoasRes = await buscarTodos(
             supabase.from('pessoas')
-                .select('id, nome_completo, funcao, numero_pulseira, status_acesso, bloqueado, origem_cadastro, created_at')
+                .select('id, nome_completo, funcao, numero_pulseira, status_acesso, bloqueado, origem_cadastro, aceite_lgpd, foto_url, created_at')
                 .eq('evento_id', eventoId)
                 .eq('empresa_id', empresaId)
                 .order('nome_completo')
@@ -77,11 +78,16 @@ class EmpresaResumoService {
                 dentro,
                 expulso,
                 bloqueado: !!p.bloqueado,
+                tem_foto: !!p.foto_url,
+                foto_url: p.foto_url || null,
+                cadastro_concluido: p.aceite_lgpd === true || p.origem_cadastro !== 'externo',
                 situacao_documental: avaliacao.status_documentos,
                 pendente: avaliacao.status_documentos !== 'aprovado',
                 obrigatorios: documentoService._obrigatoriosComSituacao(avaliacao)
             };
         });
+
+        await assinarLinhas(linhas, { campo: 'foto_url', buckets: BUCKETS_FOTO });
 
         const resumo = {
             cadastrados: linhas.length,
